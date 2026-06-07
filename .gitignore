@@ -3,6 +3,8 @@
 
 # Runtime artifacts
 *.db
+*.db-wal
+*.db-shm
 rsi_scan_latest.csv
 scan.log
 bot.log

@@ -1185,6 +1185,20 @@ def test_live_edge_adjust_render_no_nan():
         outcomes.track_records = orig
 
 
+def test_storage_wal_and_busy_timeout():
+    # The scan and the always-on listener share one DB file; WAL + busy_timeout
+    # let them read/write concurrently without "database is locked".
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner.storage import Storage
+    st = Storage(Path(tempfile.mkdtemp()) / "wal.db")
+    try:
+        assert str(st.conn.execute("PRAGMA journal_mode").fetchone()[0]).lower() == "wal"
+        assert st.conn.execute("PRAGMA busy_timeout").fetchone()[0] >= 1000
+    finally:
+        st.close()
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

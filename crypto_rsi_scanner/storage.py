@@ -110,8 +110,14 @@ CREATE TABLE IF NOT EXISTS paper_trades (
 
 class Storage:
     def __init__(self, db_path: Path):
-        self.conn = sqlite3.connect(str(db_path))
+        # timeout: wait (don't immediately error) when another process holds the lock.
+        self.conn = sqlite3.connect(str(db_path), timeout=30.0)
         self.conn.row_factory = sqlite3.Row
+        # The daily scan (launchd) and the always-on bot listener share this one
+        # SQLite file. WAL lets a reader and a writer proceed concurrently without
+        # "database is locked"; busy_timeout backs the rarer writer/writer overlap.
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=30000")
         self.conn.executescript(_SCHEMA)
         self._migrate()
         self.conn.commit()

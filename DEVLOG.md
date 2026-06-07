@@ -17,6 +17,21 @@ the working agreement.
 
 ---
 
+## 2026-06-08 — SQLite WAL + busy_timeout for scan/listener concurrency · Claude
+**Why:** The daily scan (launchd) and the always-on bot listener share one SQLite
+file. Default rollback-journal mode makes readers and writers block each other, so
+a scan write during a listener read (or vice versa) risks "database is locked".
+**Changes:**
+- `storage.py` `Storage.__init__`: open with `timeout=30`, `PRAGMA journal_mode=WAL`
+  + `PRAGMA busy_timeout=30000`. WAL lets one reader + one writer proceed
+  concurrently; busy_timeout backs the rarer writer/writer overlap.
+- `.gitignore`: ignore the new `*.db-wal` / `*.db-shm` sidecars.
+- `tests/test_indicators.py`: assert Storage opens in WAL with a busy_timeout.
+**Verify:** `make verify` green (97/97 + smoke). Live DB confirmed `journal_mode=wal`;
+listener restarted on new code (PID 54739); WAL sidecars present and gitignored.
+**Notes:** WAL is persistent in the DB header; needs local disk (it's on the Mac's
+local FS). No schema change.
+
 ## 2026-06-08 — Initialize local git + commit-per-prompt convention · Claude
 **Why:** Two agents now edit the same files; git gives real diffs/blame/rollback
 that a hand-maintained log can't. Human approved adopting it.
