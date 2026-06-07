@@ -1,0 +1,1016 @@
+"""Offline backtester: replay the live signal logic over real daily OHLC history
+and measure each setup's edge AGAINST a regime base-rate benchmark.
+
+Why the benchmark matters: a setup like breakdown_risk (oversold in a downtrend)
+"confirms" often simply because downtrends persist. Comparing each setup's
+confirm-rate and forward return to the base rate of the *same regime* (what a
+random day in that regime did) isolates the RSI signal's actual contribution —
+so a gaudy hit-rate that's really just "trends trend" shows up as ~0 edge.
+
+Faithfulness: it reuses the package's own pure functions (wilder_rsi, decide_flag,
+trend_regime, setup_for, conviction_score, favorable) over a trailing window the
+same length as a live scan, and grades only fresh crossings (is_new), exactly as
+the live scanner does.
+
+Data: Binance 1d klines — free, no key, real OHLC closes (the live scanner runs
+RSI on CoinGecko snapshot-prices, so this is also a cleaner price source).
+Universe: current top-N by market cap from CoinGecko, falling back to a built-in
+list of majors if CoinGecko is unreachable.
+
+Caveats it does NOT correct for: (1) survivorship — today's top-N over past
+history skips coins that dropped out; (2) single venue (Binance USDT pairs);
+(3) no fees/slippage. This measures signal *edge*, not a tradable P&L.
+
+Usage:
+  python -m crypto_rsi_scanner.backtest --top-n 80 --days 730
+  python -m crypto_rsi_scanner.backtest --symbols BTC,ETH,SOL --days 365
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import logging
+import math
+import statistics
+import time
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import requests
+
+from . import config
+from .client import CoinGeckoClient
+from .indicators import (
+    adaptive_thresholds,
+    annualized_vol,
+    conviction_score,
+    detect_divergence,
+    rsi_z_score,
+    volume_ratio,
+    wilder_rsi,
+)
+from .outcomes import favorable
+from .signal_registry import (
+    SETUPS,
+    canonical_market_regime,
+    market_alignment,
+    setup_for,
+    setup_has_edge,
+)
+from .universe import candidate_count, filter_markets, format_exclusions
+
+log = logging.getLogger(__name__)
+
+HORIZONS = config.OUTCOME_HORIZONS
+PRIMARY = config.OUTCOME_PRIMARY_HORIZON
+LB = config.LOOKBACK_DAYS_DAILY  # trailing window per "scan", mirrors live
+_START = max(LB, config.REGIME_LONG_MA)
+
+# Point-in-time conditioning features (no lookahead): trailing realized vol and
+# trailing return (downside momentum). Used to test *when* a setup's expected
+# direction actually holds — e.g. does oversold-in-downtrend only keep falling
+# in high-volatility crashes?
+VOL_WINDOW = 20
+MOM_WINDOW = 14
+_FEATURE_IDX = {"vol": 0, "mom": 1}
+_FEATURE_LABEL = {"vol": "trailing 20d annualized vol", "mom": "trailing 14d return"}
+# Setups with a single defining regime, sliceable by --slice.
+_SETUP_REGIME = {
+    "breakdown_risk": ("DOWNTREND", "down"),
+    "dip_buy": ("UPTREND", "up"),
+    "trend_continuation": ("UPTREND", "up"),
+}
+# data-api.binance.vision is Binance's public market-data mirror: same kline
+# format, no key, and (unlike api.binance.com, which 451s from restricted
+# locations) no geo-block. api.binance.com is kept as a fallback.
+_BINANCE_HOSTS = (
+    "https://data-api.binance.vision/api/v3/klines",
+    "https://api.binance.com/api/v3/klines",
+)
+
+_DEFAULT_UNIVERSE = [
+    "BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "DOGE", "TRX", "LINK", "AVAX",
+    "DOT", "MATIC", "LTC", "BCH", "UNI", "ATOM", "XLM", "ETC", "FIL", "APT",
+    "NEAR", "ICP", "ARB", "OP", "INJ", "SUI", "SEI", "AAVE", "GRT", "ALGO",
+    "RUNE", "FTM", "SAND", "MANA", "AXS", "EOS", "THETA", "EGLD", "FLOW", "CRV",
+]
+
+
+# --------------------------------------------------------------------------- #
+# Data
+# --------------------------------------------------------------------------- #
+
+def _klines_paged(host: str, symbol: str, days: int, session: requests.Session):
+    """Page Binance klines back `days` (>1000 candles needs multiple calls).
+    Returns {open_ms: row} or None if the host rejects the very first call."""
+    end_ms = int(time.time() * 1000)
+    cursor = end_ms - days * 86_400_000
+    rows: dict = {}
+    while True:
+        r = session.get(host, params={"symbol": symbol, "interval": "1d",
+                                      "limit": 1000, "startTime": cursor}, timeout=20)
+        if r.status_code != 200:  # 451 geo-block / 400 bad symbol
+            return rows or None
+        batch = r.json()
+        if not batch:
+            break
+        for row in batch:
+            rows[row[0]] = row
+        last_open = batch[-1][0]
+        if len(batch) < 1000 or last_open + 86_400_000 >= end_ms:
+            break
+        cursor = last_open + 86_400_000
+    return rows or None
+
+
+def fetch_klines(symbol: str, days: int, session: requests.Session) -> pd.DataFrame | None:
+    """Binance 1d klines -> DataFrame[close, volume] (UTC), paginated back `days`."""
+    rows = None
+    for host in _BINANCE_HOSTS:
+        try:
+            rows = _klines_paged(host, symbol, days, session)
+            if rows:
+                break
+        except Exception as e:  # noqa: BLE001
+            log.debug("klines %s via %s failed: %s", symbol, host, e)
+    if not rows:
+        return None
+    ordered = [rows[k] for k in sorted(rows)]
+    idx = pd.to_datetime([r[0] for r in ordered], unit="ms", utc=True)
+    close = pd.Series([float(r[4]) for r in ordered], index=idx, dtype=float)
+    vol = pd.Series([float(r[5]) for r in ordered], index=idx, dtype=float)
+    return pd.DataFrame({"close": close, "volume": vol})
+
+
+def _cg_base_headers() -> tuple[str, dict]:
+    key = config.COINGECKO_API_KEY
+    if key and config.COINGECKO_KEY_TYPE == "pro":
+        return "https://pro-api.coingecko.com/api/v3", {"x-cg-pro-api-key": key}
+    if key:
+        return "https://api.coingecko.com/api/v3", {"x-cg-demo-api-key": key}
+    return "https://api.coingecko.com/api/v3", {}
+
+
+def cg_top_coins(n: int) -> list[dict]:
+    """Current clean top-N coins by market cap as [{'id','symbol'}].
+
+    Uses the same universe hygiene as the live scanner. Empty list on failure.
+    """
+    base, headers = _cg_base_headers()
+    try:
+        fetch_n = candidate_count(n)
+        r = requests.get(
+            f"{base}/coins/markets",
+            params={"vs_currency": "usd", "order": "market_cap_desc",
+                    "per_page": fetch_n, "page": 1,
+                    "price_change_percentage": "24h"},
+            headers=headers, timeout=30,
+        )
+        r.raise_for_status()
+        clean, excluded = filter_markets(r.json(), limit=n)
+        if excluded:
+            log.info("CoinGecko universe hygiene excluded: %s", format_exclusions(excluded))
+        return [
+            {"id": m["id"], "symbol": str(m["symbol"]).upper()}
+            for m in clean
+            if m.get("id") and m.get("symbol")
+        ][:n]
+    except Exception as e:  # noqa: BLE001
+        log.warning("CoinGecko universe fetch failed (%s)", e)
+        return []
+
+
+def cg_top_symbols(n: int) -> list[str]:
+    """Top-N symbols for the (survivorship-biased) Binance path; falls back to a
+    built-in list if CoinGecko is unreachable."""
+    syms = [c["symbol"] for c in cg_top_coins(n)]
+    return syms or list(_DEFAULT_UNIVERSE)
+
+
+# --------------------------------------------------------------------------- #
+# Replay
+# --------------------------------------------------------------------------- #
+
+def _severity(flag: str, rsi: float) -> str:
+    for threshold, level in config.SEVERITY_TIERS.get(flag, []):
+        if flag == "OB" and rsi >= threshold:
+            return level
+        if flag == "OS" and rsi <= threshold:
+            return level
+    return "WATCH"
+
+
+def _weekly_asof(weekly_rsi: pd.Series, ts: pd.Timestamp) -> float | None:
+    prior = weekly_rsi.loc[weekly_rsi.index <= ts]
+    return float(prior.iloc[-1]) if len(prior) else None
+
+
+def market_regime_series(close: pd.Series) -> pd.Series:
+    """BULL / BEAR / CHOP per date from a leader series (BTC), via the same MA
+    structure as trend_regime. This is the market backdrop each signal is tagged
+    with — distinct from a coin's own trend. 'NA' during the 200d warm-up."""
+    sma_s = close.rolling(config.REGIME_SHORT_MA).mean()
+    sma_l = close.rolling(config.REGIME_LONG_MA).mean()
+    slope = sma_l - sma_l.shift(config.REGIME_SLOPE_LOOKBACK)
+    above, aligned = close > sma_l, sma_s > sma_l
+    out = pd.Series("CHOP", index=close.index, dtype=object)
+    out[above & aligned & (slope >= 0)] = "BULL"
+    out[(~above) & (~aligned) & (slope <= 0)] = "BEAR"
+    out[sma_l.isna() | sma_s.isna()] = "NA"
+    return out
+
+
+def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
+              cond_base: dict | None = None, member=None,
+              mkt_arr=None, mkt_base: dict | None = None,
+              trigger: str = "cross_into") -> None:
+    """Walk one coin day by day. Appends graded crossing signals to `signals`
+    and, for *every* day, the forward returns into `regime_base[(regime, h)]`
+    (the benchmark each setup is measured against). If `cond_base` is given, also
+    records (vol, mom, ret) per day for the conditional (sliced) analysis.
+
+    `member`, if given, is a per-day bool array (point-in-time top-N membership):
+    days where the coin was NOT in the universe contribute neither signals nor
+    base-rate days, which is what removes survivorship bias. RSI/regime are still
+    computed every day so crossing detection stays correct across gaps."""
+    if cond_base is None:
+        cond_base = defaultdict(list)
+    if mkt_base is None:
+        mkt_base = defaultdict(list)
+    closes = df["close"]
+    volumes = df["volume"]
+    n = len(closes)
+    if n < _START + max(HORIZONS) + 1:
+        return
+
+    rsi_full = wilder_rsi(closes, config.RSI_PERIOD)
+    weekly = closes.resample("W").last().dropna()
+    weekly_rsi = wilder_rsi(weekly, config.RSI_PERIOD).dropna()
+
+    # Rolling MAs over the full series: value at t uses exactly the trailing
+    # window, so this matches trend_regime() bar-for-bar but far cheaper.
+    sma_s = closes.rolling(config.REGIME_SHORT_MA).mean()
+    sma_l = closes.rolling(config.REGIME_LONG_MA).mean()
+
+    def regime_at(t: int) -> str:
+        sl, ss = sma_l.iloc[t], sma_s.iloc[t]
+        if np.isnan(sl) or np.isnan(ss):
+            return "UNKNOWN"
+        price = closes.iloc[t]
+        slope = 0.0
+        j = t - config.REGIME_SLOPE_LOOKBACK
+        if j >= 0 and not np.isnan(sma_l.iloc[j]):
+            slope = sl - sma_l.iloc[j]
+        above, aligned = price > sl, ss > sl
+        if above and aligned and slope >= 0:
+            return "UPTREND"
+        if (not above) and (not aligned) and slope <= 0:
+            return "DOWNTREND"
+        return "RANGE"
+
+    prev_in_ob = prev_in_os = False
+    closes_v = closes.to_numpy()
+    rsi_v = rsi_full.to_numpy()
+
+    for t in range(_START, n):
+        cur_rsi = rsi_v[t]
+        if np.isnan(cur_rsi):
+            prev_in_ob = prev_in_os = False
+            continue
+        regime = regime_at(t)
+        entry = closes_v[t]
+
+        in_universe = member is None or bool(member[t])
+        mkt = str(mkt_arr[t]) if mkt_arr is not None else ""
+
+        # point-in-time conditioning features (no lookahead)
+        vol_t = annualized_vol(closes.iloc[max(0, t - VOL_WINDOW):t + 1])
+        mom_t = ((closes_v[t] / closes_v[t - MOM_WINDOW] - 1.0) * 100.0
+                 if t >= MOM_WINDOW else float("nan"))
+
+        # benchmark: forward returns for every in-universe day in this regime
+        if in_universe:
+            for h in HORIZONS:
+                if t + h < n and entry > 0:
+                    ret_h = (closes_v[t + h] / entry - 1.0) * 100.0
+                    regime_base[(regime, h)].append(ret_h)
+                    cond_base[(regime, h)].append((vol_t, mom_t, ret_h))
+                    mkt_base[(regime, mkt, h)].append(ret_h)
+
+        lo = t - LB + 1
+        win_rsi = rsi_full.iloc[lo:t + 1].dropna()
+        if len(win_rsi) < 30:
+            prev_in_ob = prev_in_os = False
+            continue
+        adapt_ob, adapt_os = adaptive_thresholds(
+            win_rsi, config.ADAPTIVE_OB_PERCENTILE, config.ADAPTIVE_OS_PERCENTILE
+        )
+        eff_ob = min(config.RSI_OB, adapt_ob)
+        eff_os = max(config.RSI_OS, adapt_os)
+
+        # Entry trigger. cross_into: the day RSI first pierces the zone (current
+        # live behaviour — catches the knife). confirm: the day RSI turns back
+        # OUT of the zone (the bounce/rollover has started).
+        in_ob = float(cur_rsi) >= eff_ob
+        in_os = float(cur_rsi) <= eff_os
+        if trigger == "confirm":
+            fire_ob = prev_in_ob and not in_ob   # rolled back below overbought
+            fire_os = prev_in_os and not in_os    # bounced back above oversold
+        else:  # cross_into
+            fire_ob = in_ob and not prev_in_ob
+            fire_os = in_os and not prev_in_os
+        prev_in_ob, prev_in_os = in_ob, in_os
+
+        flag = "OB" if fire_ob else ("OS" if fire_os else "")
+        if not flag or not in_universe:
+            continue
+
+        setup, exp = setup_for(flag, regime)
+        aligned = market_alignment(setup, mkt)
+        win_close = closes.iloc[lo:t + 1]
+        sig = {
+            "flag": flag,
+            "severity": _severity(flag, float(cur_rsi)),
+            "setup_type": setup,
+            "expected_dir": exp,
+            "market_aligned": aligned,
+            "rsi_4h": None,
+            "rsi_weekly": _weekly_asof(weekly_rsi, closes.index[t]),
+            "rsi_z": rsi_z_score(win_rsi, config.RSI_Z_WINDOW),
+            "volume_ratio": volume_ratio(volumes.iloc[lo:t + 1], config.VOLUME_AVG_WINDOW),
+            "divergence": detect_divergence(
+                win_close, win_rsi, config.DIVERGENCE_LOOKBACK, config.DIVERGENCE_ORDER
+            ),
+        }
+        conv = conviction_score(sig)
+        for h in HORIZONS:
+            if t + h >= n or entry <= 0:
+                continue
+            ret = (closes_v[t + h] / entry - 1.0) * 100.0
+            signals.append({
+                "setup": setup, "exp": exp, "regime": regime, "h": h,
+                "ret": ret, "fav": favorable(exp, ret), "conv": conv,
+                "vol": vol_t, "mom": mom_t, "mkt": mkt,
+            })
+
+
+# --------------------------------------------------------------------------- #
+# Aggregation (pure — unit-tested without network)
+# --------------------------------------------------------------------------- #
+
+def _sign(exp: str) -> float:
+    return 1.0 if exp == "up" else -1.0
+
+
+def _base_rates(regime_base: dict) -> tuple[dict, dict]:
+    """(base_conf, base_mean): base_conf[(regime, h, dir)] = P(move that dir) on
+    any day in that regime; base_mean[(regime, h)] = mean forward return."""
+    base_conf, base_mean = {}, {}
+    for (regime, h), rets in regime_base.items():
+        arr = np.asarray(rets, dtype=float)
+        if not len(arr):
+            continue
+        base_mean[(regime, h)] = float(arr.mean())
+        base_conf[(regime, h, "up")] = float((arr > 0).mean())
+        base_conf[(regime, h, "down")] = float((arr < 0).mean())
+    return base_conf, base_mean
+
+
+def summarize(signals: list, regime_base: dict, horizons=HORIZONS) -> list[dict]:
+    """Per (setup, horizon): n, confirm%, regime base%, edge (confirm-base), raw
+    median/avg return, and median *directional excess* return over the regime."""
+    base_conf, base_mean = _base_rates(regime_base)
+    groups: dict = defaultdict(list)
+    for s in signals:
+        groups[(s["setup"], s["h"])].append(s)
+
+    rows = []
+    for (setup, h), sigs in sorted(groups.items()):
+        rets = [s["ret"] for s in sigs]
+        conf = 100.0 * statistics.fmean(s["fav"] for s in sigs)
+        base = 100.0 * statistics.fmean(
+            base_conf.get((s["regime"], h, s["exp"]), 0.0) for s in sigs
+        )
+        excess = [
+            _sign(s["exp"]) * (s["ret"] - base_mean.get((s["regime"], h), 0.0))
+            for s in sigs
+        ]
+        rows.append({
+            "setup": setup, "h": h, "n": len(sigs),
+            "conf": conf, "base": base, "edge": conf - base,
+            "med_ret": statistics.median(rets), "avg_ret": statistics.fmean(rets),
+            "med_excess": statistics.median(excess),
+        })
+    return rows
+
+
+def _bucket(c: float) -> str:
+    return "high (65+)" if c >= 65 else "med (40-64)" if c >= 40 else "low (<40)"
+
+
+def summarize_by_conviction(signals: list, regime_base: dict, horizon: int) -> list[dict]:
+    base_conf, _ = _base_rates(regime_base)
+    groups: dict = defaultdict(list)
+    for s in signals:
+        if s["h"] == horizon:
+            groups[_bucket(s["conv"])].append(s)
+    order = ["low (<40)", "med (40-64)", "high (65+)"]
+    rows = []
+    for bucket in order:
+        sigs = groups.get(bucket)
+        if not sigs:
+            continue
+        conf = 100.0 * statistics.fmean(s["fav"] for s in sigs)
+        base = 100.0 * statistics.fmean(
+            base_conf.get((s["regime"], horizon, s["exp"]), 0.0) for s in sigs
+        )
+        rows.append({"bucket": bucket, "n": len(sigs), "conf": conf,
+                     "base": base, "edge": conf - base})
+    return rows
+
+
+def summarize_market(signals: list, mkt_base: dict, horizon: int) -> list[dict]:
+    """Per (setup, market regime): confirm% vs a base rate conditioned on the
+    SAME (coin-regime, market-regime). This separates bull/bear so a setup that
+    only works in one regime can't hide inside a blended average."""
+    bconf: dict = {}
+    for (regime, mkt, h), rets in mkt_base.items():
+        arr = np.asarray(rets, dtype=float)
+        if not len(arr):
+            continue
+        bconf[(regime, mkt, h, "up")] = float((arr > 0).mean())
+        bconf[(regime, mkt, h, "down")] = float((arr < 0).mean())
+
+    groups: dict = defaultdict(list)
+    for s in signals:
+        if s["h"] == horizon and s.get("mkt") not in (None, "", "NA"):
+            groups[(s["setup"], s["mkt"])].append(s)
+
+    rows = []
+    for (setup, mkt), sigs in sorted(groups.items()):
+        conf = 100.0 * statistics.fmean(s["fav"] for s in sigs)
+        base = 100.0 * statistics.fmean(
+            bconf.get((s["regime"], mkt, horizon, s["exp"]), 0.0) for s in sigs
+        )
+        rows.append({"setup": setup, "mkt": mkt, "n": len(sigs), "conf": conf,
+                     "base": base, "edge": conf - base,
+                     "med": statistics.median(s["ret"] for s in sigs)})
+    return rows
+
+
+# --------------------------------------------------------------------------- #
+# Backtest-to-registry calibration
+# --------------------------------------------------------------------------- #
+
+CALIBRATION_SCHEMA = 1
+CALIBRATION_MAX_SWING = 18
+CALIBRATION_MIN_PRIOR = 5
+CALIBRATION_MAX_PRIOR = 90
+
+
+def _clamp_prior(v: int) -> int:
+    return max(CALIBRATION_MIN_PRIOR, min(CALIBRATION_MAX_PRIOR, v))
+
+
+def _calibrated_prior(default: int, edge_pct: float, n: int, min_samples: int) -> int:
+    """Move a registry prior toward measured edge, but only cautiously.
+
+    `edge_pct` is confirm-rate minus same-regime base rate in percentage points.
+    The conversion is deliberately damped and sample-size scaled so small or
+    noisy backtests do not rewrite live conviction too aggressively.
+    """
+    if n < min_samples:
+        return default
+    confidence = min(1.0, n / max(1, 4 * min_samples))
+    raw_delta = max(-CALIBRATION_MAX_SWING, min(CALIBRATION_MAX_SWING, edge_pct * 0.45))
+    return _clamp_prior(int(round(default + raw_delta * confidence)))
+
+
+def build_registry_prior_export(
+    signals: list,
+    mkt_base: dict,
+    *,
+    n_coins: int,
+    days: int,
+    source: str,
+    pit: bool = False,
+    trigger: str = "cross_into",
+    horizon: int = PRIMARY,
+    min_samples: int = 8,
+) -> dict:
+    """Build a registry calibration artifact from a completed backtest run.
+
+    The artifact is machine-readable by `signal_registry.load_prior_overrides`,
+    but still includes evidence cells so a human can review what moved.
+    """
+    rows = summarize_market(signals, mkt_base, horizon)
+    grouped: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    evidence_by_setup: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        setup_type = r["setup"]
+        alignment = market_alignment(setup_type, r["mkt"])
+        cell = {
+            "market_regime": r["mkt"],
+            "canonical_market_regime": canonical_market_regime(r["mkt"]),
+            "alignment": alignment,
+            "n": int(r["n"]),
+            "confirm_pct": round(float(r["conf"]), 2),
+            "base_pct": round(float(r["base"]), 2),
+            "edge_pct": round(float(r["edge"]), 2),
+            "median_return_pct": round(float(r["med"]), 4),
+            "used": bool(r["n"] >= min_samples),
+        }
+        grouped[(setup_type, alignment)].append(cell)
+        evidence_by_setup[setup_type].append(cell)
+
+    payload = {
+        "schema": CALIBRATION_SCHEMA,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "primary_horizon_days": horizon,
+        "min_samples": min_samples,
+        "run": {
+            "source": source,
+            "days": days,
+            "n_coins": n_coins,
+            "pit": pit,
+            "trigger": trigger,
+            "graded_observations": len(signals),
+        },
+        "setups": {},
+    }
+
+    for setup_type, setup in SETUPS.items():
+        calibrated = dict(setup.edge_priors)
+        notes: list[str] = []
+        if setup.has_edge:
+            for alignment in ("favorable", "neutral", "adverse"):
+                cells = grouped.get((setup_type, alignment), [])
+                used = [c for c in cells if c["used"]]
+                if not used:
+                    continue
+                n = sum(c["n"] for c in used)
+                edge = sum(c["edge_pct"] * c["n"] for c in used) / n
+                calibrated[alignment] = _calibrated_prior(
+                    setup.edge_priors[alignment], edge, n, min_samples
+                )
+        else:
+            notes.append("context_only_no_edge_not_auto_promoted")
+
+        payload["setups"][setup_type] = {
+            "label": setup.label,
+            "has_edge": setup.has_edge,
+            "default_edge_priors": dict(setup.edge_priors),
+            "edge_priors": calibrated,
+            "evidence": sorted(
+                evidence_by_setup.get(setup_type, []),
+                key=lambda c: (c["alignment"], c["market_regime"]),
+            ),
+        }
+        if notes:
+            payload["setups"][setup_type]["notes"] = notes
+    return payload
+
+
+def write_registry_prior_export(path: str | Path, payload: dict) -> Path:
+    out = Path(path).expanduser()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return out
+
+
+def format_market(signals: list, mkt_base: dict, horizon: int) -> str:
+    cov: dict = defaultdict(int)
+    for (regime, mkt, h), rets in mkt_base.items():
+        if h == horizon and mkt not in ("", "NA"):
+            cov[mkt] += len(rets)
+    coverage = "  ".join(f"{m}:{cov[m]}" for m in ("BULL", "CHOP", "BEAR") if cov.get(m))
+
+    out = [f"\nMarket-regime coverage ({horizon}d base-days): {coverage or 'none'}"]
+    out.append(f"By setup × MARKET regime at {horizon}d (BTC bull/bear/chop):")
+    out.append(f"  {'setup':<19}{'mkt':<6}{'n':>5}{'conf%':>7}{'base%':>7}{'edge':>7}{'medRet':>9}")
+    for r in summarize_market(signals, mkt_base, horizon):
+        out.append(f"  {r['setup']:<19}{r['mkt']:<6}{r['n']:>5}{r['conf']:>6.0f}%"
+                   f"{r['base']:>6.0f}%{r['edge']:>+6.0f}{r['med']:>8.1f}%")
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# Trigger A/B (cross-into the zone vs confirm on the turn out)
+# --------------------------------------------------------------------------- #
+
+def _dir_ret(s: dict) -> float:
+    """Direction-adjusted return: positive = price moved the setup's way."""
+    return s["ret"] if s["exp"] == "up" else -s["ret"]
+
+
+def _actionable_summary(signals: list, horizon: int) -> dict | None:
+    """Tradeable book: edge-bearing setups in a non-adverse market regime — the
+    same filter the live gating uses. win% and direction-adjusted PnL."""
+    rows = [s for s in signals if s["h"] == horizon
+            and setup_has_edge(s["setup"])
+            and market_alignment(s["setup"], s["mkt"]) != "adverse"]
+    if not rows:
+        return None
+    pnl = [_dir_ret(s) for s in rows]
+    return {"n": len(rows), "win": 100.0 * statistics.fmean(s["fav"] for s in rows),
+            "avg": statistics.fmean(pnl), "med": statistics.median(pnl)}
+
+
+def format_trigger_comparison(results: dict, horizons=(3, PRIMARY)) -> str:
+    out = ["=" * 64,
+           "TRIGGER A/B — enter on the TURN (confirm) vs the pierce (cross-in)",
+           "edge = setup confirm% − same-regime base%; PnL = direction-adjusted",
+           "=" * 64]
+
+    out.append(f"\nActionable book @ {PRIMARY}d (edge-bearing, non-adverse regime):")
+    out.append(f"  {'trigger':<12}{'n':>6}{'win%':>7}{'avgPnL':>9}{'medPnL':>9}")
+    for trig, res in results.items():
+        st = _actionable_summary(res[0], PRIMARY)
+        out.append(f"  {trig:<12}{st['n']:>6}{st['win']:>6.0f}%{st['avg']:>+8.1f}%{st['med']:>+8.1f}%"
+                   if st else f"  {trig:<12}  (no signals)")
+
+    for h in horizons:
+        summ = {trig: {r["setup"]: r for r in summarize(res[0], res[1]) if r["h"] == h}
+                for trig, res in results.items()}
+        setups = sorted({s for d in summ.values() for s in d})
+        out.append(f"\nPer-setup edge @ {h}d  (n / edge per trigger):")
+        out.append("  " + f"{'setup':<19}" + "".join(f"{t:>16}" for t in results))
+        for s in setups:
+            line = f"  {s:<19}"
+            for trig in results:
+                r = summ[trig].get(s)
+                line += f"{(str(r['n'])+'/'+format(r['edge'],'+.0f')):>16}" if r else f"{'—':>16}"
+            out.append(line)
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# Conditional slice — "WHEN does a setup's expected direction hold?"
+# --------------------------------------------------------------------------- #
+
+def _isnan(x) -> bool:
+    return isinstance(x, float) and math.isnan(x)
+
+
+def conditional_table(
+    signals: list, cond_base: dict, setup: str, regime: str, expected_dir: str,
+    horizon: int, feature: str, min_n: int = 8,
+) -> tuple | None:
+    """Slice one setup by a point-in-time feature (vol/mom) into terciles, and
+    within each bucket compare the signal's confirm-rate to a base rate
+    conditioned on the SAME bucket. This avoids re-introducing the tautology:
+    if high-vol downtrend days all fall anyway, a high signal confirm% in that
+    bucket still shows ~0 edge. Returns ((q1, q2), rows) or None."""
+    fi = _FEATURE_IDX[feature]
+    sig = [s for s in signals
+           if s["setup"] == setup and s["h"] == horizon and not _isnan(s[feature])]
+    if len(sig) < 3 * min_n:
+        return None
+    base = [b for b in cond_base.get((regime, horizon), []) if not _isnan(b[fi])]
+
+    vals = sorted(s[feature] for s in sig)
+    q1, q2 = vals[len(vals) // 3], vals[2 * len(vals) // 3]
+    bounds = [(float("-inf"), q1), (q1, q2), (q2, float("inf"))]
+    confirms = (lambda r: r < 0) if expected_dir == "down" else (lambda r: r > 0)
+
+    rows = []
+    for lo, hi in bounds:
+        ss = [s for s in sig if lo <= s[feature] < hi]
+        bb = [b for b in base if lo <= b[fi] < hi]
+        if len(ss) < min_n:
+            rows.append(None)
+            continue
+        rows.append({
+            "n": len(ss),
+            "sig": 100.0 * statistics.fmean(confirms(s["ret"]) for s in ss),
+            "base": (100.0 * statistics.fmean(confirms(b[2]) for b in bb)
+                     if bb else float("nan")),
+            "med": statistics.median(s["ret"] for s in ss),
+        })
+    if all(r is None for r in rows):
+        return None
+    for r in rows:
+        if r is not None:
+            r["edge"] = float("nan") if _isnan(r["base"]) else r["sig"] - r["base"]
+    return (q1, q2), rows
+
+
+def _range_str(name: str, q1: float, q2: float, feature: str) -> str:
+    fmt = (lambda v: f"{v:.2f}") if feature == "vol" else (lambda v: f"{v:+.0f}%")
+    if name == "low":
+        return f"<{fmt(q1)}"
+    if name == "high":
+        return f">{fmt(q2)}"
+    return f"{fmt(q1)}…{fmt(q2)}"
+
+
+def format_conditional(setup: str, regime: str, feature: str, horizon: int,
+                       result: tuple) -> str:
+    (q1, q2), rows = result
+    out = [f"\n{setup} in {regime.lower()} by {_FEATURE_LABEL[feature]} "
+           f"(terciles), {horizon}d horizon:"]
+    out.append(f"  {'bucket':<7}{'range':<14}{'n':>5}{'conf%':>7}{'base%':>7}{'edge':>7}{'medRet':>9}")
+    for name, r in zip(("low", "mid", "high"), rows):
+        if not r:
+            continue
+        base = "  n/a" if _isnan(r["base"]) else f"{r['base']:>6.0f}%"
+        edge = "   n/a" if _isnan(r["edge"]) else f"{r['edge']:>+6.0f}"
+        out.append(f"  {name:<7}{_range_str(name, q1, q2, feature):<14}{r['n']:>5}"
+                   f"{r['sig']:>6.0f}%{base}{edge}{r['med']:>8.1f}%")
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# Report
+# --------------------------------------------------------------------------- #
+
+def format_report(signals: list, regime_base: dict, n_coins: int, days: int,
+                  source: str = "Binance 1d klines", pit: bool = False) -> str:
+    out: list[str] = ["=" * 64, "RSI BACKTEST — setup edge vs regime base rate"]
+    out.append(f"Universe: {n_coins} coins · {days}d {source} · "
+               f"{len(signals)} graded obs")
+    out.append("Edge = signal confirm% minus the SAME regime's base confirm%.")
+    out.append("A high confirm% with ~0 edge is just 'trends trend', not signal.")
+    out.append("=" * 64)
+
+    if not signals:
+        out.append("\nNo signals generated — no usable price history fetched.")
+        out.append("Try --symbols BTC,ETH,SOL or check Binance reachability.")
+        return "\n".join(out)
+
+    out.append("\nBy setup × horizon (confirm = moved the expected way):")
+    out.append(f"  {'setup':<19}{'h':>4}{'n':>6}{'conf%':>7}{'base%':>7}"
+               f"{'edge':>7}{'medRet':>8}{'medExc':>8}")
+    for r in summarize(signals, regime_base):
+        out.append(
+            f"  {r['setup']:<19}{str(r['h'])+'d':>4}{r['n']:>6}"
+            f"{r['conf']:>6.0f}%{r['base']:>6.0f}%{r['edge']:>+6.0f}"
+            f"{r['med_ret']:>7.1f}%{r['med_excess']:>+7.1f}"
+        )
+
+    out.append("\nRegime base rates (any day; P = moved that way over h):")
+    out.append(f"  {'regime':<11}{'h':>4}{'n':>7}{'P(up)':>7}{'P(down)':>9}{'medRet':>8}")
+    for (regime, h) in sorted(regime_base):
+        arr = np.asarray(regime_base[(regime, h)], dtype=float)
+        if not len(arr):
+            continue
+        out.append(
+            f"  {regime:<11}{str(h)+'d':>4}{len(arr):>7}"
+            f"{100*(arr>0).mean():>6.0f}%{100*(arr<0).mean():>8.0f}%"
+            f"{np.median(arr):>7.1f}%"
+        )
+
+    conv_rows = summarize_by_conviction(signals, regime_base, PRIMARY)
+    if conv_rows:
+        out.append(f"\nBy conviction at {PRIMARY}d (does the score earn its edge?):")
+        out.append(f"  {'bucket':<12}{'n':>6}{'conf%':>7}{'base%':>7}{'edge':>7}")
+        for r in conv_rows:
+            out.append(f"  {r['bucket']:<12}{r['n']:>6}{r['conf']:>6.0f}%"
+                       f"{r['base']:>6.0f}%{r['edge']:>+6.0f}")
+
+    out.append("\n" + "=" * 64)
+    if pit:
+        out.append("Point-in-time top-N (survivorship-reduced). Residual bias:")
+        out.append("coins that fell below the candidate pool floor still vanish.")
+    else:
+        out.append("Caveats: survivorship (today's top-N), single venue, no fees.")
+    out.append("Edge > 0 means the RSI entry beat just being in that regime.")
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- #
+# Point-in-time universe (survivorship fix)
+# --------------------------------------------------------------------------- #
+
+def _parse_cg_chart(data: dict) -> pd.DataFrame | None:
+    """CoinGecko /market_chart -> daily DataFrame[close, mcap, volume] (UTC)."""
+    prices = data.get("prices") or []
+    if len(prices) < 2:
+        return None
+
+    def _daily(pairs, how):
+        s = pd.Series({p[0]: p[1] for p in pairs}, dtype=float)
+        s.index = pd.to_datetime(s.index, unit="ms", utc=True).floor("D")
+        return s.groupby(level=0).sum() if how == "sum" else s.groupby(level=0).last()
+
+    close = _daily(prices, "last")
+    mcaps = data.get("market_caps") or []
+    vols = data.get("total_volumes") or []
+    mcap = _daily(mcaps, "last").reindex(close.index) if mcaps else pd.Series(np.nan, index=close.index)
+    vol = _daily(vols, "sum").reindex(close.index) if vols else pd.Series(0.0, index=close.index)
+    return pd.DataFrame({"close": close, "mcap": mcap, "volume": vol}).dropna(subset=["close"])
+
+
+async def _fetch_cg_histories(ids: list[str], days: int) -> dict:
+    """Fetch market_chart (price + market cap + volume) for the candidate pool,
+    in parallel under the client's rate limiter."""
+    async with CoinGeckoClient() as client:
+        async def one(cid):
+            try:
+                return cid, _parse_cg_chart(await client.get_market_chart(cid, days))
+            except Exception as e:  # noqa: BLE001
+                log.debug("cg chart %s failed: %s", cid, e)
+                return cid, None
+        results = await asyncio.gather(*[one(c) for c in ids])
+
+    min_len = _START + max(HORIZONS) + 1
+    out = {cid: df for cid, df in results if df is not None and len(df) >= min_len}
+    log.info("PIT: usable history for %d/%d candidates", len(out), len(ids))
+    return out
+
+
+def build_pit_membership(histories: dict, top_n: int) -> pd.DataFrame:
+    """Per-date top-N membership: rank candidates by their market cap on each
+    date; the top_n are 'in universe' that day. Bool DataFrame[date x coin_id]."""
+    mcap = pd.DataFrame({cid: df["mcap"] for cid, df in histories.items()}).sort_index()
+    rank = mcap.rank(axis=1, ascending=False, method="min")
+    return rank.le(top_n) & mcap.notna()
+
+
+def run_pit(pool: list[dict], top_n: int, days: int, trigger: str = "cross_into"
+            ) -> tuple[list, dict, dict, dict, int]:
+    histories = asyncio.run(_fetch_cg_histories([c["id"] for c in pool], days))
+    signals: list = []
+    regime_base: dict = defaultdict(list)
+    cond_base: dict = defaultdict(list)
+    mkt_base: dict = defaultdict(list)
+    if not histories:
+        return signals, regime_base, cond_base, mkt_base, 0
+    member_df = build_pit_membership(histories, top_n)
+    mkt = (market_regime_series(histories["bitcoin"]["close"])
+           if "bitcoin" in histories else None)
+    for cid, df in histories.items():
+        mem = member_df[cid].reindex(df.index, fill_value=False).to_numpy()
+        if not mem.any():
+            continue
+        mkt_arr = mkt.reindex(df.index).fillna("NA").to_numpy() if mkt is not None else None
+        walk_coin(df, signals, regime_base, cond_base, member=mem,
+                  mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger)
+    return signals, regime_base, cond_base, mkt_base, len(histories)
+
+
+# --------------------------------------------------------------------------- #
+# Entry point
+# --------------------------------------------------------------------------- #
+
+def _fetch_all(universe: list[str], days: int) -> tuple[dict, pd.Series | None]:
+    """Fetch every coin's klines once (so triggers can be A/B'd on the same data)
+    plus BTC's market-regime series."""
+    session = requests.Session()
+    btc = fetch_klines("BTCUSDT", days, session)
+    mkt = market_regime_series(btc["close"]) if btc is not None else None
+    if mkt is None:
+        log.warning("Could not fetch BTC; market-regime breakdown disabled.")
+    frames: dict = {}
+    for i, sym in enumerate(universe, 1):
+        df = fetch_klines(sym + "USDT", days, session)
+        if df is not None and len(df) >= _START + max(HORIZONS) + 1:
+            frames[sym] = df
+        if i % 20 == 0:
+            log.info("  ...%d/%d fetched (%d usable)", i, len(universe), len(frames))
+        time.sleep(0.04)  # be polite to the API
+    return frames, mkt
+
+
+def _walk_all(frames: dict, mkt, trigger: str = "cross_into") -> tuple[list, dict, dict, dict]:
+    signals: list = []
+    regime_base: dict = defaultdict(list)
+    cond_base: dict = defaultdict(list)
+    mkt_base: dict = defaultdict(list)
+    for df in frames.values():
+        mkt_arr = mkt.reindex(df.index).fillna("NA").to_numpy() if mkt is not None else None
+        walk_coin(df, signals, regime_base, cond_base,
+                  mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger)
+    return signals, regime_base, cond_base, mkt_base
+
+
+def run(universe: list[str], days: int, trigger: str = "cross_into"
+        ) -> tuple[list, dict, dict, dict, int]:
+    frames, mkt = _fetch_all(universe, days)
+    s, rb, cb, mb = _walk_all(frames, mkt, trigger)
+    return s, rb, cb, mb, len(frames)
+
+
+def run_triggers(universe: list[str], days: int,
+                 triggers=("cross_into", "confirm")) -> tuple[dict, int]:
+    """Fetch once, walk under each trigger — for an apples-to-apples A/B."""
+    frames, mkt = _fetch_all(universe, days)
+    results = {trig: _walk_all(frames, mkt, trig) for trig in triggers}
+    return results, len(frames)
+
+
+def main(argv=None) -> None:
+    p = argparse.ArgumentParser(description="Backtest RSI setups vs regime base rates.")
+    p.add_argument("--top-n", type=int, default=80, help="Top-N coins by mcap.")
+    p.add_argument("--days", type=int, default=1460,
+                   help="History length in days (Binance paginates; ~1460 = 4y "
+                        "spans the 2022 bear. CoinGecko/PIT capped at 365 on a demo key).")
+    p.add_argument("--symbols", default=None, help="Comma list to override the universe.")
+    p.add_argument("--pit", action="store_true",
+                   help="Point-in-time universe (fixes survivorship; uses CoinGecko "
+                        "price+market-cap history instead of Binance).")
+    p.add_argument("--pool", type=int, default=150,
+                   help="PIT candidate pool size (bigger = less survivorship, slower).")
+    p.add_argument("--slice", default=None,
+                   help="Conditionally slice one setup by vol/momentum: "
+                        f"{', '.join(_SETUP_REGIME)}.")
+    p.add_argument("--slice-horizons", default="1,3,7",
+                   help="Horizons (days) to show in the slice, comma-separated.")
+    p.add_argument("--trigger", choices=("cross_into", "confirm"), default="cross_into",
+                   help="Entry: cross_into (pierce the zone, default) or confirm (turn back out).")
+    p.add_argument("--compare-triggers", action="store_true",
+                   help="A/B both triggers on the same data (Binance path) and exit.")
+    p.add_argument("--export-priors", default=None, metavar="PATH",
+                   help="Write a registry prior calibration JSON from this backtest.")
+    p.add_argument("--prior-min-samples", type=int, default=8,
+                   help="Minimum setup x market samples needed to move a prior.")
+    p.add_argument("-v", "--verbose", action="store_true")
+    args = p.parse_args(argv)
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-5s %(message)s", datefmt="%H:%M:%S",
+    )
+
+    if args.compare_triggers:
+        if args.export_priors:
+            log.warning("--export-priors is ignored with --compare-triggers")
+        universe = ([s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+                    if args.symbols else cg_top_symbols(args.top_n))
+        log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
+        results, ok = run_triggers(universe, args.days)
+        log.info("Done: %d usable coins", ok)
+        print("\n" + format_trigger_comparison(results) + "\n")
+        return
+
+    if args.pit:
+        pool = cg_top_coins(args.pool)
+        if not pool:
+            print("PIT mode needs CoinGecko, but the universe fetch failed.")
+            return
+        days = args.days
+        if config.COINGECKO_KEY_TYPE != "pro":
+            days = min(days, 365)
+            log.info("Demo/free CoinGecko key: capping history at 365d "
+                     "(a pro key extends this).")
+        log.info("PIT mode: pool=%d, top-%d membership, %dd CoinGecko history...",
+                 len(pool), args.top_n, days)
+        signals, regime_base, cond_base, mkt_base, ok = run_pit(
+            pool, args.top_n, days, args.trigger)
+        source, report_days = "CoinGecko daily (point-in-time top-N)", days
+    else:
+        if args.symbols:
+            universe = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+        else:
+            universe = cg_top_symbols(args.top_n)
+        log.info("Universe: %d symbols; fetching Binance 1d klines (%dd, paginated, %s)...",
+                 len(universe), args.days, args.trigger)
+        signals, regime_base, cond_base, mkt_base, ok = run(universe, args.days, args.trigger)
+        source, report_days = "Binance 1d klines", args.days
+
+    log.info("Usable history: %d coins; %d graded observations", ok, len(signals))
+    print("\n" + format_report(signals, regime_base, ok, report_days,
+                                source=source, pit=args.pit) + "\n")
+    if mkt_base:
+        print(format_market(signals, mkt_base, PRIMARY))
+        print(format_market(signals, mkt_base, 1))
+
+    if args.export_priors:
+        payload = build_registry_prior_export(
+            signals,
+            mkt_base,
+            n_coins=ok,
+            days=report_days,
+            source=source,
+            pit=args.pit,
+            trigger=args.trigger,
+            min_samples=args.prior_min_samples,
+        )
+        out = write_registry_prior_export(args.export_priors, payload)
+        log.info("Wrote registry prior calibration: %s", out)
+
+    if args.slice:
+        sr = _SETUP_REGIME.get(args.slice)
+        if not sr:
+            print(f"--slice supports: {', '.join(_SETUP_REGIME)}")
+            return
+        regime, exp = sr
+        horizons = [int(h) for h in args.slice_horizons.split(",") if h.strip()]
+        print("=" * 64)
+        print(f"CONDITIONAL SLICE — when does '{args.slice}' (expect {exp}) hold?")
+        print("=" * 64)
+        for feature in ("vol", "mom"):
+            for h in horizons:
+                res = conditional_table(signals, cond_base, args.slice, regime, exp, h, feature)
+                if res:
+                    print(format_conditional(args.slice, regime, feature, h, res))
+        print()
+
+
+if __name__ == "__main__":
+    main()

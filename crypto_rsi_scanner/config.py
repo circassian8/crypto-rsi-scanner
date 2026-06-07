@@ -1,0 +1,187 @@
+from __future__ import annotations
+
+import logging
+import os
+from pathlib import Path
+
+log = logging.getLogger(__name__)
+
+
+def _load_dotenv(path: Path) -> None:
+    """Minimal .env loader (no dependency). Existing env vars win."""
+    if not path.exists():
+        return
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        # An empty value means "unset" — skip it so code defaults still apply
+        # (e.g. `CG_CALLS_PER_MINUTE=` must not shadow the int default).
+        if key and value:
+            os.environ.setdefault(key, value)
+
+
+_load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+TOP_N = int(os.getenv("RSI_TOP_N", "100"))
+RSI_PERIOD = 14
+RSI_OB = float(os.getenv("RSI_OB", "70"))
+RSI_OS = float(os.getenv("RSI_OS", "30"))
+LOOKBACK_DAYS_DAILY = 250  # >= REGIME_LONG_MA so the 200-day MA is available
+LOOKBACK_DAYS_4H = 90
+RSI_Z_WINDOW = 90
+MIN_ANNUAL_VOL = 0.20
+
+ADAPTIVE_OB_PERCENTILE = 95
+ADAPTIVE_OS_PERCENTILE = 5
+
+SEVERITY_TIERS = {
+    "OB": [(90.0, "EXTREME"), (80.0, "ALERT"), (70.0, "WATCH")],
+    "OS": [(10.0, "EXTREME"), (20.0, "ALERT"), (30.0, "WATCH")],
+}
+
+COOLDOWN_HOURS = float(os.getenv("RSI_COOLDOWN_HOURS", "48"))
+MIN_CONVICTION_ALERT = int(os.getenv("RSI_MIN_CONVICTION", "0"))  # 0 = nothing dropped
+
+# --- Approaching-threshold pre-alerts -------------------------------------
+# A coin that hasn't crossed yet but is within APPROACH_MARGIN RSI points of
+# its (effective) threshold AND moving toward it by at least APPROACH_MIN_DELTA
+# over the delta window. Surfaces setups *before* they trigger.
+APPROACH_MARGIN = float(os.getenv("RSI_APPROACH_MARGIN", "5"))
+APPROACH_MIN_DELTA = float(os.getenv("RSI_APPROACH_MIN_DELTA", "3"))
+
+# --- Tiered notification routing ------------------------------------------
+# Nothing worth a look is dropped; tiering decides *how loud* it is.
+#   INSTANT: sent immediately, prominent. Edge-triggered (newly crossed).
+#   DIGEST:  batched watch-list snapshot, sent at most once per interval.
+# A real OB/OS crossing is INSTANT if its severity is in INSTANT_SEVERITIES
+# or its conviction >= INSTANT_CONVICTION; otherwise DIGEST. Pre-alerts are
+# always DIGEST.
+INSTANT_CONVICTION = int(os.getenv("RSI_INSTANT_CONVICTION", "65"))
+INSTANT_SEVERITIES = {"EXTREME", "ALERT"}
+DIGEST_INTERVAL_HOURS = float(os.getenv("RSI_DIGEST_INTERVAL_HOURS", "24"))
+
+_CG_DEFAULT_CPM = "25" if os.getenv("COINGECKO_API_KEY") else "8"
+CALLS_PER_MINUTE = int(os.getenv("CG_CALLS_PER_MINUTE", _CG_DEFAULT_CPM))
+MAX_RETRIES = 5
+
+VOLUME_AVG_WINDOW = 20
+VOLUME_SPIKE_THRESHOLD = 1.5
+
+BTC_CORR_WINDOW = 30
+RSI_DELTA_WINDOW = 3
+DIVERGENCE_LOOKBACK = 30
+DIVERGENCE_ORDER = 5
+
+# Trend regime (moving-average structure, close-only).
+REGIME_SHORT_MA = 50
+REGIME_LONG_MA = 200
+REGIME_SLOPE_LOOKBACK = 20
+
+# Signal outcome tracking: forward return measured N days after each crossing,
+# computed from price history already fetched each scan (no extra API calls).
+OUTCOME_HORIZONS = [1, 3, 7, 14]
+OUTCOME_PRIMARY_HORIZON = 7  # horizon used for regime / conviction breakdowns
+
+# Self-tuning conviction: let each (flag, regime) bucket's historical hit-rate
+# nudge the conviction score. Needs enough matured samples to be trustworthy.
+SELFTUNE_ENABLED = (os.getenv("RSI_SELFTUNE", "1").lower() not in ("0", "false", "no"))
+SELFTUNE_MIN_SAMPLES = int(os.getenv("RSI_SELFTUNE_MIN_SAMPLES", "8"))
+SELFTUNE_MAX_SWING = int(os.getenv("RSI_SELFTUNE_MAX_SWING", "15"))
+
+# Market-regime gating: each setup only has edge in specific BTC market regimes
+# defined in signal_registry.py. The registry now seeds conviction from measured
+# edge priors; this flag controls whether the current market regime is used for
+# alignment/routing. MARKET_ALIGN_SWING is retained for the legacy helper/tests.
+MARKET_GATING_ENABLED = (os.getenv("RSI_MARKET_GATING", "1").lower() not in ("0", "false", "no"))
+MARKET_ALIGN_SWING = int(os.getenv("RSI_MARKET_ALIGN_SWING", "12"))
+
+# Paper-trading scoreboard: auto-open a virtual trade on each new OB/OS crossing
+# (long if the setup expects up, short if down), close it after PAPER_HOLD_DAYS
+# at that day's close, and track realized P&L — the live proof of whether the
+# gated signals make money. No real orders; uses prices already fetched.
+PAPER_TRADING_ENABLED = (os.getenv("RSI_PAPER", "1").lower() not in ("0", "false", "no"))
+PAPER_HOLD_DAYS = int(os.getenv("RSI_PAPER_HOLD_DAYS", str(OUTCOME_PRIMARY_HORIZON)))
+
+# Macro context header in the digest (Fear & Greed + BTC trend + breadth).
+MACRO_ENABLED = (os.getenv("RSI_MACRO", "1").lower() not in ("0", "false", "no"))
+
+# Heartbeat / dead-man's-switch: alert if a run breaks or degrades silently.
+HEARTBEAT_ENABLED = (os.getenv("RSI_HEARTBEAT", "1").lower() not in ("0", "false", "no"))
+# Warn if more than this fraction of coins fail to fetch (silent degradation).
+HEARTBEAT_MAX_FETCH_FAIL_RATIO = float(os.getenv("RSI_HEARTBEAT_MAX_FAIL", "0.30"))
+
+RSI_4H_FETCH_UPPER = 60.0
+RSI_4H_FETCH_LOWER = 40.0
+
+# Universe hygiene. The live scan/backtest request a larger CoinGecko candidate
+# pool, then filter stablecoins, wrapped/staked receipts, stale/suspicious
+# listings, and illiquid assets before taking the requested top-N.
+UNIVERSE_FETCH_MULTIPLIER = int(os.getenv("RSI_UNIVERSE_FETCH_MULTIPLIER", "2"))
+UNIVERSE_EXTRA_CANDIDATES = int(os.getenv("RSI_UNIVERSE_EXTRA_CANDIDATES", "50"))
+UNIVERSE_MAX_CANDIDATES = int(os.getenv("RSI_UNIVERSE_MAX_CANDIDATES", "250"))
+UNIVERSE_MIN_VOLUME_TO_MCAP = float(os.getenv("RSI_MIN_VOLUME_TO_MCAP", "0.001"))
+UNIVERSE_MIN_MARKET_CAP_USD = float(os.getenv("RSI_MIN_MARKET_CAP_USD", "0"))
+UNIVERSE_MAX_ABS_24H_CHANGE = float(os.getenv("RSI_MAX_ABS_24H_CHANGE", "500"))
+
+EXCLUDE_SYMBOLS = {
+    "usdt", "usdc", "dai", "usde", "fdusd", "tusd", "usdd", "pyusd", "usds",
+    "busd", "gusd", "frax", "lusd", "usd0", "usdb", "crvusd", "usdx",
+    "wbtc", "weth", "weeth", "wsteth", "steth", "reth", "cbbtc", "cbeth",
+    "solvbtc", "lbtc", "wbeth", "meth", "ezeth", "rseth", "bnsol", "jitosol",
+    "wbnb",
+}
+
+COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
+COINGECKO_KEY_TYPE = (os.getenv("COINGECKO_KEY_TYPE") or "demo").lower()
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# One or more recipient chat IDs, comma-separated (e.g. "133428954,987654321").
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_CHAT_IDS = [
+    cid.strip() for cid in (TELEGRAM_CHAT_ID or "").split(",") if cid.strip()
+]
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+SMTP_HOST = os.getenv("SMTP_HOST")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASS = os.getenv("SMTP_PASS")
+EMAIL_TO = os.getenv("EMAIL_TO")
+
+DATA_DIR = Path(__file__).resolve().parent.parent
+DB_PATH = DATA_DIR / "rsi_scanner.db"
+CSV_OUT = DATA_DIR / "rsi_scan_latest.csv"
+
+
+def redact_token(text: str) -> str:
+    """Strip the Telegram bot token from a string before logging — it rides
+    along inside request URLs in exception messages (e.g. getUpdates failures),
+    which would otherwise leak the token into the log file."""
+    token = TELEGRAM_BOT_TOKEN
+    if token and token in text:
+        return text.replace(token, "<bot-token>")
+    return text
+
+
+def has_notification_channel() -> bool:
+    return bool(
+        (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS)
+        or DISCORD_WEBHOOK_URL
+        or (SMTP_HOST and SMTP_USER and SMTP_PASS and EMAIL_TO)
+    )
+
+
+def validate() -> None:
+    """Log warnings about config that will degrade the run. Non-fatal."""
+    if not COINGECKO_API_KEY:
+        log.warning(
+            "No COINGECKO_API_KEY set — free tier is heavily rate-limited; "
+            "4H data may be incomplete. A free demo key is strongly recommended."
+        )
+    if not has_notification_channel():
+        log.warning("No notification channel configured — output will be console-only.")
+    if RSI_OS >= RSI_OB:
+        raise ValueError(f"RSI_OS ({RSI_OS}) must be below RSI_OB ({RSI_OB}).")

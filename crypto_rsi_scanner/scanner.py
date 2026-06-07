@@ -1,0 +1,704 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from datetime import datetime, timezone
+
+import numpy as np
+import pandas as pd
+
+from . import config
+from .client import CoinGeckoClient
+from .indicators import (
+    adaptive_thresholds,
+    annualized_vol,
+    btc_correlation,
+    conviction_adjustment,
+    conviction_score,
+    decide_flag,
+    detect_divergence,
+    rsi_rate_of_change,
+    rsi_z_score,
+    trend_regime,
+    volume_ratio,
+    wilder_rsi,
+)
+from .signal_registry import market_alignment, regime_note, setup_for
+from .notifications import notify_all
+from .storage import Storage
+from .universe import candidate_count, filter_markets, format_exclusions
+from . import outcomes
+from . import telegram
+from . import heartbeat
+from . import macro
+from . import paper
+
+log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _parse_chart(
+    data: dict, resample: str | None = None
+) -> tuple[pd.Series, pd.Series]:
+    prices = data.get("prices", [])
+    volumes = data.get("total_volumes", [])
+    if not prices:
+        return pd.Series(dtype=float), pd.Series(dtype=float)
+
+    pdf = pd.DataFrame(prices, columns=["ts", "price"])
+    pdf["dt"] = pd.to_datetime(pdf["ts"], unit="ms", utc=True)
+    pdf = pdf.set_index("dt")
+
+    vdf = pd.DataFrame(volumes, columns=["ts", "volume"]) if volumes else pd.DataFrame(columns=["ts", "volume"])
+    if not vdf.empty:
+        vdf["dt"] = pd.to_datetime(vdf["ts"], unit="ms", utc=True)
+        vdf = vdf.set_index("dt")
+
+    if resample:
+        price_s = pdf["price"].resample(resample).last().dropna()
+        vol_s = vdf["volume"].resample(resample).sum().dropna() if not vdf.empty else pd.Series(dtype=float)
+    else:
+        pdf["date"] = pdf.index.date
+        price_s = pdf.groupby("date")["price"].last()
+        price_s.index = pd.to_datetime(price_s.index, utc=True)
+        if not vdf.empty:
+            vdf["date"] = vdf.index.date
+            vol_s = vdf.groupby("date")["volume"].sum()
+            vol_s.index = pd.to_datetime(vol_s.index, utc=True)
+        else:
+            vol_s = pd.Series(dtype=float)
+
+    return price_s, vol_s
+
+
+def _severity(flag: str, rsi: float) -> str:
+    if flag in ("PRE_OB", "PRE_OS"):
+        return "APPROACHING"
+    if flag not in ("OB", "OS"):
+        return ""
+    for threshold, level in config.SEVERITY_TIERS[flag]:
+        if flag == "OB" and rsi >= threshold:
+            return level
+        if flag == "OS" and rsi <= threshold:
+            return level
+    return "WATCH"
+
+
+def classify_tier(flag: str, severity: str, conviction: int,
+                  market_aligned: str = "neutral") -> str:
+    """INSTANT (loud, immediate) vs DIGEST (batched watch-list)."""
+    if flag in ("PRE_OB", "PRE_OS"):
+        return "DIGEST"
+    # A setup with no edge in the current market regime shouldn't go loud —
+    # hold it to the digest unless the move is an outright extreme.
+    if market_aligned == "adverse" and severity != "EXTREME":
+        return "DIGEST"
+    if severity in config.INSTANT_SEVERITIES or conviction >= config.INSTANT_CONVICTION:
+        return "INSTANT"
+    return "DIGEST"
+
+
+# ---------------------------------------------------------------------------
+# Per-coin analysis
+# ---------------------------------------------------------------------------
+
+def _analyze_coin(
+    closes: pd.Series,
+    volumes: pd.Series,
+    closes_4h: pd.Series | None,
+    btc_closes: pd.Series | None,
+    market_info: dict,
+    market_regime: str = "UNKNOWN",
+) -> dict | None:
+    sym = (market_info.get("symbol") or "").upper()
+    coin_id = market_info.get("id", "")
+
+    if len(closes) < config.RSI_PERIOD + config.RSI_Z_WINDOW // 2:
+        return None
+    if annualized_vol(closes) < config.MIN_ANNUAL_VOL:
+        return None
+
+    rsi_series = wilder_rsi(closes, config.RSI_PERIOD).dropna()
+    if rsi_series.empty:
+        return None
+    cur_rsi = float(rsi_series.iloc[-1])
+
+    # Weekly RSI (resample daily -> weekly)
+    weekly_closes = closes.resample("W").last().dropna()
+    weekly_rsi_s = wilder_rsi(weekly_closes, config.RSI_PERIOD).dropna()
+    weekly_rsi = float(weekly_rsi_s.iloc[-1]) if not weekly_rsi_s.empty else None
+
+    # 4H RSI
+    rsi_4h = None
+    if closes_4h is not None and len(closes_4h) >= config.RSI_PERIOD + 1:
+        rsi_4h_s = wilder_rsi(closes_4h, config.RSI_PERIOD).dropna()
+        if not rsi_4h_s.empty:
+            rsi_4h = float(rsi_4h_s.iloc[-1])
+
+    # Adaptive thresholds. Effective threshold = whichever triggers first, so a
+    # coin that never reaches 70 still flags when it's extreme for *itself*.
+    adapt_ob, adapt_os = adaptive_thresholds(
+        rsi_series, config.ADAPTIVE_OB_PERCENTILE, config.ADAPTIVE_OS_PERCENTILE
+    )
+    eff_ob = min(config.RSI_OB, adapt_ob)
+    eff_os = max(config.RSI_OS, adapt_os)
+
+    z = rsi_z_score(rsi_series, config.RSI_Z_WINDOW)
+    delta = rsi_rate_of_change(rsi_series, config.RSI_DELTA_WINDOW)
+    vol_r = volume_ratio(volumes, config.VOLUME_AVG_WINDOW) if not volumes.empty else 1.0
+
+    # Flag: crossed (OB/OS) > approaching (PRE_*, within margin AND moving in).
+    flag = decide_flag(
+        cur_rsi, delta, eff_ob, eff_os, config.APPROACH_MARGIN, config.APPROACH_MIN_DELTA
+    )
+
+    btc_corr = 0.0
+    if btc_closes is not None and coin_id != "bitcoin":
+        btc_corr = btc_correlation(closes, btc_closes, config.BTC_CORR_WINDOW)
+
+    div = detect_divergence(
+        closes, rsi_series, config.DIVERGENCE_LOOKBACK, config.DIVERGENCE_ORDER
+    )
+
+    regime = trend_regime(
+        closes,
+        config.REGIME_SHORT_MA,
+        config.REGIME_LONG_MA,
+        config.REGIME_SLOPE_LOOKBACK,
+    )
+
+    result = {
+        "symbol": sym,
+        "coin_id": coin_id,
+        "name": market_info.get("name"),
+        "rsi_daily": round(cur_rsi, 1),
+        "rsi_4h": round(rsi_4h, 1) if rsi_4h is not None else None,
+        "rsi_weekly": round(weekly_rsi, 1) if weekly_rsi is not None else None,
+        "rsi_z": round(z, 2),
+        "rsi_delta": round(delta, 1),
+        "adapt_ob": round(adapt_ob, 1),
+        "adapt_os": round(adapt_os, 1),
+        "volume_ratio": round(vol_r, 2),
+        "btc_corr": round(btc_corr, 2),
+        "divergence": div,
+        "regime": regime,
+        "regime_note": regime_note(flag, regime),
+        "price": market_info.get("current_price"),
+        "mcap_rank": market_info.get("market_cap_rank"),
+        "pct_24h": market_info.get("price_change_percentage_24h_in_currency"),
+        "pct_7d": market_info.get("price_change_percentage_7d_in_currency"),
+        "ath": market_info.get("ath"),
+        "ath_pct": market_info.get("ath_change_percentage"),
+        "sparkline": (market_info.get("sparkline_in_7d") or {}).get("price"),
+        "flag": flag,
+        "severity": _severity(flag, cur_rsi),
+    }
+    result["setup_type"], result["expected_dir"] = setup_for(flag, regime)
+    result["market_regime"] = market_regime
+    aligned = (
+        market_alignment(result["setup_type"], market_regime)
+        if config.MARKET_GATING_ENABLED else "neutral"
+    )
+    result["market_aligned"] = aligned
+
+    result["conviction"] = conviction_score(result)
+    result["tier"] = (
+        classify_tier(flag, result["severity"], result["conviction"], aligned)
+        if flag else ""
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Async scan
+# ---------------------------------------------------------------------------
+
+async def scan(top_n: int | None = None) -> tuple[pd.DataFrame, dict, dict]:
+    n = top_n or config.TOP_N
+    log.info(
+        "Starting scan at %s",
+        datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+    )
+
+    async with CoinGeckoClient() as client:
+        fetch_n = candidate_count(n)
+        markets = await client.get_top_markets(fetch_n)
+        coins, excluded = filter_markets(markets, limit=n)
+        log.info(
+            "Scanning %d clean coins (requested top-%d; fetched %d candidates; excluded: %s)",
+            len(coins), n, len(markets), format_exclusions(excluded),
+        )
+        if len(coins) < n:
+            log.warning("Only %d clean coins available for requested top-%d", len(coins), n)
+
+        # --- fetch daily charts for all coins ---
+        async def _fetch_daily(coin_id: str) -> tuple[str, dict | None]:
+            try:
+                data = await client.get_market_chart(coin_id, config.LOOKBACK_DAYS_DAILY)
+                return coin_id, data
+            except Exception as e:
+                log.warning("Daily fetch failed for %s: %s", coin_id, e)
+                return coin_id, None
+
+        daily_results = await asyncio.gather(*[_fetch_daily(m["id"]) for m in coins])
+        daily_raw: dict[str, dict | None] = dict(daily_results)
+        n_ok = sum(1 for v in daily_raw.values() if v)
+        log.info("Daily data: %d/%d succeeded", n_ok, len(coins))
+        stats = {"requested": len(coins), "fetched": n_ok}
+
+        # --- parse daily, identify coins near thresholds for 4H fetch ---
+        daily_parsed: dict[str, tuple[pd.Series, pd.Series]] = {}
+        interesting: set[str] = set()
+
+        for coin_id, raw in daily_raw.items():
+            if not raw:
+                continue
+            closes, volumes = _parse_chart(raw)
+            if len(closes) < config.RSI_PERIOD + 1:
+                continue
+            daily_parsed[coin_id] = (closes, volumes)
+            rsi_s = wilder_rsi(closes, config.RSI_PERIOD).dropna()
+            if not rsi_s.empty:
+                cur = float(rsi_s.iloc[-1])
+                if cur >= config.RSI_4H_FETCH_UPPER or cur <= config.RSI_4H_FETCH_LOWER:
+                    interesting.add(coin_id)
+
+        log.info("Fetching 4H data for %d coins near thresholds", len(interesting))
+
+        # --- fetch hourly charts for interesting coins, resample to 4H ---
+        async def _fetch_4h(coin_id: str) -> tuple[str, dict | None]:
+            try:
+                data = await client.get_market_chart(coin_id, config.LOOKBACK_DAYS_4H)
+                return coin_id, data
+            except Exception as e:
+                log.warning("4H fetch failed for %s: %s", coin_id, e)
+                return coin_id, None
+
+        four_h_parsed: dict[str, pd.Series] = {}
+        if interesting:
+            four_h_results = await asyncio.gather(
+                *[_fetch_4h(cid) for cid in interesting]
+            )
+            for coin_id, raw in four_h_results:
+                if not raw:
+                    continue
+                closes_4h, _ = _parse_chart(raw, resample="4h")
+                if len(closes_4h) >= config.RSI_PERIOD + 1:
+                    four_h_parsed[coin_id] = closes_4h
+
+    # --- BTC closes for correlation ---
+    btc_closes: pd.Series | None = None
+    if "bitcoin" in daily_parsed:
+        btc_closes = daily_parsed["bitcoin"][0]
+
+    # --- market regime (BTC trend): the backdrop every setup is gated against ---
+    market_regime = "UNKNOWN"
+    if btc_closes is not None and len(btc_closes) >= config.REGIME_LONG_MA:
+        market_regime = trend_regime(
+            btc_closes, config.REGIME_SHORT_MA, config.REGIME_LONG_MA,
+            config.REGIME_SLOPE_LOOKBACK,
+        )
+        log.info("Market regime (BTC): %s", market_regime)
+
+    # --- full analysis ---
+    coin_map = {m["id"]: m for m in coins}
+    rows: list[dict] = []
+    for coin_id, (closes, volumes) in daily_parsed.items():
+        market = coin_map.get(coin_id)
+        if not market:
+            continue
+        result = _analyze_coin(
+            closes,
+            volumes,
+            four_h_parsed.get(coin_id),
+            btc_closes,
+            market,
+            market_regime,
+        )
+        if result:
+            rows.append(result)
+
+    # closes per coin, reused for outcome evaluation (no extra API calls)
+    closes_map = {cid: cv[0] for cid, cv in daily_parsed.items()}
+
+    stats["analyzed"] = len(rows)
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df, closes_map, stats
+
+    df = df.sort_values("rsi_daily", ascending=False).reset_index(drop=True)
+    df["xrank"] = df["rsi_daily"].rank(ascending=False, method="min").astype(int)
+    return df, closes_map, stats
+
+
+# ---------------------------------------------------------------------------
+# Message builder
+# ---------------------------------------------------------------------------
+
+def _is_present(value: object) -> bool:
+    return value is not None and not (isinstance(value, float) and np.isnan(value))
+
+
+def _format_signal(s: dict, is_new: bool) -> str:
+    """One aligned line for the console/CSV report (monospace context)."""
+    sev = {"EXTREME": "!!", "ALERT": "!", "WATCH": ".", "APPROACHING": "~"}.get(s["severity"], "")
+    parts = [f"  {s['symbol']:<7} {sev:<2} c{int(s['conviction']):>3}"]
+
+    rsi_str = f"D:{s['rsi_daily']:>5}"
+    if _is_present(s.get("rsi_4h")):
+        rsi_str += f"  4H:{s['rsi_4h']:>5}"
+    if _is_present(s.get("rsi_weekly")):
+        rsi_str += f"  W:{s['rsi_weekly']:>5}"
+    parts.append(rsi_str)
+
+    parts.append(f"z{s['rsi_z']:+.1f}")
+    parts.append(f"d{s['rsi_delta']:+.0f}")
+
+    if s["volume_ratio"] >= config.VOLUME_SPIKE_THRESHOLD:
+        parts.append(f"vol:{s['volume_ratio']:.1f}x")
+    if (s.get("btc_corr") or 0) > 0.7:
+        parts.append("BTC-beta")
+    if s.get("divergence"):
+        parts.append(f"{'bull' if s['divergence'] == 'bullish' else 'bear'}-div")
+
+    regime = s.get("regime") or ""
+    if regime == "UNKNOWN":
+        parts.append("regime?")
+    elif regime:
+        note = s.get("regime_note") or ""
+        parts.append(f"{regime}{'/' + note if note else ''}")
+
+    if is_new:
+        parts.append("NEW")
+
+    return " | ".join(parts)
+
+
+def build_message(
+    df: pd.DataFrame, prev_flags: dict[str, str]
+) -> tuple[str, list[dict]]:
+    """Full console/CSV report. Returns (text, signals) where signals is one
+    dict per currently-flagged coin (OB/OS/PRE_*) with routing metadata."""
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    ob = df[df["flag"] == "OB"].sort_values("conviction", ascending=False)
+    os_ = df[df["flag"] == "OS"].sort_values("conviction", ascending=False)
+    pre = df[df["flag"].isin(["PRE_OB", "PRE_OS"])].sort_values("conviction", ascending=False)
+    n = len(df)
+    n_ob, n_os, n_pre = len(ob), len(os_), len(pre)
+
+    lines = [f"RSI Scanner  {now_str}"]
+    lines.append(f"Universe: {n} | OB: {n_ob} | OS: {n_os} | Approaching: {n_pre}")
+
+    if n and n_ob >= n * 0.4:
+        lines.append("!! High OB breadth - broad rally, individual flags are mostly beta")
+    if n and n_os >= n * 0.4:
+        lines.append("!! High OS breadth - broad flush, likely one macro move")
+
+    signals: list[dict] = []
+
+    def _emit(group, header: str) -> None:
+        lines.append(header)
+        for rec in group.to_dict("records"):
+            is_new = prev_flags.get(rec["symbol"]) != rec["flag"]
+            line = _format_signal(rec, is_new)
+            lines.append(line)
+            rec["conviction"] = int(rec["conviction"])
+            rec["is_new"] = is_new
+            rec["line"] = line
+            signals.append(rec)
+
+    if n_ob:
+        _emit(ob, "\n--- OVERBOUGHT (stretched up), by conviction ---")
+    if n_os:
+        _emit(os_, "\n--- OVERSOLD (stretched down), by conviction ---")
+    if n_pre:
+        _emit(pre, "\n--- APPROACHING (not crossed yet, moving in), by conviction ---")
+    if not (n_ob or n_os or n_pre):
+        lines.append("\nNothing stretched or approaching today.")
+
+    lines.append("")
+    lines.append("c=conviction 0-100  D=daily  4H=4-hour  W=weekly  z=vs own history  d=3-day delta")
+    lines.append("!!=extreme  !=alert  .=watch  ~=approaching  NEW=just crossed")
+    lines.append("BTC-beta=correlated  vol=volume spike  bull/bear-div=RSI divergence")
+    lines.append("regime vs 200d MA: UPTREND/continuation, DOWNTREND/reversal?, RANGE/range-top|bottom")
+
+    return "\n".join(lines), signals
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) -> None:
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-5s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    config.validate()
+
+    storage = Storage(config.DB_PATH)
+    try:
+        # Process bot /start and /stop commands so the recipient list self-manages.
+        if not dry_run:
+            telegram.seed_subscribers_from_config(storage)
+            added = telegram.sync_subscribers(storage)
+            if added:
+                log.info("Added %d new subscriber(s) via the bot", added)
+
+        try:
+            df, closes_map, stats = asyncio.run(scan(top_n))
+        except Exception as exc:
+            log.exception("Scan failed")
+            if not dry_run:
+                heartbeat.alert_failure(exc, storage)
+            raise
+
+        if not dry_run:
+            heartbeat.check_health(stats, storage)
+
+        if df.empty:
+            log.error("No data - check network / API key / rate limits")
+            return
+
+        prev_flags = storage.get_prev_flags()
+        # Fold matured live history into the table before saving/alerting so CSV,
+        # DB, bot snapshots, and notifications agree on final conviction.
+        df = _apply_live_edge_adjustments(df, storage)
+        msg, signals = build_message(df, prev_flags)
+
+        print("\n" + msg + "\n")
+
+        # sparkline is a long list per row; keep it for alerts but not the CSV
+        df.drop(columns=["sparkline"], errors="ignore").to_csv(config.CSV_OUT, index=False)
+        log.info("Full table -> %s", config.CSV_OUT)
+
+        flagged = df[df["flag"] != ""]
+        ob_count = int((flagged["flag"] == "OB").sum())
+        os_count = int((flagged["flag"] == "OS").sum())
+
+        # macro context (built before saving this scan, so prev counts are prior)
+        macro_line = ""
+        if config.MACRO_ENABLED:
+            prev_counts = storage.last_scan_counts()
+            macro_data = macro.build_macro(df, ob_count, os_count, prev_counts)
+            macro_line = macro.macro_header(macro_data)
+
+        # persist to database (dry-run is read-only except the CSV)
+        if not dry_run:
+            scan_id = storage.save_scan(len(df), ob_count, os_count)
+            for _, row in flagged.iterrows():
+                sig = row.to_dict()
+                sig["is_new"] = 1 if prev_flags.get(sig["symbol"]) != sig["flag"] else 0
+                storage.save_signal(scan_id, sig)
+
+        # snapshot latest signals so bot commands (/top, /detail) can answer
+        # between runs
+        if not dry_run:
+            telegram.save_latest_snapshot(storage, signals)
+
+        _route_notifications(signals, storage, dry_run, macro_line=macro_line)
+
+        # grade past signals whose horizons have matured (uses fetched closes)
+        if not dry_run:
+            matured = outcomes.evaluate_all(storage, closes_map)
+            if matured:
+                log.info("Recorded %d matured signal outcome(s)", matured)
+
+        # paper-trade scoreboard: open new crossings, close matured positions
+        if not dry_run:
+            opened, closed = paper.update(storage, signals, closes_map)
+            if opened or closed:
+                log.info("Paper trades: opened %d, closed %d", opened, closed)
+
+        # update state for next run (skip in dry-run so cron isn't desynced)
+        if not dry_run:
+            current_flags = {row["symbol"]: row["flag"] for _, row in flagged.iterrows()}
+            storage.save_prev_flags(current_flags)
+
+    finally:
+        storage.close()
+
+
+def _apply_live_edge_adjustments(df: pd.DataFrame, storage: Storage) -> pd.DataFrame:
+    """Use matured live outcomes to annotate signals and nudge conviction.
+
+    Backtested registry priors set the baseline; once the live DB has enough
+    setup-specific outcomes, those outcomes can override the baseline gently.
+    """
+    rows = storage.outcomes_joined()
+    if not rows:
+        return df
+    horizon = config.OUTCOME_PRIMARY_HORIZON
+    stats = outcomes.track_records(rows, horizon)
+    if not stats:
+        return df
+
+    df = df.copy()
+    # Pre-create as object/None so unset rows stay None (not NaN) — NaN would
+    # crash _tg_card ("expected str, got float") and pollute the bot snapshot.
+    for col in ("track_record", "conviction_base"):
+        if col not in df.columns:
+            df[col] = pd.Series([None] * len(df), dtype=object)
+    for idx, row in df[df["flag"] != ""].iterrows():
+        setup = row.get("setup_type") or ""
+        text = outcomes.track_record_text(setup, stats, horizon)
+        if text:
+            df.at[idx, "track_record"] = text
+
+        # Live self-tuning: adjust by this setup's own matured hit rate.
+        rec = stats.get(setup)
+        if config.SELFTUNE_ENABLED and rec and rec["n"] >= config.SELFTUNE_MIN_SAMPLES:
+            hit_rate = rec["hit"] / rec["n"]
+            old = int(row["conviction"])
+            new = conviction_adjustment(
+                old, hit_rate, rec["n"],
+                min_samples=config.SELFTUNE_MIN_SAMPLES,
+                max_swing=config.SELFTUNE_MAX_SWING,
+            )
+            if new != old:
+                df.at[idx, "conviction"] = new
+                df.at[idx, "conviction_base"] = old  # keep for transparency
+                # conviction can shift the tier (e.g. across the INSTANT line)
+                df.at[idx, "tier"] = classify_tier(
+                    row["flag"], row["severity"], new, row.get("market_aligned", "neutral")
+                )
+    return df
+
+
+def _route_notifications(
+    signals: list[dict], storage: Storage, dry_run: bool, macro_line: str = ""
+) -> None:
+    """Tiered routing. Nothing worth a look is dropped — tier decides loudness.
+      INSTANT: new, important crossings -> sent now (per-coin cooldown).
+      DIGEST:  current watch-list snapshot -> batched, once per interval.
+    """
+    above_floor = lambda s: s["conviction"] >= config.MIN_CONVICTION_ALERT
+
+    # Live recipient list = DB subscribers (auto-grown via /start), falling back
+    # to the static .env list if nobody has subscribed yet.
+    recipients = storage.active_subscribers() or config.TELEGRAM_CHAT_IDS
+
+    # INSTANT — edge-triggered: only newly-crossed, off cooldown.
+    instant = sorted(
+        (
+            s
+            for s in signals
+            if s["tier"] == "INSTANT"
+            and s["is_new"]
+            and above_floor(s)
+            and not storage.is_on_cooldown(s["symbol"], s["flag"], config.COOLDOWN_HOURS)
+        ),
+        key=lambda s: s["conviction"],
+        reverse=True,
+    )
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    if instant:
+        names = ", ".join(s["symbol"] for s in instant)
+        if dry_run:
+            log.info("[dry-run] would send INSTANT alert: %s", names)
+        else:
+            notify_all("instant", instant, ts, chat_ids=recipients, macro_line=macro_line)
+            for s in instant:
+                storage.mark_alerted(s["symbol"], s["flag"])
+            log.info("INSTANT alert sent: %s", names)
+    else:
+        log.info("No new INSTANT signals (or on cooldown / below floor)")
+
+    # DIGEST — level-triggered snapshot, rate-limited to once per interval.
+    digest = sorted(
+        (s for s in signals if s["tier"] == "DIGEST" and above_floor(s)),
+        key=lambda s: s["conviction"],
+        reverse=True,
+    )
+    if not digest:
+        log.info("Nothing on the digest watch-list")
+        return
+
+    if not storage.digest_due(config.DIGEST_INTERVAL_HOURS):
+        log.info("Digest holding %d item(s) until next interval", len(digest))
+        return
+
+    if dry_run:
+        log.info("[dry-run] would send DIGEST with %d item(s)", len(digest))
+    else:
+        notify_all("digest", digest, ts, chat_ids=recipients, macro_line=macro_line)
+        storage.mark_digest_sent()
+        log.info("DIGEST sent with %d item(s)", len(digest))
+
+
+def report() -> None:
+    """Print accumulated signal-outcome statistics and exit."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    storage = Storage(config.DB_PATH)
+    try:
+        rows = storage.outcomes_joined()
+        print(outcomes.build_report(rows, config.OUTCOME_PRIMARY_HORIZON))
+    finally:
+        storage.close()
+
+
+def score() -> None:
+    """Print the paper-trade scoreboard and exit."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    storage = Storage(config.DB_PATH)
+    try:
+        print(paper.report(storage))
+    finally:
+        storage.close()
+
+
+def cli() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Top-N crypto multi-timeframe RSI overextension scanner."
+    )
+    parser.add_argument("--top-n", type=int, default=None, help="Number of coins to scan.")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Scan and print, but send no notifications and don't update state.",
+    )
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Print signal-outcome stats (hit-rates, forward returns) and exit.",
+    )
+    parser.add_argument(
+        "--score",
+        action="store_true",
+        help="Print the paper-trade scoreboard (realized P&L by book/setup) and exit.",
+    )
+    parser.add_argument(
+        "--listen",
+        action="store_true",
+        help="Run the bot listener loop so commands (/top, /detail, /stats) "
+             "are answered in real time. Runs until stopped.",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Debug logging.")
+    args = parser.parse_args()
+
+    if args.report:
+        report()
+        return
+    if args.score:
+        score()
+        return
+    if args.listen:
+        logging.basicConfig(
+            level=logging.DEBUG if args.verbose else logging.INFO,
+            format="%(asctime)s %(levelname)-5s %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        config.validate()
+        telegram.listen()
+        return
+    run(top_n=args.top_n, dry_run=args.dry_run, verbose=args.verbose)
