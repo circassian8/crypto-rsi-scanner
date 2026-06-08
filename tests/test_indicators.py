@@ -92,6 +92,110 @@ def test_volume_ratio_spike():
     assert abs(volume_ratio(vols, 20) - 3.0) < 1e-6
 
 
+def test_state_features_realized_vol_flat_and_changing():
+    from crypto_rsi_scanner import state_features as sf
+
+    flat = pd.Series([100.0] * 80)
+    changing = pd.Series(np.linspace(100, 130, 80) + np.sin(np.arange(80)) * 3.0)
+    assert sf.realized_vol(flat, window=20) == 0.0
+    assert sf.realized_vol(changing, window=20) > 0.0
+    vol_s = sf.realized_vol_series(changing, window=20)
+    assert vol_s.dropna().iloc[-1] > 0.0
+
+
+def test_state_features_trailing_percentile_is_trailing_only():
+    from crypto_rsi_scanner import state_features as sf
+
+    s = pd.Series([1.0, 2.0, 3.0, 4.0, 5.0, 0.0])
+    pct = sf.trailing_percentile_series(s, window=5)
+    assert pct.iloc[4] >= 0.9      # current max in [1,2,3,4,5]
+    assert pct.iloc[5] <= 0.1      # current min in [2,3,4,5,0]
+    assert sf.trailing_percentile(pd.Series([10.0] * 10), window=5) == 0.5
+
+
+def test_state_features_volatility_state_rules():
+    from crypto_rsi_scanner import state_features as sf
+
+    assert sf.volatility_state(float("nan"), 0.2, 0.5) == "unknown"
+    assert sf.volatility_state(0.10, 0.20, 0.20) == "low_compressed"
+    assert sf.volatility_state(0.25, 0.25, 0.50) == "normal"
+    assert sf.volatility_state(0.35, 0.30, 0.72) == "high"
+    assert sf.volatility_state(0.40, 0.30, 0.80) == "high_expanding"
+    assert sf.volatility_state(0.50, 0.35, 0.95) == "crisis"
+
+
+def test_state_features_cross_sectional_ranks_monotonic():
+    from crypto_rsi_scanner import state_features as sf
+
+    ranks = sf.cross_sectional_ranks({"weak": -1.0, "mid": 0.0, "strong": 2.0})
+    assert ranks["weak"] == 0.0
+    assert ranks["mid"] == 0.5
+    assert ranks["strong"] == 1.0
+    tied = sf.cross_sectional_ranks({"a": 1.0, "b": 1.0, "c": float("nan")})
+    assert tied["a"] == tied["b"]
+    assert tied["c"] == 0.5
+
+
+def test_state_features_rolling_beta_synthetic():
+    from crypto_rsi_scanner import state_features as sf
+
+    rng = np.random.RandomState(7)
+    btc_ret = rng.normal(0.0005, 0.01, 140)
+    asset_ret = 2.0 * btc_ret + rng.normal(0.0, 0.001, 140)
+    eth_ret = rng.normal(0.0002, 0.012, 140)
+    btc = pd.Series(100.0 * np.cumprod(1.0 + btc_ret))
+    asset = pd.Series(50.0 * np.cumprod(1.0 + asset_ret))
+    eth = pd.Series(80.0 * np.cumprod(1.0 + eth_ret))
+
+    assert abs(sf.rolling_beta(asset, btc, window=120) - 2.0) < 0.15
+    multi = sf.rolling_multi_beta(asset, {"BTC": btc, "ETH": eth}, window=120)
+    assert abs(multi["beta_BTC"] - 2.0) < 0.15
+    assert abs(multi["beta_ETH"]) < 0.15
+    assert 0.0 <= multi["r2"] <= 1.0
+
+
+def test_state_features_volume_and_liquidity():
+    from crypto_rsi_scanner import state_features as sf
+
+    volume = pd.Series([100.0] * 89 + [250.0])
+    close = pd.Series([10.0] * 90)
+    market_cap = pd.Series([10_000.0] * 90)
+
+    assert sf.volume_z_score(volume, window=90) > 5.0
+    assert sf.dollar_volume_20(close, volume, volume_is_usd=True) > 100.0
+    assert sf.dollar_volume_20(close, volume, volume_is_usd=False) > 1000.0
+    assert sf.turnover_20(close * volume, market_cap) > 0.10
+    assert sf.volume_price_state(-0.04, 2.0) == "down_high_volume"
+    assert sf.volume_price_state(0.04, 2.0) == "up_high_volume"
+    assert sf.volume_price_state(0.0, 2.0) == "spike_flat_price"
+    assert sf.volume_price_state(0.04, 0.0) == "up_normal_volume"
+
+
+def test_state_features_breadth_snapshot_handles_missing_and_short_histories():
+    from crypto_rsi_scanner import state_features as sf
+
+    assert sf.breadth_snapshot({"a": pd.Series([1.0, 2.0])}, {})["state"] == "unknown"
+
+    idx = pd.date_range("2026-01-01", periods=220, freq="D", tz="UTC")
+    closes = {
+        "a": pd.Series(np.linspace(10, 40, 220), index=idx),
+        "b": pd.Series(np.linspace(20, 50, 220), index=idx),
+        "c": pd.Series(np.linspace(30, 45, 220), index=idx),
+        "short": pd.Series([1.0, 2.0, 3.0], index=idx[:3]),
+    }
+    rsi = {
+        "a": pd.Series([65.0] * 220, index=idx),
+        "b": pd.Series([62.0] * 220, index=idx),
+        "c": pd.Series([45.0] * 220, index=idx),
+    }
+    snap = sf.breadth_snapshot(closes, rsi, asof=idx[-1])
+    assert snap["median_rsi"] == 62.0
+    assert snap["pct_rsi_gt_60"] == 2 / 3
+    assert snap["pct_above_50dma"] == 1.0
+    assert snap["pct_above_200dma"] == 1.0
+    assert snap["state"] == "risk_on_broad"
+
+
 def test_btc_correlation_perfect():
     btc = pd.Series(np.arange(1, 41, dtype=float))
     coin = btc * 2.0  # perfectly correlated returns

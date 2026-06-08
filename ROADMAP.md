@@ -21,6 +21,7 @@ Status labels:
 
 | status | item | owner | notes |
 |---|---|---|---|
+| todo | Integrate state features as shadow context | open | Pure `state_features.py` exists; next step is scanner/backtest state_json storage/reporting without routing changes. |
 | todo | Improve point-in-time backtest power | open | Pro CoinGecko key or alternate history source would extend PIT universe beyond demo limits. |
 | todo | Run stronger PIT calibration and review exported priors | open | Tooling exists via `backtest.py --export-priors`; needs larger PIT history before opting live into a file. |
 | waiting | Monitor universe hygiene false positives/negatives | system | Latest audit is persisted by live scans; review `main.py --universe-audit` after the next scheduled scan. |

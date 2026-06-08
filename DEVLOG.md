@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-08 — Add pure market-state feature layer · Codex
+**Why:** The research plan keeps RSI as the event trigger but needs a separate,
+auditable market-state layer before testing volatility, breadth, relative
+strength, beta, liquidity, and falling-knife hypotheses.
+**Changes:**
+- New `crypto_rsi_scanner/state_features.py` adds pure helpers for realized
+  volatility, trailing percentiles, volatility state labels, percentage returns,
+  cross-sectional ranks, single/multi-factor beta, volume z-score, dollar
+  volume, turnover, volume/price state, and breadth snapshots.
+- `tests/test_indicators.py` adds standalone tests covering flat/changing
+  volatility, trailing-only percentiles, volatility state rules, rank monotonicity,
+  synthetic beta recovery, volume/liquidity classification, and breadth behavior
+  with missing/short histories.
+- `AGENTS.md`, `ROADMAP.md`, and `DECISIONS.md` document the shadow-first state
+  feature policy and next integration step.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 115/115.
+`make verify` passes tests, alert render smoke, and paper scoreboard.
+**Notes/risks:** This is intentionally not wired into scanner routing, conviction,
+or registry priors. Next step is shadow-only scanner/backtest integration with
+`state_json`.
+
 ## 2026-06-08 — Add maintenance agent, restore drill, fixtures, and audit outputs · Codex
 **Why:** The scanner had backup/log commands, but the remaining system
 improvements were still manual or not reviewable: scheduled maintenance,

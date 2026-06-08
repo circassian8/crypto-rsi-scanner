@@ -101,6 +101,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `config.py` | env/`.env` config + all tunables; `redact_token` |
 | `client.py` | async CoinGecko client (rate-limited, retries) |
 | `universe.py` | CoinGecko universe hygiene filters/audit shared by live scan/backtest |
+| `state_features.py` | pure market-state features: volatility, breadth, relative strength, beta, liquidity |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
 | `indicators.py` | **PURE** functions: RSI, regime, setup taxonomy, market gating, conviction. Unit-tested — keep pure, add a test for new logic |
 | `scanner.py` | orchestration: scan → analyze → build message → route notifications; CLI |
@@ -130,6 +131,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   and backtest top-N selection must use the same filters. Live scans persist the
   latest audit to SQLite meta and `universe_hygiene_latest.json`; inspect it via
   `main.py --universe-audit`.
+- `state_features.py` is pure and shadow-first. State features may be tested,
+  stored, and reported before they are allowed to affect conviction, routing, or
+  gating.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.
@@ -180,8 +184,10 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 1. Let the paper scoreboard accrue ~1–2 weeks; confirm gating helps live.
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
 3. Improve point-in-time backtest power and review exported registry priors.
-4. Monitor universe hygiene false positives/negatives and tune thresholds.
-5. Use `make dry-run-fixture` before network dry-runs when validating scanner
+4. Integrate `state_features.py` into live scanner/backtest as shadow context,
+   with no routing changes until PIT/base-rate evidence supports it.
+5. Monitor universe hygiene false positives/negatives and tune thresholds.
+6. Use `make dry-run-fixture` before network dry-runs when validating scanner
    plumbing that does not need live CoinGecko data.
 
 When in doubt, read the latest `DEVLOG.md` entries, then ask the human.

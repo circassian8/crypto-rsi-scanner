@@ -177,6 +177,17 @@ waiting on network/rate-limit behavior.
 **Revisit when:** The fixture diverges from live API response shape or needs to
 cover more signal cases.
 
+## 2026-06-08 - Add market-state features shadow-first
+**Status:** accepted
+**Decision:** Keep RSI crossing/approach as the event trigger. New volatility,
+breadth, relative-strength, beta, liquidity, and risk-state features must be
+computed as pure, backtestable state context before any live conviction, routing,
+or hard-gating change.
+**Why:** The likely edge is RSI conditioned on market state, not generic indicator
+stacking. Shadow-first features avoid silently overfitting live alert behavior.
+**Revisit when:** PIT/base-rate-adjusted, cost-aware, walk-forward evidence
+supports a specific state feature affecting conviction or routing.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and
