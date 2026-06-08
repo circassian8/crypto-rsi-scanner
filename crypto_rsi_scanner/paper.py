@@ -63,6 +63,7 @@ def _open_new(storage, signals: list[dict], now: datetime) -> int:
         storage.open_paper_trade(
             symbol=s["symbol"], coin_id=coin_id, setup_type=s.get("setup_type"),
             market_regime=s.get("market_regime"), market_aligned=s.get("market_aligned"),
+            state_json=s.get("state_json"),
             direction=_direction(s.get("expected_dir")),
             conviction=int(s.get("conviction") or 0), entry_price=float(entry),
             entry_at=now.isoformat(), hold_days=config.PAPER_HOLD_DAYS,

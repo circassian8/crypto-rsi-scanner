@@ -515,13 +515,72 @@ def test_storage_save_signal_roundtrip():
         "rsi_daily": 75.0, "conviction": 60, "tier": "INSTANT", "regime": "UPTREND",
         "setup_type": "trend_continuation", "expected_dir": "up",
         "market_regime": "UPTREND", "price": 70000.0, "is_new": 1,
+        "state_json": '{"version":1}',
     })
     row = st.conn.execute(
-        "SELECT symbol, market_regime, setup_type FROM signals"
+        "SELECT symbol, market_regime, setup_type, state_json FROM signals"
     ).fetchone()
     assert row["symbol"] == "BTC" and row["market_regime"] == "UPTREND"
     assert row["setup_type"] == "trend_continuation"
+    assert row["state_json"] == '{"version":1}'
     st.close()
+
+
+def test_scanner_state_context_is_shadow_only():
+    import json
+    from crypto_rsi_scanner import scanner
+
+    idx = pd.date_range("2025-01-01", periods=240, freq="D", tz="UTC")
+    rng = np.random.RandomState(42)
+    btc = pd.Series(100 * np.exp(np.cumsum(rng.normal(0.001, 0.03, len(idx)))), index=idx)
+    eth = pd.Series(80 * np.exp(np.cumsum(rng.normal(0.001, 0.035, len(idx)))), index=idx)
+    coin = pd.Series(20 * np.exp(np.cumsum(rng.normal(0.001, 0.05, len(idx)))), index=idx)
+    vols = pd.Series(np.linspace(8_000_000, 12_000_000, len(idx)), index=idx)
+    btc_vols = pd.Series(np.linspace(500_000_000, 650_000_000, len(idx)), index=idx)
+    eth_vols = pd.Series(np.linspace(300_000_000, 400_000_000, len(idx)), index=idx)
+    daily = {
+        "bitcoin": (btc, btc_vols),
+        "ethereum": (eth, eth_vols),
+        "shadowcoin": (coin, vols),
+    }
+    market = {
+        "id": "shadowcoin", "symbol": "shd", "name": "ShadowCoin",
+        "current_price": float(coin.iloc[-1]), "market_cap": 300_000_000,
+        "total_volume": 12_000_000, "market_cap_rank": 123,
+    }
+    coin_map = {
+        "bitcoin": {"id": "bitcoin", "symbol": "btc", "market_cap": 1_000_000_000_000},
+        "ethereum": {"id": "ethereum", "symbol": "eth", "market_cap": 500_000_000_000},
+        "shadowcoin": market,
+    }
+    base = scanner._analyze_coin(coin, vols, None, btc, market, "UPTREND")
+    ctx = scanner._build_state_context(daily, coin_map, btc, eth)
+    shadow = scanner._analyze_coin(coin, vols, None, btc, market, "UPTREND", ctx)
+
+    assert base is not None and shadow is not None
+    for key in ("flag", "setup_type", "expected_dir", "market_aligned", "conviction", "tier"):
+        assert shadow[key] == base[key]
+    assert shadow["vol_state"] in {"unknown", "low_compressed", "normal", "high", "high_expanding", "crisis"}
+    assert shadow["breadth_state"] == json.loads(shadow["state_json"])["breadth"]["state"]
+    assert set(("rs_bucket", "liquidity_bucket", "falling_knife_score")).issubset(shadow)
+
+
+def test_format_signal_adds_compact_state_tokens():
+    from crypto_rsi_scanner import scanner
+
+    s = _sample_signal(
+        vol_state="crisis",
+        breadth_state="washout",
+        rs_bucket="low",
+        liquidity_bucket="low",
+        falling_knife_score=82,
+    )
+    line = scanner._format_signal(s, is_new=False)
+    assert "vol-state:crisis" in line
+    assert "breadth:washout" in line
+    assert "RS:low" in line
+    assert "liq:low" in line
+    assert "knife:82" in line
 
 
 # --- .env loader -------------------------------------------------------------
@@ -1199,7 +1258,7 @@ def test_paper_open_close_pnl_sign():
     signals = [
         {"symbol": "AAA", "coin_id": "aaa", "flag": "OS", "is_new": True, "price": 100.0,
          "setup_type": "dip_buy", "expected_dir": "up", "market_regime": "UPTREND",
-         "market_aligned": "favorable", "conviction": 70},
+         "market_aligned": "favorable", "conviction": 70, "state_json": '{"version":1}'},
         {"symbol": "BBB", "coin_id": "bbb", "flag": "OS", "is_new": True, "price": 100.0,
          "setup_type": "breakdown_risk", "expected_dir": "down", "market_regime": "DOWNTREND",
          "market_aligned": "adverse", "conviction": 40},
@@ -1215,6 +1274,7 @@ def test_paper_open_close_pnl_sign():
 
     rows = {r["symbol"]: dict(r) for r in st.closed_paper_trades()}
     assert rows["AAA"]["direction"] == "long" and rows["AAA"]["ret_pct"] > 5   # rose, long wins
+    assert rows["AAA"]["state_json"] == '{"version":1}'
     assert rows["BBB"]["direction"] == "short" and rows["BBB"]["ret_pct"] < -5  # rose, short loses
     st.close()
 

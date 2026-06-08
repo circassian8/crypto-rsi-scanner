@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS signals (
     setup_type TEXT,
     expected_dir TEXT,
     market_regime TEXT,
+    state_json TEXT,
     price REAL,
     mcap_rank INTEGER,
     is_new INTEGER DEFAULT 0,
@@ -114,6 +115,7 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     setup_type TEXT,
     market_regime TEXT,
     market_aligned TEXT,
+    state_json TEXT,
     direction TEXT NOT NULL,
     conviction INTEGER,
     entry_price REAL NOT NULL,
@@ -153,9 +155,14 @@ class Storage:
             ("setup_type", "TEXT"),
             ("expected_dir", "TEXT"),
             ("market_regime", "TEXT"),
+            ("state_json", "TEXT"),
         ):
             if name not in cols:
                 self.conn.execute(f"ALTER TABLE signals ADD COLUMN {name} {decl}")
+
+        paper_cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(paper_trades)")}
+        if "state_json" not in paper_cols:
+            self.conn.execute("ALTER TABLE paper_trades ADD COLUMN state_json TEXT")
         self._backfill_setups_once()
 
     def _backfill_setups_once(self) -> None:
@@ -301,9 +308,9 @@ class Storage:
             """INSERT INTO signals
             (scan_id, symbol, coin_id, flag, severity, rsi_daily, rsi_4h, rsi_weekly,
              rsi_z, rsi_delta, xrank, volume_ratio, btc_corr, divergence, conviction,
-             tier, regime, regime_note, setup_type, expected_dir, market_regime, price,
+             tier, regime, regime_note, setup_type, expected_dir, market_regime, state_json, price,
              mcap_rank, is_new, run_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 scan_id,
                 sig["symbol"],
@@ -326,6 +333,7 @@ class Storage:
                 _clean(sig.get("setup_type")),
                 _clean(sig.get("expected_dir")),
                 _clean(sig.get("market_regime")),
+                _clean(sig.get("state_json")),
                 _clean(sig.get("price")),
                 _clean(sig.get("mcap_rank")),
                 _clean(sig.get("is_new", 0)),
@@ -495,12 +503,12 @@ class Storage:
     def open_paper_trade(self, **t) -> None:
         self.conn.execute(
             """INSERT INTO paper_trades
-            (symbol, coin_id, setup_type, market_regime, market_aligned, direction,
+            (symbol, coin_id, setup_type, market_regime, market_aligned, state_json, direction,
              conviction, entry_price, entry_at, hold_days, status)
-            VALUES (?,?,?,?,?,?,?,?,?,?, 'open')""",
+            VALUES (?,?,?,?,?,?,?,?,?,?,?, 'open')""",
             (
                 t["symbol"], t["coin_id"], t.get("setup_type"), t.get("market_regime"),
-                t.get("market_aligned"), t["direction"], t.get("conviction"),
+                t.get("market_aligned"), t.get("state_json"), t["direction"], t.get("conviction"),
                 t["entry_price"], t["entry_at"], t["hold_days"],
             ),
         )

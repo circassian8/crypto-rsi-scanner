@@ -133,7 +133,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --universe-audit`.
 - `state_features.py` is pure and shadow-first. State features may be tested,
   stored, and reported before they are allowed to affect conviction, routing, or
-  gating.
+  gating. The live scanner attaches `state_json` only after the existing decision
+  fields are already computed.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.
@@ -184,8 +185,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 1. Let the paper scoreboard accrue ~1–2 weeks; confirm gating helps live.
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
 3. Improve point-in-time backtest power and review exported registry priors.
-4. Integrate `state_features.py` into live scanner/backtest as shadow context,
-   with no routing changes until PIT/base-rate evidence supports it.
+4. Backtest state-conditioned edge slices; promote only cohorts with clear
+   incremental edge over the registry baseline.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
 6. Use `make dry-run-fixture` before network dry-runs when validating scanner
    plumbing that does not need live CoinGecko data.

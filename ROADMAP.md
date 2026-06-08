@@ -16,12 +16,13 @@ Status labels:
 |---|---|---|---|
 | waiting | Let paper scoreboard accrue live data | system | Needs roughly 1-2 weeks of matured 7d paper trades before drawing conclusions. |
 | waiting | Validate edge-prior conviction buckets live | system | Compare high/med/low conviction and actionable/control books after enough paper trades mature. |
+| waiting | Observe live state cohorts | system | `state_json` now lands in scanner CSV/signals/paper trades; wait for enough matured outcomes before trusting state-conditioned reads. |
 
 ## Next
 
 | status | item | owner | notes |
 |---|---|---|---|
-| todo | Integrate state features as shadow context | open | Pure `state_features.py` exists; next step is scanner/backtest state_json storage/reporting without routing changes. |
+| todo | Backtest state-conditioned edge slices | open | Use stored/pure state features to test whether vol/breadth/RS/liquidity/knife cohorts improve setup edge before any routing change. |
 | todo | Improve point-in-time backtest power | open | Pro CoinGecko key or alternate history source would extend PIT universe beyond demo limits. |
 | todo | Run stronger PIT calibration and review exported priors | open | Tooling exists via `backtest.py --export-priors`; needs larger PIT history before opting live into a file. |
 | waiting | Monitor universe hygiene false positives/negatives | system | Latest audit is persisted by live scans; review `main.py --universe-audit` after the next scheduled scan. |

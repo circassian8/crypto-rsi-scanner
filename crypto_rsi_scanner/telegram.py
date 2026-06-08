@@ -85,6 +85,8 @@ def save_latest_snapshot(storage, signals: list[dict]) -> None:
         "volume_ratio", "btc_corr", "divergence", "regime", "regime_note",
         "setup_type", "expected_dir", "market_regime", "market_aligned",
         "price", "pct_24h", "pct_7d", "ath_pct", "track_record",
+        "vol_state", "breadth_state", "rs_bucket", "liquidity_bucket",
+        "falling_knife_score",
     )
     trimmed = [{k: s.get(k) for k in keep} for s in signals]
     storage.set_meta("latest_signals", json.dumps(trimmed, default=str))

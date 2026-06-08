@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-08 — Wire market-state context into live scanner · Codex
+**Why:** The pure state feature layer needs live, reviewable observations before
+any state-conditioned edge can be trusted. Scanner rows should therefore carry
+volatility, breadth, relative-strength, liquidity, and falling-knife context
+without changing current alert decisions.
+**Changes:**
+- `crypto_rsi_scanner/scanner.py` builds one shadow state context per scan,
+  attaches per-coin `state_json`, `vol_state`, `breadth_state`, `rs_bucket`,
+  `liquidity_bucket`, and `falling_knife_score` after conviction/tier are
+  computed, and adds compact console tokens for meaningful state labels.
+- `crypto_rsi_scanner/storage.py` additively migrates `signals` and
+  `paper_trades` with nullable `state_json`; `crypto_rsi_scanner/paper.py`
+  stores the entry-state snapshot for paper trades.
+- `crypto_rsi_scanner/telegram.py` preserves compact state buckets in the latest
+  bot snapshot.
+- `tests/test_indicators.py`, `ROADMAP.md`, `DECISIONS.md`, and `AGENTS.md`
+  document and test the shadow-only state boundary.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 117/117.
+`make dry-run-fixture` runs offline and shows state tokens in the scan output.
+`make smoke-alerts` passes. `make verify` passes tests, alert render smoke, and
+paper scoreboard.
+**Notes/risks:** State remains observational only. The next high-leverage work is
+state-conditioned backtest/live cohort analysis before allowing any state bucket
+to affect conviction or routing.
+
 ## 2026-06-08 — Add pure market-state feature layer · Codex
 **Why:** The research plan keeps RSI as the event trigger but needs a separate,
 auditable market-state layer before testing volatility, breadth, relative

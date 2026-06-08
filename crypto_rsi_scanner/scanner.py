@@ -27,6 +27,20 @@ from .indicators import (
     wilder_rsi,
 )
 from .signal_registry import market_alignment, regime_note, setup_for
+from .state_features import (
+    breadth_snapshot,
+    cross_sectional_ranks,
+    dollar_volume_20,
+    pct_return,
+    realized_vol,
+    realized_vol_series,
+    rolling_beta,
+    rolling_multi_beta,
+    trailing_percentile,
+    volatility_state,
+    volume_price_state,
+    volume_z_score,
+)
 from .notifications import notify_all
 from .storage import Storage
 from .universe import (
@@ -110,6 +124,225 @@ def classify_tier(flag: str, severity: str, conviction: int,
     return "DIGEST"
 
 
+def _finite_float(value: object, default: float | None = None) -> float | None:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return default
+    return v if np.isfinite(v) else default
+
+
+def _rounded(value: object, ndigits: int = 4, default: float | None = None) -> float | None:
+    v = _finite_float(value, default)
+    return None if v is None else round(v, ndigits)
+
+
+def _json_safe(value: object) -> object:
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating, float)):
+        v = float(value)
+        return v if np.isfinite(v) else None
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    return value
+
+
+def _rank_bucket(rank: object) -> str:
+    r = _finite_float(rank, 0.5) or 0.5
+    if r >= 0.67:
+        return "high"
+    if r <= 0.33:
+        return "low"
+    return "mid"
+
+
+def _liquidity_bucket(dollar_volume: object, turnover: object) -> str:
+    dv = _finite_float(dollar_volume, 0.0) or 0.0
+    tv = _finite_float(turnover, 0.0) or 0.0
+    if dv <= 0:
+        return "unknown"
+    if dv < 5_000_000 or (0 < tv < 0.001):
+        return "low"
+    if dv >= 100_000_000 or tv >= 0.01:
+        return "high"
+    return "mid"
+
+
+def _falling_knife_score(
+    *,
+    vol_state: str,
+    breadth_state: str,
+    rs_bucket: str,
+    regime: str,
+    volume_state: str,
+    ret_30d: float,
+    btc_beta_60: float,
+    beta_r2_60: float,
+) -> int:
+    """Shadow-only crash-risk score. It is stored/displayed, never routed on."""
+    score = 0
+    if vol_state == "crisis":
+        score += 25
+    elif vol_state == "high_expanding":
+        score += 18
+    if breadth_state == "breadth_collapse":
+        score += 25
+    elif breadth_state == "washout":
+        score += 15
+    if rs_bucket == "low":
+        score += 18
+    if regime == "DOWNTREND":
+        score += 15
+    if volume_state == "down_high_volume":
+        score += 14
+    if ret_30d <= -0.25:
+        score += 10
+    if beta_r2_60 >= 0.50 and btc_beta_60 >= 1.20:
+        score += 8
+    return min(100, int(score))
+
+
+def _build_state_context(
+    daily_parsed: dict[str, tuple[pd.Series, pd.Series]],
+    coin_map: dict[str, dict],
+    btc_closes: pd.Series | None,
+    eth_closes: pd.Series | None,
+) -> dict:
+    """Build shadow market-state snapshots for scanner rows.
+
+    The context is deliberately separate from signal decisions. Callers attach it
+    after conviction/tier are already computed so it cannot change live routing.
+    """
+    closes_by_coin = {cid: cv[0] for cid, cv in daily_parsed.items() if not cv[0].empty}
+    rsi_by_coin = {
+        cid: wilder_rsi(closes, config.RSI_PERIOD).dropna()
+        for cid, closes in closes_by_coin.items()
+    }
+    breadth = breadth_snapshot(closes_by_coin, rsi_by_coin)
+
+    ret_30d = {cid: pct_return(closes, 30) for cid, closes in closes_by_coin.items()}
+    ret_90d = {cid: pct_return(closes, 90) for cid, closes in closes_by_coin.items()}
+    rank_30d = cross_sectional_ranks(ret_30d)
+    rank_90d = cross_sectional_ranks(ret_90d)
+    btc_ret_30d = pct_return(btc_closes, 30) if btc_closes is not None else 0.0
+    btc_ret_90d = pct_return(btc_closes, 90) if btc_closes is not None else 0.0
+    eth_ret_30d = pct_return(eth_closes, 30) if eth_closes is not None else 0.0
+    eth_ret_90d = pct_return(eth_closes, 90) if eth_closes is not None else 0.0
+
+    factors: dict[str, pd.Series] = {}
+    if btc_closes is not None and not btc_closes.empty:
+        factors["btc"] = btc_closes
+    if eth_closes is not None and not eth_closes.empty:
+        factors["eth"] = eth_closes
+
+    per_coin: dict[str, dict] = {}
+    for coin_id, (closes, volumes) in daily_parsed.items():
+        if closes.empty:
+            continue
+        market = coin_map.get(coin_id, {})
+
+        rv_20 = realized_vol(closes, 20)
+        rv_60 = realized_vol(closes, 60)
+        rv20_series = realized_vol_series(closes, 20)
+        rv_count = len(rv20_series.dropna())
+        pct_window = min(252, rv_count) if rv_count >= 20 else 252
+        rv_pctile = trailing_percentile(rv20_series, pct_window)
+        vol_state = volatility_state(rv_20, rv_60, rv_pctile)
+
+        multi = rolling_multi_beta(closes, factors, 60)
+        btc_beta_60 = (
+            rolling_beta(closes, btc_closes, 60)
+            if btc_closes is not None and not btc_closes.empty else 0.0
+        )
+        if "beta_btc" in multi:
+            btc_beta_60 = multi["beta_btc"]
+        eth_beta_60 = multi.get("beta_eth", 0.0)
+        beta_r2_60 = multi.get("r2", 0.0)
+        resid_30d = ret_30d.get(coin_id, 0.0) - btc_beta_60 * btc_ret_30d - eth_beta_60 * eth_ret_30d
+        resid_90d = ret_90d.get(coin_id, 0.0) - btc_beta_60 * btc_ret_90d - eth_beta_60 * eth_ret_90d
+        avg_rank = (rank_30d.get(coin_id, 0.5) + rank_90d.get(coin_id, 0.5)) / 2.0
+        rs_bucket = _rank_bucket(avg_rank)
+
+        dollar_vol = dollar_volume_20(closes, volumes, volume_is_usd=True)
+        if dollar_vol <= 0:
+            dollar_vol = _finite_float(market.get("total_volume"), 0.0) or 0.0
+        market_cap = _finite_float(market.get("market_cap"), 0.0) or 0.0
+        turnover = dollar_vol / market_cap if market_cap > 0 else 0.0
+        vol_z = volume_z_score(volumes, 90) if not volumes.empty else 0.0
+        vp_state = volume_price_state(pct_return(closes, 1), vol_z)
+        liq_bucket = _liquidity_bucket(dollar_vol, turnover)
+
+        regime = trend_regime(
+            closes,
+            config.REGIME_SHORT_MA,
+            config.REGIME_LONG_MA,
+            config.REGIME_SLOPE_LOOKBACK,
+        )
+        knife = _falling_knife_score(
+            vol_state=vol_state,
+            breadth_state=str(breadth.get("state") or "unknown"),
+            rs_bucket=rs_bucket,
+            regime=regime,
+            volume_state=vp_state,
+            ret_30d=ret_30d.get(coin_id, 0.0),
+            btc_beta_60=btc_beta_60,
+            beta_r2_60=beta_r2_60,
+        )
+
+        state = {
+            "version": 1,
+            "volatility": {
+                "rv_20": _rounded(rv_20),
+                "rv_60": _rounded(rv_60),
+                "rv_pctile_252": _rounded(rv_pctile),
+                "state": vol_state,
+            },
+            "breadth": breadth,
+            "relative_strength": {
+                "ret_30d": _rounded(ret_30d.get(coin_id)),
+                "ret_90d": _rounded(ret_90d.get(coin_id)),
+                "ret_30d_ex_btc": _rounded(ret_30d.get(coin_id, 0.0) - btc_ret_30d),
+                "ret_90d_ex_btc": _rounded(ret_90d.get(coin_id, 0.0) - btc_ret_90d),
+                "resid_ret_30d": _rounded(resid_30d),
+                "resid_ret_90d": _rounded(resid_90d),
+                "rank_30d": _rounded(rank_30d.get(coin_id)),
+                "rank_90d": _rounded(rank_90d.get(coin_id)),
+                "bucket": rs_bucket,
+            },
+            "beta": {
+                "btc_beta_60": _rounded(btc_beta_60),
+                "eth_beta_60": _rounded(eth_beta_60),
+                "r2_btc_eth_60": _rounded(beta_r2_60),
+            },
+            "liquidity": {
+                "dollar_volume_20": _rounded(dollar_vol, 2),
+                "turnover_20": _rounded(turnover, 6),
+                "volume_z_90": _rounded(vol_z),
+                "volume_price_state": vp_state,
+                "bucket": liq_bucket,
+            },
+            "risk": {
+                "falling_knife_score": knife,
+            },
+        }
+        per_coin[coin_id] = {
+            "state": state,
+            "state_json": json.dumps(_json_safe(state), sort_keys=True, separators=(",", ":")),
+            "vol_state": vol_state,
+            "breadth_state": breadth.get("state") or "unknown",
+            "rs_bucket": rs_bucket,
+            "liquidity_bucket": liq_bucket,
+            "falling_knife_score": knife,
+        }
+
+    return {"breadth": breadth, "per_coin": per_coin}
+
+
 # ---------------------------------------------------------------------------
 # Per-coin analysis
 # ---------------------------------------------------------------------------
@@ -121,6 +354,7 @@ def _analyze_coin(
     btc_closes: pd.Series | None,
     market_info: dict,
     market_regime: str = "UNKNOWN",
+    state_context: dict | None = None,
 ) -> dict | None:
     sym = (market_info.get("symbol") or "").upper()
     coin_id = market_info.get("id", "")
@@ -218,6 +452,9 @@ def _analyze_coin(
         classify_tier(flag, result["severity"], result["conviction"], aligned)
         if flag else ""
     )
+    state_fields = (state_context or {}).get("per_coin", {}).get(coin_id)
+    if state_fields:
+        result.update(state_fields)
     return result
 
 
@@ -302,6 +539,9 @@ async def scan(top_n: int | None = None) -> tuple[pd.DataFrame, dict, dict]:
     btc_closes: pd.Series | None = None
     if "bitcoin" in daily_parsed:
         btc_closes = daily_parsed["bitcoin"][0]
+    eth_closes: pd.Series | None = None
+    if "ethereum" in daily_parsed:
+        eth_closes = daily_parsed["ethereum"][0]
 
     # --- market regime (BTC trend): the backdrop every setup is gated against ---
     market_regime = "UNKNOWN"
@@ -314,6 +554,7 @@ async def scan(top_n: int | None = None) -> tuple[pd.DataFrame, dict, dict]:
 
     # --- full analysis ---
     coin_map = {m["id"]: m for m in coins}
+    state_context = _build_state_context(daily_parsed, coin_map, btc_closes, eth_closes)
     rows: list[dict] = []
     for coin_id, (closes, volumes) in daily_parsed.items():
         market = coin_map.get(coin_id)
@@ -326,6 +567,7 @@ async def scan(top_n: int | None = None) -> tuple[pd.DataFrame, dict, dict]:
             btc_closes,
             market,
             market_regime,
+            state_context,
         )
         if result:
             rows.append(result)
@@ -383,6 +625,25 @@ def _format_signal(s: dict, is_new: bool) -> str:
 
     if is_new:
         parts.append("NEW")
+
+    vol_state = s.get("vol_state")
+    if vol_state in ("high_expanding", "crisis", "low_compressed"):
+        parts.append(f"vol-state:{vol_state}")
+
+    breadth_state = s.get("breadth_state")
+    if breadth_state in ("washout", "washout_recovery", "breadth_collapse", "risk_on_broad"):
+        parts.append(f"breadth:{breadth_state}")
+
+    rs_bucket = s.get("rs_bucket")
+    if rs_bucket in ("high", "low"):
+        parts.append(f"RS:{rs_bucket}")
+
+    if s.get("liquidity_bucket") == "low":
+        parts.append("liq:low")
+
+    knife_score = _finite_float(s.get("falling_knife_score"), 0.0) or 0.0
+    if knife_score >= 70:
+        parts.append(f"knife:{int(knife_score)}")
 
     return " | ".join(parts)
 
@@ -494,7 +755,7 @@ def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) 
         print("\n" + msg + "\n")
 
         # sparkline is a long list per row; keep it for alerts but not the CSV
-        df.drop(columns=["sparkline"], errors="ignore").to_csv(config.CSV_OUT, index=False)
+        df.drop(columns=["sparkline", "state"], errors="ignore").to_csv(config.CSV_OUT, index=False)
         log.info("Full table -> %s", config.CSV_OUT)
 
         flagged = df[df["flag"] != ""]

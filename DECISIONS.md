@@ -188,6 +188,18 @@ stacking. Shadow-first features avoid silently overfitting live alert behavior.
 **Revisit when:** PIT/base-rate-adjusted, cost-aware, walk-forward evidence
 supports a specific state feature affecting conviction or routing.
 
+## 2026-06-08 - Store live state snapshots observationally
+**Status:** accepted
+**Decision:** The live scanner may attach `state_json` and compact state buckets
+to rows, alerts, signals, and paper-trade entries, but it must attach them after
+`flag`, `setup_type`, `expected_dir`, `market_aligned`, `conviction`, and `tier`
+are already computed.
+**Why:** We need live/backtestable state labels to measure conditional edge, but
+state features are not yet proven enough to affect alert routing or score.
+**Revisit when:** State-conditioned PIT/live outcome analysis identifies a
+specific feature/cohort with durable incremental edge over the existing registry
+baseline.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and
