@@ -72,6 +72,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   scoreboard) · `main.py --status` (scan/listener health)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention)
+- **Ops maintenance:** `make status` shows scan, backup, and log health;
+  `make rotate-logs` copy-truncates oversized `scan.log`/`bot.log`;
+  `make launchd-status` inspects the scan/listener agents; `make restart-listener`
+  restarts the always-on bot listener.
 - **Backtest (research):**
   `python -m crypto_rsi_scanner.backtest --top-n 80 --days 1825`
   flags: `--pit` (point-in-time universe, survivorship fix) · `--slice <setup>`
@@ -97,6 +101,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `scanner.py` | orchestration: scan → analyze → build message → route notifications; CLI |
 | `storage.py` | SQLite. **Additive migrations only** (`_migrate`); one-time data migrations gated by a `meta` flag |
 | `backups.py` | safe SQLite online backups, integrity check, retention |
+| `ops.py` | local log rotation and launchd status/restart helpers |
 | `outcomes.py` | forward-return grading vs each setup's *expected direction* |
 | `formatting.py` | channel rendering (Telegram HTML cards, plain text) |
 | `notifications.py` | send to Telegram/Discord/email |
@@ -167,8 +172,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 
 1. Let the paper scoreboard accrue ~1–2 weeks; confirm gating helps live.
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
-3. Add backup freshness to status and log rotation.
-4. Improve point-in-time backtest power and review exported registry priors.
-5. Monitor universe hygiene false positives/negatives and tune thresholds.
+3. Improve point-in-time backtest power and review exported registry priors.
+4. Monitor universe hygiene false positives/negatives and tune thresholds.
+5. Add cached API fixtures if network smoke checks become too slow/noisy.
 
 When in doubt, read the latest `DEVLOG.md` entries, then ask the human.

@@ -22,6 +22,34 @@ class BackupResult:
     deleted: tuple[Path, ...]
 
 
+@dataclass(frozen=True)
+class BackupStatus:
+    backup_dir: Path
+    source_stem: str
+    path: Path | None
+    created_at: datetime | None
+    age_hours: float | None
+    size_bytes: int
+    count: int
+    stale_after_hours: float
+
+    @property
+    def missing(self) -> bool:
+        return self.path is None
+
+    @property
+    def stale(self) -> bool:
+        return self.age_hours is None or self.age_hours >= self.stale_after_hours
+
+    @property
+    def state(self) -> str:
+        if self.missing:
+            return "MISSING"
+        if self.stale:
+            return "STALE"
+        return "OK"
+
+
 def _utc_stamp(now: datetime | None = None) -> str:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -31,6 +59,26 @@ def _utc_stamp(now: datetime | None = None) -> str:
 
 def _backup_name(source: Path, now: datetime | None = None) -> str:
     return f"{source.stem}-{_utc_stamp(now)}.db"
+
+
+def _created_at_from_name(source_stem: str, path: Path) -> datetime | None:
+    prefix = f"{source_stem}-"
+    suffix = ".db"
+    if not path.name.startswith(prefix) or not path.name.endswith(suffix):
+        return None
+    rest = path.name[len(prefix):-len(suffix)]
+    stamp = rest.split("-", 1)[0]
+    try:
+        return datetime.strptime(stamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _file_time(path: Path) -> datetime | None:
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+    except FileNotFoundError:
+        return None
 
 
 def verify_backup(path: Path) -> str:
@@ -106,6 +154,55 @@ def backup_database(
         size_bytes=final.stat().st_size,
         quick_check=quick_check,
         deleted=deleted,
+    )
+
+
+def latest_backup_status(
+    source: Path,
+    backup_dir: Path,
+    *,
+    now: datetime | None = None,
+    stale_after_hours: float = 72.0,
+) -> BackupStatus:
+    """Return freshness metadata for the newest retained backup."""
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+
+    source = Path(source).expanduser()
+    backup_dir = Path(backup_dir).expanduser()
+    backups = sorted(backup_dir.glob(f"{source.stem}-*.db")) if backup_dir.exists() else []
+    if not backups:
+        return BackupStatus(
+            backup_dir=backup_dir,
+            source_stem=source.stem,
+            path=None,
+            created_at=None,
+            age_hours=None,
+            size_bytes=0,
+            count=0,
+            stale_after_hours=stale_after_hours,
+        )
+
+    def sort_key(path: Path) -> tuple[datetime, str]:
+        created = _created_at_from_name(source.stem, path) or _file_time(path)
+        return created or datetime.min.replace(tzinfo=timezone.utc), path.name
+
+    latest = max(backups, key=sort_key)
+    created_at = _created_at_from_name(source.stem, latest) or _file_time(latest)
+    age_hours = None
+    if created_at is not None:
+        age_hours = max(0.0, (now - created_at.astimezone(timezone.utc)).total_seconds() / 3600.0)
+    return BackupStatus(
+        backup_dir=backup_dir,
+        source_stem=source.stem,
+        path=latest,
+        created_at=created_at,
+        age_hours=age_hours,
+        size_bytes=latest.stat().st_size,
+        count=len(backups),
+        stale_after_hours=stale_after_hours,
     )
 
 

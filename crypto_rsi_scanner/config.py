@@ -167,6 +167,22 @@ BACKUP_DIR = Path(_BACKUP_DIR_RAW).expanduser()
 if not BACKUP_DIR.is_absolute():
     BACKUP_DIR = DATA_DIR / BACKUP_DIR
 BACKUP_KEEP = int(os.getenv("RSI_BACKUP_KEEP", "14"))
+BACKUP_STALE_HOURS = float(os.getenv("RSI_BACKUP_STALE_HOURS", "72"))
+
+_LOG_FILES_RAW = os.getenv("RSI_LOG_FILES", "scan.log,bot.log")
+LOG_FILES: list[Path] = []
+for _raw_log_path in (p.strip() for p in _LOG_FILES_RAW.split(",")):
+    if not _raw_log_path:
+        continue
+    _log_path = Path(_raw_log_path).expanduser()
+    if not _log_path.is_absolute():
+        _log_path = DATA_DIR / _log_path
+    LOG_FILES.append(_log_path)
+LOG_ROTATE_MAX_BYTES = int(os.getenv("RSI_LOG_ROTATE_MAX_BYTES", str(5 * 1024 * 1024)))
+LOG_ROTATE_KEEP = int(os.getenv("RSI_LOG_ROTATE_KEEP", "5"))
+
+LAUNCHD_SCAN_LABEL = os.getenv("RSI_LAUNCHD_SCAN_LABEL", "com.nasrenkaraf.rsiscanner")
+LAUNCHD_BOT_LABEL = os.getenv("RSI_LAUNCHD_BOT_LABEL", "com.nasrenkaraf.rsibot")
 
 
 def redact_token(text: str) -> str:

@@ -718,6 +718,37 @@ def backup_db() -> None:
     print(format_backup_result(result))
 
 
+def rotate_logs() -> None:
+    """Rotate oversized local launchd logs."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    from .ops import format_log_rotation, rotate_logs as _rotate_logs
+
+    results = _rotate_logs(
+        config.LOG_FILES,
+        max_bytes=config.LOG_ROTATE_MAX_BYTES,
+        keep=config.LOG_ROTATE_KEEP,
+    )
+    print(format_log_rotation(results))
+
+
+def launchd_status() -> None:
+    """Print launchd status for the scan and bot agents."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    from .ops import format_launchd_status, launchd_status as _launchd_status
+
+    statuses = _launchd_status((config.LAUNCHD_SCAN_LABEL, config.LAUNCHD_BOT_LABEL))
+    print(format_launchd_status(statuses))
+
+
+def restart_listener() -> None:
+    """Restart the always-on Telegram bot listener launchd agent."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    from .ops import format_launchd_command, restart_launchd_service
+
+    result = restart_launchd_service(config.LAUNCHD_BOT_LABEL)
+    print(format_launchd_command(result))
+
+
 def cli() -> None:
     import argparse
 
@@ -751,6 +782,21 @@ def cli() -> None:
         help="Create and verify a safe SQLite backup, then prune old backups.",
     )
     parser.add_argument(
+        "--rotate-logs",
+        action="store_true",
+        help="Rotate oversized local scan/listener logs and prune old rotations.",
+    )
+    parser.add_argument(
+        "--launchd-status",
+        action="store_true",
+        help="Print launchd status for the scan and bot agents.",
+    )
+    parser.add_argument(
+        "--restart-listener",
+        action="store_true",
+        help="Restart the always-on bot listener launchd agent.",
+    )
+    parser.add_argument(
         "--listen",
         action="store_true",
         help="Run the bot listener loop so commands (/top, /detail, /stats) "
@@ -770,6 +816,15 @@ def cli() -> None:
         return
     if args.backup_db:
         backup_db()
+        return
+    if args.rotate_logs:
+        rotate_logs()
+        return
+    if args.launchd_status:
+        launchd_status()
+        return
+    if args.restart_listener:
+        restart_listener()
         return
     if args.listen:
         logging.basicConfig(

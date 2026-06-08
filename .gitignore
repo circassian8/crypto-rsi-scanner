@@ -8,6 +8,7 @@
 rsi_scan_latest.csv
 scan.log
 bot.log
+*.log.*
 backups/
 
 # Python

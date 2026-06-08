@@ -16,4 +16,4 @@ Quick reminders (full detail in `AGENTS.md`):
 - Durable choices/rejections: `DECISIONS.md`.
 - Backtest signal-logic changes before shipping live.
 - Restart the listener to deploy listener code:
-  `launchctl kickstart -k "gui/$(id -u)/com.nasrenkaraf.rsibot"`.
+  `make restart-listener`.

@@ -145,6 +145,17 @@ connections; raw file copies can miss WAL contents or capture an inconsistent
 state.
 **Revisit when:** We move state storage away from local SQLite.
 
+## 2026-06-08 - Keep ops maintenance repo-owned but schedule changes explicit
+**Status:** accepted
+**Decision:** `main.py --status` reports backup freshness and log sizes;
+`main.py --rotate-logs` copy-truncates oversized local logs; launchd helpers can
+inspect scan/listener status and restart the bot listener by label. Agents should
+not install or mutate launchd schedules/plists unless the human explicitly asks.
+**Why:** The live Mac needs simple recovery/inspection commands, but changing
+service schedules is machine state outside the repo and should remain deliberate.
+**Revisit when:** The human wants a checked-in or installed maintenance
+LaunchAgent for backups/log rotation.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and

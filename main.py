@@ -24,6 +24,10 @@ ENV VARS:
   RSI_TOP_N            Number of coins to scan (default 100).
   RSI_BACKUP_DIR       Backup directory for --backup-db (default ./backups).
   RSI_BACKUP_KEEP      Number of DB backups to retain (default 14).
+  RSI_BACKUP_STALE_HOURS  Backup freshness threshold for --status (default 72).
+  RSI_LOG_FILES        Comma-separated logs for --status/--rotate-logs.
+  RSI_LOG_ROTATE_MAX_BYTES  Rotate logs larger than this (default 5 MiB).
+  RSI_LOG_ROTATE_KEEP  Number of rotated logs to retain (default 5).
 
 Secrets can also be placed in a .env file at the project root.
 
@@ -33,7 +37,10 @@ Usage:
   python main.py --dry-run       # scan + print, no notifications, no state change
   python main.py --top-n 20 -v   # smaller universe, debug logging
   python main.py --report        # print signal-outcome stats (hit-rates) and exit
+  python main.py --status        # print scan/listener/backup/log health
   python main.py --backup-db     # safe SQLite backup + integrity check
+  python main.py --rotate-logs   # rotate oversized scan/listener logs
+  python main.py --launchd-status # print launchd service status
 
 Cron (daily at 00:05 UTC):
   5 0 * * *  cd /path/to/project && python main.py >> scan.log 2>&1

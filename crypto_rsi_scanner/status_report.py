@@ -6,6 +6,8 @@ import json
 from datetime import datetime, timezone
 
 from . import config
+from .backups import latest_backup_status
+from .ops import format_bytes, log_file_status
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -40,6 +42,15 @@ def _fmt_age(hours: float | None) -> str:
     if hours < 48:
         return f"{hours:.1f}h ago"
     return f"{hours / 24:.1f}d ago"
+
+
+def _display_path(path) -> str:
+    if path is None:
+        return "n/a"
+    try:
+        return str(path.relative_to(config.DATA_DIR))
+    except ValueError:
+        return str(path)
 
 
 def _duration(start: datetime | None, finish: datetime | None) -> str:
@@ -88,6 +99,14 @@ def build_status(storage, now: datetime | None = None) -> dict:
     else:
         health = "UNKNOWN"
 
+    backup = latest_backup_status(
+        config.DB_PATH,
+        config.BACKUP_DIR,
+        now=now,
+        stale_after_hours=config.BACKUP_STALE_HOURS,
+    )
+    logs = log_file_status(config.LOG_FILES, max_bytes=config.LOG_ROTATE_MAX_BYTES)
+
     return {
         "health": health,
         "state": state,
@@ -114,6 +133,11 @@ def build_status(storage, now: datetime | None = None) -> dict:
         "latest_signal_count": _latest_signal_count(storage),
         "active_subscribers": len(storage.active_subscribers()),
         "open_paper_trades": len(storage.open_paper_trades()),
+        "backup": backup,
+        "backup_keep": config.BACKUP_KEEP,
+        "logs": logs,
+        "log_rotate_max_bytes": config.LOG_ROTATE_MAX_BYTES,
+        "log_rotate_keep": config.LOG_ROTATE_KEEP,
     }
 
 
@@ -157,6 +181,34 @@ def format_status(storage, now: datetime | None = None) -> str:
         f"{s['latest_signal_count']} current snapshot signal(s)"
     )
     lines.append(f"paper: {s['open_paper_trades']} open trade(s)")
+
+    backup = s["backup"]
+    if backup.missing:
+        lines.append(
+            f"backup: MISSING ({_display_path(backup.backup_dir)}; run main.py --backup-db)"
+        )
+    else:
+        lines.append(
+            f"backup: {backup.state} {_display_path(backup.path)} "
+            f"({_fmt_age(backup.age_hours)}, {format_bytes(backup.size_bytes)}, "
+            f"{backup.count}/{s['backup_keep']} retained)"
+        )
+    lines.append(f"backup stale threshold: {backup.stale_after_hours:.0f}h")
+
+    logs = s["logs"]
+    if logs:
+        parts = []
+        for item in logs:
+            if not item.exists:
+                parts.append(f"{_display_path(item.path)} missing")
+            else:
+                state = "rotate" if item.needs_rotation else "ok"
+                parts.append(f"{_display_path(item.path)} {format_bytes(item.size_bytes)} {state}")
+        lines.append(
+            "logs: "
+            + ", ".join(parts)
+            + f" (rotate > {format_bytes(s['log_rotate_max_bytes'])}, keep {s['log_rotate_keep']})"
+        )
     lines.append(f"stale threshold: {s['stale_threshold_hours']:.0f}h")
 
     if s["last_error"]:

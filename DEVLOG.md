@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-08 — Finish ops maintenance status, logs, and launchd helpers · Codex
+**Why:** Safe backups existed, but operational health still did not show whether
+the latest backup was fresh, logs could grow without a repo-owned rotation
+command, and launchd service inspection required memorized shell commands.
+**Changes:**
+- `main.py --status` now reports newest backup freshness, retained backup count,
+  and configured log sizes/rotation thresholds.
+- New `crypto_rsi_scanner/ops.py` adds copy-truncate log rotation plus launchd
+  scan/listener status parsing and listener restart helpers.
+- `main.py`, `Makefile`, `config.py`, `.env.example`, `.gitignore`,
+  `AGENTS.md`, `CLAUDE.md`, `ROADMAP.md`, and `DECISIONS.md` document and expose
+  `--rotate-logs`, `--launchd-status`, and `--restart-listener`.
+- `tests/test_indicators.py` covers backup freshness rendering, log rotation
+  retention, and launchd output parsing.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 104/104.
+`.venv/bin/python main.py --status` shows the live backup as `OK` and both logs
+below rotation threshold. `.venv/bin/python main.py --launchd-status` reports
+`com.nasrenkaraf.rsiscanner` loaded/not running with last exit 0 and
+`com.nasrenkaraf.rsibot` running. `.venv/bin/python main.py --rotate-logs` keeps
+the current small logs without rotating.
+**Notes/risks:** This intentionally does not install or mutate launchd schedules;
+use the new commands from an explicit scheduled job if/when the owner wants that.
+
 ## 2026-06-08 — Add safe SQLite DB backup command · Codex
 **Why:** The scanner now has operational health reporting, but the live SQLite
 DB still needed a safe recovery path. Because the DB runs in WAL mode and can be

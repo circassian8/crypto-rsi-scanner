@@ -1325,6 +1325,121 @@ def test_sqlite_backup_api_integrity_and_retention():
     assert not result.path.exists()
 
 
+def test_backup_freshness_status_report():
+    import sqlite3
+    import tempfile
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path
+
+    from crypto_rsi_scanner import config, status_report
+    from crypto_rsi_scanner.backups import backup_database
+
+    root = Path(tempfile.mkdtemp())
+    src = root / "rsi_scanner.db"
+    backup_dir = root / "backups"
+    conn = sqlite3.connect(src)
+    conn.execute("CREATE TABLE sample (id INTEGER PRIMARY KEY)")
+    conn.commit()
+    conn.close()
+
+    st = _fresh_storage()
+    orig_db = config.DB_PATH
+    orig_dir = config.BACKUP_DIR
+    orig_keep = config.BACKUP_KEEP
+    orig_stale = config.BACKUP_STALE_HOURS
+    orig_logs = config.LOG_FILES
+    config.DB_PATH = src
+    config.BACKUP_DIR = backup_dir
+    config.BACKUP_KEEP = 2
+    config.BACKUP_STALE_HOURS = 24
+    config.LOG_FILES = []
+    try:
+        created = datetime(2026, 6, 8, 1, 0, 0, tzinfo=timezone.utc)
+        backup_database(src, backup_dir, keep=2, now=created)
+
+        fresh = status_report.format_status(st, now=created + timedelta(hours=2))
+        assert "backup: OK" in fresh
+        assert "rsi_scanner-20260608T010000Z.db" in fresh
+        assert "2.0h ago" in fresh
+        assert "1/2 retained" in fresh
+
+        stale = status_report.format_status(st, now=created + timedelta(hours=25))
+        assert "backup: STALE" in stale
+
+        config.BACKUP_DIR = root / "empty"
+        missing = status_report.format_status(st, now=created + timedelta(hours=2))
+        assert "backup: MISSING" in missing
+        assert "run main.py --backup-db" in missing
+    finally:
+        config.DB_PATH = orig_db
+        config.BACKUP_DIR = orig_dir
+        config.BACKUP_KEEP = orig_keep
+        config.BACKUP_STALE_HOURS = orig_stale
+        config.LOG_FILES = orig_logs
+        st.close()
+
+
+def test_log_rotation_copytruncate_and_retention():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from crypto_rsi_scanner.ops import log_file_status, rotate_logs
+
+    root = Path(tempfile.mkdtemp())
+    log = root / "bot.log"
+    first_time = datetime(2026, 6, 8, 1, 0, 0, tzinfo=timezone.utc)
+    second_time = datetime(2026, 6, 8, 1, 0, 1, tzinfo=timezone.utc)
+
+    log.write_text("first rotation\n")
+    first = rotate_logs([log], max_bytes=3, keep=1, now=first_time)[0]
+    assert first.reason == "rotated"
+    assert first.rotated_to is not None
+    assert first.rotated_to.read_text() == "first rotation\n"
+    assert log.read_text() == ""
+
+    log.write_text("second rotation\n")
+    second = rotate_logs([log], max_bytes=3, keep=1, now=second_time)[0]
+    assert second.reason == "rotated"
+    assert second.rotated_to is not None
+    assert second.rotated_to.read_text() == "second rotation\n"
+    assert not first.rotated_to.exists()
+    assert len(list(root.glob("bot.log.*"))) == 1
+    assert log.read_text() == ""
+
+    status = log_file_status([log], max_bytes=3)[0]
+    assert status.exists is True
+    assert status.size_bytes == 0
+    assert status.rotation_count == 1
+
+
+def test_launchd_status_parser_and_formatter():
+    from crypto_rsi_scanner.ops import _parse_launchctl_print, format_launchd_status
+
+    text = """
+gui/501/com.nasrenkaraf.rsibot = {
+    path = /Users/nasrenkaraf/Library/LaunchAgents/com.nasrenkaraf.rsibot.plist
+    state = running
+    stdout path = /Users/nasrenkaraf/crypto-rsi-scanner/bot.log
+    stderr path = /Users/nasrenkaraf/crypto-rsi-scanner/bot.log
+    runs = 8
+    pid = 73052
+    last exit code = 0
+}
+"""
+    status = _parse_launchctl_print("com.nasrenkaraf.rsibot", "gui/501", text)
+    assert status.loaded is True
+    assert status.state == "running"
+    assert status.pid == 73052
+    assert status.runs == 8
+    assert status.last_exit_code == 0
+    assert status.stdout_path.endswith("bot.log")
+
+    out = format_launchd_status([status])
+    assert "com.nasrenkaraf.rsibot: running, pid 73052, runs 8, last exit 0" in out
+    assert "stdout: /Users/nasrenkaraf/crypto-rsi-scanner/bot.log" in out
+
+
 def test_storage_wal_and_busy_timeout():
     # The scan and the always-on listener share one DB file; WAL + busy_timeout
     # let them read/write concurrently without "database is locked".
