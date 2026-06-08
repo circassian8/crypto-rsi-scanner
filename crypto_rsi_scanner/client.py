@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from pathlib import Path
 
 import aiohttp
 
@@ -42,14 +44,22 @@ class CoinGeckoClient:
         cpm = calls_per_minute or config.CALLS_PER_MINUTE
         self._limiter = _RateLimiter(cpm)
         self._session: aiohttp.ClientSession | None = None
+        self._fixture_dir: Path | None = config.FIXTURE_DIR
 
     async def __aenter__(self) -> CoinGeckoClient:
-        self._session = aiohttp.ClientSession(headers=self.headers)
+        if self._fixture_dir is None:
+            self._session = aiohttp.ClientSession(headers=self.headers)
         return self
 
     async def __aexit__(self, *exc: object) -> None:
         if self._session:
             await self._session.close()
+
+    def _fixture_json(self, *parts: str) -> object:
+        if self._fixture_dir is None:
+            raise RuntimeError("fixture mode is not enabled")
+        path = self._fixture_dir.joinpath(*parts)
+        return json.loads(path.read_text())
 
     async def _get(self, path: str, params: dict) -> dict:
         url = f"{self.base_url}{path}"
@@ -82,6 +92,11 @@ class CoinGeckoClient:
         raise RuntimeError(f"CoinGecko request failed after {config.MAX_RETRIES} retries: {path}")
 
     async def get_top_markets(self, n: int) -> list[dict]:
+        if self._fixture_dir is not None:
+            data = self._fixture_json("top_markets.json")
+            if not isinstance(data, list):
+                raise RuntimeError(f"fixture top_markets.json must contain a list: {self._fixture_dir}")
+            return data[:n]
         return await self._get(
             "/coins/markets",
             {
@@ -95,6 +110,19 @@ class CoinGeckoClient:
         )
 
     async def get_market_chart(self, coin_id: str, days: int) -> dict:
+        if self._fixture_dir is not None:
+            chart_dir = self._fixture_dir / "market_chart"
+            exact = chart_dir / f"{coin_id}-{days}.json"
+            fallback = chart_dir / f"{coin_id}.json"
+            path = exact if exact.exists() else fallback
+            if not path.exists():
+                raise FileNotFoundError(
+                    f"missing CoinGecko chart fixture for {coin_id} ({days}d) in {chart_dir}"
+                )
+            data = json.loads(path.read_text())
+            if not isinstance(data, dict):
+                raise RuntimeError(f"fixture chart must contain an object: {path}")
+            return data
         return await self._get(
             f"/coins/{coin_id}/market_chart",
             {"vs_currency": "usd", "days": days},

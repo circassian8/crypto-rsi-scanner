@@ -146,7 +146,7 @@ state.
 **Revisit when:** We move state storage away from local SQLite.
 
 ## 2026-06-08 - Keep ops maintenance repo-owned but schedule changes explicit
-**Status:** accepted
+**Status:** superseded 2026-06-08 (human asked to do all suggested changes)
 **Decision:** `main.py --status` reports backup freshness and log sizes;
 `main.py --rotate-logs` copy-truncates oversized local logs; launchd helpers can
 inspect scan/listener status and restart the bot listener by label. Agents should
@@ -156,13 +156,36 @@ service schedules is machine state outside the repo and should remain deliberate
 **Revisit when:** The human wants a checked-in or installed maintenance
 LaunchAgent for backups/log rotation.
 
+## 2026-06-08 - Install daily repo-owned maintenance agent
+**Status:** accepted
+**Decision:** The repo owns `main.py --maintenance`, which creates a safe SQLite
+backup, restore-checks it, and rotates logs. `make install-maintenance-agent`
+installs/loads a daily launchd agent (`RSI_MAINTENANCE_LABEL`, default
+`com.nasrenkaraf.rsimaintenance`) that runs this command.
+**Why:** Backups and log rotation are operational controls, not one-off manual
+commands. The human explicitly asked to do the scheduled-maintenance item.
+**Revisit when:** Maintenance should move to an external scheduler/monitoring
+system or the Mac deployment labels change.
+
+## 2026-06-08 - Keep offline scanner fixture smoke checked in
+**Status:** accepted
+**Decision:** `RSI_FIXTURE_DIR` enables CoinGecko fixture mode, and
+`make dry-run-fixture` uses checked-in sanitized fixtures under
+`fixtures/coingecko_smoke`.
+**Why:** Scanner plumbing can be validated quickly without spending API quota or
+waiting on network/rate-limit behavior.
+**Revisit when:** The fixture diverges from live API response shape or needs to
+cover more signal cases.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and
-must be used by live scans and backtest top-N selection.
+must be used by live scans and backtest top-N selection. Live scans also persist
+the latest hygiene audit for review.
 **Why:** Stablecoins, wrapped/staked receipts, stale listings, and illiquid
 market-cap artifacts pollute alerts, outcomes, paper trades, and backtests.
-Using one pure filter keeps live and research universes aligned.
+Using one filter and persisted audit keeps live and research universes aligned
+and makes false positives/negatives reviewable.
 **Revisit when:** Logs show repeated false positives/negatives, or CoinGecko
 metadata support allows a more precise category-based filter.
 

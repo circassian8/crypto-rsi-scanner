@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -26,7 +29,13 @@ from .indicators import (
 from .signal_registry import market_alignment, regime_note, setup_for
 from .notifications import notify_all
 from .storage import Storage
-from .universe import candidate_count, filter_markets, format_exclusions
+from .universe import (
+    candidate_count,
+    filter_markets_with_audit,
+    format_audit,
+    format_exclusions,
+    write_audit,
+)
 from . import outcomes
 from . import telegram
 from . import heartbeat
@@ -226,7 +235,7 @@ async def scan(top_n: int | None = None) -> tuple[pd.DataFrame, dict, dict]:
     async with CoinGeckoClient() as client:
         fetch_n = candidate_count(n)
         markets = await client.get_top_markets(fetch_n)
-        coins, excluded = filter_markets(markets, limit=n)
+        coins, excluded, audit = filter_markets_with_audit(markets, limit=n)
         log.info(
             "Scanning %d clean coins (requested top-%d; fetched %d candidates; excluded: %s)",
             len(coins), n, len(markets), format_exclusions(excluded),
@@ -247,7 +256,7 @@ async def scan(top_n: int | None = None) -> tuple[pd.DataFrame, dict, dict]:
         daily_raw: dict[str, dict | None] = dict(daily_results)
         n_ok = sum(1 for v in daily_raw.values() if v)
         log.info("Daily data: %d/%d succeeded", n_ok, len(coins))
-        stats = {"requested": len(coins), "fetched": n_ok}
+        stats = {"requested": len(coins), "fetched": n_ok, "universe_audit": audit}
 
         # --- parse daily, identify coins near thresholds for 4H fetch ---
         daily_parsed: dict[str, tuple[pd.Series, pd.Series]] = {}
@@ -455,6 +464,11 @@ def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) 
                 log.info("Added %d new subscriber(s) via the bot", added)
 
         df, closes_map, stats = asyncio.run(scan(top_n))
+        if not dry_run and stats.get("universe_audit"):
+            audit = stats["universe_audit"]
+            storage.set_meta("latest_universe_audit", json.dumps(audit, sort_keys=True))
+            audit_path = write_audit(audit)
+            log.info("Universe hygiene audit -> %s", audit_path)
 
         health_ok = True
         if not dry_run:
@@ -688,12 +702,15 @@ def report() -> None:
         storage.close()
 
 
-def score() -> None:
+def score(json_output: bool = False) -> None:
     """Print the paper-trade scoreboard and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
     storage = Storage(config.DB_PATH)
     try:
-        print(paper.report(storage))
+        if json_output:
+            print(json.dumps(paper.summary(storage), indent=2, sort_keys=True, default=str))
+        else:
+            print(paper.report(storage))
     finally:
         storage.close()
 
@@ -718,6 +735,21 @@ def backup_db() -> None:
     print(format_backup_result(result))
 
 
+def verify_restore(backup_path: str | None = None) -> None:
+    """Restore-check a backup, defaulting to the newest retained DB backup."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    from .backups import format_restore_result, latest_backup_status, verify_restore as _verify_restore
+
+    path = Path(backup_path).expanduser() if backup_path else None
+    if path is None:
+        latest = latest_backup_status(config.DB_PATH, config.BACKUP_DIR)
+        if latest.path is None:
+            raise FileNotFoundError(f"no backups found in {config.BACKUP_DIR}")
+        path = latest.path
+    result = _verify_restore(path, expected_tables=config.RESTORE_EXPECTED_TABLES)
+    print(format_restore_result(result))
+
+
 def rotate_logs() -> None:
     """Rotate oversized local launchd logs."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -731,12 +763,41 @@ def rotate_logs() -> None:
     print(format_log_rotation(results))
 
 
+def maintenance() -> None:
+    """Run the daily local maintenance bundle: backup, restore drill, log rotation."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    from .backups import (
+        backup_database,
+        format_backup_result,
+        format_restore_result,
+        verify_restore as _verify_restore,
+    )
+    from .ops import format_log_rotation, rotate_logs as _rotate_logs
+
+    backup = backup_database(config.DB_PATH, config.BACKUP_DIR, keep=config.BACKUP_KEEP)
+    restore = _verify_restore(backup.path, expected_tables=config.RESTORE_EXPECTED_TABLES)
+    rotated = _rotate_logs(
+        config.LOG_FILES,
+        max_bytes=config.LOG_ROTATE_MAX_BYTES,
+        keep=config.LOG_ROTATE_KEEP,
+    )
+    print(format_backup_result(backup))
+    print()
+    print(format_restore_result(restore))
+    print()
+    print(format_log_rotation(rotated))
+
+
 def launchd_status() -> None:
     """Print launchd status for the scan and bot agents."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
     from .ops import format_launchd_status, launchd_status as _launchd_status
 
-    statuses = _launchd_status((config.LAUNCHD_SCAN_LABEL, config.LAUNCHD_BOT_LABEL))
+    statuses = _launchd_status((
+        config.LAUNCHD_SCAN_LABEL,
+        config.LAUNCHD_BOT_LABEL,
+        config.MAINTENANCE_LABEL,
+    ))
     print(format_launchd_status(statuses))
 
 
@@ -747,6 +808,35 @@ def restart_listener() -> None:
 
     result = restart_launchd_service(config.LAUNCHD_BOT_LABEL)
     print(format_launchd_command(result))
+
+
+def install_maintenance_agent() -> None:
+    """Install/load the daily launchd maintenance agent for this checkout."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    from .ops import format_maintenance_agent_install, install_maintenance_agent as _install
+
+    result = _install(
+        label=config.MAINTENANCE_LABEL,
+        python_path=Path(sys.executable),
+        main_path=config.DATA_DIR / "main.py",
+        working_dir=config.DATA_DIR,
+        log_path=config.MAINTENANCE_LOG,
+        hour=config.MAINTENANCE_HOUR,
+        minute=config.MAINTENANCE_MINUTE,
+    )
+    print(format_maintenance_agent_install(result))
+
+
+def universe_audit() -> None:
+    """Print the most recently persisted universe hygiene audit."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    storage = Storage(config.DB_PATH)
+    try:
+        raw = storage.get_meta("latest_universe_audit")
+        audit = json.loads(raw) if raw else {}
+        print(format_audit(audit))
+    finally:
+        storage.close()
 
 
 def cli() -> None:
@@ -772,6 +862,11 @@ def cli() -> None:
         help="Print the paper-trade scoreboard (realized P&L by book/setup) and exit.",
     )
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON for commands that support it.",
+    )
+    parser.add_argument(
         "--status",
         action="store_true",
         help="Print operational scan/listener health and exit.",
@@ -780,6 +875,18 @@ def cli() -> None:
         "--backup-db",
         action="store_true",
         help="Create and verify a safe SQLite backup, then prune old backups.",
+    )
+    parser.add_argument(
+        "--verify-restore",
+        nargs="?",
+        const="",
+        metavar="BACKUP",
+        help="Restore-check a backup path, or the newest retained backup when omitted.",
+    )
+    parser.add_argument(
+        "--maintenance",
+        action="store_true",
+        help="Run DB backup, restore drill, and log rotation.",
     )
     parser.add_argument(
         "--rotate-logs",
@@ -792,9 +899,19 @@ def cli() -> None:
         help="Print launchd status for the scan and bot agents.",
     )
     parser.add_argument(
+        "--install-maintenance-agent",
+        action="store_true",
+        help="Install/load the daily launchd maintenance agent for this checkout.",
+    )
+    parser.add_argument(
         "--restart-listener",
         action="store_true",
         help="Restart the always-on bot listener launchd agent.",
+    )
+    parser.add_argument(
+        "--universe-audit",
+        action="store_true",
+        help="Print the most recent universe hygiene audit.",
     )
     parser.add_argument(
         "--listen",
@@ -809,7 +926,7 @@ def cli() -> None:
         report()
         return
     if args.score:
-        score()
+        score(json_output=args.json)
         return
     if args.status:
         status()
@@ -817,14 +934,26 @@ def cli() -> None:
     if args.backup_db:
         backup_db()
         return
+    if args.verify_restore is not None:
+        verify_restore(args.verify_restore or None)
+        return
+    if args.maintenance:
+        maintenance()
+        return
     if args.rotate_logs:
         rotate_logs()
         return
     if args.launchd_status:
         launchd_status()
         return
+    if args.install_maintenance_agent:
+        install_maintenance_agent()
+        return
     if args.restart_listener:
         restart_listener()
+        return
+    if args.universe_audit:
+        universe_audit()
         return
     if args.listen:
         logging.basicConfig(

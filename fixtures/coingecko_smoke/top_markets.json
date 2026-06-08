@@ -1,0 +1,102 @@
+[
+  {
+    "ath": 73000.0,
+    "ath_change_percentage": -6.8,
+    "current_price": 68000.0,
+    "id": "bitcoin",
+    "market_cap": 1300000000000.0,
+    "market_cap_rank": 1,
+    "name": "Bitcoin",
+    "price_change_percentage_24h_in_currency": 1.2,
+    "price_change_percentage_7d_in_currency": 4.5,
+    "sparkline_in_7d": {
+      "price": [
+        65000,
+        65400,
+        65800,
+        66200,
+        66600,
+        67000,
+        67400,
+        67800
+      ]
+    },
+    "symbol": "btc",
+    "total_volume": 35000000000.0
+  },
+  {
+    "ath": 4800.0,
+    "ath_change_percentage": -25.0,
+    "current_price": 3600.0,
+    "id": "ethereum",
+    "market_cap": 430000000000.0,
+    "market_cap_rank": 2,
+    "name": "Ethereum",
+    "price_change_percentage_24h_in_currency": -0.8,
+    "price_change_percentage_7d_in_currency": 2.1,
+    "sparkline_in_7d": {
+      "price": [
+        3500.0,
+        3528.765532316252,
+        3550.4882590884736,
+        3559.8496991962434,
+        3554.557845609541,
+        3535.9083286462374,
+        3508.467200483592,
+        3478.953006338623
+      ]
+    },
+    "symbol": "eth",
+    "total_volume": 18000000000.0
+  },
+  {
+    "ath": 260.0,
+    "ath_change_percentage": -38.5,
+    "current_price": 160.0,
+    "id": "solana",
+    "market_cap": 75000000000.0,
+    "market_cap_rank": 5,
+    "name": "Solana",
+    "price_change_percentage_24h_in_currency": 3.4,
+    "price_change_percentage_7d_in_currency": 9.2,
+    "sparkline_in_7d": {
+      "price": [
+        148.0,
+        149.8,
+        151.6,
+        153.4,
+        155.2,
+        157.0,
+        158.8,
+        160.6
+      ]
+    },
+    "symbol": "sol",
+    "total_volume": 4500000000.0
+  },
+  {
+    "ath": 1.2,
+    "ath_change_percentage": -16.0,
+    "current_price": 1.0,
+    "id": "tether",
+    "market_cap": 110000000000.0,
+    "market_cap_rank": 3,
+    "name": "Tether",
+    "price_change_percentage_24h_in_currency": 0.01,
+    "price_change_percentage_7d_in_currency": 0.02,
+    "sparkline_in_7d": {
+      "price": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "symbol": "usdt",
+    "total_volume": 60000000000.0
+  }
+]

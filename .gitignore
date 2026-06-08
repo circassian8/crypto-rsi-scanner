@@ -8,7 +8,9 @@
 rsi_scan_latest.csv
 scan.log
 bot.log
+maintenance.log
 *.log.*
+universe_hygiene_latest.json
 backups/
 
 # Python

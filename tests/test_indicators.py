@@ -486,6 +486,29 @@ def test_universe_candidate_count_overfetches():
     assert universe.candidate_count(500) <= 250
 
 
+def test_universe_audit_keeps_exclusion_examples_after_limit():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import universe
+
+    markets = [
+        _market(id="blockstack", symbol="stx", name="Stacks"),
+        _market(id="tether", symbol="usdt", name="Tether"),
+        _market(id="thin", symbol="thin", name="Thin", total_volume=10.0),
+    ]
+    kept, excluded, audit = universe.filter_markets_with_audit(
+        markets,
+        limit=1,
+        now=datetime(2026, 6, 8, tzinfo=timezone.utc),
+    )
+    assert [m["symbol"] for m in kept] == ["stx"]
+    assert excluded["stable_like"] == 1
+    assert excluded["low_liquidity"] == 1
+    assert audit["kept_count"] == 1
+    assert audit["excluded_count"] == 2
+    assert {x["reason"] for x in audit["excluded_examples"]} == {"stable_like", "low_liquidity"}
+    assert "UNIVERSE HYGIENE AUDIT" in universe.format_audit(audit)
+
+
 # --- telegram formatting -----------------------------------------------------
 
 def _sample_signal(**over):
@@ -1141,6 +1164,12 @@ def test_paper_report_empty_and_populated():
     out = paper.report(st)
     assert "PAPER-TRADE SCOREBOARD" in out
     assert "actionable" in out and "control" in out
+    assert "By conviction bucket" in out
+    data = paper.summary(st)
+    assert data["closed_count"] == 2
+    assert data["books"]["actionable"]["n"] == 1
+    assert data["by_conviction_bucket"]["65-79"]["n"] == 1
+    assert data["by_conviction_bucket"]["0-49"]["n"] == 1
     st.close()
 
 
@@ -1325,6 +1354,42 @@ def test_sqlite_backup_api_integrity_and_retention():
     assert not result.path.exists()
 
 
+def test_sqlite_restore_drill_checks_schema_counts():
+    import sqlite3
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from crypto_rsi_scanner.backups import backup_database, format_restore_result, verify_restore
+
+    root = Path(tempfile.mkdtemp())
+    src = root / "source.db"
+    backup_dir = root / "backups"
+    conn = sqlite3.connect(src)
+    conn.execute("CREATE TABLE scans (id INTEGER PRIMARY KEY)")
+    conn.execute("CREATE TABLE signals (id INTEGER PRIMARY KEY)")
+    conn.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute("CREATE TABLE paper_trades (id INTEGER PRIMARY KEY)")
+    conn.execute("INSERT INTO scans DEFAULT VALUES")
+    conn.execute("INSERT INTO meta (key, value) VALUES ('k', 'v')")
+    conn.commit()
+    conn.close()
+
+    backup = backup_database(
+        src,
+        backup_dir,
+        now=datetime(2026, 6, 8, 2, 0, 0, tzinfo=timezone.utc),
+    )
+    result = verify_restore(
+        backup.path,
+        expected_tables=("scans", "signals", "meta", "paper_trades"),
+    )
+    assert result.quick_check == "ok"
+    assert result.table_counts["scans"] == 1
+    assert result.table_counts["meta"] == 1
+    assert "SQLite restore drill complete" in format_restore_result(result)
+
+
 def test_backup_freshness_status_report():
     import sqlite3
     import tempfile
@@ -1438,6 +1503,63 @@ gui/501/com.nasrenkaraf.rsibot = {
     out = format_launchd_status([status])
     assert "com.nasrenkaraf.rsibot: running, pid 73052, runs 8, last exit 0" in out
     assert "stdout: /Users/nasrenkaraf/crypto-rsi-scanner/bot.log" in out
+
+
+def test_maintenance_agent_plist_contents():
+    from pathlib import Path
+    from crypto_rsi_scanner.ops import maintenance_agent_plist
+
+    plist = maintenance_agent_plist(
+        label="com.example.maint",
+        python_path=Path("/repo/.venv/bin/python"),
+        main_path=Path("/repo/main.py"),
+        working_dir=Path("/repo"),
+        log_path=Path("/repo/maintenance.log"),
+        hour=3,
+        minute=45,
+    )
+    assert plist["Label"] == "com.example.maint"
+    assert plist["ProgramArguments"] == ["/repo/.venv/bin/python", "/repo/main.py", "--maintenance"]
+    assert plist["WorkingDirectory"] == "/repo"
+    assert plist["StandardOutPath"] == "/repo/maintenance.log"
+    assert plist["StartCalendarInterval"] == {"Hour": 3, "Minute": 45}
+    assert plist["RunAtLoad"] is False
+
+
+def test_coingecko_client_fixture_mode():
+    import asyncio
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import config
+    from crypto_rsi_scanner.client import CoinGeckoClient
+
+    root = Path(tempfile.mkdtemp())
+    chart_dir = root / "market_chart"
+    chart_dir.mkdir()
+    (root / "top_markets.json").write_text(json.dumps([
+        {"id": "bitcoin", "symbol": "btc", "name": "Bitcoin"},
+        {"id": "ethereum", "symbol": "eth", "name": "Ethereum"},
+    ]))
+    (chart_dir / "bitcoin.json").write_text(json.dumps({
+        "prices": [[1, 100.0]],
+        "total_volumes": [[1, 1000.0]],
+    }))
+
+    orig = config.FIXTURE_DIR
+    config.FIXTURE_DIR = root
+    try:
+        async def _run():
+            async with CoinGeckoClient() as client:
+                markets = await client.get_top_markets(1)
+                chart = await client.get_market_chart("bitcoin", 250)
+                return markets, chart
+        markets, chart = asyncio.run(_run())
+        assert [m["id"] for m in markets] == ["bitcoin"]
+        assert chart["prices"][0][1] == 100.0
+    finally:
+        config.FIXTURE_DIR = orig
 
 
 def test_storage_wal_and_busy_timeout():

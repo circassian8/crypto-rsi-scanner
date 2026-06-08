@@ -9,8 +9,11 @@ pure and shared by the live scanner and research paths.
 from __future__ import annotations
 
 from collections import Counter
+from datetime import datetime, timezone
+import json
 import re
 import unicodedata
+from pathlib import Path
 
 from . import config
 
@@ -109,17 +112,65 @@ def exclusion_reason(market: dict) -> str | None:
     return None
 
 
-def filter_markets(markets: list[dict], limit: int | None = None) -> tuple[list[dict], Counter]:
+def _market_summary(market: dict, reason: str | None = None) -> dict:
+    market_cap = _as_float(market.get("market_cap"))
+    volume = _as_float(market.get("total_volume"))
+    summary = {
+        "rank": market.get("market_cap_rank"),
+        "id": market.get("id"),
+        "symbol": market.get("symbol"),
+        "name": market.get("name"),
+        "market_cap": market_cap,
+        "total_volume": volume,
+        "volume_to_mcap": (volume / market_cap if market_cap and market_cap > 0 and volume is not None else None),
+        "pct_24h": _as_float(
+            market.get("price_change_percentage_24h_in_currency")
+            if market.get("price_change_percentage_24h_in_currency") is not None
+            else market.get("price_change_percentage_24h")
+        ),
+    }
+    if reason:
+        summary["reason"] = reason
+    return summary
+
+
+def filter_markets_with_audit(
+    markets: list[dict],
+    limit: int | None = None,
+    *,
+    now: datetime | None = None,
+    max_examples: int = 80,
+) -> tuple[list[dict], Counter, dict]:
     kept: list[dict] = []
     excluded: Counter = Counter()
+    excluded_examples: list[dict] = []
     for market in markets:
         reason = exclusion_reason(market)
         if reason:
             excluded[reason] += 1
+            if len(excluded_examples) < max_examples:
+                excluded_examples.append(_market_summary(market, reason))
             continue
-        kept.append(market)
-        if limit is not None and len(kept) >= limit:
-            break
+        if limit is None or len(kept) < limit:
+            kept.append(market)
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    audit = {
+        "generated_at": now.astimezone(timezone.utc).isoformat(),
+        "requested_limit": limit,
+        "fetched_count": len(markets),
+        "kept_count": len(kept),
+        "excluded_count": int(sum(excluded.values())),
+        "excluded_by_reason": dict(sorted(excluded.items())),
+        "kept": [_market_summary(m) for m in kept[:max_examples]],
+        "excluded_examples": excluded_examples,
+    }
+    return kept, excluded, audit
+
+
+def filter_markets(markets: list[dict], limit: int | None = None) -> tuple[list[dict], Counter]:
+    kept, excluded, _ = filter_markets_with_audit(markets, limit=limit)
     return kept, excluded
 
 
@@ -127,3 +178,31 @@ def format_exclusions(excluded: Counter) -> str:
     if not excluded:
         return "none"
     return ", ".join(f"{reason}={count}" for reason, count in excluded.most_common())
+
+
+def write_audit(audit: dict, path: Path | None = None) -> Path:
+    path = Path(path or config.UNIVERSE_AUDIT_OUT).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n")
+    return path
+
+
+def format_audit(audit: dict) -> str:
+    if not audit:
+        return "No universe hygiene audit has been recorded yet."
+    lines = [
+        "UNIVERSE HYGIENE AUDIT",
+        f"generated: {audit.get('generated_at', 'unknown')}",
+        f"fetched: {audit.get('fetched_count', 0)} · kept: {audit.get('kept_count', 0)} · "
+        f"excluded: {audit.get('excluded_count', 0)}",
+        "excluded by reason: " + format_exclusions(Counter(audit.get("excluded_by_reason") or {})),
+    ]
+    examples = audit.get("excluded_examples") or []
+    if examples:
+        lines.append("examples:")
+        for item in examples[:12]:
+            lines.append(
+                f"  {item.get('symbol', '?')} {item.get('name', '?')} "
+                f"rank={item.get('rank', '?')} reason={item.get('reason')}"
+            )
+    return "\n".join(lines)

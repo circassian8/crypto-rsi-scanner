@@ -168,6 +168,7 @@ if not BACKUP_DIR.is_absolute():
     BACKUP_DIR = DATA_DIR / BACKUP_DIR
 BACKUP_KEEP = int(os.getenv("RSI_BACKUP_KEEP", "14"))
 BACKUP_STALE_HOURS = float(os.getenv("RSI_BACKUP_STALE_HOURS", "72"))
+RESTORE_EXPECTED_TABLES = ("scans", "signals", "meta", "paper_trades")
 
 _LOG_FILES_RAW = os.getenv("RSI_LOG_FILES", "scan.log,bot.log")
 LOG_FILES: list[Path] = []
@@ -183,6 +184,25 @@ LOG_ROTATE_KEEP = int(os.getenv("RSI_LOG_ROTATE_KEEP", "5"))
 
 LAUNCHD_SCAN_LABEL = os.getenv("RSI_LAUNCHD_SCAN_LABEL", "com.nasrenkaraf.rsiscanner")
 LAUNCHD_BOT_LABEL = os.getenv("RSI_LAUNCHD_BOT_LABEL", "com.nasrenkaraf.rsibot")
+MAINTENANCE_LABEL = os.getenv("RSI_MAINTENANCE_LABEL", "com.nasrenkaraf.rsimaintenance")
+MAINTENANCE_HOUR = int(os.getenv("RSI_MAINTENANCE_HOUR", "3"))
+MAINTENANCE_MINUTE = int(os.getenv("RSI_MAINTENANCE_MINUTE", "45"))
+_MAINTENANCE_LOG_RAW = os.getenv("RSI_MAINTENANCE_LOG", "maintenance.log")
+MAINTENANCE_LOG = Path(_MAINTENANCE_LOG_RAW).expanduser()
+if not MAINTENANCE_LOG.is_absolute():
+    MAINTENANCE_LOG = DATA_DIR / MAINTENANCE_LOG
+if MAINTENANCE_LOG not in LOG_FILES:
+    LOG_FILES.append(MAINTENANCE_LOG)
+
+_UNIVERSE_AUDIT_OUT_RAW = os.getenv("RSI_UNIVERSE_AUDIT_OUT", "universe_hygiene_latest.json")
+UNIVERSE_AUDIT_OUT = Path(_UNIVERSE_AUDIT_OUT_RAW).expanduser()
+if not UNIVERSE_AUDIT_OUT.is_absolute():
+    UNIVERSE_AUDIT_OUT = DATA_DIR / UNIVERSE_AUDIT_OUT
+
+_FIXTURE_DIR_RAW = os.getenv("RSI_FIXTURE_DIR", "")
+FIXTURE_DIR = Path(_FIXTURE_DIR_RAW).expanduser() if _FIXTURE_DIR_RAW else None
+if FIXTURE_DIR is not None and not FIXTURE_DIR.is_absolute():
+    FIXTURE_DIR = DATA_DIR / FIXTURE_DIR
 
 
 def redact_token(text: str) -> str:

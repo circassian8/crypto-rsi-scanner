@@ -9,6 +9,7 @@ connection is reading/writing.
 from __future__ import annotations
 
 import sqlite3
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,6 +49,15 @@ class BackupStatus:
         if self.stale:
             return "STALE"
         return "OK"
+
+
+@dataclass(frozen=True)
+class RestoreCheckResult:
+    backup_path: Path
+    size_bytes: int
+    quick_check: str
+    table_counts: dict[str, int]
+    missing_tables: tuple[str, ...]
 
 
 def _utc_stamp(now: datetime | None = None) -> str:
@@ -92,6 +102,56 @@ def verify_backup(path: Path) -> str:
         return result
     finally:
         conn.close()
+
+
+def _sqlite_tables(conn: sqlite3.Connection) -> set[str]:
+    rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+    ).fetchall()
+    return {str(r[0]) for r in rows}
+
+
+def verify_restore(
+    backup_path: Path,
+    *,
+    expected_tables: tuple[str, ...] = (),
+) -> RestoreCheckResult:
+    """Restore a backup into a temporary DB, verify it, and check key tables."""
+    backup_path = Path(backup_path).expanduser()
+    if not backup_path.exists():
+        raise FileNotFoundError(f"backup not found: {backup_path}")
+
+    with tempfile.TemporaryDirectory(prefix="rsi-restore-drill-") as tmpdir:
+        restored = Path(tmpdir) / "restore.db"
+        src = sqlite3.connect(f"file:{backup_path}?mode=ro", uri=True, timeout=30.0)
+        dst = sqlite3.connect(str(restored))
+        try:
+            src.execute("PRAGMA busy_timeout=30000")
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+
+        quick_check = verify_backup(restored)
+        conn = sqlite3.connect(str(restored))
+        try:
+            tables = _sqlite_tables(conn)
+            missing = tuple(t for t in expected_tables if t not in tables)
+            if missing:
+                raise RuntimeError(f"restore missing expected table(s): {', '.join(missing)}")
+            counts: dict[str, int] = {}
+            for table in expected_tables:
+                counts[table] = int(conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0])
+        finally:
+            conn.close()
+
+        return RestoreCheckResult(
+            backup_path=backup_path,
+            size_bytes=backup_path.stat().st_size,
+            quick_check=quick_check,
+            table_counts=counts,
+            missing_tables=missing,
+        )
 
 
 def prune_backups(backup_dir: Path, source_stem: str, keep: int) -> tuple[Path, ...]:
@@ -215,4 +275,18 @@ def format_backup_result(result: BackupResult) -> str:
         f"integrity_check: {result.quick_check}",
         f"pruned: {len(result.deleted)} old backup(s)",
     ]
+    return "\n".join(lines)
+
+
+def format_restore_result(result: RestoreCheckResult) -> str:
+    size_mb = result.size_bytes / (1024 * 1024)
+    counts = ", ".join(f"{name}={count}" for name, count in result.table_counts.items())
+    lines = [
+        "SQLite restore drill complete",
+        f"path: {result.backup_path}",
+        f"size: {size_mb:.2f} MB",
+        f"integrity_check: {result.quick_check}",
+    ]
+    if counts:
+        lines.append(f"tables: {counts}")
     return "\n".join(lines)

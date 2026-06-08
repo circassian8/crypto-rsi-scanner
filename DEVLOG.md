@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-08 — Add maintenance agent, restore drill, fixtures, and audit outputs · Codex
+**Why:** The scanner had backup/log commands, but the remaining system
+improvements were still manual or not reviewable: scheduled maintenance,
+restore proof, structured paper-score data, universe-hygiene audits, and offline
+scanner fixtures.
+**Changes:**
+- `main.py --maintenance` now runs a safe DB backup, restores that backup into a
+  temporary SQLite DB for verification, and rotates configured logs.
+- `main.py --verify-restore` restore-checks the newest retained backup by
+  default; `backups.py` exposes the reusable restore-drill primitive.
+- `make install-maintenance-agent` installs/loads the daily launchd maintenance
+  agent (`com.nasrenkaraf.rsimaintenance` by default) to run `--maintenance`.
+- `main.py --score --json` emits structured paper-score data, and the text score
+  report now includes market-alignment and conviction-bucket breakdowns.
+- Live scans persist the latest universe hygiene audit to SQLite meta and
+  `universe_hygiene_latest.json`; `main.py --universe-audit` prints it.
+- `RSI_FIXTURE_DIR` enables CoinGecko fixture mode, with checked-in
+  `fixtures/coingecko_smoke` powering `make dry-run-fixture`.
+- `Makefile`, `.env.example`, `.gitignore`, `AGENTS.md`, `CLAUDE.md`,
+  `ROADMAP.md`, and `DECISIONS.md` document the new commands and operating
+  decisions.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 108/108.
+`make verify` passes tests, alert render smoke, and paper scoreboard.
+`main.py --verify-restore` passes against the latest backup. `make maintenance`
+created and restore-checked `backups/rsi_scanner-20260608T185301Z.db`.
+`make dry-run-fixture` runs the scanner offline from fixtures. The maintenance
+LaunchAgent was installed at
+`~/Library/LaunchAgents/com.nasrenkaraf.rsimaintenance.plist` and points at the
+repo venv Python.
+**Notes/risks:** `main.py --universe-audit` will show data after the next
+non-dry live scan persists the first audit. The fixture smoke validates scanner
+plumbing, not live CoinGecko availability.
+
 ## 2026-06-08 — Finish ops maintenance status, logs, and launchd helpers · Codex
 **Why:** Safe backups existed, but operational health still did not show whether
 the latest backup was fresh, logs could grow without a repo-owned rotation

@@ -1,6 +1,6 @@
 PYTHON := .venv/bin/python
 
-.PHONY: help verify test smoke-alerts score report status backup-db rotate-logs launchd-status restart-listener dry-run
+.PHONY: help verify test smoke-alerts score score-json report status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -8,13 +8,19 @@ help:
 	@echo "  make test     Run standalone tests"
 	@echo "  make smoke-alerts  Render representative alerts without sending"
 	@echo "  make score    Print paper-trade scoreboard"
+	@echo "  make score-json  Print paper-trade scoreboard as JSON"
 	@echo "  make report   Print signal outcome report"
 	@echo "  make status   Print operational scan/listener health"
 	@echo "  make backup-db  Create and verify a SQLite backup"
+	@echo "  make verify-restore  Restore-check the newest SQLite backup"
+	@echo "  make maintenance  Run backup, restore drill, and log rotation"
 	@echo "  make rotate-logs  Rotate oversized scan/listener logs"
 	@echo "  make launchd-status  Print scan/listener launchd status"
+	@echo "  make install-maintenance-agent  Install/load daily maintenance LaunchAgent"
 	@echo "  make restart-listener  Restart the always-on bot listener"
+	@echo "  make universe-audit  Print latest universe hygiene audit"
 	@echo "  make dry-run  Run a small network dry scan without writes/alerts"
+	@echo "  make dry-run-fixture  Run a small offline dry scan from checked-in fixtures"
 
 verify: test smoke-alerts score
 
@@ -27,6 +33,9 @@ smoke-alerts:
 score:
 	$(PYTHON) main.py --score
 
+score-json:
+	$(PYTHON) main.py --score --json
+
 report:
 	$(PYTHON) main.py --report
 
@@ -36,14 +45,29 @@ status:
 backup-db:
 	$(PYTHON) main.py --backup-db
 
+verify-restore:
+	$(PYTHON) main.py --verify-restore
+
+maintenance:
+	$(PYTHON) main.py --maintenance
+
 rotate-logs:
 	$(PYTHON) main.py --rotate-logs
 
 launchd-status:
 	$(PYTHON) main.py --launchd-status
 
+install-maintenance-agent:
+	$(PYTHON) main.py --install-maintenance-agent
+
 restart-listener:
 	$(PYTHON) main.py --restart-listener
 
+universe-audit:
+	$(PYTHON) main.py --universe-audit
+
 dry-run:
 	$(PYTHON) main.py --dry-run --top-n 30
+
+dry-run-fixture:
+	RSI_FIXTURE_DIR=fixtures/coingecko_smoke $(PYTHON) main.py --dry-run --top-n 3

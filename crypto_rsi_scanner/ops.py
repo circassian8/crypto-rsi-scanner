@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import plistlib
 import re
 import shutil
 import subprocess
@@ -55,6 +56,14 @@ class LaunchdCommandResult:
     domain: str
     ok: bool
     action: str
+    output: str
+
+
+@dataclass(frozen=True)
+class MaintenanceAgentInstallResult:
+    label: str
+    plist_path: Path
+    loaded: bool
     output: str
 
 
@@ -291,6 +300,119 @@ def restart_launchd_service(
 def format_launchd_command(result: LaunchdCommandResult) -> str:
     state = "ok" if result.ok else "failed"
     lines = [f"launchd {result.action} {state}: {result.domain}/{result.label}"]
+    if result.output:
+        lines.append(result.output)
+    return "\n".join(lines)
+
+
+def maintenance_agent_plist(
+    *,
+    label: str,
+    python_path: Path,
+    main_path: Path,
+    working_dir: Path,
+    log_path: Path,
+    hour: int,
+    minute: int,
+) -> dict:
+    return {
+        "Label": label,
+        "ProgramArguments": [str(python_path), str(main_path), "--maintenance"],
+        "WorkingDirectory": str(working_dir),
+        "StandardOutPath": str(log_path),
+        "StandardErrorPath": str(log_path),
+        "StartCalendarInterval": {"Hour": int(hour), "Minute": int(minute)},
+        "RunAtLoad": False,
+        "EnvironmentVariables": {
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        },
+    }
+
+
+def write_maintenance_agent_plist(
+    *,
+    label: str,
+    python_path: Path,
+    main_path: Path,
+    working_dir: Path,
+    log_path: Path,
+    hour: int,
+    minute: int,
+    launch_agents_dir: Path | None = None,
+) -> Path:
+    launch_agents_dir = launch_agents_dir or (Path.home() / "Library" / "LaunchAgents")
+    launch_agents_dir.mkdir(parents=True, exist_ok=True)
+    plist_path = launch_agents_dir / f"{label}.plist"
+    plist = maintenance_agent_plist(
+        label=label,
+        python_path=python_path,
+        main_path=main_path,
+        working_dir=working_dir,
+        log_path=log_path,
+        hour=hour,
+        minute=minute,
+    )
+    with plist_path.open("wb") as fh:
+        plistlib.dump(plist, fh, sort_keys=False)
+    return plist_path
+
+
+def install_maintenance_agent(
+    *,
+    label: str,
+    python_path: Path,
+    main_path: Path,
+    working_dir: Path,
+    log_path: Path,
+    hour: int,
+    minute: int,
+    uid: int | None = None,
+    launch_agents_dir: Path | None = None,
+    timeout_sec: float = 10.0,
+) -> MaintenanceAgentInstallResult:
+    uid = os.getuid() if uid is None else uid
+    domain = f"gui/{uid}"
+    plist_path = write_maintenance_agent_plist(
+        label=label,
+        python_path=python_path,
+        main_path=main_path,
+        working_dir=working_dir,
+        log_path=log_path,
+        hour=hour,
+        minute=minute,
+        launch_agents_dir=launch_agents_dir,
+    )
+    outputs: list[str] = []
+    subprocess.run(
+        ["launchctl", "bootout", domain, str(plist_path)],
+        capture_output=True,
+        text=True,
+        timeout=timeout_sec,
+        check=False,
+    )
+    proc = subprocess.run(
+        ["launchctl", "bootstrap", domain, str(plist_path)],
+        capture_output=True,
+        text=True,
+        timeout=timeout_sec,
+        check=False,
+    )
+    outputs.append(((proc.stdout or "") + (proc.stderr or "")).strip())
+    if proc.returncode == 0:
+        return MaintenanceAgentInstallResult(label, plist_path, True, "\n".join(o for o in outputs if o))
+
+    status = launchd_status((label,), uid=uid, timeout_sec=timeout_sec)[0]
+    return MaintenanceAgentInstallResult(
+        label,
+        plist_path,
+        status.loaded,
+        "\n".join(o for o in outputs if o),
+    )
+
+
+def format_maintenance_agent_install(result: MaintenanceAgentInstallResult) -> str:
+    state = "installed" if result.loaded else "install failed"
+    lines = [f"maintenance LaunchAgent {state}: {result.label}", f"plist: {result.plist_path}"]
     if result.output:
         lines.append(result.output)
     return "\n".join(lines)

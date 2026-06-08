@@ -69,13 +69,18 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - **Alert render smoke (no sends/network):** `make smoke-alerts`
 - **Dry scan (network, no writes/alerts):** `.venv/bin/python main.py --dry-run --top-n 30`
 - **Reports:** `main.py --report` (outcome hit-rates) · `main.py --score` (paper
-  scoreboard) · `main.py --status` (scan/listener health)
+  scoreboard) · `main.py --score --json` (structured paper scoreboard) ·
+  `main.py --status` (scan/listener health)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
-  API + integrity check + retention)
+  API + integrity check + retention); `main.py --verify-restore` restore-checks
+  the newest retained backup.
 - **Ops maintenance:** `make status` shows scan, backup, and log health;
-  `make rotate-logs` copy-truncates oversized `scan.log`/`bot.log`;
-  `make launchd-status` inspects the scan/listener agents; `make restart-listener`
-  restarts the always-on bot listener.
+  `make maintenance` runs backup + restore drill + log rotation; `make rotate-logs`
+  copy-truncates oversized logs; `make install-maintenance-agent` installs the
+  daily maintenance LaunchAgent; `make launchd-status` inspects scan/listener/
+  maintenance agents; `make restart-listener` restarts the always-on bot listener.
+- **Offline dev smoke:** `make dry-run-fixture` runs a small dry scan from
+  checked-in CoinGecko fixtures (`fixtures/coingecko_smoke`) without network.
 - **Backtest (research):**
   `python -m crypto_rsi_scanner.backtest --top-n 80 --days 1825`
   flags: `--pit` (point-in-time universe, survivorship fix) · `--slice <setup>`
@@ -95,13 +100,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 |---|---|
 | `config.py` | env/`.env` config + all tunables; `redact_token` |
 | `client.py` | async CoinGecko client (rate-limited, retries) |
-| `universe.py` | pure CoinGecko universe hygiene filters shared by live scan/backtest |
+| `universe.py` | CoinGecko universe hygiene filters/audit shared by live scan/backtest |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
 | `indicators.py` | **PURE** functions: RSI, regime, setup taxonomy, market gating, conviction. Unit-tested — keep pure, add a test for new logic |
 | `scanner.py` | orchestration: scan → analyze → build message → route notifications; CLI |
 | `storage.py` | SQLite. **Additive migrations only** (`_migrate`); one-time data migrations gated by a `meta` flag |
-| `backups.py` | safe SQLite online backups, integrity check, retention |
-| `ops.py` | local log rotation and launchd status/restart helpers |
+| `backups.py` | safe SQLite online backups, restore drills, integrity check, retention |
+| `ops.py` | local log rotation and launchd status/restart/maintenance-agent helpers |
 | `outcomes.py` | forward-return grading vs each setup's *expected direction* |
 | `formatting.py` | channel rendering (Telegram HTML cards, plain text) |
 | `notifications.py` | send to Telegram/Discord/email |
@@ -122,7 +127,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   explicit JSON calibration via `RSI_REGISTRY_PRIORS`; absent that, checked-in
   defaults remain live.
 - `universe.py` is the source of truth for CoinGecko market hygiene. Live scans
-  and backtest top-N selection must use the same filters.
+  and backtest top-N selection must use the same filters. Live scans persist the
+  latest audit to SQLite meta and `universe_hygiene_latest.json`; inspect it via
+  `main.py --universe-audit`.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.
@@ -174,6 +181,7 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
 3. Improve point-in-time backtest power and review exported registry priors.
 4. Monitor universe hygiene false positives/negatives and tune thresholds.
-5. Add cached API fixtures if network smoke checks become too slow/noisy.
+5. Use `make dry-run-fixture` before network dry-runs when validating scanner
+   plumbing that does not need live CoinGecko data.
 
 When in doubt, read the latest `DEVLOG.md` entries, then ask the human.

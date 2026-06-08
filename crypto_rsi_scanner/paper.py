@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import statistics
 from datetime import datetime, timedelta, timezone
+from collections import defaultdict
 
 from . import config
 from .signal_registry import setup_has_edge
@@ -125,6 +126,68 @@ def _fmt_stats(label: str, st: dict | None, indent: str = "") -> str:
             f"{(st['equity'] - 1) * 100:>+8.1f}%{st['maxdd']:>7.0f}%")
 
 
+def _conviction_bucket(value: int | float | None) -> str:
+    if value is None:
+        return "unknown"
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return "unknown"
+    if v < 50:
+        return "0-49"
+    if v < 65:
+        return "50-64"
+    if v < 80:
+        return "65-79"
+    return "80-100"
+
+
+def _group_stats(trades: list[dict], key_fn) -> dict[str, dict | None]:
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for trade in trades:
+        groups[str(key_fn(trade) or "?")].append(trade)
+    return {label: _stats(rows) for label, rows in sorted(groups.items())}
+
+
+def _open_position(t: dict) -> dict:
+    return {
+        "symbol": t.get("symbol"),
+        "coin_id": t.get("coin_id"),
+        "setup_type": t.get("setup_type"),
+        "market_regime": t.get("market_regime"),
+        "market_aligned": t.get("market_aligned"),
+        "direction": t.get("direction"),
+        "conviction": t.get("conviction"),
+        "entry_price": t.get("entry_price"),
+        "entry_at": t.get("entry_at"),
+        "hold_days": t.get("hold_days"),
+    }
+
+
+def summary(storage, now: datetime | None = None) -> dict:
+    closed = [dict(r) for r in storage.closed_paper_trades()]
+    open_ = [dict(r) for r in storage.open_paper_trades()]
+    actionable = [t for t in closed if _is_actionable(t)]
+    control = [t for t in closed if not _is_actionable(t)]
+    now = now or datetime.now(timezone.utc)
+    return {
+        "generated_at": now.isoformat(),
+        "hold_days": config.PAPER_HOLD_DAYS,
+        "closed_count": len(closed),
+        "open_count": len(open_),
+        "books": {
+            "all": _stats(closed),
+            "actionable": _stats(actionable),
+            "control": _stats(control),
+        },
+        "by_setup": _group_stats(closed, lambda t: t.get("setup_type") or "?"),
+        "by_market_regime": _group_stats(closed, lambda t: t.get("market_regime") or "?"),
+        "by_market_alignment": _group_stats(closed, lambda t: t.get("market_aligned") or "?"),
+        "by_conviction_bucket": _group_stats(closed, lambda t: _conviction_bucket(t.get("conviction"))),
+        "open_positions": [_open_position(t) for t in open_],
+    }
+
+
 def report(storage, now: datetime | None = None) -> str:
     closed = [dict(r) for r in storage.closed_paper_trades()]
     open_ = [dict(r) for r in storage.open_paper_trades()]
@@ -167,6 +230,23 @@ def report(storage, now: datetime | None = None) -> str:
         for mr in regimes:
             out.append(_fmt_stats(mr.lower(), _stats([t for t in closed
                                                       if (t.get("market_regime") or "?") == mr])))
+
+    alignments = sorted({t.get("market_aligned") or "?" for t in closed})
+    if len(alignments) > 1:
+        out.append("\nBy market alignment:")
+        out.append(header.replace("book", "alignment"))
+        for aligned in alignments:
+            out.append(_fmt_stats(aligned, _stats([t for t in closed
+                                                   if (t.get("market_aligned") or "?") == aligned])))
+
+    buckets = ("0-49", "50-64", "65-79", "80-100", "unknown")
+    present_buckets = [b for b in buckets if any(_conviction_bucket(t.get("conviction")) == b for t in closed)]
+    if present_buckets:
+        out.append("\nBy conviction bucket:")
+        out.append(header.replace("book", "conviction"))
+        for bucket in present_buckets:
+            out.append(_fmt_stats(bucket, _stats([t for t in closed
+                                                  if _conviction_bucket(t.get("conviction")) == bucket])))
 
     if open_:
         out.append(f"\nOpen positions ({len(open_)}): "

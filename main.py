@@ -28,6 +28,7 @@ ENV VARS:
   RSI_LOG_FILES        Comma-separated logs for --status/--rotate-logs.
   RSI_LOG_ROTATE_MAX_BYTES  Rotate logs larger than this (default 5 MiB).
   RSI_LOG_ROTATE_KEEP  Number of rotated logs to retain (default 5).
+  RSI_FIXTURE_DIR      Optional CoinGecko fixture directory for offline smoke.
 
 Secrets can also be placed in a .env file at the project root.
 
@@ -39,8 +40,11 @@ Usage:
   python main.py --report        # print signal-outcome stats (hit-rates) and exit
   python main.py --status        # print scan/listener/backup/log health
   python main.py --backup-db     # safe SQLite backup + integrity check
+  python main.py --verify-restore # restore-check latest SQLite backup
+  python main.py --maintenance   # backup + restore drill + log rotation
   python main.py --rotate-logs   # rotate oversized scan/listener logs
   python main.py --launchd-status # print launchd service status
+  python main.py --score --json  # structured paper scoreboard
 
 Cron (daily at 00:05 UTC):
   5 0 * * *  cd /path/to/project && python main.py >> scan.log 2>&1

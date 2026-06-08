@@ -23,13 +23,13 @@ Status labels:
 |---|---|---|---|
 | todo | Improve point-in-time backtest power | open | Pro CoinGecko key or alternate history source would extend PIT universe beyond demo limits. |
 | todo | Run stronger PIT calibration and review exported priors | open | Tooling exists via `backtest.py --export-priors`; needs larger PIT history before opting live into a file. |
-| todo | Monitor universe hygiene false positives/negatives | open | Initial filters are live; review excluded symbols from logs and tune thresholds if needed. |
+| waiting | Monitor universe hygiene false positives/negatives | system | Latest audit is persisted by live scans; review `main.py --universe-audit` after the next scheduled scan. |
 
 ## Later
 
 | status | item | owner | notes |
 |---|---|---|---|
-| todo | Add cached API fixtures for dev | open | Speed dry-run/backtest smoke checks and avoid unnecessary CoinGecko calls. |
+| todo | Add historical fixture snapshots for backtest smoke | open | Scanner fixture smoke exists; backtest still depends on network/Binance unless using unit tests. |
 
 ## Maintenance Rules
 
