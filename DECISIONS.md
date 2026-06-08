@@ -200,6 +200,16 @@ state features are not yet proven enough to affect alert routing or score.
 specific feature/cohort with durable incremental edge over the existing registry
 baseline.
 
+## 2026-06-09 - Grade state slices against same-state base rates
+**Status:** accepted
+**Decision:** State-conditioned backtest slices must compare each signal cohort
+against base days with the same coin trend regime and the same state bucket.
+**Why:** High-volatility, breadth-collapse, or low-RS markets can have strong
+base moves on their own. A state bucket only matters if the RSI setup beats what
+normally happened in that same state.
+**Revisit when:** A better causal/econometric benchmark replaces the current
+same-regime, same-state base-rate comparison.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and

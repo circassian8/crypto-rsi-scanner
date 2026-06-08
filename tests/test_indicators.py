@@ -169,6 +169,21 @@ def test_state_features_volume_and_liquidity():
     assert sf.volume_price_state(0.04, 2.0) == "up_high_volume"
     assert sf.volume_price_state(0.0, 2.0) == "spike_flat_price"
     assert sf.volume_price_state(0.04, 0.0) == "up_normal_volume"
+    assert sf.rank_bucket(0.9) == "high"
+    assert sf.rank_bucket(0.1) == "low"
+    assert sf.liquidity_bucket(1_000_000, 0.02) == "low"
+    assert sf.liquidity_bucket(200_000_000, 0.0) == "high"
+    assert sf.falling_knife_bucket(75) == "high"
+    assert sf.falling_knife_score(
+        vol_state="crisis",
+        breadth_state="breadth_collapse",
+        rs_bucket="low",
+        regime="DOWNTREND",
+        volume_state="down_high_volume",
+        ret_30d=-0.30,
+        btc_beta_60=1.5,
+        beta_r2_60=0.6,
+    ) >= 90
 
 
 def test_state_features_breadth_snapshot_handles_missing_and_short_histories():
@@ -1124,6 +1139,66 @@ def test_backtest_summarize_market_splits_regime():
     assert by[("mean_reversion", "BEAR")]["conf"] == 0.0
     assert abs(by[("mean_reversion", "BULL")]["edge"] - 25.0) < 1e-9   # 100 - 75
     assert abs(by[("mean_reversion", "BEAR")]["edge"] + 25.0) < 1e-9   # 0 - 25
+
+
+def test_backtest_state_slices_compare_same_state_base():
+    from crypto_rsi_scanner import backtest
+
+    signals = []
+    for _ in range(10):
+        signals.append({"setup": "dip_buy", "exp": "up", "regime": "UPTREND",
+                        "h": 7, "ret": 4.0, "fav": 1, "conv": 60,
+                        "vol_state": "low_compressed", "breadth_state": "neutral",
+                        "rs_bucket": "high", "liquidity_bucket": "high",
+                        "knife_bucket": "low"})
+    for _ in range(10):
+        signals.append({"setup": "dip_buy", "exp": "up", "regime": "UPTREND",
+                        "h": 7, "ret": -4.0, "fav": 0, "conv": 60,
+                        "vol_state": "crisis", "breadth_state": "breadth_collapse",
+                        "rs_bucket": "low", "liquidity_bucket": "low",
+                        "knife_bucket": "high"})
+
+    state_base = {
+        ("UPTREND", "vol_state", "low_compressed", 7): [1.0, -1.0] * 20,
+        ("UPTREND", "vol_state", "crisis", 7): [1.0, -1.0] * 20,
+        ("UPTREND", "rs_bucket", "high", 7): [1.0, -1.0] * 20,
+        ("UPTREND", "rs_bucket", "low", 7): [1.0, -1.0] * 20,
+        ("UPTREND", "liquidity_bucket", "high", 7): [1.0, -1.0] * 20,
+        ("UPTREND", "liquidity_bucket", "low", 7): [1.0, -1.0] * 20,
+        ("UPTREND", "knife_bucket", "low", 7): [1.0, -1.0] * 20,
+        ("UPTREND", "knife_bucket", "high", 7): [1.0, -1.0] * 20,
+        ("UPTREND", "breadth_state", "neutral", 7): [1.0, -1.0] * 20,
+        ("UPTREND", "breadth_state", "breadth_collapse", 7): [1.0, -1.0] * 20,
+    }
+    rows = backtest.summarize_state_slices(signals, state_base, 7, min_n=8)
+    by = {(r["feature"], r["bucket"]): r for r in rows}
+    assert by[("vol_state", "low_compressed")]["edge"] == 50.0
+    assert by[("vol_state", "crisis")]["edge"] == -50.0
+    assert by[("knife_bucket", "high")]["med_dir"] < 0
+    text = backtest.format_state_slices(signals, state_base, 7, min_n=8)
+    assert "State-conditioned edge slices" in text
+    assert "falling-knife bucket" in text
+
+
+def test_backtest_build_state_frames_contains_shadow_labels():
+    from crypto_rsi_scanner import backtest
+
+    idx = pd.date_range("2025-01-01", periods=280, freq="D", tz="UTC")
+    btc = pd.DataFrame({
+        "close": pd.Series(np.linspace(100, 180, len(idx)), index=idx),
+        "volume": pd.Series(1_000.0, index=idx),
+    })
+    weak = pd.DataFrame({
+        "close": pd.Series(np.linspace(80, 30, len(idx)), index=idx),
+        "volume": pd.Series(np.linspace(20_000, 40_000, len(idx)), index=idx),
+    })
+    frames = {"BTC": btc, "WEAK": weak}
+    state = backtest.build_state_frames(frames)
+    assert set(state) == {"BTC", "WEAK"}
+    cols = set(state["WEAK"].columns)
+    assert {"vol_state", "breadth_state", "rs_bucket", "liquidity_bucket",
+            "falling_knife_score", "knife_bucket"}.issubset(cols)
+    assert state["WEAK"]["rs_bucket"].iloc[-1] in {"low", "mid", "high"}
 
 
 def test_backtest_builds_registry_prior_calibration():

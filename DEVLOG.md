@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Add state-conditioned backtest slices · Codex
+**Why:** Live scanner now stores shadow market-state context, but those labels
+need a research path that can test conditional edge before any state bucket is
+allowed to affect conviction or routing.
+**Changes:**
+- `crypto_rsi_scanner/state_features.py` exposes shared bucket/risk helpers for
+  relative strength, liquidity, breadth state, and falling-knife risk so live and
+  research use the same labels.
+- `crypto_rsi_scanner/scanner.py` now consumes those shared helpers instead of
+  private copies.
+- `crypto_rsi_scanner/backtest.py` adds point-in-time state-frame construction,
+  stores state labels on graded events, builds same-regime/same-state base-rate
+  tables, and exposes `--state-slices` / `--state-min-samples` for research
+  reports.
+- `tests/test_indicators.py`, `AGENTS.md`, `ROADMAP.md`, and `DECISIONS.md`
+  cover and document the new state-slice benchmark rule.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 119/119.
+`.venv/bin/python -m crypto_rsi_scanner.backtest --help | rg
+"state-slices|state-min-samples"` confirms the new CLI flags. `make verify`
+passes tests, alert render smoke, and paper scoreboard.
+**Notes/risks:** The state-slice report is still research-only. A bucket should
+not be promoted into live conviction/routing unless it beats the same-regime,
+same-state base rate with enough PIT/live observations.
+
 ## 2026-06-08 — Wire market-state context into live scanner · Codex
 **Why:** The pure state feature layer needs live, reviewable observations before
 any state-conditioned edge can be trusted. Scanner rows should therefore carry

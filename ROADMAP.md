@@ -22,7 +22,7 @@ Status labels:
 
 | status | item | owner | notes |
 |---|---|---|---|
-| todo | Backtest state-conditioned edge slices | open | Use stored/pure state features to test whether vol/breadth/RS/liquidity/knife cohorts improve setup edge before any routing change. |
+| todo | Review larger state-slice backtests | open | `backtest --state-slices` exists; run on broader Binance/PIT data and look for durable vol/breadth/RS/liquidity/knife cohorts before any routing change. |
 | todo | Improve point-in-time backtest power | open | Pro CoinGecko key or alternate history source would extend PIT universe beyond demo limits. |
 | todo | Run stronger PIT calibration and review exported priors | open | Tooling exists via `backtest.py --export-priors`; needs larger PIT history before opting live into a file. |
 | waiting | Monitor universe hygiene false positives/negatives | system | Latest audit is persisted by live scans; review `main.py --universe-audit` after the next scheduled scan. |

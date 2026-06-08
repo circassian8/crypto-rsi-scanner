@@ -62,6 +62,17 @@ from .signal_registry import (
     setup_for,
     setup_has_edge,
 )
+from .state_features import (
+    breadth_state,
+    falling_knife_bucket,
+    falling_knife_score,
+    liquidity_bucket,
+    rank_bucket,
+    realized_vol_series,
+    trailing_percentile_series,
+    volatility_state,
+    volume_price_state,
+)
 from .universe import candidate_count, filter_markets, format_exclusions
 
 log = logging.getLogger(__name__)
@@ -79,6 +90,13 @@ VOL_WINDOW = 20
 MOM_WINDOW = 14
 _FEATURE_IDX = {"vol": 0, "mom": 1}
 _FEATURE_LABEL = {"vol": "trailing 20d annualized vol", "mom": "trailing 14d return"}
+_STATE_FEATURES = {
+    "vol_state": "volatility state",
+    "breadth_state": "market breadth state",
+    "rs_bucket": "relative-strength bucket",
+    "liquidity_bucket": "liquidity bucket",
+    "knife_bucket": "falling-knife bucket",
+}
 # Setups with a single defining regime, sliceable by --slice.
 _SETUP_REGIME = {
     "breakdown_risk": ("DOWNTREND", "down"),
@@ -225,10 +243,190 @@ def market_regime_series(close: pd.Series) -> pd.Series:
     return out
 
 
+def _trend_regime_series(close: pd.Series) -> pd.Series:
+    sma_s = close.rolling(config.REGIME_SHORT_MA).mean()
+    sma_l = close.rolling(config.REGIME_LONG_MA).mean()
+    slope = sma_l - sma_l.shift(config.REGIME_SLOPE_LOOKBACK)
+    above, aligned = close > sma_l, sma_s > sma_l
+    out = pd.Series("RANGE", index=close.index, dtype=object)
+    out[above & aligned & (slope >= 0)] = "UPTREND"
+    out[(~above) & (~aligned) & (slope <= 0)] = "DOWNTREND"
+    out[sma_l.isna() | sma_s.isna()] = "UNKNOWN"
+    return out
+
+
+def _active_mask(frame: pd.DataFrame, membership: pd.DataFrame | None) -> pd.DataFrame:
+    active = frame.notna()
+    if membership is None:
+        return active
+    member = membership.reindex(index=frame.index, columns=frame.columns, fill_value=False)
+    return active & member.astype(bool)
+
+
+def _pct_true(values: pd.DataFrame, active: pd.DataFrame) -> pd.Series:
+    valid = active & values.notna()
+    denom = valid.sum(axis=1).replace(0, np.nan)
+    return (values.where(valid).sum(axis=1) / denom).replace([np.inf, -np.inf], np.nan)
+
+
+def _cross_sectional_rank_frame(values: pd.DataFrame, active: pd.DataFrame) -> pd.DataFrame:
+    masked = values.where(active)
+    ranks = masked.rank(axis=1, method="average", ascending=True)
+    counts = masked.count(axis=1)
+    denom = (counts - 1).replace(0, np.nan)
+    out = ranks.sub(1, axis=0).div(denom, axis=0)
+    return out.fillna(0.5)
+
+
+def _volume_z_series(volume: pd.Series, window: int = 90) -> pd.Series:
+    mean = volume.rolling(window, min_periods=window).mean()
+    std = volume.rolling(window, min_periods=window).std(ddof=0)
+    return ((volume - mean) / std.replace(0, np.nan)).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+
+def build_state_frames(
+    frames: dict[str, pd.DataFrame],
+    membership: pd.DataFrame | None = None,
+    *,
+    volume_is_usd: bool = False,
+) -> dict[str, pd.DataFrame]:
+    """Point-in-time state labels per coin/date for state-conditioned research.
+
+    `membership` lets the PIT path compute breadth and ranks only from coins that
+    were actually in the universe on each date.
+    """
+    if not frames:
+        return {}
+
+    close_frame = pd.DataFrame({sym: df["close"] for sym, df in frames.items()}).sort_index()
+    active = _active_mask(close_frame, membership)
+
+    rsi_frame = pd.DataFrame({
+        sym: wilder_rsi(df["close"], config.RSI_PERIOD)
+        for sym, df in frames.items()
+    }).reindex(close_frame.index)
+    rsi_active = rsi_frame.where(active)
+    n_rsi = rsi_active.notna().sum(axis=1).replace(0, np.nan)
+    median_rsi = rsi_active.median(axis=1)
+    pct_rsi_lt_30 = (rsi_active.lt(30).where(rsi_active.notna()).sum(axis=1) / n_rsi)
+    pct_rsi_lt_40 = (rsi_active.lt(40).where(rsi_active.notna()).sum(axis=1) / n_rsi)
+    pct_rsi_gt_60 = (rsi_active.gt(60).where(rsi_active.notna()).sum(axis=1) / n_rsi)
+
+    ma50 = close_frame.rolling(50, min_periods=50).mean()
+    ma200 = close_frame.rolling(200, min_periods=200).mean()
+    pct_above_50 = _pct_true(close_frame.gt(ma50), active & ma50.notna())
+    pct_above_200 = _pct_true(close_frame.gt(ma200), active & ma200.notna())
+    pct_above_50_chg = pct_above_50 - pct_above_50.shift(5)
+    pct_above_200_chg = pct_above_200 - pct_above_200.shift(5)
+    breadth = pd.Series(index=close_frame.index, dtype=object)
+    for ts in close_frame.index:
+        breadth.loc[ts] = breadth_state(
+            median_rsi=None if pd.isna(median_rsi.loc[ts]) else float(median_rsi.loc[ts]),
+            pct_rsi_lt_30=None if pd.isna(pct_rsi_lt_30.loc[ts]) else float(pct_rsi_lt_30.loc[ts]),
+            pct_rsi_lt_40=None if pd.isna(pct_rsi_lt_40.loc[ts]) else float(pct_rsi_lt_40.loc[ts]),
+            pct_rsi_gt_60=None if pd.isna(pct_rsi_gt_60.loc[ts]) else float(pct_rsi_gt_60.loc[ts]),
+            pct_above_50dma=None if pd.isna(pct_above_50.loc[ts]) else float(pct_above_50.loc[ts]),
+            pct_above_200dma=None if pd.isna(pct_above_200.loc[ts]) else float(pct_above_200.loc[ts]),
+            pct_above_50dma_chg_5d=None if pd.isna(pct_above_50_chg.loc[ts]) else float(pct_above_50_chg.loc[ts]),
+            pct_above_200dma_chg_5d=None if pd.isna(pct_above_200_chg.loc[ts]) else float(pct_above_200_chg.loc[ts]),
+        )
+
+    rank30 = _cross_sectional_rank_frame(close_frame / close_frame.shift(30) - 1.0, active)
+    rank90 = _cross_sectional_rank_frame(close_frame / close_frame.shift(90) - 1.0, active)
+    avg_rank = (rank30 + rank90) / 2.0
+
+    btc_close = None
+    for key in ("BTC", "bitcoin", "btc"):
+        if key in close_frame:
+            btc_close = close_frame[key]
+            break
+    btc_ret = btc_close.pct_change(fill_method=None) if btc_close is not None else None
+
+    out: dict[str, pd.DataFrame] = {}
+    for sym, df in frames.items():
+        close = df["close"]
+        volume = df["volume"]
+        idx = close.index
+        rv20 = realized_vol_series(close, 20).reindex(idx)
+        rv60 = realized_vol_series(close, 60).reindex(idx)
+        rv_pct = trailing_percentile_series(rv20, 252).reindex(idx).fillna(0.5)
+        vol_states = pd.Series(
+            [volatility_state(a, b, c) for a, b, c in zip(rv20, rv60, rv_pct)],
+            index=idx,
+            dtype=object,
+        )
+
+        rs = avg_rank[sym].reindex(idx).map(rank_bucket)
+        dollar = volume if volume_is_usd else close * volume
+        dollar20 = dollar.rolling(20, min_periods=1).mean()
+        mcap = df["mcap"] if "mcap" in df else pd.Series(np.nan, index=idx)
+        turnover = (dollar20 / mcap.replace(0, np.nan)).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        liq = pd.Series(
+            [liquidity_bucket(dv, tv) for dv, tv in zip(dollar20, turnover)],
+            index=idx,
+            dtype=object,
+        )
+
+        vol_z = _volume_z_series(volume, 90)
+        ret_1d = close.pct_change(fill_method=None).fillna(0.0)
+        volume_states = pd.Series(
+            [volume_price_state(r, z) for r, z in zip(ret_1d, vol_z)],
+            index=idx,
+            dtype=object,
+        )
+        breadth_for_coin = breadth.reindex(idx).fillna("unknown")
+        regime = _trend_regime_series(close)
+        ret30 = close.pct_change(30, fill_method=None).fillna(0.0)
+
+        beta = pd.Series(0.0, index=idx)
+        r2 = pd.Series(0.0, index=idx)
+        if btc_ret is not None and sym not in ("BTC", "bitcoin", "btc"):
+            ret = close.pct_change(fill_method=None)
+            cov = ret.rolling(60, min_periods=20).cov(btc_ret)
+            var = btc_ret.rolling(60, min_periods=20).var()
+            beta = (cov / var.replace(0, np.nan)).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+            corr = ret.rolling(60, min_periods=20).corr(btc_ret).replace([np.inf, -np.inf], np.nan)
+            r2 = corr.pow(2).fillna(0.0)
+        elif btc_ret is not None:
+            beta = pd.Series(1.0, index=idx)
+            r2 = pd.Series(1.0, index=idx)
+
+        knife = pd.Series(
+            [
+                falling_knife_score(
+                    vol_state=vs,
+                    breadth_state=str(br or "unknown"),
+                    rs_bucket=rb,
+                    regime=rg,
+                    volume_state=vp,
+                    ret_30d=float(rt) if np.isfinite(rt) else 0.0,
+                    btc_beta_60=float(bt) if np.isfinite(bt) else 0.0,
+                    beta_r2_60=float(rr) if np.isfinite(rr) else 0.0,
+                )
+                for vs, br, rb, rg, vp, rt, bt, rr in zip(
+                    vol_states, breadth_for_coin, rs, regime, volume_states, ret30, beta, r2
+                )
+            ],
+            index=idx,
+            dtype=int,
+        )
+        out[sym] = pd.DataFrame({
+            "vol_state": vol_states,
+            "breadth_state": breadth_for_coin,
+            "rs_bucket": rs.fillna("mid"),
+            "liquidity_bucket": liq.fillna("unknown"),
+            "falling_knife_score": knife,
+            "knife_bucket": knife.map(falling_knife_bucket),
+        }, index=idx)
+    return out
+
+
 def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
               cond_base: dict | None = None, member=None,
               mkt_arr=None, mkt_base: dict | None = None,
-              trigger: str = "cross_into") -> None:
+              trigger: str = "cross_into",
+              state_frame: pd.DataFrame | None = None,
+              state_base: dict | None = None) -> None:
     """Walk one coin day by day. Appends graded crossing signals to `signals`
     and, for *every* day, the forward returns into `regime_base[(regime, h)]`
     (the benchmark each setup is measured against). If `cond_base` is given, also
@@ -242,6 +440,8 @@ def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
         cond_base = defaultdict(list)
     if mkt_base is None:
         mkt_base = defaultdict(list)
+    if state_base is None:
+        state_base = defaultdict(list)
     closes = df["close"]
     volumes = df["volume"]
     n = len(closes)
@@ -292,6 +492,11 @@ def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
         vol_t = annualized_vol(closes.iloc[max(0, t - VOL_WINDOW):t + 1])
         mom_t = ((closes_v[t] / closes_v[t - MOM_WINDOW] - 1.0) * 100.0
                  if t >= MOM_WINDOW else float("nan"))
+        state = {}
+        if state_frame is not None:
+            ts = closes.index[t]
+            if ts in state_frame.index:
+                state = state_frame.loc[ts].to_dict()
 
         # benchmark: forward returns for every in-universe day in this regime
         if in_universe:
@@ -301,6 +506,10 @@ def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
                     regime_base[(regime, h)].append(ret_h)
                     cond_base[(regime, h)].append((vol_t, mom_t, ret_h))
                     mkt_base[(regime, mkt, h)].append(ret_h)
+                    for feature in _STATE_FEATURES:
+                        bucket = state.get(feature)
+                        if bucket not in (None, "", "unknown"):
+                            state_base[(regime, feature, str(bucket), h)].append(ret_h)
 
         lo = t - LB + 1
         win_rsi = rsi_full.iloc[lo:t + 1].dropna()
@@ -356,6 +565,12 @@ def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
                 "setup": setup, "exp": exp, "regime": regime, "h": h,
                 "ret": ret, "fav": favorable(exp, ret), "conv": conv,
                 "vol": vol_t, "mom": mom_t, "mkt": mkt,
+                "vol_state": state.get("vol_state"),
+                "breadth_state": state.get("breadth_state"),
+                "rs_bucket": state.get("rs_bucket"),
+                "liquidity_bucket": state.get("liquidity_bucket"),
+                "knife_bucket": state.get("knife_bucket"),
+                "falling_knife_score": state.get("falling_knife_score"),
             })
 
 
@@ -461,6 +676,81 @@ def summarize_market(signals: list, mkt_base: dict, horizon: int) -> list[dict]:
                      "base": base, "edge": conf - base,
                      "med": statistics.median(s["ret"] for s in sigs)})
     return rows
+
+
+def summarize_state_slices(
+    signals: list,
+    state_base: dict,
+    horizon: int = PRIMARY,
+    *,
+    min_n: int = 8,
+    setup: str | None = None,
+) -> list[dict]:
+    """Per setup x state bucket edge vs same-regime, same-state base days."""
+    bconf: dict = {}
+    for (regime, feature, bucket, h), rets in state_base.items():
+        if h != horizon:
+            continue
+        arr = np.asarray(rets, dtype=float)
+        if not len(arr):
+            continue
+        bconf[(regime, feature, bucket, h, "up")] = float((arr > 0).mean())
+        bconf[(regime, feature, bucket, h, "down")] = float((arr < 0).mean())
+
+    groups: dict = defaultdict(list)
+    for s in signals:
+        if s["h"] != horizon:
+            continue
+        if setup and s["setup"] != setup:
+            continue
+        for feature in _STATE_FEATURES:
+            bucket = s.get(feature)
+            if bucket not in (None, "", "unknown"):
+                groups[(feature, str(bucket), s["setup"])].append(s)
+
+    rows = []
+    for (feature, bucket, setup_name), sigs in groups.items():
+        if len(sigs) < min_n:
+            continue
+        conf = 100.0 * statistics.fmean(s["fav"] for s in sigs)
+        base = 100.0 * statistics.fmean(
+            bconf.get((s["regime"], feature, bucket, horizon, s["exp"]), 0.0)
+            for s in sigs
+        )
+        base_cells = {(s["regime"], feature, bucket, horizon) for s in sigs}
+        base_n = sum(len(state_base.get(cell, [])) for cell in base_cells)
+        rows.append({
+            "feature": feature,
+            "bucket": bucket,
+            "setup": setup_name,
+            "n": len(sigs),
+            "base_n": base_n,
+            "conf": conf,
+            "base": base,
+            "edge": conf - base,
+            "med": statistics.median(s["ret"] for s in sigs),
+            "med_dir": statistics.median(_dir_ret(s) for s in sigs),
+        })
+    return sorted(rows, key=lambda r: (_state_feature_order(r["feature"], r["bucket"]), r["setup"]))
+
+
+_STATE_BUCKET_ORDER = {
+    "vol_state": ("low_compressed", "normal", "high", "high_expanding", "crisis"),
+    "breadth_state": (
+        "breadth_collapse", "washout", "washout_recovery", "neutral",
+        "risk_on_narrow", "risk_on_broad",
+    ),
+    "rs_bucket": ("low", "mid", "high"),
+    "liquidity_bucket": ("low", "mid", "high"),
+    "knife_bucket": ("low", "elevated", "high"),
+}
+
+
+def _state_feature_order(feature: str, bucket: str) -> tuple:
+    feature_order = list(_STATE_FEATURES).index(feature) if feature in _STATE_FEATURES else 99
+    buckets = _STATE_BUCKET_ORDER.get(feature, ())
+    bucket_order = buckets.index(bucket) if bucket in buckets else 99
+    return feature_order, bucket_order, bucket
 
 
 # --------------------------------------------------------------------------- #
@@ -596,6 +886,39 @@ def format_market(signals: list, mkt_base: dict, horizon: int) -> str:
     for r in summarize_market(signals, mkt_base, horizon):
         out.append(f"  {r['setup']:<19}{r['mkt']:<6}{r['n']:>5}{r['conf']:>6.0f}%"
                    f"{r['base']:>6.0f}%{r['edge']:>+6.0f}{r['med']:>8.1f}%")
+    return "\n".join(out)
+
+
+def format_state_slices(
+    signals: list,
+    state_base: dict,
+    horizon: int = PRIMARY,
+    *,
+    min_n: int = 8,
+    setup: str | None = None,
+) -> str:
+    rows = summarize_state_slices(
+        signals, state_base, horizon, min_n=min_n, setup=setup
+    )
+    out = [
+        "\nState-conditioned edge slices "
+        f"at {horizon}d (base = same coin-regime + same state bucket):"
+    ]
+    if not rows:
+        out.append(f"  No state buckets met min_n={min_n}. Try more days/coins.")
+        return "\n".join(out)
+
+    out.append(f"  {'feature':<17}{'bucket':<18}{'setup':<19}"
+               f"{'n':>5}{'baseN':>7}{'conf%':>7}{'base%':>7}"
+               f"{'edge':>7}{'medRet':>9}{'medDir':>9}")
+    for r in rows:
+        label = _STATE_FEATURES.get(r["feature"], r["feature"])
+        out.append(
+            f"  {label:<17}{r['bucket']:<18}{r['setup']:<19}"
+            f"{r['n']:>5}{r['base_n']:>7}{r['conf']:>6.0f}%"
+            f"{r['base']:>6.0f}%{r['edge']:>+6.0f}"
+            f"{r['med']:>8.1f}%{r['med_dir']:>+8.1f}%"
+        )
     return "\n".join(out)
 
 
@@ -832,16 +1155,26 @@ def build_pit_membership(histories: dict, top_n: int) -> pd.DataFrame:
     return rank.le(top_n) & mcap.notna()
 
 
-def run_pit(pool: list[dict], top_n: int, days: int, trigger: str = "cross_into"
-            ) -> tuple[list, dict, dict, dict, int]:
+def run_pit(
+    pool: list[dict],
+    top_n: int,
+    days: int,
+    trigger: str = "cross_into",
+    state_slices: bool = False,
+) -> tuple[list, dict, dict, dict, dict, int]:
     histories = asyncio.run(_fetch_cg_histories([c["id"] for c in pool], days))
     signals: list = []
     regime_base: dict = defaultdict(list)
     cond_base: dict = defaultdict(list)
     mkt_base: dict = defaultdict(list)
+    state_base: dict = defaultdict(list)
     if not histories:
-        return signals, regime_base, cond_base, mkt_base, 0
+        return signals, regime_base, cond_base, mkt_base, state_base, 0
     member_df = build_pit_membership(histories, top_n)
+    state_frames = (
+        build_state_frames(histories, member_df, volume_is_usd=True)
+        if state_slices else {}
+    )
     mkt = (market_regime_series(histories["bitcoin"]["close"])
            if "bitcoin" in histories else None)
     for cid, df in histories.items():
@@ -850,8 +1183,9 @@ def run_pit(pool: list[dict], top_n: int, days: int, trigger: str = "cross_into"
             continue
         mkt_arr = mkt.reindex(df.index).fillna("NA").to_numpy() if mkt is not None else None
         walk_coin(df, signals, regime_base, cond_base, member=mem,
-                  mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger)
-    return signals, regime_base, cond_base, mkt_base, len(histories)
+                  mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger,
+                  state_frame=state_frames.get(cid), state_base=state_base)
+    return signals, regime_base, cond_base, mkt_base, state_base, len(histories)
 
 
 # --------------------------------------------------------------------------- #
@@ -877,23 +1211,35 @@ def _fetch_all(universe: list[str], days: int) -> tuple[dict, pd.Series | None]:
     return frames, mkt
 
 
-def _walk_all(frames: dict, mkt, trigger: str = "cross_into") -> tuple[list, dict, dict, dict]:
+def _walk_all(
+    frames: dict,
+    mkt,
+    trigger: str = "cross_into",
+    state_slices: bool = False,
+) -> tuple[list, dict, dict, dict, dict]:
     signals: list = []
     regime_base: dict = defaultdict(list)
     cond_base: dict = defaultdict(list)
     mkt_base: dict = defaultdict(list)
-    for df in frames.values():
+    state_base: dict = defaultdict(list)
+    state_frames = build_state_frames(frames, volume_is_usd=False) if state_slices else {}
+    for sym, df in frames.items():
         mkt_arr = mkt.reindex(df.index).fillna("NA").to_numpy() if mkt is not None else None
         walk_coin(df, signals, regime_base, cond_base,
-                  mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger)
-    return signals, regime_base, cond_base, mkt_base
+                  mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger,
+                  state_frame=state_frames.get(sym), state_base=state_base)
+    return signals, regime_base, cond_base, mkt_base, state_base
 
 
-def run(universe: list[str], days: int, trigger: str = "cross_into"
-        ) -> tuple[list, dict, dict, dict, int]:
+def run(
+    universe: list[str],
+    days: int,
+    trigger: str = "cross_into",
+    state_slices: bool = False,
+) -> tuple[list, dict, dict, dict, dict, int]:
     frames, mkt = _fetch_all(universe, days)
-    s, rb, cb, mb = _walk_all(frames, mkt, trigger)
-    return s, rb, cb, mb, len(frames)
+    s, rb, cb, mb, sb = _walk_all(frames, mkt, trigger, state_slices)
+    return s, rb, cb, mb, sb, len(frames)
 
 
 def run_triggers(universe: list[str], days: int,
@@ -921,6 +1267,11 @@ def main(argv=None) -> None:
                         f"{', '.join(_SETUP_REGIME)}.")
     p.add_argument("--slice-horizons", default="1,3,7",
                    help="Horizons (days) to show in the slice, comma-separated.")
+    p.add_argument("--state-slices", action="store_true",
+                   help="Show setup edge by shadow state buckets: volatility, "
+                        "breadth, relative strength, liquidity, and falling-knife risk.")
+    p.add_argument("--state-min-samples", type=int, default=8,
+                   help="Minimum signals needed to print a state-slice row.")
     p.add_argument("--trigger", choices=("cross_into", "confirm"), default="cross_into",
                    help="Entry: cross_into (pierce the zone, default) or confirm (turn back out).")
     p.add_argument("--compare-triggers", action="store_true",
@@ -960,8 +1311,8 @@ def main(argv=None) -> None:
                      "(a pro key extends this).")
         log.info("PIT mode: pool=%d, top-%d membership, %dd CoinGecko history...",
                  len(pool), args.top_n, days)
-        signals, regime_base, cond_base, mkt_base, ok = run_pit(
-            pool, args.top_n, days, args.trigger)
+        signals, regime_base, cond_base, mkt_base, state_base, ok = run_pit(
+            pool, args.top_n, days, args.trigger, state_slices=args.state_slices)
         source, report_days = "CoinGecko daily (point-in-time top-N)", days
     else:
         if args.symbols:
@@ -970,7 +1321,8 @@ def main(argv=None) -> None:
             universe = cg_top_symbols(args.top_n)
         log.info("Universe: %d symbols; fetching Binance 1d klines (%dd, paginated, %s)...",
                  len(universe), args.days, args.trigger)
-        signals, regime_base, cond_base, mkt_base, ok = run(universe, args.days, args.trigger)
+        signals, regime_base, cond_base, mkt_base, state_base, ok = run(
+            universe, args.days, args.trigger, state_slices=args.state_slices)
         source, report_days = "Binance 1d klines", args.days
 
     log.info("Usable history: %d coins; %d graded observations", ok, len(signals))
@@ -979,6 +1331,11 @@ def main(argv=None) -> None:
     if mkt_base:
         print(format_market(signals, mkt_base, PRIMARY))
         print(format_market(signals, mkt_base, 1))
+    if args.state_slices:
+        print(format_state_slices(
+            signals, state_base, PRIMARY, min_n=args.state_min_samples,
+            setup=args.slice,
+        ))
 
     if args.export_priors:
         payload = build_registry_prior_export(

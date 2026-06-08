@@ -85,6 +85,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `python -m crypto_rsi_scanner.backtest --top-n 80 --days 1825`
   flags: `--pit` (point-in-time universe, survivorship fix) · `--slice <setup>`
   (vol/momentum slice) · `--compare-triggers` (entry-trigger A/B) ·
+  `--state-slices` (shadow state-conditioned edge table) ·
   `--export-priors registry_priors.json` (write reviewable registry calibration)
 - **Deploy:** the scan agent (`com.nasrenkaraf.rsiscanner`) auto-loads new code on
   its next run (03:10 MSK). The **listener must be restarted** to pick up code:
@@ -101,7 +102,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `config.py` | env/`.env` config + all tunables; `redact_token` |
 | `client.py` | async CoinGecko client (rate-limited, retries) |
 | `universe.py` | CoinGecko universe hygiene filters/audit shared by live scan/backtest |
-| `state_features.py` | pure market-state features: volatility, breadth, relative strength, beta, liquidity |
+| `state_features.py` | pure market-state features: volatility, breadth, relative strength, beta, liquidity, risk buckets |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
 | `indicators.py` | **PURE** functions: RSI, regime, setup taxonomy, market gating, conviction. Unit-tested — keep pure, add a test for new logic |
 | `scanner.py` | orchestration: scan → analyze → build message → route notifications; CLI |
@@ -185,8 +186,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 1. Let the paper scoreboard accrue ~1–2 weeks; confirm gating helps live.
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
 3. Improve point-in-time backtest power and review exported registry priors.
-4. Backtest state-conditioned edge slices; promote only cohorts with clear
-   incremental edge over the registry baseline.
+4. Run larger state-conditioned edge slices (`backtest --state-slices`) and
+   promote only cohorts with clear incremental edge over the registry baseline.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
 6. Use `make dry-run-fixture` before network dry-runs when validating scanner
    plumbing that does not need live CoinGecko data.

@@ -31,7 +31,10 @@ from .state_features import (
     breadth_snapshot,
     cross_sectional_ranks,
     dollar_volume_20,
+    falling_knife_score,
+    liquidity_bucket,
     pct_return,
+    rank_bucket,
     realized_vol,
     realized_vol_series,
     rolling_beta,
@@ -152,61 +155,6 @@ def _json_safe(value: object) -> object:
     return value
 
 
-def _rank_bucket(rank: object) -> str:
-    r = _finite_float(rank, 0.5) or 0.5
-    if r >= 0.67:
-        return "high"
-    if r <= 0.33:
-        return "low"
-    return "mid"
-
-
-def _liquidity_bucket(dollar_volume: object, turnover: object) -> str:
-    dv = _finite_float(dollar_volume, 0.0) or 0.0
-    tv = _finite_float(turnover, 0.0) or 0.0
-    if dv <= 0:
-        return "unknown"
-    if dv < 5_000_000 or (0 < tv < 0.001):
-        return "low"
-    if dv >= 100_000_000 or tv >= 0.01:
-        return "high"
-    return "mid"
-
-
-def _falling_knife_score(
-    *,
-    vol_state: str,
-    breadth_state: str,
-    rs_bucket: str,
-    regime: str,
-    volume_state: str,
-    ret_30d: float,
-    btc_beta_60: float,
-    beta_r2_60: float,
-) -> int:
-    """Shadow-only crash-risk score. It is stored/displayed, never routed on."""
-    score = 0
-    if vol_state == "crisis":
-        score += 25
-    elif vol_state == "high_expanding":
-        score += 18
-    if breadth_state == "breadth_collapse":
-        score += 25
-    elif breadth_state == "washout":
-        score += 15
-    if rs_bucket == "low":
-        score += 18
-    if regime == "DOWNTREND":
-        score += 15
-    if volume_state == "down_high_volume":
-        score += 14
-    if ret_30d <= -0.25:
-        score += 10
-    if beta_r2_60 >= 0.50 and btc_beta_60 >= 1.20:
-        score += 8
-    return min(100, int(score))
-
-
 def _build_state_context(
     daily_parsed: dict[str, tuple[pd.Series, pd.Series]],
     coin_map: dict[str, dict],
@@ -266,7 +214,7 @@ def _build_state_context(
         resid_30d = ret_30d.get(coin_id, 0.0) - btc_beta_60 * btc_ret_30d - eth_beta_60 * eth_ret_30d
         resid_90d = ret_90d.get(coin_id, 0.0) - btc_beta_60 * btc_ret_90d - eth_beta_60 * eth_ret_90d
         avg_rank = (rank_30d.get(coin_id, 0.5) + rank_90d.get(coin_id, 0.5)) / 2.0
-        rs_bucket = _rank_bucket(avg_rank)
+        rs_bucket = rank_bucket(avg_rank)
 
         dollar_vol = dollar_volume_20(closes, volumes, volume_is_usd=True)
         if dollar_vol <= 0:
@@ -275,7 +223,7 @@ def _build_state_context(
         turnover = dollar_vol / market_cap if market_cap > 0 else 0.0
         vol_z = volume_z_score(volumes, 90) if not volumes.empty else 0.0
         vp_state = volume_price_state(pct_return(closes, 1), vol_z)
-        liq_bucket = _liquidity_bucket(dollar_vol, turnover)
+        liq_bucket = liquidity_bucket(dollar_vol, turnover)
 
         regime = trend_regime(
             closes,
@@ -283,7 +231,7 @@ def _build_state_context(
             config.REGIME_LONG_MA,
             config.REGIME_SLOPE_LOOKBACK,
         )
-        knife = _falling_knife_score(
+        knife = falling_knife_score(
             vol_state=vol_state,
             breadth_state=str(breadth.get("state") or "unknown"),
             rs_bucket=rs_bucket,

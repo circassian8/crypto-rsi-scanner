@@ -111,6 +111,73 @@ def volatility_state(rv_20: float, rv_60: float, rv_pctile_252: float) -> str:
     return "normal"
 
 
+def rank_bucket(rank: object) -> str:
+    r = float(rank) if _finite(rank) else 0.5
+    if r >= 0.67:
+        return "high"
+    if r <= 0.33:
+        return "low"
+    return "mid"
+
+
+def liquidity_bucket(dollar_volume: object, turnover: object) -> str:
+    dv = float(dollar_volume) if _finite(dollar_volume) else 0.0
+    tv = float(turnover) if _finite(turnover) else 0.0
+    if dv <= 0:
+        return "unknown"
+    if dv < 5_000_000 or (0 < tv < 0.001):
+        return "low"
+    if dv >= 100_000_000 or tv >= 0.01:
+        return "high"
+    return "mid"
+
+
+def falling_knife_score(
+    *,
+    vol_state: str,
+    breadth_state: str,
+    rs_bucket: str,
+    regime: str,
+    volume_state: str,
+    ret_30d: float,
+    btc_beta_60: float,
+    beta_r2_60: float,
+) -> int:
+    """Heuristic crash-risk score for shadow analysis, not a live trigger."""
+    score = 0
+    if vol_state == "crisis":
+        score += 25
+    elif vol_state == "high_expanding":
+        score += 18
+    if breadth_state == "breadth_collapse":
+        score += 25
+    elif breadth_state == "washout":
+        score += 15
+    if rs_bucket == "low":
+        score += 18
+    if regime == "DOWNTREND":
+        score += 15
+    if volume_state == "down_high_volume":
+        score += 14
+    if _finite(ret_30d) and float(ret_30d) <= -0.25:
+        score += 10
+    if (
+        _finite(beta_r2_60) and _finite(btc_beta_60)
+        and float(beta_r2_60) >= 0.50 and float(btc_beta_60) >= 1.20
+    ):
+        score += 8
+    return min(100, int(score))
+
+
+def falling_knife_bucket(score: object) -> str:
+    value = float(score) if _finite(score) else 0.0
+    if value >= 70:
+        return "high"
+    if value >= 40:
+        return "elevated"
+    return "low"
+
+
 def pct_return_series(close: pd.Series, window: int) -> pd.Series:
     prices = pd.Series(close, dtype="float64").replace([np.inf, -np.inf], np.nan)
     if window <= 0:
@@ -304,7 +371,7 @@ def _pct_above_ma(
     return float(sum(values) / len(values))
 
 
-def _breadth_state(
+def breadth_state(
     *,
     median_rsi: float | None,
     pct_rsi_lt_30: float | None,
@@ -365,7 +432,7 @@ def breadth_snapshot(
     pct_50_chg = (pct_50 - pct_50_prev) if pct_50 is not None and pct_50_prev is not None else None
     pct_200_chg = (pct_200 - pct_200_prev) if pct_200 is not None and pct_200_prev is not None else None
 
-    state = _breadth_state(
+    state = breadth_state(
         median_rsi=median_rsi,
         pct_rsi_lt_30=pct_rsi_lt_30,
         pct_rsi_lt_40=pct_rsi_lt_40,
