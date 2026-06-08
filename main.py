@@ -22,6 +22,8 @@ ENV VARS:
   RSI_OB / RSI_OS      Override overbought/oversold thresholds (default 70/30).
   RSI_COOLDOWN_HOURS   Alert cooldown per coin (default 48).
   RSI_TOP_N            Number of coins to scan (default 100).
+  RSI_BACKUP_DIR       Backup directory for --backup-db (default ./backups).
+  RSI_BACKUP_KEEP      Number of DB backups to retain (default 14).
 
 Secrets can also be placed in a .env file at the project root.
 
@@ -31,6 +33,7 @@ Usage:
   python main.py --dry-run       # scan + print, no notifications, no state change
   python main.py --top-n 20 -v   # smaller universe, debug logging
   python main.py --report        # print signal-outcome stats (hit-rates) and exit
+  python main.py --backup-db     # safe SQLite backup + integrity check
 
 Cron (daily at 00:05 UTC):
   5 0 * * *  cd /path/to/project && python main.py >> scan.log 2>&1

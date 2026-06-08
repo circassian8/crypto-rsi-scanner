@@ -1,6 +1,6 @@
 PYTHON := .venv/bin/python
 
-.PHONY: help verify test smoke-alerts score report dry-run
+.PHONY: help verify test smoke-alerts score report status backup-db dry-run
 
 help:
 	@echo "Targets:"
@@ -9,6 +9,8 @@ help:
 	@echo "  make smoke-alerts  Render representative alerts without sending"
 	@echo "  make score    Print paper-trade scoreboard"
 	@echo "  make report   Print signal outcome report"
+	@echo "  make status   Print operational scan/listener health"
+	@echo "  make backup-db  Create and verify a SQLite backup"
 	@echo "  make dry-run  Run a small network dry scan without writes/alerts"
 
 verify: test smoke-alerts score
@@ -24,6 +26,12 @@ score:
 
 report:
 	$(PYTHON) main.py --report
+
+status:
+	$(PYTHON) main.py --status
+
+backup-db:
+	$(PYTHON) main.py --backup-db
 
 dry-run:
 	$(PYTHON) main.py --dry-run --top-n 30

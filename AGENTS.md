@@ -70,6 +70,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - **Dry scan (network, no writes/alerts):** `.venv/bin/python main.py --dry-run --top-n 30`
 - **Reports:** `main.py --report` (outcome hit-rates) · `main.py --score` (paper
   scoreboard) · `main.py --status` (scan/listener health)
+- **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
+  API + integrity check + retention)
 - **Backtest (research):**
   `python -m crypto_rsi_scanner.backtest --top-n 80 --days 1825`
   flags: `--pit` (point-in-time universe, survivorship fix) · `--slice <setup>`
@@ -94,6 +96,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `indicators.py` | **PURE** functions: RSI, regime, setup taxonomy, market gating, conviction. Unit-tested — keep pure, add a test for new logic |
 | `scanner.py` | orchestration: scan → analyze → build message → route notifications; CLI |
 | `storage.py` | SQLite. **Additive migrations only** (`_migrate`); one-time data migrations gated by a `meta` flag |
+| `backups.py` | safe SQLite online backups, integrity check, retention |
 | `outcomes.py` | forward-return grading vs each setup's *expected direction* |
 | `formatting.py` | channel rendering (Telegram HTML cards, plain text) |
 | `notifications.py` | send to Telegram/Discord/email |
@@ -164,7 +167,7 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 
 1. Let the paper scoreboard accrue ~1–2 weeks; confirm gating helps live.
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
-3. Add DB backups and log rotation.
+3. Add backup freshness to status and log rotation.
 4. Improve point-in-time backtest power and review exported registry priors.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
 

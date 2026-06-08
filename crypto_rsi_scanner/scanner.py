@@ -709,6 +709,15 @@ def status() -> None:
         storage.close()
 
 
+def backup_db() -> None:
+    """Create and verify a safe SQLite backup, then prune old backups."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    from .backups import backup_database, format_backup_result
+
+    result = backup_database(config.DB_PATH, config.BACKUP_DIR, keep=config.BACKUP_KEEP)
+    print(format_backup_result(result))
+
+
 def cli() -> None:
     import argparse
 
@@ -737,6 +746,11 @@ def cli() -> None:
         help="Print operational scan/listener health and exit.",
     )
     parser.add_argument(
+        "--backup-db",
+        action="store_true",
+        help="Create and verify a safe SQLite backup, then prune old backups.",
+    )
+    parser.add_argument(
         "--listen",
         action="store_true",
         help="Run the bot listener loop so commands (/top, /detail, /stats) "
@@ -753,6 +767,9 @@ def cli() -> None:
         return
     if args.status:
         status()
+        return
+    if args.backup_db:
+        backup_db()
         return
     if args.listen:
         logging.basicConfig(

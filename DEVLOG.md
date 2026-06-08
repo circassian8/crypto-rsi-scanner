@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-08 — Add safe SQLite DB backup command · Codex
+**Why:** The scanner now has operational health reporting, but the live SQLite
+DB still needed a safe recovery path. Because the DB runs in WAL mode and can be
+open from the scan and listener, raw file copies are not reliable enough.
+**Changes:**
+- New `crypto_rsi_scanner/backups.py` uses SQLite's online backup API to create
+  consistent snapshots, writes through a temp file, verifies the result with
+  `PRAGMA integrity_check`, and prunes older backups by retention count.
+- `main.py --backup-db` and `make backup-db` create a verified backup under
+  `RSI_BACKUP_DIR` with `RSI_BACKUP_KEEP` retention.
+- `config.py`, `.env.example`, `.gitignore`, `AGENTS.md`, `ROADMAP.md`, and
+  `DECISIONS.md` document/configure the backup workflow and keep backup artifacts
+  out of git.
+- `tests/test_indicators.py` adds a temp-DB backup integrity and retention test.
+**Verify:** `.venv/bin/python main.py --backup-db` created
+`backups/rsi_scanner-20260608T182009Z.db`, size 0.20 MB, `integrity_check: ok`.
+`make verify` passes: tests 101/101, alert render smoke, and paper scoreboard.
+**Notes/risks:** Backup freshness is not yet shown in `--status`; ROADMAP keeps
+that and log rotation as the next ops-hardening work.
+
 ## 2026-06-08 — Add scan status and bot health report · Codex
 **Why:** The scanner had heartbeat alerts for crashes/degraded fetches, but no
 single persisted view of the latest run state. If launchd missed a scan or a run

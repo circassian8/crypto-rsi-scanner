@@ -135,6 +135,16 @@ degrades, or fails after fetching. One shared status source gives CLI, bot, and
 watchdog paths the same view of scan freshness and last errors.
 **Revisit when:** We add richer historical run tables or external monitoring.
 
+## 2026-06-08 - Use SQLite online backup API
+**Status:** accepted
+**Decision:** DB backups must use SQLite's online backup API, verify the resulting
+backup with `PRAGMA integrity_check`, and apply retention. Do not back up by
+copying only `rsi_scanner.db`.
+**Why:** The live DB runs in WAL mode and can have active scan/listener
+connections; raw file copies can miss WAL contents or capture an inconsistent
+state.
+**Revisit when:** We move state storage away from local SQLite.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and

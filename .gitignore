@@ -8,6 +8,7 @@
 rsi_scan_latest.csv
 scan.log
 bot.log
+backups/
 
 # Python
 __pycache__/

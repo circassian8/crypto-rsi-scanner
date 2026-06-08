@@ -162,6 +162,12 @@ DATA_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = DATA_DIR / "rsi_scanner.db"
 CSV_OUT = DATA_DIR / "rsi_scan_latest.csv"
 
+_BACKUP_DIR_RAW = os.getenv("RSI_BACKUP_DIR", "backups")
+BACKUP_DIR = Path(_BACKUP_DIR_RAW).expanduser()
+if not BACKUP_DIR.is_absolute():
+    BACKUP_DIR = DATA_DIR / BACKUP_DIR
+BACKUP_KEEP = int(os.getenv("RSI_BACKUP_KEEP", "14"))
+
 
 def redact_token(text: str) -> str:
     """Strip the Telegram bot token from a string before logging — it rides

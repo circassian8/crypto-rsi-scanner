@@ -1286,6 +1286,45 @@ def test_scan_status_failure_and_bot_health_escapes():
         st.close()
 
 
+def test_sqlite_backup_api_integrity_and_retention():
+    import sqlite3
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from crypto_rsi_scanner.backups import backup_database
+
+    root = Path(tempfile.mkdtemp())
+    src = root / "source.db"
+    backup_dir = root / "backups"
+    conn = sqlite3.connect(src)
+    conn.execute("CREATE TABLE sample (id INTEGER PRIMARY KEY, value TEXT)")
+    conn.execute("INSERT INTO sample (value) VALUES ('ok')")
+    conn.commit()
+    conn.close()
+
+    result = backup_database(
+        src,
+        backup_dir,
+        keep=2,
+        now=datetime(2026, 6, 8, 1, 2, 3, tzinfo=timezone.utc),
+    )
+    assert result.path.exists()
+    assert result.quick_check == "ok"
+    copied = sqlite3.connect(result.path)
+    try:
+        assert copied.execute("SELECT value FROM sample").fetchone()[0] == "ok"
+    finally:
+        copied.close()
+
+    backup_database(src, backup_dir, keep=2, now=datetime(2026, 6, 8, 1, 2, 4, tzinfo=timezone.utc))
+    third = backup_database(src, backup_dir, keep=2, now=datetime(2026, 6, 8, 1, 2, 5, tzinfo=timezone.utc))
+    backups = sorted(backup_dir.glob("source-*.db"))
+    assert len(backups) == 2
+    assert backups[-1] == third.path
+    assert not result.path.exists()
+
+
 def test_storage_wal_and_busy_timeout():
     # The scan and the always-on listener share one DB file; WAL + busy_timeout
     # let them read/write concurrently without "database is locked".
