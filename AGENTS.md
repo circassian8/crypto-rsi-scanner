@@ -68,7 +68,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `.venv/bin/python tests/test_indicators.py`
 - **Alert render smoke (no sends/network):** `make smoke-alerts`
 - **Dry scan (network, no writes/alerts):** `.venv/bin/python main.py --dry-run --top-n 30`
-- **Reports:** `main.py --report` (outcome hit-rates) · `main.py --score` (paper scoreboard)
+- **Reports:** `main.py --report` (outcome hit-rates) · `main.py --score` (paper
+  scoreboard) · `main.py --status` (scan/listener health)
 - **Backtest (research):**
   `python -m crypto_rsi_scanner.backtest --top-n 80 --days 1825`
   flags: `--pit` (point-in-time universe, survivorship fix) · `--slice <setup>`
@@ -97,6 +98,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `formatting.py` | channel rendering (Telegram HTML cards, plain text) |
 | `notifications.py` | send to Telegram/Discord/email |
 | `alert_smoke.py` | offline representative alert-render smoke test |
+| `status_report.py` | shared CLI/bot operational health report |
 | `telegram.py` | bot listener + commands (`/top /detail /stats /score`) + subscriber mgmt |
 | `macro.py` / `heartbeat.py` | digest market-context header / dead-man's-switch |
 | `paper.py` | paper-trade scoreboard (virtual P&L) |
@@ -162,7 +164,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 
 1. Let the paper scoreboard accrue ~1–2 weeks; confirm gating helps live.
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
-3. Improve point-in-time backtest power and review exported registry priors.
-4. Monitor universe hygiene false positives/negatives and tune thresholds.
+3. Add DB backups and log rotation.
+4. Improve point-in-time backtest power and review exported registry priors.
+5. Monitor universe hygiene false positives/negatives and tune thresholds.
 
 When in doubt, read the latest `DEVLOG.md` entries, then ask the human.

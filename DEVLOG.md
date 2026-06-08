@@ -1,9 +1,9 @@
 # DEVLOG — change history
 
-This project has **no git repo**, so this file is the history. **Newest entries
-at the top**, just under this header. Append (prepend) one entry per non-trivial
-change. Keep it skimmable; deep reasoning can link to code. See `AGENTS.md` for
-the working agreement.
+This project now has **local git** for diffs/rollback, while this file remains
+the human-readable narrative history. **Newest entries at the top**, just under
+this header. Append (prepend) one entry per non-trivial change. Keep it skimmable;
+deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ### Entry template (copy this)
 
@@ -16,6 +16,33 @@ the working agreement.
 ```
 
 ---
+
+## 2026-06-08 — Add scan status and bot health report · Codex
+**Why:** The scanner had heartbeat alerts for crashes/degraded fetches, but no
+single persisted view of the latest run state. If launchd missed a scan or a run
+failed after fetching, the owner and bot had to infer health from logs.
+**Changes:**
+- `storage.py` now persists scan lifecycle status in SQLite meta: running,
+  success, failure, start/finish times, last success/failure, fetch/analyze
+  counts, signal counts, routing counts, outcome updates, and paper-trade updates.
+- `scanner.py` records live scan start/success/failure status, preserves dry-run
+  read-only behavior, returns notification routing counts, and adds
+  `main.py --status`.
+- New `status_report.py` renders one shared operational report for CLI and bot.
+- `telegram.py` adds `/health` and `/status`, updates help text, and has the
+  listener check stale successful scans with a one-alert-per-episode watchdog.
+- `heartbeat.py`, `config.py`, and `.env.example` expose/tune stale-scan alerts
+  via `RSI_STALE_SCAN_HOURS` and `RSI_STALE_CHECK_INTERVAL_SEC`.
+- `AGENTS.md`, `ROADMAP.md`, and `DECISIONS.md` document the status path and
+  narrow remaining ops hardening to DB backups/log rotation.
+- `tests/test_indicators.py` adds status lifecycle/report, bot escaping, stale
+  watchdog, and WAL/busy-timeout coverage.
+**Verify:** `.venv/bin/python main.py --status` prints current local DB health
+(`health: OK`, last success fallback from the existing `scans` table). `make
+verify` passes: tests 100/100, alert render smoke, and paper scoreboard.
+**Notes/risks:** Existing live runs will show `scan state: unknown` until the next
+non-dry scan writes the new status meta; last-success freshness still falls back
+to the historical `scans` table.
 
 ## 2026-06-08 — SQLite WAL + busy_timeout for scan/listener concurrency · Claude
 **Why:** The daily scan (launchd) and the always-on bot listener share one SQLite

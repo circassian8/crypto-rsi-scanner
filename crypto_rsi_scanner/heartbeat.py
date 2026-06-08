@@ -39,6 +39,26 @@ def alert_failure(exc: Exception, storage=None) -> None:
         log.error("Heartbeat failure alert could not be sent: %s", e)
 
 
+def alert_stale_scan(last_scan, hours_stale: float, storage=None) -> None:
+    """No successful scan in too long — the daily run likely didn't fire (Mac
+    asleep through the schedule, launchd unloaded, or the scan failing). Raised by
+    the always-on listener, the one process that keeps running when the scan doesn't."""
+    if not config.HEARTBEAT_ENABLED:
+        return
+    when = "never" if last_scan is None else last_scan.strftime("%Y-%m-%d %H:%M UTC")
+    text = (
+        "🚨 <b>RSI Scanner — NO RECENT SCAN</b>\n"
+        f"Last successful scan: {when} (~{hours_stale:.0f}h ago).\n"
+        "The daily scan hasn't run. Check the Mac was awake at the schedule, the "
+        "launchd job is loaded, and <code>scan.log</code> for errors."
+    )
+    try:
+        _send(text, storage)
+        log.warning("Stale-scan alert sent (last scan ~%.0fh ago)", hours_stale)
+    except Exception as e:
+        log.error("Stale-scan alert could not be sent: %s", e)
+
+
 def check_health(stats: dict, storage=None) -> bool:
     """Inspect a completed run's stats; alert on no-data or heavy degradation.
     Returns True if healthy, False if a warning was raised."""

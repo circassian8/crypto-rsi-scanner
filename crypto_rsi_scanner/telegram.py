@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 import logging
 import time
+import html
+from datetime import datetime, timezone
 
 import requests
 
@@ -27,7 +29,7 @@ _WELCOME = (
     "✅ You're subscribed to RSI Scanner alerts.\n"
     "Daily watch-list digest + instant pings for high-conviction overbought/"
     "oversold crossings in the top-100 coins.\n\n"
-    "Commands: /top  /detail SYM  /stats  /score  /help  /stop"
+    "Commands: /top  /detail SYM  /stats  /score  /health  /help  /stop"
 )
 _GOODBYE = "👋 You've unsubscribed. Send /start to rejoin anytime."
 _HELP = (
@@ -36,6 +38,7 @@ _HELP = (
     "/detail SYM — full readout for one coin (e.g. /detail BNB)\n"
     "/stats — historical signal hit-rates\n"
     "/score — paper-trade scoreboard (realized P&amp;L)\n"
+    "/health — scan/listener health\n"
     "/start — subscribe · /stop — unsubscribe\n"
     "/help — this message"
 )
@@ -134,6 +137,11 @@ def _cmd_score(storage) -> str:
     return "<pre>" + paper.report(storage) + "</pre>"
 
 
+def _cmd_health(storage) -> str:
+    from .status_report import format_status
+    return "<pre>" + html.escape(format_status(storage), quote=False) + "</pre>"
+
+
 def _dispatch_command(storage, token: str, chat_id: str, text: str) -> bool:
     """Handle a known command. Returns True if it was a command."""
     parts = text.split(maxsplit=1)
@@ -148,6 +156,8 @@ def _dispatch_command(storage, token: str, chat_id: str, text: str) -> bool:
         _send(token, chat_id, _cmd_stats(storage))
     elif cmd in ("/score", "/scoreboard"):
         _send(token, chat_id, _cmd_score(storage))
+    elif cmd in ("/health", "/status"):
+        _send(token, chat_id, _cmd_health(storage))
     elif cmd == "/help":
         _send(token, chat_id, _HELP)
     else:
@@ -229,6 +239,36 @@ def sync_subscribers(storage) -> int:
         return 0
 
 
+def _check_scan_staleness(storage, state: dict, now=None) -> None:
+    """Watchdog: alert once (via heartbeat) if no successful scan has landed in
+    config.STALE_SCAN_HOURS. `state` persists the throttle timer + alerted flag
+    across listener iterations. No-op when heartbeat is off or there's no scan
+    history yet (can't distinguish a fresh install from a stalled one)."""
+    if not config.HEARTBEAT_ENABLED or config.STALE_SCAN_HOURS <= 0:
+        return
+    if time.monotonic() - state.get("last_check", 0.0) < config.STALE_CHECK_INTERVAL_SEC:
+        return
+    state["last_check"] = time.monotonic()
+
+    last = (
+        storage.last_successful_scan_at()
+        if hasattr(storage, "last_successful_scan_at")
+        else storage.last_scan_at()
+    )
+    if last is None:
+        return
+    now = now or datetime.now(timezone.utc)
+    hours = (now - last).total_seconds() / 3600.0
+    if hours >= config.STALE_SCAN_HOURS:
+        if not state.get("alerted"):
+            from . import heartbeat
+            heartbeat.alert_stale_scan(last, hours, storage)
+            state["alerted"] = True
+    elif state.get("alerted"):
+        log.info("Scan freshness recovered (last scan ~%.0fh ago).", hours)
+        state["alerted"] = False
+
+
 def listen(poll_seconds: int = 30) -> None:
     """Run a continuous long-polling loop so commands get answered in real time.
     Intended to run as a background service (separate from the daily scan)."""
@@ -243,6 +283,7 @@ def listen(poll_seconds: int = 30) -> None:
     storage = Storage(config.DB_PATH)
     offline = False
     backoff = poll_seconds
+    stale_state: dict = {}
     try:
         while True:
             try:
@@ -250,6 +291,8 @@ def listen(poll_seconds: int = 30) -> None:
                 if offline:
                     log.info("Telegram reachable again — resuming normal polling.")
                     offline, backoff = False, poll_seconds
+                # online: opportunistically check the daily scan hasn't gone silent
+                _check_scan_staleness(storage, stale_state)
             except KeyboardInterrupt:
                 raise
             except _Unreachable:

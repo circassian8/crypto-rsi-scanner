@@ -22,7 +22,7 @@ Status labels:
 | status | item | owner | notes |
 |---|---|---|---|
 | todo | Improve point-in-time backtest power | open | Pro CoinGecko key or alternate history source would extend PIT universe beyond demo limits. |
-| todo | Add ops hardening | open | Log rotation, DB backup, launchd health/status check, and last-successful-scan visibility. |
+| todo | Add DB backups and log rotation | open | Scan status and stale watchdog are live; remaining ops work is safe SQLite backups, log rotation, and launchd status helpers. |
 | todo | Run stronger PIT calibration and review exported priors | open | Tooling exists via `backtest.py --export-priors`; needs larger PIT history before opting live into a file. |
 | todo | Monitor universe hygiene false positives/negatives | open | Initial filters are live; review excluded symbols from logs and tune thresholds if needed. |
 

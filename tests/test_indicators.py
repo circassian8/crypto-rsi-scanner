@@ -1185,6 +1185,107 @@ def test_live_edge_adjust_render_no_nan():
         outcomes.track_records = orig
 
 
+def test_scan_staleness_alert_dedup_and_recovery():
+    from datetime import datetime, timedelta, timezone
+    from crypto_rsi_scanner import telegram, heartbeat, config
+
+    sent = []
+    orig_alert = heartbeat.alert_stale_scan
+    orig_int = config.STALE_CHECK_INTERVAL_SEC
+    heartbeat.alert_stale_scan = lambda last, hrs, storage=None: sent.append(hrs)
+    config.STALE_CHECK_INTERVAL_SEC = 0           # disable throttle for the test
+    try:
+        now = datetime(2026, 6, 8, tzinfo=timezone.utc)
+
+        class Store:
+            def __init__(self, dt):
+                self.dt = dt
+            def last_scan_at(self):
+                return self.dt
+
+        state: dict = {}
+        telegram._check_scan_staleness(Store(now - timedelta(hours=2)), state, now=now)
+        assert sent == []                          # fresh -> no alert
+        telegram._check_scan_staleness(Store(now - timedelta(hours=40)), state, now=now)
+        assert len(sent) == 1                      # stale -> one alert
+        telegram._check_scan_staleness(Store(now - timedelta(hours=41)), state, now=now)
+        assert len(sent) == 1                      # still stale -> no repeat (dedup)
+        telegram._check_scan_staleness(Store(now - timedelta(hours=1)), state, now=now)
+        telegram._check_scan_staleness(Store(now - timedelta(hours=40)), state, now=now)
+        assert len(sent) == 2                      # recovered then stale again -> re-alerts
+        # no scan history yet -> never alerts
+        telegram._check_scan_staleness(Store(None), {}, now=now)
+        assert len(sent) == 2
+    finally:
+        heartbeat.alert_stale_scan = orig_alert
+        config.STALE_CHECK_INTERVAL_SEC = orig_int
+
+
+def test_scan_status_lifecycle_and_report():
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    from crypto_rsi_scanner import config, status_report, telegram
+
+    st = _fresh_storage()
+    orig_stale = config.STALE_SCAN_HOURS
+    config.STALE_SCAN_HOURS = 36
+    try:
+        st.mark_scan_started(top_n=12)
+        assert st.scan_status()["state"] == "running"
+
+        st.mark_scan_success(
+            top_n=12,
+            requested=15,
+            fetched=14,
+            analyzed=12,
+            coin_count=12,
+            flagged_count=3,
+            ob_count=2,
+            os_count=1,
+            instant_count=1,
+            digest_count=2,
+            matured_outcomes=4,
+            paper_opened=1,
+            paper_closed=0,
+        )
+        status = st.scan_status()
+        assert status["state"] == "success"
+        assert st.last_successful_scan_at() is not None
+        telegram.save_latest_snapshot(st, [{"symbol": "AAA", "flag": "OB"}])
+        st.subscribe("111", "alice")
+
+        out = status_report.format_status(st)
+        assert "health: OK" in out
+        assert "fetch: requested 15, fetched 14, analyzed 12" in out
+        assert "signals: scanned 12, flagged 3 (OB 2, OS 1)" in out
+        assert "bot: 1 subscriber(s), 1 current snapshot signal(s)" in out
+
+        old = datetime.now(timezone.utc) - timedelta(hours=40)
+        status["last_success_at"] = old.isoformat()
+        st.set_meta("scan_status", json.dumps(status))
+        assert "health: STALE" in status_report.format_status(st, now=datetime.now(timezone.utc))
+    finally:
+        config.STALE_SCAN_HOURS = orig_stale
+        st.close()
+
+
+def test_scan_status_failure_and_bot_health_escapes():
+    from crypto_rsi_scanner import telegram
+
+    st = _fresh_storage()
+    try:
+        st.mark_scan_started(top_n=10)
+        st.mark_scan_failure("bad <network> & token", requested=10, fetched=0, analyzed=0)
+        plain = telegram._cmd_health(st)
+        assert "RSI SCANNER STATUS" in plain
+        assert "health: FAILED" in plain
+        assert "bad &lt;network&gt; &amp; token" in plain
+        assert "<network>" not in plain
+    finally:
+        st.close()
+
+
 def test_storage_wal_and_busy_timeout():
     # The scan and the always-on listener share one DB file; WAL + busy_timeout
     # let them read/write concurrently without "database is locked".

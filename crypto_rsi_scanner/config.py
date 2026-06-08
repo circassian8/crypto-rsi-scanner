@@ -114,6 +114,13 @@ HEARTBEAT_ENABLED = (os.getenv("RSI_HEARTBEAT", "1").lower() not in ("0", "false
 # Warn if more than this fraction of coins fail to fetch (silent degradation).
 HEARTBEAT_MAX_FETCH_FAIL_RATIO = float(os.getenv("RSI_HEARTBEAT_MAX_FAIL", "0.30"))
 
+# Stale-scan watchdog: the always-on listener alerts (once) if no successful scan
+# has landed in STALE_SCAN_HOURS — catches a Mac asleep through the 03:10 schedule,
+# an unloaded launchd job, or a silently-failing scan. Default 36h tolerates normal
+# overnight sleep; lower it for a tighter watch. Gated by HEARTBEAT_ENABLED.
+STALE_SCAN_HOURS = float(os.getenv("RSI_STALE_SCAN_HOURS", "36"))
+STALE_CHECK_INTERVAL_SEC = int(os.getenv("RSI_STALE_CHECK_INTERVAL_SEC", "1800"))
+
 RSI_4H_FETCH_UPPER = 60.0
 RSI_4H_FETCH_LOWER = 40.0
 

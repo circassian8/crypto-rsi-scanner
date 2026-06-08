@@ -444,6 +444,9 @@ def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) 
 
     storage = Storage(config.DB_PATH)
     try:
+        if not dry_run:
+            storage.mark_scan_started(top_n=top_n, dry_run=False)
+
         # Process bot /start and /stop commands so the recipient list self-manages.
         if not dry_run:
             telegram.seed_subscribers_from_config(storage)
@@ -451,19 +454,21 @@ def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) 
             if added:
                 log.info("Added %d new subscriber(s) via the bot", added)
 
-        try:
-            df, closes_map, stats = asyncio.run(scan(top_n))
-        except Exception as exc:
-            log.exception("Scan failed")
-            if not dry_run:
-                heartbeat.alert_failure(exc, storage)
-            raise
+        df, closes_map, stats = asyncio.run(scan(top_n))
 
+        health_ok = True
         if not dry_run:
-            heartbeat.check_health(stats, storage)
+            health_ok = heartbeat.check_health(stats, storage)
 
         if df.empty:
             log.error("No data - check network / API key / rate limits")
+            if not dry_run:
+                storage.mark_scan_failure(
+                    "No data - check network / API key / rate limits",
+                    requested=stats.get("requested", 0),
+                    fetched=stats.get("fetched", 0),
+                    analyzed=stats.get("analyzed", 0),
+                )
             return
 
         prev_flags = storage.get_prev_flags()
@@ -502,15 +507,17 @@ def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) 
         if not dry_run:
             telegram.save_latest_snapshot(storage, signals)
 
-        _route_notifications(signals, storage, dry_run, macro_line=macro_line)
+        route_stats = _route_notifications(signals, storage, dry_run, macro_line=macro_line)
 
         # grade past signals whose horizons have matured (uses fetched closes)
+        matured = 0
         if not dry_run:
             matured = outcomes.evaluate_all(storage, closes_map)
             if matured:
                 log.info("Recorded %d matured signal outcome(s)", matured)
 
         # paper-trade scoreboard: open new crossings, close matured positions
+        opened = closed = 0
         if not dry_run:
             opened, closed = paper.update(storage, signals, closes_map)
             if opened or closed:
@@ -520,7 +527,31 @@ def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) 
         if not dry_run:
             current_flags = {row["symbol"]: row["flag"] for _, row in flagged.iterrows()}
             storage.save_prev_flags(current_flags)
+            storage.mark_scan_success(
+                top_n=top_n,
+                health_ok=health_ok,
+                requested=stats.get("requested", 0),
+                fetched=stats.get("fetched", 0),
+                analyzed=stats.get("analyzed", 0),
+                coin_count=len(df),
+                flagged_count=len(flagged),
+                ob_count=ob_count,
+                os_count=os_count,
+                instant_count=route_stats["instant_count"],
+                digest_count=route_stats["digest_count"],
+                instant_sent=route_stats["instant_sent"],
+                digest_sent=route_stats["digest_sent"],
+                matured_outcomes=matured,
+                paper_opened=opened,
+                paper_closed=closed,
+            )
 
+    except Exception as exc:
+        log.exception("Scan failed")
+        if not dry_run:
+            storage.mark_scan_failure(f"{type(exc).__name__}: {exc}")
+            heartbeat.alert_failure(exc, storage)
+        raise
     finally:
         storage.close()
 
@@ -573,7 +604,7 @@ def _apply_live_edge_adjustments(df: pd.DataFrame, storage: Storage) -> pd.DataF
 
 def _route_notifications(
     signals: list[dict], storage: Storage, dry_run: bool, macro_line: str = ""
-) -> None:
+) -> dict:
     """Tiered routing. Nothing worth a look is dropped — tier decides loudness.
       INSTANT: new, important crossings -> sent now (per-coin cooldown).
       DIGEST:  current watch-list snapshot -> batched, once per interval.
@@ -599,13 +630,21 @@ def _route_notifications(
     )
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    routed = {
+        "instant_count": len(instant),
+        "digest_count": 0,
+        "instant_sent": False,
+        "digest_sent": False,
+    }
 
     if instant:
         names = ", ".join(s["symbol"] for s in instant)
         if dry_run:
             log.info("[dry-run] would send INSTANT alert: %s", names)
         else:
-            notify_all("instant", instant, ts, chat_ids=recipients, macro_line=macro_line)
+            routed["instant_sent"] = bool(
+                notify_all("instant", instant, ts, chat_ids=recipients, macro_line=macro_line)
+            )
             for s in instant:
                 storage.mark_alerted(s["symbol"], s["flag"])
             log.info("INSTANT alert sent: %s", names)
@@ -620,18 +659,22 @@ def _route_notifications(
     )
     if not digest:
         log.info("Nothing on the digest watch-list")
-        return
+        return routed
+    routed["digest_count"] = len(digest)
 
     if not storage.digest_due(config.DIGEST_INTERVAL_HOURS):
         log.info("Digest holding %d item(s) until next interval", len(digest))
-        return
+        return routed
 
     if dry_run:
         log.info("[dry-run] would send DIGEST with %d item(s)", len(digest))
     else:
-        notify_all("digest", digest, ts, chat_ids=recipients, macro_line=macro_line)
+        routed["digest_sent"] = bool(
+            notify_all("digest", digest, ts, chat_ids=recipients, macro_line=macro_line)
+        )
         storage.mark_digest_sent()
         log.info("DIGEST sent with %d item(s)", len(digest))
+    return routed
 
 
 def report() -> None:
@@ -651,6 +694,17 @@ def score() -> None:
     storage = Storage(config.DB_PATH)
     try:
         print(paper.report(storage))
+    finally:
+        storage.close()
+
+
+def status() -> None:
+    """Print operational scan/listener health and exit."""
+    logging.basicConfig(level=logging.WARNING, format="%(message)s")
+    storage = Storage(config.DB_PATH)
+    try:
+        from .status_report import format_status
+        print(format_status(storage))
     finally:
         storage.close()
 
@@ -678,6 +732,11 @@ def cli() -> None:
         help="Print the paper-trade scoreboard (realized P&L by book/setup) and exit.",
     )
     parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Print operational scan/listener health and exit.",
+    )
+    parser.add_argument(
         "--listen",
         action="store_true",
         help="Run the bot listener loop so commands (/top, /detail, /stats) "
@@ -691,6 +750,9 @@ def cli() -> None:
         return
     if args.score:
         score()
+        return
+    if args.status:
+        status()
         return
     if args.listen:
         logging.basicConfig(

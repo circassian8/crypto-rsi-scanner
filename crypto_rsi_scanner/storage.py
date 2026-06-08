@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import math
 import sqlite3
@@ -8,12 +9,30 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
+_SCAN_STATUS_META_KEY = "scan_status"
+
 
 def _clean(value: object) -> object:
     """Coerce pandas/NumPy NaN to None so SQLite stores NULL, not a NaN float."""
     if isinstance(value, float) and math.isnan(value):
         return None
     return value
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (
@@ -188,7 +207,7 @@ class Storage:
         self.conn.close()
 
     def save_scan(self, coin_count: int, ob_count: int, os_count: int) -> int:
-        now = datetime.now(timezone.utc).isoformat()
+        now = _now_iso()
         cur = self.conn.execute(
             "INSERT INTO scans (run_at, coin_count, ob_count, os_count) VALUES (?, ?, ?, ?)",
             (now, coin_count, ob_count, os_count),
@@ -205,8 +224,79 @@ class Storage:
             return None
         return {"ob": row["ob_count"], "os": row["os_count"]}
 
+    def last_scan_at(self) -> datetime | None:
+        """UTC timestamp of the most recent completed scan (None if none yet)."""
+        row = self.conn.execute(
+            "SELECT run_at FROM scans ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if not row or not row["run_at"]:
+            return None
+        return _parse_iso(row["run_at"])
+
+    def scan_status(self) -> dict:
+        raw = self.get_meta(_SCAN_STATUS_META_KEY)
+        if not raw:
+            return {}
+        try:
+            status = json.loads(raw)
+        except Exception:  # noqa: BLE001
+            return {}
+        return status if isinstance(status, dict) else {}
+
+    def _write_scan_status(self, status: dict) -> dict:
+        self.set_meta(_SCAN_STATUS_META_KEY, json.dumps(status, default=str, sort_keys=True))
+        return status
+
+    def mark_scan_started(self, top_n: int | None = None, dry_run: bool = False) -> dict:
+        prev = self.scan_status()
+        now = _now_iso()
+        return self._write_scan_status({
+            "state": "running",
+            "started_at": now,
+            "finished_at": None,
+            "top_n": top_n,
+            "dry_run": bool(dry_run),
+            "last_success_at": prev.get("last_success_at"),
+            "last_failure_at": prev.get("last_failure_at"),
+            "last_error": None,
+        })
+
+    def mark_scan_success(self, **fields) -> dict:
+        prev = self.scan_status()
+        now = _now_iso()
+        status = {
+            **{k: v for k, v in prev.items() if k.startswith("last_")},
+            "state": "success",
+            "started_at": prev.get("started_at"),
+            "finished_at": now,
+            "last_success_at": now,
+            "last_failure_at": prev.get("last_failure_at"),
+            "last_error": None,
+        }
+        status.update(fields)
+        return self._write_scan_status(status)
+
+    def mark_scan_failure(self, error: object, **fields) -> dict:
+        prev = self.scan_status()
+        now = _now_iso()
+        status = {
+            **{k: v for k, v in prev.items() if k.startswith("last_")},
+            "state": "failure",
+            "started_at": prev.get("started_at"),
+            "finished_at": now,
+            "last_success_at": prev.get("last_success_at"),
+            "last_failure_at": now,
+            "last_error": str(error)[:500],
+        }
+        status.update(fields)
+        return self._write_scan_status(status)
+
+    def last_successful_scan_at(self) -> datetime | None:
+        status_dt = _parse_iso(self.scan_status().get("last_success_at"))
+        return status_dt or self.last_scan_at()
+
     def save_signal(self, scan_id: int, sig: dict) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = _now_iso()
         self.conn.execute(
             """INSERT INTO signals
             (scan_id, symbol, coin_id, flag, severity, rsi_daily, rsi_4h, rsi_weekly,
@@ -286,7 +376,7 @@ class Storage:
         row = self.conn.execute(
             "SELECT active FROM subscribers WHERE chat_id = ?", (chat_id,)
         ).fetchone()
-        now = datetime.now(timezone.utc).isoformat()
+        now = _now_iso()
         if row is None:
             self.conn.execute(
                 "INSERT INTO subscribers (chat_id, name, active, subscribed_at) "
@@ -339,7 +429,7 @@ class Storage:
         return elapsed / 3600 >= interval_hours
 
     def mark_digest_sent(self) -> None:
-        self.set_meta("last_digest_at", datetime.now(timezone.utc).isoformat())
+        self.set_meta("last_digest_at", _now_iso())
 
     # -- outcomes: forward returns measured after each crossing
 

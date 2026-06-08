@@ -124,6 +124,17 @@ digest caps, NaN handling, and edge-case symbols.
 **Revisit when:** Rendering moves to a richer template/parser with equivalent
 coverage.
 
+## 2026-06-08 - Persist and expose scan health
+**Status:** accepted
+**Decision:** Live scans persist their latest operational status in SQLite meta,
+and both `main.py --status` and the bot `/health` command render it through the
+shared `status_report.py` formatter. The always-on listener also checks stale
+successful scans and raises a heartbeat alert once per stale episode.
+**Why:** A correct signal engine is not enough if the launchd scan silently stops,
+degrades, or fails after fetching. One shared status source gives CLI, bot, and
+watchdog paths the same view of scan freshness and last errors.
+**Revisit when:** We add richer historical run tables or external monitoring.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and
