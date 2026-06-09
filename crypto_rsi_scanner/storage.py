@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS signals (
     setup_type TEXT,
     expected_dir TEXT,
     market_regime TEXT,
+    market_aligned TEXT,
     state_json TEXT,
     price REAL,
     mcap_rank INTEGER,
@@ -155,6 +156,7 @@ class Storage:
             ("setup_type", "TEXT"),
             ("expected_dir", "TEXT"),
             ("market_regime", "TEXT"),
+            ("market_aligned", "TEXT"),
             ("state_json", "TEXT"),
         ):
             if name not in cols:
@@ -164,6 +166,7 @@ class Storage:
         if "state_json" not in paper_cols:
             self.conn.execute("ALTER TABLE paper_trades ADD COLUMN state_json TEXT")
         self._backfill_setups_once()
+        self._backfill_market_alignment_once()
 
     def _backfill_setups_once(self) -> None:
         """One-time, on upgrade: stamp setup_type/expected_dir onto historical
@@ -209,6 +212,29 @@ class Storage:
                 "Setup migration: stamped %d signal(s), re-graded %d outcome(s)",
                 len(sig_rows), regraded,
             )
+
+    def _backfill_market_alignment_once(self) -> None:
+        if self.get_meta("market_alignment_backfill_v1"):
+            return
+        from .signal_registry import market_alignment, setup_for
+
+        rows = self.conn.execute(
+            "SELECT id, flag, regime, setup_type, market_regime FROM signals "
+            "WHERE market_aligned IS NULL"
+        ).fetchall()
+        updated = 0
+        for r in rows:
+            setup = r["setup_type"] or setup_for(r["flag"] or "", r["regime"] or "")[0]
+            aligned = market_alignment(setup, r["market_regime"])
+            self.conn.execute(
+                "UPDATE signals SET market_aligned = ? WHERE id = ?",
+                (aligned, r["id"]),
+            )
+            updated += 1
+        self.conn.commit()
+        self.set_meta("market_alignment_backfill_v1", datetime.now(timezone.utc).isoformat())
+        if updated:
+            log.info("Market-alignment migration: stamped %d signal(s)", updated)
 
     def close(self) -> None:
         self.conn.close()
@@ -308,9 +334,9 @@ class Storage:
             """INSERT INTO signals
             (scan_id, symbol, coin_id, flag, severity, rsi_daily, rsi_4h, rsi_weekly,
              rsi_z, rsi_delta, xrank, volume_ratio, btc_corr, divergence, conviction,
-             tier, regime, regime_note, setup_type, expected_dir, market_regime, state_json, price,
+             tier, regime, regime_note, setup_type, expected_dir, market_regime, market_aligned, state_json, price,
              mcap_rank, is_new, run_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 scan_id,
                 sig["symbol"],
@@ -333,6 +359,7 @@ class Storage:
                 _clean(sig.get("setup_type")),
                 _clean(sig.get("expected_dir")),
                 _clean(sig.get("market_regime")),
+                _clean(sig.get("market_aligned")),
                 _clean(sig.get("state_json")),
                 _clean(sig.get("price")),
                 _clean(sig.get("mcap_rank")),
@@ -449,6 +476,15 @@ class Storage:
             (coin_id, since_iso),
         ).fetchall()
 
+    def recent_signal_coin_ids(self, since_iso: str) -> list[str]:
+        """Coin IDs with recent crossing signals that may still need outcomes."""
+        rows = self.conn.execute(
+            "SELECT DISTINCT coin_id FROM signals "
+            "WHERE is_new = 1 AND run_at >= ? AND coin_id IS NOT NULL AND coin_id != ''",
+            (since_iso,),
+        ).fetchall()
+        return [r["coin_id"] for r in rows]
+
     def has_outcome(self, signal_id: int, horizon: int) -> bool:
         return (
             self.conn.execute(
@@ -488,6 +524,7 @@ class Storage:
         return self.conn.execute(
             "SELECT o.horizon_days, o.ret_pct, o.favorable, "
             "s.flag, s.regime, s.regime_note, s.setup_type, s.expected_dir, "
+            "s.market_regime, s.market_aligned, s.state_json, "
             "s.conviction, s.symbol, s.severity "
             "FROM outcomes o JOIN signals s ON o.signal_id = s.id"
         ).fetchall()
@@ -518,6 +555,13 @@ class Storage:
         return self.conn.execute(
             "SELECT * FROM paper_trades WHERE status = 'open' ORDER BY entry_at"
         ).fetchall()
+
+    def open_paper_coin_ids(self) -> list[str]:
+        rows = self.conn.execute(
+            "SELECT DISTINCT coin_id FROM paper_trades "
+            "WHERE status = 'open' AND coin_id IS NOT NULL AND coin_id != ''"
+        ).fetchall()
+        return [r["coin_id"] for r in rows]
 
     def closed_paper_trades(self) -> list:
         return self.conn.execute(

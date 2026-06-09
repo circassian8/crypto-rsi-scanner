@@ -74,8 +74,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - **Backtest research smoke:** `make backtest-costs` runs the fixture backtest
   with state slices, cost/slippage modeling, and walk-forward folds.
 - **Dry scan (network, no writes/alerts):** `.venv/bin/python main.py --dry-run --top-n 30`
-- **Reports:** `main.py --report` (outcome hit-rates) · `main.py --score` (paper
-  scoreboard) · `main.py --score --json` (structured paper scoreboard) ·
+- **Reports:** `main.py --report` (outcome hit-rates plus actionable/control and
+  market-alignment cohorts) · `main.py --score` (paper scoreboard) ·
+  `main.py --score --json` (structured paper scoreboard) ·
   `main.py --score --cohorts` (state cohort scoreboard) · `main.py --status`
   (scan/listener health) · `main.py --universe-audit` (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
@@ -158,6 +159,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.
+- Notification bookkeeping is delivery-sensitive: only mark instant cooldowns or
+  digest timestamps after at least one channel succeeds.
 - Run `make verify` before claiming implementation work is complete. If you skip
   it, say exactly why.
 - Storage: additive `ALTER` in `_migrate`; bump a `meta` flag for one-time data
@@ -192,6 +195,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   "actionable (gated)" book vs a "control (gated-out)" book.
   Use `--score --cohorts` once paper trades close to inspect setup, conviction,
   market-alignment, and stored state-bucket cohorts.
+- **Live outcome report** (`--report`) now includes actionable/control and
+  setup-market-alignment cohorts. The scanner also fetches extra recent histories
+  for pending outcomes/paper trades when a signaled coin leaves today's clean
+  top-N universe.
 - **State-slice research:** `research/STATE_SLICE_BACKTEST_2026-06-09.md`
   contains the 4-year Binance current-top review; `research/PIT_STATE_SLICE_CONFIRMATION_2026-06-09.md`
   contains the cached 365d PIT review. The PIT run was bear-only, so it does not

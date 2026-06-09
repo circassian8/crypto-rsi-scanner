@@ -13,13 +13,15 @@ hit-rates honest — a correct breakdown call no longer counts as a failed bounc
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
 from . import config
-from .signal_registry import setup_for
+from .signal_registry import market_alignment, setup_for, setup_has_edge
+from .state_features import falling_knife_bucket
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +49,55 @@ def _setup_key(d: dict) -> str:
     if st and not (isinstance(st, float) and pd.isna(st)):
         return st
     return setup_for(d.get("flag", ""), d.get("regime") or "")[0]
+
+
+def _present(value: object) -> bool:
+    if value is None:
+        return False
+    try:
+        return not pd.isna(value)
+    except (TypeError, ValueError):
+        return True
+
+
+def _market_alignment_key(d: dict) -> str:
+    aligned = d.get("market_aligned")
+    if _present(aligned):
+        return str(aligned)
+    return market_alignment(_setup_key(d), d.get("market_regime"))
+
+
+def _is_actionable(d: dict) -> bool:
+    return setup_has_edge(_setup_key(d)) and _market_alignment_key(d) != "adverse"
+
+
+def _state_doc(d: dict) -> dict:
+    raw = d.get("state_json")
+    if not _present(raw):
+        return {}
+    try:
+        doc = json.loads(str(raw))
+    except Exception:  # noqa: BLE001
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def _state_bucket(d: dict, feature: str) -> str:
+    doc = _state_doc(d)
+    if feature == "volatility":
+        return str((doc.get("volatility") or {}).get("state") or "unknown")
+    if feature == "breadth":
+        return str((doc.get("breadth") or {}).get("state") or "unknown")
+    if feature == "relative_strength":
+        return str((doc.get("relative_strength") or {}).get("bucket") or "unknown")
+    if feature == "liquidity":
+        return str((doc.get("liquidity") or {}).get("bucket") or "unknown")
+    if feature == "falling_knife":
+        risk = doc.get("risk") or {}
+        if "falling_knife_score" not in risk:
+            return "unknown"
+        return falling_knife_bucket(risk.get("falling_knife_score"))
+    return "unknown"
 
 
 def _price_asof(closes: pd.Series, ts: datetime) -> float | None:
@@ -193,6 +244,8 @@ def build_report(rows: list, primary_horizon: int = 7) -> str:
 
     df = pd.DataFrame([dict(r) for r in rows])
     df["setup_type"] = df.apply(_setup_key, axis=1)
+    df["market_aligned"] = df.apply(_market_alignment_key, axis=1)
+    df["book"] = df.apply(lambda r: "actionable" if _is_actionable(r) else "control", axis=1)
     crossed = df[df["flag"].isin(["OB", "OS"])].copy()
 
     out: list[str] = []
@@ -223,6 +276,29 @@ def build_report(rows: list, primary_horizon: int = 7) -> str:
     if not ph.empty:
         ph = ph.copy()
         ph["bucket"] = ph["conviction"].map(_bucket_conviction)
+        out.append(f"\nBy actionable/control at {primary_horizon}d:")
+        out.append(f"  {'book':<12}{'n':>5}{'medRet':>9}{'conf%':>7}")
+        for book in ("actionable", "control"):
+            g = ph[ph["book"] == book]
+            if g.empty:
+                continue
+            out.append(
+                f"  {book:<12}{len(g):>5}"
+                f"{g['ret_pct'].median():>8.1f}%{100 * g['favorable'].mean():>6.0f}%"
+            )
+
+        alignments = [a for a in ("favorable", "neutral", "adverse")
+                      if not ph[ph["market_aligned"] == a].empty]
+        if alignments:
+            out.append(f"\nBy market alignment at {primary_horizon}d:")
+            out.append(f"  {'alignment':<12}{'n':>5}{'medRet':>9}{'conf%':>7}")
+            for aligned in alignments:
+                g = ph[ph["market_aligned"] == aligned]
+                out.append(
+                    f"  {aligned:<12}{len(g):>5}"
+                    f"{g['ret_pct'].median():>8.1f}%{100 * g['favorable'].mean():>6.0f}%"
+                )
+
         out.append(f"\nBy conviction at {primary_horizon}d (does higher score = better?):")
         out.append(f"  {'bucket':<12}{'n':>5}{'medRet':>9}{'conf%':>7}")
         for bucket in ("low (<40)", "med (40-64)", "high (65+)"):
@@ -234,8 +310,35 @@ def build_report(rows: list, primary_horizon: int = 7) -> str:
                 f"{g['ret_pct'].median():>8.1f}%{100 * g['favorable'].mean():>6.0f}%"
             )
 
+        state_features = {
+            "volatility": "volatility",
+            "breadth": "breadth",
+            "relative_strength": "relative strength",
+            "liquidity": "liquidity",
+            "falling_knife": "falling-knife",
+        }
+        state_lines: list[str] = []
+        for feature, label in state_features.items():
+            buckets = sorted({_state_bucket(dict(r), feature) for _, r in ph.iterrows()})
+            buckets = [b for b in buckets if b != "unknown"]
+            if not buckets:
+                continue
+            state_lines.append(f"  {label}:")
+            state_lines.append(f"    {'bucket':<18}{'n':>5}{'medRet':>9}{'conf%':>7}")
+            for bucket in buckets:
+                mask = ph.apply(lambda r, f=feature, b=bucket: _state_bucket(dict(r), f) == b, axis=1)
+                g = ph[mask]
+                state_lines.append(
+                    f"    {bucket:<18}{len(g):>5}"
+                    f"{g['ret_pct'].median():>8.1f}%{100 * g['favorable'].mean():>6.0f}%"
+                )
+        if state_lines:
+            out.append(f"\nBy state cohort at {primary_horizon}d:")
+            out.extend(state_lines)
+
     out.append("\n" + "=" * 60)
-    out.append("Note: top-100 scanner — signals on coins that later left the top")
-    out.append("100 stop maturing. Overlapping signals are de-correlated by")
-    out.append("scoring only crossing events (is_new), not every day in-zone.")
+    out.append("Note: the scanner fetches extra recent histories for pending")
+    out.append("outcomes when coins leave today's top universe. Overlapping")
+    out.append("signals are de-correlated by scoring only crossing events")
+    out.append("(is_new), not every day in-zone.")
     return "\n".join(out)

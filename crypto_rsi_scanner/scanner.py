@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -663,6 +663,54 @@ async def fetch_universe_audit(top_n: int | None = None) -> dict:
     return audit
 
 
+async def _fetch_extra_daily_closes(coin_ids: list[str]) -> dict[str, pd.Series]:
+    """Fetch daily closes for pending outcome/paper coins outside today's universe."""
+    if not coin_ids:
+        return {}
+    async with CoinGeckoClient() as client:
+        async def _fetch(coin_id: str) -> tuple[str, pd.Series | None]:
+            try:
+                raw = await client.get_market_chart(coin_id, config.LOOKBACK_DAYS_DAILY)
+                closes, _ = _parse_chart(raw)
+                return coin_id, closes if not closes.empty else None
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Pending-history fetch failed for %s: %s", coin_id, exc)
+                return coin_id, None
+
+        results = await asyncio.gather(*[_fetch(cid) for cid in coin_ids])
+    return {cid: closes for cid, closes in results if closes is not None}
+
+
+def _outcome_since(now: datetime | None = None) -> str:
+    now = now or datetime.now(timezone.utc)
+    return (now - timedelta(days=max(config.OUTCOME_HORIZONS) + 5)).isoformat()
+
+
+def _ensure_pending_closes(storage: Storage, closes_map: dict[str, pd.Series]) -> int:
+    """Fill closes_map for recent signals/open paper trades that left today's universe."""
+    needed = set(storage.recent_signal_coin_ids(_outcome_since()))
+    needed.update(storage.open_paper_coin_ids())
+    missing = sorted(cid for cid in needed if cid not in closes_map)
+    if not missing:
+        return 0
+    log.info("Fetching %d extra histories for pending outcome/paper bookkeeping", len(missing))
+    extra = asyncio.run(_fetch_extra_daily_closes(missing))
+    closes_map.update(extra)
+    if len(extra) < len(missing):
+        log.warning("Pending-history data: %d/%d succeeded", len(extra), len(missing))
+    return len(extra)
+
+
+def _write_latest_csv(df: pd.DataFrame, *, dry_run: bool) -> bool:
+    if dry_run:
+        log.info("[dry-run] not writing latest CSV")
+        return False
+    # sparkline is a long list per row; keep it for alerts but not the CSV
+    df.drop(columns=["sparkline", "state"], errors="ignore").to_csv(config.CSV_OUT, index=False)
+    log.info("Full table -> %s", config.CSV_OUT)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -718,9 +766,7 @@ def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) 
 
         print("\n" + msg + "\n")
 
-        # sparkline is a long list per row; keep it for alerts but not the CSV
-        df.drop(columns=["sparkline", "state"], errors="ignore").to_csv(config.CSV_OUT, index=False)
-        log.info("Full table -> %s", config.CSV_OUT)
+        _write_latest_csv(df, dry_run=dry_run)
 
         flagged = df[df["flag"] != ""]
         ob_count = int((flagged["flag"] == "OB").sum())
@@ -733,7 +779,7 @@ def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) 
             macro_data = macro.build_macro(df, ob_count, os_count, prev_counts)
             macro_line = macro.macro_header(macro_data)
 
-        # persist to database (dry-run is read-only except the CSV)
+        # persist to database
         if not dry_run:
             scan_id = storage.save_scan(len(df), ob_count, os_count)
             for _, row in flagged.iterrows():
@@ -751,6 +797,7 @@ def run(top_n: int | None = None, dry_run: bool = False, verbose: bool = False) 
         # grade past signals whose horizons have matured (uses fetched closes)
         matured = 0
         if not dry_run:
+            _ensure_pending_closes(storage, closes_map)
             matured = outcomes.evaluate_all(storage, closes_map)
             if matured:
                 log.info("Recorded %d matured signal outcome(s)", matured)
@@ -881,12 +928,14 @@ def _route_notifications(
         if dry_run:
             log.info("[dry-run] would send INSTANT alert: %s", names)
         else:
-            routed["instant_sent"] = bool(
-                notify_all("instant", instant, ts, chat_ids=recipients, macro_line=macro_line)
-            )
-            for s in instant:
-                storage.mark_alerted(s["symbol"], s["flag"])
-            log.info("INSTANT alert sent: %s", names)
+            sent = notify_all("instant", instant, ts, chat_ids=recipients, macro_line=macro_line)
+            routed["instant_sent"] = bool(sent)
+            if sent:
+                for s in instant:
+                    storage.mark_alerted(s["symbol"], s["flag"])
+                log.info("INSTANT alert sent: %s", names)
+            else:
+                log.warning("INSTANT alert failed on all channels; not marking cooldown: %s", names)
     else:
         log.info("No new INSTANT signals (or on cooldown / below floor)")
 
@@ -908,11 +957,13 @@ def _route_notifications(
     if dry_run:
         log.info("[dry-run] would send DIGEST with %d item(s)", len(digest))
     else:
-        routed["digest_sent"] = bool(
-            notify_all("digest", digest, ts, chat_ids=recipients, macro_line=macro_line)
-        )
-        storage.mark_digest_sent()
-        log.info("DIGEST sent with %d item(s)", len(digest))
+        sent = notify_all("digest", digest, ts, chat_ids=recipients, macro_line=macro_line)
+        routed["digest_sent"] = bool(sent)
+        if sent:
+            storage.mark_digest_sent()
+            log.info("DIGEST sent with %d item(s)", len(digest))
+        else:
+            log.warning("DIGEST failed on all channels; not marking digest sent")
     return routed
 
 

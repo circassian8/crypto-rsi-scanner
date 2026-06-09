@@ -35,9 +35,9 @@ Secrets can also be placed in a .env file at the project root.
 Usage:
   pip install -r requirements.txt
   python main.py                 # full scan + notify
-  python main.py --dry-run       # scan + print, no notifications, no state change
+  python main.py --dry-run       # scan + print, no notifications or writes
   python main.py --top-n 20 -v   # smaller universe, debug logging
-  python main.py --report        # print signal-outcome stats (hit-rates) and exit
+  python main.py --report        # print signal-outcome stats/cohorts and exit
   python main.py --status        # print scan/listener/backup/log health
   python main.py --score --cohorts # paper scoreboard with state cohorts
   python main.py --backup-db     # safe SQLite backup + integrity check

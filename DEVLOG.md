@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Fix review reliability gaps · Codex
+**Why:** A fresh review found several boundary bugs: failed alert sends could
+still advance cooldown/digest state, paper trades opened before matured same-coin
+positions closed, live outcome reports could not directly validate gating, and
+dry-run/universe-audit behavior had small honesty gaps.
+**Changes:**
+- `crypto_rsi_scanner/scanner.py` now skips CSV writes in dry-run mode, fetches
+  extra recent histories for pending outcome/paper bookkeeping when coins leave
+  today's clean universe, and only marks instant/digest notification state after
+  a channel succeeds.
+- `crypto_rsi_scanner/notifications.py` splits long Telegram messages into
+  multiple line-aware chunks instead of truncating later cards.
+- `crypto_rsi_scanner/storage.py` adds `signals.market_aligned`, backfills it
+  additively, exposes pending signal/open paper coin IDs, and returns market/state
+  context from `outcomes_joined()`.
+- `crypto_rsi_scanner/outcomes.py` adds actionable/control, market-alignment, and
+  state-cohort sections to `main.py --report`.
+- `crypto_rsi_scanner/paper.py` closes matured trades before opening new
+  crossings and treats missing falling-knife state as unknown, not low risk.
+- `crypto_rsi_scanner/universe.py` stores all kept audit rows so suspicious-kept
+  checks cover the full requested clean universe.
+- `tests/test_indicators.py`, `AGENTS.md`, `ROADMAP.md`, `DECISIONS.md`, and
+  `main.py` document and cover the reliability changes.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 128/128.
+`main.py --report`, `make dry-run-fixture`, and `make score-cohorts` run
+successfully. `make verify` passes tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This changes live reliability/bookkeeping and reporting, but not
+the core RSI setup taxonomy, conviction priors, or market-gating rules. The first
+post-change `Storage` open migrates the ignored live DB with `market_aligned`.
+
 ## 2026-06-09 — Add cohort, cost, and walk-forward research tools · Codex
 **Why:** The remaining improvement tracks needed tooling before any live signal
 behavior changes: live cohort reads, cost/slippage-aware backtest output,

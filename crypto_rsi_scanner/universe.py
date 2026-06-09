@@ -177,7 +177,7 @@ def filter_markets_with_audit(
         "kept_count": len(kept),
         "excluded_count": int(sum(excluded.values())),
         "excluded_by_reason": dict(sorted(excluded.items())),
-        "kept": [_market_summary(m) for m in kept[:max_examples]],
+        "kept": [_market_summary(m) for m in kept],
         "excluded_examples": excluded_examples,
     }
     return kept, excluded, audit

@@ -311,6 +311,27 @@ changing live behavior.
 **Revisit when:** A specific cost-aware, walk-forward-supported rule is proposed
 and documented for live promotion.
 
+## 2026-06-09 - Mark notification state only after delivery
+**Status:** accepted
+**Decision:** Instant cooldowns and digest timestamps are updated only after at
+least one notification channel reports success. Telegram alerts should be split
+into multiple messages when needed instead of silently truncating cards.
+**Why:** A transient Telegram/API failure should not suppress the next retry, and
+large alert batches should not drop later cards while appearing delivered.
+**Revisit when:** Delivery moves to an external queue with acknowledgements.
+
+## 2026-06-09 - Keep live outcome maturation independent of today's universe
+**Status:** accepted
+**Decision:** Recent pending signal outcomes and open paper trades may fetch
+extra daily histories for coins that are no longer in today's clean top-N
+universe. Live outcome reports include actionable/control and market-alignment
+cohorts, deriving alignment for older rows when needed.
+**Why:** Gating and conviction cannot be judged honestly if outcomes disappear
+when a coin leaves the current universe. The report needs to answer whether
+surfaced signals beat the control set directly.
+**Revisit when:** Outcome tracking moves to a provider-backed historical data
+store or a dedicated run/outcome table with complete lifecycle states.
+
 ## 2026-06-07 - Do not exclude STX by symbol
 **Status:** accepted
 **Decision:** `stx` is not in the hard exclude list.

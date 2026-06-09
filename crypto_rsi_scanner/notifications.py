@@ -21,6 +21,25 @@ def _truncate(text: str, limit: int) -> str:
     return text[:cut] + "\n…"
 
 
+def _message_chunks(text: str, limit: int) -> list[str]:
+    """Split long messages on line boundaries without discarding content."""
+    if len(text) <= limit:
+        return [text]
+    chunks: list[str] = []
+    rest = text
+    while len(rest) > limit:
+        cut = rest.rfind("\n\n", 0, limit)
+        if cut <= 0:
+            cut = rest.rfind("\n", 0, limit)
+        if cut <= 0:
+            cut = limit
+        chunks.append(rest[:cut])
+        rest = rest[cut:].lstrip("\n")
+    if rest:
+        chunks.append(rest)
+    return chunks
+
+
 def send_telegram(
     text: str, parse_mode: str | None = None, chat_ids: list[str] | None = None
 ) -> bool:
@@ -35,30 +54,40 @@ def send_telegram(
     if not token or not chat_ids:
         return False
 
-    body = _truncate(text, 4096)
+    chunks = _message_chunks(text, 4096)
     sent = 0
     for chat_id in chat_ids:
-        payload = {
-            "chat_id": chat_id,
-            "text": body,
-            "disable_web_page_preview": True,
-        }
-        if parse_mode:
-            payload["parse_mode"] = parse_mode
-        try:
-            r = requests.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json=payload,
-                timeout=20,
-            )
-            r.raise_for_status()
+        delivered_all = True
+        for body in chunks:
+            payload = {
+                "chat_id": chat_id,
+                "text": body,
+                "disable_web_page_preview": True,
+            }
+            if parse_mode:
+                payload["parse_mode"] = parse_mode
+            try:
+                r = requests.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    json=payload,
+                    timeout=20,
+                )
+                r.raise_for_status()
+            except Exception as e:
+                delivered_all = False
+                # Most common cause: recipient never pressed Start on the bot.
+                log.error("Telegram send to %s failed: %s", chat_id, config.redact_token(str(e)))
+                break
+        if delivered_all:
             sent += 1
-        except Exception as e:
-            # Most common cause: recipient never pressed Start on the bot.
-            log.error("Telegram send to %s failed: %s", chat_id, config.redact_token(str(e)))
 
     if sent:
-        log.info("Telegram message sent to %d/%d recipient(s)", sent, len(chat_ids))
+        log.info(
+            "Telegram message sent to %d/%d recipient(s) in %d chunk(s)",
+            sent,
+            len(chat_ids),
+            len(chunks),
+        )
     return sent > 0
 
 

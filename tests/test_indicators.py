@@ -529,15 +529,18 @@ def test_storage_save_signal_roundtrip():
         "symbol": "BTC", "coin_id": "bitcoin", "flag": "OB", "severity": "ALERT",
         "rsi_daily": 75.0, "conviction": 60, "tier": "INSTANT", "regime": "UPTREND",
         "setup_type": "trend_continuation", "expected_dir": "up",
-        "market_regime": "UPTREND", "price": 70000.0, "is_new": 1,
+        "market_regime": "UPTREND", "market_aligned": "favorable",
+        "price": 70000.0, "is_new": 1,
         "state_json": '{"version":1}',
     })
     row = st.conn.execute(
-        "SELECT symbol, market_regime, setup_type, state_json FROM signals"
+        "SELECT symbol, market_regime, market_aligned, setup_type, state_json FROM signals"
     ).fetchone()
     assert row["symbol"] == "BTC" and row["market_regime"] == "UPTREND"
+    assert row["market_aligned"] == "favorable"
     assert row["setup_type"] == "trend_continuation"
     assert row["state_json"] == '{"version":1}'
+    assert st.recent_signal_coin_ids("2020-01-01T00:00:00+00:00") == ["bitcoin"]
     st.close()
 
 
@@ -596,6 +599,25 @@ def test_format_signal_adds_compact_state_tokens():
     assert "RS:low" in line
     assert "liq:low" in line
     assert "knife:82" in line
+
+
+def test_dry_run_csv_helper_does_not_write():
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import scanner, config
+
+    path = Path(tempfile.mkdtemp()) / "latest.csv"
+    orig = config.CSV_OUT
+    config.CSV_OUT = path
+    try:
+        df = pd.DataFrame([{"symbol": "AAA", "sparkline": [1, 2], "state": {"x": 1}}])
+        assert scanner._write_latest_csv(df, dry_run=True) is False
+        assert not path.exists()
+        assert scanner._write_latest_csv(df, dry_run=False) is True
+        assert path.exists()
+        assert "sparkline" not in path.read_text()
+    finally:
+        config.CSV_OUT = orig
 
 
 # --- .env loader -------------------------------------------------------------
@@ -711,6 +733,29 @@ def test_universe_audit_flags_suspicious_kept_rows():
     leaks = universe.suspicious_kept(audit)
     assert [x["symbol"] for x in leaks] == ["yield"]
     assert "suspicious kept" in universe.format_audit(audit)
+
+    markets = [
+        {
+            "id": f"plain-{i}",
+            "symbol": f"p{i}",
+            "name": f"Plain {i}",
+            "market_cap": 1_000_000_000,
+            "total_volume": 20_000_000,
+            "market_cap_rank": i + 1,
+        }
+        for i in range(90)
+    ]
+    markets.append({
+        "id": "example-yield",
+        "symbol": "yield",
+        "name": "Example Yield",
+        "market_cap": 900_000_000,
+        "total_volume": 20_000_000,
+        "market_cap_rank": 99,
+    })
+    _, _, full_audit = universe.filter_markets_with_audit(markets, limit=100)
+    assert len(full_audit["kept"]) == 91
+    assert universe.suspicious_kept(full_audit)[0]["symbol"] == "yield"
 
 
 def test_scanner_fetch_universe_audit_uses_shared_filter():
@@ -885,17 +930,24 @@ def test_build_report_empty_and_populated():
     rows = [
         {"horizon_days": 7, "ret_pct": -3.0, "favorable": 1, "flag": "OB",
          "regime": "DOWNTREND", "regime_note": "reversal?", "conviction": 80,
-         "symbol": "A", "severity": "ALERT"},
+         "symbol": "A", "severity": "ALERT", "market_regime": "DOWNTREND",
+         "market_aligned": "neutral",
+         "state_json": '{"volatility":{"state":"high"},"breadth":{"state":"washout"}}'},
         {"horizon_days": 7, "ret_pct": 2.0, "favorable": 0, "flag": "OB",
          "regime": "UPTREND", "regime_note": "continuation", "conviction": 55,
-         "symbol": "B", "severity": "WATCH"},
+         "symbol": "B", "severity": "WATCH", "market_regime": "DOWNTREND",
+         "market_aligned": "favorable"},
         {"horizon_days": 7, "ret_pct": 4.0, "favorable": 1, "flag": "OS",
          "regime": "DOWNTREND", "regime_note": "continuation", "conviction": 70,
-         "symbol": "C", "severity": "ALERT"},
+         "symbol": "C", "severity": "ALERT", "market_regime": "DOWNTREND",
+         "market_aligned": "adverse"},
     ]
     out = build_report(rows, primary_horizon=7)
     assert "RSI SIGNAL OUTCOMES" in out
     assert "By setup" in out and "By conviction" in out
+    assert "By actionable/control" in out
+    assert "By market alignment" in out
+    assert "By state cohort" in out and "washout" in out
 
 
 # --- subscriber management ---------------------------------------------------
@@ -1498,6 +1550,33 @@ def test_paper_open_close_pnl_sign():
     st.close()
 
 
+def test_paper_closes_before_opening_same_coin_new_crossing():
+    import tempfile
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner.storage import Storage
+    from crypto_rsi_scanner import paper, config
+
+    st = Storage(Path(tempfile.mkdtemp()) / "roll.db")
+    now0 = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    sig = {"symbol": "AAA", "coin_id": "aaa", "flag": "OS", "is_new": True, "price": 100.0,
+           "setup_type": "dip_buy", "expected_dir": "up",
+           "market_regime": "UPTREND", "market_aligned": "favorable", "conviction": 70}
+    assert paper.update(st, [sig], {}, now=now0) == (1, 0)
+
+    h = config.PAPER_HOLD_DAYS
+    idx = pd.date_range(now0, periods=h + 2, freq="D", tz="UTC")
+    closes = pd.Series([100.0 + i for i in range(len(idx))], index=idx)
+    later = now0 + timedelta(days=h + 1)
+    new_sig = {**sig, "price": 120.0, "conviction": 75}
+    assert paper.update(st, [new_sig], {"aaa": closes}, now=later) == (1, 1)
+    assert len(st.closed_paper_trades()) == 1
+    open_rows = [dict(r) for r in st.open_paper_trades()]
+    assert len(open_rows) == 1
+    assert open_rows[0]["entry_price"] == 120.0
+    st.close()
+
+
 def test_paper_not_closed_before_maturity():
     import tempfile
     from datetime import datetime, timedelta, timezone
@@ -1604,6 +1683,75 @@ def test_live_edge_adjust_render_no_nan():
             assert "nan" not in card.lower(), f"NaN leaked for {s['symbol']}"
     finally:
         outcomes.track_records = orig
+
+
+def test_route_notifications_only_marks_successful_sends():
+    from crypto_rsi_scanner import scanner
+
+    class Store:
+        def __init__(self):
+            self.alerted = []
+            self.digest_marked = False
+        def active_subscribers(self):
+            return ["1"]
+        def is_on_cooldown(self, symbol, flag, cooldown_hours):
+            return False
+        def mark_alerted(self, symbol, flag):
+            self.alerted.append((symbol, flag))
+        def digest_due(self, interval_hours):
+            return True
+        def mark_digest_sent(self):
+            self.digest_marked = True
+
+    signals = [
+        {"symbol": "AAA", "flag": "OB", "tier": "INSTANT", "is_new": True, "conviction": 90},
+        {"symbol": "BBB", "flag": "PRE_OS", "tier": "DIGEST", "is_new": True, "conviction": 35},
+    ]
+    orig = scanner.notify_all
+    try:
+        store = Store()
+        scanner.notify_all = lambda *args, **kwargs: []
+        stats = scanner._route_notifications(signals, store, dry_run=False)
+        assert stats["instant_sent"] is False and stats["digest_sent"] is False
+        assert store.alerted == []
+        assert store.digest_marked is False
+
+        store = Store()
+        scanner.notify_all = lambda *args, **kwargs: ["Telegram"]
+        stats = scanner._route_notifications(signals, store, dry_run=False)
+        assert stats["instant_sent"] is True and stats["digest_sent"] is True
+        assert store.alerted == [("AAA", "OB")]
+        assert store.digest_marked is True
+    finally:
+        scanner.notify_all = orig
+
+
+def test_telegram_send_chunks_long_messages():
+    from crypto_rsi_scanner import notifications, config
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+    calls = []
+    orig_post = notifications.requests.post
+    orig_token = config.TELEGRAM_BOT_TOKEN
+    orig_chat_ids = config.TELEGRAM_CHAT_IDS
+    notifications.requests.post = lambda url, json, timeout: calls.append(json["text"]) or Response()
+    config.TELEGRAM_BOT_TOKEN = "token"
+    config.TELEGRAM_CHAT_IDS = ["1"]
+    try:
+        text = ("signal line\n\n" * 700).strip()
+        assert len(text) > 4096
+        assert notifications.send_telegram(text, parse_mode="HTML") is True
+        assert len(calls) > 1
+        assert all(len(body) <= 4096 for body in calls)
+        assert not any("…" in body for body in calls)
+        assert "signal line" in calls[-1]
+    finally:
+        notifications.requests.post = orig_post
+        config.TELEGRAM_BOT_TOKEN = orig_token
+        config.TELEGRAM_CHAT_IDS = orig_chat_ids
 
 
 def test_scan_staleness_alert_dedup_and_recovery():

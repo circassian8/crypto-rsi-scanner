@@ -48,7 +48,9 @@ def update(storage, signals: list[dict], closes_map: dict, now: datetime | None 
     if not config.PAPER_TRADING_ENABLED:
         return 0, 0
     now = now or datetime.now(timezone.utc)
-    return _open_new(storage, signals, now), _close_matured(storage, closes_map, now)
+    closed = _close_matured(storage, closes_map, now)
+    opened = _open_new(storage, signals, now)
+    return opened, closed
 
 
 def _open_new(storage, signals: list[dict], now: datetime) -> int:
@@ -174,8 +176,10 @@ def _state_bucket(trade: dict, path: str) -> str:
     if path == "liquidity":
         return str((doc.get("liquidity") or {}).get("bucket") or "unknown")
     if path == "falling_knife":
-        score = (doc.get("risk") or {}).get("falling_knife_score")
-        return falling_knife_bucket(score)
+        risk = doc.get("risk") or {}
+        if "falling_knife_score" not in risk:
+            return "unknown"
+        return falling_knife_bucket(risk.get("falling_knife_score"))
     return "unknown"
 
 
