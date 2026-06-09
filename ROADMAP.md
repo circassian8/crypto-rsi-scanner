@@ -26,7 +26,7 @@ Status labels:
 
 | status | item | owner | notes |
 |---|---|---|---|
-| waiting | Re-check universe hygiene after next scan | system | 2026-06-09 audit found stable/pegged false negatives and filters were tightened; review `main.py --universe-audit` after the next scheduled scan confirms live output. |
+| waiting | Monitor next full-scan universe audit | system | `make refresh-universe-audit` confirmed current hygiene output after the filter tighten: 53 excluded, no obvious USD/stable kept by audit regex. Re-check after the next scheduled full scan. |
 
 ## Later
 

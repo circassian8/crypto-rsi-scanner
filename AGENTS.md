@@ -74,7 +74,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - **Dry scan (network, no writes/alerts):** `.venv/bin/python main.py --dry-run --top-n 30`
 - **Reports:** `main.py --report` (outcome hit-rates) · `main.py --score` (paper
   scoreboard) · `main.py --score --json` (structured paper scoreboard) ·
-  `main.py --status` (scan/listener health)
+  `main.py --status` (scan/listener health) · `main.py --universe-audit`
+  (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks
   the newest retained backup.
@@ -85,6 +86,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   maintenance agents; `make restart-listener` restarts the always-on bot listener.
 - **Offline dev smoke:** `make dry-run-fixture` runs a small dry scan from
   checked-in CoinGecko fixtures (`fixtures/coingecko_smoke`) without network.
+- **Universe hygiene refresh:** `make refresh-universe-audit` fetches only the
+  CoinGecko market list, applies shared hygiene filters, persists the audit, and
+  prints it without running RSI analysis or sending alerts.
 - **Backtest (research):**
   `python -m crypto_rsi_scanner.backtest --top-n 80 --days 1825`
   flags: `--pit` (point-in-time universe, survivorship fix) · `--slice <setup>`
@@ -139,9 +143,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - `universe.py` is the source of truth for CoinGecko market hygiene. Live scans
   and backtest top-N selection must use the same filters. Live scans persist the
   latest audit to SQLite meta and `universe_hygiene_latest.json`; inspect it via
-  `main.py --universe-audit`. The 2026-06-09 audit tightened stable/pegged
-  detection for fiat, gold, and yield products that were slipping into kept
-  candidates.
+  `main.py --universe-audit`, or refresh only the audit with
+  `main.py --refresh-universe-audit`. The 2026-06-09 audit tightened
+  stable/pegged detection for fiat, gold, and yield products that were slipping
+  into kept candidates.
 - `state_features.py` is pure and shadow-first. State features may be tested,
   stored, and reported before they are allowed to affect conviction, routing, or
   gating. The live scanner attaches `state_json` only after the existing decision

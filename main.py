@@ -45,6 +45,7 @@ Usage:
   python main.py --rotate-logs   # rotate oversized scan/listener logs
   python main.py --launchd-status # print launchd service status
   python main.py --score --json  # structured paper scoreboard
+  python main.py --refresh-universe-audit # refresh hygiene audit only
 
 Cron (daily at 00:05 UTC):
   5 0 * * *  cd /path/to/project && python main.py >> scan.log 2>&1

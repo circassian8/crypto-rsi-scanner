@@ -289,6 +289,17 @@ They add noise to alerts, paper trades, and backtests.
 these rules, or CoinGecko exposes reliable categories for stable/commodity/yield
 products.
 
+## 2026-06-09 - Refresh universe audits without full scans
+**Status:** accepted
+**Decision:** `main.py --refresh-universe-audit` and `make refresh-universe-audit`
+may fetch the current CoinGecko market list, apply shared hygiene filters,
+persist the audit, and print it without running RSI analysis or notifications.
+**Why:** Hygiene tuning needs fast feedback. A full scan spends more API calls,
+touches scanner bookkeeping, and performs unrelated RSI work when only the
+market-list filter changed.
+**Revisit when:** CoinGecko rate limits make even market-list-only refreshes too
+expensive or audit persistence moves out of local SQLite/files.
+
 ## 2026-06-07 - Do not exclude STX by symbol
 **Status:** accepted
 **Decision:** `stx` is not in the hard exclude list.

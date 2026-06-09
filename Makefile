@@ -1,6 +1,6 @@
 PYTHON := .venv/bin/python
 
-.PHONY: help verify test smoke-alerts backtest-fixture score score-json report status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture score score-json report status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -20,6 +20,7 @@ help:
 	@echo "  make install-maintenance-agent  Install/load daily maintenance LaunchAgent"
 	@echo "  make restart-listener  Restart the always-on bot listener"
 	@echo "  make universe-audit  Print latest universe hygiene audit"
+	@echo "  make refresh-universe-audit  Fetch and persist a fresh hygiene audit"
 	@echo "  make dry-run  Run a small network dry scan without writes/alerts"
 	@echo "  make dry-run-fixture  Run a small offline dry scan from checked-in fixtures"
 
@@ -69,6 +70,9 @@ restart-listener:
 
 universe-audit:
 	$(PYTHON) main.py --universe-audit
+
+refresh-universe-audit:
+	$(PYTHON) main.py --refresh-universe-audit
 
 dry-run:
 	$(PYTHON) main.py --dry-run --top-n 30

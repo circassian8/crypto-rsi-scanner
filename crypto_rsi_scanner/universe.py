@@ -70,6 +70,8 @@ def exclusion_reason(market: dict) -> str | None:
 
     if symbol in _STABLE_SYMBOLS:
         return "stable_like"
+    if symbol.startswith("usd") or symbol.endswith("usd"):
+        return "stable_like"
     if _STABLE_NAME_RE.search(name) and (
         symbol.startswith("usd")
         or symbol.endswith("usd")

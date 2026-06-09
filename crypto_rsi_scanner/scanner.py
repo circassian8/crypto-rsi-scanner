@@ -647,6 +647,22 @@ def build_message(
     return "\n".join(lines), signals
 
 
+async def fetch_universe_audit(top_n: int | None = None) -> dict:
+    """Fetch only the CoinGecko market list and build a hygiene audit."""
+    n = top_n or config.TOP_N
+    async with CoinGeckoClient() as client:
+        fetch_n = candidate_count(n)
+        markets = await client.get_top_markets(fetch_n)
+    _, excluded, audit = filter_markets_with_audit(markets, limit=n)
+    log.info(
+        "Universe audit: requested top-%d; fetched %d candidates; excluded: %s",
+        n,
+        len(markets),
+        format_exclusions(excluded),
+    )
+    return audit
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -1048,6 +1064,25 @@ def universe_audit() -> None:
         storage.close()
 
 
+def refresh_universe_audit(top_n: int | None = None, verbose: bool = False) -> None:
+    """Refresh and persist the universe hygiene audit without a full RSI scan."""
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-5s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    config.validate()
+    audit = asyncio.run(fetch_universe_audit(top_n))
+    storage = Storage(config.DB_PATH)
+    try:
+        storage.set_meta("latest_universe_audit", json.dumps(audit, sort_keys=True))
+    finally:
+        storage.close()
+    audit_path = write_audit(audit)
+    log.info("Universe hygiene audit -> %s", audit_path)
+    print(format_audit(audit))
+
+
 def cli() -> None:
     import argparse
 
@@ -1123,6 +1158,11 @@ def cli() -> None:
         help="Print the most recent universe hygiene audit.",
     )
     parser.add_argument(
+        "--refresh-universe-audit",
+        action="store_true",
+        help="Fetch, persist, and print a fresh universe hygiene audit without a full RSI scan.",
+    )
+    parser.add_argument(
         "--listen",
         action="store_true",
         help="Run the bot listener loop so commands (/top, /detail, /stats) "
@@ -1163,6 +1203,9 @@ def cli() -> None:
         return
     if args.universe_audit:
         universe_audit()
+        return
+    if args.refresh_universe_audit:
+        refresh_universe_audit(top_n=args.top_n, verbose=args.verbose)
         return
     if args.listen:
         logging.basicConfig(

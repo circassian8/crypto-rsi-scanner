@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Add universe audit refresh command · Codex
+**Why:** After tightening hygiene filters, the project still had to wait for a
+full scheduled scan to confirm the market-list filter. A lightweight refresh
+path gives immediate feedback without running RSI analysis or sending alerts.
+**Changes:**
+- `crypto_rsi_scanner/scanner.py` adds `fetch_universe_audit()` plus
+  `main.py --refresh-universe-audit`, which fetches current CoinGecko market
+  rows, applies shared universe hygiene, persists the audit, and prints it.
+- `Makefile` adds `make refresh-universe-audit`.
+- `crypto_rsi_scanner/universe.py` now directly excludes symbols that start or
+  end with `usd`, catching observed BFUSD/apxUSD leaks from the refreshed audit.
+- `tests/test_indicators.py` covers the audit refresh helper with a fake
+  CoinGecko client and the new USD-prefix/suffix examples.
+- `ROADMAP.md`, `DECISIONS.md`, and `AGENTS.md` document the workflow and the
+  refreshed audit result.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 122/122.
+`make refresh-universe-audit` persisted a fresh audit: 200 fetched, 100 kept, 53
+excluded (`stable_like=36`, `low_liquidity=17`). A kept-set regex scan found no
+obvious USD/stable/yield leaks. `make verify` passes tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard after the documentation update.
+**Notes/risks:** The command updates `universe_hygiene_latest.json` and the DB
+meta audit, but does not run a full scan, send alerts, or alter signal state.
+
 ## 2026-06-09 — Tighten universe stable/pegged filters · Codex
 **Why:** The next roadmap item was to review the latest live universe hygiene
 audit for false positives/negatives. The 2026-06-09 03:10 MSK audit showed

@@ -640,6 +640,8 @@ def test_universe_filters_stable_wrapped_and_bad_quality():
         (_market(id="usd1-wlfi", symbol="usd1", name="USD1"), "stable_like"),
         (_market(id="global-dollar", symbol="usdg", name="Global Dollar"), "stable_like"),
         (_market(id="usdtb", symbol="usdtb", name="USDtb"), "stable_like"),
+        (_market(id="bfusd", symbol="bfusd", name="BFUSD"), "stable_like"),
+        (_market(id="apxusd", symbol="apxusd", name="apxUSD"), "stable_like"),
         (_market(id="united-stables", symbol="u", name="United Stables"), "stable_like"),
         (_market(id="gho", symbol="gho", name="GHO"), "stable_like"),
         (_market(id="ylds", symbol="ylds", name="YLDS"), "stable_like"),
@@ -694,6 +696,36 @@ def test_universe_audit_keeps_exclusion_examples_after_limit():
     assert audit["excluded_count"] == 2
     assert {x["reason"] for x in audit["excluded_examples"]} == {"stable_like", "low_liquidity"}
     assert "UNIVERSE HYGIENE AUDIT" in universe.format_audit(audit)
+
+
+def test_scanner_fetch_universe_audit_uses_shared_filter():
+    import asyncio
+    from crypto_rsi_scanner import scanner
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+        async def get_top_markets(self, n):
+            assert n >= 2
+            return [
+                _market(id="blockstack", symbol="stx", name="Stacks"),
+                _market(id="usd1-wlfi", symbol="usd1", name="USD1"),
+            ]
+
+    orig = scanner.CoinGeckoClient
+    scanner.CoinGeckoClient = FakeClient
+    try:
+        audit = asyncio.run(scanner.fetch_universe_audit(top_n=1))
+    finally:
+        scanner.CoinGeckoClient = orig
+
+    assert audit["kept_count"] == 1
+    assert audit["kept"][0]["symbol"] == "stx"
+    assert audit["excluded_by_reason"] == {"stable_like": 1}
 
 
 # --- telegram formatting -----------------------------------------------------
