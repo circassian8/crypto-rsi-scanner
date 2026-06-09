@@ -39,6 +39,7 @@ Usage:
   python main.py --top-n 20 -v   # smaller universe, debug logging
   python main.py --report        # print signal-outcome stats (hit-rates) and exit
   python main.py --status        # print scan/listener/backup/log health
+  python main.py --score --cohorts # paper scoreboard with state cohorts
   python main.py --backup-db     # safe SQLite backup + integrity check
   python main.py --verify-restore # restore-check latest SQLite backup
   python main.py --maintenance   # backup + restore drill + log rotation

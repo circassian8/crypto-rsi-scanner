@@ -698,6 +698,21 @@ def test_universe_audit_keeps_exclusion_examples_after_limit():
     assert "UNIVERSE HYGIENE AUDIT" in universe.format_audit(audit)
 
 
+def test_universe_audit_flags_suspicious_kept_rows():
+    from crypto_rsi_scanner import universe
+
+    audit = {
+        "kept": [
+            {"id": "bitcoin", "symbol": "btc", "name": "Bitcoin", "rank": 1},
+            {"id": "example-yield", "symbol": "yield", "name": "Example Yield", "rank": 99},
+        ],
+        "excluded_by_reason": {},
+    }
+    leaks = universe.suspicious_kept(audit)
+    assert [x["symbol"] for x in leaks] == ["yield"]
+    assert "suspicious kept" in universe.format_audit(audit)
+
+
 def test_scanner_fetch_universe_audit_uses_shared_filter():
     import asyncio
     from crypto_rsi_scanner import scanner
@@ -1278,6 +1293,40 @@ def test_backtest_builds_registry_prior_calibration():
     assert "context_only_no_edge_not_auto_promoted" in payload["setups"]["breakdown_risk"]["notes"]
 
 
+def test_backtest_cost_and_walk_forward_reports():
+    from crypto_rsi_scanner import backtest
+
+    idx = pd.date_range("2026-01-01", periods=8, freq="D", tz="UTC")
+    signals = []
+    for i, ts in enumerate(idx):
+        setup = "dip_buy" if i % 2 == 0 else "breakdown_risk"
+        exp = "up" if setup == "dip_buy" else "down"
+        ret = 2.0 if setup == "dip_buy" else -1.0
+        signals.append({
+            "setup": setup,
+            "exp": exp,
+            "h": 7,
+            "ret": ret,
+            "fav": 1,
+            "conv": 70 - i,
+            "mkt": "BULL" if setup == "dip_buy" else "BEAR",
+            "ts": ts,
+            "symbol": f"T{i}",
+            "liquidity_bucket": "low" if i == 0 else "high",
+        })
+
+    costs = backtest.format_cost_report(
+        signals, fee_bps=10, slippage_bps=20, max_trades_per_day=1
+    )
+    assert "Cost-aware backtest book" in costs
+    assert "actionable" in costs
+    assert "dip_buy" in costs
+
+    wf = backtest.format_walk_forward(signals, folds=4)
+    assert "Walk-forward setup stability" in wf
+    assert "Train = all earlier folds" in wf
+
+
 def test_backtest_pit_membership():
     # Point-in-time top-2: a coin that's big early then shrinks should be a
     # member only while it ranks in the top-2 by mcap on each date.
@@ -1482,9 +1531,13 @@ def test_paper_report_empty_and_populated():
     assert "No paper trades yet" in paper.report(st)
     st.conn.execute(
         "INSERT INTO paper_trades (symbol, coin_id, setup_type, market_regime, "
-        "market_aligned, direction, conviction, entry_price, entry_at, hold_days, "
+        "market_aligned, state_json, direction, conviction, entry_price, entry_at, hold_days, "
         "exit_price, exit_at, ret_pct, status) VALUES "
-        "('AAA','aaa','dip_buy','UPTREND','favorable','long',70,100,'2026-05-01',7,"
+        "('AAA','aaa','dip_buy','UPTREND','favorable',"
+        "'{\"volatility\":{\"state\":\"high\"},\"breadth\":{\"state\":\"washout\"},"
+        "\"relative_strength\":{\"bucket\":\"low\"},\"liquidity\":{\"bucket\":\"mid\"},"
+        "\"risk\":{\"falling_knife_score\":80}}',"
+        "'long',70,100,'2026-05-01',7,"
         "110,'2026-05-08',10.0,'closed')"
     )
     st.conn.execute(
@@ -1499,11 +1552,16 @@ def test_paper_report_empty_and_populated():
     assert "PAPER-TRADE SCOREBOARD" in out
     assert "actionable" in out and "control" in out
     assert "By conviction bucket" in out
+    cohorts = paper.report(st, cohorts=True)
+    assert "By state cohort" in cohorts
+    assert "volatility" in cohorts and "high" in cohorts
+    assert "falling-knife" in cohorts
     data = paper.summary(st)
     assert data["closed_count"] == 2
     assert data["books"]["actionable"]["n"] == 1
     assert data["by_conviction_bucket"]["65-79"]["n"] == 1
     assert data["by_conviction_bucket"]["0-49"]["n"] == 1
+    assert data["by_state"]["volatility"]["high"]["n"] == 1
     st.close()
 
 

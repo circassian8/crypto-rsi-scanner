@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Add cohort, cost, and walk-forward research tools · Codex
+**Why:** The remaining improvement tracks needed tooling before any live signal
+behavior changes: live cohort reads, cost/slippage-aware backtest output,
+chronological stability checks, and a repeatable way to spot universe hygiene
+leaks.
+**Changes:**
+- `crypto_rsi_scanner/paper.py`, `scanner.py`, `main.py`, and `Makefile` add
+  `main.py --score --cohorts` / `make score-cohorts`, including state-bucket
+  cohort stats from stored `state_json` once paper trades close.
+- `crypto_rsi_scanner/backtest.py` adds `--costs`, `--fee-bps`,
+  `--slippage-bps`, `--max-trades-per-day`, `--walk-forward`, and timestamped
+  signal labels so research can inspect costs, capacity, drawdown, and fold
+  stability before promoting calibration.
+- `crypto_rsi_scanner/universe.py` adds suspicious-kept leak detection to the
+  audit formatter for stable/wrapped/yield-like rows that survive filtering.
+- `research/PIT_DATA_OPTIONS_2026-06-09.md` documents the current 365d PIT data
+  limit, Pro-key/deeper-history workflow, alternate provider contract, and
+  promotion rule.
+- `AGENTS.md`, `ROADMAP.md`, and `DECISIONS.md` record the new commands and the
+  decision that cost/walk-forward outputs are research-only until a specific
+  live rule is proposed.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 124/124.
+`make score-cohorts`, `make backtest-costs`, and `make universe-audit` all run
+successfully. `make verify` passes tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** No live signal scoring, routing, or gating changed. Broader PIT
+history still requires a Pro CoinGecko key or alternate historical market-cap
+provider before registry priors should be promoted live.
+
 ## 2026-06-09 — Add universe audit refresh command · Codex
 **Why:** After tightening hygiene filters, the project still had to wait for a
 full scheduled scan to confirm the market-list filter. A lightweight refresh

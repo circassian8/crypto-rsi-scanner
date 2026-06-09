@@ -300,6 +300,17 @@ market-list filter changed.
 **Revisit when:** CoinGecko rate limits make even market-list-only refreshes too
 expensive or audit persistence moves out of local SQLite/files.
 
+## 2026-06-09 - Keep cost and walk-forward outputs research-only
+**Status:** accepted
+**Decision:** Backtest `--costs` and `--walk-forward` reports are required
+research diagnostics before promoting a calibration, but they do not alter live
+conviction, routing, or gating by themselves.
+**Why:** Costs, slippage, capacity, and temporal stability can invalidate a thin
+headline edge. They should be visible in research output without silently
+changing live behavior.
+**Revisit when:** A specific cost-aware, walk-forward-supported rule is proposed
+and documented for live promotion.
+
 ## 2026-06-07 - Do not exclude STX by symbol
 **Status:** accepted
 **Decision:** `stx` is not in the hard exclude list.

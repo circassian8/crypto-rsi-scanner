@@ -927,7 +927,7 @@ def report() -> None:
         storage.close()
 
 
-def score(json_output: bool = False) -> None:
+def score(json_output: bool = False, cohorts: bool = False) -> None:
     """Print the paper-trade scoreboard and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
     storage = Storage(config.DB_PATH)
@@ -935,7 +935,7 @@ def score(json_output: bool = False) -> None:
         if json_output:
             print(json.dumps(paper.summary(storage), indent=2, sort_keys=True, default=str))
         else:
-            print(paper.report(storage))
+            print(paper.report(storage, cohorts=cohorts))
     finally:
         storage.close()
 
@@ -1111,6 +1111,11 @@ def cli() -> None:
         help="Emit machine-readable JSON for commands that support it.",
     )
     parser.add_argument(
+        "--cohorts",
+        action="store_true",
+        help="For --score, include live paper-trade cohort breakdowns.",
+    )
+    parser.add_argument(
         "--status",
         action="store_true",
         help="Print operational scan/listener health and exit.",
@@ -1175,7 +1180,7 @@ def cli() -> None:
         report()
         return
     if args.score:
-        score(json_output=args.json)
+        score(json_output=args.json, cohorts=args.cohorts)
         return
     if args.status:
         status()

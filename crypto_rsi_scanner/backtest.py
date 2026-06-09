@@ -24,6 +24,7 @@ history skips coins that dropped out; (2) single venue (Binance USDT pairs);
 Usage:
   python -m crypto_rsi_scanner.backtest --top-n 80 --days 730
   python -m crypto_rsi_scanner.backtest --symbols BTC,ETH,SOL --days 365
+  python -m crypto_rsi_scanner.backtest --top-n 80 --days 1460 --costs --walk-forward
 """
 
 from __future__ import annotations
@@ -485,7 +486,8 @@ def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
               mkt_arr=None, mkt_base: dict | None = None,
               trigger: str = "cross_into",
               state_frame: pd.DataFrame | None = None,
-              state_base: dict | None = None) -> None:
+              state_base: dict | None = None,
+              label: str = "") -> None:
     """Walk one coin day by day. Appends graded crossing signals to `signals`
     and, for *every* day, the forward returns into `regime_base[(regime, h)]`
     (the benchmark each setup is measured against). If `cond_base` is given, also
@@ -624,6 +626,7 @@ def walk_coin(df: pd.DataFrame, signals: list, regime_base: dict,
                 "setup": setup, "exp": exp, "regime": regime, "h": h,
                 "ret": ret, "fav": favorable(exp, ret), "conv": conv,
                 "vol": vol_t, "mom": mom_t, "mkt": mkt,
+                "ts": closes.index[t], "symbol": label,
                 "vol_state": state.get("vol_state"),
                 "breadth_state": state.get("breadth_state"),
                 "rs_bucket": state.get("rs_bucket"),
@@ -1003,6 +1006,146 @@ def _actionable_summary(signals: list, horizon: int) -> dict | None:
             "avg": statistics.fmean(pnl), "med": statistics.median(pnl)}
 
 
+def _liquidity_slippage_multiplier(bucket: str | None) -> float:
+    return {"high": 0.5, "mid": 1.0, "low": 2.0}.get(str(bucket or ""), 1.25)
+
+
+def _cost_adjusted_return(signal: dict, fee_bps: float, slippage_bps: float) -> float:
+    """Direction-adjusted return after a simple round-trip fee/slippage model."""
+    slip = slippage_bps * _liquidity_slippage_multiplier(signal.get("liquidity_bucket"))
+    return _dir_ret(signal) - (fee_bps + slip) / 100.0
+
+
+def _cost_stats(rows: list[dict], fee_bps: float, slippage_bps: float) -> dict | None:
+    if not rows:
+        return None
+    net = [_cost_adjusted_return(s, fee_bps, slippage_bps) for s in rows]
+    ordered = sorted(rows, key=lambda s: (str(s.get("ts") or ""), str(s.get("symbol") or "")))
+    eq, peak, maxdd = 1.0, 1.0, 0.0
+    for s in ordered:
+        eq *= 1.0 + _cost_adjusted_return(s, fee_bps, slippage_bps) / 100.0
+        peak = max(peak, eq)
+        maxdd = max(maxdd, (peak - eq) / peak if peak > 0 else 0.0)
+    wins = sum(1 for r in net if r > 0)
+    return {
+        "n": len(net),
+        "win": 100.0 * wins / len(net),
+        "avg": statistics.fmean(net),
+        "med": statistics.median(net),
+        "equity": (eq - 1.0) * 100.0,
+        "maxdd": 100.0 * maxdd,
+    }
+
+
+def _cap_trades_per_day(rows: list[dict], max_trades_per_day: int | None) -> list[dict]:
+    if not max_trades_per_day or max_trades_per_day <= 0:
+        return rows
+    chosen: list[dict] = []
+    by_day: dict[str, list[dict]] = defaultdict(list)
+    for s in rows:
+        ts = pd.Timestamp(s.get("ts")) if s.get("ts") is not None else pd.NaT
+        day = "unknown" if pd.isna(ts) else ts.date().isoformat()
+        by_day[day].append(s)
+    for day in sorted(by_day):
+        ranked = sorted(by_day[day], key=lambda s: (s.get("conv") or 0), reverse=True)
+        chosen.extend(ranked[:max_trades_per_day])
+    return chosen
+
+
+def _format_cost_row(label: str, st: dict | None) -> str:
+    if not st:
+        return f"  {label:<22} (no signals)"
+    return (
+        f"  {label:<22}{st['n']:>5}{st['win']:>6.0f}%"
+        f"{st['avg']:>+8.2f}%{st['med']:>+8.2f}%"
+        f"{st['equity']:>+9.1f}%{st['maxdd']:>7.0f}%"
+    )
+
+
+def format_cost_report(
+    signals: list,
+    *,
+    horizon: int = PRIMARY,
+    fee_bps: float = 10.0,
+    slippage_bps: float = 20.0,
+    max_trades_per_day: int | None = None,
+) -> str:
+    """Cost-aware, direction-adjusted performance for the backtest signals."""
+    crossed = [s for s in signals if s["h"] == horizon]
+    actionable = [
+        s for s in crossed
+        if setup_has_edge(s["setup"]) and market_alignment(s["setup"], s.get("mkt")) != "adverse"
+    ]
+    control = [s for s in crossed if s not in actionable]
+    actionable = _cap_trades_per_day(actionable, max_trades_per_day)
+
+    out = [
+        f"\nCost-aware backtest book at {horizon}d:",
+        f"  cost = {fee_bps:.1f} bps fee + liquidity-scaled {slippage_bps:.1f} bps slippage",
+    ]
+    if max_trades_per_day:
+        out.append(f"  cap = top {max_trades_per_day} actionable signal(s) per day by conviction")
+    out.append(f"  {'book/setup':<22}{'n':>5}{'win%':>7}{'avgNet':>9}{'medNet':>9}{'equity':>10}{'maxDD':>7}")
+    out.append(_format_cost_row("all", _cost_stats(crossed, fee_bps, slippage_bps)))
+    out.append(_format_cost_row("actionable", _cost_stats(actionable, fee_bps, slippage_bps)))
+    out.append(_format_cost_row("control", _cost_stats(control, fee_bps, slippage_bps)))
+
+    setups = sorted({s["setup"] for s in actionable})
+    if setups:
+        out.append("  -- actionable by setup --")
+        for setup in setups:
+            rows = [s for s in actionable if s["setup"] == setup]
+            out.append(_format_cost_row(setup, _cost_stats(rows, fee_bps, slippage_bps)))
+    return "\n".join(out)
+
+
+def _time_folds(signals: list, folds: int, horizon: int) -> list[list[dict]]:
+    rows = sorted([s for s in signals if s["h"] == horizon and s.get("ts") is not None],
+                  key=lambda s: pd.Timestamp(s["ts"]))
+    if folds < 2 or len(rows) < folds:
+        return []
+    size = max(1, len(rows) // folds)
+    out = [rows[i * size:(i + 1) * size] for i in range(folds - 1)]
+    out.append(rows[(folds - 1) * size:])
+    return [f for f in out if f]
+
+
+def _setup_confirm(rows: list[dict], setup: str) -> dict | None:
+    sub = [s for s in rows if s["setup"] == setup]
+    if not sub:
+        return None
+    return {
+        "n": len(sub),
+        "conf": 100.0 * statistics.fmean(s["fav"] for s in sub),
+        "med_dir": statistics.median(_dir_ret(s) for s in sub),
+    }
+
+
+def format_walk_forward(signals: list, *, horizon: int = PRIMARY, folds: int = 4) -> str:
+    """Simple time-split check: do setup hit-rates persist into the next fold?"""
+    split = _time_folds(signals, folds, horizon)
+    out = [f"\nWalk-forward setup stability at {horizon}d ({len(split)} time folds):"]
+    if len(split) < 2:
+        out.append("  Not enough timestamped signals for walk-forward analysis.")
+        return "\n".join(out)
+    out.append("  Train = all earlier folds; test = next chronological fold.")
+    out.append(f"  {'fold':<6}{'setup':<19}{'trainN':>7}{'train%':>8}{'testN':>7}{'test%':>8}{'testMed':>9}")
+    setups = sorted({s["setup"] for s in signals if s["h"] == horizon})
+    for i in range(1, len(split)):
+        train = [s for f in split[:i] for s in f]
+        test = split[i]
+        for setup in setups:
+            tr = _setup_confirm(train, setup)
+            te = _setup_confirm(test, setup)
+            if not tr or not te:
+                continue
+            out.append(
+                f"  {i:<6}{setup:<19}{tr['n']:>7}{tr['conf']:>7.0f}%"
+                f"{te['n']:>7}{te['conf']:>7.0f}%{te['med_dir']:>+8.1f}%"
+            )
+    return "\n".join(out)
+
+
 def format_trigger_comparison(results: dict, horizons=(3, PRIMARY)) -> str:
     out = ["=" * 64,
            "TRIGGER A/B — enter on the TURN (confirm) vs the pierce (cross-in)",
@@ -1323,7 +1466,8 @@ def run_pit(
         mkt_arr = mkt.reindex(df.index).fillna("NA").to_numpy() if mkt is not None else None
         walk_coin(df, signals, regime_base, cond_base, member=mem,
                   mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger,
-                  state_frame=state_frames.get(cid), state_base=state_base)
+                  state_frame=state_frames.get(cid), state_base=state_base,
+                  label=cid)
     return signals, regime_base, cond_base, mkt_base, state_base, len(histories)
 
 
@@ -1377,7 +1521,8 @@ def _walk_all(
         mkt_arr = mkt.reindex(df.index).fillna("NA").to_numpy() if mkt is not None else None
         walk_coin(df, signals, regime_base, cond_base,
                   mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger,
-                  state_frame=state_frames.get(sym), state_base=state_base)
+                  state_frame=state_frames.get(sym), state_base=state_base,
+                  label=sym)
     return signals, regime_base, cond_base, mkt_base, state_base
 
 
@@ -1433,6 +1578,18 @@ def main(argv=None) -> None:
                         "breadth, relative strength, liquidity, and falling-knife risk.")
     p.add_argument("--state-min-samples", type=int, default=8,
                    help="Minimum signals needed to print a state-slice row.")
+    p.add_argument("--costs", action="store_true",
+                   help="Print a cost/slippage-aware actionable-book report.")
+    p.add_argument("--fee-bps", type=float, default=10.0,
+                   help="Round-trip fee in basis points for --costs.")
+    p.add_argument("--slippage-bps", type=float, default=20.0,
+                   help="Base round-trip slippage bps for --costs; scaled by liquidity bucket when available.")
+    p.add_argument("--max-trades-per-day", type=int, default=0,
+                   help="For --costs, keep only top-N actionable signals per day by conviction.")
+    p.add_argument("--walk-forward", action="store_true",
+                   help="Print chronological setup stability folds for the primary horizon.")
+    p.add_argument("--walk-forward-folds", type=int, default=4,
+                   help="Number of chronological folds for --walk-forward.")
     p.add_argument("--trigger", choices=("cross_into", "confirm"), default="cross_into",
                    help="Entry: cross_into (pierce the zone, default) or confirm (turn back out).")
     p.add_argument("--compare-triggers", action="store_true",
@@ -1516,6 +1673,20 @@ def main(argv=None) -> None:
         print(format_state_slices(
             signals, state_base, PRIMARY, min_n=args.state_min_samples,
             setup=args.slice,
+        ))
+    if args.costs:
+        print(format_cost_report(
+            signals,
+            horizon=PRIMARY,
+            fee_bps=args.fee_bps,
+            slippage_bps=args.slippage_bps,
+            max_trades_per_day=args.max_trades_per_day or None,
+        ))
+    if args.walk_forward:
+        print(format_walk_forward(
+            signals,
+            horizon=PRIMARY,
+            folds=args.walk_forward_folds,
         ))
 
     if args.export_priors:

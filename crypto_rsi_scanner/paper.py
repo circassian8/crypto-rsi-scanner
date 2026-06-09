@@ -15,12 +15,14 @@ they overlap — so it's an edge proxy, not a literal account balance.
 from __future__ import annotations
 
 import logging
+import json
 import statistics
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from . import config
 from .signal_registry import setup_has_edge
+from .state_features import falling_knife_bucket
 from .outcomes import _price_asof
 
 log = logging.getLogger(__name__)
@@ -150,6 +152,49 @@ def _group_stats(trades: list[dict], key_fn) -> dict[str, dict | None]:
     return {label: _stats(rows) for label, rows in sorted(groups.items())}
 
 
+def _state_doc(trade: dict) -> dict:
+    raw = trade.get("state_json")
+    if not raw:
+        return {}
+    try:
+        doc = json.loads(raw)
+    except Exception:  # noqa: BLE001
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def _state_bucket(trade: dict, path: str) -> str:
+    doc = _state_doc(trade)
+    if path == "volatility":
+        return str((doc.get("volatility") or {}).get("state") or "unknown")
+    if path == "breadth":
+        return str((doc.get("breadth") or {}).get("state") or "unknown")
+    if path == "relative_strength":
+        return str((doc.get("relative_strength") or {}).get("bucket") or "unknown")
+    if path == "liquidity":
+        return str((doc.get("liquidity") or {}).get("bucket") or "unknown")
+    if path == "falling_knife":
+        score = (doc.get("risk") or {}).get("falling_knife_score")
+        return falling_knife_bucket(score)
+    return "unknown"
+
+
+_STATE_COHORTS = {
+    "volatility": "volatility",
+    "breadth": "breadth",
+    "relative_strength": "relative strength",
+    "liquidity": "liquidity",
+    "falling_knife": "falling-knife",
+}
+
+
+def _state_group_stats(trades: list[dict]) -> dict[str, dict[str, dict | None]]:
+    return {
+        feature: _group_stats(trades, lambda t, f=feature: _state_bucket(t, f))
+        for feature in _STATE_COHORTS
+    }
+
+
 def _open_position(t: dict) -> dict:
     return {
         "symbol": t.get("symbol"),
@@ -185,11 +230,12 @@ def summary(storage, now: datetime | None = None) -> dict:
         "by_market_regime": _group_stats(closed, lambda t: t.get("market_regime") or "?"),
         "by_market_alignment": _group_stats(closed, lambda t: t.get("market_aligned") or "?"),
         "by_conviction_bucket": _group_stats(closed, lambda t: _conviction_bucket(t.get("conviction"))),
+        "by_state": _state_group_stats(closed),
         "open_positions": [_open_position(t) for t in open_],
     }
 
 
-def report(storage, now: datetime | None = None) -> str:
+def report(storage, now: datetime | None = None, *, cohorts: bool = False) -> str:
     closed = [dict(r) for r in storage.closed_paper_trades()]
     open_ = [dict(r) for r in storage.open_paper_trades()]
     if not closed and not open_:
@@ -248,6 +294,23 @@ def report(storage, now: datetime | None = None) -> str:
         for bucket in present_buckets:
             out.append(_fmt_stats(bucket, _stats([t for t in closed
                                                   if _conviction_bucket(t.get("conviction")) == bucket])))
+
+    if cohorts and closed:
+        out.append("\nBy state cohort:")
+        for feature, label in _STATE_COHORTS.items():
+            rows = {
+                bucket: st
+                for bucket, st in _group_stats(
+                    closed, lambda t, f=feature: _state_bucket(t, f)
+                ).items()
+                if bucket != "unknown" and st
+            }
+            if not rows:
+                continue
+            out.append(f"\n  {label}:")
+            out.append(header.replace("book", "bucket"))
+            for bucket, st in rows.items():
+                out.append(_fmt_stats(bucket, st, indent="  "))
 
     if open_:
         out.append(f"\nOpen positions ({len(open_)}): "

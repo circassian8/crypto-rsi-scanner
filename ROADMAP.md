@@ -31,7 +31,9 @@ Status labels:
 ## Later
 
 No ready later items. Current remaining work is waiting on live outcomes, broader
-PIT history, or the next universe hygiene audit.
+PIT history, or the next universe hygiene audit. Tooling now exists for
+`--score --cohorts`, cost-aware backtests, walk-forward checks, audit refreshes,
+and suspicious-kept audit leak detection.
 
 ## Maintenance Rules
 

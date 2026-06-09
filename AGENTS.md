@@ -71,11 +71,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - **Alert render smoke (no sends/network):** `make smoke-alerts`
 - **Backtest fixture smoke (no network):** `make backtest-fixture` runs the
   default Binance-style backtest path from checked-in BTC/ETH/SOL kline fixtures.
+- **Backtest research smoke:** `make backtest-costs` runs the fixture backtest
+  with state slices, cost/slippage modeling, and walk-forward folds.
 - **Dry scan (network, no writes/alerts):** `.venv/bin/python main.py --dry-run --top-n 30`
 - **Reports:** `main.py --report` (outcome hit-rates) · `main.py --score` (paper
   scoreboard) · `main.py --score --json` (structured paper scoreboard) ·
-  `main.py --status` (scan/listener health) · `main.py --universe-audit`
-  (latest hygiene audit)
+  `main.py --score --cohorts` (state cohort scoreboard) · `main.py --status`
+  (scan/listener health) · `main.py --universe-audit` (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks
   the newest retained backup.
@@ -98,6 +100,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   CoinGecko PIT histories) ·
   `--export-priors registry_priors.json` (write reviewable registry calibration) ·
   `--fixture-dir fixtures/backtest_smoke` (offline Binance-path smoke) ·
+  `--costs` / `--fee-bps` / `--slippage-bps` / `--max-trades-per-day`
+  (cost-aware research) · `--walk-forward` (chronological setup stability) ·
   `--min-signals N` (fail if a smoke run produces too few graded observations)
 - **Deploy:** the scan agent (`com.nasrenkaraf.rsiscanner`) auto-loads new code on
   its next run (03:10 MSK). The **listener must be restarted** to pick up code:
@@ -186,6 +190,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   baseline. This still needs validation from the paper scoreboard.
 - **Paper scoreboard** (`--score`, `/score`) is accruing live; compares an
   "actionable (gated)" book vs a "control (gated-out)" book.
+  Use `--score --cohorts` once paper trades close to inspect setup, conviction,
+  market-alignment, and stored state-bucket cohorts.
 - **State-slice research:** `research/STATE_SLICE_BACKTEST_2026-06-09.md`
   contains the 4-year Binance current-top review; `research/PIT_STATE_SLICE_CONFIRMATION_2026-06-09.md`
   contains the cached 365d PIT review. The PIT run was bear-only, so it does not
@@ -194,6 +200,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   and `research/registry_priors_pit_2026-06-09.json` capture the cached 365d PIT
   export. It is review-only, not live-loaded: the run was BEAR-only and moved
   broad neutral priors from narrow bear evidence.
+- **PIT data depth:** `research/PIT_DATA_OPTIONS_2026-06-09.md` documents the
+  current 365d demo/free limit and the workflow for rerunning deeper PIT research
+  with a Pro key or alternate historical market-cap provider.
 - **Confirmation entry trigger** was A/B'd and **rejected** (no improvement) — do
   not re-add without new evidence.
 - Caveats: the Binance backtest path is survivorship-biased (today's top-N); the

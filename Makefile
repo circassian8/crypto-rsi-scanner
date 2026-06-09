@@ -1,6 +1,6 @@
 PYTHON := .venv/bin/python
 
-.PHONY: help verify test smoke-alerts backtest-fixture score score-json report status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -8,8 +8,10 @@ help:
 	@echo "  make test     Run standalone tests"
 	@echo "  make smoke-alerts  Render representative alerts without sending"
 	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
+	@echo "  make backtest-costs  Run fixture backtest with costs + walk-forward"
 	@echo "  make score    Print paper-trade scoreboard"
 	@echo "  make score-json  Print paper-trade scoreboard as JSON"
+	@echo "  make score-cohorts  Print paper-trade scoreboard with state cohorts"
 	@echo "  make report   Print signal outcome report"
 	@echo "  make status   Print operational scan/listener health"
 	@echo "  make backup-db  Create and verify a SQLite backup"
@@ -35,11 +37,17 @@ smoke-alerts:
 backtest-fixture:
 	$(PYTHON) -m crypto_rsi_scanner.backtest --fixture-dir fixtures/backtest_smoke --top-n 3 --days 365 --min-signals 1
 
+backtest-costs:
+	$(PYTHON) -m crypto_rsi_scanner.backtest --fixture-dir fixtures/backtest_smoke --top-n 3 --days 365 --state-slices --costs --walk-forward --min-signals 1
+
 score:
 	$(PYTHON) main.py --score
 
 score-json:
 	$(PYTHON) main.py --score --json
+
+score-cohorts:
+	$(PYTHON) main.py --score --cohorts
 
 report:
 	$(PYTHON) main.py --report

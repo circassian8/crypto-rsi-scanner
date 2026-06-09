@@ -36,6 +36,13 @@ _DERIVATIVE_NAME_RE = re.compile(
     r")\b"
 )
 
+_SUSPICIOUS_KEPT_RE = re.compile(
+    r"\b(usd|dollar|stable|wrapped|bridged|staked|restaked|liquid|staking|"
+    r"receipt|synthetic|peg|wormhole|axelar|yield|vault|fund)\b|"
+    r"staked|wrapped|usd",
+    re.I,
+)
+
 
 def _clean_text(value: object) -> str:
     text = unicodedata.normalize("NFKC", str(value or ""))
@@ -187,6 +194,18 @@ def format_exclusions(excluded: Counter) -> str:
     return ", ".join(f"{reason}={count}" for reason, count in excluded.most_common())
 
 
+def suspicious_kept(audit: dict, *, limit: int = 20) -> list[dict]:
+    """Rows kept by hygiene but matching terms that often indicate non-RSI assets."""
+    out: list[dict] = []
+    for item in audit.get("kept") or []:
+        text = f"{item.get('id', '')} {item.get('symbol', '')} {item.get('name', '')}"
+        if _SUSPICIOUS_KEPT_RE.search(text):
+            out.append(item)
+            if len(out) >= limit:
+                break
+    return out
+
+
 def write_audit(audit: dict, path: Path | None = None) -> Path:
     path = Path(path or config.UNIVERSE_AUDIT_OUT).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -211,5 +230,13 @@ def format_audit(audit: dict) -> str:
             lines.append(
                 f"  {item.get('symbol', '?')} {item.get('name', '?')} "
                 f"rank={item.get('rank', '?')} reason={item.get('reason')}"
+            )
+    leaks = suspicious_kept(audit, limit=12)
+    if leaks:
+        lines.append("suspicious kept:")
+        for item in leaks:
+            lines.append(
+                f"  {item.get('symbol', '?')} {item.get('name', '?')} "
+                f"rank={item.get('rank', '?')}"
             )
     return "\n".join(lines)
