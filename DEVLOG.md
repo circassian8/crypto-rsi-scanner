@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Run cached PIT state-slice confirmation · Codex
+**Why:** The next roadmap item was to use point-in-time membership to check
+whether the current-top Binance state-slice candidates survive a less
+survivorship-biased test.
+**Changes:**
+- Ran `.venv/bin/python -m crypto_rsi_scanner.backtest --pit --top-n 80 --pool
+  150 --days 365 --state-slices`: cache started empty, populated 150 raw
+  CoinGecko histories, used 128 histories, and produced 1325 graded observations.
+- Added `research/PIT_STATE_SLICE_CONFIRMATION_2026-06-09.md` with the command,
+  caveats, setup baseline, state-slice read, and no-live-change decision.
+- `ROADMAP.md`, `DECISIONS.md`, and `AGENTS.md` record that this PIT result is
+  bear-regime evidence only; bull/chop state candidates still need deeper PIT or
+  live confirmation.
+**Verify:** PIT run completed successfully and populated the local gitignored
+cache. `make verify` passes tests 120/120, alert render smoke, and paper
+scoreboard after the documentation update.
+**Notes/risks:** No signal logic changed. The 365d demo CoinGecko PIT window
+only had BTC `BEAR` market-regime coverage, so it supports monitoring
+bear-regime `mean_reversion` and keeping `breakdown_risk` context-only, but does
+not validate bull/chop rules.
+
 ## 2026-06-09 — Add PIT history cache for backtests · Codex
 **Why:** PIT state-slice confirmation and registry calibration depend on
 CoinGecko market-cap histories, which are rate-limit sensitive and expensive to

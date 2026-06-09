@@ -232,6 +232,18 @@ logic reproducible without checking bulky data into git.
 **Revisit when:** A better historical market-cap data source replaces CoinGecko
 or the cache needs versioned schema metadata.
 
+## 2026-06-09 - Treat first cached PIT state-slice run as bear-only evidence
+**Status:** accepted
+**Decision:** The cached 365d PIT state-slice run confirms only bear-regime
+conditions. It supports continued monitoring of bear-regime `mean_reversion` and
+continued rejection of `breakdown_risk`, but it does not justify live state
+routing changes.
+**Why:** The run used point-in-time membership and 128 usable histories, but the
+available 365d CoinGecko window only produced BTC `BEAR` market-regime coverage.
+Bull/chop state candidates from the 4-year Binance run remain unconfirmed.
+**Revisit when:** Deeper PIT history includes bull/chop periods or live
+`state_json` outcomes mature enough to test those cohorts directly.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and

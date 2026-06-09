@@ -174,6 +174,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   baseline. This still needs validation from the paper scoreboard.
 - **Paper scoreboard** (`--score`, `/score`) is accruing live; compares an
   "actionable (gated)" book vs a "control (gated-out)" book.
+- **State-slice research:** `research/STATE_SLICE_BACKTEST_2026-06-09.md`
+  contains the 4-year Binance current-top review; `research/PIT_STATE_SLICE_CONFIRMATION_2026-06-09.md`
+  contains the cached 365d PIT review. The PIT run was bear-only, so it does not
+  confirm bull/chop state rules.
 - **Confirmation entry trigger** was A/B'd and **rejected** (no improvement) — do
   not re-add without new evidence.
 - Caveats: the Binance backtest path is survivorship-biased (today's top-N); the
