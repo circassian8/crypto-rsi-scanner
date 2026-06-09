@@ -87,6 +87,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   flags: `--pit` (point-in-time universe, survivorship fix) · `--slice <setup>`
   (vol/momentum slice) · `--compare-triggers` (entry-trigger A/B) ·
   `--state-slices` (shadow state-conditioned edge table) ·
+  `--pit-cache-dir backtest_cache` / `--refresh-pit-cache` (reuse/refetch
+  CoinGecko PIT histories) ·
   `--export-priors registry_priors.json` (write reviewable registry calibration)
 - **Deploy:** the scan agent (`com.nasrenkaraf.rsiscanner`) auto-loads new code on
   its next run (03:10 MSK). The **listener must be restarted** to pick up code:
@@ -186,9 +188,10 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 
 1. Let the paper scoreboard accrue ~1–2 weeks; confirm gating helps live.
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
-3. Improve point-in-time backtest power and review exported registry priors.
-4. Confirm the 2026-06-09 state-slice candidates via PIT/live data before any
+3. Confirm the 2026-06-09 state-slice candidates via cached PIT/live data before any
    live conviction or routing change.
+4. Improve PIT history depth further with a Pro CoinGecko key or alternate
+   historical market-cap source, then review exported registry priors.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
 6. Use `make dry-run-fixture` before network dry-runs when validating scanner
    plumbing that does not need live CoinGecko data.

@@ -204,6 +204,11 @@ FIXTURE_DIR = Path(_FIXTURE_DIR_RAW).expanduser() if _FIXTURE_DIR_RAW else None
 if FIXTURE_DIR is not None and not FIXTURE_DIR.is_absolute():
     FIXTURE_DIR = DATA_DIR / FIXTURE_DIR
 
+_BACKTEST_CACHE_DIR_RAW = os.getenv("RSI_BACKTEST_CACHE_DIR", "backtest_cache")
+BACKTEST_CACHE_DIR = Path(_BACKTEST_CACHE_DIR_RAW).expanduser()
+if not BACKTEST_CACHE_DIR.is_absolute():
+    BACKTEST_CACHE_DIR = DATA_DIR / BACKTEST_CACHE_DIR
+
 
 def redact_token(text: str) -> str:
     """Strip the Telegram bot token from a string before logging — it rides

@@ -12,6 +12,7 @@ maintenance.log
 *.log.*
 universe_hygiene_latest.json
 backups/
+backtest_cache/
 
 # Python
 __pycache__/

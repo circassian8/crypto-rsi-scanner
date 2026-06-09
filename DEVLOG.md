@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Add PIT history cache for backtests · Codex
+**Why:** PIT state-slice confirmation and registry calibration depend on
+CoinGecko market-cap histories, which are rate-limit sensitive and expensive to
+refetch. A local raw-history cache improves practical PIT research power even
+before a deeper Pro/alternate data source is available.
+**Changes:**
+- `crypto_rsi_scanner/backtest.py` caches raw CoinGecko `market_chart` JSON for
+  PIT histories, reads cached histories before network fetches, and adds
+  `--pit-cache-dir`, `--no-pit-cache`, and `--refresh-pit-cache` flags.
+- `crypto_rsi_scanner/config.py`, `.env.example`, and `.gitignore` add the
+  configurable `RSI_BACKTEST_CACHE_DIR` (`backtest_cache` by default) and keep
+  cached research data out of git.
+- `tests/test_indicators.py` adds a PIT cache roundtrip test that loads a cached
+  synthetic history without network.
+- `AGENTS.md`, `ROADMAP.md`, and `DECISIONS.md` document the cache behavior and
+  the remaining data-source limit for >365d PIT history.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 120/120.
+`.venv/bin/python -m crypto_rsi_scanner.backtest --help | rg
+"pit-cache|refresh-pit-cache|no-pit-cache"` confirms the CLI flags. `make
+verify` passes tests, alert render smoke, and paper scoreboard.
+**Notes/risks:** This improves repeatability/resume behavior and larger-pool PIT
+runs, but it does not bypass CoinGecko demo history limits. >365d PIT still needs
+a Pro key or alternate historical market-cap source.
+
 ## 2026-06-09 — Run first larger state-slice review · Codex
 **Why:** The next research step was to use `backtest --state-slices` on a larger
 history and decide whether any shadow market-state buckets are ready for live

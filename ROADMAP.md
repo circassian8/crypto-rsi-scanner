@@ -18,13 +18,13 @@ Status labels:
 | waiting | Validate edge-prior conviction buckets live | system | Compare high/med/low conviction and actionable/control books after enough paper trades mature. |
 | waiting | Observe live state cohorts | system | `state_json` now lands in scanner CSV/signals/paper trades; wait for enough matured outcomes before trusting state-conditioned reads. |
 | waiting | Confirm state-slice candidate cohorts | system | First Binance current-top run is documented in `research/STATE_SLICE_BACKTEST_2026-06-09.md`; needs PIT/live confirmation before any live rule. |
+| waiting | Extend PIT history depth beyond demo limits | human/data | PIT cache now helps reuse CoinGecko histories, but >365d PIT still needs a Pro key or alternate historical market-cap source. |
 
 ## Next
 
 | status | item | owner | notes |
 |---|---|---|---|
-| todo | Improve point-in-time backtest power | open | Pro CoinGecko key or alternate history source would extend PIT universe beyond demo limits. |
-| todo | Run PIT state-slice confirmation | open | Re-check candidate cohorts from the 2026-06-09 Binance run once PIT history/source power is stronger. |
+| todo | Run cached PIT state-slice confirmation | open | Use `backtest --pit --state-slices`; cache raw CoinGecko histories in `backtest_cache` so interrupted/rate-limited runs can resume. |
 | todo | Run stronger PIT calibration and review exported priors | open | Tooling exists via `backtest.py --export-priors`; needs larger PIT history before opting live into a file. |
 | waiting | Monitor universe hygiene false positives/negatives | system | Latest audit is persisted by live scans; review `main.py --universe-audit` after the next scheduled scan. |
 

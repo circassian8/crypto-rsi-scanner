@@ -1253,6 +1253,33 @@ def test_backtest_pit_membership():
     assert list(member["riser"]) == [False, False, True, True]
 
 
+def test_backtest_pit_history_cache_roundtrip():
+    import asyncio
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import backtest
+
+    idx = pd.date_range("2025-01-01", periods=280, freq="D", tz="UTC")
+    data = {
+        "prices": [[int(ts.timestamp() * 1000), float(i + 1)] for i, ts in enumerate(idx)],
+        "market_caps": [[int(ts.timestamp() * 1000), float(1_000_000 + i)] for i, ts in enumerate(idx)],
+        "total_volumes": [[int(ts.timestamp() * 1000), float(10_000 + i)] for i, ts in enumerate(idx)],
+    }
+    cache_dir = Path(tempfile.mkdtemp())
+    backtest._write_cg_chart_cache(cache_dir, "bitcoin/test", 365, data)
+
+    path = backtest._cg_chart_cache_path(cache_dir, "bitcoin/test", 365)
+    assert path.name == "bitcoin_test-365d.json"
+    assert backtest._load_cg_chart_cache(cache_dir, "bitcoin/test", 365)["prices"][0][1] == 1.0
+
+    histories = asyncio.run(backtest._fetch_cg_histories(
+        ["bitcoin/test"], 365, cache_dir=cache_dir
+    ))
+    assert set(histories) == {"bitcoin/test"}
+    assert len(histories["bitcoin/test"]) == len(idx)
+    assert {"close", "mcap", "volume"}.issubset(histories["bitcoin/test"].columns)
+
+
 def test_backtest_walk_respects_membership():
     # With a membership mask all-False, no signals and no base days accrue.
     from collections import defaultdict

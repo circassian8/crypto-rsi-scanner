@@ -33,6 +33,7 @@ import asyncio
 import json
 import logging
 import math
+import re
 import statistics
 import time
 from collections import defaultdict
@@ -1129,20 +1130,93 @@ def _parse_cg_chart(data: dict) -> pd.DataFrame | None:
     return pd.DataFrame({"close": close, "mcap": mcap, "volume": vol}).dropna(subset=["close"])
 
 
-async def _fetch_cg_histories(ids: list[str], days: int) -> dict:
+def _safe_cache_name(coin_id: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", coin_id).strip("_") or "coin"
+
+
+def _cg_chart_cache_path(cache_dir: Path, coin_id: str, days: int) -> Path:
+    return cache_dir / "coingecko_market_chart" / f"{_safe_cache_name(coin_id)}-{days}d.json"
+
+
+def _load_cg_chart_cache(cache_dir: Path | None, coin_id: str, days: int) -> dict | None:
+    if cache_dir is None:
+        return None
+    path = _cg_chart_cache_path(cache_dir, coin_id, days)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        log.warning("Ignoring unreadable PIT cache %s: %s", path, e)
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _write_cg_chart_cache(cache_dir: Path | None, coin_id: str, days: int, data: dict) -> None:
+    if cache_dir is None:
+        return
+    path = _cg_chart_cache_path(cache_dir, coin_id, days)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, separators=(",", ":"), sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+
+
+async def _fetch_cg_histories(
+    ids: list[str],
+    days: int,
+    *,
+    cache_dir: Path | None = None,
+    refresh_cache: bool = False,
+) -> dict:
     """Fetch market_chart (price + market cap + volume) for the candidate pool,
-    in parallel under the client's rate limiter."""
-    async with CoinGeckoClient() as client:
-        async def one(cid):
-            try:
-                return cid, _parse_cg_chart(await client.get_market_chart(cid, days))
-            except Exception as e:  # noqa: BLE001
-                log.debug("cg chart %s failed: %s", cid, e)
-                return cid, None
-        results = await asyncio.gather(*[one(c) for c in ids])
+    in parallel under the client's rate limiter. Cache raw JSON so interrupted
+    PIT research runs can resume without re-spending API quota."""
+    raw_by_id: dict[str, dict] = {}
+    missing: list[str] = []
+    if not refresh_cache:
+        for cid in ids:
+            cached = _load_cg_chart_cache(cache_dir, cid, days)
+            if cached is None:
+                missing.append(cid)
+            else:
+                raw_by_id[cid] = cached
+    else:
+        missing = list(ids)
+
+    if missing:
+        async with CoinGeckoClient() as client:
+            async def one(cid):
+                try:
+                    data = await client.get_market_chart(cid, days)
+                    _write_cg_chart_cache(cache_dir, cid, days, data)
+                    return cid, data
+                except Exception as e:  # noqa: BLE001
+                    log.debug("cg chart %s failed: %s", cid, e)
+                    return cid, None
+            results = await asyncio.gather(*[one(c) for c in missing])
+        for cid, raw in results:
+            if isinstance(raw, dict):
+                raw_by_id[cid] = raw
+
+    if cache_dir is not None:
+        log.info(
+            "PIT cache: %d hit(s), %d miss(es), dir=%s",
+            len(ids) - len(missing),
+            len(missing),
+            cache_dir,
+        )
+
+    parsed: dict[str, pd.DataFrame] = {}
+    for cid, raw in raw_by_id.items():
+        try:
+            parsed[cid] = _parse_cg_chart(raw)
+        except Exception as e:  # noqa: BLE001
+            log.debug("cg chart %s parse failed: %s", cid, e)
+            parsed[cid] = None
 
     min_len = _START + max(HORIZONS) + 1
-    out = {cid: df for cid, df in results if df is not None and len(df) >= min_len}
+    out = {cid: df for cid, df in parsed.items() if df is not None and len(df) >= min_len}
     log.info("PIT: usable history for %d/%d candidates", len(out), len(ids))
     return out
 
@@ -1161,8 +1235,15 @@ def run_pit(
     days: int,
     trigger: str = "cross_into",
     state_slices: bool = False,
+    cache_dir: Path | None = None,
+    refresh_cache: bool = False,
 ) -> tuple[list, dict, dict, dict, dict, int]:
-    histories = asyncio.run(_fetch_cg_histories([c["id"] for c in pool], days))
+    histories = asyncio.run(_fetch_cg_histories(
+        [c["id"] for c in pool],
+        days,
+        cache_dir=cache_dir,
+        refresh_cache=refresh_cache,
+    ))
     signals: list = []
     regime_base: dict = defaultdict(list)
     cond_base: dict = defaultdict(list)
@@ -1262,6 +1343,12 @@ def main(argv=None) -> None:
                         "price+market-cap history instead of Binance).")
     p.add_argument("--pool", type=int, default=150,
                    help="PIT candidate pool size (bigger = less survivorship, slower).")
+    p.add_argument("--pit-cache-dir", default=str(config.BACKTEST_CACHE_DIR),
+                   help="Directory for cached CoinGecko PIT market_chart JSON.")
+    p.add_argument("--no-pit-cache", action="store_true",
+                   help="Disable the CoinGecko PIT history cache for this run.")
+    p.add_argument("--refresh-pit-cache", action="store_true",
+                   help="Refetch PIT histories even when cached JSON exists.")
     p.add_argument("--slice", default=None,
                    help="Conditionally slice one setup by vol/momentum: "
                         f"{', '.join(_SETUP_REGIME)}.")
@@ -1309,10 +1396,18 @@ def main(argv=None) -> None:
             days = min(days, 365)
             log.info("Demo/free CoinGecko key: capping history at 365d "
                      "(a pro key extends this).")
+        pit_cache_dir = None if args.no_pit_cache else Path(args.pit_cache_dir).expanduser()
         log.info("PIT mode: pool=%d, top-%d membership, %dd CoinGecko history...",
                  len(pool), args.top_n, days)
         signals, regime_base, cond_base, mkt_base, state_base, ok = run_pit(
-            pool, args.top_n, days, args.trigger, state_slices=args.state_slices)
+            pool,
+            args.top_n,
+            days,
+            args.trigger,
+            state_slices=args.state_slices,
+            cache_dir=pit_cache_dir,
+            refresh_cache=args.refresh_pit_cache,
+        )
         source, report_days = "CoinGecko daily (point-in-time top-N)", days
     else:
         if args.symbols:

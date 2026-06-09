@@ -221,6 +221,17 @@ confirmation before they can affect alerts.
 outcomes confirm a specific cohort with enough samples and positive incremental
 edge over the same-regime, same-state base rate.
 
+## 2026-06-09 - Cache raw PIT CoinGecko histories
+**Status:** accepted
+**Decision:** PIT backtests cache raw CoinGecko `market_chart` JSON under the
+configured `RSI_BACKTEST_CACHE_DIR` (`backtest_cache` by default), and research
+commands can disable or refresh that cache explicitly.
+**Why:** PIT state-slice and calibration runs are rate-limit sensitive and can be
+interrupted. Caching raw inputs lets runs resume and keeps derived parsing/report
+logic reproducible without checking bulky data into git.
+**Revisit when:** A better historical market-cap data source replaces CoinGecko
+or the cache needs versioned schema metadata.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and
