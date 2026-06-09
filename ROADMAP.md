@@ -26,7 +26,7 @@ Status labels:
 
 | status | item | owner | notes |
 |---|---|---|---|
-| waiting | Monitor universe hygiene false positives/negatives | system | Latest audit is persisted by live scans; review `main.py --universe-audit` after the next scheduled scan. |
+| waiting | Re-check universe hygiene after next scan | system | 2026-06-09 audit found stable/pegged false negatives and filters were tightened; review `main.py --universe-audit` after the next scheduled scan confirms live output. |
 
 ## Later
 

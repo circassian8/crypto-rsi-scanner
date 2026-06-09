@@ -637,6 +637,15 @@ def test_universe_filters_stable_wrapped_and_bad_quality():
     from crypto_rsi_scanner import universe
     cases = [
         (_market(id="tether", symbol="usdt", name="Tether"), "stable_like"),
+        (_market(id="usd1-wlfi", symbol="usd1", name="USD1"), "stable_like"),
+        (_market(id="global-dollar", symbol="usdg", name="Global Dollar"), "stable_like"),
+        (_market(id="usdtb", symbol="usdtb", name="USDtb"), "stable_like"),
+        (_market(id="united-stables", symbol="u", name="United Stables"), "stable_like"),
+        (_market(id="gho", symbol="gho", name="GHO"), "stable_like"),
+        (_market(id="ylds", symbol="ylds", name="YLDS"), "stable_like"),
+        (_market(id="usx", symbol="usx", name="USX"), "stable_like"),
+        (_market(id="tether-gold", symbol="xaut", name="Tether Gold"), "stable_like"),
+        (_market(id="pax-gold", symbol="paxg", name="PAX Gold"), "stable_like"),
         (_market(id="wrapped-bitcoin", symbol="wbtc", name="Wrapped Bitcoin"), "excluded_symbol"),
         (_market(id="bridged-eth", symbol="beth", name="Bridged ETH"), "wrapped_staked_or_synthetic"),
         (_market(id="thin", symbol="thin", name="Thin", total_volume=10.0), "low_liquidity"),

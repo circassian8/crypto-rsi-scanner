@@ -21,11 +21,12 @@ from . import config
 _STABLE_SYMBOLS = {
     "usd", "usdt", "usdc", "dai", "usde", "fdusd", "tusd", "usdd", "pyusd",
     "usds", "busd", "gusd", "frax", "lusd", "usd0", "usdb", "crvusd",
-    "usdx", "susd", "eusd", "usdp", "usdy", "usdl", "rlusd",
+    "usdx", "susd", "eusd", "usdp", "usdy", "usdl", "rlusd", "usd1",
+    "usdg", "usdtb", "gho", "ylds", "usx", "usyc", "xaut", "paxg",
 }
 
 _STABLE_NAME_RE = re.compile(
-    r"\b(stablecoin|stable coin|stable|tether|usd|u\.s\. dollar|dollar|dai|frax)\b"
+    r"\b(stablecoin|stable coin|stables?|tether|usd[a-z0-9]*|u\.s\. dollar|dollars?|dai|frax)\b"
 )
 
 _DERIVATIVE_NAME_RE = re.compile(
@@ -70,7 +71,11 @@ def exclusion_reason(market: dict) -> str | None:
     if symbol in _STABLE_SYMBOLS:
         return "stable_like"
     if _STABLE_NAME_RE.search(name) and (
-        symbol.endswith("usd") or "usd" in joined or "stable" in name
+        symbol.startswith("usd")
+        or symbol.endswith("usd")
+        or "usd" in joined
+        or "dollar" in name
+        or "stable" in name
     ):
         return "stable_like"
 

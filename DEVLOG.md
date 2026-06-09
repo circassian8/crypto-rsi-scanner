@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Tighten universe stable/pegged filters · Codex
+**Why:** The next roadmap item was to review the latest live universe hygiene
+audit for false positives/negatives. The 2026-06-09 03:10 MSK audit showed
+stable/pegged products surviving into the kept top-100.
+**Changes:**
+- Reviewed `main.py --universe-audit`: 200 fetched, 100 kept, 41 excluded
+  (`stable_like=19`, `low_liquidity=22`).
+- `crypto_rsi_scanner/universe.py` now catches observed false negatives:
+  USD1, Global Dollar/USDG, USDtb, United Stables, GHO, YLDS, USX, USYC,
+  Tether Gold/XAUT, and PAX Gold/PAXG.
+- `crypto_rsi_scanner/config.py` mirrors the safe symbol-only exclusions; the
+  one-letter United Stables symbol is caught by name instead.
+- `tests/test_indicators.py` covers the newly observed stable/pegged examples.
+- `ROADMAP.md`, `DECISIONS.md`, and `AGENTS.md` record the audit result and the
+  follow-up to re-check the next live audit.
+**Verify:** Replayed the known kept false negatives through `exclusion_reason()`;
+they now return `stable_like`. `.venv/bin/python tests/test_indicators.py`
+passes 121/121. `make verify` passes tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard after the documentation update.
+**Notes/risks:** Low-liquidity exclusions such as LEO were left unchanged. The
+next scheduled scan should confirm these products no longer appear in the kept
+universe.
+
 ## 2026-06-09 — Add offline backtest fixture smoke · Codex
 **Why:** The final ready roadmap item was to make the backtest CLI smoke-testable
 without relying on Binance/network availability.

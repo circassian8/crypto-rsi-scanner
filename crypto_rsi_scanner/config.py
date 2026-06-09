@@ -137,6 +137,7 @@ UNIVERSE_MAX_ABS_24H_CHANGE = float(os.getenv("RSI_MAX_ABS_24H_CHANGE", "500"))
 EXCLUDE_SYMBOLS = {
     "usdt", "usdc", "dai", "usde", "fdusd", "tusd", "usdd", "pyusd", "usds",
     "busd", "gusd", "frax", "lusd", "usd0", "usdb", "crvusd", "usdx",
+    "usd1", "usdg", "usdtb", "gho", "ylds", "usx", "usyc", "xaut", "paxg",
     "wbtc", "weth", "weeth", "wsteth", "steth", "reth", "cbbtc", "cbeth",
     "solvbtc", "lbtc", "wbeth", "meth", "ezeth", "rseth", "bnsol", "jitosol",
     "wbnb",

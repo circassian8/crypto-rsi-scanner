@@ -277,6 +277,18 @@ and makes false positives/negatives reviewable.
 **Revisit when:** Logs show repeated false positives/negatives, or CoinGecko
 metadata support allows a more precise category-based filter.
 
+## 2026-06-09 - Exclude fiat, gold, and yield-pegged products from RSI universe
+**Status:** accepted
+**Decision:** Treat observed fiat/gold/yield-pegged products such as USD1, USDG,
+USDtb, GHO, YLDS, USX, USYC, XAUT, and PAXG as `stable_like` universe
+exclusions.
+**Why:** The 2026-06-09 live hygiene audit showed these products surviving into
+the kept top-100 even though they are not good directional crypto RSI candidates.
+They add noise to alerts, paper trades, and backtests.
+**Revisit when:** The audit shows a repeated legitimate asset being excluded by
+these rules, or CoinGecko exposes reliable categories for stable/commodity/yield
+products.
+
 ## 2026-06-07 - Do not exclude STX by symbol
 **Status:** accepted
 **Decision:** `stx` is not in the hard exclude list.
