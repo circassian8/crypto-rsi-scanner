@@ -178,6 +178,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   contains the 4-year Binance current-top review; `research/PIT_STATE_SLICE_CONFIRMATION_2026-06-09.md`
   contains the cached 365d PIT review. The PIT run was bear-only, so it does not
   confirm bull/chop state rules.
+- **Registry-prior PIT review:** `research/PIT_REGISTRY_PRIORS_REVIEW_2026-06-09.md`
+  and `research/registry_priors_pit_2026-06-09.json` capture the cached 365d PIT
+  export. It is review-only, not live-loaded: the run was BEAR-only and moved
+  broad neutral priors from narrow bear evidence.
 - **Confirmation entry trigger** was A/B'd and **rejected** (no improvement) — do
   not re-add without new evidence.
 - Caveats: the Binance backtest path is survivorship-biased (today's top-N); the
@@ -195,7 +199,7 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 3. Confirm the 2026-06-09 state-slice candidates via cached PIT/live data before any
    live conviction or routing change.
 4. Improve PIT history depth further with a Pro CoinGecko key or alternate
-   historical market-cap source, then review exported registry priors.
+   historical market-cap source, then re-run registry-prior calibration.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
 6. Use `make dry-run-fixture` before network dry-runs when validating scanner
    plumbing that does not need live CoinGecko data.

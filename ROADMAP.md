@@ -18,6 +18,7 @@ Status labels:
 | waiting | Validate edge-prior conviction buckets live | system | Compare high/med/low conviction and actionable/control books after enough paper trades mature. |
 | waiting | Observe live state cohorts | system | `state_json` now lands in scanner CSV/signals/paper trades; wait for enough matured outcomes before trusting state-conditioned reads. |
 | waiting | Confirm state-slice candidate cohorts | system | First Binance current-top run is documented in `research/STATE_SLICE_BACKTEST_2026-06-09.md`; needs PIT/live confirmation before any live rule. |
+| waiting | Re-run registry-prior calibration with broader PIT coverage | human/data | `research/PIT_REGISTRY_PRIORS_REVIEW_2026-06-09.md` reviewed the 365d export; it is BEAR-only and should not be loaded live. |
 | waiting | Extend PIT history depth beyond demo limits | human/data | PIT cache now helps reuse CoinGecko histories, but >365d PIT still needs a Pro key or alternate historical market-cap source. |
 | waiting | Confirm bull/chop state cohorts | human/data | Cached 365d PIT run only covered BTC `BEAR`; bull/chop confirmation needs deeper PIT history. |
 
@@ -25,7 +26,6 @@ Status labels:
 
 | status | item | owner | notes |
 |---|---|---|---|
-| todo | Run stronger PIT calibration and review exported priors | open | Tooling exists via `backtest.py --export-priors`; needs larger PIT history before opting live into a file. |
 | waiting | Monitor universe hygiene false positives/negatives | system | Latest audit is persisted by live scans; review `main.py --universe-audit` after the next scheduled scan. |
 
 ## Later

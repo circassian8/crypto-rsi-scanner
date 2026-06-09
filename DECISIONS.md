@@ -244,6 +244,16 @@ Bull/chop state candidates from the 4-year Binance run remain unconfirmed.
 **Revisit when:** Deeper PIT history includes bull/chop periods or live
 `state_json` outcomes mature enough to test those cohorts directly.
 
+## 2026-06-09 - Do not load the first PIT registry-prior export live
+**Status:** accepted
+**Decision:** `research/registry_priors_pit_2026-06-09.json` is a checked-in
+research artifact only. Do not set `RSI_REGISTRY_PRIORS` to it for live scans.
+**Why:** The 365d point-in-time run had only BTC `BEAR` market coverage. It moved
+`mean_reversion.neutral` from 42 to 47 and `trend_continuation.neutral` from 42
+to 40, but those neutral prior cells are broader than this bear-only evidence.
+**Revisit when:** PIT history includes bull/chop coverage or mature live paper
+outcomes validate setup-by-market prior cells directly.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and

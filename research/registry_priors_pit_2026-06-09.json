@@ -1,0 +1,135 @@
+{
+  "generated_at": "2026-06-09T11:26:58Z",
+  "min_samples": 8,
+  "primary_horizon_days": 7,
+  "run": {
+    "days": 365,
+    "graded_observations": 1325,
+    "n_coins": 128,
+    "pit": true,
+    "source": "CoinGecko daily (point-in-time top-N)",
+    "trigger": "cross_into"
+  },
+  "schema": 1,
+  "setups": {
+    "breakdown_risk": {
+      "default_edge_priors": {
+        "adverse": 24,
+        "favorable": 62,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "edge_priors": {
+        "adverse": 24,
+        "favorable": 62,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "evidence": [
+        {
+          "alignment": "adverse",
+          "base_pct": 56.34,
+          "canonical_market_regime": "DOWNTREND",
+          "confirm_pct": 51.16,
+          "edge_pct": -5.18,
+          "market_regime": "BEAR",
+          "median_return_pct": -0.0092,
+          "n": 43,
+          "used": true
+        }
+      ],
+      "has_edge": false,
+      "label": "Breakdown Risk",
+      "notes": [
+        "context_only_no_edge_not_auto_promoted"
+      ]
+    },
+    "dip_buy": {
+      "default_edge_priors": {
+        "adverse": 24,
+        "favorable": 64,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "edge_priors": {
+        "adverse": 24,
+        "favorable": 64,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "evidence": [
+        {
+          "alignment": "adverse",
+          "base_pct": 46.81,
+          "canonical_market_regime": "DOWNTREND",
+          "confirm_pct": 0.0,
+          "edge_pct": -46.81,
+          "market_regime": "BEAR",
+          "median_return_pct": -4.3654,
+          "n": 5,
+          "used": false
+        }
+      ],
+      "has_edge": true,
+      "label": "Dip Buy"
+    },
+    "mean_reversion": {
+      "default_edge_priors": {
+        "adverse": 24,
+        "favorable": 58,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "edge_priors": {
+        "adverse": 24,
+        "favorable": 58,
+        "neutral": 47,
+        "no_edge": 16
+      },
+      "evidence": [
+        {
+          "alignment": "neutral",
+          "base_pct": 53.95,
+          "canonical_market_regime": "DOWNTREND",
+          "confirm_pct": 65.5,
+          "edge_pct": 11.55,
+          "market_regime": "BEAR",
+          "median_return_pct": -0.2689,
+          "n": 229,
+          "used": true
+        }
+      ],
+      "has_edge": true,
+      "label": "Mean Reversion"
+    },
+    "trend_continuation": {
+      "default_edge_priors": {
+        "adverse": 24,
+        "favorable": 64,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "edge_priors": {
+        "adverse": 24,
+        "favorable": 64,
+        "neutral": 40,
+        "no_edge": 16
+      },
+      "evidence": [
+        {
+          "alignment": "neutral",
+          "base_pct": 46.81,
+          "canonical_market_regime": "DOWNTREND",
+          "confirm_pct": 42.86,
+          "edge_pct": -3.96,
+          "market_regime": "BEAR",
+          "median_return_pct": -0.0409,
+          "n": 35,
+          "used": true
+        }
+      ],
+      "has_edge": true,
+      "label": "Trend Continuation"
+    }
+  }
+}

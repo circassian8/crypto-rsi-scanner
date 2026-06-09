@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Review cached PIT registry priors · Codex
+**Why:** The next roadmap research step was to export registry conviction priors
+from point-in-time histories and decide whether the artifact is strong enough to
+load live.
+**Changes:**
+- Ran `.venv/bin/python -m crypto_rsi_scanner.backtest --pit --top-n 80 --pool
+  150 --days 365 --export-priors research/registry_priors_pit_2026-06-09.json`:
+  150 cache hits, 128 usable histories, 1325 graded observations.
+- Added `research/registry_priors_pit_2026-06-09.json` and
+  `research/PIT_REGISTRY_PRIORS_REVIEW_2026-06-09.md` with the exported deltas
+  and review-only decision.
+- `ROADMAP.md`, `DECISIONS.md`, and `AGENTS.md` now record that the 365d PIT
+  prior export is BEAR-only evidence and should not be loaded with
+  `RSI_REGISTRY_PRIORS`.
+**Verify:** PIT export completed successfully. `make verify` passes tests
+120/120, alert render smoke, and paper scoreboard after the documentation
+updates.
+**Notes/risks:** No signal logic changed. The export moved
+`mean_reversion.neutral` 42 -> 47 and `trend_continuation.neutral` 42 -> 40, but
+that is not enough for live adoption because the market coverage was only BEAR.
+
 ## 2026-06-09 — Run cached PIT state-slice confirmation · Codex
 **Why:** The next roadmap item was to use point-in-time membership to check
 whether the current-top Binance state-slice candidates survive a less
