@@ -908,13 +908,13 @@ def format_state_slices(
         out.append(f"  No state buckets met min_n={min_n}. Try more days/coins.")
         return "\n".join(out)
 
-    out.append(f"  {'feature':<17}{'bucket':<18}{'setup':<19}"
+    out.append(f"  {'feature':<25}{'bucket':<20}{'setup':<19}"
                f"{'n':>5}{'baseN':>7}{'conf%':>7}{'base%':>7}"
                f"{'edge':>7}{'medRet':>9}{'medDir':>9}")
     for r in rows:
         label = _STATE_FEATURES.get(r["feature"], r["feature"])
         out.append(
-            f"  {label:<17}{r['bucket']:<18}{r['setup']:<19}"
+            f"  {label:<25}{r['bucket']:<20}{r['setup']:<19}"
             f"{r['n']:>5}{r['base_n']:>7}{r['conf']:>6.0f}%"
             f"{r['base']:>6.0f}%{r['edge']:>+6.0f}"
             f"{r['med']:>8.1f}%{r['med_dir']:>+8.1f}%"

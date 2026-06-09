@@ -210,6 +210,17 @@ normally happened in that same state.
 **Revisit when:** A better causal/econometric benchmark replaces the current
 same-regime, same-state base-rate comparison.
 
+## 2026-06-09 - Do not promote first state-slice candidates live
+**Status:** accepted
+**Decision:** The 2026-06-09 current-top Binance state-slice review is research
+evidence only. Do not alter live conviction, routing, or gating from it alone.
+**Why:** The run found plausible cohorts, but it remains survivorship-biased,
+single-venue, costless, and some cells are small. State buckets need PIT/live
+confirmation before they can affect alerts.
+**Revisit when:** Point-in-time state-slice backtests or mature live `state_json`
+outcomes confirm a specific cohort with enough samples and positive incremental
+edge over the same-regime, same-state base rate.
+
 ## 2026-06-07 - Share universe hygiene across live and research
 **Status:** accepted
 **Decision:** `crypto_rsi_scanner/universe.py` owns CoinGecko market hygiene and

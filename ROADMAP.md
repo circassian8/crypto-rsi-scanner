@@ -17,13 +17,14 @@ Status labels:
 | waiting | Let paper scoreboard accrue live data | system | Needs roughly 1-2 weeks of matured 7d paper trades before drawing conclusions. |
 | waiting | Validate edge-prior conviction buckets live | system | Compare high/med/low conviction and actionable/control books after enough paper trades mature. |
 | waiting | Observe live state cohorts | system | `state_json` now lands in scanner CSV/signals/paper trades; wait for enough matured outcomes before trusting state-conditioned reads. |
+| waiting | Confirm state-slice candidate cohorts | system | First Binance current-top run is documented in `research/STATE_SLICE_BACKTEST_2026-06-09.md`; needs PIT/live confirmation before any live rule. |
 
 ## Next
 
 | status | item | owner | notes |
 |---|---|---|---|
-| todo | Review larger state-slice backtests | open | `backtest --state-slices` exists; run on broader Binance/PIT data and look for durable vol/breadth/RS/liquidity/knife cohorts before any routing change. |
 | todo | Improve point-in-time backtest power | open | Pro CoinGecko key or alternate history source would extend PIT universe beyond demo limits. |
+| todo | Run PIT state-slice confirmation | open | Re-check candidate cohorts from the 2026-06-09 Binance run once PIT history/source power is stronger. |
 | todo | Run stronger PIT calibration and review exported priors | open | Tooling exists via `backtest.py --export-priors`; needs larger PIT history before opting live into a file. |
 | waiting | Monitor universe hygiene false positives/negatives | system | Latest audit is persisted by live scans; review `main.py --universe-audit` after the next scheduled scan. |
 

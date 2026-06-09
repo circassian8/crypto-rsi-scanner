@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Run first larger state-slice review · Codex
+**Why:** The next research step was to use `backtest --state-slices` on a larger
+history and decide whether any shadow market-state buckets are ready for live
+promotion.
+**Changes:**
+- Ran `.venv/bin/python -m crypto_rsi_scanner.backtest --top-n 80 --days 1460
+  --state-slices`: 49 usable Binance histories, 7648 graded observations.
+- Added `research/STATE_SLICE_BACKTEST_2026-06-09.md` with the command, caveats,
+  setup baseline, market-regime check, candidate state cohorts, and no-promotion
+  decision.
+- `crypto_rsi_scanner/backtest.py` widens the state-slice table columns so long
+  feature labels do not run into bucket names.
+- `ROADMAP.md`, `DECISIONS.md`, and `AGENTS.md` record that these candidates
+  need PIT/live confirmation before any live conviction/routing change.
+**Verify:** Larger state-slice run completed successfully. Full local
+verification was rerun after the docs/formatting update: `make verify` passes
+tests 119/119, alert render smoke, and paper scoreboard.
+**Notes/risks:** No live signal logic changed. Most plausible candidates are
+documented, but the run is current-top survivorship-biased, single-venue, and
+costless, so it is not enough to alter live alerts.
+
 ## 2026-06-09 — Add state-conditioned backtest slices · Codex
 **Why:** Live scanner now stores shadow market-state context, but those labels
 need a research path that can test conditional edge before any state bucket is

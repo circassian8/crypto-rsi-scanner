@@ -38,6 +38,7 @@ capturing that prompt's work, with a clear message:
 | `ROADMAP.md` | Current pending work, blocked items, and priorities. |
 | `DECISIONS.md` | Durable accepted/rejected decisions and revisit conditions. |
 | `CLAUDE.md` | Thin Claude Code bridge back to this protocol. |
+| `research/` | Checked-in research notes for backtest reviews and non-code conclusions. |
 
 Before starting substantial work, read `ROADMAP.md` and `DECISIONS.md` after this
 file. When a change completes or changes priority/status, update `ROADMAP.md`.
@@ -186,8 +187,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 1. Let the paper scoreboard accrue ~1–2 weeks; confirm gating helps live.
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
 3. Improve point-in-time backtest power and review exported registry priors.
-4. Run larger state-conditioned edge slices (`backtest --state-slices`) and
-   promote only cohorts with clear incremental edge over the registry baseline.
+4. Confirm the 2026-06-09 state-slice candidates via PIT/live data before any
+   live conviction or routing change.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
 6. Use `make dry-run-fixture` before network dry-runs when validating scanner
    plumbing that does not need live CoinGecko data.
