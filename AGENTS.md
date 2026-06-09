@@ -39,6 +39,7 @@ capturing that prompt's work, with a clear message:
 | `DECISIONS.md` | Durable accepted/rejected decisions and revisit conditions. |
 | `CLAUDE.md` | Thin Claude Code bridge back to this protocol. |
 | `research/` | Checked-in research notes for backtest reviews and non-code conclusions. |
+| `fixtures/backtest_smoke/` | Checked-in BTC/ETH/SOL daily klines for offline backtest smoke. |
 
 Before starting substantial work, read `ROADMAP.md` and `DECISIONS.md` after this
 file. When a change completes or changes priority/status, update `ROADMAP.md`.
@@ -64,10 +65,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - **Python:** `.venv/bin/python` (3.13). Deps in `requirements.txt`. (Note: `pytest`
   is NOT installed — use the standalone runner below.)
 - **Standard verification:** `make verify` (runs tests + alert render smoke +
-  paper scoreboard).
+  backtest fixture smoke + paper scoreboard).
 - **Tests (must all pass before you claim done):**
   `.venv/bin/python tests/test_indicators.py`
 - **Alert render smoke (no sends/network):** `make smoke-alerts`
+- **Backtest fixture smoke (no network):** `make backtest-fixture` runs the
+  default Binance-style backtest path from checked-in BTC/ETH/SOL kline fixtures.
 - **Dry scan (network, no writes/alerts):** `.venv/bin/python main.py --dry-run --top-n 30`
 - **Reports:** `main.py --report` (outcome hit-rates) · `main.py --score` (paper
   scoreboard) · `main.py --score --json` (structured paper scoreboard) ·
@@ -89,7 +92,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `--state-slices` (shadow state-conditioned edge table) ·
   `--pit-cache-dir backtest_cache` / `--refresh-pit-cache` (reuse/refetch
   CoinGecko PIT histories) ·
-  `--export-priors registry_priors.json` (write reviewable registry calibration)
+  `--export-priors registry_priors.json` (write reviewable registry calibration) ·
+  `--fixture-dir fixtures/backtest_smoke` (offline Binance-path smoke) ·
+  `--min-signals N` (fail if a smoke run produces too few graded observations)
 - **Deploy:** the scan agent (`com.nasrenkaraf.rsiscanner`) auto-loads new code on
   its next run (03:10 MSK). The **listener must be restarted** to pick up code:
   `launchctl kickstart -k "gui/$(id -u)/com.nasrenkaraf.rsibot"`.

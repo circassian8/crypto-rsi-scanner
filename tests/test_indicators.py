@@ -1280,6 +1280,33 @@ def test_backtest_pit_history_cache_roundtrip():
     assert {"close", "mcap", "volume"}.issubset(histories["bitcoin/test"].columns)
 
 
+def test_backtest_klines_fixture_loader_and_symbols():
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner.backtest import fixture_symbols, load_klines_fixture
+
+    root = Path(tempfile.mkdtemp()) / "fixture"
+    klines = root / "klines"
+    klines.mkdir(parents=True)
+    (klines / "BTCUSDT.csv").write_text(
+        "date,close,volume\n"
+        "2026-01-02T00:00:00Z,101,1000\n"
+        "2026-01-01T00:00:00Z,100,900\n"
+        "2026-01-03T00:00:00Z,103,1100\n"
+    )
+    (klines / "ETHUSDT.csv").write_text(
+        "date,close,volume\n"
+        "2026-01-01T00:00:00Z,10,50\n"
+    )
+
+    assert fixture_symbols(root) == ["BTC", "ETH"]
+    df = load_klines_fixture("BTCUSDT", 2, root)
+    assert df is not None
+    assert list(df["close"]) == [101, 103]
+    assert str(df.index.tz) == "UTC"
+
+
 def test_backtest_walk_respects_membership():
     # With a membership mask all-False, no signals and no base days accrue.
     from collections import defaultdict

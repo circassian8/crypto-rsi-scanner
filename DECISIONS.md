@@ -177,6 +177,17 @@ waiting on network/rate-limit behavior.
 **Revisit when:** The fixture diverges from live API response shape or needs to
 cover more signal cases.
 
+## 2026-06-09 - Keep offline backtest fixture smoke in verification
+**Status:** accepted
+**Decision:** `make backtest-fixture` runs the default Binance-style backtest
+path against checked-in BTC/ETH/SOL daily kline CSVs under
+`fixtures/backtest_smoke`, and `make verify` includes that target.
+**Why:** The backtester had strong unit coverage, but its CLI/default data path
+still depended on Binance/network for a smoke run. A small fixture catches
+parser, CLI, report, market-regime, and signal-walk regressions locally.
+**Revisit when:** The fixture stops producing representative graded observations
+or the default research data source changes.
+
 ## 2026-06-08 - Add market-state features shadow-first
 **Status:** accepted
 **Decision:** Keep RSI crossing/approach as the event trigger. New volatility,

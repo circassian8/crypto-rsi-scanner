@@ -166,6 +166,64 @@ def fetch_klines(symbol: str, days: int, session: requests.Session) -> pd.DataFr
     return pd.DataFrame({"close": close, "volume": vol})
 
 
+def _fixture_klines_path(fixture_dir: str | Path, symbol: str) -> Path | None:
+    root = Path(fixture_dir).expanduser()
+    candidates = (
+        root / "klines" / f"{symbol}.csv",
+        root / f"{symbol}.csv",
+    )
+    for path in candidates:
+        if path.exists():
+            return path
+    return None
+
+
+def load_klines_fixture(symbol: str, days: int, fixture_dir: str | Path) -> pd.DataFrame | None:
+    """Load a checked-in Binance-style daily OHLC fixture CSV.
+
+    Expected columns: `date`, `close`, and optional `volume`. Dates are parsed as
+    UTC, sorted, and tailed to `days` so one fixture can smoke multiple windows.
+    """
+    path = _fixture_klines_path(fixture_dir, symbol)
+    if path is None:
+        log.warning("Fixture klines missing for %s in %s", symbol, fixture_dir)
+        return None
+    try:
+        raw = pd.read_csv(path)
+        if "date" not in raw or "close" not in raw:
+            raise ValueError("fixture CSV must contain date and close columns")
+        idx = pd.to_datetime(raw["date"], utc=True)
+        close = pd.to_numeric(raw["close"], errors="coerce")
+        volume = (
+            pd.to_numeric(raw["volume"], errors="coerce")
+            if "volume" in raw
+            else pd.Series(0.0, index=raw.index)
+        )
+        df = pd.DataFrame({
+            "close": close.to_numpy(),
+            "volume": volume.to_numpy(),
+        }, index=idx)
+        df = df.sort_index().dropna(subset=["close"])
+        return df.tail(days) if days > 0 else df
+    except Exception as e:  # noqa: BLE001
+        log.warning("Fixture klines unreadable for %s (%s): %s", symbol, path, e)
+        return None
+
+
+def fixture_symbols(fixture_dir: str | Path) -> list[str]:
+    """Infer base symbols from fixture CSV names such as BTCUSDT.csv."""
+    root = Path(fixture_dir).expanduser()
+    search = root / "klines" if (root / "klines").exists() else root
+    out: list[str] = []
+    for path in sorted(search.glob("*.csv")):
+        sym = path.stem.upper()
+        if sym.endswith("USDT"):
+            sym = sym[:-4]
+        if sym and sym not in out:
+            out.append(sym)
+    return out
+
+
 def _cg_base_headers() -> tuple[str, dict]:
     key = config.COINGECKO_API_KEY
     if key and config.COINGECKO_KEY_TYPE == "pro":
@@ -1273,22 +1331,33 @@ def run_pit(
 # Entry point
 # --------------------------------------------------------------------------- #
 
-def _fetch_all(universe: list[str], days: int) -> tuple[dict, pd.Series | None]:
+def _fetch_all(
+    universe: list[str],
+    days: int,
+    fixture_dir: str | Path | None = None,
+) -> tuple[dict, pd.Series | None]:
     """Fetch every coin's klines once (so triggers can be A/B'd on the same data)
     plus BTC's market-regime series."""
-    session = requests.Session()
-    btc = fetch_klines("BTCUSDT", days, session)
+    session = None if fixture_dir else requests.Session()
+
+    def _get(symbol: str) -> pd.DataFrame | None:
+        if fixture_dir:
+            return load_klines_fixture(symbol, days, fixture_dir)
+        return fetch_klines(symbol, days, session)
+
+    btc = _get("BTCUSDT")
     mkt = market_regime_series(btc["close"]) if btc is not None else None
     if mkt is None:
         log.warning("Could not fetch BTC; market-regime breakdown disabled.")
     frames: dict = {}
     for i, sym in enumerate(universe, 1):
-        df = fetch_klines(sym + "USDT", days, session)
+        df = _get(sym + "USDT")
         if df is not None and len(df) >= _START + max(HORIZONS) + 1:
             frames[sym] = df
         if i % 20 == 0:
             log.info("  ...%d/%d fetched (%d usable)", i, len(universe), len(frames))
-        time.sleep(0.04)  # be polite to the API
+        if not fixture_dir:
+            time.sleep(0.04)  # be polite to the API
     return frames, mkt
 
 
@@ -1317,16 +1386,18 @@ def run(
     days: int,
     trigger: str = "cross_into",
     state_slices: bool = False,
+    fixture_dir: str | Path | None = None,
 ) -> tuple[list, dict, dict, dict, dict, int]:
-    frames, mkt = _fetch_all(universe, days)
+    frames, mkt = _fetch_all(universe, days, fixture_dir=fixture_dir)
     s, rb, cb, mb, sb = _walk_all(frames, mkt, trigger, state_slices)
     return s, rb, cb, mb, sb, len(frames)
 
 
 def run_triggers(universe: list[str], days: int,
-                 triggers=("cross_into", "confirm")) -> tuple[dict, int]:
+                 triggers=("cross_into", "confirm"),
+                 fixture_dir: str | Path | None = None) -> tuple[dict, int]:
     """Fetch once, walk under each trigger — for an apples-to-apples A/B."""
-    frames, mkt = _fetch_all(universe, days)
+    frames, mkt = _fetch_all(universe, days, fixture_dir=fixture_dir)
     results = {trig: _walk_all(frames, mkt, trig) for trig in triggers}
     return results, len(frames)
 
@@ -1349,6 +1420,9 @@ def main(argv=None) -> None:
                    help="Disable the CoinGecko PIT history cache for this run.")
     p.add_argument("--refresh-pit-cache", action="store_true",
                    help="Refetch PIT histories even when cached JSON exists.")
+    p.add_argument("--fixture-dir", default=None,
+                   help="Load Binance-path OHLC CSV fixtures instead of network. "
+                        "Ignored in --pit mode.")
     p.add_argument("--slice", default=None,
                    help="Conditionally slice one setup by vol/momentum: "
                         f"{', '.join(_SETUP_REGIME)}.")
@@ -1367,6 +1441,8 @@ def main(argv=None) -> None:
                    help="Write a registry prior calibration JSON from this backtest.")
     p.add_argument("--prior-min-samples", type=int, default=8,
                    help="Minimum setup x market samples needed to move a prior.")
+    p.add_argument("--min-signals", type=int, default=0,
+                   help="Exit non-zero if fewer than this many graded observations are produced.")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
 
@@ -1378,15 +1454,21 @@ def main(argv=None) -> None:
     if args.compare_triggers:
         if args.export_priors:
             log.warning("--export-priors is ignored with --compare-triggers")
-        universe = ([s.strip().upper() for s in args.symbols.split(",") if s.strip()]
-                    if args.symbols else cg_top_symbols(args.top_n))
+        if args.symbols:
+            universe = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+        elif args.fixture_dir:
+            universe = fixture_symbols(args.fixture_dir)[:args.top_n]
+        else:
+            universe = cg_top_symbols(args.top_n)
         log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
-        results, ok = run_triggers(universe, args.days)
+        results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
         log.info("Done: %d usable coins", ok)
         print("\n" + format_trigger_comparison(results) + "\n")
         return
 
     if args.pit:
+        if args.fixture_dir:
+            log.warning("--fixture-dir is ignored with --pit")
         pool = cg_top_coins(args.pool)
         if not pool:
             print("PIT mode needs CoinGecko, but the universe fetch failed.")
@@ -1412,13 +1494,17 @@ def main(argv=None) -> None:
     else:
         if args.symbols:
             universe = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+        elif args.fixture_dir:
+            universe = fixture_symbols(args.fixture_dir)[:args.top_n]
         else:
             universe = cg_top_symbols(args.top_n)
-        log.info("Universe: %d symbols; fetching Binance 1d klines (%dd, paginated, %s)...",
-                 len(universe), args.days, args.trigger)
+        source = "fixture Binance 1d klines" if args.fixture_dir else "Binance 1d klines"
+        log.info("Universe: %d symbols; fetching %s (%dd, paginated, %s)...",
+                 len(universe), source, args.days, args.trigger)
         signals, regime_base, cond_base, mkt_base, state_base, ok = run(
-            universe, args.days, args.trigger, state_slices=args.state_slices)
-        source, report_days = "Binance 1d klines", args.days
+            universe, args.days, args.trigger, state_slices=args.state_slices,
+            fixture_dir=args.fixture_dir)
+        report_days = args.days
 
     log.info("Usable history: %d coins; %d graded observations", ok, len(signals))
     print("\n" + format_report(signals, regime_base, ok, report_days,
@@ -1445,6 +1531,12 @@ def main(argv=None) -> None:
         )
         out = write_registry_prior_export(args.export_priors, payload)
         log.info("Wrote registry prior calibration: %s", out)
+
+    if args.min_signals and len(signals) < args.min_signals:
+        raise SystemExit(
+            f"Backtest produced {len(signals)} graded observations; "
+            f"expected at least {args.min_signals}."
+        )
 
     if args.slice:
         sr = _SETUP_REGIME.get(args.slice)

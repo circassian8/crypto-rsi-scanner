@@ -30,9 +30,8 @@ Status labels:
 
 ## Later
 
-| status | item | owner | notes |
-|---|---|---|---|
-| todo | Add historical fixture snapshots for backtest smoke | open | Scanner fixture smoke exists; backtest still depends on network/Binance unless using unit tests. |
+No ready later items. Current remaining work is waiting on live outcomes, broader
+PIT history, or the next universe hygiene audit.
 
 ## Maintenance Rules
 

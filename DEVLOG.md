@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-09 — Add offline backtest fixture smoke · Codex
+**Why:** The final ready roadmap item was to make the backtest CLI smoke-testable
+without relying on Binance/network availability.
+**Changes:**
+- `crypto_rsi_scanner/backtest.py` can load Binance-style daily kline CSVs via
+  `--fixture-dir`, infer symbols from fixture filenames, and fail smoke runs with
+  `--min-signals` when too few graded observations are produced.
+- Added checked-in BTC/ETH/SOL 365d fixture snapshots under
+  `fixtures/backtest_smoke/klines/` plus a fixture README.
+- `Makefile` adds `make backtest-fixture` and includes it in `make verify`.
+- `tests/test_indicators.py` covers fixture symbol inference and CSV parsing.
+- `ROADMAP.md`, `DECISIONS.md`, and `AGENTS.md` document the completed fixture
+  smoke and its verification role.
+**Verify:** `make backtest-fixture` produces 3 usable coins and 33 graded
+observations. `.venv/bin/python tests/test_indicators.py` passes 121/121.
+`make verify` passes tests, alert render smoke, backtest fixture smoke, and paper
+scoreboard after the documentation update.
+**Notes/risks:** No live scanner logic changed. The fixture is a small smoke
+dataset, not strategy evidence.
+
 ## 2026-06-09 — Review cached PIT registry priors · Codex
 **Why:** The next roadmap research step was to export registry conviction priors
 from point-in-time histories and decide whether the artifact is strong enough to

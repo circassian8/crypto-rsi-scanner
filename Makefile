@@ -1,12 +1,13 @@
 PYTHON := .venv/bin/python
 
-.PHONY: help verify test smoke-alerts score score-json report status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture score score-json report status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
 	@echo "  make verify   Run the standard local verification suite"
 	@echo "  make test     Run standalone tests"
 	@echo "  make smoke-alerts  Render representative alerts without sending"
+	@echo "  make backtest-fixture  Run offline backtest smoke from checked-in klines"
 	@echo "  make score    Print paper-trade scoreboard"
 	@echo "  make score-json  Print paper-trade scoreboard as JSON"
 	@echo "  make report   Print signal outcome report"
@@ -22,13 +23,16 @@ help:
 	@echo "  make dry-run  Run a small network dry scan without writes/alerts"
 	@echo "  make dry-run-fixture  Run a small offline dry scan from checked-in fixtures"
 
-verify: test smoke-alerts score
+verify: test smoke-alerts backtest-fixture score
 
 test:
 	$(PYTHON) tests/test_indicators.py
 
 smoke-alerts:
 	$(PYTHON) -m crypto_rsi_scanner.alert_smoke
+
+backtest-fixture:
+	$(PYTHON) -m crypto_rsi_scanner.backtest --fixture-dir fixtures/backtest_smoke --top-n 3 --days 365 --min-signals 1
 
 score:
 	$(PYTHON) main.py --score
