@@ -337,3 +337,18 @@ store or a dedicated run/outcome table with complete lifecycle states.
 **Decision:** `stx` is not in the hard exclude list.
 **Why:** Symbol-only filtering treated Stacks like a staked/wrapped receipt, but
 it is a normal asset and should pass unless another hygiene rule excludes it.
+
+## 2026-06-10 - Volume-rank PIT is the standard full-cycle research universe
+**Status:** accepted
+**Decision:** Conclusion-bearing backtest research uses `backtest --pit-volume`
+(per-date top-N by trailing 30d dollar volume over the full Binance USDT pool).
+The plain current-top Binance path is for quick smokes only; the CoinGecko mcap
+`--pit` path remains as a cross-check (365d on the demo key).
+**Why:** It is the only path that is simultaneously full-cycle (~5y, covering
+bull/chop/bear) and point-in-time, with free, cacheable data. The 2026-06-10 run
+(368 coins, 21,334 obs) confirmed the gating map and first validated conviction
+monotonicity. Known residual biases (delisted pairs absent, single venue,
+volume-rank ≠ live mcap universe) are documented in
+`research/VOLUME_PIT_BACKTEST_2026-06-10.md`.
+**Revisit when:** A historical market-cap source (Pro key or alternative) allows
+a deep mcap-PIT comparison, or multi-venue data becomes available.

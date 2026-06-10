@@ -17,6 +17,15 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-10 — Sync agent docs to the volume-PIT reality · Claude
+**Why:** AGENTS.md still told agents PIT research was bear-only/365d and needed a
+Pro key, and conviction was "unvalidated" — all superseded by the volume-PIT run.
+Stale shared docs are how settled questions get relitigated.
+**Changes:** AGENTS.md (flag list +`--pit-volume`; "PIT data depth: SOLVED";
+conviction-validation status; research-path caveats now point to `--pit-volume`);
+DECISIONS.md (new: "Volume-rank PIT is the standard full-cycle research universe").
+**Verify:** docs-only; `make verify` green.
+
 ## 2026-06-10 — Volume-rank PIT universe: 5y survivorship-reduced backtest, no Pro key · Claude
 **Why:** Every blocked research item (bull/chop validation, prior recalibration,
 state-cohort confirmation) was gated on point-in-time history >365d, which the

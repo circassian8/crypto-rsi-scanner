@@ -94,7 +94,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   prints it without running RSI analysis or sending alerts.
 - **Backtest (research):**
   `python -m crypto_rsi_scanner.backtest --top-n 80 --days 1825`
-  flags: `--pit` (point-in-time universe, survivorship fix) · `--slice <setup>`
+  flags: `--pit` (point-in-time universe via CoinGecko mcap, 365d on demo key) ·
+  `--pit-volume` (**preferred for full-cycle research**: point-in-time top-N by
+  trailing 30d dollar volume over the whole Binance USDT pool — 5y, free,
+  cached) · `--slice <setup>`
   (vol/momentum slice) · `--compare-triggers` (entry-trigger A/B) ·
   `--state-slices` (shadow state-conditioned edge table) ·
   `--pit-cache-dir backtest_cache` / `--refresh-pit-cache` (reuse/refetch
@@ -190,7 +193,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   conviction from setup×market-regime priors; `backtest.py --export-priors` can
   generate reviewable numeric overrides, and `RSI_REGISTRY_PRIORS` opts live into
   that artifact. Severity/confluence and matured live outcomes nudge around that
-  baseline. This still needs validation from the paper scoreboard.
+  baseline. First backtest validation landed 2026-06-10: on the 5y volume-PIT
+  run conviction is monotonic with edge (low −3 / med +3 / high +9, n=307);
+  live paper-scoreboard validation still pending.
 - **Paper scoreboard** (`--score`, `/score`) is accruing live; compares an
   "actionable (gated)" book vs a "control (gated-out)" book.
   Use `--score --cohorts` once paper trades close to inspect setup, conviction,
@@ -207,14 +212,22 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   and `research/registry_priors_pit_2026-06-09.json` capture the cached 365d PIT
   export. It is review-only, not live-loaded: the run was BEAR-only and moved
   broad neutral priors from narrow bear evidence.
-- **PIT data depth:** `research/PIT_DATA_OPTIONS_2026-06-09.md` documents the
-  current 365d demo/free limit and the workflow for rerunning deeper PIT research
-  with a Pro key or alternate historical market-cap provider.
+- **PIT data depth: SOLVED (2026-06-10)** by `--pit-volume` — membership by
+  trailing 30d dollar-volume rank over the Binance USDT pool gives 5y
+  point-in-time coverage with no Pro key. `research/VOLUME_PIT_BACKTEST_2026-06-10.md`
+  is the first full-cycle survivorship-reduced run (368 coins, 21,334 obs,
+  BULL/CHOP/BEAR all covered): the gating map held (mean_reversion CHOP +10
+  n=800; breakdown_risk no edge anywhere). Its prior export
+  (`research/registry_priors_volpit_2026-06-10.json`) supersedes the bear-only
+  one for review; still NOT live-loaded. `research/PIT_DATA_OPTIONS_2026-06-09.md`
+  is historical context. Residual caveats: delisted pairs absent, single venue,
+  volume-rank ≠ live mcap universe.
 - **Confirmation entry trigger** was A/B'd and **rejected** (no improvement) — do
   not re-add without new evidence.
-- Caveats: the Binance backtest path is survivorship-biased (today's top-N); the
-  `--pit` path fixes that but the demo CoinGecko key caps history at 365d (a pro
-  key extends it).
+- Caveats: the plain Binance backtest path is survivorship-biased (today's
+  top-N). Prefer `--pit-volume` for any conclusion-bearing research; `--pit`
+  (CoinGecko mcap) remains for cross-checking but is capped at 365d on the demo
+  key.
 
 ---
 
