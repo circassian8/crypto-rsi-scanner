@@ -1395,6 +1395,69 @@ def test_backtest_pit_membership():
     assert list(member["riser"]) == [False, False, True, True]
 
 
+def test_backtest_volume_membership_rolling_rank():
+    # Membership = top-N by TRAILING mean dollar volume: needs `window` days of
+    # history to enter (no lookahead), and rank flips follow the trailing mean.
+    from crypto_rsi_scanner import backtest
+    idx = pd.date_range("2025-01-01", periods=6, freq="D", tz="UTC")
+    frames = {
+        "BIG": pd.DataFrame({"quote_volume": [100.0] * 6}, index=idx),
+        "FADE": pd.DataFrame({"quote_volume": [90, 90, 1, 1, 1, 1]}, index=idx),
+        "RISE": pd.DataFrame({"quote_volume": [1, 1, 95, 95, 95, 95]}, index=idx),
+    }
+    m = backtest.build_volume_membership(frames, top_n=2, window=2)
+    # day 0: trailing-2 mean undefined for everyone -> nobody is a member
+    assert not m.iloc[0].any()
+    assert list(m["BIG"])[1:] == [True] * 5
+    # FADE trailing means: 90, 45.5, 1, 1, 1 — loses rank 2 to RISE (48) on day 2
+    assert list(m["FADE"])[1:] == [True, False, False, False, False]
+    # RISE trailing means: 1, 48, 95, 95, 95 — enters as soon as its ramp shows up
+    assert list(m["RISE"])[1:] == [False, True, True, True, True]
+
+
+def test_backtest_filter_usdt_bases_hygiene():
+    from crypto_rsi_scanner import backtest
+    syms = [
+        {"baseAsset": "BTC", "quoteAsset": "USDT", "status": "TRADING"},
+        {"baseAsset": "JUP", "quoteAsset": "USDT", "status": "TRADING"},   # real coin, UP suffix
+        {"baseAsset": "USDC", "quoteAsset": "USDT", "status": "TRADING"},  # stable
+        {"baseAsset": "EUR", "quoteAsset": "USDT", "status": "TRADING"},   # fiat
+        {"baseAsset": "WBTC", "quoteAsset": "USDT", "status": "TRADING"},  # wrapped
+        {"baseAsset": "OLD", "quoteAsset": "USDT", "status": "BREAK"},     # not trading
+        {"baseAsset": "ETH", "quoteAsset": "BTC", "status": "TRADING"},    # wrong quote
+        {"baseAsset": "BTC", "quoteAsset": "USDT", "status": "TRADING"},   # dup
+    ]
+    assert backtest._filter_usdt_bases(syms) == ["BTC", "JUP"]
+
+
+def test_backtest_klines_rows_to_frame_quote_volume():
+    from crypto_rsi_scanner import backtest
+    # Binance kline array: [open_ms, open, high, low, close, base_vol, close_ms, quote_vol, ...]
+    rows = [
+        [1735689600000, "1", "2", "0.5", "1.5", "1000", 0, "1500.5", 0, 0, 0, 0],
+        [1735776000000, "1.5", "2", "1", "1.8", "2000", 0, "3600.25", 0, 0, 0, 0],
+    ]
+    df = backtest._klines_rows_to_frame(rows)
+    assert list(df["close"]) == [1.5, 1.8]
+    assert list(df["volume"]) == [1000.0, 2000.0]
+    assert list(df["quote_volume"]) == [1500.5, 3600.25]
+    assert df.index.tz is not None
+
+
+def test_backtest_binance_klines_cache_roundtrip():
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import backtest
+    cache = Path(tempfile.mkdtemp())
+    rows = [[1735689600000, "1", "2", "0.5", "1.5", "10", 0, "15", 0, 0, 0, 0]]
+    backtest._write_binance_klines_cache(cache, "AAAUSDT", 30, rows)
+    # cache hit must not touch the network: session=None would fail otherwise
+    df = backtest.fetch_klines("AAAUSDT", 30, session=None, cache_dir=cache)
+    assert df is not None and list(df["quote_volume"]) == [15.0]
+    # no cache entry + no session -> None (still no network)
+    assert backtest.fetch_klines("BBBUSDT", 30, session=None, cache_dir=cache) is None
+
+
 def test_backtest_pit_history_cache_roundtrip():
     import asyncio
     import tempfile

@@ -148,23 +148,76 @@ def _klines_paged(host: str, symbol: str, days: int, session: requests.Session):
     return rows or None
 
 
-def fetch_klines(symbol: str, days: int, session: requests.Session) -> pd.DataFrame | None:
-    """Binance 1d klines -> DataFrame[close, volume] (UTC), paginated back `days`."""
-    rows = None
-    for host in _BINANCE_HOSTS:
-        try:
-            rows = _klines_paged(host, symbol, days, session)
-            if rows:
-                break
-        except Exception as e:  # noqa: BLE001
-            log.debug("klines %s via %s failed: %s", symbol, host, e)
-    if not rows:
-        return None
-    ordered = [rows[k] for k in sorted(rows)]
+def _klines_rows_to_frame(ordered: list) -> pd.DataFrame:
+    """Kline rows (Binance array format, time-ordered) -> DataFrame indexed by UTC
+    day with close, volume (base asset) and quote_volume (USDT ≈ dollar volume,
+    field 7 — the basis for point-in-time volume-rank universe membership)."""
     idx = pd.to_datetime([r[0] for r in ordered], unit="ms", utc=True)
-    close = pd.Series([float(r[4]) for r in ordered], index=idx, dtype=float)
-    vol = pd.Series([float(r[5]) for r in ordered], index=idx, dtype=float)
-    return pd.DataFrame({"close": close, "volume": vol})
+    return pd.DataFrame({
+        "close": pd.Series([float(r[4]) for r in ordered], index=idx, dtype=float),
+        "volume": pd.Series([float(r[5]) for r in ordered], index=idx, dtype=float),
+        "quote_volume": pd.Series([float(r[7]) for r in ordered], index=idx, dtype=float),
+    })
+
+
+def _binance_klines_cache_path(cache_dir: Path, symbol: str, days: int) -> Path:
+    return cache_dir / "binance_klines" / f"{_safe_cache_name(symbol)}-{days}d.json"
+
+
+def _load_binance_klines_cache(cache_dir: Path | None, symbol: str, days: int) -> list | None:
+    if cache_dir is None:
+        return None
+    path = _binance_klines_cache_path(cache_dir, symbol, days)
+    if not path.exists():
+        return None
+    try:
+        rows = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        log.warning("Ignoring unreadable klines cache %s: %s", path, e)
+        return None
+    return rows if isinstance(rows, list) and rows else None
+
+
+def _write_binance_klines_cache(cache_dir: Path | None, symbol: str, days: int, rows: list) -> None:
+    if cache_dir is None:
+        return
+    path = _binance_klines_cache_path(cache_dir, symbol, days)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(rows, separators=(",", ":")), encoding="utf-8")
+    tmp.replace(path)
+
+
+def fetch_klines(
+    symbol: str,
+    days: int,
+    session: requests.Session | None,
+    cache_dir: Path | None = None,
+    refresh_cache: bool = False,
+) -> pd.DataFrame | None:
+    """Binance 1d klines -> DataFrame[close, volume, quote_volume] (UTC),
+    paginated back `days`. With `cache_dir`, raw rows are cached like the
+    CoinGecko PIT cache (research data is as-of fetch time; --refresh-pit-cache
+    refetches). On a cache hit the session is never touched."""
+    ordered: list | None = None
+    if not refresh_cache:
+        ordered = _load_binance_klines_cache(cache_dir, symbol, days)
+    if ordered is None:
+        if session is None:
+            return None
+        rows = None
+        for host in _BINANCE_HOSTS:
+            try:
+                rows = _klines_paged(host, symbol, days, session)
+                if rows:
+                    break
+            except Exception as e:  # noqa: BLE001
+                log.debug("klines %s via %s failed: %s", symbol, host, e)
+        if not rows:
+            return None
+        ordered = [rows[k] for k in sorted(rows)]
+        _write_binance_klines_cache(cache_dir, symbol, days, ordered)
+    return _klines_rows_to_frame(ordered)
 
 
 def _fixture_klines_path(fixture_dir: str | Path, symbol: str) -> Path | None:
@@ -261,6 +314,50 @@ def cg_top_coins(n: int) -> list[dict]:
     except Exception as e:  # noqa: BLE001
         log.warning("CoinGecko universe fetch failed (%s)", e)
         return []
+
+
+# Fiat / pegged bases that trade against USDT but aren't crypto momentum assets.
+# Leveraged tokens (BTCUP/ETHDOWN, …) need no suffix filter: Binance delisted
+# them all, so status=TRADING already excludes them — and a suffix filter would
+# wrongly drop real coins like JUP or SYRUP.
+_FIAT_OR_PEGGED_BASES = {
+    "eur", "gbp", "aud", "try", "brl", "ars", "uah", "rub", "ngn", "bidr",
+    "idrt", "aeur", "usdp", "ust", "wusd", "xusd",
+}
+
+
+def _filter_usdt_bases(symbols: list[dict]) -> list[str]:
+    """exchangeInfo symbol dicts -> sorted unique base assets for the volume-PIT
+    pool: USDT-quoted, currently TRADING, minus stables/wrapped/fiat."""
+    bases: set[str] = set()
+    for s in symbols:
+        if s.get("quoteAsset") != "USDT" or s.get("status") != "TRADING":
+            continue
+        base = (s.get("baseAsset") or "").upper()
+        if not base:
+            continue
+        low = base.lower()
+        if low in config.EXCLUDE_SYMBOLS or low in _FIAT_OR_PEGGED_BASES:
+            continue
+        bases.add(base)
+    return sorted(bases)
+
+
+def binance_usdt_pool(session: requests.Session) -> list[str]:
+    """Every currently-TRADING Binance USDT base (hygiene-filtered) — the
+    candidate pool for point-in-time volume-rank membership. Residual
+    survivorship: pairs Binance has fully delisted are absent from exchangeInfo,
+    so coins that died off the venue can't re-enter the sample."""
+    for host in _BINANCE_HOSTS:
+        url = host.replace("/klines", "/exchangeInfo")
+        try:
+            r = session.get(url, timeout=30)
+            if r.status_code != 200:
+                continue
+            return _filter_usdt_bases(r.json().get("symbols", []))
+        except Exception as e:  # noqa: BLE001
+            log.debug("exchangeInfo via %s failed: %s", url, e)
+    return []
 
 
 def cg_top_symbols(n: int) -> list[str]:
@@ -1472,6 +1569,96 @@ def run_pit(
 
 
 # --------------------------------------------------------------------------- #
+# Point-in-time universe by VOLUME RANK (no CoinGecko Pro key needed)
+# --------------------------------------------------------------------------- #
+# The mcap-based PIT path is capped at 365d by the CoinGecko demo key — a
+# bear-only window that can't validate bull/chop rules. Binance klines are free
+# for ~5y and carry quote (USDT) volume, so we define membership as "top-N by
+# trailing dollar volume on each date": fully point-in-time, and arguably a
+# better *tradeable-universe* definition than market cap. Residual biases:
+# single venue, USDT pairs only (coins are invisible before their Binance
+# listing), and fully-delisted pairs are absent from today's exchangeInfo.
+
+VOLUME_MEMBERSHIP_WINDOW = 30
+
+
+def build_volume_membership(frames: dict, top_n: int,
+                            window: int = VOLUME_MEMBERSHIP_WINDOW) -> pd.DataFrame:
+    """Per-date top-N membership by trailing `window`-day mean dollar volume.
+    Bool DataFrame[date x symbol]; a symbol needs `window` days of history before
+    it can enter (no lookahead — the trailing mean at t uses days <= t)."""
+    qv = pd.DataFrame(
+        {sym: df["quote_volume"] for sym, df in frames.items()}
+    ).sort_index()
+    trail = qv.rolling(window, min_periods=window).mean()
+    rank = trail.rank(axis=1, ascending=False, method="min")
+    return rank.le(top_n) & trail.notna()
+
+
+def run_pit_volume(
+    top_n: int,
+    days: int,
+    trigger: str = "cross_into",
+    state_slices: bool = False,
+    cache_dir: Path | None = None,
+    refresh_cache: bool = False,
+    volume_window: int = VOLUME_MEMBERSHIP_WINDOW,
+) -> tuple[list, dict, dict, dict, dict, int]:
+    """Volume-rank PIT backtest over the full Binance USDT pool."""
+    signals: list = []
+    regime_base: dict = defaultdict(list)
+    cond_base: dict = defaultdict(list)
+    mkt_base: dict = defaultdict(list)
+    state_base: dict = defaultdict(list)
+
+    session = requests.Session()
+    pool = binance_usdt_pool(session)
+    if not pool:
+        log.error("Volume-PIT: could not fetch the Binance USDT symbol pool.")
+        return signals, regime_base, cond_base, mkt_base, state_base, 0
+    if "BTC" not in pool:
+        pool = ["BTC"] + pool  # always need BTC for the market regime
+    log.info("Volume-PIT pool: %d Binance USDT bases (%dd history)...", len(pool), days)
+
+    min_len = _START + max(HORIZONS) + 1
+    frames: dict = {}
+    for i, base in enumerate(pool, 1):
+        df = fetch_klines(base + "USDT", days, session,
+                          cache_dir=cache_dir, refresh_cache=refresh_cache)
+        if df is not None and len(df) >= min_len:
+            frames[base] = df
+        if i % 50 == 0:
+            log.info("  ...%d/%d fetched (%d usable)", i, len(pool), len(frames))
+        time.sleep(0.03)  # be polite to the API
+    log.info("Volume-PIT: usable history for %d/%d candidates", len(frames), len(pool))
+    if not frames:
+        return signals, regime_base, cond_base, mkt_base, state_base, 0
+
+    member_df = build_volume_membership(frames, top_n, volume_window)
+    # Walk on dollar volume so volume_ratio matches the live scanner (CoinGecko
+    # volumes are USD); the plain Binance path keeps base volume untouched.
+    usd_frames = {sym: df.assign(volume=df["quote_volume"]) for sym, df in frames.items()}
+    state_frames = (
+        build_state_frames(usd_frames, member_df, volume_is_usd=True)
+        if state_slices else {}
+    )
+    mkt = market_regime_series(frames["BTC"]["close"]) if "BTC" in frames else None
+    if mkt is None:
+        log.warning("Volume-PIT: no BTC history; market-regime breakdown disabled.")
+
+    for sym, df in usd_frames.items():
+        mem = member_df[sym].reindex(df.index, fill_value=False).to_numpy()
+        if not mem.any():
+            continue
+        mkt_arr = mkt.reindex(df.index).fillna("NA").to_numpy() if mkt is not None else None
+        walk_coin(df, signals, regime_base, cond_base, member=mem,
+                  mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger,
+                  state_frame=state_frames.get(sym), state_base=state_base,
+                  label=sym)
+    return signals, regime_base, cond_base, mkt_base, state_base, len(frames)
+
+
+# --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
 
@@ -1557,6 +1744,12 @@ def main(argv=None) -> None:
     p.add_argument("--pit", action="store_true",
                    help="Point-in-time universe (fixes survivorship; uses CoinGecko "
                         "price+market-cap history instead of Binance).")
+    p.add_argument("--pit-volume", action="store_true",
+                   help="Point-in-time universe by trailing dollar-VOLUME rank over "
+                        "the full Binance USDT pool — 5y history with no CoinGecko "
+                        "Pro key. Ignores --pool/--symbols (whole pool).")
+    p.add_argument("--volume-window", type=int, default=VOLUME_MEMBERSHIP_WINDOW,
+                   help="Trailing window (days) for --pit-volume membership rank.")
     p.add_argument("--pool", type=int, default=150,
                    help="PIT candidate pool size (bigger = less survivorship, slower).")
     p.add_argument("--pit-cache-dir", default=str(config.BACKTEST_CACHE_DIR),
@@ -1623,7 +1816,27 @@ def main(argv=None) -> None:
         print("\n" + format_trigger_comparison(results) + "\n")
         return
 
-    if args.pit:
+    if args.pit and args.pit_volume:
+        raise SystemExit("--pit and --pit-volume are mutually exclusive.")
+
+    if args.pit_volume:
+        if args.fixture_dir:
+            log.warning("--fixture-dir is ignored with --pit-volume")
+        pit_cache_dir = None if args.no_pit_cache else Path(args.pit_cache_dir).expanduser()
+        log.info("Volume-PIT mode: top-%d by trailing %dd dollar volume, %dd history...",
+                 args.top_n, args.volume_window, args.days)
+        signals, regime_base, cond_base, mkt_base, state_base, ok = run_pit_volume(
+            args.top_n,
+            args.days,
+            args.trigger,
+            state_slices=args.state_slices,
+            cache_dir=pit_cache_dir,
+            refresh_cache=args.refresh_pit_cache,
+            volume_window=args.volume_window,
+        )
+        source = f"Binance 1d klines (PIT top-N by {args.volume_window}d volume)"
+        report_days = args.days
+    elif args.pit:
         if args.fixture_dir:
             log.warning("--fixture-dir is ignored with --pit")
         pool = cg_top_coins(args.pool)
@@ -1664,8 +1877,9 @@ def main(argv=None) -> None:
         report_days = args.days
 
     log.info("Usable history: %d coins; %d graded observations", ok, len(signals))
+    is_pit = args.pit or args.pit_volume
     print("\n" + format_report(signals, regime_base, ok, report_days,
-                                source=source, pit=args.pit) + "\n")
+                                source=source, pit=is_pit) + "\n")
     if mkt_base:
         print(format_market(signals, mkt_base, PRIMARY))
         print(format_market(signals, mkt_base, 1))
@@ -1696,7 +1910,7 @@ def main(argv=None) -> None:
             n_coins=ok,
             days=report_days,
             source=source,
-            pit=args.pit,
+            pit=is_pit,
             trigger=args.trigger,
             min_samples=args.prior_min_samples,
         )

@@ -17,10 +17,11 @@ Status labels:
 | waiting | Let paper scoreboard accrue live data | system | Needs roughly 1-2 weeks of matured 7d paper trades before drawing conclusions. |
 | waiting | Validate edge-prior conviction buckets live | system | `main.py --report` now prints actionable/control, market alignment, and conviction buckets; wait for enough 7d outcomes before drawing conclusions. |
 | waiting | Observe live state cohorts | system | `state_json` now lands in scanner CSV/signals/paper trades; `--report` and `--score --cohorts` expose cohorts once enough matured outcomes/trades exist. |
-| waiting | Confirm state-slice candidate cohorts | system | First Binance current-top run is documented in `research/STATE_SLICE_BACKTEST_2026-06-09.md`; needs PIT/live confirmation before any live rule. |
-| waiting | Re-run registry-prior calibration with broader PIT coverage | human/data | `research/PIT_REGISTRY_PRIORS_REVIEW_2026-06-09.md` reviewed the 365d export; it is BEAR-only and should not be loaded live. |
-| waiting | Extend PIT history depth beyond demo limits | human/data | PIT cache now helps reuse CoinGecko histories, but >365d PIT still needs a Pro key or alternate historical market-cap source. |
-| waiting | Confirm bull/chop state cohorts | human/data | Cached 365d PIT run only covered BTC `BEAR`; bull/chop confirmation needs deeper PIT history. |
+| waiting | Confirm state-slice candidate cohorts | system | Volume-PIT 5y run (`research/VOLUME_PIT_BACKTEST_2026-06-10.md`) replicated several candidates (breakdown_risk crisis-vol −19; mean_reversion washout +14 / risk_on −8); needs live-cohort cross-check before any live rule. |
+| todo | Review volume-PIT registry prior export | human | `research/registry_priors_volpit_2026-06-10.json` is the first full-cycle, survivorship-reduced calibration artifact. Review before any `RSI_REGISTRY_PRIORS` opt-in. |
+| done | Extend PIT history depth beyond demo limits | — | Solved without a Pro key: `backtest --pit-volume` ranks the full Binance USDT pool by trailing 30d dollar volume per date (5y, point-in-time, cached). Details in `DEVLOG.md` 2026-06-10. |
+| done | Confirm bull/chop state cohorts | — | Volume-PIT 5y run covered BULL 60.9k / CHOP 23.8k / BEAR 46.7k base-days: gating-map directions all confirmed (mean_reversion CHOP +10 n=800; dip_buy/trend_continuation BULL positive-thin; breakdown_risk no edge). See `research/VOLUME_PIT_BACKTEST_2026-06-10.md`. |
+| todo | Walk-forward check of the CHOP mean_reversion edge | open | Run `--pit-volume --walk-forward` to confirm the +10 CHOP edge isn't one episode. Cached data makes this cheap. |
 
 ## Next
 

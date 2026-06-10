@@ -1,0 +1,223 @@
+{
+  "generated_at": "2026-06-10T00:35:22Z",
+  "min_samples": 8,
+  "primary_horizon_days": 7,
+  "run": {
+    "days": 1825,
+    "graded_observations": 21334,
+    "n_coins": 368,
+    "pit": true,
+    "source": "Binance 1d klines (PIT top-N by 30d volume)",
+    "trigger": "cross_into"
+  },
+  "schema": 1,
+  "setups": {
+    "breakdown_risk": {
+      "default_edge_priors": {
+        "adverse": 24,
+        "favorable": 62,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "edge_priors": {
+        "adverse": 24,
+        "favorable": 62,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "evidence": [
+        {
+          "alignment": "adverse",
+          "base_pct": 56.97,
+          "canonical_market_regime": "DOWNTREND",
+          "confirm_pct": 54.09,
+          "edge_pct": -2.88,
+          "market_regime": "BEAR",
+          "median_return_pct": -1.3214,
+          "n": 771,
+          "used": true
+        },
+        {
+          "alignment": "adverse",
+          "base_pct": 57.35,
+          "canonical_market_regime": "UPTREND",
+          "confirm_pct": 59.93,
+          "edge_pct": 2.58,
+          "market_regime": "BULL",
+          "median_return_pct": -2.2727,
+          "n": 307,
+          "used": true
+        },
+        {
+          "alignment": "adverse",
+          "base_pct": 47.71,
+          "canonical_market_regime": "RANGE",
+          "confirm_pct": 32.67,
+          "edge_pct": -15.04,
+          "market_regime": "CHOP",
+          "median_return_pct": 3.1714,
+          "n": 352,
+          "used": true
+        }
+      ],
+      "has_edge": false,
+      "label": "Breakdown Risk",
+      "notes": [
+        "context_only_no_edge_not_auto_promoted"
+      ]
+    },
+    "dip_buy": {
+      "default_edge_priors": {
+        "adverse": 24,
+        "favorable": 64,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "edge_priors": {
+        "adverse": 31,
+        "favorable": 67,
+        "neutral": 47,
+        "no_edge": 16
+      },
+      "evidence": [
+        {
+          "alignment": "adverse",
+          "base_pct": 38.96,
+          "canonical_market_regime": "DOWNTREND",
+          "confirm_pct": 60.87,
+          "edge_pct": 21.91,
+          "market_regime": "BEAR",
+          "median_return_pct": 5.1578,
+          "n": 23,
+          "used": true
+        },
+        {
+          "alignment": "favorable",
+          "base_pct": 42.25,
+          "canonical_market_regime": "UPTREND",
+          "confirm_pct": 47.81,
+          "edge_pct": 5.56,
+          "market_regime": "BULL",
+          "median_return_pct": -0.7942,
+          "n": 251,
+          "used": true
+        },
+        {
+          "alignment": "neutral",
+          "base_pct": 49.29,
+          "canonical_market_regime": "RANGE",
+          "confirm_pct": 62.07,
+          "edge_pct": 12.78,
+          "market_regime": "CHOP",
+          "median_return_pct": 2.5776,
+          "n": 29,
+          "used": true
+        }
+      ],
+      "has_edge": true,
+      "label": "Dip Buy"
+    },
+    "mean_reversion": {
+      "default_edge_priors": {
+        "adverse": 24,
+        "favorable": 58,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "edge_priors": {
+        "adverse": 23,
+        "favorable": 63,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "evidence": [
+        {
+          "alignment": "adverse",
+          "base_pct": 51.25,
+          "canonical_market_regime": "UPTREND",
+          "confirm_pct": 48.42,
+          "edge_pct": -2.83,
+          "market_regime": "BULL",
+          "median_return_pct": 0.0341,
+          "n": 1138,
+          "used": true
+        },
+        {
+          "alignment": "favorable",
+          "base_pct": 49.12,
+          "canonical_market_regime": "RANGE",
+          "confirm_pct": 59.25,
+          "edge_pct": 10.13,
+          "market_regime": "CHOP",
+          "median_return_pct": 2.3401,
+          "n": 800,
+          "used": true
+        },
+        {
+          "alignment": "neutral",
+          "base_pct": 55.59,
+          "canonical_market_regime": "DOWNTREND",
+          "confirm_pct": 55.61,
+          "edge_pct": 0.02,
+          "market_regime": "BEAR",
+          "median_return_pct": -2.9341,
+          "n": 1043,
+          "used": true
+        }
+      ],
+      "has_edge": true,
+      "label": "Mean Reversion"
+    },
+    "trend_continuation": {
+      "default_edge_priors": {
+        "adverse": 24,
+        "favorable": 64,
+        "neutral": 42,
+        "no_edge": 16
+      },
+      "edge_priors": {
+        "adverse": 23,
+        "favorable": 66,
+        "neutral": 43,
+        "no_edge": 16
+      },
+      "evidence": [
+        {
+          "alignment": "adverse",
+          "base_pct": 49.29,
+          "canonical_market_regime": "RANGE",
+          "confirm_pct": 46.15,
+          "edge_pct": -3.14,
+          "market_regime": "CHOP",
+          "median_return_pct": -1.1621,
+          "n": 52,
+          "used": true
+        },
+        {
+          "alignment": "favorable",
+          "base_pct": 42.25,
+          "canonical_market_regime": "UPTREND",
+          "confirm_pct": 46.23,
+          "edge_pct": 3.98,
+          "market_regime": "BULL",
+          "median_return_pct": -1.4307,
+          "n": 517,
+          "used": true
+        },
+        {
+          "alignment": "neutral",
+          "base_pct": 38.96,
+          "canonical_market_regime": "DOWNTREND",
+          "confirm_pct": 40.91,
+          "edge_pct": 1.95,
+          "market_regime": "BEAR",
+          "median_return_pct": -2.3882,
+          "n": 44,
+          "used": true
+        }
+      ],
+      "has_edge": true,
+      "label": "Trend Continuation"
+    }
+  }
+}

@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-10 — Volume-rank PIT universe: 5y survivorship-reduced backtest, no Pro key · Claude
+**Why:** Every blocked research item (bull/chop validation, prior recalibration,
+state-cohort confirmation) was gated on point-in-time history >365d, which the
+mcap PIT path can't get on a demo CoinGecko key. Binance klines are free for ~5y
+and carry quote (USDT) volume — so membership can be ranked by trailing dollar
+volume instead of market cap.
+**Changes:**
+- `backtest.py`: `--pit-volume` mode — `binance_usdt_pool()` (exchangeInfo,
+  hygiene-filtered; no leveraged-token suffix filter needed since those are all
+  delisted, and JUP/SYRUP are real coins), `build_volume_membership()` (top-N by
+  trailing `--volume-window`=30d mean quote volume, no lookahead),
+  `run_pit_volume()` (walks on USD volume so volume_ratio matches live CoinGecko
+  semantics). `fetch_klines` now returns `quote_volume` and caches raw rows under
+  `backtest_cache/binance_klines/` (reuses the PIT cache flags; cache hit never
+  touches the network).
+- Tests: membership rolling-rank, pool hygiene filter, kline row parsing, cache
+  roundtrip (132/132).
+- `research/VOLUME_PIT_BACKTEST_2026-06-10.md` + prior export
+  `research/registry_priors_volpit_2026-06-10.json`; ROADMAP: two "needs Pro
+  key" items closed, follow-ups added.
+**Verify:** `make verify` green (132/132 + smokes). Full run: 368 coins, 21,334
+graded obs, balanced coverage (BULL 60.9k / CHOP 23.8k / BEAR 46.7k base-days).
+**Results:** Gating map confirmed on survivorship-reduced full-cycle data —
+mean_reversion CHOP **+10 (n=800)** third independent confirmation;
+mean_reversion BULL −3; dip_buy/trend_continuation BULL positive but thin
+(+6/+4); breakdown_risk no edge anywhere (context-only stays right). **Conviction
+monotonic with edge for the first time** (low −3 / med +3 / high +9, n=307) —
+first real validation of the registry edge-prior conviction. State-slice
+replications: breakdown_risk crisis-vol −19; mean_reversion washout +14,
+risk_on_broad −8.
+**Notes/risks:** Residual survivorship (delisted pairs absent from exchangeInfo);
+single venue; volume-rank ≠ live mcap universe. Prior export is reviewable only —
+NOT loaded live (opt-in policy unchanged).
+
 ## 2026-06-09 — Fix review reliability gaps · Codex
 **Why:** A fresh review found several boundary bugs: failed alert sends could
 still advance cooldown/digest state, paper trades opened before matured same-coin
