@@ -599,6 +599,8 @@ def reason_codes(candidate: FadeCandidate, cfg: EventFadeConfig, now: datetime) 
 
 def warnings(candidate: FadeCandidate, cfg: EventFadeConfig, now: datetime) -> list[str]:
     out = ["alert-only mode; no live order placed"]
+    if candidate.component_scores and not _eligible_from_scores(candidate, cfg):
+        out.append("not an eligible proxy event-fade candidate")
     if candidate.derivatives is None:
         out.append("derivatives data missing")
     if candidate.supply is None:
@@ -618,9 +620,7 @@ def warnings(candidate: FadeCandidate, cfg: EventFadeConfig, now: datetime) -> l
     return out
 
 
-def is_event_fade_candidate(candidate: FadeCandidate, cfg: EventFadeConfig, now: datetime) -> bool:
-    if not candidate.component_scores:
-        calculate_fade_score(candidate, cfg, now)
+def _eligible_from_scores(candidate: FadeCandidate, cfg: EventFadeConfig) -> bool:
     return (
         candidate.event.confidence >= cfg.min_event_confidence
         and candidate.event.event_time is not None
@@ -630,6 +630,12 @@ def is_event_fade_candidate(candidate: FadeCandidate, cfg: EventFadeConfig, now:
         and candidate.component_scores.get("event_clarity", 0) >= 70
         and candidate.component_scores.get("pre_event_pump", 0) >= 60
     )
+
+
+def is_event_fade_candidate(candidate: FadeCandidate, cfg: EventFadeConfig, now: datetime) -> bool:
+    if not candidate.component_scores:
+        calculate_fade_score(candidate, cfg, now)
+    return _eligible_from_scores(candidate, cfg)
 
 
 def is_blowoff_structure(candidate: FadeCandidate, cfg: EventFadeConfig, now: datetime) -> bool:
@@ -709,6 +715,12 @@ def _invalidated(candidate: FadeCandidate, cfg: EventFadeConfig, now: datetime) 
 
 def advance_fade_state(candidate: FadeCandidate, now: datetime, cfg: EventFadeConfig) -> FadeState:
     calculate_fade_score(candidate, cfg, now)
+    if not is_event_fade_candidate(candidate, cfg, now):
+        candidate.state = FadeState.DISCOVERED
+        candidate.reason_codes = reason_codes(candidate, cfg, now)
+        candidate.warnings = warnings(candidate, cfg, now)
+        return candidate.state
+
     state = candidate.state
     for _ in range(10):
         previous = state
@@ -773,7 +785,11 @@ def signal_type_for_state(
 
 def generate_fade_signal(candidate: FadeCandidate, cfg: EventFadeConfig, now: datetime) -> FadeSignal:
     state = advance_fade_state(candidate, now, cfg)
-    signal_type = signal_type_for_state(state, candidate.fade_score, candidate.event.event_time, cfg)
+    signal_type = (
+        signal_type_for_state(state, candidate.fade_score, candidate.event.event_time, cfg)
+        if is_event_fade_candidate(candidate, cfg, now)
+        else FadeSignalType.NO_TRADE
+    )
     tech = candidate.technical
     return FadeSignal(
         symbol=candidate.symbol,
@@ -874,11 +890,13 @@ def support_break_confirmed(series: Sequence[float], support_level: float) -> bo
     return bool(vals) and vals[-1] < support_level and any(v >= support_level for v in vals[:-1])
 
 
-def event_fade_feature_vector(candidate: FadeCandidate) -> dict:
+def event_fade_feature_vector(candidate: FadeCandidate, cfg: EventFadeConfig | None = None) -> dict:
+    cfg = cfg or EventFadeConfig()
     scores = candidate.component_scores
     m = candidate.market
     d = candidate.derivatives
     r = candidate.rsi
+    eligible = _eligible_from_scores(candidate, cfg)
     return {
         "event_type": candidate.event.event_type,
         "event_confidence": candidate.event.confidence,
@@ -903,12 +921,12 @@ def event_fade_feature_vector(candidate: FadeCandidate) -> dict:
         "rsi_weekly": r.rsi_weekly if r else None,
         "rsi_rollover_confirmed": r.rsi_rollover_confirmed if r else None,
         "btc_risk_on_score": r.btc_risk_on_score if r else None,
+        "eligible": eligible,
         "state": candidate.state.value,
-        "signal_type": signal_type_for_state(
-            candidate.state,
-            candidate.fade_score,
-            candidate.event.event_time,
-            EventFadeConfig(),
+        "signal_type": (
+            signal_type_for_state(candidate.state, candidate.fade_score, candidate.event.event_time, cfg)
+            if eligible
+            else FadeSignalType.NO_TRADE
         ).value,
     }
 

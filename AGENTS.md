@@ -170,7 +170,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - `event_fade.py` is a separate research sleeve for dated proxy-catalyst
   sell-the-news fades. It must stay alert-only and inert by default: no storage,
   notification routing, paper trading, or execution without explicit
-  backtest/manual-review evidence and a new decision.
+  backtest/manual-review evidence and a new decision. Proxy eligibility is a
+  hard gate: direct-beneficiary or non-proxy events must remain `NO_TRADE` even
+  if pump, crowding, RSI, and post-event failure scores are high.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.
@@ -239,8 +241,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - **Event fade research sleeve (2026-06-16):** VELVET/SpaceX-style proxy-event
   blowoffs are modeled separately in `event_fade.py`. The thesis is dated
   catalyst + proxy purity + pre-event pump + crowding/liquidity/supply pressure
-  + post-event failure. It is not part of the RSI setup registry, does not trade,
-  and should not affect live routing until validated on an event sample.
+  + post-event failure. The proxy/direct-beneficiary check is a hard gate, not a
+  score nudge. It is not part of the RSI setup registry, does not trade, and
+  should not affect live routing until validated on an event sample.
 - Caveats: the plain Binance backtest path is survivorship-biased (today's
   top-N). Prefer `--pit-volume` for any conclusion-bearing research; `--pit`
   (CoinGecko mcap) remains for cross-checking but is capped at 365d on the demo

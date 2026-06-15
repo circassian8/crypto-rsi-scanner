@@ -32,7 +32,9 @@ different branch.
 **Decision:** The event-fade engine is a separate research sleeve for dated
 proxy-catalyst sell-the-news setups. It may score local fixtures and produce
 alert-only reports, but it must not write live storage, route notifications,
-open paper trades, or imply execution.
+open paper trades, or imply execution. Proxy eligibility is a hard gate:
+direct-beneficiary or non-proxy events must remain `NO_TRADE` even if every
+other score and post-event failure check is strong.
 **Why:** The thesis is structurally different from the RSI overextension setup
 registry and has not been validated across a historical/manual event sample.
 The VELVET-style pattern requires catalyst, proxy, crowding, liquidity/supply,

@@ -395,6 +395,38 @@ def test_event_fade_state_machine_reaches_short_only_after_failure():
     assert signal.signal_type != ef.FadeSignalType.SHORT_TRIGGERED
 
 
+def test_event_fade_direct_beneficiary_never_triggers_short():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_fade as ef
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    cfg = ef.EventFadeConfig(min_trigger_score=70)
+    candidate = _event_fade_velvet_candidate(now, direct=True)
+    signal = ef.generate_fade_signal(candidate, cfg, now)
+    assert candidate.fade_score >= cfg.min_trigger_score
+    assert candidate.component_scores["pre_event_pump"] == 100
+    assert candidate.component_scores["post_event_failure"] == 100
+    assert not ef.is_event_fade_candidate(candidate, cfg, now)
+    assert signal.signal_type == ef.FadeSignalType.NO_TRADE
+    assert signal.state == ef.FadeState.DISCOVERED
+    assert "not an eligible proxy event-fade candidate" in signal.warnings
+
+
+def test_event_fade_non_proxy_event_never_triggers_even_if_manually_armed():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_fade as ef
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    cfg = ef.EventFadeConfig()
+    candidate = _event_fade_velvet_candidate(now)
+    candidate.event.is_proxy_narrative = False
+    candidate.state = ef.FadeState.ARMED
+    signal = ef.generate_fade_signal(candidate, cfg, now)
+    assert not ef.is_event_fade_candidate(candidate, cfg, now)
+    assert signal.signal_type == ef.FadeSignalType.NO_TRADE
+    assert signal.state == ef.FadeState.DISCOVERED
+
+
 def test_event_fade_no_dated_catalyst_does_not_trigger():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_fade as ef
@@ -478,8 +510,13 @@ def test_event_fade_json_loader_and_feature_vector():
     assert vector["event_type"] == "ipo_proxy"
     assert vector["fade_score"] >= 80
     assert vector["rsi_rollover_confirmed"] is True
+    assert vector["eligible"] is True
     assert vector["signal_type"] == "NO_TRADE"
     assert candidate.state == ef.FadeState.DISCOVERED
+
+    candidate.state = ef.FadeState.WATCHLISTED
+    assert ef.event_fade_feature_vector(candidate)["signal_type"] == "WATCHLIST"
+    assert ef.event_fade_feature_vector(candidate, ef.EventFadeConfig(min_watchlist_score=95))["signal_type"] == "NO_TRADE"
 
 
 def test_conviction_monotonic_with_severity():

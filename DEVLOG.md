@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Hard-gate event-fade proxy eligibility · Codex
+**Why:** External review caught that `is_event_fade_candidate()` had the right
+proxy/direct-beneficiary rule, but the state machine treated proxy purity mostly
+as a score component. That could let a high-scoring direct-beneficiary event
+drift into a generic overextended-event short, which is not the event-fade thesis.
+**Changes:**
+- `crypto_rsi_scanner/event_fade.py` now enforces proxy eligibility before a
+  candidate can advance beyond `DISCOVERED`; ineligible direct-beneficiary or
+  non-proxy events emit `NO_TRADE` even if pump, crowding, RSI, and post-event
+  failure evidence are strong.
+- `event_fade_feature_vector()` now accepts an optional config and uses the same
+  eligibility gate when reporting `signal_type`.
+- `tests/test_indicators.py` adds regressions for direct-beneficiary and
+  manually armed non-proxy events, plus config-sensitive feature-vector output.
+- `AGENTS.md` and `DECISIONS.md` record the hard proxy gate as durable event-fade
+  design, not just a test detail.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 147/147.
+`RSI_EVENT_FADE_EVENTS_PATH=fixtures/event_fade/sample_events.json .venv/bin/python main.py --event-fade-report`
+still prints `TESTVELVET SHORT_TRIGGERED`. `make verify` passes.
+**Notes/risks:** Valid proxy-event fixtures still trigger; direct-beneficiary and
+non-proxy events now stay diagnostic-only.
+
 ## 2026-06-16 — Make push-after-commit the collaboration rule · Codex
 **Why:** The human wants GitHub to stay current so Claude, Codex, and external
 ChatGPT review all see the latest committed project state.
