@@ -514,6 +514,14 @@ def test_event_fade_json_loader_and_feature_vector():
     assert vector["signal_type"] == "NO_TRADE"
     assert candidate.state == ef.FadeState.DISCOVERED
 
+    unscored = _event_fade_velvet_candidate(now)
+    assert unscored.component_scores == {}
+    vector = ef.event_fade_feature_vector(unscored, now=now)
+    assert vector["fade_score"] >= 80
+    assert vector["eligible"] is True
+    assert unscored.component_scores["event_clarity"] >= 70
+    assert unscored.state == ef.FadeState.DISCOVERED
+
     candidate.state = ef.FadeState.WATCHLISTED
     assert ef.event_fade_feature_vector(candidate)["signal_type"] == "WATCHLIST"
     assert ef.event_fade_feature_vector(candidate, ef.EventFadeConfig(min_watchlist_score=95))["signal_type"] == "NO_TRADE"

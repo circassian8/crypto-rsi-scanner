@@ -890,8 +890,14 @@ def support_break_confirmed(series: Sequence[float], support_level: float) -> bo
     return bool(vals) and vals[-1] < support_level and any(v >= support_level for v in vals[:-1])
 
 
-def event_fade_feature_vector(candidate: FadeCandidate, cfg: EventFadeConfig | None = None) -> dict:
+def event_fade_feature_vector(
+    candidate: FadeCandidate,
+    cfg: EventFadeConfig | None = None,
+    now: datetime | None = None,
+) -> dict:
     cfg = cfg or EventFadeConfig()
+    if not candidate.component_scores:
+        calculate_fade_score(candidate, cfg, now or candidate.market.timestamp)
     scores = candidate.component_scores
     m = candidate.market
     d = candidate.derivatives

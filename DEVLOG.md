@@ -17,6 +17,21 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Self-score event-fade feature exports · Codex
+**Why:** Review noted that `event_fade_feature_vector()` assumed callers had
+already populated `component_scores`, which could silently export zeroed scores
+from an otherwise valid candidate.
+**Changes:**
+- `crypto_rsi_scanner/event_fade.py` lets `event_fade_feature_vector()` accept
+  optional `now` and automatically calculate fade scores when the candidate has
+  not already been scored, without advancing the candidate state.
+- `tests/test_indicators.py` adds regression coverage for unscored feature-vector
+  export: scores and eligibility populate, while state remains `DISCOVERED`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 147/147.
+`make verify` passes.
+**Notes/risks:** Feature export can now mutate scoring metadata on an unscored
+candidate, but still does not advance the event-fade state machine.
+
 ## 2026-06-16 — Hard-gate event-fade proxy eligibility · Codex
 **Why:** External review caught that `is_event_fade_candidate()` had the right
 proxy/direct-beneficiary rule, but the state machine treated proxy purity mostly
