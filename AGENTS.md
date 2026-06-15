@@ -79,7 +79,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --score --json` (structured paper scoreboard) ·
   `main.py --score --cohorts` (state cohort scoreboard) · `main.py --status`
   (scan/listener health) · `main.py --refresh-paper` (close matured paper trades
-  without running an alerting scan) · `main.py --universe-audit` (latest hygiene audit)
+  without running an alerting scan) · `main.py --event-fade-report` (score local
+  event-fade fixtures, alert-only/no sends) · `main.py --universe-audit` (latest
+  hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks
   the newest retained backup.
@@ -125,6 +127,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `client.py` | async CoinGecko client (rate-limited, retries) |
 | `universe.py` | CoinGecko universe hygiene filters/audit shared by live scan/backtest |
 | `state_features.py` | pure market-state features: volatility, breadth, relative strength, beta, liquidity, risk buckets |
+| `event_fade.py` | pure alert-only sell-the-news event-fade research sleeve; no storage, alerts, paper trades, or execution |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
 | `indicators.py` | **PURE** functions: RSI, regime, setup taxonomy, market gating, conviction. Unit-tested — keep pure, add a test for new logic |
 | `scanner.py` | orchestration: scan → analyze → build message → route notifications; CLI |
@@ -161,6 +164,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   stored, and reported before they are allowed to affect conviction, routing, or
   gating. The live scanner attaches `state_json` only after the existing decision
   fields are already computed.
+- `event_fade.py` is a separate research sleeve for dated proxy-catalyst
+  sell-the-news fades. It must stay alert-only and inert by default: no storage,
+  notification routing, paper trading, or execution without explicit
+  backtest/manual-review evidence and a new decision.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.
@@ -226,6 +233,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   volume-rank ≠ live mcap universe.
 - **Confirmation entry trigger** was A/B'd and **rejected** (no improvement) — do
   not re-add without new evidence.
+- **Event fade research sleeve (2026-06-16):** VELVET/SpaceX-style proxy-event
+  blowoffs are modeled separately in `event_fade.py`. The thesis is dated
+  catalyst + proxy purity + pre-event pump + crowding/liquidity/supply pressure
+  + post-event failure. It is not part of the RSI setup registry, does not trade,
+  and should not affect live routing until validated on an event sample.
 - Caveats: the plain Binance backtest path is survivorship-biased (today's
   top-N). Prefer `--pit-volume` for any conclusion-bearing research; `--pit`
   (CoinGecko mcap) remains for cross-checking but is capped at 365d on the demo
@@ -241,8 +253,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
 3. Confirm the 2026-06-09 state-slice candidates via cached PIT/live data before any
    live conviction or routing change.
-4. Improve PIT history depth further with a Pro CoinGecko key or alternate
-   historical market-cap source, then re-run registry-prior calibration.
+4. Build a manually reviewed event-fade sample before promoting event-fade output
+   beyond local reports.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
 6. Use `make dry-run-fixture` before network dry-runs when validating scanner
    plumbing that does not need live CoinGecko data.

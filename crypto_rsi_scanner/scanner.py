@@ -58,6 +58,7 @@ from . import telegram
 from . import heartbeat
 from . import macro
 from . import paper
+from . import event_fade
 
 log = logging.getLogger(__name__)
 
@@ -1012,6 +1013,28 @@ def refresh_paper(verbose: bool = False, json_output: bool = False, cohorts: boo
         storage.close()
 
 
+def event_fade_report(verbose: bool = False) -> None:
+    """Print local event-fade fixture scores without changing live RSI behavior."""
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-5s %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    cfg = event_fade.runtime_config(config)
+    path = config.EVENT_FADE_EVENTS_PATH
+    if not path:
+        print("No event-fade event file configured. Set RSI_EVENT_FADE_EVENTS_PATH to a local JSON file.")
+        return
+    try:
+        candidates = event_fade.load_event_fade_candidates(path)
+    except ValueError as exc:
+        log.warning("Event fade fixture load failed: %s", exc)
+        print(f"Event fade fixture load failed: {exc}")
+        return
+    now = datetime.now(timezone.utc)
+    print(event_fade.format_fade_report(candidates, cfg, now))
+
+
 def status() -> None:
     """Print operational scan/listener health and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -1183,6 +1206,11 @@ def cli() -> None:
         help="Fetch open paper-trade histories, close matured positions, and print the scoreboard without alerts.",
     )
     parser.add_argument(
+        "--event-fade-report",
+        action="store_true",
+        help="Score local event-fade JSON fixtures and print an alert-only report.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for commands that support it.",
@@ -1261,6 +1289,9 @@ def cli() -> None:
         return
     if args.refresh_paper:
         refresh_paper(verbose=args.verbose, json_output=args.json, cohorts=args.cohorts)
+        return
+    if args.event_fade_report:
+        event_fade_report(verbose=args.verbose)
         return
     if args.status:
         status()

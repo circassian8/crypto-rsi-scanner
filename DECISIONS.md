@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-16 - Keep event fades alert-only until validated
+**Status:** accepted
+**Decision:** The event-fade engine is a separate research sleeve for dated
+proxy-catalyst sell-the-news setups. It may score local fixtures and produce
+alert-only reports, but it must not write live storage, route notifications,
+open paper trades, or imply execution.
+**Why:** The thesis is structurally different from the RSI overextension setup
+registry and has not been validated across a historical/manual event sample.
+The VELVET-style pattern requires catalyst, proxy, crowding, liquidity/supply,
+and post-event failure evidence; generic overbought pumps are not enough.
+**Revisit when:** A reviewed event dataset or backtest shows durable positive
+post-event fade edge and the human explicitly approves live routing/paper
+tracking.
+
 ## 2026-06-07 - Use DEVLOG as history while repo has no git
 **Status:** superseded 2026-06-08 (see "Adopt local git + commit per change-making prompt")
 **Decision:** Every non-trivial change must prepend an entry to `DEVLOG.md`,

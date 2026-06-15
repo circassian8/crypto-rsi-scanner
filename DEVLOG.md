@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add alert-only event-fade research sleeve · Codex
+**Why:** The VELVET/SpaceX-style idea is not "short every overbought RSI pump";
+it is a separate sell-the-news pattern around dated proxy catalysts, crowded
+positioning, liquidity/supply fragility, and post-event failure. The system
+needed a research-safe engine that can model that thesis without changing live
+RSI alerts or implying execution.
+**Changes:**
+- `crypto_rsi_scanner/event_fade.py` adds a pure event-fade engine: dataclasses,
+  component scores, state machine, post-event failure trigger, BTC risk-on block,
+  risk sizing helper, feature-vector export, JSON fixture loaders, and an
+  alert-only report formatter.
+- `crypto_rsi_scanner/config.py`, `crypto_rsi_scanner/scanner.py`, `main.py`, and
+  `Makefile` add inert-by-default event-fade tunables and
+  `main.py --event-fade-report` / `make event-fade-report` for local fixture
+  scoring only.
+- `fixtures/event_fade/sample_events.json` adds a TESTVELVET proxy-event fixture
+  that reaches `SHORT_TRIGGERED` only after the event and failure evidence.
+- `tests/test_indicators.py` covers component scores, negative direct-beneficiary
+  cases, no dated catalyst, post-event confirmation, BTC risk-on blocking, risk
+  helpers, JSON loading, and passive feature-vector export.
+- `research/event_fade.md`, `AGENTS.md`, `ROADMAP.md`, and `DECISIONS.md`
+  document the event-fade thesis, constraints, next validation step, and durable
+  rule that this remains alert-only until validated.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 145/145.
+`RSI_EVENT_FADE_EVENTS_PATH=fixtures/event_fade/sample_events.json .venv/bin/python main.py --event-fade-report`
+prints `TESTVELVET SHORT_TRIGGERED` with alert-only/no-order warning.
+`git diff --check` passes. `make verify` passes.
+**Notes/risks:** Phase 1 uses local/manual JSON inputs only. No live storage,
+notification routing, paper trades, exchange execution, or existing RSI signal
+behavior changed. Next step is a manually reviewed event-fade validation sample.
+
 ## 2026-06-15 — Add safe paper-trade refresh command · Codex
 **Why:** Live paper-trade validation was blocked even after several positions
 passed their 7-day hold, because paper exits only closed during the daily

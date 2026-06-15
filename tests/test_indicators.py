@@ -235,6 +235,253 @@ def test_divergence_bearish():
     assert detect_divergence(price, rsi, lookback=40, order=3) == "bearish"
 
 
+# --- event-fade research sleeve ---------------------------------------------
+
+def _event_fade_velvet_candidate(now=None, *, direct=False, no_event_time=False, btc_risk_on=35):
+    from datetime import datetime, timezone, timedelta
+    from crypto_rsi_scanner import event_fade as ef
+
+    now = now or datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    event_time = None if no_event_time else now - timedelta(hours=2)
+    event = ef.CatalystEvent(
+        event_id="testvelvet-spacex",
+        coin_id="testvelvet",
+        symbol="TESTVELVET",
+        event_name="SpaceX IPO trading start",
+        event_type="etf_approval" if direct else "ipo_proxy",
+        event_time=event_time,
+        first_seen_time=now - timedelta(days=2),
+        source="manual_fixture",
+        confidence=0.95,
+        external_asset=None if direct else "SpaceX",
+        is_proxy_narrative=not direct,
+        is_direct_beneficiary=direct,
+    )
+    market = ef.EventMarketSnapshot(
+        symbol="TESTVELVET",
+        coin_id="testvelvet",
+        timestamp=now,
+        price=7.2,
+        spot_volume_24h=8_000_000,
+        market_cap=45_000_000,
+        return_24h=1.2,
+        return_72h=3.5,
+        return_7d=8.5,
+        distance_from_20d_ma=2.0,
+        volume_zscore_24h=6.2,
+        order_book_depth_1pct=8_000,
+        order_book_depth_2pct=25_000,
+        spread_bps=45,
+    )
+    derivatives = ef.EventDerivativesSnapshot(
+        symbol="TESTVELVET",
+        timestamp=now,
+        perp_available=True,
+        open_interest_24h_change_pct=0.65,
+        open_interest_to_market_cap=0.40,
+        funding_rate_8h=0.0012,
+        perp_spot_volume_ratio=22,
+        long_short_ratio=2.1,
+        basis=0.025,
+    )
+    supply = ef.EventSupplyPressureSnapshot(
+        symbol="TESTVELVET",
+        timestamp=now,
+        large_holder_exchange_inflow=True,
+        cex_inflow_pct_supply=0.02,
+        top_holder_concentration=0.62,
+        team_or_mm_wallet_activity=True,
+    )
+    rsi = ef.EventRSISnapshot(
+        symbol="TESTVELVET",
+        timestamp=now,
+        rsi_daily=86,
+        rsi_4h=78,
+        rsi_weekly=72,
+        target_overbought_score=90,
+        btc_risk_on_score=btc_risk_on,
+        rsi_rollover_confirmed=True,
+        bearish_rsi_divergence=True,
+    )
+    technical = ef.EventTechnicalSnapshot(
+        symbol="TESTVELVET",
+        timestamp=now,
+        event_vwap=8.1,
+        price_below_event_vwap=True,
+        failed_reclaim_event_vwap=True,
+        lower_high_confirmed=True,
+        first_support_broken=True,
+        post_event_high=9.4,
+        post_event_lower_high=8.6,
+        invalidation_level=8.65,
+        entry_reference_price=7.2,
+    )
+    return ef.FadeCandidate(
+        "TESTVELVET", "testvelvet", event, market, derivatives, supply, rsi, technical
+    )
+
+
+def test_event_fade_component_scores_velvet_like_and_direct_beneficiary_low():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_fade as ef
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    cfg = ef.EventFadeConfig()
+    candidate = _event_fade_velvet_candidate(now)
+    score = ef.calculate_fade_score(candidate, cfg, now)
+    assert score >= 80
+    assert candidate.component_scores["event_clarity"] >= 70
+    assert candidate.component_scores["proxy_purity"] >= 70
+    assert candidate.component_scores["pre_event_pump"] >= 90
+    assert candidate.component_scores["derivatives_crowding"] >= 80
+
+    direct = _event_fade_velvet_candidate(now, direct=True)
+    ef.calculate_fade_score(direct, cfg, now)
+    assert direct.component_scores["proxy_purity"] < 50
+    assert not ef.is_event_fade_candidate(direct, cfg, now)
+
+
+def test_event_fade_pre_event_pump_and_optional_data_are_safe():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_fade as ef
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    event = ef.CatalystEvent(
+        "pump-no-derivs", "p", "PUMP", "Manual catalyst", "other",
+        now, confidence=0.9, is_proxy_narrative=True,
+    )
+    market = ef.EventMarketSnapshot(
+        "PUMP", "p", now, 1.0, return_24h=0.8, return_7d=10.0, volume_zscore_24h=6.0
+    )
+    candidate = ef.FadeCandidate("PUMP", "p", event, market)
+    ef.calculate_fade_score(candidate, ef.EventFadeConfig(), now)
+    assert candidate.component_scores["pre_event_pump"] >= 90
+    assert candidate.component_scores["derivatives_crowding"] == 50
+    assert candidate.component_scores["supply_pressure"] == 50
+    assert "derivatives data missing" in candidate.warnings
+
+
+def test_event_fade_post_event_failure_requires_event_passed_and_confirmation():
+    from datetime import datetime, timezone, timedelta
+    from crypto_rsi_scanner import event_fade as ef
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    candidate = _event_fade_velvet_candidate(now)
+    before_event = candidate.event.event_time - timedelta(minutes=1)
+    assert ef.score_post_event_failure(candidate.event, candidate.technical, candidate.rsi, before_event) == 0
+    assert ef.is_post_event_failure(candidate, ef.EventFadeConfig(), now)
+
+    candidate.technical.failed_reclaim_event_vwap = False
+    candidate.technical.lower_high_confirmed = False
+    candidate.technical.first_support_broken = False
+    assert not ef.is_post_event_failure(candidate, ef.EventFadeConfig(), now)
+
+
+def test_event_fade_state_machine_reaches_short_only_after_failure():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_fade as ef
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    cfg = ef.EventFadeConfig()
+    candidate = _event_fade_velvet_candidate(now)
+    signal = ef.generate_fade_signal(candidate, cfg, now)
+    assert signal.signal_type == ef.FadeSignalType.SHORT_TRIGGERED
+    assert signal.state == ef.FadeState.TRIGGERED_SHORT
+    assert "dated proxy catalyst" in signal.reason_codes
+
+    no_tech = _event_fade_velvet_candidate(now)
+    no_tech.technical = None
+    signal = ef.generate_fade_signal(no_tech, cfg, now)
+    assert signal.signal_type != ef.FadeSignalType.SHORT_TRIGGERED
+
+
+def test_event_fade_no_dated_catalyst_does_not_trigger():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_fade as ef
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    candidate = _event_fade_velvet_candidate(now, no_event_time=True)
+    signal = ef.generate_fade_signal(candidate, ef.EventFadeConfig(), now)
+    assert candidate.component_scores["event_clarity"] < 70
+    assert signal.signal_type != ef.FadeSignalType.SHORT_TRIGGERED
+
+
+def test_event_fade_btc_risk_on_blocks_weak_short():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_fade as ef
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    candidate = _event_fade_velvet_candidate(now, btc_risk_on=95)
+    candidate.market.return_7d = 1.6
+    candidate.derivatives.perp_spot_volume_ratio = 5.5
+    ef.calculate_fade_score(candidate, ef.EventFadeConfig(), now)
+    assert ef.is_btc_regime_blocking_short(candidate, ef.EventFadeConfig())
+    assert not ef.is_post_event_failure(candidate, ef.EventFadeConfig(), now)
+
+
+def test_event_fade_risk_sizing_and_technical_helpers():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_fade as ef
+
+    sizing = ef.calculate_position_size(
+        account_equity=10_000,
+        risk_pct=0.005,
+        entry_price=7.0,
+        stop_price=8.0,
+        max_leverage_hint=2.0,
+        liquidity_depth_2pct=1_000,
+    )
+    assert sizing["valid"]
+    assert sizing["risk_usd"] == 50
+    assert sizing["position_units"] == 50
+    assert "notional is large relative to visible 2pct depth" in sizing["warnings"]
+    assert not ef.calculate_position_size(10_000, 0.005, 7.0, 7.0, 2.0)["valid"]
+
+    times = [datetime(2026, 1, i + 1, tzinfo=timezone.utc) for i in range(3)]
+    assert abs(ef.anchored_vwap([10, 20, 30], [1, 1, 2], times, times[1]) - (80 / 3)) < 1e-9
+    assert ef.price_below_level(9, 10)
+    assert ef.failed_reclaim([8, 11, 9], 10, lookback=3)
+    assert ef.lower_high_confirmed([10, 15, 12, 13, 11])
+    assert ef.support_break_confirmed([12, 11, 9], 10)
+
+
+def test_event_fade_json_loader_and_feature_vector():
+    import json
+    import tempfile
+    from pathlib import Path
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_fade as ef
+
+    path = Path(tempfile.mkdtemp()) / "events.json"
+    path.write_text(json.dumps([{
+        "event_id": "testvelvet-spacex-ipo",
+        "coin_id": "testvelvet",
+        "symbol": "TESTVELVET",
+        "event_name": "SpaceX IPO trading start",
+        "event_type": "ipo_proxy",
+        "event_time": "2026-06-12T13:30:00Z",
+        "first_seen_time": "2026-06-10T00:00:00Z",
+        "source": "manual_fixture",
+        "confidence": 0.95,
+        "external_asset": "SpaceX",
+        "is_proxy_narrative": True,
+        "is_direct_beneficiary": False,
+    }]))
+    events = ef.load_event_fade_events(path)
+    assert len(events) == 1
+    assert events[0].symbol == "TESTVELVET"
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    candidate = _event_fade_velvet_candidate(now)
+    ef.calculate_fade_score(candidate, ef.EventFadeConfig(), now)
+    vector = ef.event_fade_feature_vector(candidate)
+    assert vector["event_type"] == "ipo_proxy"
+    assert vector["fade_score"] >= 80
+    assert vector["rsi_rollover_confirmed"] is True
+    assert vector["signal_type"] == "NO_TRADE"
+    assert candidate.state == ef.FadeState.DISCOVERED
+
+
 def test_conviction_monotonic_with_severity():
     base = {"flag": "OB", "rsi_z": 0.0, "volume_ratio": 1.0}
     watch = conviction_score({**base, "severity": "WATCH"})

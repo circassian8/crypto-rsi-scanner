@@ -7,6 +7,13 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.lower() not in ("0", "false", "no", "off")
+
+
 def _load_dotenv(path: Path) -> None:
     """Minimal .env loader (no dependency). Existing env vars win."""
     if not path.exists():
@@ -106,6 +113,34 @@ MARKET_ALIGN_SWING = int(os.getenv("RSI_MARKET_ALIGN_SWING", "12"))
 PAPER_TRADING_ENABLED = (os.getenv("RSI_PAPER", "1").lower() not in ("0", "false", "no"))
 PAPER_HOLD_DAYS = int(os.getenv("RSI_PAPER_HOLD_DAYS", str(OUTCOME_PRIMARY_HORIZON)))
 
+# Sell-the-news / proxy-catalyst event fade research sleeve. Disabled by
+# default and alert-only when enabled; no live order execution exists.
+EVENT_FADE_ENABLED = _env_bool("RSI_EVENT_FADE_ENABLED", False)
+EVENT_FADE_MODE = os.getenv("RSI_EVENT_FADE_MODE", "alert_only")
+_EVENT_FADE_EVENTS_PATH_RAW = os.getenv("RSI_EVENT_FADE_EVENTS_PATH", "")
+EVENT_FADE_MIN_WATCHLIST_SCORE = int(os.getenv("RSI_EVENT_FADE_MIN_WATCHLIST_SCORE", "60"))
+EVENT_FADE_MIN_ARMED_SCORE = int(os.getenv("RSI_EVENT_FADE_MIN_ARMED_SCORE", "75"))
+EVENT_FADE_MIN_TRIGGER_SCORE = int(os.getenv("RSI_EVENT_FADE_MIN_TRIGGER_SCORE", "80"))
+EVENT_FADE_MIN_EVENT_CONFIDENCE = float(os.getenv("RSI_EVENT_FADE_MIN_EVENT_CONFIDENCE", "0.80"))
+EVENT_FADE_MAX_DAYS_TO_EVENT = float(os.getenv("RSI_EVENT_FADE_MAX_DAYS_TO_EVENT", "7"))
+EVENT_FADE_EXPIRE_HOURS_AFTER_EVENT = float(os.getenv("RSI_EVENT_FADE_EXPIRE_HOURS_AFTER_EVENT", "72"))
+EVENT_FADE_MIN_RETURN_24H = float(os.getenv("RSI_EVENT_FADE_MIN_RETURN_24H", "0.75"))
+EVENT_FADE_MIN_RETURN_7D = float(os.getenv("RSI_EVENT_FADE_MIN_RETURN_7D", "1.50"))
+EVENT_FADE_EXTREME_RETURN_7D = float(os.getenv("RSI_EVENT_FADE_EXTREME_RETURN_7D", "5.00"))
+EVENT_FADE_MIN_VOLUME_Z = float(os.getenv("RSI_EVENT_FADE_MIN_VOLUME_Z", "3.0"))
+EVENT_FADE_MIN_OI_CHANGE_24H = float(os.getenv("RSI_EVENT_FADE_MIN_OI_CHANGE_24H", "0.30"))
+EVENT_FADE_HOT_FUNDING_8H = float(os.getenv("RSI_EVENT_FADE_HOT_FUNDING_8H", "0.0005"))
+EVENT_FADE_EXTREME_FUNDING_8H = float(os.getenv("RSI_EVENT_FADE_EXTREME_FUNDING_8H", "0.0010"))
+EVENT_FADE_MIN_PERP_SPOT_VOLUME_RATIO = float(os.getenv("RSI_EVENT_FADE_MIN_PERP_SPOT_VOLUME_RATIO", "5.0"))
+EVENT_FADE_MIN_RSI_OVERBOUGHT_SCORE = float(os.getenv("RSI_EVENT_FADE_MIN_RSI_OVERBOUGHT_SCORE", "60"))
+EVENT_FADE_BLOCK_BTC_STRONG_RISK_ON = _env_bool("RSI_EVENT_FADE_BLOCK_BTC_STRONG_RISK_ON", True)
+EVENT_FADE_MAX_SPREAD_BPS = float(os.getenv("RSI_EVENT_FADE_MAX_SPREAD_BPS", "100"))
+EVENT_FADE_MIN_DEPTH_2PCT_USD = float(os.getenv("RSI_EVENT_FADE_MIN_DEPTH_2PCT_USD", "10000"))
+EVENT_FADE_DEFAULT_RISK_PCT = float(os.getenv("RSI_EVENT_FADE_DEFAULT_RISK_PCT", "0.005"))
+EVENT_FADE_MAX_RISK_PCT = float(os.getenv("RSI_EVENT_FADE_MAX_RISK_PCT", "0.01"))
+EVENT_FADE_MAX_LEVERAGE_HINT = float(os.getenv("RSI_EVENT_FADE_MAX_LEVERAGE_HINT", "2.0"))
+EVENT_FADE_MIN_FAILURE_CHECKS = int(os.getenv("RSI_EVENT_FADE_MIN_FAILURE_CHECKS", "2"))
+
 # Macro context header in the digest (Fear & Greed + BTC trend + breadth).
 MACRO_ENABLED = (os.getenv("RSI_MACRO", "1").lower() not in ("0", "false", "no"))
 
@@ -162,6 +197,10 @@ EMAIL_TO = os.getenv("EMAIL_TO")
 DATA_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = DATA_DIR / "rsi_scanner.db"
 CSV_OUT = DATA_DIR / "rsi_scan_latest.csv"
+
+EVENT_FADE_EVENTS_PATH = Path(_EVENT_FADE_EVENTS_PATH_RAW).expanduser() if _EVENT_FADE_EVENTS_PATH_RAW else None
+if EVENT_FADE_EVENTS_PATH is not None and not EVENT_FADE_EVENTS_PATH.is_absolute():
+    EVENT_FADE_EVENTS_PATH = DATA_DIR / EVENT_FADE_EVENTS_PATH
 
 _BACKUP_DIR_RAW = os.getenv("RSI_BACKUP_DIR", "backups")
 BACKUP_DIR = Path(_BACKUP_DIR_RAW).expanduser()

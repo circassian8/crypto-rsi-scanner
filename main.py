@@ -41,6 +41,7 @@ Usage:
   python main.py --status        # print scan/listener/backup/log health
   python main.py --score --cohorts # paper scoreboard with state cohorts
   python main.py --refresh-paper # close matured paper trades without alerts
+  python main.py --event-fade-report # score local event-fade fixtures
   python main.py --backup-db     # safe SQLite backup + integrity check
   python main.py --verify-restore # restore-check latest SQLite backup
   python main.py --maintenance   # backup + restore drill + log rotation

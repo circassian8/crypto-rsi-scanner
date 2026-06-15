@@ -1,0 +1,93 @@
+[
+  {
+    "event": {
+      "event_id": "testvelvet-spacex-ipo",
+      "coin_id": "testvelvet",
+      "symbol": "TESTVELVET",
+      "event_name": "SpaceX IPO trading start",
+      "event_type": "ipo_proxy",
+      "event_time": "2026-06-15T13:30:00Z",
+      "first_seen_time": "2026-06-13T00:00:00Z",
+      "source": "manual_fixture",
+      "source_url": null,
+      "confidence": 0.95,
+      "external_asset": "SpaceX",
+      "is_proxy_narrative": true,
+      "is_direct_beneficiary": false,
+      "notes": "Synthetic/pre-IPO proxy narrative fixture."
+    },
+    "market": {
+      "symbol": "TESTVELVET",
+      "coin_id": "testvelvet",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "price": 7.2,
+      "volume_24h": 120000000,
+      "spot_volume_24h": 8000000,
+      "market_cap": 45000000,
+      "fdv": 700000000,
+      "return_24h": 1.2,
+      "return_72h": 3.5,
+      "return_7d": 8.5,
+      "distance_from_20d_ma": 2.0,
+      "volume_zscore_24h": 6.2,
+      "order_book_depth_1pct": 8000,
+      "order_book_depth_2pct": 25000,
+      "spread_bps": 45
+    },
+    "derivatives": {
+      "symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "perp_available": true,
+      "open_interest": 18000000,
+      "open_interest_24h_change_pct": 0.65,
+      "open_interest_to_market_cap": 0.4,
+      "funding_rate_8h": 0.0012,
+      "funding_rate_percentile": 0.98,
+      "futures_volume_24h": 180000000,
+      "perp_spot_volume_ratio": 22,
+      "liquidations_24h": 1200000,
+      "long_short_ratio": 2.1,
+      "basis": 0.025
+    },
+    "supply": {
+      "symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "large_holder_exchange_inflow": true,
+      "cex_inflow_amount": 1000000,
+      "cex_inflow_pct_supply": 0.02,
+      "unlock_amount": null,
+      "unlock_pct_circulating": null,
+      "top_holder_concentration": 0.62,
+      "team_or_mm_wallet_activity": true,
+      "admin_or_mint_risk": false,
+      "notes": "Manual fixture pressure, not an on-chain assertion."
+    },
+    "rsi": {
+      "symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "rsi_daily": 86,
+      "rsi_4h": 78,
+      "rsi_weekly": 72,
+      "target_overbought_score": 90,
+      "target_oversold_score": 0,
+      "btc_risk_on_score": 35,
+      "btc_risk_off_score": 40,
+      "rsi_rollover_confirmed": true,
+      "bearish_rsi_divergence": true
+    },
+    "technical": {
+      "symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "event_vwap": 8.1,
+      "price_below_event_vwap": true,
+      "failed_reclaim_event_vwap": true,
+      "lower_high_confirmed": true,
+      "first_support_broken": true,
+      "post_event_high": 9.4,
+      "post_event_lower_high": 8.6,
+      "invalidation_level": 8.65,
+      "entry_reference_price": 7.2
+    },
+    "state": "DISCOVERED"
+  }
+]
