@@ -17,6 +17,21 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Make push-after-commit the collaboration rule · Codex
+**Why:** The human wants GitHub to stay current so Claude, Codex, and external
+ChatGPT review all see the latest committed project state.
+**Changes:**
+- `AGENTS.md` changes the core rule from "commit every change" to "commit and
+  push every change", with standing approval to push `main` to `origin` after
+  each commit.
+- `CLAUDE.md` now repeats the three post-change requirements directly for
+  Claude: DEVLOG, commit, push.
+- `DECISIONS.md` records the durable decision and supersedes the older
+  no-push-without-explicit-approval clause.
+**Verify:** docs-only; `git diff --check` passes; `make verify` passes.
+**Notes/risks:** Agents should still ask before force-pushing, changing remotes,
+or pushing a different branch.
+
 ## 2026-06-16 — Add alert-only event-fade research sleeve · Codex
 **Why:** The VELVET/SpaceX-style idea is not "short every overbought RSI pump";
 it is a separate sell-the-news pattern around dated proxy catalysts, crowded

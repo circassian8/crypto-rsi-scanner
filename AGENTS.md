@@ -4,9 +4,10 @@ This repo is co-developed by a human owner and two AI coding agents (Anthropic
 **Claude**, OpenAI **Codex**). **Read this file first, every session.** It is the
 shared source of truth for how we work, the architecture, and what we've learned.
 
-> ✅ **This repo is under local git (branch `main`).** Commit at the end of every
-> change-making prompt (see "Commit every change"). `DEVLOG.md` remains the
-> human-readable narrative/decision history — keep both current.
+> ✅ **This repo is under git (branch `main`, remote `origin`).** Commit and push
+> at the end of every change-making prompt (see "Commit and push every change").
+> `DEVLOG.md` remains the human-readable narrative/decision history — keep both
+> current.
 
 ---
 
@@ -19,16 +20,18 @@ understand the current state.
 
 Sign your entry with your name (`Claude` / `Codex` / `human`).
 
-## The other rule: commit every change
+## The other rule: commit and push every change
 
-This is a local git repo. **End any prompt that changed files with one commit**
-capturing that prompt's work, with a clear message:
+This is a git repo with a GitHub remote. **End any prompt that changed files
+with one commit and push it to `origin/main`** capturing that prompt's work, with
+a clear message:
 - One logical commit per change-making prompt (don't fold in unrelated prompts).
 - Run `make verify` first; don't commit a red tree.
 - Never commit secrets/artifacts: `.env`, `*.db`, logs, `.venv`, and
   `.claude/settings.local.json` are gitignored — keep it that way.
-- Commit on `main` (personal repo, no remote). No `git push` / remote without
-  explicit human approval.
+- Commit on `main`, then `git push` after the commit. The human gave standing
+  approval on 2026-06-16 to push after every commit. Ask again only before
+  changing remotes, force-pushing, or pushing to a different branch.
 
 ## Collaboration files
 

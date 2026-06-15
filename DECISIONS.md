@@ -16,6 +16,17 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-16 - Push after every commit
+**Status:** accepted
+**Decision:** Every change-making prompt ends with one commit on `main` and a
+push to `origin/main`. The human gave standing approval to push after each
+commit, superseding the older "no push without explicit approval" clause.
+**Why:** GitHub is now the shared handoff point for Claude, Codex, and external
+ChatGPT review, so commits should not remain local after a completed prompt.
+**Revisit when:** The human revokes standing push approval, asks for PR branches,
+or a future change would require force-pushing, changing remotes, or pushing to a
+different branch.
+
 ## 2026-06-16 - Keep event fades alert-only until validated
 **Status:** accepted
 **Decision:** The event-fade engine is a separate research sleeve for dated
