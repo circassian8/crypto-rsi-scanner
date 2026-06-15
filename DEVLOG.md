@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-15 — Fix volume-PIT trigger comparison guardrails · Codex
+**Why:** Review found that `--compare-triggers --pit-volume` silently used the
+default trigger-comparison universe instead of the volume-PIT universe, and bad
+research inputs like `--volume-window 0` could produce empty/noisy output instead
+of a clear error.
+**Changes:**
+- `crypto_rsi_scanner/backtest.py` splits volume-PIT into fetch-once and
+  walk-under-trigger helpers, adds `run_pit_volume_triggers()`, wires
+  `--compare-triggers --pit-volume` through the real volume-ranked universe, and
+  rejects invalid CLI values before any network/cache work.
+- `build_volume_membership()` now rejects non-positive `top_n`/`window` values.
+- The volume-PIT fetch path now closes its `requests.Session` and skips API
+  throttling sleeps when a kline file is already cached.
+- `tests/test_indicators.py` adds regression coverage for invalid inputs, the
+  PIT-volume compare branch, and cache-hit sleep/session behavior.
+- `AGENTS.md` documents that `--compare-triggers` supports `--pit-volume`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 136/136.
+`make verify` passes. Real smoke:
+`.venv/bin/python -m crypto_rsi_scanner.backtest --compare-triggers --pit-volume --top-n 5 --days 1825 --volume-window 30`
+runs on 368 usable volume-PIT histories and prints both trigger books.
+**Notes/risks:** Research-tooling only; no live scanner scoring, routing, or
+alert behavior changed.
+
 ## 2026-06-10 — Sync agent docs to the volume-PIT reality · Claude
 **Why:** AGENTS.md still told agents PIT research was bear-only/365d and needed a
 Pro key, and conviction was "unvalidated" — all superseded by the volume-PIT run.

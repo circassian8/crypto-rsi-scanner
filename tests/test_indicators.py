@@ -1415,6 +1415,145 @@ def test_backtest_volume_membership_rolling_rank():
     assert list(m["RISE"])[1:] == [False, True, True, True, True]
 
 
+def test_backtest_volume_membership_rejects_invalid_args():
+    from crypto_rsi_scanner import backtest
+    idx = pd.date_range("2025-01-01", periods=3, freq="D", tz="UTC")
+    frames = {"AAA": pd.DataFrame({"quote_volume": [1.0, 2.0, 3.0]}, index=idx)}
+
+    try:
+        backtest.build_volume_membership(frames, top_n=0, window=2)
+    except ValueError as e:
+        assert "top_n" in str(e)
+    else:
+        raise AssertionError("top_n=0 should fail")
+
+    try:
+        backtest.build_volume_membership(frames, top_n=1, window=0)
+    except ValueError as e:
+        assert "window" in str(e)
+    else:
+        raise AssertionError("window=0 should fail")
+
+
+def test_backtest_main_rejects_invalid_cli_args():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import backtest
+
+    for argv in (
+        ["--pit-volume", "--volume-window", "0"],
+        ["--top-n", "0"],
+        ["--compare-triggers", "--pit"],
+    ):
+        with contextlib.redirect_stderr(io.StringIO()):
+            try:
+                backtest.main(argv)
+            except SystemExit as e:
+                assert e.code == 2
+            else:
+                raise AssertionError(f"{argv} should fail")
+
+
+def test_backtest_main_compare_triggers_uses_volume_pit():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import backtest
+
+    calls = {}
+    orig_pit_triggers = backtest.run_pit_volume_triggers
+    orig_triggers = backtest.run_triggers
+    orig_format = backtest.format_trigger_comparison
+
+    def fake_pit_triggers(top_n, days, **kwargs):
+        calls["pit"] = {
+            "top_n": top_n,
+            "days": days,
+            "cache_dir": kwargs.get("cache_dir"),
+            "refresh_cache": kwargs.get("refresh_cache"),
+            "volume_window": kwargs.get("volume_window"),
+        }
+        return {"cross_into": ([], {}, {}, {}, {}), "confirm": ([], {}, {}, {}, {})}, 2
+
+    def fail_default_triggers(*args, **kwargs):
+        raise AssertionError("default trigger path should not run")
+
+    def fake_format(results):
+        assert set(results) == {"cross_into", "confirm"}
+        return "pit-volume comparison"
+
+    backtest.run_pit_volume_triggers = fake_pit_triggers
+    backtest.run_triggers = fail_default_triggers
+    backtest.format_trigger_comparison = fake_format
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            backtest.main([
+                "--compare-triggers",
+                "--pit-volume",
+                "--top-n", "7",
+                "--days", "30",
+                "--volume-window", "3",
+                "--no-pit-cache",
+            ])
+        assert "pit-volume comparison" in out.getvalue()
+        assert calls["pit"] == {
+            "top_n": 7,
+            "days": 30,
+            "cache_dir": None,
+            "refresh_cache": False,
+            "volume_window": 3,
+        }
+    finally:
+        backtest.run_pit_volume_triggers = orig_pit_triggers
+        backtest.run_triggers = orig_triggers
+        backtest.format_trigger_comparison = orig_format
+
+
+def test_backtest_fetch_volume_pit_frames_cache_hit_no_sleep_and_closes_session():
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import backtest
+
+    cache = Path(tempfile.mkdtemp())
+    periods = backtest._START + max(backtest.HORIZONS) + 1
+    rows = [
+        [
+            1735689600000 + i * 86_400_000,
+            "1", "2", "0.5", str(100 + i), "10", 0, "15", 0, 0, 0, 0,
+        ]
+        for i in range(periods)
+    ]
+    for symbol in ("BTCUSDT", "ETHUSDT"):
+        backtest._write_binance_klines_cache(cache, symbol, periods, rows)
+
+    class FakeSession:
+        closed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.closed = True
+
+    fake_session = FakeSession()
+    sleeps = []
+    orig_session = backtest.requests.Session
+    orig_pool = backtest.binance_usdt_pool
+    orig_sleep = backtest.time.sleep
+    backtest.requests.Session = lambda: fake_session
+    backtest.binance_usdt_pool = lambda session: ["BTC", "ETH"]
+    backtest.time.sleep = lambda seconds: sleeps.append(seconds)
+    try:
+        frames = backtest._fetch_volume_pit_frames(periods, cache_dir=cache)
+        assert set(frames) == {"BTC", "ETH"}
+        assert sleeps == []
+        assert fake_session.closed is True
+    finally:
+        backtest.requests.Session = orig_session
+        backtest.binance_usdt_pool = orig_pool
+        backtest.time.sleep = orig_sleep
+
+
 def test_backtest_filter_usdt_bases_hygiene():
     from crypto_rsi_scanner import backtest
     syms = [

@@ -1582,11 +1582,31 @@ def run_pit(
 VOLUME_MEMBERSHIP_WINDOW = 30
 
 
+def _require_positive_int(name: str, value: int) -> None:
+    if value < 1:
+        raise ValueError(f"{name} must be >= 1")
+
+
+def _has_binance_klines_cache(
+    cache_dir: Path | None,
+    symbol: str,
+    days: int,
+    refresh_cache: bool,
+) -> bool:
+    return (
+        cache_dir is not None
+        and not refresh_cache
+        and _binance_klines_cache_path(cache_dir, symbol, days).exists()
+    )
+
+
 def build_volume_membership(frames: dict, top_n: int,
                             window: int = VOLUME_MEMBERSHIP_WINDOW) -> pd.DataFrame:
     """Per-date top-N membership by trailing `window`-day mean dollar volume.
     Bool DataFrame[date x symbol]; a symbol needs `window` days of history before
     it can enter (no lookahead — the trailing mean at t uses days <= t)."""
+    _require_positive_int("top_n", top_n)
+    _require_positive_int("window", window)
     qv = pd.DataFrame(
         {sym: df["quote_volume"] for sym, df in frames.items()}
     ).sort_index()
@@ -1595,44 +1615,53 @@ def build_volume_membership(frames: dict, top_n: int,
     return rank.le(top_n) & trail.notna()
 
 
-def run_pit_volume(
-    top_n: int,
+def _fetch_volume_pit_frames(
     days: int,
-    trigger: str = "cross_into",
-    state_slices: bool = False,
     cache_dir: Path | None = None,
     refresh_cache: bool = False,
+) -> dict:
+    """Fetch/cache the whole Binance USDT pool once for volume-PIT research."""
+    with requests.Session() as session:
+        pool = binance_usdt_pool(session)
+        if not pool:
+            log.error("Volume-PIT: could not fetch the Binance USDT symbol pool.")
+            return {}
+        if "BTC" not in pool:
+            pool = ["BTC"] + pool  # always need BTC for the market regime
+        log.info("Volume-PIT pool: %d Binance USDT bases (%dd history)...", len(pool), days)
+
+        min_len = _START + max(HORIZONS) + 1
+        frames: dict = {}
+        for i, base in enumerate(pool, 1):
+            symbol = base + "USDT"
+            from_cache = _has_binance_klines_cache(cache_dir, symbol, days, refresh_cache)
+            df = fetch_klines(symbol, days, session,
+                              cache_dir=cache_dir, refresh_cache=refresh_cache)
+            if df is not None and len(df) >= min_len:
+                frames[base] = df
+            if i % 50 == 0:
+                log.info("  ...%d/%d fetched (%d usable)", i, len(pool), len(frames))
+            if not from_cache:
+                time.sleep(0.03)  # be polite to the API when we actually hit it
+    log.info("Volume-PIT: usable history for %d/%d candidates", len(frames), len(pool))
+    return frames
+
+
+def _walk_volume_pit_frames(
+    frames: dict,
+    top_n: int,
+    trigger: str = "cross_into",
+    state_slices: bool = False,
     volume_window: int = VOLUME_MEMBERSHIP_WINDOW,
-) -> tuple[list, dict, dict, dict, dict, int]:
-    """Volume-rank PIT backtest over the full Binance USDT pool."""
+) -> tuple[list, dict, dict, dict, dict]:
+    """Walk an already-fetched volume-PIT frame set under one trigger."""
     signals: list = []
     regime_base: dict = defaultdict(list)
     cond_base: dict = defaultdict(list)
     mkt_base: dict = defaultdict(list)
     state_base: dict = defaultdict(list)
-
-    session = requests.Session()
-    pool = binance_usdt_pool(session)
-    if not pool:
-        log.error("Volume-PIT: could not fetch the Binance USDT symbol pool.")
-        return signals, regime_base, cond_base, mkt_base, state_base, 0
-    if "BTC" not in pool:
-        pool = ["BTC"] + pool  # always need BTC for the market regime
-    log.info("Volume-PIT pool: %d Binance USDT bases (%dd history)...", len(pool), days)
-
-    min_len = _START + max(HORIZONS) + 1
-    frames: dict = {}
-    for i, base in enumerate(pool, 1):
-        df = fetch_klines(base + "USDT", days, session,
-                          cache_dir=cache_dir, refresh_cache=refresh_cache)
-        if df is not None and len(df) >= min_len:
-            frames[base] = df
-        if i % 50 == 0:
-            log.info("  ...%d/%d fetched (%d usable)", i, len(pool), len(frames))
-        time.sleep(0.03)  # be polite to the API
-    log.info("Volume-PIT: usable history for %d/%d candidates", len(frames), len(pool))
     if not frames:
-        return signals, regime_base, cond_base, mkt_base, state_base, 0
+        return signals, regime_base, cond_base, mkt_base, state_base
 
     member_df = build_volume_membership(frames, top_n, volume_window)
     # Walk on dollar volume so volume_ratio matches the live scanner (CoinGecko
@@ -1655,7 +1684,50 @@ def run_pit_volume(
                   mkt_arr=mkt_arr, mkt_base=mkt_base, trigger=trigger,
                   state_frame=state_frames.get(sym), state_base=state_base,
                   label=sym)
+    return signals, regime_base, cond_base, mkt_base, state_base
+
+
+def run_pit_volume(
+    top_n: int,
+    days: int,
+    trigger: str = "cross_into",
+    state_slices: bool = False,
+    cache_dir: Path | None = None,
+    refresh_cache: bool = False,
+    volume_window: int = VOLUME_MEMBERSHIP_WINDOW,
+) -> tuple[list, dict, dict, dict, dict, int]:
+    """Volume-rank PIT backtest over the full Binance USDT pool."""
+    frames = _fetch_volume_pit_frames(days, cache_dir=cache_dir, refresh_cache=refresh_cache)
+    signals, regime_base, cond_base, mkt_base, state_base = _walk_volume_pit_frames(
+        frames,
+        top_n,
+        trigger=trigger,
+        state_slices=state_slices,
+        volume_window=volume_window,
+    )
     return signals, regime_base, cond_base, mkt_base, state_base, len(frames)
+
+
+def run_pit_volume_triggers(
+    top_n: int,
+    days: int,
+    triggers=("cross_into", "confirm"),
+    cache_dir: Path | None = None,
+    refresh_cache: bool = False,
+    volume_window: int = VOLUME_MEMBERSHIP_WINDOW,
+) -> tuple[dict, int]:
+    """Fetch the volume-PIT universe once, then A/B triggers on that same data."""
+    frames = _fetch_volume_pit_frames(days, cache_dir=cache_dir, refresh_cache=refresh_cache)
+    results = {
+        trig: _walk_volume_pit_frames(
+            frames,
+            top_n,
+            trigger=trig,
+            volume_window=volume_window,
+        )
+        for trig in triggers
+    }
+    return results, len(frames)
 
 
 # --------------------------------------------------------------------------- #
@@ -1734,6 +1806,25 @@ def run_triggers(universe: list[str], days: int,
     return results, len(frames)
 
 
+def _validate_cli_args(p: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if args.top_n < 1:
+        p.error("--top-n must be >= 1")
+    if args.days < 1:
+        p.error("--days must be >= 1")
+    if args.pool < 1:
+        p.error("--pool must be >= 1")
+    if args.volume_window < 1:
+        p.error("--volume-window must be >= 1")
+    if args.max_trades_per_day < 0:
+        p.error("--max-trades-per-day must be >= 0")
+    if args.walk_forward_folds < 2:
+        p.error("--walk-forward-folds must be >= 2")
+    if args.pit and args.pit_volume:
+        p.error("--pit and --pit-volume are mutually exclusive")
+    if args.compare_triggers and args.pit:
+        p.error("--compare-triggers is not supported with --pit; use --pit-volume or the default Binance path")
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(description="Backtest RSI setups vs regime base rates.")
     p.add_argument("--top-n", type=int, default=80, help="Top-N coins by mcap.")
@@ -1786,7 +1877,7 @@ def main(argv=None) -> None:
     p.add_argument("--trigger", choices=("cross_into", "confirm"), default="cross_into",
                    help="Entry: cross_into (pierce the zone, default) or confirm (turn back out).")
     p.add_argument("--compare-triggers", action="store_true",
-                   help="A/B both triggers on the same data (Binance path) and exit.")
+                   help="A/B both triggers on the same data; supports default Binance path or --pit-volume.")
     p.add_argument("--export-priors", default=None, metavar="PATH",
                    help="Write a registry prior calibration JSON from this backtest.")
     p.add_argument("--prior-min-samples", type=int, default=8,
@@ -1795,6 +1886,7 @@ def main(argv=None) -> None:
                    help="Exit non-zero if fewer than this many graded observations are produced.")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
+    _validate_cli_args(p, args)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -1804,20 +1896,34 @@ def main(argv=None) -> None:
     if args.compare_triggers:
         if args.export_priors:
             log.warning("--export-priors is ignored with --compare-triggers")
-        if args.symbols:
+        pit_cache_dir = None if args.no_pit_cache else Path(args.pit_cache_dir).expanduser()
+        if args.pit_volume:
+            if args.fixture_dir:
+                log.warning("--fixture-dir is ignored with --pit-volume")
+            log.info("Volume-PIT trigger A/B: top-%d by trailing %dd volume (%dd history)...",
+                     args.top_n, args.volume_window, args.days)
+            results, ok = run_pit_volume_triggers(
+                args.top_n,
+                args.days,
+                cache_dir=pit_cache_dir,
+                refresh_cache=args.refresh_pit_cache,
+                volume_window=args.volume_window,
+            )
+        elif args.symbols:
             universe = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+            log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
+            results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
         elif args.fixture_dir:
             universe = fixture_symbols(args.fixture_dir)[:args.top_n]
+            log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
+            results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
         else:
             universe = cg_top_symbols(args.top_n)
-        log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
-        results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
+            log.info("Trigger A/B on %d symbols (%dd, paginated)...", len(universe), args.days)
+            results, ok = run_triggers(universe, args.days, fixture_dir=args.fixture_dir)
         log.info("Done: %d usable coins", ok)
         print("\n" + format_trigger_comparison(results) + "\n")
         return
-
-    if args.pit and args.pit_volume:
-        raise SystemExit("--pit and --pit-volume are mutually exclusive.")
 
     if args.pit_volume:
         if args.fixture_dir:

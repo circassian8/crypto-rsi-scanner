@@ -98,7 +98,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `--pit-volume` (**preferred for full-cycle research**: point-in-time top-N by
   trailing 30d dollar volume over the whole Binance USDT pool — 5y, free,
   cached) · `--slice <setup>`
-  (vol/momentum slice) · `--compare-triggers` (entry-trigger A/B) ·
+  (vol/momentum slice) · `--compare-triggers` (entry-trigger A/B; supports the
+  default Binance path and `--pit-volume`) ·
   `--state-slices` (shadow state-conditioned edge table) ·
   `--pit-cache-dir backtest_cache` / `--refresh-pit-cache` (reuse/refetch
   CoinGecko PIT histories) ·
