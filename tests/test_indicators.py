@@ -1846,6 +1846,62 @@ def test_paper_report_empty_and_populated():
     st.close()
 
 
+def test_refresh_paper_closes_without_scan_or_alerts():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import scanner
+
+    calls = {}
+
+    class FakeStorage:
+        def __init__(self, path):
+            self.path = path
+            calls["storage_path"] = path
+
+        def open_paper_coin_ids(self):
+            return ["aaa", "bbb"]
+
+        def close(self):
+            calls["closed_storage"] = True
+
+    async def fake_fetch(ids):
+        calls["fetch_ids"] = list(ids)
+        return {"aaa": pd.Series([1.0]), "bbb": pd.Series([2.0])}
+
+    def fake_update(storage, signals, closes_map):
+        calls["update"] = (storage, list(signals), sorted(closes_map))
+        return 0, 2
+
+    def fake_report(storage, cohorts=False):
+        calls["cohorts"] = cohorts
+        return "paper report"
+
+    orig_storage = scanner.Storage
+    orig_fetch = scanner._fetch_extra_daily_closes
+    orig_update = scanner.paper.update
+    orig_report = scanner.paper.report
+    scanner.Storage = FakeStorage
+    scanner._fetch_extra_daily_closes = fake_fetch
+    scanner.paper.update = fake_update
+    scanner.paper.report = fake_report
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.refresh_paper(cohorts=True)
+        assert "closed 2 trade(s)" in out.getvalue()
+        assert "paper report" in out.getvalue()
+        assert calls["fetch_ids"] == ["aaa", "bbb"]
+        assert calls["update"][1] == []
+        assert calls["update"][2] == ["aaa", "bbb"]
+        assert calls["cohorts"] is True
+        assert calls["closed_storage"] is True
+    finally:
+        scanner.Storage = orig_storage
+        scanner._fetch_extra_daily_closes = orig_fetch
+        scanner.paper.update = orig_update
+        scanner.paper.report = orig_report
+
+
 # --- regression: NaN enrichment from the DataFrame self-tune path -------------
 
 def test_tg_card_tolerates_nan_enrichment():

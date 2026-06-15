@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-15 — Add safe paper-trade refresh command · Codex
+**Why:** Live paper-trade validation was blocked even after several positions
+passed their 7-day hold, because paper exits only closed during the daily
+non-dry-run scan. Triggering a full scan just to close trades can send alerts, so
+the project needed a narrow non-alerting refresh path.
+**Changes:**
+- `crypto_rsi_scanner/scanner.py` adds `main.py --refresh-paper`, which fetches
+  histories only for open paper-trade coins, calls the existing paper close logic
+  with no new signals, and prints the refreshed scoreboard. It supports
+  `--cohorts` and `--json` like `--score`.
+- `main.py` and `AGENTS.md` document the new command.
+- `tests/test_indicators.py` covers that the refresh command fetches open paper
+  histories, passes an empty signal list, prints the report, and closes storage
+  without running scan/alert plumbing.
+- `ROADMAP.md` records that the first six paper trades closed but are still too
+  small/outlier-dominated for strategy decisions.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 137/137.
+`main.py --refresh-paper --cohorts` fetched 19/19 open histories and closed 6
+trades. `make verify` passed after the change.
+**Notes/risks:** The first closed paper sample is not decision-grade: 6 trades,
+including one -95.7% SIREN outlier. Keep waiting for more closed paper trades
+before promoting live priors or state cohorts.
+
 ## 2026-06-15 — Fix volume-PIT trigger comparison guardrails · Codex
 **Why:** Review found that `--compare-triggers --pit-volume` silently used the
 default trigger-comparison universe instead of the volume-PIT universe, and bad

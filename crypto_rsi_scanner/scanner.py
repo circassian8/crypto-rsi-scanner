@@ -991,6 +991,27 @@ def score(json_output: bool = False, cohorts: bool = False) -> None:
         storage.close()
 
 
+def refresh_paper(verbose: bool = False, json_output: bool = False, cohorts: bool = False) -> None:
+    """Close matured paper trades without running a full alerting scan."""
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-5s %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    storage = Storage(config.DB_PATH)
+    try:
+        coin_ids = storage.open_paper_coin_ids()
+        closes_map = asyncio.run(_fetch_extra_daily_closes(coin_ids))
+        _, closed = paper.update(storage, [], closes_map)
+        print(f"Paper refresh: fetched {len(closes_map)}/{len(coin_ids)} histories; closed {closed} trade(s).")
+        if json_output:
+            print(json.dumps(paper.summary(storage), indent=2, sort_keys=True, default=str))
+        else:
+            print(paper.report(storage, cohorts=cohorts))
+    finally:
+        storage.close()
+
+
 def status() -> None:
     """Print operational scan/listener health and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -1157,6 +1178,11 @@ def cli() -> None:
         help="Print the paper-trade scoreboard (realized P&L by book/setup) and exit.",
     )
     parser.add_argument(
+        "--refresh-paper",
+        action="store_true",
+        help="Fetch open paper-trade histories, close matured positions, and print the scoreboard without alerts.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for commands that support it.",
@@ -1232,6 +1258,9 @@ def cli() -> None:
         return
     if args.score:
         score(json_output=args.json, cohorts=args.cohorts)
+        return
+    if args.refresh_paper:
+        refresh_paper(verbose=args.verbose, json_output=args.json, cohorts=args.cohorts)
         return
     if args.status:
         status()

@@ -78,7 +78,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   market-alignment cohorts) · `main.py --score` (paper scoreboard) ·
   `main.py --score --json` (structured paper scoreboard) ·
   `main.py --score --cohorts` (state cohort scoreboard) · `main.py --status`
-  (scan/listener health) · `main.py --universe-audit` (latest hygiene audit)
+  (scan/listener health) · `main.py --refresh-paper` (close matured paper trades
+  without running an alerting scan) · `main.py --universe-audit` (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks
   the newest retained backup.
