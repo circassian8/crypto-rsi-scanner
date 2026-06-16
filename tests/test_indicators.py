@@ -3339,6 +3339,32 @@ def test_event_fade_validation_reports_google_news_publisher_origins():
     assert "coindesk" in report
     assert "thedefiant.io" in report
 
+    queue_rows = [
+        dict(row)
+        for row in rows
+        if row["asset_symbol"] in {"TESTAI", "TESTPRED"}
+    ]
+    for row in queue_rows:
+        row["human_label"] = ""
+        row["review_status"] = ""
+
+    queue = event_validation.build_labeling_queue(queue_rows, limit=10)
+    origin_items = {
+        item.asset_symbol: item.source_origins
+        for item in queue.items
+        if item.asset_symbol in {"TESTAI", "TESTPRED"}
+    }
+    assert origin_items["TESTAI"] == ("coindesk",)
+    assert origin_items["TESTPRED"] == ("thedefiant.io",)
+    queue_report = event_validation.format_labeling_queue(queue)
+    assert "origins: coindesk" in queue_report
+    assert "origins: thedefiant.io" in queue_report
+
+    template_rows = event_validation.build_review_template_rows(queue_rows, limit=10)
+    template_by_symbol = {row["asset_symbol"]: row for row in template_rows}
+    assert template_by_symbol["TESTAI"]["source_origins"] == ["coindesk"]
+    assert template_by_symbol["TESTPRED"]["source_origins"] == ["thedefiant.io"]
+
 
 def test_event_fade_validation_review_blocks_narrow_event_or_btc_samples():
     from crypto_rsi_scanner import event_discovery, event_validation
@@ -3688,6 +3714,8 @@ def test_event_fade_validation_review_packet_formats_human_evidence():
     assert "Event-time baseline: entry=`8.00` | 72h=`-20.0%` | trigger edge=`+0.8pp`" in packet
     assert "Classifier evidence:" in packet
     assert "Sources:" in packet
+    assert "Source origins:" in packet
+    assert "example.test" in packet
     assert "human_label" in packet
 
 
@@ -3704,6 +3732,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     assert template_rows[0]["event_time_confidence"] == 1.0
     assert template_rows[0]["event_time_source"] == "explicit"
     assert template_rows[0]["suggested_label"] == "valid_proxy_fade or false_positive"
+    assert template_rows[0]["source_origins"] == ["example.test"]
     assert template_rows[0]["missing_fields"] == [
         "human_label",
         "max_adverse_excursion",

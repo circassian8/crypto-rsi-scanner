@@ -321,21 +321,24 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   --event-fade-labeling-queue` may prioritize unlabeled proxy/control rows and
   reviewed triggered rows missing required outcomes, source-timing review,
   low-confidence event-time confirmation, or explicit review status/labels. The
-  queue surfaces event-time source/confidence and ranks higher-confidence
+  queue surfaces event-time source/confidence plus source-origin/publisher
+  context, and ranks higher-confidence
   explicit event times before weaker source-text dates inside the same review
   bucket, but it must not auto-label rows, modify sample files, write storage,
   route alerts, open paper trades, or imply promotion.
 - Event-fade validation review packets are artifact-only. `main.py
-  --event-fade-review-packet SAMPLE OUT` may write a Markdown packet for manual
-  validation review, but it must not auto-label rows, modify the source sample,
-  write storage, route alerts, open paper trades, or imply promotion.
+  --event-fade-review-packet SAMPLE OUT` may write a Markdown packet with source
+  URLs, source-origin/publisher context, and row evidence for manual validation
+  review, but it must not auto-label rows, modify the source sample, write
+  storage, route alerts, open paper trades, or imply promotion.
 - Event-fade validation review templates are artifact-only. `main.py
   --event-fade-export-review-template SAMPLE OUT` may write compact editable
-  sidecar rows, and `main.py --event-fade-apply-review-template SAMPLE TEMPLATE
-  OUT` may copy nonblank human labels/notes/outcomes from that sidecar into a
-  validation-sample artifact only when the sidecar evidence fields still match
-  the sample row. They must not infer labels, write live storage, route alerts,
-  open paper trades, or imply promotion.
+  sidecar rows with derived source origins, and `main.py
+  --event-fade-apply-review-template SAMPLE TEMPLATE OUT` may copy nonblank
+  human labels/notes/outcomes from that sidecar into a validation-sample
+  artifact only when the sidecar evidence fields still match the sample row.
+  They must not infer labels, write live storage, route alerts, open paper
+  trades, or imply promotion.
 - Event-fade validation review bundles are artifact-only. `main.py
   --event-fade-review-bundle SAMPLE OUT_DIR` may copy the sample and write local
   review aids under `OUT_DIR`; with `--event-fade-review-bundle-prices` it may

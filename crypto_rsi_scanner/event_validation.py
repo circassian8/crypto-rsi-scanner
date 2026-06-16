@@ -79,6 +79,7 @@ REVIEW_TEMPLATE_FIELDS = (
     "suggested_label",
     "missing_fields",
     "source_urls",
+    "source_origins",
     "raw_published_at",
     "raw_fetched_at",
     "published_at_min",
@@ -104,6 +105,7 @@ REVIEW_TEMPLATE_DERIVED_FIELDS = frozenset({
     "queue_category",
     "suggested_label",
     "missing_fields",
+    "source_origins",
 })
 REVIEW_TEMPLATE_EVIDENCE_FIELDS = tuple(
     field
@@ -261,6 +263,7 @@ class ValidationLabelingQueueItem:
     suggested_label: str
     missing_fields: tuple[str, ...]
     source_urls: tuple[str, ...]
+    source_origins: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -590,6 +593,8 @@ def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
         )
         if item.source_urls:
             rows.append("   sources: " + ", ".join(item.source_urls[:3]))
+        if item.source_origins:
+            rows.append("   origins: " + ", ".join(item.source_origins[:3]))
     return "\n".join(rows)
 
 
@@ -1228,6 +1233,7 @@ def _format_review_packet_row(
     fields.extend(_packet_bullets("Warnings", row.get("warnings")))
     fields.extend(_packet_bullets("Missing data", row.get("missing_data")))
     fields.extend(_packet_bullets("Sources", row.get("source_urls")))
+    fields.extend(_packet_bullets("Source origins", source_origin_values(row)))
     fields.extend(_packet_bullets("Raw titles", row.get("raw_titles")))
     fields.extend([
         "- Review fields to fill:",
@@ -1248,6 +1254,7 @@ def _review_template_row(
         "suggested_label": item.suggested_label,
         "missing_fields": list(item.missing_fields),
         "source_urls": list(item.source_urls),
+        "source_origins": list(item.source_origins),
     })
     return out
 
@@ -1565,6 +1572,7 @@ def _queue_item(
         suggested_label=suggested_label,
         missing_fields=missing_fields,
         source_urls=tuple(str(value) for value in _list_values(row.get("source_urls")) if value),
+        source_origins=source_origin_values(row),
     )
 
 

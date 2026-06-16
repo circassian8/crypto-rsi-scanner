@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Surface source origins in review aids · Codex
+**Why:** Source-origin diversity is now measured in validation reviews, but the
+manual labeling artifacts still forced reviewers to infer publisher/domain
+concentration from raw URLs and titles. The row-level review workflow should
+show that context directly.
+**Changes:**
+- Added derived `source_origins` to event-fade labeling queue items and review
+  template rows.
+- Added source-origin lines to `--event-fade-labeling-queue` output and
+  `--event-fade-review-packet` Markdown rows.
+- Marked `source_origins` as a derived review-template field so regenerated
+  publisher inference does not create noisy sidecar evidence-change blockers.
+- Added regression coverage for Google News publisher extraction in queues and
+  templates, and for source-origin rendering in review packets.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 245/245
+tests, and `make verify` passes.
+**Notes/risks:** Artifact-only validation workflow change. No changes to event
+discovery, event-fade scoring, alerts, paper trades, live storage, or promotion
+automation.
+
 ## 2026-06-17 — Surface event-fade source-origin diversity · Codex
 **Why:** The event-fade validation review already checks source-provider
 diversity, but RSS and Google News rows can hide multiple independent publishers
