@@ -972,10 +972,12 @@ until a stronger source confirms the catalyst time.
 For a newline-separated URL list, set
 `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH`. The checked-in no-key starter
 list is `fixtures/event_discovery/public_rss_feeds.txt`; it includes broad
-crypto publisher feeds plus a targeted Google News RSS search for pre-IPO,
-tokenized-stock, prediction-market, and fan-token narratives. Use it for local
-research cache collection, then inspect and label the resulting bundle before
-any conclusion-bearing review.
+crypto publisher feeds plus targeted Google News RSS searches for pre-IPO,
+tokenized-stock, synthetic-exposure, fan-token, prediction-market, sports, and
+political proxy narratives. The searches intentionally bias toward dated
+proxy-instrument leads because broad feeds mostly produce generic BTC controls.
+Use it for local research cache collection, then inspect and label the resulting
+bundle before any conclusion-bearing review.
 
 Refresh the no-key public RSS source bundle and write a cache-backed review
 workspace in one step:

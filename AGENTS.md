@@ -544,10 +544,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   event-discovery sources from the environment/`.env`. `make
   event-fade-public-rss-review-cycle` is the no-key convenience path for
   public RSS feeds listed in
-  `fixtures/event_discovery/public_rss_feeds.txt`, including a targeted Google
-  News RSS search for pre-IPO/tokenized-stock/prediction-market/fan-token
-  narratives. It defaults to a 30-day lookback and a broader live CoinGecko
-  resolver universe, and writes only research cache/review artifacts.
+  `fixtures/event_discovery/public_rss_feeds.txt`, including targeted Google
+  News RSS searches for pre-IPO/tokenized-stock/synthetic-exposure, fan-token,
+  prediction-market, sports, and political proxy narratives. It defaults to a
+  30-day lookback and a broader live CoinGecko resolver universe, and writes
+  only research cache/review artifacts.
   `make event-fade-gdelt-review-cycle` is the no-key convenience path for live
   GDELT Article List news. It uses the configured proxy-narrative query, defaults
   to a 30-day lookback plus live CoinGecko universe enrichment, and writes only

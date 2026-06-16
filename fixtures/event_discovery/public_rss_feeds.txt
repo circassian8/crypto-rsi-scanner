@@ -9,7 +9,11 @@ https://decrypt.co/feed
 https://www.coindesk.com/arc/outboundfeeds/rss/
 https://www.theblock.co/rss.xml
 
-# Targeted no-key discovery feed for proxy-style narratives. Broad publisher
-# feeds mostly produce generic BTC controls; this search feed surfaces pre-IPO,
-# tokenized-stock, prediction-market, and fan-token stories for manual review.
-https://news.google.com/rss/search?q=%28crypto%20OR%20token%29%20%28%22pre-IPO%22%20OR%20%22pre%20IPO%22%20OR%20%22synthetic%20exposure%22%20OR%20%22tokenized%20stock%22%20OR%20%22fan%20token%22%20OR%20%22prediction%20market%22%29&hl=en-US&gl=US&ceid=US:en
+# Targeted no-key discovery feeds for proxy-style narratives. Broad publisher
+# feeds mostly produce generic BTC controls; these search feeds bias collection
+# toward dated proxy-instrument leads without adding another provider.
+https://news.google.com/rss/search?q=%28crypto%20OR%20token%29%20%28%22pre-IPO%22%20OR%20%22pre%20IPO%22%20OR%20%22synthetic%20exposure%22%20OR%20%22tokenized%20stock%22%20OR%20%22tokenized%20shares%22%20OR%20%22stock%20token%22%29%20%28SpaceX%20OR%20OpenAI%20OR%20Anthropic%20OR%20Stripe%20OR%20Databricks%20OR%20Anduril%20OR%20Figma%20OR%20xAI%29&hl=en-US&gl=US&ceid=US:en
+https://news.google.com/rss/search?q=%28crypto%20OR%20token%20OR%20perpetual%20OR%20market%29%20%28%22trade%20exposure%22%20OR%20%22exposure%20to%22%20OR%20tokenized%20OR%20synthetic%29%20%28SpaceX%20OR%20OpenAI%20OR%20Anthropic%20OR%20IPO%29&hl=en-US&gl=US&ceid=US:en
+https://news.google.com/rss/search?q=%28%22fan%20token%22%20OR%20%22prediction%20market%22%29%20%28%22World%20Cup%22%20OR%20%22Champions%20League%22%20OR%20match%20OR%20final%29%20crypto&hl=en-US&gl=US&ceid=US:en
+https://news.google.com/rss/search?q=%28crypto%20OR%20token%20OR%20memecoin%29%20%28election%20OR%20inauguration%20OR%20vote%29%20%28%22prediction%20market%22%20OR%20proxy%20OR%20%22fan%20token%22%29&hl=en-US&gl=US&ceid=US:en
+https://news.google.com/rss/search?q=%28crypto%20OR%20token%29%20%28Polymarket%20OR%20%22prediction%20market%22%29%20%28SpaceX%20OR%20OpenAI%20OR%20IPO%20OR%20%22World%20Cup%22%29&hl=en-US&gl=US&ceid=US:en

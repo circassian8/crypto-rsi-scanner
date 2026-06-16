@@ -427,6 +427,37 @@ def test_public_rss_make_target_does_not_inject_fixture_aliases():
     assert "fixtures/event_discovery/asset_aliases.json" not in result.stdout
 
 
+def test_public_rss_feed_list_targets_proxy_instrument_research():
+    from pathlib import Path
+    from urllib.parse import parse_qs, urlparse
+
+    path = Path("fixtures/event_discovery/public_rss_feeds.txt")
+    urls = [
+        line.split("#", 1)[0].strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.split("#", 1)[0].strip()
+    ]
+    google_queries = [
+        parse_qs(urlparse(url).query).get("q", [""])[0].lower()
+        for url in urls
+        if "news.google.com/rss/search" in url
+    ]
+    joined = " ".join(google_queries)
+
+    assert len(google_queries) >= 5
+    for term in (
+        "pre-ipo",
+        "synthetic exposure",
+        "tokenized stock",
+        "spacex",
+        "openai",
+        "fan token",
+        "prediction market",
+        "election",
+    ):
+        assert term in joined
+
+
 def test_polymarket_make_target_uses_live_prediction_market_source():
     import subprocess
 

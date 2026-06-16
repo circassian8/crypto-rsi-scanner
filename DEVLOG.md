@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Broaden no-key proxy RSS searches · Codex
+**Why:** The first no-key review cycle produced mostly ambiguous controls and
+only one proxy-venue row. Before adding more providers, the public RSS starter
+list should better target dated proxy-instrument evidence.
+**Changes:**
+- Expanded `fixtures/event_discovery/public_rss_feeds.txt` from one targeted
+  Google News search to several searches covering pre-IPO/synthetic exposure,
+  tokenized stocks, fan tokens, prediction markets, sports, and political proxy
+  narratives.
+- Added an offline regression test that keeps the checked-in RSS list focused
+  on proxy-instrument research terms.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the expanded no-key RSS behavior.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 251/251
+tests, and `make verify` passes. A focused public-RSS research smoke into
+`/tmp/event_fade_expanded_rss_bundle` collected 381 raw rows, 350 normalized
+events, 118 candidate snapshots, 27 proxy candidates, and 16 proxy-instrument
+rows; all remained `NO_TRADE` because 117/118 rows lacked confirmed event time.
+**Notes/risks:** This improves collection targeting only. It does not promote
+event fade beyond research reports. Rows still need human labels/outcomes, and
+the next data-quality gap is event-time confirmation for proxy-instrument leads.
+
 ## 2026-06-17 — Run no-key event-fade review cycle · Codex
 **Why:** After the stabilization pass, the next Pro-plan step was to run the
 research collection workflow and see whether it produced reviewable proxy-fade
