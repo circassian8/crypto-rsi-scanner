@@ -1,0 +1,26 @@
+{
+  "catalogs": [
+    {
+      "catalogName": "New Cryptocurrency Listing",
+      "articles": [
+        {
+          "id": "binance-testlist-spot",
+          "title": "Binance Will List Test Listing (TESTLIST)",
+          "body": "Binance will list Test Listing (TESTLIST) and open spot trading for TESTLIST/USDT at 2026-06-15 12:00 UTC.",
+          "releaseDate": "2026-06-15T09:00:00Z",
+          "listing_time": "2026-06-15T12:00:00Z",
+          "url": "https://www.binance.com/en/support/announcement/binance-testlist",
+          "source_confidence": 0.92
+        },
+        {
+          "id": "binance-general-maintenance",
+          "title": "Binance Updates API Rate Limits",
+          "body": "General operational announcement with no asset listing.",
+          "releaseDate": "2026-06-15T10:00:00Z",
+          "url": "https://www.binance.com/en/support/announcement/api-maintenance",
+          "source_confidence": 0.80
+        }
+      ]
+    }
+  ]
+}

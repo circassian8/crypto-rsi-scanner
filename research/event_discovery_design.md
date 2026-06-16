@@ -1,8 +1,8 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1/2 fixture framework with clean CoinGecko universe bridge,
-research-only
+**Status:** Phase 1/2/3 fixture framework with clean CoinGecko universe bridge
+and fixture-backed exchange announcement providers, research-only
 
 ## Goal
 
@@ -32,6 +32,10 @@ Phase 1 files:
 - `event_providers/manual_json.py`: local JSON fixture provider
 - `event_providers/coingecko_universe.py`: local CoinGecko market fixture
   provider that reuses shared universe hygiene filters
+- `event_providers/binance_announcements.py`: local Binance announcement fixture
+  provider for spot/listing-style direct events
+- `event_providers/bybit_announcements.py`: local Bybit announcement fixture
+  provider for listing/perp-style direct events
 - `event_resolver.py`: alias-aware asset resolver
 - `event_classification.py`: deterministic proxy/direct classifier
 - `event_discovery.py`: normalizer, deduper, orchestrator, report formatter
@@ -47,6 +51,21 @@ synthetics, bad identity rows, and low-quality market rows are screened by the
 same logic used by live scans and backtests.
 
 This is still an offline fixture path. It does not fetch CoinGecko directly.
+
+## Exchange Announcement Providers
+
+Binance and Bybit announcement providers currently read local JSON fixtures only.
+They parse spot listing and perpetual/futures listing announcements into
+`RawDiscoveredEvent` rows with normalized event metadata. These events are
+valuable for the radar and negative/control sample, but they are direct
+token-specific catalysts by default:
+
+- exchange listings -> `direct_listing`
+- perp/futures listings -> `direct_listing`
+- generic/non-listing exchange announcements -> ignored
+
+Direct exchange events must remain `NO_TRADE` under the event-fade proxy gate
+unless a separate source later proves a true proxy relationship.
 
 ## Classification Rules
 
@@ -91,6 +110,8 @@ more dangerous than missed setups.
 - TESTTOKEN + Binance listing direct event
 - TESTPUMP ambiguous pump with no dated catalyst
 - COLLIDE ticker collision that must not resolve confidently
+- TESTLIST Binance spot-listing announcement fixture
+- TESTPERP Bybit perpetual-listing announcement fixture
 
 `fixtures/coingecko_smoke/top_markets.json` is also used for universe-provider
 coverage. BTC/ETH/SOL become discovery assets, while Tether is excluded by the
@@ -102,6 +123,8 @@ Run the research report with:
 
 ```bash
 RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
+RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH=fixtures/event_discovery/binance_announcements.json \
+RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH=fixtures/event_discovery/bybit_announcements.json \
 RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report
 ```

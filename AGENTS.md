@@ -84,8 +84,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   (scan/listener health) · `main.py --refresh-paper` (close matured paper trades
   without running an alerting scan) · `main.py --event-fade-report` (score local
   event-fade fixtures, alert-only/no sends) · `main.py --event-discovery-report`
-  (fixture event radar with optional clean CoinGecko universe fixture,
-  research-only/no writes) · `main.py --universe-audit` (latest hygiene audit)
+  (fixture event radar with optional exchange-announcement and clean CoinGecko
+  universe fixtures, research-only/no writes) · `main.py --universe-audit`
+  (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks
   the newest retained backup.
@@ -135,7 +136,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_models.py` | immutable event-discovery dataclasses for raw events, normalized events, links, classifications, and candidates |
 | `event_discovery.py` | fixture-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring report |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
-| `event_providers/` | research event provider interfaces, manual JSON event fixtures, and cleaned CoinGecko universe fixture provider; no live event provider enabled yet |
+| `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider, and fixture-backed exchange announcement parsers; no live event provider enabled yet |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
 | `indicators.py` | **PURE** functions: RSI, regime, setup taxonomy, market gating, conviction. Unit-tested — keep pure, add a test for new logic |
 | `scanner.py` | orchestration: scan → analyze → build message → route notifications; CLI |
@@ -179,10 +180,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   hard gate: direct-beneficiary or non-proxy events must remain `NO_TRADE` even
   if pump, crowding, RSI, and post-event failure scores are high.
 - Event discovery is radar-first and fixture-backed. It may normalize, resolve,
-  classify, dedupe, and print local reports, and it may load a clean CoinGecko
-  market fixture through the shared `universe.py` hygiene filters, but it must
-  not write live signal/outcome/paper tables or route notifications.
-  Ticker-only/ambiguous asset matches must stay below trigger confidence.
+  classify, dedupe, and print local reports, and it may load local exchange
+  announcement fixtures plus a clean CoinGecko market fixture through the shared
+  `universe.py` hygiene filters, but it must not write live signal/outcome/paper
+  tables or route notifications. Ticker-only/ambiguous asset matches must stay
+  below trigger confidence.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.
@@ -254,13 +256,15 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   + post-event failure. The proxy/direct-beneficiary check is a hard gate, not a
   score nudge. It is not part of the RSI setup registry, does not trade, and
   should not affect live routing until validated on an event sample.
-- **Event discovery Phase 1/2 (2026-06-16):** Local fixture radar exists via
+- **Event discovery Phase 1/2/3 (2026-06-16):** Local fixture radar exists via
   `main.py --event-discovery-report`. It finds raw events, resolves assets with
   aliases, classifies proxy/direct/ambiguous relationships, rejects ticker
   collisions, can merge an optional cleaned CoinGecko market fixture from
-  `RSI_EVENT_DISCOVERY_UNIVERSE_PATH`, and feeds structured candidates through
-  `event_fade.py` for a research-only report. No network event providers,
-  cache writes, live DB writes, notifications, or paper trades are enabled.
+  `RSI_EVENT_DISCOVERY_UNIVERSE_PATH`, can parse local Binance/Bybit
+  announcement fixtures as direct listing/perp events, and feeds structured
+  candidates through `event_fade.py` for a research-only report. No network event
+  providers, cache writes, live DB writes, notifications, or paper trades are
+  enabled.
 - Caveats: the plain Binance backtest path is survivorship-biased (today's
   top-N). Prefer `--pit-volume` for any conclusion-bearing research; `--pit`
   (CoinGecko mcap) remains for cross-checking but is capped at 365d on the demo

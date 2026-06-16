@@ -49,6 +49,30 @@
       "source": "fixture"
     },
     {
+      "coin_id": "testlist",
+      "symbol": "TESTLIST",
+      "name": "Test Listing",
+      "aliases": ["testlist", "test listing"],
+      "categories": ["exchange-listing-fixture"],
+      "contract_addresses": {},
+      "market_cap": 80000000,
+      "volume_24h": 50000000,
+      "price": 2.5,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "testperp",
+      "symbol": "TESTPERP",
+      "name": "Test Perp",
+      "aliases": ["testperp", "test perp"],
+      "categories": ["perp-listing-fixture"],
+      "contract_addresses": {},
+      "market_cap": 90000000,
+      "volume_24h": 70000000,
+      "price": 3.4,
+      "source": "fixture"
+    },
+    {
       "coin_id": "collision-alpha",
       "symbol": "COLLIDE",
       "name": "Collision Alpha",

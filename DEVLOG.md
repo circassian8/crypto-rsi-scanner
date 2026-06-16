@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add fixture-backed exchange announcement providers · Codex
+**Why:** The event radar needs direct exchange events in the dataset so proxy
+fades can be tested against realistic negative/control cases. Phase 3 adds
+exchange announcement parsing without enabling live network sources.
+**Changes:**
+- Added fixture-backed `BinanceAnnouncementProvider` and
+  `BybitAnnouncementProvider`, plus shared announcement parsing helpers for
+  spot/listing and perpetual/futures listing events.
+- Added Binance and Bybit announcement fixtures covering TESTLIST spot listing
+  and TESTPERP perp listing, plus alias entries for both assets.
+- Event discovery can now combine manual raw-event fixtures, Binance
+  announcements, Bybit announcements, and the cleaned CoinGecko universe fixture
+  in one research-only report.
+- Added optional config paths:
+  `RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH` and
+  `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH`.
+- Added offline tests for fixture parsing, malformed-provider fail-soft
+  behavior, exchange-only scanner reports, and direct/no-trade safety for
+  listing/perp events.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the Phase 3 exchange-provider status and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 158/158.
+`make event-discovery-report` prints TESTLIST and TESTPERP as direct
+`NO_TRADE/DISCOVERED` candidates while TESTVELVET remains the only proxy trigger
+fixture. `make verify` passes.
+**Notes/risks:** Providers are fixture-backed only. No live exchange API calls,
+DB writes, Telegram routing, paper trades, or execution were added.
+
 ## 2026-06-16 — Bridge event discovery to clean CoinGecko universe fixtures · Codex
 **Why:** The event radar could resolve only manually aliased assets. The next
 step was to let discovery use the same cleaned CoinGecko-style universe fixture

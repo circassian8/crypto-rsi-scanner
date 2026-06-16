@@ -20,6 +20,8 @@ from .event_models import (
     NormalizedEvent,
     RawDiscoveredEvent,
 )
+from .event_providers.binance_announcements import BinanceAnnouncementProvider
+from .event_providers.bybit_announcements import BybitAnnouncementProvider
 from .event_providers.coingecko_universe import CoinGeckoUniverseProvider
 from .event_providers.manual_json import ManualJsonEventProvider, parse_datetime
 from .event_resolver import clean_text, load_asset_aliases, resolve_event_assets
@@ -172,6 +174,8 @@ def run_manual_discovery(
     event_path: str | Path | None,
     alias_path: str | Path | None,
     *,
+    binance_announcements_path: str | Path | None = None,
+    bybit_announcements_path: str | Path | None = None,
     universe_path: str | Path | None = None,
     universe_limit: int | None = None,
     cfg: EventDiscoveryConfig | None = None,
@@ -182,9 +186,34 @@ def run_manual_discovery(
     now = _as_utc(now or datetime.now(timezone.utc))
     start = now - timedelta(hours=cfg.lookback_hours)
     end = now + timedelta(days=cfg.horizon_days)
-    raw_events = ManualJsonEventProvider(event_path).fetch_events(start, end)
+    raw_events = load_discovery_events(
+        event_path,
+        start,
+        end,
+        binance_announcements_path=binance_announcements_path,
+        bybit_announcements_path=bybit_announcements_path,
+    )
     assets = load_discovery_assets(alias_path, universe_path=universe_path, universe_limit=universe_limit)
     return run_discovery(raw_events, assets, cfg=cfg, fade_cfg=fade_cfg, now=now)
+
+
+def load_discovery_events(
+    event_path: str | Path | None,
+    start: datetime,
+    end: datetime,
+    *,
+    binance_announcements_path: str | Path | None = None,
+    bybit_announcements_path: str | Path | None = None,
+) -> list[RawDiscoveredEvent]:
+    """Load local event fixtures from every configured research source."""
+    events: list[RawDiscoveredEvent] = []
+    if event_path:
+        events.extend(ManualJsonEventProvider(event_path).fetch_events(start, end))
+    if binance_announcements_path:
+        events.extend(BinanceAnnouncementProvider(binance_announcements_path).fetch_events(start, end))
+    if bybit_announcements_path:
+        events.extend(BybitAnnouncementProvider(bybit_announcements_path).fetch_events(start, end))
+    return events
 
 
 def load_discovery_assets(

@@ -1043,9 +1043,16 @@ def event_discovery_report(verbose: bool = False) -> None:
         format="%(asctime)s %(levelname)-5s %(message)s",
         datefmt="%H:%M:%S",
     )
-    path = config.EVENT_DISCOVERY_EVENTS_PATH
-    if not path:
-        print("No event-discovery event file configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH to a local JSON file.")
+    paths = (
+        config.EVENT_DISCOVERY_EVENTS_PATH,
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
+    )
+    if not any(paths):
+        print(
+            "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
+            "or an exchange announcement fixture path."
+        )
         return
     cfg = event_discovery.EventDiscoveryConfig(
         min_link_confidence=config.EVENT_DISCOVERY_MIN_LINK_CONFIDENCE,
@@ -1054,8 +1061,10 @@ def event_discovery_report(verbose: bool = False) -> None:
         horizon_days=config.EVENT_DISCOVERY_HORIZON_DAYS,
     )
     result = event_discovery.run_manual_discovery(
-        path,
+        config.EVENT_DISCOVERY_EVENTS_PATH,
         config.EVENT_DISCOVERY_ALIASES_PATH,
+        binance_announcements_path=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
+        bybit_announcements_path=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
         universe_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
         universe_limit=config.EVENT_DISCOVERY_UNIVERSE_LIMIT or None,
         cfg=cfg,

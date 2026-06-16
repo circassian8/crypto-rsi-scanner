@@ -542,6 +542,13 @@ def _coingecko_universe_fixture_path():
     return Path(__file__).resolve().parent.parent / "fixtures" / "coingecko_smoke" / "top_markets.json"
 
 
+def _exchange_announcement_fixture_paths():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery"
+    return root / "binance_announcements.json", root / "bybit_announcements.json"
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -604,6 +611,39 @@ def test_event_discovery_coingecko_universe_provider_uses_hygiene():
     assert by_id["bitcoin"].price == 68000.0
     assert by_id["bitcoin"].source == "coingecko_universe"
     assert "tether" not in by_id
+
+
+def test_event_discovery_exchange_announcement_providers_parse_fixtures():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner.event_providers.binance_announcements import BinanceAnnouncementProvider
+    from crypto_rsi_scanner.event_providers.bybit_announcements import BybitAnnouncementProvider
+
+    binance_path, bybit_path = _exchange_announcement_fixture_paths()
+    start = datetime(2026, 6, 12, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    binance_events = BinanceAnnouncementProvider(binance_path, required=True).fetch_events(start, end)
+    bybit_events = BybitAnnouncementProvider(bybit_path, required=True).fetch_events(start, end)
+    assert len(binance_events) == 1
+    assert len(bybit_events) == 1
+    assert binance_events[0].provider == "binance_announcements"
+    assert binance_events[0].raw_json["event"]["event_type"] == "exchange_listing"
+    assert binance_events[0].raw_json["event"]["event_time"] == "2026-06-15T12:00:00+00:00"
+    assert bybit_events[0].provider == "bybit_announcements"
+    assert bybit_events[0].raw_json["event"]["event_type"] == "perp_listing"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_path = Path(tmp) / "bad_announcements.json"
+        bad_path.write_text(json.dumps({"result": {"list": ["not an object"]}}), encoding="utf-8")
+        assert BinanceAnnouncementProvider(bad_path).fetch_events(start, end) == []
+        try:
+            BinanceAnnouncementProvider(bad_path, required=True).fetch_events(start, end)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("required malformed announcement fixture should fail")
 
 
 def test_event_discovery_normalizes_and_dedupes_events():
@@ -683,6 +723,46 @@ def test_event_discovery_resolves_real_assets_from_clean_universe_fixture():
     assert btc.fade_signal.signal_type == FadeSignalType.NO_TRADE
 
 
+def test_event_discovery_exchange_announcements_are_direct_no_trade():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    binance_path, bybit_path = _exchange_announcement_fixture_paths()
+    start = datetime(2026, 6, 12, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    raw = event_discovery.load_discovery_events(
+        None,
+        start,
+        end,
+        binance_announcements_path=binance_path,
+        bybit_announcements_path=bybit_path,
+    )
+    assets = load_asset_aliases(aliases_path)
+    result = event_discovery.run_discovery(
+        raw,
+        assets,
+        now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+    )
+    by_symbol = {candidate.asset.symbol: candidate for candidate in result.candidates}
+    assert len(raw) == 2
+    assert set(by_symbol) == {"TESTLIST", "TESTPERP"}
+
+    listing = by_symbol["TESTLIST"]
+    assert listing.event.event_type == "exchange_listing"
+    assert listing.classification.relationship_type == "direct_listing"
+    assert listing.classification.is_direct_beneficiary is True
+    assert listing.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    perp = by_symbol["TESTPERP"]
+    assert perp.event.event_type == "perp_listing"
+    assert perp.classification.relationship_type == "direct_listing"
+    assert perp.classification.is_direct_beneficiary is True
+    assert perp.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+
 def test_event_classification_proxy_direct_and_ambiguous_cases():
     result = _event_discovery_fixture_result()
     by_coin = {classification.coin_id: classification for classification in result.classifications}
@@ -739,9 +819,13 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     events_path, aliases_path = _event_discovery_fixture_paths()
     orig_events = config.EVENT_DISCOVERY_EVENTS_PATH
     orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
+    orig_binance = config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH
+    orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = events_path
     config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
         out = io.StringIO()
@@ -755,6 +839,41 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     finally:
         config.EVENT_DISCOVERY_EVENTS_PATH = orig_events
         config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = orig_binance
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
+
+
+def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    binance_path, bybit_path = _exchange_announcement_fixture_paths()
+    orig_events = config.EVENT_DISCOVERY_EVENTS_PATH
+    orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
+    orig_binance = config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH
+    orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
+    orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
+    config.EVENT_DISCOVERY_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = binance_path
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = bybit_path
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_discovery_report()
+        text = out.getvalue()
+        assert "TESTLIST" in text
+        assert "TESTPERP" in text
+        assert "NO_TRADE/DISCOVERED" in text
+    finally:
+        config.EVENT_DISCOVERY_EVENTS_PATH = orig_events
+        config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = orig_binance
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
 
