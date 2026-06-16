@@ -522,6 +522,11 @@ The bundle is a convenience wrapper around existing artifact-only commands. It
 does not infer labels, alter the source sample, write live storage, route
 alerts, open paper trades, or imply promotion. If a local price fixture is
 supplied, outcome filling is applied only to the bundle-local sample copy.
+If `--event-fade-review-bundle-reviewed REVIEWED_SAMPLE` is supplied, the
+bundle first merges matching prior review fields into the bundle-local
+`validation_sample.jsonl` using the same evidence-fingerprint guard as
+`--event-fade-merge-sample`. The manifest records matched rows, copied fields,
+evidence-changed rows, and any skipped evidence-change details.
 
 `main.py --event-fade-cache-review-bundle OUT_DIR` writes the same workspace
 directly from latest cached candidate snapshots under
@@ -532,6 +537,8 @@ It writes only under `OUT_DIR`.
 
 `make event-fade-review-cycle` runs the fixture-backed cache refresh and then
 writes the cache-backed review bundle using the same `EVENT_DISCOVERY_CACHE_DIR`.
+Set `EVENT_FADE_REVIEW_BUNDLE_REVIEWED=/path/to/previous_reviewed_sample.jsonl`
+to preserve valid prior human review work during the refresh.
 
 ## Validation Sample Review
 
@@ -910,6 +917,7 @@ step:
 make event-fade-review-cycle
 EVENT_DISCOVERY_CACHE_DIR=event_fade_cache \
 EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_cache_review_bundle \
+EVENT_FADE_REVIEW_BUNDLE_REVIEWED=/path/to/previous_reviewed_sample.jsonl \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-review-cycle
 ```

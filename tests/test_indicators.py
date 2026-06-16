@@ -3560,6 +3560,70 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert round(velvet["post_event_return_72h"], 4) == -0.2083
 
 
+def test_event_fade_review_bundle_scanner_merges_prior_reviewed_sample():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    reviewed = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    reviewed_row = next(row for row in reviewed if row["asset_symbol"] == "TESTVELVET")
+    reviewed_row["review_status"] = "reviewed"
+    reviewed_row["human_label"] = "valid_proxy_fade"
+    reviewed_row["human_notes"] = "Reviewed prior bundle evidence."
+    with tempfile.TemporaryDirectory() as tmp:
+        sample_path = Path(tmp) / "sample.jsonl"
+        reviewed_path = Path(tmp) / "reviewed.jsonl"
+        bundle_dir = Path(tmp) / "review_bundle"
+        event_discovery.write_validation_sample(rows, sample_path)
+        event_discovery.write_validation_sample(reviewed, reviewed_path)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_review_bundle(
+                str(sample_path),
+                str(bundle_dir),
+                limit=1,
+                prices_path=str(_outcome_prices_fixture_path()),
+                reviewed_path=str(reviewed_path),
+            )
+        text = out.getvalue()
+        assert "Review merge: 1 matched row(s)" in text
+        assert "0 evidence-changed row(s)" in text
+        assert "needing_review=16" in text
+
+        manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["review_merge"]["enabled"] is True
+        assert manifest["review_merge"]["reviewed_path"] == str(reviewed_path)
+        assert manifest["review_merge"]["matched_rows"] == 1
+        assert manifest["review_merge"]["copied_fields"] == 3
+        assert manifest["queue"]["needed_rows"] == 16
+
+        readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
+        assert "Prior reviewed sample" in readme
+
+        copied_rows = [
+            json.loads(line)
+            for line in (bundle_dir / "validation_sample.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        copied_velvet = next(row for row in copied_rows if row["asset_symbol"] == "TESTVELVET")
+        assert copied_velvet["human_label"] == "valid_proxy_fade"
+        assert copied_velvet["human_notes"] == "Reviewed prior bundle evidence."
+
+        filled_rows = [
+            json.loads(line)
+            for line in (bundle_dir / "validation_sample_with_outcomes.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
+        ]
+        filled_velvet = next(row for row in filled_rows if row["asset_symbol"] == "TESTVELVET")
+        assert filled_velvet["human_label"] == "valid_proxy_fade"
+        assert round(filled_velvet["post_event_return_72h"], 4) == -0.2083
+
+
 def test_event_fade_cache_review_bundle_scanner_writes_workspace():
     import contextlib
     import csv

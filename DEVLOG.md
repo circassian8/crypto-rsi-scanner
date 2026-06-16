@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Let event-fade review bundles preserve prior labels · Codex
+**Why:** The review-cycle workflow could refresh the event-discovery cache and
+write a new review bundle, but preserving valid labels/outcomes from a prior
+review still required a separate merge command. That made it too easy to hand a
+reviewer a fresh bundle that forgot already reviewed work.
+**Changes:**
+- Added optional prior-reviewed-sample merging to
+  `main.py --event-fade-review-bundle` and
+  `main.py --event-fade-cache-review-bundle` via
+  `--event-fade-review-bundle-reviewed`.
+- Threaded merge counts, copied-field counts, evidence-changed rows, and skipped
+  evidence-change details into the review-bundle manifest and README.
+- Added `EVENT_FADE_REVIEW_BUNDLE_REVIEWED` to Makefile review-bundle and
+  review-cycle targets so cache refresh + bundle export can preserve prior
+  review work in one command.
+- Added regression coverage proving a bundle can merge prior review
+  status/labels/notes, fill local outcomes, reduce the review queue, and record
+  merge provenance.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the refreshed workflow.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 222/222.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This is artifact-only review workflow support. The merge still
+uses evidence fingerprints and leaves changed-evidence rows unreviewed; it does
+not alter live storage, alerts, paper trades, or event-fade scoring.
+
 ## 2026-06-16 — Report event-fade review merge evidence drift · Codex
 **Why:** Evidence-drift protection blocked stale review labels/outcomes, but a
 reviewer still needed to know which rows were skipped and why. Counts alone are

@@ -1369,18 +1369,22 @@ def event_fade_review_bundle(
     *,
     limit: int | None = 20,
     prices_path: str | None = None,
+    reviewed_path: str | None = None,
     overwrite_outcomes: bool = False,
     verbose: bool = False,
 ) -> None:
     """Write a local event-fade validation review workspace."""
     _setup_event_discovery_logging(verbose)
     source_rows = event_validation.load_validation_sample(sample_path)
+    bundle_rows, review_merge = _merge_review_rows_for_bundle(source_rows, reviewed_path)
     result = _write_event_fade_review_bundle(
-        source_rows=source_rows,
+        source_rows=bundle_rows,
         sample_path=sample_path,
         out_dir=out_dir,
         limit=limit,
         prices_path=prices_path,
+        reviewed_path=reviewed_path,
+        review_merge=review_merge,
         overwrite_outcomes=overwrite_outcomes,
     )
     print(
@@ -1390,6 +1394,7 @@ def event_fade_review_bundle(
         f"showing={result['queue'].shown_rows}, "
         f"dir={result['bundle_dir']}"
     )
+    _print_review_merge_summary(review_merge)
     if result["outcome_sample"] is not None:
         print(f"Outcome-filled sample: {result['outcome_sample']}")
 
@@ -1399,18 +1404,22 @@ def event_fade_cache_review_bundle(
     *,
     limit: int | None = 20,
     prices_path: str | None = None,
+    reviewed_path: str | None = None,
     overwrite_outcomes: bool = False,
     verbose: bool = False,
 ) -> None:
     """Write a local review workspace from latest cached event-discovery snapshots."""
     _setup_event_discovery_logging(verbose)
     read = event_cache.load_cached_validation_sample(config.EVENT_DISCOVERY_CACHE_DIR)
+    bundle_rows, review_merge = _merge_review_rows_for_bundle(read.rows, reviewed_path)
     result = _write_event_fade_review_bundle(
-        source_rows=read.rows,
+        source_rows=bundle_rows,
         sample_path=f"cache:{read.cache_dir}",
         out_dir=out_dir,
         limit=limit,
         prices_path=prices_path,
+        reviewed_path=reviewed_path,
+        review_merge=review_merge,
         overwrite_outcomes=overwrite_outcomes,
     )
     print(
@@ -1421,8 +1430,37 @@ def event_fade_cache_review_bundle(
         f"showing={result['queue'].shown_rows}, "
         f"dir={result['bundle_dir']}"
     )
+    _print_review_merge_summary(review_merge)
     if result["outcome_sample"] is not None:
         print(f"Outcome-filled sample: {result['outcome_sample']}")
+
+
+def _merge_review_rows_for_bundle(
+    source_rows: list[dict[str, Any]],
+    reviewed_path: str | None,
+) -> tuple[list[dict[str, Any]], event_validation.ValidationSampleMergeResult | None]:
+    if not reviewed_path:
+        return source_rows, None
+    reviewed_rows = event_validation.load_validation_sample(reviewed_path)
+    result = event_validation.merge_review_fields(source_rows, reviewed_rows)
+    return result.rows, result
+
+
+def _print_review_merge_summary(
+    review_merge: event_validation.ValidationSampleMergeResult | None,
+) -> None:
+    if review_merge is None:
+        return
+    print(
+        "Review merge: "
+        f"{review_merge.matched_rows} matched row(s), "
+        f"{review_merge.evidence_changed_rows} evidence-changed row(s), "
+        f"{review_merge.unmatched_reviewed_rows} unmatched reviewed row(s), "
+        f"{review_merge.copied_fields} copied field(s)"
+    )
+    evidence_changes = event_validation.format_merge_evidence_changes(review_merge)
+    if evidence_changes:
+        print(evidence_changes)
 
 
 def _write_event_fade_review_bundle(
@@ -1432,6 +1470,8 @@ def _write_event_fade_review_bundle(
     out_dir: str,
     limit: int | None,
     prices_path: str | None,
+    reviewed_path: str | None,
+    review_merge: event_validation.ValidationSampleMergeResult | None,
     overwrite_outcomes: bool,
 ) -> dict[str, Any]:
     bundle_dir = Path(out_dir).expanduser()
@@ -1497,6 +1537,8 @@ def _write_event_fade_review_bundle(
         limit=limit,
         fill_summary=fill_summary,
         fill_result=fill_result,
+        reviewed_path=reviewed_path,
+        review_merge=review_merge,
     )
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
@@ -1515,6 +1557,8 @@ def _write_event_fade_review_bundle(
             rows=len(review_rows),
             queue=queue,
             fill_summary=fill_summary,
+            reviewed_path=reviewed_path,
+            review_merge=review_merge,
         ),
         encoding="utf-8",
     )
@@ -1545,6 +1589,8 @@ def _event_fade_review_bundle_manifest(
     limit: int | None,
     fill_summary: str,
     fill_result: event_validation.ValidationOutcomeFillResult | None,
+    reviewed_path: str | None,
+    review_merge: event_validation.ValidationSampleMergeResult | None,
 ) -> dict[str, Any]:
     files = {
         "readme": readme_path.name,
@@ -1601,6 +1647,38 @@ def _event_fade_review_bundle_manifest(
             "next_sample_work": list(event_validation.validation_review_next_steps(review)),
         },
         "outcome_fill": outcome_fill,
+        "review_merge": _event_fade_review_merge_manifest(reviewed_path, review_merge),
+    }
+
+
+def _event_fade_review_merge_manifest(
+    reviewed_path: str | None,
+    review_merge: event_validation.ValidationSampleMergeResult | None,
+) -> dict[str, Any]:
+    if review_merge is None:
+        return {
+            "enabled": False,
+            "reviewed_path": reviewed_path,
+        }
+    return {
+        "enabled": True,
+        "reviewed_path": reviewed_path,
+        "fresh_rows": review_merge.fresh_rows,
+        "reviewed_rows": review_merge.reviewed_rows,
+        "matched_rows": review_merge.matched_rows,
+        "evidence_changed_rows": review_merge.evidence_changed_rows,
+        "unmatched_reviewed_rows": review_merge.unmatched_reviewed_rows,
+        "copied_fields": review_merge.copied_fields,
+        "evidence_changes": [
+            {
+                "event_id": item.event_id,
+                "asset_symbol": item.asset_symbol,
+                "asset_coin_id": item.asset_coin_id,
+                "relationship_type": item.relationship_type,
+                "changed_fields": list(item.changed_fields),
+            }
+            for item in review_merge.evidence_changes
+        ],
     }
 
 
@@ -1690,12 +1768,23 @@ def _event_fade_review_bundle_readme(
     rows: int,
     queue: event_validation.ValidationLabelingQueue,
     fill_summary: str,
+    reviewed_path: str | None,
+    review_merge: event_validation.ValidationSampleMergeResult | None,
 ) -> str:
     outcome_line = (
         f"- `{outcome_sample.name}`: sample with locally filled trigger/baseline outcomes"
         if outcome_sample is not None
         else "- No outcome-filled sample was written."
     )
+    if review_merge is None:
+        merge_line = "- No prior reviewed sample was merged."
+    else:
+        merge_line = (
+            f"- Prior reviewed sample `{reviewed_path}` merged: "
+            f"{review_merge.matched_rows} matched, "
+            f"{review_merge.evidence_changed_rows} evidence-changed, "
+            f"{review_merge.copied_fields} copied field(s)."
+        )
     return "\n".join([
         "# Event-Fade Validation Review Bundle",
         "",
@@ -1706,6 +1795,8 @@ def _event_fade_review_bundle_readme(
         f"Rows needing labels/status/outcomes: {queue.needed_rows}",
         f"Rows shown in queue/template/packet: {queue.shown_rows}",
         f"Outcome fill: {fill_summary}",
+        "Review merge:",
+        merge_line,
         "",
         "Files:",
         f"- `{copied_sample.name}`: copied source validation sample",
@@ -1975,6 +2066,11 @@ def cli() -> None:
         help="Optional local OHLCV price fixture for review-bundle outcome filling.",
     )
     parser.add_argument(
+        "--event-fade-review-bundle-reviewed",
+        metavar="REVIEWED_SAMPLE",
+        help="Optional prior reviewed sample to merge into review-bundle rows before writing artifacts.",
+    )
+    parser.add_argument(
         "--event-fade-queue-limit",
         type=int,
         default=20,
@@ -2168,6 +2264,7 @@ def cli() -> None:
             out_dir,
             limit=args.event_fade_queue_limit,
             prices_path=args.event_fade_review_bundle_prices,
+            reviewed_path=args.event_fade_review_bundle_reviewed,
             overwrite_outcomes=args.event_fade_overwrite_outcomes,
             verbose=args.verbose,
         )
@@ -2177,6 +2274,7 @@ def cli() -> None:
             args.event_fade_cache_review_bundle,
             limit=args.event_fade_queue_limit,
             prices_path=args.event_fade_review_bundle_prices,
+            reviewed_path=args.event_fade_review_bundle_reviewed,
             overwrite_outcomes=args.event_fade_overwrite_outcomes,
             verbose=args.verbose,
         )

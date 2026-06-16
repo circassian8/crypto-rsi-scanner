@@ -12,6 +12,7 @@ EVENT_FADE_SAMPLE_REVIEW_APPLIED ?= /tmp/event_fade_validation_review_applied.js
 EVENT_FADE_REVIEW_BUNDLE_DIR ?= /tmp/event_fade_review_bundle
 EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR ?= /tmp/event_fade_cache_review_bundle
 EVENT_FADE_REVIEW_BUNDLE_PRICES ?=
+EVENT_FADE_REVIEW_BUNDLE_REVIEWED ?=
 EVENT_FADE_QUEUE_LIMIT ?= 20
 EVENT_DISCOVERY_CACHE_DIR ?= event_fade_cache
 EVENT_FADE_OUTCOME_PRICES ?= fixtures/event_discovery/outcome_prices.json
@@ -205,15 +206,15 @@ event-fade-apply-review-template:
 	$(PYTHON) main.py --event-fade-apply-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE) $(EVENT_FADE_SAMPLE_REVIEW_APPLIED)
 
 event-fade-review-bundle:
-	$(PYTHON) main.py --event-fade-review-bundle $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),)
+	$(PYTHON) main.py --event-fade-review-bundle $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),)
 
 event-fade-cache-review-bundle:
 	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
-	$(PYTHON) main.py --event-fade-cache-review-bundle $(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),)
+	$(PYTHON) main.py --event-fade-cache-review-bundle $(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),)
 
 event-fade-review-cycle:
 	$(MAKE) event-discovery-refresh EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR)
-	$(MAKE) event-fade-cache-review-bundle EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=$(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) EVENT_FADE_QUEUE_LIMIT=$(EVENT_FADE_QUEUE_LIMIT) EVENT_FADE_REVIEW_BUNDLE_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_PRICES)
+	$(MAKE) event-fade-cache-review-bundle EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=$(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) EVENT_FADE_QUEUE_LIMIT=$(EVENT_FADE_QUEUE_LIMIT) EVENT_FADE_REVIEW_BUNDLE_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_PRICES) EVENT_FADE_REVIEW_BUNDLE_REVIEWED=$(EVENT_FADE_REVIEW_BUNDLE_REVIEWED)
 
 event-fade-merge-sample:
 	$(PYTHON) main.py --event-fade-merge-sample $(EVENT_FADE_SAMPLE_FRESH) $(EVENT_FADE_SAMPLE_REVIEWED) $(EVENT_FADE_SAMPLE_MERGED)
