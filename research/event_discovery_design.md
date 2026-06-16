@@ -554,6 +554,8 @@ The reviewer currently checks:
   decision time
 - reviewed rows with any source evidence published/fetched after the decision
   time, even if another source for the same event was available earlier
+- decision time is `trigger_observed_at` for reviewed `SHORT_TRIGGERED` rows and
+  `event_time` for other reviewed dated rows, including direct/ambiguous controls
 - trigger latency from event time to `SHORT_TRIGGERED`, including negative
   latencies that imply invalid state progression
 - average MFE, MAE, MFE/MAE ratio, and post-event 24h/72h/7d returns for

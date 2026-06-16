@@ -2419,6 +2419,13 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
         row = pick(symbol, relationship)
         row["human_label"] = label
         row["review_status"] = "reviewed"
+        row["first_seen_time"] = "2026-06-12T00:00:00+00:00"
+        row["published_at_min"] = "2026-06-12T00:00:00+00:00"
+        row["published_at_max"] = "2026-06-12T00:00:00+00:00"
+        row["fetched_at_min"] = "2026-06-12T00:00:00+00:00"
+        row["fetched_at_max"] = "2026-06-12T00:00:00+00:00"
+        row["raw_published_at"] = ["2026-06-12T00:00:00+00:00"]
+        row["raw_fetched_at"] = ["2026-06-12T00:00:00+00:00"]
         return row
 
     velvet = mark("TESTVELVET", "valid_proxy_fade")
@@ -2876,6 +2883,43 @@ def test_event_fade_validation_review_flags_mixed_late_source_evidence():
     queue = event_validation.build_labeling_queue(rows)
     item = next(item for item in queue.items if item.asset_symbol == "TESTVELVET")
     assert item.category == "review_post_decision_source"
+
+
+def test_event_fade_validation_review_flags_late_control_evidence():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    direct = next(
+        row
+        for row in rows
+        if row["asset_symbol"] == "TESTBTC" and row["relationship_type"] == "direct_token_event"
+    )
+    direct["human_label"] = "direct_event"
+    direct["review_status"] = "reviewed"
+    direct["event_time"] = "2026-06-15T13:30:00+00:00"
+    direct["first_seen_time"] = "2026-06-15T14:00:00+00:00"
+    direct["published_at_min"] = "2026-06-15T14:00:00+00:00"
+    direct["published_at_max"] = "2026-06-15T14:00:00+00:00"
+    direct["fetched_at_min"] = "2026-06-15T14:00:00+00:00"
+    direct["fetched_at_max"] = "2026-06-15T14:00:00+00:00"
+    direct["raw_published_at"] = ["2026-06-15T14:00:00+00:00"]
+    direct["raw_fetched_at"] = ["2026-06-15T14:00:00+00:00"]
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=0,
+        min_negative_controls=1,
+        min_triggered_reviewed=0,
+    )
+    assert review.reviewed_negative_controls == 1
+    assert review.point_in_time_violation_rows == 1
+    assert review.post_decision_source_rows == 1
+    assert any("evidence first seen after the decision time" in blocker for blocker in review.promotion_blockers)
+    assert any("source evidence after the decision time" in blocker for blocker in review.promotion_blockers)
+
+    queue = event_validation.build_labeling_queue(rows)
+    item = next(item for item in queue.items if item.asset_symbol == "TESTBTC")
+    assert item.category == "fix_point_in_time_evidence"
 
 
 def test_event_discovery_scanner_report_uses_local_fixtures():

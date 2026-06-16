@@ -265,6 +265,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   event-type/relationship/BTC-risk cohorts, diversity gates, and promotion
   blockers plus concrete next-sample work. A row only counts as reviewed
   evidence when it has `review_status=reviewed` and a known `human_label`.
+  Source-timing checks use `trigger_observed_at` for reviewed `SHORT_TRIGGERED`
+  rows and `event_time` for other reviewed dated rows, including direct or
+  ambiguous controls.
   The review command must not automatically promote alerts, write live storage,
   open paper trades, or imply execution.
 - Event-fade validation labeling queues are artifact-only. `main.py

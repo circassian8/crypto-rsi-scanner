@@ -1501,11 +1501,9 @@ def _post_decision_source(row: Mapping[str, Any]) -> bool:
 
 def _decision_time(row: Mapping[str, Any]) -> datetime | None:
     signal_type = _signal_type(row)
-    if signal_type == "WATCHLIST":
-        return _dt(row.get("event_time"))
     if signal_type == "SHORT_TRIGGERED":
         return _dt(row.get("trigger_observed_at"))
-    return None
+    return _dt(row.get("event_time"))
 
 
 def _source_known_times(row: Mapping[str, Any], *, include_max: bool) -> list[datetime]:

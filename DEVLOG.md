@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Apply point-in-time source checks to dated controls · Codex
+**Why:** Reviewed direct/ambiguous negative controls could previously skip
+source-timing checks because `NO_TRADE` rows had no review decision time. That
+could let post-event articles inflate the validation control sample even though
+the event was not actually knowable before its catalyst time.
+**Changes:**
+- Tightened `crypto_rsi_scanner/event_validation.py` so reviewed
+  `SHORT_TRIGGERED` rows still use `trigger_observed_at` as the decision time,
+  while other reviewed dated rows use `event_time`.
+- Added a regression test proving a reviewed direct-beneficiary control with
+  source evidence after event time is blocked and prioritized for
+  point-in-time review.
+- Updated `AGENTS.md` and `research/event_discovery_design.md` with the
+  decision-time convention.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 217/217.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This tightens review/promotion evidence only. It does not
+change event discovery, event-fade scoring, alert routing, live storage, or
+paper trading.
+
 ## 2026-06-16 — Align event-fade cohort counts with reviewed evidence · Codex
 **Why:** The validation report's top-level metrics required
 `review_status=reviewed` plus a known `human_label`, but cohort tables still
