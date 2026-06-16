@@ -4497,6 +4497,11 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert manifest["files"]["review_template"] == "review_template.csv"
         assert manifest["outcome_fill"]["filled_rows"] == 1
         assert manifest["review"]["promotion_ready"] is False
+        assert manifest["review"]["reviewed_proxy_event_types"] == 0
+        assert manifest["review"]["min_proxy_event_types"] == 2
+        assert manifest["review"]["reviewed_proxy_source_providers"] == 0
+        assert manifest["review"]["min_proxy_source_providers"] == 2
+        assert manifest["review"]["low_confidence_trigger_event_time_rows"] == 0
         assert manifest["sample_summary"]["rows"] == 17
         assert manifest["sample_summary"]["proxy_candidates"] == 6
         assert manifest["sample_summary"]["direct_beneficiaries"] == 9
@@ -4510,6 +4515,8 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "Proxy candidates: 6" in readme
         assert "Asset roles: direct_beneficiary=9, proxy_instrument=6, ambiguous=2" in readme
         assert "Source provider detail:" in readme
+        assert "Review gates:" in readme
+        assert "Proxy diversity: event_types=0/2, source_providers=0/2" in readme
         assert "manual_json: rows=5, proxy=1, direct=3, triggered=1, missing_time=1" in readme
 
         packet = (bundle_dir / "review_packet.md").read_text(encoding="utf-8")
@@ -4722,6 +4729,8 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
             assert manifest["sample_summary"]["rows"] == 17
             assert manifest["sample_summary"]["asset_roles"]["proxy_instrument"] == 6
             assert manifest["sample_summary"]["source_provider_summary"]["manual_json"]["short_triggered_rows"] == 1
+            assert manifest["review"]["reviewed_proxy_source_providers"] == 0
+            assert manifest["review"]["min_proxy_source_providers"] == 2
 
             template_text = (bundle_dir / "review_template.csv").read_text(encoding="utf-8")
             template_rows = list(csv.DictReader(template_text.splitlines()))

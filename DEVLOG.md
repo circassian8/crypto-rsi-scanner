@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Expose review gates in event-fade bundles · Codex
+**Why:** The no-key review bundle is the handoff artifact for human and external
+review, but its manifest/README only exposed a subset of the validation gates.
+Source-provider diversity and timing blockers should be visible without parsing
+the full text report.
+**Changes:**
+- Added review-gate metrics to review-bundle `manifest.json`, including proxy
+  event-type/source-provider diversity, trigger BTC-risk diversity,
+  low-confidence trigger event times, and event-time baseline gaps.
+- Added a compact `Review gates` section to bundle `README.md`.
+- Covered the enriched manifest and README fields in review-bundle regression
+  tests.
+**Verify:** `make verify` passes, including 243/243 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This is review artifact metadata only. It does not change event
+discovery, validation thresholds, event-fade scoring, alerts, paper trades, or
+live storage.
+
 ## 2026-06-16 — Gate validation on source-provider diversity · Codex
 **Why:** The no-key event-fade review workflow can collect many rows from one
 RSS/feed/API source. A reviewed proxy sample should not look promotion-ready

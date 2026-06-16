@@ -1701,6 +1701,7 @@ def _write_event_fade_review_bundle(
             manifest_path=manifest_path,
             rows=len(review_rows),
             queue=queue,
+            review=review,
             sample_summary=sample_summary,
             fill_summary=fill_summary,
             auto_export_prices=auto_export_prices,
@@ -1800,8 +1801,16 @@ def _event_fade_review_bundle_manifest(
             "reviewed_rows": review.reviewed_rows,
             "reviewed_proxy_candidates": review.reviewed_proxy_candidates,
             "reviewed_negative_controls": review.reviewed_negative_controls,
+            "reviewed_proxy_event_types": review.reviewed_proxy_event_types,
+            "min_proxy_event_types": review.min_proxy_event_types,
+            "reviewed_proxy_source_providers": review.reviewed_proxy_source_providers,
+            "min_proxy_source_providers": review.min_proxy_source_providers,
             "triggered_reviewed": review.triggered_reviewed,
+            "triggered_btc_risk_buckets": review.triggered_btc_risk_buckets,
+            "min_trigger_btc_risk_buckets": review.min_trigger_btc_risk_buckets,
+            "low_confidence_trigger_event_time_rows": review.low_confidence_trigger_event_time_rows,
             "missing_trigger_outcome_rows": review.missing_trigger_outcome_rows,
+            "missing_event_time_baseline_rows": review.missing_event_time_baseline_rows,
             "point_in_time_violation_rows": review.point_in_time_violation_rows,
             "post_decision_source_rows": review.post_decision_source_rows,
             "missing_source_timing_rows": review.missing_source_timing_rows,
@@ -2066,6 +2075,7 @@ def _event_fade_review_bundle_readme(
     manifest_path: Path,
     rows: int,
     queue: event_validation.ValidationLabelingQueue,
+    review: event_validation.EventFadeValidationReview,
     sample_summary: dict[str, Any],
     fill_summary: str,
     auto_export_prices: bool,
@@ -2105,6 +2115,9 @@ def _event_fade_review_bundle_readme(
         "",
         "Sample summary:",
         *_event_fade_review_bundle_summary_lines(sample_summary),
+        "",
+        "Review gates:",
+        *_event_fade_review_gate_lines(review),
         *warning_lines,
         f"Auto price export: {'yes' if auto_export_prices else 'no'}",
         f"Outcome fill: {fill_summary}",
@@ -2141,6 +2154,32 @@ def _event_fade_review_bundle_summary_lines(sample_summary: dict[str, Any]) -> l
         "- Relationships: " + _summary_count_line(sample_summary.get("relationship_types")),
         "- Source providers: " + _summary_count_line(sample_summary.get("source_providers")),
         "- Source provider detail: " + _source_provider_summary_line(sample_summary.get("source_provider_summary")),
+        "",
+    ]
+
+
+def _event_fade_review_gate_lines(review: event_validation.EventFadeValidationReview) -> list[str]:
+    return [
+        f"- Promotion ready: {'yes' if review.promotion_ready else 'no'}",
+        (
+            f"- Reviewed coverage: proxy={review.reviewed_proxy_candidates}/{review.min_proxy_candidates}, "
+            f"controls={review.reviewed_negative_controls}/{review.min_negative_controls}, "
+            f"triggers={review.triggered_reviewed}/{review.min_triggered_reviewed}"
+        ),
+        (
+            f"- Proxy diversity: event_types={review.reviewed_proxy_event_types}/{review.min_proxy_event_types}, "
+            f"source_providers={review.reviewed_proxy_source_providers}/{review.min_proxy_source_providers}"
+        ),
+        (
+            f"- Trigger diversity: btc_risk_buckets={review.triggered_btc_risk_buckets}/"
+            f"{review.min_trigger_btc_risk_buckets}"
+        ),
+        (
+            f"- Timing blockers: low_confidence_trigger_times={review.low_confidence_trigger_event_time_rows}, "
+            f"missing_source_timing={review.missing_source_timing_rows}, "
+            f"point_in_time_violations={review.point_in_time_violation_rows}, "
+            f"post_decision_source_rows={review.post_decision_source_rows}"
+        ),
         "",
     ]
 

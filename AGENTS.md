@@ -344,10 +344,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   for offline fixture smoke. With
   `--event-fade-review-bundle-reviewed` it may first merge prior reviewed
   labels/notes/outcomes that still match the fresh evidence fingerprint. It also
-  writes a `manifest.json` for bundle provenance/counts/price-export/merge
-  status. Empty bundles must warn that no validation rows were produced and
-  point back to provider status/source refresh, rather than looking like
-  completed review work. It must not infer labels, write live storage, route
+  writes a `manifest.json` for bundle provenance/counts/review-gate metrics/
+  price-export/merge status, and its README summarizes the same coverage,
+  diversity, timing, and promotion-readiness gates. Empty bundles must warn that
+  no validation rows were produced and point back to provider status/source
+  refresh, rather than looking like completed review work. It must not infer
+  labels, write live storage, route
   alerts, open paper trades, or imply promotion.
 - Event-fade validation merges are artifact-only. `main.py --event-fade-merge-sample`
   may copy nonblank human labels/notes/outcomes from a previously reviewed

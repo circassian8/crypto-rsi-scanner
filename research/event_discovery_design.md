@@ -586,7 +586,8 @@ workspace for a validation sample. The bundle contains:
 - `review_template.csv`: compact editable sidecar
 - `review_report.txt`: current metrics and promotion blockers
 - `manifest.json`: machine-readable bundle provenance, file map, review counts,
-  blockers, next-sample work, and optional outcome-fill stats
+  diversity/timing gate metrics, blockers, next-sample work, and optional
+  outcome-fill stats
 - `README.md`: suggested manual workflow
 
 The bundle is a convenience wrapper around existing artifact-only commands. It
@@ -601,8 +602,11 @@ If `--event-fade-review-bundle-reviewed REVIEWED_SAMPLE` is supplied, the
 bundle first merges matching prior review fields into the bundle-local
 `validation_sample.jsonl` using the same evidence-fingerprint guard as
 `--event-fade-merge-sample`. The manifest records matched rows, copied fields,
-evidence-changed rows, any skipped evidence-change details, price-export counts,
-and outcome-fill counts.
+evidence-changed rows, any skipped evidence-change details, review-gate metrics
+such as proxy source-provider diversity and low-confidence trigger event times,
+price-export counts, and outcome-fill counts. The README mirrors the core
+coverage/diversity/timing gates so a local bundle is inspectable without opening
+the full review report first.
 
 `main.py --event-fade-cache-review-bundle OUT_DIR` writes the same workspace
 directly from latest cached candidate snapshots under
