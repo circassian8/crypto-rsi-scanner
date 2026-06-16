@@ -1124,6 +1124,7 @@ def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResul
         coinalyze_live=config.EVENT_DISCOVERY_COINALYZE_LIVE,
         coinalyze_api_key=config.EVENT_DISCOVERY_COINALYZE_API_KEY,
         coinalyze_symbols=config.EVENT_DISCOVERY_COINALYZE_SYMBOLS,
+        coinalyze_auto_symbols=config.EVENT_DISCOVERY_COINALYZE_AUTO_SYMBOLS,
         coinalyze_base_url=config.EVENT_DISCOVERY_COINALYZE_BASE_URL,
         coinalyze_timeout=config.EVENT_DISCOVERY_COINALYZE_TIMEOUT,
         coinalyze_history_interval=config.EVENT_DISCOVERY_COINALYZE_HISTORY_INTERVAL,

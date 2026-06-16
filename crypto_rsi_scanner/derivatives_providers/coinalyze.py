@@ -35,6 +35,8 @@ class CoinalyzeDerivativesProvider:
         live_enabled: bool = False,
         api_key: str = "",
         symbols: Iterable[str] = (),
+        base_symbols: Iterable[str] = (),
+        auto_symbols: bool = True,
         base_url: str = "https://api.coinalyze.net/v1/",
         timeout: float = 10.0,
         history_interval: str = "1hour",
@@ -48,6 +50,8 @@ class CoinalyzeDerivativesProvider:
         self.live_enabled = live_enabled
         self.api_key = api_key
         self.symbols = tuple(symbol.strip() for symbol in symbols if str(symbol).strip())
+        self.base_symbols = tuple(_normalize_base_symbol(symbol) for symbol in base_symbols if str(symbol).strip())
+        self.auto_symbols = auto_symbols
         self.base_url = base_url.rstrip("/") + "/"
         self.timeout = timeout
         self.history_interval = history_interval
@@ -84,13 +88,14 @@ class CoinalyzeDerivativesProvider:
                 raise ValueError("Coinalyze live derivatives fetch requires API key")
             log.warning("Coinalyze live derivatives fetch skipped: missing API key")
             return {}
-        if not self.symbols:
+        symbols = self._live_symbols()
+        if not symbols:
             if self.required:
                 raise ValueError("Coinalyze live derivatives fetch requires at least one symbol")
             log.warning("Coinalyze live derivatives fetch skipped: no symbols configured")
             return {}
         try:
-            rows = self._fetch_live_rows()
+            rows = self._fetch_live_rows(symbols)
         except Exception as exc:  # noqa: BLE001
             if self.required:
                 raise
@@ -105,9 +110,17 @@ class CoinalyzeDerivativesProvider:
                 out[key] = snapshot
         return out
 
-    def _fetch_live_rows(self) -> list[dict[str, Any]]:
+    def _live_symbols(self) -> tuple[str, ...]:
+        if self.symbols:
+            return self.symbols
+        if not self.auto_symbols or not self.base_symbols:
+            return ()
+        markets = self._get("future-markets", {})
+        return resolve_future_market_symbols(markets, self.base_symbols)
+
+    def _fetch_live_rows(self, live_symbols: Iterable[str]) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
-        for symbols in _batches(self.symbols, 20):
+        for symbols in _batches(live_symbols, 20):
             by_symbol = _base_rows(symbols)
             for item in self._get("open-interest", {"symbols": ",".join(symbols), "convert_to_usd": _bool_param(self.convert_to_usd)}):
                 symbol = str(item.get("symbol") or "")
@@ -182,6 +195,55 @@ def _live_base_row(symbol: str) -> dict[str, Any]:
         "base_symbol": _strip_quote_suffix(symbol),
         "perp_available": True,
     }
+
+
+def resolve_future_market_symbols(
+    markets: Iterable[Mapping[str, Any]],
+    base_symbols: Iterable[str],
+) -> tuple[str, ...]:
+    """Select one preferred Coinalyze futures symbol for each requested base."""
+    requested = [_normalize_base_symbol(symbol) for symbol in base_symbols if str(symbol).strip()]
+    by_base: dict[str, tuple[int, str]] = {}
+    for market in markets:
+        symbol = str(market.get("symbol") or "").strip()
+        base = _normalize_base_symbol(market.get("base_asset") or _strip_quote_suffix(symbol))
+        if not symbol or base not in requested:
+            continue
+        score = _future_market_score(market)
+        current = by_base.get(base)
+        if current is None or score > current[0]:
+            by_base[base] = (score, symbol)
+    out: list[str] = []
+    seen: set[str] = set()
+    for base in requested:
+        selected = by_base.get(base)
+        if selected is None:
+            continue
+        symbol = selected[1]
+        if symbol not in seen:
+            seen.add(symbol)
+            out.append(symbol)
+    return tuple(out)
+
+
+def _future_market_score(market: Mapping[str, Any]) -> int:
+    score = 0
+    if market.get("is_perpetual") is True:
+        score += 100
+    quote = str(market.get("quote_asset") or "").upper()
+    if quote == "USDT":
+        score += 40
+    elif quote == "USD":
+        score += 30
+    margined = str(market.get("margined") or "").upper()
+    if margined == "STABLE":
+        score += 20
+    exchange = str(market.get("exchange") or "").upper()
+    if exchange in {"BINANCE", "BYBIT", "OKX"}:
+        score += 5
+    if str(market.get("symbol") or "").upper().endswith(".A"):
+        score += 1
+    return score
 
 
 def _snapshot(row: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -271,6 +333,10 @@ def _strip_quote_suffix(symbol: str) -> str:
         if raw.endswith(suffix) and len(raw) > len(suffix):
             raw = raw[: -len(suffix)]
     return raw
+
+
+def _normalize_base_symbol(value: object) -> str:
+    return _strip_quote_suffix(str(value or "")).upper()
 
 
 def _parse_dt(value: object) -> datetime | None:

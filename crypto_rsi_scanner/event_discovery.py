@@ -347,6 +347,7 @@ def run_manual_discovery(
     coinalyze_live: bool = False,
     coinalyze_api_key: str = "",
     coinalyze_symbols: Iterable[str] = (),
+    coinalyze_auto_symbols: bool = True,
     coinalyze_base_url: str = "https://api.coinalyze.net/v1/",
     coinalyze_timeout: float = 10.0,
     coinalyze_history_interval: str = "1hour",
@@ -415,11 +416,20 @@ def run_manual_discovery(
         sports_fixtures_path=sports_fixtures_path,
         prediction_market_events_path=prediction_market_events_path,
     )
+    assets = load_discovery_assets(
+        alias_path,
+        universe_path=universe_path,
+        universe_limit=universe_limit,
+        universe_live=universe_live,
+        universe_fetch_limit=universe_fetch_limit,
+    )
     derivatives = load_derivatives_snapshots(
         coinalyze_derivatives_path,
         coinalyze_live=coinalyze_live,
         coinalyze_api_key=coinalyze_api_key,
         coinalyze_symbols=coinalyze_symbols,
+        coinalyze_auto_symbols=coinalyze_auto_symbols,
+        coinalyze_base_symbols=_coinalyze_base_symbols(assets),
         coinalyze_base_url=coinalyze_base_url,
         coinalyze_timeout=coinalyze_timeout,
         coinalyze_history_interval=coinalyze_history_interval,
@@ -431,13 +441,6 @@ def run_manual_discovery(
         etherscan_supply_path=etherscan_supply_path,
         arkham_supply_path=arkham_supply_path,
         dune_supply_path=dune_supply_path,
-    )
-    assets = load_discovery_assets(
-        alias_path,
-        universe_path=universe_path,
-        universe_limit=universe_limit,
-        universe_live=universe_live,
-        universe_fetch_limit=universe_fetch_limit,
     )
     return run_discovery(
         raw_events,
@@ -590,12 +593,41 @@ def load_discovery_assets(
     return merge_discovered_assets(assets)
 
 
+def _coinalyze_base_symbols(assets: Iterable[DiscoveredAsset]) -> tuple[str, ...]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for asset in assets:
+        for value in (asset.symbol, *asset.aliases):
+            symbol = _coinalyze_base_symbol(value)
+            if not symbol or symbol in seen:
+                continue
+            seen.add(symbol)
+            out.append(symbol)
+            break
+    return tuple(out)
+
+
+def _coinalyze_base_symbol(value: object) -> str:
+    text = str(value or "").strip().upper()
+    if not text:
+        return ""
+    compact = text.replace("-", "").replace("_", "").replace("/", "")
+    for suffix in ("USDT", "USD"):
+        if compact.endswith(suffix) and len(compact) > len(suffix):
+            compact = compact[: -len(suffix)]
+    if compact.isalnum() and any(ch.isalpha() for ch in compact):
+        return compact
+    return ""
+
+
 def load_derivatives_snapshots(
     coinalyze_derivatives_path: str | Path | None,
     *,
     coinalyze_live: bool = False,
     coinalyze_api_key: str = "",
     coinalyze_symbols: Iterable[str] = (),
+    coinalyze_auto_symbols: bool = True,
+    coinalyze_base_symbols: Iterable[str] = (),
     coinalyze_base_url: str = "https://api.coinalyze.net/v1/",
     coinalyze_timeout: float = 10.0,
     coinalyze_history_interval: str = "1hour",
@@ -612,6 +644,8 @@ def load_derivatives_snapshots(
             live_enabled=True,
             api_key=coinalyze_api_key,
             symbols=coinalyze_symbols,
+            base_symbols=coinalyze_base_symbols,
+            auto_symbols=coinalyze_auto_symbols,
             base_url=coinalyze_base_url,
             timeout=coinalyze_timeout,
             history_interval=coinalyze_history_interval,

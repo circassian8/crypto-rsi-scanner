@@ -6,7 +6,8 @@ fixture-backed exchange announcement providers plus opt-in live Bybit
 announcement fetch, structured calendar/unlock providers, news/proxy-narrative
 providers plus opt-in live CryptoPanic posts, GDELT Article List, and
 project-blog RSS/Atom fetches, external catalyst providers, and
-Coinalyze-style derivatives plus opt-in live Coinalyze REST enrichment,
+Coinalyze-style derivatives plus opt-in live Coinalyze REST enrichment with
+optional `future-markets` symbol auto-resolution,
 Tokenomist/Etherscan/Arkham/Dune-style supply/on-chain enrichment, plus grouped
 auto reporting and validation-sample exports, research-only JSONL cache refresh,
 validation-sample review metrics, labeling-queue support, research-only merge
@@ -208,11 +209,14 @@ sample evidence, not trade triggers.
 
 The Coinalyze-style derivatives provider reads local JSON fixtures by default.
 It can also fetch live Coinalyze REST snapshots when
-`RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, `RSI_EVENT_DISCOVERY_COINALYZE_API_KEY`
-is set, and `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` contains explicit
-Coinalyze future symbols such as `BTCUSDT_PERP.A`. Live derivatives are
-enrichment only; enabling them without an event source does not create discovery
-events.
+`RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1` and
+`RSI_EVENT_DISCOVERY_COINALYZE_API_KEY` is set. Explicit
+`RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` such as `BTCUSDT_PERP.A` are used first.
+If explicit symbols are omitted and
+`RSI_EVENT_DISCOVERY_COINALYZE_AUTO_SYMBOLS=1`, the provider queries Coinalyze
+`future-markets` and selects one preferred perp symbol for each already-resolved
+discovery asset base. Live derivatives are enrichment only; enabling them
+without an event source does not create discovery events.
 
 The provider produces candidate enrichment keyed by coin id, symbol, base
 symbol, or market symbol and fills `EventDerivativesSnapshot` fields used by
@@ -226,11 +230,11 @@ symbol, or market symbol and fills `EventDerivativesSnapshot` fields used by
 - perp/spot volume ratio
 - liquidations, long/short ratio, and basis
 
-The live path uses Coinalyze's documented `open-interest`, `funding-rate`,
-`open-interest-history`, `liquidation-history`, `long-short-ratio-history`, and
-`ohlcv-history` endpoints. Current OI/funding fill the latest snapshot; 24h OI
-change, liquidations, long/short ratio, and futures volume are derived from the
-configured historical lookback.
+The live path uses Coinalyze's documented `future-markets`, `open-interest`,
+`funding-rate`, `open-interest-history`, `liquidation-history`,
+`long-short-ratio-history`, and `ohlcv-history` endpoints. Current OI/funding
+fill the latest snapshot; 24h OI change, liquidations, long/short ratio, and
+futures volume are derived from the configured historical lookback.
 
 Raw event fixture data wins over provider enrichment. This keeps provider rows
 from overwriting hand-reviewed event evidence during fixture research.
@@ -599,7 +603,8 @@ This command writes only `raw_events.jsonl` and `discovery_runs.jsonl` rows. Use
 `--event-discovery-refresh` or validation-sample exports for normalized
 candidate snapshots.
 
-Add opt-in live Coinalyze derivatives enrichment to a radar pass:
+Add opt-in live Coinalyze derivatives enrichment to a radar pass with explicit
+symbols:
 
 ```bash
 RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
@@ -611,6 +616,17 @@ RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS=BTCUSDT_PERP.A,ETHUSDT_PERP.A \
 
 Live Coinalyze is enrichment only. It cannot create events by itself and must
 not bypass proxy/direct eligibility.
+
+Or let the provider resolve preferred Coinalyze perp symbols from already-linked
+discovery assets:
+
+```bash
+RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
+RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1 \
+RSI_EVENT_DISCOVERY_COINALYZE_API_KEY=... \
+RSI_EVENT_DISCOVERY_COINALYZE_AUTO_SYMBOLS=1 \
+  .venv/bin/python main.py --event-discovery-report
+```
 
 Run an opt-in live CryptoPanic news radar pass:
 

@@ -219,13 +219,20 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   structured calendar, unlock, news/proxy-narrative, external catalyst,
   derivatives, supply/on-chain, and clean CoinGecko market fixtures through the
   shared `universe.py` hygiene filters. Opt-in live Bybit announcement,
-  CryptoPanic posts, GDELT Article List, and project-blog RSS/Atom fetching are
-  allowed only for local research reports/exports/cache refreshes, not live
-  routing. Event discovery must not write live signal/outcome/paper tables or
-  route notifications.
+  CryptoPanic posts, GDELT Article List, project-blog RSS/Atom, and Coinalyze
+  derivatives fetching are allowed only for local research
+  reports/exports/cache refreshes, not live routing. Event discovery must not
+  write live signal/outcome/paper tables or route notifications.
   Ticker-only/ambiguous asset matches must stay below trigger confidence.
   Provider enrichment is evidence, not eligibility; raw reviewed fixture
   evidence takes precedence over provider rows.
+- Live Coinalyze enrichment may auto-resolve futures symbols. When
+  `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, explicit
+  `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise
+  `RSI_EVENT_DISCOVERY_COINALYZE_AUTO_SYMBOLS=1` may query Coinalyze
+  `future-markets` and select preferred perp symbols from already-resolved
+  discovery assets. This is enrichment only; it cannot create events or bypass
+  the event-fade proxy/direct gate.
 - Event-discovery cache writes are observational only. `main.py
   --event-discovery-refresh` may append JSONL files under
   `RSI_EVENT_DISCOVERY_CACHE_DIR` for raw events, normalized events, links,
@@ -344,8 +351,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   sports, and prediction-market catalyst fixtures as radar evidence, can attach local
   Coinalyze-style OI/funding/crowding snapshots from
   `RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH`, can optionally fetch live
-  Coinalyze derivatives snapshots from configured
-  `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` when
+  Coinalyze derivatives snapshots from explicit
+  `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` or auto-resolved Coinalyze
+  `future-markets` symbols from already-resolved discovery assets when
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, can attach local
   Tokenomist/Etherscan/Arkham/Dune-style supply and on-chain snapshots from the
   `RSI_EVENT_DISCOVERY_*_SUPPLY_PATH` env vars, and feeds structured candidates

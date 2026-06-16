@@ -1386,6 +1386,109 @@ def test_event_discovery_coinalyze_live_provider_parses_offline():
     assert snapshots["TESTPERP"]["open_interest_24h_change_pct"] == 0.0
 
 
+def test_event_discovery_coinalyze_live_provider_auto_resolves_future_markets_offline():
+    import json
+    from urllib.parse import parse_qs, urlparse
+    from crypto_rsi_scanner.derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
+
+    seen = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def opener(request, timeout):
+        parsed = urlparse(request.full_url)
+        endpoint = parsed.path.rsplit("/", 1)[-1]
+        query = parse_qs(parsed.query)
+        seen.append((endpoint, query, timeout))
+        payloads = {
+            "future-markets": [
+                {
+                    "symbol": "TESTLISTUSD_PERP.0",
+                    "exchange": "SLOW",
+                    "base_asset": "TESTLIST",
+                    "quote_asset": "USD",
+                    "is_perpetual": True,
+                    "margined": "COIN",
+                },
+                {
+                    "symbol": "TESTLISTUSDT_PERP.A",
+                    "exchange": "BINANCE",
+                    "base_asset": "TESTLIST",
+                    "quote_asset": "USDT",
+                    "is_perpetual": True,
+                    "margined": "STABLE",
+                },
+                {
+                    "symbol": "TESTPERPUSDT_PERP.A",
+                    "exchange": "BYBIT",
+                    "base_asset": "TESTPERP",
+                    "quote_asset": "USDT",
+                    "is_perpetual": True,
+                    "margined": "STABLE",
+                },
+                {
+                    "symbol": "UNRELATEDUSDT_PERP.A",
+                    "exchange": "BINANCE",
+                    "base_asset": "UNRELATED",
+                    "quote_asset": "USDT",
+                    "is_perpetual": True,
+                    "margined": "STABLE",
+                },
+            ],
+            "open-interest": [
+                {"symbol": "TESTLISTUSDT_PERP.A", "value": 18000000, "update": 1781513400},
+                {"symbol": "TESTPERPUSDT_PERP.A", "value": 3000000, "update": 1781513400},
+            ],
+            "funding-rate": [],
+            "open-interest-history": [],
+            "liquidation-history": [],
+            "long-short-ratio-history": [],
+            "ohlcv-history": [],
+        }
+        return FakeResponse(payloads[endpoint])
+
+    snapshots = CoinalyzeDerivativesProvider(
+        None,
+        live_enabled=True,
+        api_key="coinalyze-key",
+        base_symbols=("TESTLIST", "TESTPERP"),
+        base_url="https://example.test/v1/",
+        opener=opener,
+        clock=lambda: 1781513400,
+        required=True,
+    ).fetch_snapshots()
+
+    assert seen[0][0] == "future-markets"
+    assert seen[1][0] == "open-interest"
+    assert seen[1][1]["symbols"] == ["TESTLISTUSDT_PERP.A,TESTPERPUSDT_PERP.A"]
+    assert snapshots["TESTLIST"]["open_interest"] == 18000000.0
+    assert snapshots["TESTPERP"]["open_interest"] == 3000000.0
+    assert "UNRELATED" not in snapshots
+
+
+def test_event_discovery_coinalyze_base_symbols_from_assets():
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_models import DiscoveredAsset
+
+    assets = [
+        DiscoveredAsset(coin_id="testlist", symbol="TESTLIST", name="Test List", aliases=("Test List",)),
+        DiscoveredAsset(coin_id="testperp", symbol="TESTPERPUSDT", name="Test Perp"),
+        DiscoveredAsset(coin_id="bad", symbol="", name="Bad", aliases=("not a ticker",)),
+    ]
+    assert event_discovery._coinalyze_base_symbols(assets) == ("TESTLIST", "TESTPERP")
+
+
 def test_event_discovery_coinalyze_live_provider_missing_config_fail_soft():
     from crypto_rsi_scanner.derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
 

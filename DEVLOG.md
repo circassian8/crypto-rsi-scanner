@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Auto-resolve live Coinalyze derivatives symbols · Codex
+**Why:** Live Coinalyze derivatives enrichment still required hand-written
+future-market symbols, which made the event radar harder to run on newly
+discovered assets. The safer default is to resolve preferred Coinalyze perp
+symbols from assets the discovery pipeline has already linked, while keeping
+explicit symbols as the override path.
+**Changes:**
+- Extended `crypto_rsi_scanner/derivatives_providers/coinalyze.py` with
+  `future-markets` symbol resolution. Explicit
+  `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise the provider can
+  select one preferred perp market per requested base asset.
+- Moved discovery-asset loading ahead of derivatives enrichment in
+  `crypto_rsi_scanner/event_discovery.py` so live Coinalyze can derive base
+  symbols from resolved assets and aliases.
+- Added `RSI_EVENT_DISCOVERY_COINALYZE_AUTO_SYMBOLS` config and `.env.example`
+  documentation, wired through the scanner report path.
+- Added offline tests for future-market resolution preference, automatic base
+  symbol extraction from discovery assets, exchange-suffix symbols, zero-value
+  snapshot preservation, and the live provider fail-soft path.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to document the auto-symbol path as
+  research-only enrichment.
+**Verify:** `make verify` passes: 207/207 tests, alert render smoke, backtest
+fixture smoke, and paper scoreboard.
+**Notes/risks:** Live Coinalyze is still enrichment only. It cannot create
+events, route alerts, write live signal/outcome/paper tables, or bypass the
+event-fade proxy/direct eligibility gate.
+
 ## 2026-06-16 — Add opt-in live Coinalyze derivatives enrichment · Codex
 **Why:** The event-fade plan depends on derivatives crowding evidence, but
 Coinalyze enrichment was fixture-only. Research radar runs need an opt-in live
