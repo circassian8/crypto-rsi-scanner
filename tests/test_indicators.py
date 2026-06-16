@@ -2633,6 +2633,27 @@ def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
     assert "valid_proxy_fade or false_positive" in report
 
 
+def test_event_fade_validation_review_packet_formats_human_evidence():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    prices = event_validation.load_outcome_price_fixture(_outcome_prices_fixture_path())
+    filled = event_validation.fill_validation_outcomes(rows, prices)
+    packet = event_validation.format_review_packet(filled.rows, limit=1)
+
+    assert "# Event-Fade Validation Review Packet" in packet
+    assert "Rows: 17 | needing labels/outcomes: 17 | showing: 1" in packet
+    assert "## 1. TESTVELVET - SpaceX IPO trading start" in packet
+    assert "- Queue category: `label_triggered_candidate`" in packet
+    assert "- Suggested label: `valid_proxy_fade or false_positive`" in packet
+    assert "- Missing fields: `human_label`" in packet
+    assert "trigger 72h=`-20.8%`" in packet
+    assert "Event-time baseline: entry=`8.00` | 72h=`-20.0%` | trigger edge=`+0.8pp`" in packet
+    assert "Classifier evidence:" in packet
+    assert "Sources:" in packet
+    assert "human_label" in packet
+
+
 def test_event_fade_validation_labeling_queue_flags_reviewed_trigger_outcomes():
     from crypto_rsi_scanner import event_discovery, event_validation
 
@@ -3061,6 +3082,31 @@ def test_event_fade_labeling_queue_scanner_reads_jsonl_fixture():
         assert "showing: 3" in text
         assert "label_triggered_candidate" in text
         assert "TESTVELVET" in text
+
+
+def test_event_fade_review_packet_scanner_writes_markdown_fixture():
+    import contextlib
+    import io
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        sample_path = Path(tmp) / "sample.jsonl"
+        packet_path = Path(tmp) / "packet.md"
+        event_discovery.write_validation_sample(rows, sample_path)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_review_packet(str(sample_path), str(packet_path), limit=1)
+        text = out.getvalue()
+        assert "Event-fade review packet" in text
+        assert "wrote 1/17 row(s) needing review" in text
+
+        packet = packet_path.read_text(encoding="utf-8")
+        assert "# Event-Fade Validation Review Packet" in packet
+        assert "## 1. TESTVELVET - SpaceX IPO trading start" in packet
+        assert "Review fields to fill" in packet
 
 
 def test_event_fade_merge_sample_scanner_writes_merged_jsonl():

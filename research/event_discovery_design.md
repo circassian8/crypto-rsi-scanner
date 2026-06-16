@@ -446,6 +446,27 @@ trigger time, missing fields, suggested label category, and source URLs. It is a
 workflow aid for building the reviewed validation sample; it is not promotion
 evidence by itself.
 
+## Validation Review Packet
+
+`main.py --event-fade-review-packet SAMPLE OUT` reads the same JSONL/CSV
+validation sample as the queue and writes a Markdown packet for manual review.
+It uses the queue priority order, then expands each selected row with:
+
+- event, asset, relationship, proxy/direct classification, and timestamps
+- source URLs, raw titles, classifier evidence, reason codes, warnings, and
+  missing-data markers
+- signal state, fade score, eligibility, trigger time, entry reference, and
+  invalidation level
+- trigger-time outcomes, event-time baseline outcome, and trigger-vs-baseline
+  72h edge when those fields are already filled
+- explicit `review_status`, `human_label`, and `human_notes` fields to fill in
+
+The packet is a human workflow artifact only. It does not auto-label rows,
+modify the source sample, write live storage, route alerts, open paper trades,
+or imply promotion. After labels/outcomes are filled in the sample, use
+`main.py --event-fade-review-sample PATH` to measure coverage, trigger quality,
+and promotion blockers.
+
 ## Validation Sample Review
 
 `main.py --event-fade-review-sample PATH` reads a labeled JSONL/CSV validation
@@ -751,6 +772,16 @@ Print a review queue for missing labels/outcomes:
 make event-fade-labeling-queue
 EVENT_FADE_SAMPLE_IN=/path/to/labeled_sample.csv EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-labeling-queue
+```
+
+Write a Markdown packet for manual review:
+
+```bash
+make event-fade-review-packet
+EVENT_FADE_SAMPLE_IN=/path/to/labeled_sample.csv \
+EVENT_FADE_REVIEW_PACKET_OUT=/tmp/event_fade_review_packet.md \
+EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-review-packet
 ```
 
 Preserve labels/outcomes across a refreshed export:

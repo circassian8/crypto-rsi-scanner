@@ -1288,6 +1288,30 @@ def event_fade_labeling_queue(path: str, limit: int | None = 20, verbose: bool =
     print(event_validation.format_labeling_queue(queue))
 
 
+def event_fade_review_packet(
+    sample_path: str,
+    out_path: str,
+    *,
+    limit: int | None = 20,
+    verbose: bool = False,
+) -> None:
+    """Write a Markdown packet for manual event-fade validation review."""
+    _setup_event_discovery_logging(verbose)
+    rows = event_validation.load_validation_sample(sample_path)
+    queue = event_validation.build_labeling_queue(rows, limit=limit)
+    packet = event_validation.format_review_packet(rows, limit=limit)
+    if out_path == "-":
+        print(packet)
+        return
+    out = Path(out_path).expanduser()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(packet + "\n", encoding="utf-8")
+    print(
+        "Event-fade review packet: "
+        f"wrote {queue.shown_rows}/{queue.needed_rows} row(s) needing review to {out}"
+    )
+
+
 def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, verbose: bool = False) -> None:
     """Merge manual labels/outcomes from a reviewed sample into a fresh export."""
     _setup_event_discovery_logging(verbose)
@@ -1573,10 +1597,16 @@ def cli() -> None:
         help="Print prioritized validation sample rows that need human labels/outcomes.",
     )
     parser.add_argument(
+        "--event-fade-review-packet",
+        nargs=2,
+        metavar=("SAMPLE", "OUT"),
+        help="Write a Markdown manual-review packet for prioritized validation rows.",
+    )
+    parser.add_argument(
         "--event-fade-queue-limit",
         type=int,
         default=20,
-        help="Maximum rows to show for --event-fade-labeling-queue.",
+        help="Maximum rows to show for --event-fade-labeling-queue or --event-fade-review-packet.",
     )
     parser.add_argument(
         "--event-fade-merge-sample",
@@ -1724,6 +1754,15 @@ def cli() -> None:
     if args.event_fade_labeling_queue:
         event_fade_labeling_queue(
             args.event_fade_labeling_queue,
+            limit=args.event_fade_queue_limit,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_fade_review_packet:
+        sample_path, out_path = args.event_fade_review_packet
+        event_fade_review_packet(
+            sample_path,
+            out_path,
             limit=args.event_fade_queue_limit,
             verbose=args.verbose,
         )

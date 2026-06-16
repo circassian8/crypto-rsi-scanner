@@ -401,6 +401,43 @@ def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
     return "\n".join(rows)
 
 
+def format_review_packet(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int | None = 20,
+) -> str:
+    """Format prioritized validation rows as a human-labeling Markdown packet."""
+    data = [dict(row) for row in rows]
+    queue = build_labeling_queue(data, limit=limit)
+    pairs = _review_packet_items(data, limit=limit)
+    out = [
+        "# Event-Fade Validation Review Packet",
+        "",
+        "Research-only: no alerts, DB writes, paper trades, or orders.",
+        "",
+        (
+            f"Rows: {queue.total_rows} | needing labels/outcomes: {queue.needed_rows} | "
+            f"showing: {queue.shown_rows}"
+        ),
+    ]
+    if queue.limit is not None:
+        out.append(f"Limit: {queue.limit}")
+    if not pairs:
+        message = (
+            "No rows shown by the current limit."
+            if queue.needed_rows
+            else "No rows need labels or required trigger outcomes."
+        )
+        out.extend(["", message])
+        return "\n".join(out)
+
+    out.append("")
+    for idx, (item, row) in enumerate(pairs, 1):
+        out.extend(_format_review_packet_row(idx, item, row))
+        out.append("")
+    return "\n".join(out).rstrip()
+
+
 def review_validation_sample(
     rows: Iterable[Mapping[str, Any]],
     *,
@@ -704,6 +741,127 @@ def _format_cohort_lines(cohorts: tuple[ValidationCohort, ...]) -> list[str]:
             f"72h={_fmt_pct(cohort.avg_post_event_return_72h)}"
         )
     return rows
+
+
+def _review_packet_items(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int | None,
+) -> list[tuple[ValidationLabelingQueueItem, Mapping[str, Any]]]:
+    pairs: list[tuple[ValidationLabelingQueueItem, Mapping[str, Any]]] = []
+    for row in rows:
+        item = _labeling_queue_item(row)
+        if item is not None:
+            pairs.append((item, row))
+    pairs.sort(
+        key=lambda pair: (
+            pair[0].priority,
+            pair[0].event_time or "",
+            pair[0].asset_symbol,
+            pair[0].event_name,
+        )
+    )
+    return pairs[: max(0, limit)] if limit is not None else pairs
+
+
+def _format_review_packet_row(
+    idx: int,
+    item: ValidationLabelingQueueItem,
+    row: Mapping[str, Any],
+) -> list[str]:
+    symbol = item.asset_symbol or "UNKNOWN"
+    coin_id = item.asset_coin_id or "unknown"
+    event_name = _packet_text(item.event_name or "Unnamed event")
+    missing = ", ".join(item.missing_fields) if item.missing_fields else "review required"
+    current_label = item.human_label or "unlabeled"
+    edge_72h = _trigger_vs_event_time_72h_edges((row,))
+    fields = [
+        f"## {idx}. {symbol} - {event_name}",
+        "",
+        f"- Queue category: `{item.category}`",
+        f"- Suggested label: `{item.suggested_label}`",
+        f"- Missing fields: `{missing}`",
+        f"- Current label: `{current_label}`",
+        f"- Event: `{_packet_text(row.get('event_type'))}` at `{_packet_text(item.event_time or 'unknown')}`",
+        (
+            f"- First seen: `{_packet_text(row.get('first_seen_time'))}` | "
+            f"published: `{_packet_text(row.get('published_at_min'))}` | "
+            f"fetched: `{_packet_text(row.get('fetched_at_min'))}`"
+        ),
+        (
+            f"- Asset: `{symbol}` (`{coin_id}`) | relationship: "
+            f"`{_packet_text(item.relationship_type or 'unknown')}`"
+        ),
+        (
+            "- Classification: "
+            f"proxy=`{_bool(row.get('is_proxy_narrative'))}` | "
+            f"direct=`{_bool(row.get('is_direct_beneficiary'))}` | "
+            f"confidence=`{_fmt_num(_num(row.get('classifier_confidence')))}`"
+        ),
+        (
+            "- Signal: "
+            f"`{item.signal_type or 'NO_TRADE'}` | state=`{_packet_text(row.get('fade_state'))}` | "
+            f"eligible=`{_bool(row.get('eligible'))}` | score=`{_fmt_num(_num(row.get('fade_score')))}`"
+        ),
+        (
+            "- Timing/risk: "
+            f"trigger=`{_packet_text(item.trigger_observed_at or 'n/a')}` | "
+            f"entry=`{_fmt_num(_num(row.get('entry_reference_price')))}` | "
+            f"invalidation=`{_fmt_num(_num(row.get('invalidation_level')))}` | "
+            f"BTC risk=`{_fmt_num(_num(row.get('btc_risk_on_score')))}`"
+        ),
+        (
+            "- Outcomes: "
+            f"trigger 24h=`{_fmt_pct(_num(row.get('post_event_return_24h')))}` | "
+            f"trigger 72h=`{_fmt_pct(_num(row.get('post_event_return_72h')))}` | "
+            f"trigger 7d=`{_fmt_pct(_num(row.get('post_event_return_7d')))}` | "
+            f"MFE=`{_fmt_pct(_num(row.get('max_favorable_excursion')))}` | "
+            f"MAE=`{_fmt_pct(_num(row.get('max_adverse_excursion')))}`"
+        ),
+        (
+            "- Event-time baseline: "
+            f"entry=`{_fmt_num(_num(row.get('event_time_entry_price')))}` | "
+            f"72h=`{_fmt_pct(_num(row.get('event_time_post_event_return_72h')))}` | "
+            f"trigger edge=`{_fmt_pp(edge_72h[0] if edge_72h else None)}`"
+        ),
+        f"- Classifier reason: {_packet_text(row.get('classification_reason'))}",
+    ]
+    fields.extend(_packet_bullets("Classifier evidence", row.get("classification_evidence")))
+    fields.extend(_packet_bullets("Reason codes", row.get("reason_codes")))
+    fields.extend(_packet_bullets("Warnings", row.get("warnings")))
+    fields.extend(_packet_bullets("Missing data", row.get("missing_data")))
+    fields.extend(_packet_bullets("Sources", row.get("source_urls")))
+    fields.extend(_packet_bullets("Raw titles", row.get("raw_titles")))
+    fields.extend([
+        "- Review fields to fill:",
+        "  - `review_status`: `reviewed`",
+        "  - `human_label`: `valid_proxy_fade` | `false_positive` | `direct_event` | `ambiguous`",
+        "  - `human_notes`: evidence-backed note",
+    ])
+    return fields
+
+
+def _packet_bullets(label: str, value: object, *, max_items: int = 5) -> list[str]:
+    values = [_packet_text(item) for item in _list_values(value) if _packet_text(item)]
+    if not values:
+        return [f"- {label}: none"]
+    out = [f"- {label}:"]
+    for item in values[:max_items]:
+        out.append(f"  - {item}")
+    if len(values) > max_items:
+        out.append(f"  - ... {len(values) - max_items} more")
+    return out
+
+
+def _packet_text(value: object) -> str:
+    if value in (None, ""):
+        return "n/a"
+    if isinstance(value, (dict, list, tuple)):
+        try:
+            value = json.dumps(value, sort_keys=True)
+        except TypeError:
+            value = str(value)
+    return " ".join(str(value).split())
 
 
 def _price_index_from_mapping(raw: Mapping[str, Any]) -> dict[str, list[ValidationOutcomeCandle]]:

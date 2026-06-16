@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade review packet export · Codex
+**Why:** The validation sample now has queue/review metrics, but manual labeling
+still required jumping between source evidence, classifier rationale, signal
+fields, and outcome columns. A Markdown packet makes the reviewed event dataset
+easier to build without changing live behavior.
+**Changes:**
+- Added `event_validation.format_review_packet()` to render prioritized
+  validation rows with source URLs, raw titles, classifier evidence,
+  signal/risk fields, trigger/event-time outcomes, and explicit human review
+  fields.
+- Added `main.py --event-fade-review-packet SAMPLE OUT` plus
+  `make event-fade-review-packet`; the command writes only the requested
+  Markdown artifact or stdout.
+- Added offline tests for the pure formatter and scanner write path in
+  `tests/test_indicators.py`.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  to document the packet workflow and artifact-only guardrail.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 210/210.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This is a human-review workflow artifact only. It does not
+auto-label rows, modify samples, write live storage, route alerts, open paper
+trades, or imply event-fade promotion.
+
 ## 2026-06-16 — Add event-fade validation diversity and latency gates · Codex
 **Why:** The event-fade promotion plan requires evidence across more than one
 event type and market context, plus trigger-latency visibility. The reviewer
