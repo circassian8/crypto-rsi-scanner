@@ -2193,7 +2193,7 @@ def _event_fade_review_bundle_readme(
         "",
         "Suggested workflow:",
         "1. Read `review_packet.md` for evidence.",
-        "2. Edit `review_template.csv` with `review_status`, `human_label`, `human_notes`, and any missing outcomes.",
+        "2. Edit `review_template.csv` with `review_status`, `human_label`, `human_notes`, any human event-time confirmation, and any missing outcomes.",
         "3. Apply the edited sidecar with `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`.",
         "4. Run `main.py --event-fade-review-sample OUT` to inspect coverage and blockers.",
         "",

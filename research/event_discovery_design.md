@@ -608,13 +608,19 @@ sidecar keeps stable identity/context fields plus editable review fields:
   source URLs
 - raw/min/max source timestamps for point-in-time review
 - `review_status`, `human_label`, `human_notes`
+- `human_event_time`, `human_event_time_source`,
+  `human_event_time_confidence`, and `human_event_time_notes` when the system
+  missed or weakly inferred a catalyst time
 - trigger-time and event-time-baseline outcome fields when they need manual
   override or preservation
 
 After a human edits the sidecar, `main.py --event-fade-apply-review-template
 SAMPLE TEMPLATE OUT` copies nonblank review fields back into a full validation
 sample artifact and immediately prints the resulting review report and
-next-sample work. A row only counts as reviewed evidence when it has both
+next-sample work. Human event-time confirmation is stored separately from the
+machine-extracted `event_time` so later analysis can distinguish what the system
+knew from what the reviewer confirmed. A row only counts as reviewed evidence
+when it has both
 `review_status=reviewed` and a known `human_label`. The apply command uses stable
 event/asset/relationship identity and writes only `OUT`; it does not infer
 labels, alter the source sample, write live storage, route alerts, open paper

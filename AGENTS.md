@@ -351,8 +351,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   --event-fade-export-review-template SAMPLE OUT` may write compact editable
   sidecar rows with derived source origins, and `main.py
   --event-fade-apply-review-template SAMPLE TEMPLATE OUT` may copy nonblank
-  human labels/notes/outcomes from that sidecar into a validation-sample
-  artifact only when the sidecar evidence fields still match the sample row.
+  human labels/notes/outcomes and human event-time confirmations from that
+  sidecar into a validation-sample artifact only when the sidecar evidence
+  fields still match the sample row. Human event-time confirmation fields must
+  stay separate from the machine-extracted `event_time`; they are review
+  evidence, not proof that the system knew the event time automatically.
   They must not infer labels, write live storage, route alerts, open paper
   trades, or imply promotion.
 - Event-fade validation review bundles are artifact-only. `main.py

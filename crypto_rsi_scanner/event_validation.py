@@ -53,6 +53,10 @@ REVIEW_FIELDS = (
     "event_time_post_event_return_7d",
     "outcome_price_interval",
     "outcome_price_source",
+    "human_event_time",
+    "human_event_time_source",
+    "human_event_time_confidence",
+    "human_event_time_notes",
 )
 ASSET_ROLE_REVIEW_METADATA_FIELDS = (
     "asset_role",
@@ -75,6 +79,10 @@ REVIEW_TEMPLATE_FIELDS = (
     "event_time",
     "event_time_confidence",
     "event_time_source",
+    "human_event_time",
+    "human_event_time_confidence",
+    "human_event_time_source",
+    "human_event_time_notes",
     "trigger_observed_at",
     "signal_type",
     "queue_category",
@@ -1257,6 +1265,9 @@ def _format_review_packet_row(
         "  - `review_status`: `reviewed`",
         "  - `human_label`: `valid_proxy_fade` | `false_positive` | `direct_event` | `ambiguous`",
         "  - `human_notes`: evidence-backed note",
+        "  - `human_event_time`: explicit catalyst time if the system missed or weakly inferred it",
+        "  - `human_event_time_source`: source URL/title proving that time",
+        "  - `human_event_time_confidence`: reviewer confidence from 0.0 to 1.0",
     ])
     return fields
 
@@ -1566,10 +1577,21 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
             suggested_label=label or _suggested_label(row),
             missing_fields=missing_required_outcomes,
         )
-    if not label and _is_proxy_candidate(row):
+    if not label and _is_proxy_candidate(row) and _proxy_event_time_needs_human_confirmation(row):
+        missing = ("human_label", "human_event_time", "human_event_time_source", "human_event_time_confidence")
+        if _string_or_none(row.get("event_time")) and _num(row.get("event_time_confidence")) is not None:
+            missing = ("human_label", "human_event_time_source", "human_event_time_confidence")
         return _queue_item(
             row,
             priority=9,
+            category="confirm_proxy_event_time",
+            suggested_label="valid_proxy_fade or false_positive",
+            missing_fields=missing,
+        )
+    if not label and _is_proxy_candidate(row):
+        return _queue_item(
+            row,
+            priority=10,
             category="label_proxy_candidate",
             suggested_label="valid_proxy_fade or false_positive",
             missing_fields=("human_label",),
@@ -1577,7 +1599,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_direct_or_ambiguous(row):
         return _queue_item(
             row,
-            priority=10,
+            priority=11,
             category="label_negative_control",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label",),
@@ -1619,6 +1641,21 @@ def _trigger_event_time_needs_confirmation(row: Mapping[str, Any]) -> bool:
         return False
     confidence = _num(row.get("event_time_confidence")) or 0.0
     return confidence < DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE
+
+
+def _proxy_event_time_needs_human_confirmation(row: Mapping[str, Any]) -> bool:
+    if _string_or_none(row.get("human_event_time")):
+        confidence = _num(row.get("human_event_time_confidence")) or 0.0
+        if confidence >= DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE:
+            return False
+    event_time = _string_or_none(row.get("event_time"))
+    confidence = _num(row.get("event_time_confidence")) or 0.0
+    source = str(row.get("event_time_source") or "").strip()
+    if not event_time:
+        return True
+    if confidence < DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE:
+        return True
+    return source != "explicit"
 
 
 def _labeling_queue_sort_key(

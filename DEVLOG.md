@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add human event-time review fields · Codex
+**Why:** The expanded no-key RSS cycle produced many proxy-instrument leads, but
+nearly all lacked confirmed catalyst times. Reviewers need a first-class,
+artifact-only way to confirm event times without overwriting what the system
+actually extracted.
+**Changes:**
+- Added `human_event_time`, `human_event_time_source`,
+  `human_event_time_confidence`, and `human_event_time_notes` to validation
+  samples, review templates, and sidecar apply copying.
+- Prioritized unlabeled proxy rows with missing/weak/non-explicit event times as
+  `confirm_proxy_event_time` in the labeling queue before ordinary proxy labels.
+- Updated review packets, bundle README text, `AGENTS.md`, and
+  `research/event_discovery_design.md` to explain that human event-time
+  confirmation stays separate from machine-derived `event_time`.
+- Added regression coverage for queue prioritization and sidecar round-tripping
+  of human event-time confirmations without changing original event evidence.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 252/252
+tests, and `make verify` passes. A cache-review-bundle smoke against
+`/tmp/event_fade_expanded_rss_cache` wrote `/tmp/event_fade_event_time_review_bundle`
+with `confirm_proxy_event_time` queue rows and `human_event_time*` columns in
+`review_template.csv`.
+**Notes/risks:** This is review-artifact plumbing only. It does not make
+event-fade eligible, route alerts, write live DB rows, open paper trades, or
+convert human-confirmed times into system-discovered catalyst times.
+
 ## 2026-06-17 — Broaden no-key proxy RSS searches · Codex
 **Why:** The first no-key review cycle produced mostly ambiguous controls and
 only one proxy-venue row. Before adding more providers, the public RSS starter

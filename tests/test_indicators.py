@@ -3923,11 +3923,73 @@ def test_event_fade_validation_labeling_queue_prefers_explicit_event_times():
 
     queue = event_validation.build_labeling_queue(rows)
     assert [item.asset_symbol for item in queue.items] == [
-        "EXPLICIT",
         "TEXTDATE",
         "MISSINGTIME",
+        "EXPLICIT",
     ]
-    assert all(item.category == "label_proxy_candidate" for item in queue.items)
+    assert [item.category for item in queue.items] == [
+        "confirm_proxy_event_time",
+        "confirm_proxy_event_time",
+        "label_proxy_candidate",
+    ]
+    assert queue.items[0].missing_fields == (
+        "human_label",
+        "human_event_time_source",
+        "human_event_time_confidence",
+    )
+    assert queue.items[1].missing_fields == (
+        "human_label",
+        "human_event_time",
+        "human_event_time_source",
+        "human_event_time_confidence",
+    )
+
+
+def test_event_fade_validation_review_template_roundtrips_human_event_time():
+    from crypto_rsi_scanner import event_validation
+
+    rows = [{
+        "event_id": "event-missing-time",
+        "asset_symbol": "HYPE",
+        "asset_coin_id": "hyperliquid",
+        "event_name": "Hyperliquid SpaceX pre-IPO market",
+        "relationship_type": "proxy_exposure",
+        "signal_type": "NO_TRADE",
+        "event_time": "",
+        "event_time_source": "",
+        "event_time_confidence": None,
+        "is_proxy_narrative": True,
+        "is_direct_beneficiary": False,
+        "source_urls": ["https://example.test/hype-spacex"],
+        "raw_titles": ["Hyperliquid launches SpaceX pre-IPO market"],
+    }]
+
+    template_rows = event_validation.build_review_template_rows(rows, limit=1)
+    assert template_rows[0]["queue_category"] == "confirm_proxy_event_time"
+    assert template_rows[0]["human_event_time"] is None
+    assert template_rows[0]["missing_fields"] == [
+        "human_label",
+        "human_event_time",
+        "human_event_time_source",
+        "human_event_time_confidence",
+    ]
+
+    template_rows[0]["review_status"] = "reviewed"
+    template_rows[0]["human_label"] = "valid_proxy_fade"
+    template_rows[0]["human_event_time"] = "2026-06-20T13:30:00+00:00"
+    template_rows[0]["human_event_time_source"] = "https://example.test/hype-spacex"
+    template_rows[0]["human_event_time_confidence"] = 0.95
+    template_rows[0]["human_event_time_notes"] = "Source states the market opens at 13:30 UTC."
+    result = event_validation.apply_review_template(rows, template_rows)
+    assert result.matched_rows == 1
+    assert result.evidence_changed_rows == 0
+    assert result.copied_fields == 6
+    out = result.rows[0]
+    assert out["event_time"] == ""
+    assert out["human_event_time"] == "2026-06-20T13:30:00+00:00"
+    assert out["human_event_time_source"] == "https://example.test/hype-spacex"
+    assert out["human_event_time_confidence"] == 0.95
+    assert out["human_event_time_notes"] == "Source states the market opens at 13:30 UTC."
 
 
 def test_event_fade_validation_review_packet_formats_human_evidence():
@@ -3966,6 +4028,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     assert template_rows[0]["queue_category"] == "label_triggered_candidate"
     assert template_rows[0]["event_time_confidence"] == 1.0
     assert template_rows[0]["event_time_source"] == "explicit"
+    assert template_rows[0]["human_event_time"] is None
     assert template_rows[0]["suggested_label"] == "valid_proxy_fade or false_positive"
     assert template_rows[0]["source_origins"] == ["example.test"]
     assert template_rows[0]["missing_fields"] == [
