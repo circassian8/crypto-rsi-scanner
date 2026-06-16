@@ -1,11 +1,11 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1-8 fixture framework with clean CoinGecko universe bridge,
+**Status:** Phase 1-9 fixture framework with clean CoinGecko universe bridge,
 fixture-backed exchange announcement providers, structured calendar/unlock
 providers, news/proxy-narrative providers, external catalyst providers, and
 Coinalyze-style derivatives plus Tokenomist/Etherscan/Arkham/Dune-style
-supply/on-chain enrichment, research-only
+supply/on-chain enrichment, plus grouped auto reporting, research-only
 
 ## Goal
 
@@ -67,7 +67,8 @@ Current files:
   concentration/admin-risk style snapshots
 - `event_resolver.py`: alias-aware asset resolver
 - `event_classification.py`: deterministic proxy/direct classifier
-- `event_discovery.py`: normalizer, deduper, orchestrator, report formatter
+- `event_discovery.py`: normalizer, deduper, orchestrator, flat radar report
+  formatter, and grouped event-fade auto report formatter
 
 ## Universe Integration
 
@@ -193,6 +194,29 @@ Supply pressure is evidence, not eligibility. A direct exchange listing, token
 unlock, or other non-proxy event must remain `NO_TRADE` even when exchange
 inflows, unlocks, concentration, and admin-risk flags are severe.
 
+## Auto Report
+
+`main.py --event-fade-auto-report` runs the same fixture-only discovery path as
+`--event-discovery-report`, then groups the scored candidates into lifecycle
+sections:
+
+- EVENT RADAR
+- PROXY WATCHLIST
+- BLOWOFF RISK
+- EVENT PASSED
+- ARMED
+- TRIGGERED
+- REJECTED / NO TRADE
+- AMBIGUOUS
+
+Each candidate row includes symbol, coin id, event name/time, first-seen time,
+link/classifier confidence, relationship type, fade score, state/signal,
+missing data, reason codes, warnings, source URLs, and invalidation level when
+available.
+
+This remains local and observational. It does not send Telegram alerts, write
+live signal/outcome/paper tables, open paper trades, or imply execution.
+
 ## Classification Rules
 
 Proxy candidates need all of:
@@ -272,7 +296,7 @@ shared hygiene filter.
 
 ## CLI
 
-Run the research report with:
+Run the flat research radar with:
 
 ```bash
 RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
@@ -295,7 +319,14 @@ RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report
 ```
 
-The report is local and observational. It does not send alerts or write the DB.
+Run the grouped event-fade auto report with the same fixture set:
+
+```bash
+make event-fade-auto-report
+```
+
+Both reports are local and observational. They do not send alerts or write the
+DB.
 
 ## Promotion Requirements
 

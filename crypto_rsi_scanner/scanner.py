@@ -1036,13 +1036,7 @@ def event_fade_report(verbose: bool = False) -> None:
     print(event_fade.format_fade_report(candidates, cfg, now))
 
 
-def event_discovery_report(verbose: bool = False) -> None:
-    """Print research-only event-discovery radar from local fixtures."""
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(asctime)s %(levelname)-5s %(message)s",
-        datefmt="%H:%M:%S",
-    )
+def _event_discovery_paths_configured() -> bool:
     paths = (
         config.EVENT_DISCOVERY_EVENTS_PATH,
         config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
@@ -1061,19 +1055,17 @@ def event_discovery_report(verbose: bool = False) -> None:
         config.EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH,
         config.EVENT_DISCOVERY_DUNE_SUPPLY_PATH,
     )
-    if not any(paths):
-        print(
-            "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
-            "or an exchange announcement fixture path."
-        )
-        return
+    return any(paths)
+
+
+def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResult:
     cfg = event_discovery.EventDiscoveryConfig(
         min_link_confidence=config.EVENT_DISCOVERY_MIN_LINK_CONFIDENCE,
         min_classifier_confidence=config.EVENT_DISCOVERY_MIN_CLASSIFIER_CONFIDENCE,
         lookback_hours=config.EVENT_DISCOVERY_LOOKBACK_HOURS,
         horizon_days=config.EVENT_DISCOVERY_HORIZON_DAYS,
     )
-    result = event_discovery.run_manual_discovery(
+    return event_discovery.run_manual_discovery(
         config.EVENT_DISCOVERY_EVENTS_PATH,
         config.EVENT_DISCOVERY_ALIASES_PATH,
         binance_announcements_path=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
@@ -1096,7 +1088,40 @@ def event_discovery_report(verbose: bool = False) -> None:
         cfg=cfg,
         fade_cfg=event_fade.runtime_config(config),
     )
+
+
+def _setup_event_discovery_logging(verbose: bool) -> None:
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-5s %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+
+def event_discovery_report(verbose: bool = False) -> None:
+    """Print research-only event-discovery radar from local fixtures."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_discovery_paths_configured():
+        print(
+            "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
+            "or an exchange announcement fixture path."
+        )
+        return
+    result = _event_discovery_result_from_config()
     print(event_discovery.format_discovery_report(result))
+
+
+def event_fade_auto_report(verbose: bool = False) -> None:
+    """Print grouped research-only event-fade candidates from discovery fixtures."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_discovery_paths_configured():
+        print(
+            "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
+            "or another event-discovery fixture path."
+        )
+        return
+    result = _event_discovery_result_from_config()
+    print(event_discovery.format_event_fade_auto_report(result))
 
 
 def status() -> None:
@@ -1280,6 +1305,11 @@ def cli() -> None:
         help="Print research-only event radar from local discovery fixtures.",
     )
     parser.add_argument(
+        "--event-fade-auto-report",
+        action="store_true",
+        help="Print grouped research-only event-fade candidates from discovery fixtures.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for commands that support it.",
@@ -1364,6 +1394,9 @@ def cli() -> None:
         return
     if args.event_discovery_report:
         event_discovery_report(verbose=args.verbose)
+        return
+    if args.event_fade_auto_report:
+        event_fade_auto_report(verbose=args.verbose)
         return
     if args.status:
         status()

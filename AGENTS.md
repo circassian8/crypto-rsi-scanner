@@ -87,7 +87,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   (fixture event radar with optional exchange-announcement, structured calendar,
   unlock, news/proxy-narrative, external catalyst, Coinalyze-style derivatives,
   supply/on-chain enrichment, and clean CoinGecko universe fixtures,
-  research-only/no writes) ·
+  research-only/no writes) · `main.py --event-fade-auto-report` (grouped
+  discovery-fed event-fade sections: watchlist/blowoff/event-passed/armed/
+  triggered/rejected/ambiguous, research-only/no writes) ·
   `main.py --universe-audit` (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks
@@ -136,7 +138,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `state_features.py` | pure market-state features: volatility, breadth, relative strength, beta, liquidity, risk buckets |
 | `event_fade.py` | pure alert-only sell-the-news event-fade research sleeve; no storage, alerts, paper trades, or execution |
 | `event_models.py` | immutable event-discovery dataclasses for raw events, normalized events, links, classifications, and candidates |
-| `event_discovery.py` | fixture-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring report |
+| `event_discovery.py` | fixture-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring and grouped auto reports |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
 | `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider, fixture-backed exchange announcement parsers, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers, and external IPO/sports/prediction-market catalyst parsers; no live event provider enabled yet |
 | `derivatives_providers/` | fixture-backed derivatives enrichment adapters for event discovery, starting with Coinalyze-style OI/funding/crowding snapshots; no live derivatives provider enabled yet |
@@ -263,7 +265,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   + post-event failure. The proxy/direct-beneficiary check is a hard gate, not a
   score nudge. It is not part of the RSI setup registry, does not trade, and
   should not affect live routing until validated on an event sample.
-- **Event discovery Phase 1-8 (2026-06-16):** Local fixture radar exists via
+- **Event discovery Phase 1-9 (2026-06-16):** Local fixture radar exists via
   `main.py --event-discovery-report`. It finds raw events, resolves assets with
   aliases, classifies proxy/direct/ambiguous relationships, rejects ticker
   collisions, can merge an optional cleaned CoinGecko market fixture from
@@ -277,7 +279,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH`, can attach local
   Tokenomist/Etherscan/Arkham/Dune-style supply and on-chain snapshots from the
   `RSI_EVENT_DISCOVERY_*_SUPPLY_PATH` env vars, and feeds structured candidates
-  through `event_fade.py` for a research-only report. No network
+  through `event_fade.py` for flat radar and grouped auto reports. The grouped
+  report is `main.py --event-fade-auto-report` and prints event radar, proxy
+  watchlist, blowoff risk, event-passed, armed, triggered, rejected/no-trade,
+  and ambiguous sections with evidence/warnings. No network
   event/news/derivatives/supply providers, cache writes, live DB
   writes, notifications, or paper trades are enabled.
 - Caveats: the plain Binance backtest path is survivorship-biased (today's

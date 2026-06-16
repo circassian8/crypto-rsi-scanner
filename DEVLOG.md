@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add grouped event-fade auto report · Codex
+**Why:** The discovery pipeline had a flat radar/classification report, but the
+Phase 9 work order called for a clearer event-fade output grouped by candidate
+lifecycle before building the validation sample.
+**Changes:**
+- Added `event_discovery.format_event_fade_auto_report()` with EVENT RADAR,
+  PROXY WATCHLIST, BLOWOFF RISK, EVENT PASSED, ARMED, TRIGGERED,
+  REJECTED / NO TRADE, and AMBIGUOUS sections.
+- Candidate rows now surface symbol/coin id, event timing, first-seen time,
+  link/classifier confidence, relationship type, fade score, state/signal,
+  missing data, reason codes, warnings, source URLs, and invalidation when
+  available.
+- Added `main.py --event-fade-auto-report` and `make event-fade-auto-report`;
+  both reuse the existing fixture-only discovery inputs and do not write DB
+  rows, send notifications, open paper trades, or imply execution.
+- Shared scanner discovery fixture loading between the flat radar report and the
+  grouped auto report so provider wiring cannot drift.
+- Made Makefile discovery fixture reports deterministic with a 120-hour
+  lookback and 2-day horizon.
+- Expanded offline tests for grouped section output and scanner CLI plumbing.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with Phase 9 status and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 175/175.
+`make event-fade-auto-report` prints the grouped research-only report with
+TESTVELVET under TRIGGERED, TESTAI under BLOWOFF RISK, TESTPRED under PROXY
+WATCHLIST, direct cases under REJECTED / NO TRADE, and ambiguous cases under
+AMBIGUOUS. `git diff --check` passes. `make verify` passes.
+**Notes/risks:** Still fixture-backed and local-only. This is a reporting
+surface for validation work, not a live routing, paper-trading, storage, or
+execution path.
+
 ## 2026-06-16 — Add fixture supply/on-chain enrichment for event discovery · Codex
 **Why:** The event-fade radar needs local supply and on-chain pressure evidence
 before validation-sample work, but those fields must remain research-only

@@ -604,6 +604,41 @@ def _event_discovery_fixture_result():
     return event_discovery.run_discovery(raw, assets, now=now)
 
 
+def _full_event_discovery_fixture_result():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    binance_path, bybit_path = _exchange_announcement_fixture_paths()
+    coinmarketcal_path, tokenomist_path = _structured_calendar_fixture_paths()
+    cryptopanic_path, gdelt_path, blog_path = _news_fixture_paths()
+    ipo_path, sports_path, prediction_path = _external_catalyst_fixture_paths()
+    tokenomist_supply_path, etherscan_supply_path, arkham_supply_path, dune_supply_path = _supply_fixture_paths()
+    cfg = event_discovery.EventDiscoveryConfig(lookback_hours=120, horizon_days=2)
+    return event_discovery.run_manual_discovery(
+        events_path,
+        aliases_path,
+        binance_announcements_path=binance_path,
+        bybit_announcements_path=bybit_path,
+        coinmarketcal_path=coinmarketcal_path,
+        tokenomist_path=tokenomist_path,
+        cryptopanic_path=cryptopanic_path,
+        gdelt_path=gdelt_path,
+        project_blog_rss_path=blog_path,
+        external_ipo_path=ipo_path,
+        sports_fixtures_path=sports_path,
+        prediction_market_events_path=prediction_path,
+        coinalyze_derivatives_path=_derivatives_fixture_path(),
+        tokenomist_supply_path=tokenomist_supply_path,
+        etherscan_supply_path=etherscan_supply_path,
+        arkham_supply_path=arkham_supply_path,
+        dune_supply_path=dune_supply_path,
+        universe_path=_coingecko_universe_fixture_path(),
+        cfg=cfg,
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+
+
 def test_event_discovery_manual_provider_fixture_and_missing_path():
     import json
     import tempfile
@@ -1270,6 +1305,37 @@ def test_event_discovery_pipeline_and_event_fade_safety():
     assert "TESTBTC" in report
 
 
+def test_event_fade_auto_report_groups_discovered_candidates():
+    from crypto_rsi_scanner import event_discovery
+
+    result = _full_event_discovery_fixture_result()
+    report = event_discovery.format_event_fade_auto_report(result)
+    assert "EVENT FADE AUTO REPORT" in report
+    assert "no alerts, DB writes, paper trades, or orders" in report
+    assert "EVENT RADAR" in report
+    for section in (
+        "PROXY WATCHLIST",
+        "BLOWOFF RISK",
+        "EVENT PASSED",
+        "ARMED",
+        "TRIGGERED",
+        "REJECTED / NO TRADE",
+        "AMBIGUOUS",
+    ):
+        assert section in report
+    assert "TRIGGERED\n  TESTVELVET" in report
+    assert "BLOWOFF RISK\n  TESTAI" in report
+    assert "PROXY WATCHLIST\n  TESTPRED" in report
+    assert "REJECTED / NO TRADE" in report
+    assert "  TESTLIST     coin=testlist" in report
+    assert "TESTUNLOCK" in report
+    assert "AMBIGUOUS" in report
+    assert "  TESTPUMP     coin=testpump" in report
+    assert "missing:" in report
+    assert "sources:" in report
+    assert "invalidation: 8.65" in report
+
+
 def test_event_discovery_scanner_report_uses_local_fixtures():
     import contextlib
     import io
@@ -1328,6 +1394,77 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
         config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
+
+
+def test_event_fade_auto_scanner_report_uses_local_fixtures():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    binance_path, bybit_path = _exchange_announcement_fixture_paths()
+    coinmarketcal_path, tokenomist_path = _structured_calendar_fixture_paths()
+    cryptopanic_path, gdelt_path, blog_path = _news_fixture_paths()
+    ipo_path, sports_path, prediction_path = _external_catalyst_fixture_paths()
+    tokenomist_supply_path, etherscan_supply_path, arkham_supply_path, dune_supply_path = _supply_fixture_paths()
+    attrs = (
+        "EVENT_DISCOVERY_EVENTS_PATH",
+        "EVENT_DISCOVERY_ALIASES_PATH",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH",
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH",
+        "EVENT_DISCOVERY_COINMARKETCAL_PATH",
+        "EVENT_DISCOVERY_TOKENOMIST_PATH",
+        "EVENT_DISCOVERY_CRYPTOPANIC_PATH",
+        "EVENT_DISCOVERY_GDELT_PATH",
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH",
+        "EVENT_DISCOVERY_EXTERNAL_IPO_PATH",
+        "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH",
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH",
+        "EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH",
+        "EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH",
+        "EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH",
+        "EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH",
+        "EVENT_DISCOVERY_DUNE_SUPPLY_PATH",
+        "EVENT_DISCOVERY_UNIVERSE_PATH",
+        "EVENT_DISCOVERY_LOOKBACK_HOURS",
+        "EVENT_DISCOVERY_HORIZON_DAYS",
+    )
+    original = {name: getattr(config, name) for name in attrs}
+    config.EVENT_DISCOVERY_EVENTS_PATH = events_path
+    config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = binance_path
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = bybit_path
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = coinmarketcal_path
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = tokenomist_path
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = cryptopanic_path
+    config.EVENT_DISCOVERY_GDELT_PATH = gdelt_path
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = blog_path
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = ipo_path
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = sports_path
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = prediction_path
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = _derivatives_fixture_path()
+    config.EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH = tokenomist_supply_path
+    config.EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH = etherscan_supply_path
+    config.EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH = arkham_supply_path
+    config.EVENT_DISCOVERY_DUNE_SUPPLY_PATH = dune_supply_path
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = _coingecko_universe_fixture_path()
+    config.EVENT_DISCOVERY_LOOKBACK_HOURS = 120
+    config.EVENT_DISCOVERY_HORIZON_DAYS = 2
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_auto_report()
+        text = out.getvalue()
+        assert "EVENT FADE AUTO REPORT" in text
+        assert "TRIGGERED\n  TESTVELVET" in text
+        assert "BLOWOFF RISK\n  TESTAI" in text
+        assert "REJECTED / NO TRADE" in text
+        assert "  TESTLIST     coin=testlist" in text
+        assert "AMBIGUOUS" in text
+        assert "  TESTPUMP     coin=testpump" in text
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
 
 
 def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
