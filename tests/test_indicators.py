@@ -410,7 +410,26 @@ def test_polymarket_make_target_uses_live_prediction_market_source():
     assert "event-fade-cache-review-bundle" in result.stdout
 
 
-def test_no_key_make_target_combines_public_rss_and_polymarket_sources():
+def test_gdelt_make_target_uses_live_news_source():
+    import subprocess
+
+    result = subprocess.run(
+        ["make", "-n", "event-fade-gdelt-review-cycle"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "event-discovery-refresh-gdelt" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_GDELT_LIVE=1" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_GDELT_QUERY=" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_GDELT_MAX_RECORDS=50" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1" in result.stdout
+    assert "event-fade-cache-review-bundle" in result.stdout
+    assert "fixtures/event_discovery/asset_aliases.json" not in result.stdout
+
+
+def test_no_key_make_target_combines_public_rss_gdelt_and_polymarket_sources():
     import subprocess
 
     result = subprocess.run(
@@ -421,8 +440,10 @@ def test_no_key_make_target_combines_public_rss_and_polymarket_sources():
     )
 
     assert "event-discovery-refresh-public-rss" in result.stdout
+    assert "event-discovery-refresh-gdelt" in result.stdout
     assert "event-discovery-refresh-polymarket" in result.stdout
     assert "RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_GDELT_LIVE=1" in result.stdout
     assert "RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1" in result.stdout
     assert "event-fade-cache-review-bundle" in result.stdout
 

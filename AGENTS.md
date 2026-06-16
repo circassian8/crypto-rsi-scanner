@@ -103,12 +103,16 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   event-fade-public-rss-review-cycle` (opt-in no-key public RSS source bundle
   with a 30-day lookback, targeted proxy-narrative search feed, and optional
   live CoinGecko universe enrichment; research cache/review artifacts only) ·
+  `make event-discovery-refresh-gdelt` / `make
+  event-fade-gdelt-review-cycle` (opt-in no-key GDELT Article List source with
+  configurable proxy-narrative query and optional live CoinGecko universe
+  enrichment; research cache/review artifacts only) ·
   `make event-discovery-refresh-polymarket` / `make
   event-fade-polymarket-review-cycle` (opt-in no-key Polymarket Gamma dated
   catalyst source with optional live CoinGecko universe enrichment; research
   cache/review artifacts only) · `make event-fade-no-key-review-cycle` (runs
-  public RSS and Polymarket refreshes into the same cache, then writes one
-  mixed-source review bundle) ·
+  public RSS, GDELT, and Polymarket refreshes into the same cache, then writes
+  one mixed-source review bundle) ·
   `main.py --event-discovery-binance-listen` (listen to Binance's signed CMS
   WebSocket for the configured window and append raw research cache evidence
   only; no live DB writes) ·
@@ -519,11 +523,15 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   News RSS search for pre-IPO/tokenized-stock/prediction-market/fan-token
   narratives. It defaults to a 30-day lookback and a broader live CoinGecko
   resolver universe, and writes only research cache/review artifacts.
+  `make event-fade-gdelt-review-cycle` is the no-key convenience path for live
+  GDELT Article List news. It uses the configured proxy-narrative query, defaults
+  to a 30-day lookback plus live CoinGecko universe enrichment, and writes only
+  research cache/review artifacts.
   `make event-fade-polymarket-review-cycle` is the no-key convenience path for
   Polymarket Gamma dated catalyst events. It defaults to live CoinGecko universe
   enrichment and writes only research cache/review artifacts.
-  `make event-fade-no-key-review-cycle` runs public RSS and Polymarket into the
-  same cache before writing a single mixed-source review bundle.
+  `make event-fade-no-key-review-cycle` runs public RSS, GDELT, and Polymarket
+  into the same cache before writing a single mixed-source review bundle.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,

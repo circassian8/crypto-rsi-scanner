@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add GDELT to no-key event-fade review cycle · Codex
+**Why:** The no-key validation workflow needs broader independent source
+coverage than public RSS plus Polymarket. GDELT was already implemented as an
+opt-in no-key news source, but it lacked a Make convenience target and was not
+part of the mixed review cycle.
+**Changes:**
+- Added `make event-discovery-refresh-gdelt` and
+  `make event-fade-gdelt-review-cycle` with configurable query, record limit,
+  30-day lookback, and live CoinGecko universe enrichment defaults.
+- Updated `make event-fade-no-key-review-cycle` so it now runs public RSS,
+  GDELT, and Polymarket into one observational cache before writing the review
+  bundle.
+- Added Make dry-run regression tests covering the new GDELT target and the
+  expanded no-key aggregate cycle.
+- Updated `AGENTS.md`, `ROADMAP.md`, `.env.example`, and
+  `research/event_discovery_design.md` with the new workflow.
+**Verify:** `make -n event-fade-gdelt-review-cycle`, `make -n
+event-fade-no-key-review-cycle`, `.venv/bin/python tests/test_indicators.py`
+with 244/244 passing, and `make verify` all pass. A temp live
+`make event-fade-gdelt-review-cycle` failed soft on GDELT HTTP 429 and wrote an
+empty review bundle; a temp live `make event-fade-no-key-review-cycle` still
+completed from RSS/Polymarket with 41 review rows despite the GDELT 429.
+**Notes/risks:** This is research workflow plumbing only. It does not change
+event-fade scoring, validation thresholds, alerts, paper trades, live storage,
+or promotion. GDELT is currently rate-limited in this environment, so it may
+need a smaller query/window or retry later before it contributes rows.
+
 ## 2026-06-16 — Expose review gates in event-fade bundles · Codex
 **Why:** The no-key review bundle is the handoff artifact for human and external
 review, but its manifest/README only exposed a subset of the validation gates.

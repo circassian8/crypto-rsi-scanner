@@ -876,6 +876,23 @@ The live GDELT path queries Article List JSON, reuses the same news parser as
 fixtures, and remains research-only/fail-soft. It should add narrative evidence
 for human review or local cache export, not route event-fade signals live.
 
+Use the no-key Make convenience target when building a cache-backed review
+workspace from GDELT:
+
+```bash
+EVENT_DISCOVERY_CACHE_DIR=event_fade_cache \
+EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_gdelt_bundle \
+EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1 \
+EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-gdelt-review-cycle
+```
+
+This target enables `RSI_EVENT_DISCOVERY_GDELT_LIVE=1`, uses the configured
+proxy-narrative query, sets a 30-day lookback, and enables broader live
+CoinGecko universe enrichment by default. GDELT rows remain source evidence for
+manual review; they cannot bypass asset-resolution, proxy/direct, event-time, or
+post-event failure gates.
+
 Run an opt-in live project-blog/RSS radar pass:
 
 ```bash
@@ -929,12 +946,12 @@ proxy instruments/venues from lower-confidence text-date rows, undated
 attention, background mentions, infrastructure rows, and ticker-word collisions.
 Provider/network failures remain warnings in `discovery_runs.jsonl`.
 
-The live Polymarket cycle is complementary to public RSS: it can produce dated
-external-catalyst/control rows even when RSS rows are undated, but current public
-Polymarket data may still resolve mostly ambiguous controls. Treat that as
-useful negative-control evidence, not proof of a proxy-fade edge.
+The live Polymarket cycle is complementary to public RSS and GDELT: it can
+produce dated external-catalyst/control rows even when news rows are undated, but
+current public Polymarket data may still resolve mostly ambiguous controls.
+Treat that as useful negative-control evidence, not proof of a proxy-fade edge.
 
-For a mixed no-key review bundle, run both public RSS and Polymarket into the
+For a mixed no-key review bundle, run public RSS, GDELT, and Polymarket into the
 same cache and write one review workspace:
 
 ```bash
@@ -946,8 +963,8 @@ EVENT_FADE_QUEUE_LIMIT=50 \
 ```
 
 This is the preferred no-key sample-expansion command because the resulting
-bundle can contain RSS proxy-attention or source-text-dated proxy rows plus
-Polymarket dated external-catalyst controls.
+bundle can contain RSS/GDELT proxy-attention or source-text-dated proxy rows
+plus Polymarket dated external-catalyst controls.
 
 Validation review reports include asset-role and source-provider cohorts
 alongside event-type, relationship, event-time-source, and BTC-risk cohorts. Use
@@ -970,7 +987,7 @@ Review bundles also write a compact sample summary into `manifest.json` and
 providers, proxy candidate count, proxy-context control count, direct
 beneficiary count, SHORT_TRIGGERED count, missing-event-time count, and
 per-source provider quality counts. This is the fastest way to sanity-check a
-fresh RSS/Polymarket bundle before filling the sidecar labels.
+fresh RSS/GDELT/Polymarket bundle before filling the sidecar labels.
 
 Inspect configured provider readiness without printing secrets:
 
