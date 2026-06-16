@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Block reviewed event-fade rows missing source timing · Codex
+**Why:** Point-in-time validation can catch late source evidence, but a reviewed
+row with no source timestamps at all was effectively unaudited. The validation
+dataset must prove when evidence was knowable, especially before it contributes
+to proxy/control coverage or promotion metrics.
+**Changes:**
+- Added `missing_source_timing_rows` to event-fade validation review metrics,
+  reports, next-sample work, and review-bundle manifests.
+- Added a labeling-queue category for reviewed rows that need source timing
+  evidence or removal.
+- Added regression coverage for missing source timing and tightened the
+  promotion-ready fixture to assert zero missing source timing.
+- Updated `AGENTS.md` and `research/event_discovery_design.md` with the new
+  blocker and queue priority.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 218/218.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This is review-evidence tightening only. It does not change
+event discovery, event-fade scoring, alert routing, live storage, or paper
+trading.
+
 ## 2026-06-16 — Apply point-in-time source checks to dated controls · Codex
 **Why:** Reviewed direct/ambiguous negative controls could previously skip
 source-timing checks because `NO_TRADE` rows had no review decision time. That

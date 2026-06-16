@@ -438,12 +438,13 @@ Queue priority is:
 3. labeled rows missing `review_status=reviewed`
 4. reviewed rows with point-in-time evidence violations
 5. reviewed rows with any source evidence after the decision time
-6. unlabeled `SHORT_TRIGGERED` rows
-7. reviewed `SHORT_TRIGGERED` rows missing required outcome fields:
+6. reviewed rows missing source timing evidence
+7. unlabeled `SHORT_TRIGGERED` rows
+8. reviewed `SHORT_TRIGGERED` rows missing required outcome fields:
    `max_adverse_excursion`, `max_favorable_excursion`, and
    `post_event_return_72h`
-8. unlabeled proxy candidates
-9. unlabeled direct/ambiguous negative controls
+9. unlabeled proxy candidates
+10. unlabeled direct/ambiguous negative controls
 
 The report shows the event, asset, signal type, relationship, event time,
 trigger time, missing fields, suggested label category, and source URLs. It is a
@@ -556,6 +557,8 @@ The reviewer currently checks:
   time, even if another source for the same event was available earlier
 - decision time is `trigger_observed_at` for reviewed `SHORT_TRIGGERED` rows and
   `event_time` for other reviewed dated rows, including direct/ambiguous controls
+- reviewed rows with no source timing evidence, which must be removed or given
+  auditable timing before they count toward promotion evidence
 - trigger latency from event time to `SHORT_TRIGGERED`, including negative
   latencies that imply invalid state progression
 - average MFE, MAE, MFE/MAE ratio, and post-event 24h/72h/7d returns for
@@ -570,8 +573,9 @@ The reviewer currently checks:
 The report also prints a `NEXT SAMPLE WORK` section that translates blockers
 into concrete work: how many more proxy candidates, direct/ambiguous controls,
 and reviewed `SHORT_TRIGGERED` rows are needed, which rows still need explicit
-review status or labels, which unsafe point-in-time rows need review/removal,
-and which triggered rows still need trigger or event-time baseline outcomes.
+review status or labels, which unsafe or missing point-in-time rows need
+review/removal, and which triggered rows still need trigger or event-time
+baseline outcomes.
 
 The command prints `BLOCKED` until coverage and outcome evidence are strong
 enough. Even when it prints `READY FOR HUMAN DECISION`, the repo decision still

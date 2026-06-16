@@ -1593,6 +1593,7 @@ def _event_fade_review_bundle_manifest(
             "missing_trigger_outcome_rows": review.missing_trigger_outcome_rows,
             "point_in_time_violation_rows": review.point_in_time_violation_rows,
             "post_decision_source_rows": review.post_decision_source_rows,
+            "missing_source_timing_rows": review.missing_source_timing_rows,
             "next_sample_work": list(event_validation.validation_review_next_steps(review)),
         },
         "outcome_fill": outcome_fill,

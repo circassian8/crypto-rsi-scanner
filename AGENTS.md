@@ -267,7 +267,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   evidence when it has `review_status=reviewed` and a known `human_label`.
   Source-timing checks use `trigger_observed_at` for reviewed `SHORT_TRIGGERED`
   rows and `event_time` for other reviewed dated rows, including direct or
-  ambiguous controls.
+  ambiguous controls. Reviewed rows with no source timing evidence are blocked
+  until timing is added or the row is removed.
   The review command must not automatically promote alerts, write live storage,
   open paper trades, or imply execution.
 - Event-fade validation labeling queues are artifact-only. `main.py

@@ -2483,6 +2483,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert review.missing_event_time_baseline_rows == 0
     assert review.point_in_time_violation_rows == 0
     assert review.post_decision_source_rows == 0
+    assert review.missing_source_timing_rows == 0
     assert review.promotion_blockers == ()
     assert event_validation.validation_review_next_steps(review) == (
         "Mechanical review gates are satisfied; explicit human approval is still required before promotion.",
@@ -2512,6 +2513,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "trigger edge vs baseline=+10.0pp" in report
     assert "proxy event types: 2/2" in report
     assert "trigger BTC risk buckets: 1/1" in report
+    assert "reviewed rows missing source timing: 0" in report
     assert "trigger latency: avg=22.5h" in report
     assert "rows with post-decision source evidence: 0" in report
     assert "labeled rows missing review_status=reviewed: 0" in report
@@ -2920,6 +2922,45 @@ def test_event_fade_validation_review_flags_late_control_evidence():
     queue = event_validation.build_labeling_queue(rows)
     item = next(item for item in queue.items if item.asset_symbol == "TESTBTC")
     assert item.category == "fix_point_in_time_evidence"
+
+
+def test_event_fade_validation_review_blocks_missing_source_timing():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    direct = next(
+        row
+        for row in rows
+        if row["asset_symbol"] == "TESTBTC" and row["relationship_type"] == "direct_token_event"
+    )
+    direct["human_label"] = "direct_event"
+    direct["review_status"] = "reviewed"
+    direct["first_seen_time"] = ""
+    direct["published_at_min"] = ""
+    direct["published_at_max"] = ""
+    direct["fetched_at_min"] = ""
+    direct["fetched_at_max"] = ""
+    direct["raw_published_at"] = []
+    direct["raw_fetched_at"] = []
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=0,
+        min_negative_controls=1,
+        min_triggered_reviewed=0,
+    )
+    assert review.reviewed_negative_controls == 1
+    assert review.missing_source_timing_rows == 1
+    assert "1 reviewed row(s) are missing source timing evidence" in review.promotion_blockers
+    assert (
+        "Add source timing evidence or remove 1 reviewed row(s)."
+        in event_validation.validation_review_next_steps(review)
+    )
+
+    queue = event_validation.build_labeling_queue(rows)
+    item = next(item for item in queue.items if item.asset_symbol == "TESTBTC")
+    assert item.category == "add_source_timing"
+    assert "first_seen_time" in item.missing_fields
 
 
 def test_event_discovery_scanner_report_uses_local_fixtures():
