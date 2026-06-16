@@ -72,8 +72,8 @@ Current files:
 - `event_discovery.py`: normalizer, deduper, orchestrator, flat radar report
   formatter, grouped event-fade auto report formatter, and validation-sample
   export helpers
-- `event_validation.py`: local validation-sample loader/reviewer for human
-  labels, outcome metrics, and promotion blockers
+- `event_validation.py`: local validation-sample loader/reviewer/merger for
+  human labels, outcome metrics, and promotion blockers
 
 ## Universe Integration
 
@@ -247,6 +247,26 @@ Each row includes:
 This export may write only the requested local artifact. It must not write live
 DB rows, send alerts, open paper trades, or imply execution.
 
+## Validation Sample Merge
+
+`main.py --event-fade-merge-sample FRESH REVIEWED OUT` preserves human work when
+the discovery export is regenerated. It reads a fresh JSONL/CSV export and a
+previously reviewed JSONL/CSV sample, matches rows by stable event id, asset id,
+and relationship type, then copies nonblank review fields into the fresh rows:
+
+- `review_status`
+- `human_label`
+- `human_notes`
+- `max_adverse_excursion`
+- `max_favorable_excursion`
+- `post_event_return_24h`
+- `post_event_return_72h`
+- `post_event_return_7d`
+
+The merge writes only the requested `OUT` artifact and reports matched/unmatched
+reviewed rows. It does not change live storage, routing, paper trades, or event
+state.
+
 ## Validation Sample Review
 
 `main.py --event-fade-review-sample PATH` reads a labeled JSONL/CSV validation
@@ -399,7 +419,17 @@ make event-fade-review-sample
 EVENT_FADE_SAMPLE_IN=/path/to/labeled_sample.csv make event-fade-review-sample
 ```
 
-All four outputs are local and observational. They do not send alerts or write
+Preserve labels/outcomes across a refreshed export:
+
+```bash
+make event-fade-merge-sample
+EVENT_FADE_SAMPLE_FRESH=/tmp/new_export.jsonl \
+EVENT_FADE_SAMPLE_REVIEWED=/path/to/old_labeled_sample.csv \
+EVENT_FADE_SAMPLE_MERGED=/tmp/merged_sample.jsonl \
+  make event-fade-merge-sample
+```
+
+All five outputs are local and observational. They do not send alerts or write
 the DB.
 
 ## Promotion Requirements

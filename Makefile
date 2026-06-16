@@ -1,8 +1,11 @@
 PYTHON := .venv/bin/python
 EVENT_FADE_SAMPLE_OUT ?= /tmp/event_fade_validation_sample.jsonl
 EVENT_FADE_SAMPLE_IN ?= $(EVENT_FADE_SAMPLE_OUT)
+EVENT_FADE_SAMPLE_FRESH ?= $(EVENT_FADE_SAMPLE_OUT)
+EVENT_FADE_SAMPLE_REVIEWED ?= $(EVENT_FADE_SAMPLE_IN)
+EVENT_FADE_SAMPLE_MERGED ?= /tmp/event_fade_validation_merged.jsonl
 
-.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-fade-auto-report event-fade-export-sample event-fade-review-sample status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-fade-auto-report event-fade-export-sample event-fade-review-sample event-fade-merge-sample status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -20,6 +23,7 @@ help:
 	@echo "  make event-fade-auto-report  Print grouped event-fade discovery report"
 	@echo "  make event-fade-export-sample  Write validation sample from fixtures"
 	@echo "  make event-fade-review-sample  Review labels/outcomes in validation sample"
+	@echo "  make event-fade-merge-sample  Preserve labels/outcomes in fresh sample"
 	@echo "  make status   Print operational scan/listener health"
 	@echo "  make backup-db  Create and verify a SQLite backup"
 	@echo "  make verify-restore  Restore-check the newest SQLite backup"
@@ -130,6 +134,9 @@ event-fade-export-sample:
 
 event-fade-review-sample:
 	$(PYTHON) main.py --event-fade-review-sample $(EVENT_FADE_SAMPLE_IN)
+
+event-fade-merge-sample:
+	$(PYTHON) main.py --event-fade-merge-sample $(EVENT_FADE_SAMPLE_FRESH) $(EVENT_FADE_SAMPLE_REVIEWED) $(EVENT_FADE_SAMPLE_MERGED)
 
 status:
 	$(PYTHON) main.py --status

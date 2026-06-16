@@ -1151,6 +1151,21 @@ def event_fade_review_sample(path: str, verbose: bool = False) -> None:
     print(event_validation.format_validation_review(review))
 
 
+def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, verbose: bool = False) -> None:
+    """Merge manual labels/outcomes from a reviewed sample into a fresh export."""
+    _setup_event_discovery_logging(verbose)
+    fresh = event_validation.load_validation_sample(fresh_path)
+    reviewed = event_validation.load_validation_sample(reviewed_path)
+    result = event_validation.merge_review_fields(fresh, reviewed)
+    out = event_discovery.write_validation_sample(result.rows, out_path)
+    print(
+        "Event-fade validation sample merge: "
+        f"{result.matched_rows} matched row(s), "
+        f"{result.unmatched_reviewed_rows} unmatched reviewed row(s), "
+        f"{result.copied_fields} copied field(s), wrote {len(result.rows)} row(s) to {out}"
+    )
+
+
 def status() -> None:
     """Print operational scan/listener health and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -1347,6 +1362,12 @@ def cli() -> None:
         help="Review labels/outcomes in a research-only event-fade validation sample export.",
     )
     parser.add_argument(
+        "--event-fade-merge-sample",
+        nargs=3,
+        metavar=("FRESH", "REVIEWED", "OUT"),
+        help="Merge human labels/outcomes from REVIEWED into FRESH and write OUT.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for commands that support it.",
@@ -1440,6 +1461,10 @@ def cli() -> None:
         return
     if args.event_fade_review_sample:
         event_fade_review_sample(args.event_fade_review_sample, verbose=args.verbose)
+        return
+    if args.event_fade_merge_sample:
+        fresh_path, reviewed_path, out_path = args.event_fade_merge_sample
+        event_fade_merge_sample(fresh_path, reviewed_path, out_path, verbose=args.verbose)
         return
     if args.status:
         status()

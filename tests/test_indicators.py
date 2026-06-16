@@ -1542,6 +1542,40 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
         ).promotion_ready
 
 
+def test_event_fade_validation_merge_preserves_review_fields():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    fresh = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    reviewed = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    source = next(row for row in reviewed if row["asset_symbol"] == "TESTVELVET")
+    source["review_status"] = "reviewed"
+    source["human_label"] = "valid_proxy_fade"
+    source["human_notes"] = "Reviewed SpaceX proxy event."
+    source["max_favorable_excursion"] = 0.42
+    source["max_adverse_excursion"] = 0.08
+    source["post_event_return_24h"] = -0.11
+    source["post_event_return_72h"] = -0.22
+    source["post_event_return_7d"] = -0.31
+    stale = dict(source)
+    stale["event_id"] = "missing-event"
+    reviewed.append(stale)
+
+    result = event_validation.merge_review_fields(fresh, reviewed)
+    assert result.fresh_rows == len(fresh)
+    assert result.reviewed_rows == len(reviewed)
+    assert result.matched_rows == 1
+    assert result.unmatched_reviewed_rows == 1
+    assert result.copied_fields == 8
+
+    merged = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
+    assert merged["human_label"] == "valid_proxy_fade"
+    assert merged["human_notes"] == "Reviewed SpaceX proxy event."
+    assert merged["max_favorable_excursion"] == 0.42
+    assert merged["post_event_return_72h"] == -0.22
+    other = next(row for row in result.rows if row["asset_symbol"] == "TESTPUMP")
+    assert other["human_label"] == ""
+
+
 def test_event_fade_validation_review_blocks_late_or_weak_trigger_evidence():
     from crypto_rsi_scanner import event_discovery, event_validation
 
@@ -1753,6 +1787,36 @@ def test_event_fade_review_sample_scanner_reads_jsonl_fixture():
         assert "Rows: 17" in text
         assert "BLOCKED" in text
         assert "reviewed proxy candidates 0/25" in text
+
+
+def test_event_fade_merge_sample_scanner_writes_merged_jsonl():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    fresh = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    reviewed = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    reviewed_row = next(row for row in reviewed if row["asset_symbol"] == "TESTVELVET")
+    reviewed_row["human_label"] = "valid_proxy_fade"
+    reviewed_row["post_event_return_72h"] = -0.22
+    with tempfile.TemporaryDirectory() as tmp:
+        fresh_path = Path(tmp) / "fresh.jsonl"
+        reviewed_path = Path(tmp) / "reviewed.jsonl"
+        merged_path = Path(tmp) / "merged.jsonl"
+        event_discovery.write_validation_sample(fresh, fresh_path)
+        event_discovery.write_validation_sample(reviewed, reviewed_path)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_merge_sample(str(fresh_path), str(reviewed_path), str(merged_path))
+        text = out.getvalue()
+        assert "matched row(s)" in text
+        rows = [json.loads(line) for line in merged_path.read_text(encoding="utf-8").splitlines()]
+        velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+        assert velvet["human_label"] == "valid_proxy_fade"
+        assert velvet["post_event_return_72h"] == -0.22
 
 
 def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():

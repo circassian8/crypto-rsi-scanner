@@ -30,6 +30,16 @@ REQUIRED_TRIGGER_OUTCOME_FIELDS = (
     "max_favorable_excursion",
     "post_event_return_72h",
 )
+REVIEW_FIELDS = (
+    "review_status",
+    "human_label",
+    "human_notes",
+    "max_adverse_excursion",
+    "max_favorable_excursion",
+    "post_event_return_24h",
+    "post_event_return_72h",
+    "post_event_return_7d",
+)
 
 
 @dataclass(frozen=True)
@@ -68,6 +78,16 @@ class EventFadeValidationReview:
         return not self.promotion_blockers
 
 
+@dataclass(frozen=True)
+class ValidationSampleMergeResult:
+    rows: list[dict[str, Any]]
+    fresh_rows: int
+    reviewed_rows: int
+    matched_rows: int
+    unmatched_reviewed_rows: int
+    copied_fields: int
+
+
 def load_validation_sample(path: str | Path) -> list[dict[str, Any]]:
     """Load a validation sample export from JSONL or CSV."""
     sample_path = Path(path).expanduser()
@@ -80,6 +100,43 @@ def load_validation_sample(path: str | Path) -> list[dict[str, Any]]:
         if stripped:
             rows.append(json.loads(stripped))
     return rows
+
+
+def merge_review_fields(
+    fresh_rows: Iterable[Mapping[str, Any]],
+    reviewed_rows: Iterable[Mapping[str, Any]],
+) -> ValidationSampleMergeResult:
+    """Copy human labels/outcomes from an older reviewed sample into fresh rows."""
+    fresh = [dict(row) for row in fresh_rows]
+    reviewed = [dict(row) for row in reviewed_rows]
+    reviewed_by_key = {
+        key: row
+        for row in reviewed
+        if (key := _sample_key(row)) is not None and _has_review_data(row)
+    }
+    matched_keys: set[tuple[str, str, str]] = set()
+    copied_fields = 0
+    merged: list[dict[str, Any]] = []
+    for row in fresh:
+        out = dict(row)
+        key = _sample_key(row)
+        source = reviewed_by_key.get(key) if key is not None else None
+        if source is not None:
+            matched_keys.add(key)
+            for field in REVIEW_FIELDS:
+                value = source.get(field)
+                if _has_value(value):
+                    out[field] = value
+                    copied_fields += 1
+        merged.append(out)
+    return ValidationSampleMergeResult(
+        rows=merged,
+        fresh_rows=len(fresh),
+        reviewed_rows=len(reviewed),
+        matched_rows=len(matched_keys),
+        unmatched_reviewed_rows=max(0, len(reviewed_by_key) - len(matched_keys)),
+        copied_fields=copied_fields,
+    )
 
 
 def review_validation_sample(
@@ -312,6 +369,27 @@ def _label(row: Mapping[str, Any]) -> str:
 
 def _signal_type(row: Mapping[str, Any]) -> str:
     return str(row.get("signal_type") or "").strip()
+
+
+def _sample_key(row: Mapping[str, Any]) -> tuple[str, str, str] | None:
+    event_id = str(row.get("event_id") or "").strip()
+    coin_id = str(row.get("asset_coin_id") or "").strip().casefold()
+    relationship = str(row.get("relationship_type") or "").strip().casefold()
+    if event_id and coin_id and relationship:
+        return (event_id, coin_id, relationship)
+    event_name = str(row.get("event_name") or "").strip().casefold()
+    symbol = str(row.get("asset_symbol") or "").strip().casefold()
+    if event_name and symbol and relationship:
+        return (event_name, symbol, relationship)
+    return None
+
+
+def _has_review_data(row: Mapping[str, Any]) -> bool:
+    return any(_has_value(row.get(field)) for field in REVIEW_FIELDS)
+
+
+def _has_value(value: object) -> bool:
+    return value is not None and value != ""
 
 
 def _is_proxy_candidate(row: Mapping[str, Any]) -> bool:

@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade validation sample merge workflow · Codex
+**Why:** A reviewed validation sample will need repeated fresh exports as event
+fixtures expand, and prior human labels/outcomes should not be lost or manually
+retyped.
+**Changes:**
+- Added `event_validation.merge_review_fields()` to copy nonblank review fields
+  from a previously labeled sample into a fresh export by event/asset/
+  relationship identity.
+- Added `main.py --event-fade-merge-sample FRESH REVIEWED OUT` and
+  `make event-fade-merge-sample`, with separate fresh/reviewed/merged path
+  variables.
+- Added offline tests for direct merge behavior and scanner CLI file output.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the export → merge → label → review
+  workflow and artifact-only guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 183/183.
+`git diff --check` passes. `make verify` passes.
+**Notes/risks:** Merge copies only nonblank human review/outcome fields and only
+writes the requested output artifact. It does not write live storage, route
+alerts, open paper trades, or imply execution.
+
 ## 2026-06-16 — Harden event-fade validation promotion blockers · Codex
 **Why:** The review command summarized labels/outcomes, but it could still mark
 a tiny or point-in-time-invalid sample as ready if thresholds were lowered. The
