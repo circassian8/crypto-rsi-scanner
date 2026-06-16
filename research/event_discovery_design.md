@@ -6,7 +6,8 @@ fixture-backed exchange announcement providers, structured calendar/unlock
 providers, news/proxy-narrative providers, external catalyst providers, and
 Coinalyze-style derivatives plus Tokenomist/Etherscan/Arkham/Dune-style
 supply/on-chain enrichment, plus grouped auto reporting and validation-sample
-exports plus validation-sample review metrics, research-only
+exports, validation-sample review metrics, labeling-queue support, and
+research-only merge support.
 
 ## Goal
 
@@ -72,8 +73,8 @@ Current files:
 - `event_discovery.py`: normalizer, deduper, orchestrator, flat radar report
   formatter, grouped event-fade auto report formatter, and validation-sample
   export helpers
-- `event_validation.py`: local validation-sample loader/reviewer/merger for
-  human labels, outcome metrics, and promotion blockers
+- `event_validation.py`: local validation-sample loader/reviewer/labeling
+  queue/merger for human labels, outcome metrics, and promotion blockers
 
 ## Universe Integration
 
@@ -267,6 +268,28 @@ The merge writes only the requested `OUT` artifact and reports matched/unmatched
 reviewed rows. It does not change live storage, routing, paper trades, or event
 state.
 
+## Validation Sample Labeling Queue
+
+`main.py --event-fade-labeling-queue PATH` reads a JSONL/CSV validation sample
+and prints the next rows that need human review. It is a read-only report; it
+does not auto-label rows or write the sample.
+
+Queue priority is:
+
+1. unknown `human_label` values
+2. reviewed rows with point-in-time evidence violations
+3. unlabeled `SHORT_TRIGGERED` rows
+4. reviewed `SHORT_TRIGGERED` rows missing required outcome fields:
+   `max_adverse_excursion`, `max_favorable_excursion`, and
+   `post_event_return_72h`
+5. unlabeled proxy candidates
+6. unlabeled direct/ambiguous negative controls
+
+The report shows the event, asset, signal type, relationship, event time,
+trigger time, missing fields, suggested label category, and source URLs. It is a
+workflow aid for building the reviewed validation sample; it is not promotion
+evidence by itself.
+
 ## Validation Sample Review
 
 `main.py --event-fade-review-sample PATH` reads a labeled JSONL/CSV validation
@@ -419,6 +442,14 @@ make event-fade-review-sample
 EVENT_FADE_SAMPLE_IN=/path/to/labeled_sample.csv make event-fade-review-sample
 ```
 
+Print a review queue for missing labels/outcomes:
+
+```bash
+make event-fade-labeling-queue
+EVENT_FADE_SAMPLE_IN=/path/to/labeled_sample.csv EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-labeling-queue
+```
+
 Preserve labels/outcomes across a refreshed export:
 
 ```bash
@@ -429,7 +460,7 @@ EVENT_FADE_SAMPLE_MERGED=/tmp/merged_sample.jsonl \
   make event-fade-merge-sample
 ```
 
-All five outputs are local and observational. They do not send alerts or write
+All six outputs are local and observational. They do not send alerts or write
 the DB.
 
 ## Promotion Requirements

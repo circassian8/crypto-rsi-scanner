@@ -1576,6 +1576,53 @@ def test_event_fade_validation_merge_preserves_review_fields():
     assert other["human_label"] == ""
 
 
+def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    queue = event_validation.build_labeling_queue(rows, limit=10)
+    assert queue.total_rows == len(rows)
+    assert queue.needed_rows == len(rows)
+    assert queue.shown_rows == 10
+
+    first = queue.items[0]
+    assert first.asset_symbol == "TESTVELVET"
+    assert first.category == "label_triggered_candidate"
+    assert first.suggested_label == "valid_proxy_fade or false_positive"
+    assert first.missing_fields == (
+        "human_label",
+        "max_adverse_excursion",
+        "max_favorable_excursion",
+        "post_event_return_72h",
+    )
+
+    assert any(item.category == "label_proxy_candidate" for item in queue.items)
+    assert any(item.category == "label_negative_control" for item in queue.items)
+
+    report = event_validation.format_labeling_queue(queue)
+    assert "EVENT FADE VALIDATION LABELING QUEUE" in report
+    assert "needing labels/outcomes: 17" in report
+    assert "label_triggered_candidate" in report
+    assert "TESTVELVET" in report
+    assert "valid_proxy_fade or false_positive" in report
+
+
+def test_event_fade_validation_labeling_queue_flags_reviewed_trigger_outcomes():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+    triggered["human_label"] = "valid_proxy_fade"
+    queue = event_validation.build_labeling_queue(rows)
+    item = next(item for item in queue.items if item.asset_symbol == "TESTVELVET")
+    assert item.category == "fill_trigger_outcomes"
+    assert item.missing_fields == (
+        "max_adverse_excursion",
+        "max_favorable_excursion",
+        "post_event_return_72h",
+    )
+
+
 def test_event_fade_validation_review_blocks_late_or_weak_trigger_evidence():
     from crypto_rsi_scanner import event_discovery, event_validation
 
@@ -1787,6 +1834,27 @@ def test_event_fade_review_sample_scanner_reads_jsonl_fixture():
         assert "Rows: 17" in text
         assert "BLOCKED" in text
         assert "reviewed proxy candidates 0/25" in text
+
+
+def test_event_fade_labeling_queue_scanner_reads_jsonl_fixture():
+    import contextlib
+    import io
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = Path(tmp) / "sample.jsonl"
+        event_discovery.write_validation_sample(rows, out_path)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_labeling_queue(str(out_path), limit=3)
+        text = out.getvalue()
+        assert "EVENT FADE VALIDATION LABELING QUEUE" in text
+        assert "showing: 3" in text
+        assert "label_triggered_candidate" in text
+        assert "TESTVELVET" in text
 
 
 def test_event_fade_merge_sample_scanner_writes_merged_jsonl():

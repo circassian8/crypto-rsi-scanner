@@ -95,6 +95,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   fields; research-only/no writes except the requested artifact) ·
   `main.py --event-fade-review-sample PATH` (read a labeled JSONL/CSV sample and
   print review metrics plus promotion blockers; research-only/no writes) ·
+  `main.py --event-fade-labeling-queue PATH` (prioritize unlabeled rows and
+  triggered rows missing required outcomes; research-only/no writes) ·
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT` (copy prior human
   labels/outcomes into a fresh validation export; writes only `OUT`) ·
   `main.py --universe-audit` (latest hygiene audit)
@@ -146,7 +148,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_fade.py` | pure alert-only sell-the-news event-fade research sleeve; no storage, alerts, paper trades, or execution |
 | `event_models.py` | immutable event-discovery dataclasses for raw events, normalized events, links, classifications, and candidates |
 | `event_discovery.py` | fixture-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring, grouped auto reports, and validation sample exports |
-| `event_validation.py` | research-only validation-sample loader/reviewer/merger for human labels, outcome metrics, and promotion blockers |
+| `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
 | `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider, fixture-backed exchange announcement parsers, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers, and external IPO/sports/prediction-market catalyst parsers; no live event provider enabled yet |
 | `derivatives_providers/` | fixture-backed derivatives enrichment adapters for event discovery, starting with Coinalyze-style OI/funding/crowding snapshots; no live derivatives provider enabled yet |
@@ -207,6 +209,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   precision, point-in-time violations, MFE/MAE, post-event returns, and
   promotion blockers, but it must not automatically promote alerts, write live
   storage, open paper trades, or imply execution.
+- Event-fade validation labeling queues are artifact-only. `main.py
+  --event-fade-labeling-queue` may prioritize unlabeled proxy/control rows and
+  reviewed triggered rows missing required outcomes, but it must not auto-label
+  rows, modify sample files, write storage, route alerts, open paper trades, or
+  imply promotion.
 - Event-fade validation merges are artifact-only. `main.py --event-fade-merge-sample`
   may copy nonblank human labels/notes/outcomes from a previously reviewed
   JSONL/CSV sample into a fresh export by event/asset/relationship identity, but
@@ -307,10 +314,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   reports sample coverage, reviewed trigger count, trigger precision,
   false-positive rate, point-in-time evidence violations, MFE/MAE, post-event
   returns, and blockers such as too few reviewed proxy/control/trigger cases or
-  weak edge-quality metrics. `main.py --event-fade-merge-sample FRESH REVIEWED
-  OUT` preserves prior human labels/outcomes when regenerating a fresh export.
-  No network event/news/derivatives/supply providers, cache writes, live DB
-  writes, notifications, or paper trades are enabled.
+  weak edge-quality metrics. `main.py --event-fade-labeling-queue PATH`
+  prioritizes the next rows to label and triggered rows missing required
+  outcome fields. `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
+  preserves prior human labels/outcomes when regenerating a fresh export. No
+  network event/news/derivatives/supply providers, cache writes, live DB writes,
+  notifications, or paper trades are enabled.
 - Caveats: the plain Binance backtest path is survivorship-biased (today's
   top-N). Prefer `--pit-volume` for any conclusion-bearing research; `--pit`
   (CoinGecko mcap) remains for cross-checking but is capped at 365d on the demo
@@ -329,7 +338,9 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 4. Use `main.py --event-fade-export-sample PATH` to build a manually reviewed
    event-fade sample from discovery fixtures, use
    `main.py --event-fade-merge-sample FRESH REVIEWED OUT` to preserve prior
-   labels/outcomes across refreshes, fill human labels/outcomes, then use
+   labels/outcomes across refreshes, use
+   `main.py --event-fade-labeling-queue PATH` to prioritize missing
+   labels/outcomes, fill human labels/outcomes, then use
    `main.py --event-fade-review-sample PATH` before promoting event-fade output
    beyond local reports.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.

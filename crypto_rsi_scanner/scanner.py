@@ -1151,6 +1151,14 @@ def event_fade_review_sample(path: str, verbose: bool = False) -> None:
     print(event_validation.format_validation_review(review))
 
 
+def event_fade_labeling_queue(path: str, limit: int | None = 20, verbose: bool = False) -> None:
+    """Print prioritized rows that still need event-fade validation review."""
+    _setup_event_discovery_logging(verbose)
+    rows = event_validation.load_validation_sample(path)
+    queue = event_validation.build_labeling_queue(rows, limit=limit)
+    print(event_validation.format_labeling_queue(queue))
+
+
 def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, verbose: bool = False) -> None:
     """Merge manual labels/outcomes from a reviewed sample into a fresh export."""
     _setup_event_discovery_logging(verbose)
@@ -1362,6 +1370,17 @@ def cli() -> None:
         help="Review labels/outcomes in a research-only event-fade validation sample export.",
     )
     parser.add_argument(
+        "--event-fade-labeling-queue",
+        metavar="PATH",
+        help="Print prioritized validation sample rows that need human labels/outcomes.",
+    )
+    parser.add_argument(
+        "--event-fade-queue-limit",
+        type=int,
+        default=20,
+        help="Maximum rows to show for --event-fade-labeling-queue.",
+    )
+    parser.add_argument(
         "--event-fade-merge-sample",
         nargs=3,
         metavar=("FRESH", "REVIEWED", "OUT"),
@@ -1461,6 +1480,13 @@ def cli() -> None:
         return
     if args.event_fade_review_sample:
         event_fade_review_sample(args.event_fade_review_sample, verbose=args.verbose)
+        return
+    if args.event_fade_labeling_queue:
+        event_fade_labeling_queue(
+            args.event_fade_labeling_queue,
+            limit=args.event_fade_queue_limit,
+            verbose=args.verbose,
+        )
         return
     if args.event_fade_merge_sample:
         fresh_path, reviewed_path, out_path = args.event_fade_merge_sample

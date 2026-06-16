@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade validation labeling queue · Codex
+**Why:** The event-fade validation workflow could export, merge, and review
+samples, but it did not tell a reviewer which rows to label next or which
+triggered rows were missing required outcome fields.
+**Changes:**
+- Added `event_validation.build_labeling_queue()` and
+  `format_labeling_queue()` to prioritize unknown labels, point-in-time issues,
+  unlabeled triggered rows, triggered rows missing required outcomes, proxy
+  candidates, and direct/ambiguous controls.
+- Added `main.py --event-fade-labeling-queue PATH` plus
+  `make event-fade-labeling-queue`, controlled by `EVENT_FADE_SAMPLE_IN` and
+  `EVENT_FADE_QUEUE_LIMIT`.
+- Added offline tests for pure queue priority, reviewed-trigger outcome gaps,
+  and scanner CLI output.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the queue command and artifact-only
+  guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 186/186.
+`make event-fade-export-sample ... && make event-fade-labeling-queue ...`
+prints the expected prioritized queue. `git diff --check` passes.
+`make verify` passes.
+**Notes/risks:** This is a read-only sample review aid. It does not auto-label
+rows, write live storage, route alerts, open paper trades, or imply promotion.
+
 ## 2026-06-16 — Add event-fade validation sample merge workflow · Codex
 **Why:** A reviewed validation sample will need repeated fresh exports as event
 fixtures expand, and prior human labels/outcomes should not be lost or manually

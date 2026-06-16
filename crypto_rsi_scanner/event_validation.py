@@ -88,6 +88,33 @@ class ValidationSampleMergeResult:
     copied_fields: int
 
 
+@dataclass(frozen=True)
+class ValidationLabelingQueueItem:
+    priority: int
+    category: str
+    asset_symbol: str
+    asset_coin_id: str
+    event_id: str
+    event_name: str
+    relationship_type: str
+    signal_type: str
+    event_time: str | None
+    trigger_observed_at: str | None
+    human_label: str
+    suggested_label: str
+    missing_fields: tuple[str, ...]
+    source_urls: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ValidationLabelingQueue:
+    total_rows: int
+    needed_rows: int
+    shown_rows: int
+    limit: int | None
+    items: tuple[ValidationLabelingQueueItem, ...]
+
+
 def load_validation_sample(path: str | Path) -> list[dict[str, Any]]:
     """Load a validation sample export from JSONL or CSV."""
     sample_path = Path(path).expanduser()
@@ -137,6 +164,70 @@ def merge_review_fields(
         unmatched_reviewed_rows=max(0, len(reviewed_by_key) - len(matched_keys)),
         copied_fields=copied_fields,
     )
+
+
+def build_labeling_queue(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int | None = None,
+) -> ValidationLabelingQueue:
+    """Prioritize validation rows that still need human labels or outcomes."""
+    data = [dict(row) for row in rows]
+    items = [_labeling_queue_item(row) for row in data]
+    needed = sorted(
+        (item for item in items if item is not None),
+        key=lambda item: (
+            item.priority,
+            item.event_time or "",
+            item.asset_symbol,
+            item.event_name,
+        ),
+    )
+    shown = needed[: max(0, limit)] if limit is not None else needed
+    return ValidationLabelingQueue(
+        total_rows=len(data),
+        needed_rows=len(needed),
+        shown_rows=len(shown),
+        limit=limit,
+        items=tuple(shown),
+    )
+
+
+def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
+    rows = [
+        "=" * 78,
+        "EVENT FADE VALIDATION LABELING QUEUE (research-only; no alerts, DB writes, paper trades, or orders)",
+        "=" * 78,
+        (
+            f"Rows: {queue.total_rows} · needing labels/outcomes: {queue.needed_rows} · "
+            f"showing: {queue.shown_rows}"
+        ),
+    ]
+    if queue.limit is not None:
+        rows.append(f"Limit: {queue.limit}")
+    if not queue.items:
+        rows.append("")
+        rows.append("No rows need labels or required trigger outcomes.")
+        return "\n".join(rows)
+
+    rows.append("")
+    for idx, item in enumerate(queue.items, 1):
+        missing = ", ".join(item.missing_fields) if item.missing_fields else "review required"
+        event_time = item.event_time or "unknown"
+        trigger_time = item.trigger_observed_at or "n/a"
+        label = item.human_label or "unlabeled"
+        rows.append(
+            f"{idx}. {item.category} · {item.asset_symbol} ({item.asset_coin_id}) · "
+            f"signal={item.signal_type or 'NO_TRADE'} · rel={item.relationship_type}"
+        )
+        rows.append(f"   event: {item.event_name}")
+        rows.append(f"   event_time: {event_time} · trigger: {trigger_time}")
+        rows.append(
+            f"   label: {label} · suggested: {item.suggested_label} · missing: {missing}"
+        )
+        if item.source_urls:
+            rows.append("   sources: " + ", ".join(item.source_urls[:3]))
+    return "\n".join(rows)
 
 
 def review_validation_sample(
@@ -338,6 +429,102 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
     return "\n".join(rows)
 
 
+def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem | None:
+    label = _label(row)
+    signal_type = _signal_type(row)
+    triggered = signal_type == "SHORT_TRIGGERED"
+    missing_trigger_outcomes = tuple(
+        field for field in REQUIRED_TRIGGER_OUTCOME_FIELDS if _num(row.get(field)) is None
+    )
+
+    if label and label not in KNOWN_LABELS:
+        return _queue_item(
+            row,
+            priority=0,
+            category="fix_unknown_label",
+            suggested_label=", ".join(sorted(KNOWN_LABELS)),
+            missing_fields=(),
+        )
+    if label and _point_in_time_violation(row):
+        return _queue_item(
+            row,
+            priority=1,
+            category="fix_point_in_time_evidence",
+            suggested_label=label,
+            missing_fields=(),
+        )
+    if triggered and not label:
+        return _queue_item(
+            row,
+            priority=2,
+            category="label_triggered_candidate",
+            suggested_label=_suggested_label(row),
+            missing_fields=("human_label", *missing_trigger_outcomes),
+        )
+    if triggered and missing_trigger_outcomes:
+        return _queue_item(
+            row,
+            priority=3,
+            category="fill_trigger_outcomes",
+            suggested_label=label or _suggested_label(row),
+            missing_fields=missing_trigger_outcomes,
+        )
+    if not label and _is_proxy_candidate(row):
+        return _queue_item(
+            row,
+            priority=4,
+            category="label_proxy_candidate",
+            suggested_label="valid_proxy_fade or false_positive",
+            missing_fields=("human_label",),
+        )
+    if not label and _is_direct_or_ambiguous(row):
+        return _queue_item(
+            row,
+            priority=5,
+            category="label_negative_control",
+            suggested_label=_suggested_label(row),
+            missing_fields=("human_label",),
+        )
+    return None
+
+
+def _queue_item(
+    row: Mapping[str, Any],
+    *,
+    priority: int,
+    category: str,
+    suggested_label: str,
+    missing_fields: tuple[str, ...],
+) -> ValidationLabelingQueueItem:
+    return ValidationLabelingQueueItem(
+        priority=priority,
+        category=category,
+        asset_symbol=str(row.get("asset_symbol") or ""),
+        asset_coin_id=str(row.get("asset_coin_id") or ""),
+        event_id=str(row.get("event_id") or ""),
+        event_name=str(row.get("event_name") or ""),
+        relationship_type=str(row.get("relationship_type") or ""),
+        signal_type=_signal_type(row),
+        event_time=_string_or_none(row.get("event_time")),
+        trigger_observed_at=_string_or_none(row.get("trigger_observed_at")),
+        human_label=_label(row),
+        suggested_label=suggested_label,
+        missing_fields=missing_fields,
+        source_urls=tuple(str(value) for value in _list_values(row.get("source_urls")) if value),
+    )
+
+
+def _suggested_label(row: Mapping[str, Any]) -> str:
+    if _is_proxy_candidate(row):
+        return "valid_proxy_fade or false_positive"
+    if _bool(row.get("is_direct_beneficiary")):
+        return "direct_event"
+    relation = str(row.get("relationship_type") or "").strip()
+    if relation == "ambiguous":
+        return "ambiguous"
+    return "direct_event or ambiguous"
+
+
 def _parse_csv_row(row: Mapping[str, str]) -> dict[str, Any]:
     return {key: _parse_csv_cell(value) for key, value in row.items()}
 
@@ -390,6 +577,31 @@ def _has_review_data(row: Mapping[str, Any]) -> bool:
 
 def _has_value(value: object) -> bool:
     return value is not None and value != ""
+
+
+def _string_or_none(value: object) -> str | None:
+    if value in (None, ""):
+        return None
+    return str(value)
+
+
+def _list_values(value: object) -> list[Any]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    if isinstance(value, str):
+        raw = value.strip()
+        if raw.startswith("["):
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                return [value]
+            return parsed if isinstance(parsed, list) else [value]
+        return [value]
+    return [value]
 
 
 def _is_proxy_candidate(row: Mapping[str, Any]) -> bool:
