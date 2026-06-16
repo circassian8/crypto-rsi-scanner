@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add configured event-fade review cycle · Codex
+**Why:** The one-command review cycle was fixture-backed, which is correct for
+deterministic smoke work but not enough for collecting real event-fade
+validation candidates from configured research sources.
+**Changes:**
+- Added `make event-discovery-refresh-configured`, which runs
+  `main.py --event-discovery-refresh` with only the configured cache directory
+  and no fixture path injection.
+- Added `make event-fade-configured-review-cycle`, which refreshes configured
+  event-discovery sources and then writes the cache-backed manual review bundle.
+- Documented the fixture-backed vs configured-source workflow distinction in
+  `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`.
+**Verify:** `make -n event-discovery-refresh-configured` and
+`make -n event-fade-configured-review-cycle` confirm the configured path does
+not inject fixture paths. `git diff --check` passes. `make verify` passes,
+including 223/223 tests, alert render smoke, backtest fixture smoke, and paper
+scoreboard.
+**Notes/risks:** This is workflow-only and research-only. The configured cycle
+may use opt-in live providers if enabled in the environment/`.env`, but it still
+writes only the observational cache and review bundle artifacts; it does not
+route alerts, open paper trades, or write live signal/outcome/paper tables.
+
 ## 2026-06-16 — Default event-fade price export to real kline cache · Codex
 **Why:** The review-bundle auto-price workflow defaulted through the checked-in
 fixture kline directory, which is correct for offline tests but wrong for real

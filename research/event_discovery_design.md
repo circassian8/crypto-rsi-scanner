@@ -294,6 +294,9 @@ runs the discovery pipeline, and appends local JSONL artifacts under
 `RSI_EVENT_DISCOVERY_CACHE_DIR` (`event_fade_cache` by default, gitignored).
 The cache preserves point-in-time evidence for review and future backtests. It
 does not write SQLite, live signal/outcome/paper tables, Telegram, or orders.
+`make event-discovery-refresh` is fixture-backed for deterministic local smoke
+work; `make event-discovery-refresh-configured` avoids Makefile fixture
+injection and uses only sources configured through the environment/`.env`.
 `main.py --event-discovery-binance-listen` appends raw Binance announcement rows
 and a run row to the same cache without normalization, classification, alerts,
 or paper trades.
@@ -547,6 +550,13 @@ It writes only under `OUT_DIR`.
 writes the cache-backed review bundle using the same `EVENT_DISCOVERY_CACHE_DIR`.
 Set `EVENT_FADE_REVIEW_BUNDLE_REVIEWED=/path/to/previous_reviewed_sample.jsonl`
 to preserve valid prior human review work during the refresh.
+
+`make event-fade-configured-review-cycle` runs the same cache-backed review
+bundle workflow, but starts with `make event-discovery-refresh-configured`. Use
+it when the goal is to collect review candidates from the research sources
+enabled in `.env` or the shell, such as opt-in live announcement/news/RSS/
+derivatives providers. It still writes only the observational cache and review
+bundle artifacts.
 
 ## Validation Sample Review
 
@@ -939,6 +949,21 @@ EVENT_FADE_REVIEW_BUNDLE_REVIEWED=/path/to/previous_reviewed_sample.jsonl \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-review-cycle
 ```
+
+Refresh configured research sources and write the review bundle in one step:
+
+```bash
+make event-fade-configured-review-cycle
+EVENT_DISCOVERY_CACHE_DIR=event_fade_cache \
+EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_cache_review_bundle \
+EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1 \
+EVENT_FADE_REVIEW_BUNDLE_REVIEWED=/path/to/previous_reviewed_sample.jsonl \
+EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-configured-review-cycle
+```
+
+This target intentionally does not set fixture paths. Configure providers with
+`RSI_EVENT_DISCOVERY_*` environment variables or `.env` first.
 
 Preserve review status/labels/outcomes across a refreshed export:
 

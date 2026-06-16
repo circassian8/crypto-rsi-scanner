@@ -91,7 +91,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   universe fixtures or opt-in live CoinGecko universe resolver enrichment,
   research-only/no writes) · `main.py --event-discovery-refresh` (fetch
   configured event-discovery sources and append research-only JSONL cache
-  artifacts under `RSI_EVENT_DISCOVERY_CACHE_DIR`; no live DB writes) ·
+  artifacts under `RSI_EVENT_DISCOVERY_CACHE_DIR`; no live DB writes; use
+  `make event-discovery-refresh-configured` when you want the Makefile to avoid
+  injecting fixture paths) ·
   `main.py --event-discovery-binance-listen` (listen to Binance's signed CMS
   WebSocket for the configured window and append raw research cache evidence
   only; no live DB writes) ·
@@ -445,7 +447,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   --event-fade-cache-review-bundle OUT_DIR` builds the same workspace directly
   from latest cached candidate snapshots. `make event-fade-review-cycle` runs
   the fixture-backed cache refresh and cache review-bundle export with the same
-  `EVENT_DISCOVERY_CACHE_DIR`.
+  `EVENT_DISCOVERY_CACHE_DIR`; `make event-fade-configured-review-cycle` runs
+  the same bundle workflow after a refresh that uses only configured
+  event-discovery sources from the environment/`.env`.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,
