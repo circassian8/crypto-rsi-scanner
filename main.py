@@ -43,6 +43,7 @@ Usage:
   python main.py --refresh-paper # close matured paper trades without alerts
   python main.py --event-fade-report # score local event-fade fixtures
   python main.py --event-discovery-report # research-only event radar from fixtures
+  python main.py --event-discovery-refresh # write research-only event JSONL cache
   python main.py --event-fade-auto-report # grouped event-fade report from discovery fixtures
   python main.py --event-fade-export-sample sample.jsonl # validation sample export
   python main.py --event-fade-review-sample sample.jsonl # review labels/outcomes

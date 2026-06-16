@@ -87,7 +87,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   (fixture event radar with optional exchange-announcement, structured calendar,
   unlock, news/proxy-narrative, external catalyst, Coinalyze-style derivatives,
   supply/on-chain enrichment, and clean CoinGecko universe fixtures,
-  research-only/no writes) · `main.py --event-fade-auto-report` (grouped
+  research-only/no writes) · `main.py --event-discovery-refresh` (fetch
+  configured event-discovery sources and append research-only JSONL cache
+  artifacts under `RSI_EVENT_DISCOVERY_CACHE_DIR`; no live DB writes) ·
+  `main.py --event-fade-auto-report` (grouped
   discovery-fed event-fade sections: watchlist/blowoff/event-passed/armed/
   triggered/rejected/ambiguous, research-only/no writes) ·
   `main.py --event-fade-export-sample PATH` (JSONL/CSV validation-sample export
@@ -148,6 +151,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_fade.py` | pure alert-only sell-the-news event-fade research sleeve; no storage, alerts, paper trades, or execution |
 | `event_models.py` | immutable event-discovery dataclasses for raw events, normalized events, links, classifications, and candidates |
 | `event_discovery.py` | research-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring, grouped auto reports, and validation sample exports |
+| `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
 | `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider, exchange announcement parsers with opt-in live Bybit fetch, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers, and external IPO/sports/prediction-market catalyst parsers |
@@ -206,6 +210,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   asset matches must stay below trigger confidence. Provider enrichment is
   evidence, not eligibility; raw reviewed fixture evidence takes precedence over
   provider rows.
+- Event-discovery cache writes are observational only. `main.py
+  --event-discovery-refresh` may append JSONL files under
+  `RSI_EVENT_DISCOVERY_CACHE_DIR` for raw events, normalized events, links,
+  classifications, candidate snapshots, and run metadata. It must not write the
+  live SQLite signal/outcome/paper tables, route alerts, open paper trades, or
+  imply promotion.
 - Event-fade validation review is research-only. `main.py --event-fade-review-sample`
   may read labeled JSONL/CSV sample artifacts and print coverage, trigger
   precision, point-in-time violations, MFE/MAE, post-event returns, and
@@ -323,9 +333,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   outcome fields. `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Bybit announcement fetch, no network event/news/
-  derivatives/supply providers, cache writes, live DB writes, notifications, or
-  paper trades are enabled. Bybit listings/perp listings are direct events and
-  must remain `NO_TRADE` unless separate evidence proves a true proxy
+  derivatives/supply providers, live DB writes, notifications, or paper trades
+  are enabled. `main.py --event-discovery-refresh` can write the local
+  observational JSONL cache only. Bybit listings/perp listings are direct events
+  and must remain `NO_TRADE` unless separate evidence proves a true proxy
   relationship.
 - Caveats: the plain Binance backtest path is survivorship-biased (today's
   top-N). Prefer `--pit-volume` for any conclusion-bearing research; `--pit`

@@ -59,6 +59,7 @@ from . import heartbeat
 from . import macro
 from . import paper
 from . import event_fade
+from . import event_cache
 from . import event_discovery
 from . import event_validation
 
@@ -1119,6 +1120,28 @@ def event_discovery_report(verbose: bool = False) -> None:
     print(event_discovery.format_discovery_report(result))
 
 
+def event_discovery_refresh(verbose: bool = False) -> None:
+    """Fetch configured event-discovery sources and write observational cache artifacts."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_discovery_paths_configured():
+        print(
+            "No event-discovery sources configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
+            "or another event-discovery fixture path, or opt into live Bybit announcements."
+        )
+        return
+    result = _event_discovery_result_from_config()
+    write = event_cache.write_event_discovery_cache(result, config.EVENT_DISCOVERY_CACHE_DIR)
+    print(
+        "Event-discovery cache refresh: "
+        f"raw={write.raw_events_written}, "
+        f"normalized={write.normalized_events_written}, "
+        f"links={write.event_asset_links_written}, "
+        f"classifications={write.classifications_written}, "
+        f"candidate_snapshots={write.candidate_snapshots_written}, "
+        f"run={write.run_id}, dir={write.cache_dir}"
+    )
+
+
 def event_fade_auto_report(verbose: bool = False) -> None:
     """Print grouped research-only event-fade candidates from discovery fixtures."""
     _setup_event_discovery_logging(verbose)
@@ -1362,6 +1385,11 @@ def cli() -> None:
         help="Print research-only event radar from local discovery fixtures.",
     )
     parser.add_argument(
+        "--event-discovery-refresh",
+        action="store_true",
+        help="Fetch configured event-discovery sources and append research-only JSONL cache artifacts.",
+    )
+    parser.add_argument(
         "--event-fade-auto-report",
         action="store_true",
         help="Print grouped research-only event-fade candidates from discovery fixtures.",
@@ -1478,6 +1506,9 @@ def cli() -> None:
         return
     if args.event_discovery_report:
         event_discovery_report(verbose=args.verbose)
+        return
+    if args.event_discovery_refresh:
+        event_discovery_refresh(verbose=args.verbose)
         return
     if args.event_fade_auto_report:
         event_fade_auto_report(verbose=args.verbose)

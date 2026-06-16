@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-discovery JSONL cache refresh · Codex
+**Why:** Live/refreshed event sources need point-in-time preservation before
+they can support manual validation or backtests. `RSI_EVENT_DISCOVERY_CACHE_DIR`
+already existed and was gitignored, but nothing wrote the observational cache.
+**Changes:**
+- Added `crypto_rsi_scanner/event_cache.py`, a research-only JSONL cache writer
+  for raw events, normalized events, asset links, classifications, candidate
+  snapshots, and discovery-run metadata.
+- Added `main.py --event-discovery-refresh` and
+  `make event-discovery-refresh`, wired through the existing discovery source
+  configuration and `RSI_EVENT_DISCOVERY_CACHE_DIR`.
+- Candidate snapshots reuse the validation-sample row builder so cache exports
+  and human-review exports stay aligned.
+- Added offline tests for cache artifact contents, point-in-time timestamps,
+  dedupe of stable evidence rows, candidate snapshot appends, and scanner CLI
+  cache refresh output.
+- Updated `.env.example`, `AGENTS.md`, `ROADMAP.md`, `DECISIONS.md`, and
+  `research/event_discovery_design.md` with the cache workflow and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 189/189.
+`RSI_EVENT_DISCOVERY_CACHE_DIR=$(mktemp -d)/cache make event-discovery-refresh`
+writes the expected research cache summary. `git diff --check` passes.
+`make verify` passes.
+**Notes/risks:** This is observational research storage only. It writes JSONL
+artifacts under the configured cache directory, not live SQLite signal/outcome/
+paper tables, notifications, paper trades, or execution paths.
+
 ## 2026-06-16 — Add opt-in live Bybit announcement discovery · Codex
 **Why:** The Pro plan's event radar should eventually discover exchange events
 automatically, but the repo only had fixture-backed announcement parsing. Bybit

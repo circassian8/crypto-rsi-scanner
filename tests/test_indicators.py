@@ -1518,6 +1518,63 @@ def test_event_fade_validation_sample_rows_and_serializers():
         assert len(list(csv.DictReader(csv_path.read_text(encoding="utf-8").splitlines()))) == len(rows)
 
 
+def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_cache
+
+    result = _full_event_discovery_fixture_result()
+    observed_at = datetime(2026, 6, 16, 12, 30, tzinfo=timezone.utc)
+    with tempfile.TemporaryDirectory() as tmp:
+        cache_dir = Path(tmp) / "event_fade_cache"
+        write = event_cache.write_event_discovery_cache(result, cache_dir, observed_at=observed_at)
+        assert write.raw_events_written == len(result.raw_events)
+        assert write.normalized_events_written == len(result.normalized_events)
+        assert write.event_asset_links_written == len(result.links)
+        assert write.classifications_written == len(result.classifications)
+        assert write.candidate_snapshots_written == len(result.candidates)
+        assert write.runs_written == 1
+
+        expected_files = {
+            "raw_events.jsonl",
+            "normalized_events.jsonl",
+            "event_asset_links.jsonl",
+            "classifications.jsonl",
+            "candidate_snapshots.jsonl",
+            "discovery_runs.jsonl",
+        }
+        assert expected_files == {path.name for path in cache_dir.iterdir()}
+
+        raw_rows = [
+            json.loads(line)
+            for line in (cache_dir / "raw_events.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        assert raw_rows[0]["schema_version"] == event_cache.CACHE_SCHEMA_VERSION
+        assert raw_rows[0]["row_type"] == "raw_event"
+        assert raw_rows[0]["observed_at"] == "2026-06-16T12:30:00+00:00"
+        assert raw_rows[0]["run_id"] == write.run_id
+        assert raw_rows[0]["fetched_at"].endswith("+00:00")
+
+        snapshot_rows = [
+            json.loads(line)
+            for line in (cache_dir / "candidate_snapshots.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        velvet = next(row for row in snapshot_rows if row["asset_symbol"] == "TESTVELVET")
+        assert velvet["row_type"] == "candidate_snapshot"
+        assert velvet["schema_version"] == event_cache.CACHE_SCHEMA_VERSION
+        assert velvet["exported_at"] == "2026-06-16T12:30:00+00:00"
+        assert velvet["signal_type"] == "SHORT_TRIGGERED"
+
+        second = event_cache.write_event_discovery_cache(result, cache_dir, observed_at=observed_at)
+        assert second.raw_events_written == 0
+        assert second.normalized_events_written == 0
+        assert second.event_asset_links_written == 0
+        assert second.classifications_written == 0
+        assert second.candidate_snapshots_written == len(result.candidates)
+
+
 def test_event_fade_validation_review_blocks_unlabeled_export():
     from crypto_rsi_scanner import event_discovery, event_validation
 
@@ -1794,6 +1851,40 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
         config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
+
+
+def test_event_discovery_refresh_scanner_writes_cache_fixture():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+
+    values = _full_event_discovery_config_values()
+    attrs = tuple(values) + ("EVENT_DISCOVERY_CACHE_DIR",)
+    original = {name: getattr(config, name) for name in attrs}
+    for name, value in values.items():
+        setattr(config, name, value)
+    with tempfile.TemporaryDirectory() as tmp:
+        config.EVENT_DISCOVERY_CACHE_DIR = Path(tmp) / "cache"
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_discovery_refresh()
+            text = out.getvalue()
+            assert "Event-discovery cache refresh" in text
+            assert "candidate_snapshots=17" in text
+            raw_path = config.EVENT_DISCOVERY_CACHE_DIR / "raw_events.jsonl"
+            run_path = config.EVENT_DISCOVERY_CACHE_DIR / "discovery_runs.jsonl"
+            assert raw_path.exists()
+            assert run_path.exists()
+            run = json.loads(run_path.read_text(encoding="utf-8").splitlines()[0])
+            assert run["row_type"] == "discovery_run"
+            assert run["candidate_snapshots"] == 17
+        finally:
+            for name, value in original.items():
+                setattr(config, name, value)
 
 
 def test_event_fade_auto_scanner_report_uses_local_fixtures():

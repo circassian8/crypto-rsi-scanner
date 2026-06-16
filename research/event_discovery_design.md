@@ -7,8 +7,8 @@ announcement fetch, structured calendar/unlock
 providers, news/proxy-narrative providers, external catalyst providers, and
 Coinalyze-style derivatives plus Tokenomist/Etherscan/Arkham/Dune-style
 supply/on-chain enrichment, plus grouped auto reporting and validation-sample
-exports, validation-sample review metrics, labeling-queue support, and
-research-only merge support.
+exports, research-only JSONL cache refresh, validation-sample review metrics,
+labeling-queue support, and research-only merge support.
 
 ## Goal
 
@@ -27,10 +27,10 @@ an alerting, paper-trading, storage, or execution path.
 ## Boundary
 
 `event_fade.py` remains pure and side-effect free. Discovery code may normalize,
-resolve, classify, dedupe, report local fixture data, export local validation
-artifacts, and review labeled local validation artifacts. It must not mutate
-live scanner state, send Telegram messages, write signal/outcome/paper tables,
-or imply an order.
+resolve, classify, dedupe, report local fixture data, write local observational
+JSONL cache artifacts, export local validation artifacts, and review labeled
+local validation artifacts. It must not mutate live scanner state, send Telegram
+messages, write live signal/outcome/paper tables, or imply an order.
 
 Current files:
 
@@ -74,6 +74,8 @@ Current files:
 - `event_discovery.py`: normalizer, deduper, orchestrator, flat radar report
   formatter, grouped event-fade auto report formatter, and validation-sample
   export helpers
+- `event_cache.py`: local JSONL observational cache writer for point-in-time
+  discovery evidence
 - `event_validation.py`: local validation-sample loader/reviewer/labeling
   queue/merger for human labels, outcome metrics, and promotion blockers
 
@@ -231,6 +233,27 @@ available.
 
 This remains local and observational. It does not send Telegram alerts, write
 live signal/outcome/paper tables, open paper trades, or imply execution.
+
+## Observational JSONL Cache
+
+`main.py --event-discovery-refresh` fetches the configured research sources,
+runs the discovery pipeline, and appends local JSONL artifacts under
+`RSI_EVENT_DISCOVERY_CACHE_DIR` (`event_fade_cache` by default, gitignored).
+The cache preserves point-in-time evidence for review and future backtests. It
+does not write SQLite, live signal/outcome/paper tables, Telegram, or orders.
+
+Files:
+
+- `raw_events.jsonl`
+- `normalized_events.jsonl`
+- `event_asset_links.jsonl`
+- `classifications.jsonl`
+- `candidate_snapshots.jsonl`
+- `discovery_runs.jsonl`
+
+Stable evidence files dedupe already-seen rows by source/event identity where
+possible. `candidate_snapshots.jsonl` appends every refresh so later analysis
+can inspect how scores and missing data looked at each observed time.
 
 ## Validation Sample Export
 
@@ -444,6 +467,20 @@ The live Bybit path is research-only and fail-soft. It should only add direct
 exchange-listing/perp-listing evidence to the radar unless another source later
 proves a proxy relationship.
 
+Write the local observational JSONL cache with the fixture set:
+
+```bash
+make event-discovery-refresh
+```
+
+For live Bybit research cache refreshes:
+
+```bash
+RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1 \
+RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
+  .venv/bin/python main.py --event-discovery-refresh
+```
+
 Run the grouped event-fade auto report with the same fixture set:
 
 ```bash
@@ -482,8 +519,8 @@ EVENT_FADE_SAMPLE_MERGED=/tmp/merged_sample.jsonl \
   make event-fade-merge-sample
 ```
 
-All six outputs are local and observational. They do not send alerts or write
-the DB.
+All outputs are local and observational. They do not send alerts or write the
+live DB.
 
 ## Promotion Requirements
 

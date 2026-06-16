@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-16 - Allow observational event-discovery JSONL cache
+**Status:** accepted
+**Decision:** Event discovery may write local JSONL cache artifacts under the
+configured `RSI_EVENT_DISCOVERY_CACHE_DIR` for raw events, normalized events,
+asset links, classifications, candidate snapshots, and discovery-run metadata.
+This cache is observational research storage only; it must not write live
+signal/outcome/paper tables, route notifications, open paper trades, or imply
+execution.
+**Why:** The event-fade validation plan requires point-in-time evidence. Live or
+refreshed providers are not useful for review/backtesting unless the system
+preserves what was known, when it was observed, and which source supplied it.
+**Revisit when:** Event-fade promotion is explicitly approved and the cache
+needs migration to a reviewed SQLite research schema or a production data store.
+
 ## 2026-06-16 - Push after every commit
 **Status:** accepted
 **Decision:** Every change-making prompt ends with one commit on `main` and a
