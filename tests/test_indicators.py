@@ -1247,6 +1247,106 @@ def test_event_discovery_news_providers_parse_fixtures():
             raise AssertionError("required malformed news fixture should fail")
 
 
+def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
+    import json
+    from datetime import datetime, timezone
+    from urllib.parse import parse_qs, urlparse
+    from crypto_rsi_scanner.event_providers.cryptopanic import CryptoPanicProvider
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    seen = {}
+
+    def fake_opener(request, timeout):
+        seen["url"] = request.full_url
+        seen["timeout"] = timeout
+        seen["accept"] = request.headers.get("Accept")
+        return FakeResponse({
+            "results": [
+                {
+                    "id": "cp-testai-openai-preipo",
+                    "title": "TESTAI offers synthetic exposure to OpenAI pre IPO event",
+                    "published_at": "2026-06-15T10:15:00Z",
+                    "url": "https://example.test/cryptopanic/testai-openai",
+                    "source": {"domain": "example.test"},
+                    "currencies": [{"code": "TESTAI", "title": "Test AI"}],
+                },
+            ],
+        })
+
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    fetched_at = datetime(2026, 6, 15, 10, 20, tzinfo=timezone.utc)
+    provider = CryptoPanicProvider(
+        None,
+        live_enabled=True,
+        api_token="token123",
+        base_url="https://cryptopanic.test/api/v1/posts/",
+        public=True,
+        filter_name="hot",
+        currencies="BTC,ETH",
+        regions="en",
+        kind="news",
+        search="pre-ipo",
+        timeout=2.5,
+        opener=fake_opener,
+        fetched_at=fetched_at,
+    )
+    events = provider.fetch_events(start, end)
+    assert len(events) == 1
+    parsed = urlparse(seen["url"])
+    params = parse_qs(parsed.query)
+    assert parsed.scheme == "https"
+    assert parsed.netloc == "cryptopanic.test"
+    assert params["auth_token"] == ["token123"]
+    assert params["public"] == ["true"]
+    assert params["filter"] == ["hot"]
+    assert params["currencies"] == ["BTC,ETH"]
+    assert params["regions"] == ["en"]
+    assert params["kind"] == ["news"]
+    assert params["search"] == ["pre-ipo"]
+    assert seen["timeout"] == 2.5
+    assert seen["accept"] == "application/json"
+    event = events[0]
+    assert event.provider == "cryptopanic"
+    assert event.source_url == "https://example.test/cryptopanic/testai-openai"
+    assert event.published_at.isoformat() == "2026-06-15T10:15:00+00:00"
+    assert event.fetched_at == fetched_at
+    assert event.raw_json["event"]["event_type"] == "ipo_proxy"
+    assert event.raw_json["currencies"][0]["code"] == "TESTAI"
+
+    assert CryptoPanicProvider(None, live_enabled=True, api_token="").fetch_events(start, end) == []
+    try:
+        CryptoPanicProvider(None, live_enabled=True, api_token="", required=True).fetch_events(start, end)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("required missing CryptoPanic token should fail")
+
+    def failing_opener(request, timeout):
+        raise TimeoutError("offline timeout")
+
+    assert CryptoPanicProvider(
+        None,
+        live_enabled=True,
+        api_token="token123",
+        opener=failing_opener,
+    ).fetch_events(start, end) == []
+
+
 def test_event_discovery_gdelt_live_provider_parses_article_list_offline():
     import json
     from datetime import datetime, timezone

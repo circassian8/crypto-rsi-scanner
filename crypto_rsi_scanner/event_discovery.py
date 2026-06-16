@@ -312,6 +312,16 @@ def run_manual_discovery(
     coinmarketcal_path: str | Path | None = None,
     tokenomist_path: str | Path | None = None,
     cryptopanic_path: str | Path | None = None,
+    cryptopanic_live: bool = False,
+    cryptopanic_api_token: str = "",
+    cryptopanic_base_url: str = "https://cryptopanic.com/api/v1/posts/",
+    cryptopanic_public: bool = True,
+    cryptopanic_filter: str = "",
+    cryptopanic_currencies: str = "",
+    cryptopanic_regions: str = "",
+    cryptopanic_kind: str = "",
+    cryptopanic_search: str = "",
+    cryptopanic_timeout: float = 10.0,
     gdelt_path: str | Path | None = None,
     gdelt_live: bool = False,
     gdelt_base_url: str = "https://api.gdeltproject.org/api/v2/doc/doc",
@@ -355,6 +365,16 @@ def run_manual_discovery(
         coinmarketcal_path=coinmarketcal_path,
         tokenomist_path=tokenomist_path,
         cryptopanic_path=cryptopanic_path,
+        cryptopanic_live=cryptopanic_live,
+        cryptopanic_api_token=cryptopanic_api_token,
+        cryptopanic_base_url=cryptopanic_base_url,
+        cryptopanic_public=cryptopanic_public,
+        cryptopanic_filter=cryptopanic_filter,
+        cryptopanic_currencies=cryptopanic_currencies,
+        cryptopanic_regions=cryptopanic_regions,
+        cryptopanic_kind=cryptopanic_kind,
+        cryptopanic_search=cryptopanic_search,
+        cryptopanic_timeout=cryptopanic_timeout,
         gdelt_path=gdelt_path,
         gdelt_live=gdelt_live,
         gdelt_base_url=gdelt_base_url,
@@ -404,6 +424,16 @@ def load_discovery_events(
     coinmarketcal_path: str | Path | None = None,
     tokenomist_path: str | Path | None = None,
     cryptopanic_path: str | Path | None = None,
+    cryptopanic_live: bool = False,
+    cryptopanic_api_token: str = "",
+    cryptopanic_base_url: str = "https://cryptopanic.com/api/v1/posts/",
+    cryptopanic_public: bool = True,
+    cryptopanic_filter: str = "",
+    cryptopanic_currencies: str = "",
+    cryptopanic_regions: str = "",
+    cryptopanic_kind: str = "",
+    cryptopanic_search: str = "",
+    cryptopanic_timeout: float = 10.0,
     gdelt_path: str | Path | None = None,
     gdelt_live: bool = False,
     gdelt_base_url: str = "https://api.gdeltproject.org/api/v2/doc/doc",
@@ -438,8 +468,20 @@ def load_discovery_events(
         events.extend(CoinMarketCalProvider(coinmarketcal_path).fetch_events(start, end))
     if tokenomist_path:
         events.extend(TokenomistProvider(tokenomist_path).fetch_events(start, end))
-    if cryptopanic_path:
-        events.extend(CryptoPanicProvider(cryptopanic_path).fetch_events(start, end))
+    if cryptopanic_path or cryptopanic_live:
+        events.extend(CryptoPanicProvider(
+            cryptopanic_path,
+            live_enabled=cryptopanic_live,
+            api_token=cryptopanic_api_token,
+            base_url=cryptopanic_base_url,
+            public=cryptopanic_public,
+            filter_name=cryptopanic_filter,
+            currencies=cryptopanic_currencies,
+            regions=cryptopanic_regions,
+            kind=cryptopanic_kind,
+            search=cryptopanic_search,
+            timeout=cryptopanic_timeout,
+        ).fetch_events(start, end))
     if gdelt_path or gdelt_live:
         events.extend(GdeltProvider(
             gdelt_path,

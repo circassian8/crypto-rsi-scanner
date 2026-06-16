@@ -4,8 +4,9 @@
 **Status:** Phase 1-10 framework with clean CoinGecko universe bridge,
 fixture-backed exchange announcement providers plus opt-in live Bybit
 announcement fetch, structured calendar/unlock providers, news/proxy-narrative
-providers plus opt-in live GDELT Article List and project-blog RSS/Atom fetches,
-external catalyst providers, and Coinalyze-style derivatives plus
+providers plus opt-in live CryptoPanic posts, GDELT Article List, and
+project-blog RSS/Atom fetches, external catalyst providers, and
+Coinalyze-style derivatives plus
 Tokenomist/Etherscan/Arkham/Dune-style supply/on-chain enrichment, plus grouped
 auto reporting and validation-sample exports, research-only JSONL cache refresh,
 validation-sample review metrics, labeling-queue support, research-only merge
@@ -49,7 +50,8 @@ Current files:
 - `event_providers/tokenomist.py`: local unlock fixture provider that also
   populates supply-pressure fields
 - `event_providers/cryptopanic.py`: local CryptoPanic-style news fixture
-  provider for proxy/direct/ambiguous narrative evidence
+  provider plus opt-in live posts fetch for proxy/direct/ambiguous narrative
+  evidence
 - `event_providers/gdelt.py`: local GDELT-style news fixture provider plus
   opt-in live GDELT Article List fetch for external catalyst and attention-event
   evidence
@@ -138,7 +140,8 @@ later proves a true proxy relationship.
 ## News And Proxy-Narrative Providers
 
 CryptoPanic-, GDELT-, and project-blog/RSS-style providers read local JSON
-fixtures by default. GDELT can optionally fetch live Article List JSON, and
+fixtures by default. CryptoPanic can optionally fetch live posts when an API
+token is configured, GDELT can optionally fetch live Article List JSON, and
 project-blog/RSS can optionally fetch explicit RSS/Atom feed URLs. All paths
 normalize article/feed shapes into `RawDiscoveredEvent` rows, preserving
 explicit fixture event metadata when provided and otherwise inferring only
@@ -532,6 +535,19 @@ RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
 The live Bybit path is research-only and fail-soft. It should only add direct
 exchange-listing/perp-listing evidence to the radar unless another source later
 proves a proxy relationship.
+
+Run an opt-in live CryptoPanic news radar pass:
+
+```bash
+RSI_EVENT_DISCOVERY_CRYPTOPANIC_LIVE=1 \
+RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN=... \
+RSI_EVENT_DISCOVERY_CRYPTOPANIC_SEARCH='pre-ipo OR synthetic exposure' \
+RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
+  .venv/bin/python main.py --event-discovery-report
+```
+
+The live CryptoPanic path fetches posts JSON only when a token is configured,
+reuses the same news parser as fixtures, and remains research-only/fail-soft.
 
 Run an opt-in live GDELT news radar pass:
 

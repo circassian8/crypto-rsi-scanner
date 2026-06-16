@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add opt-in live CryptoPanic discovery · Codex
+**Why:** The event-fade validation pipeline needs more real news coverage for
+proxy/direct/ambiguous narrative review. CryptoPanic was fixture-only; an
+explicit, token-gated live path can feed research reports and cache exports
+without changing live alert behavior.
+**Changes:**
+- Extended `crypto_rsi_scanner/event_providers/cryptopanic.py` from
+  fixture-only to optional live posts fetching with API-token config, public/
+  filter/currency/region/kind/search parameters, injected opener support, and
+  fail-soft behavior.
+- Wired `RSI_EVENT_DISCOVERY_CRYPTOPANIC_*` config through `config.py`,
+  `event_discovery.py`, and `scanner.py`; scanner no-source messages now refer
+  to generic live research providers instead of only Bybit.
+- Added `.env.example` entries for the CryptoPanic live path.
+- Added offline tests for request parameters, response parsing, missing-token
+  behavior, and fetch failure handling.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  to record CryptoPanic as an opt-in live research source.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 197/197.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** Live CryptoPanic fetching is opt-in and requires
+`RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN`. It feeds local reports/cache/export
+paths only; it does not route Telegram alerts, write live signal/outcome/paper
+tables, open paper trades, or promote event-fade signals.
+
 ## 2026-06-16 — Add opt-in live project-blog RSS discovery · Codex
 **Why:** The event-fade validation sample needs broader real narrative coverage,
 especially project-sourced posts that may announce synthetic/proxy exposure or

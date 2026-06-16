@@ -1048,6 +1048,7 @@ def _event_discovery_paths_configured() -> bool:
         config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
         config.EVENT_DISCOVERY_TOKENOMIST_PATH,
         config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+        config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
         config.EVENT_DISCOVERY_GDELT_PATH,
         config.EVENT_DISCOVERY_GDELT_LIVE,
         config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
@@ -1085,6 +1086,16 @@ def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResul
         coinmarketcal_path=config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
         tokenomist_path=config.EVENT_DISCOVERY_TOKENOMIST_PATH,
         cryptopanic_path=config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+        cryptopanic_live=config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
+        cryptopanic_api_token=config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN,
+        cryptopanic_base_url=config.EVENT_DISCOVERY_CRYPTOPANIC_BASE_URL,
+        cryptopanic_public=config.EVENT_DISCOVERY_CRYPTOPANIC_PUBLIC,
+        cryptopanic_filter=config.EVENT_DISCOVERY_CRYPTOPANIC_FILTER,
+        cryptopanic_currencies=config.EVENT_DISCOVERY_CRYPTOPANIC_CURRENCIES,
+        cryptopanic_regions=config.EVENT_DISCOVERY_CRYPTOPANIC_REGIONS,
+        cryptopanic_kind=config.EVENT_DISCOVERY_CRYPTOPANIC_KIND,
+        cryptopanic_search=config.EVENT_DISCOVERY_CRYPTOPANIC_SEARCH,
+        cryptopanic_timeout=config.EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT,
         gdelt_path=config.EVENT_DISCOVERY_GDELT_PATH,
         gdelt_live=config.EVENT_DISCOVERY_GDELT_LIVE,
         gdelt_base_url=config.EVENT_DISCOVERY_GDELT_BASE_URL,
@@ -1124,7 +1135,7 @@ def event_discovery_report(verbose: bool = False) -> None:
     if not _event_discovery_paths_configured():
         print(
             "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
-            "or an exchange announcement fixture path, or opt into live Bybit announcements."
+            "or another event-discovery fixture path, or opt into a live research provider."
         )
         return
     result = _event_discovery_result_from_config()
@@ -1137,7 +1148,7 @@ def event_discovery_refresh(verbose: bool = False) -> None:
     if not _event_discovery_paths_configured():
         print(
             "No event-discovery sources configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
-            "or another event-discovery fixture path, or opt into live Bybit announcements."
+            "or another event-discovery fixture path, or opt into a live research provider."
         )
         return
     result = _event_discovery_result_from_config()
@@ -1159,7 +1170,7 @@ def event_fade_auto_report(verbose: bool = False) -> None:
     if not _event_discovery_paths_configured():
         print(
             "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
-            "or another event-discovery fixture path, or opt into live Bybit announcements."
+            "or another event-discovery fixture path, or opt into a live research provider."
         )
         return
     result = _event_discovery_result_from_config()
@@ -1172,7 +1183,7 @@ def event_fade_export_sample(path: str, verbose: bool = False) -> None:
     if not _event_discovery_paths_configured():
         print(
             "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
-            "or another event-discovery fixture path, or opt into live Bybit announcements."
+            "or another event-discovery fixture path, or opt into a live research provider."
         )
         return
     result = _event_discovery_result_from_config()
