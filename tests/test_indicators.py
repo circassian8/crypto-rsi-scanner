@@ -3843,6 +3843,41 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
             config.EVENT_DISCOVERY_CACHE_DIR = original_cache_dir
 
 
+def test_event_fade_cache_review_bundle_warns_on_empty_cache():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+
+    original_cache_dir = config.EVENT_DISCOVERY_CACHE_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        cache_dir = Path(tmp) / "empty_cache"
+        bundle_dir = Path(tmp) / "empty_bundle"
+        config.EVENT_DISCOVERY_CACHE_DIR = cache_dir
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_fade_cache_review_bundle(str(bundle_dir), limit=5)
+            text = out.getvalue()
+            assert "snapshots_read=0" in text
+            assert "rows=0" in text
+            assert "No validation rows were available" in text
+            assert "event-discovery-status" in text
+
+            manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+            assert manifest["source"]["review_rows"] == 0
+            assert manifest["warnings"]
+            assert "No validation rows were available" in manifest["warnings"][0]
+
+            readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
+            assert "Warnings:" in readme
+            assert "No validation rows were available" in readme
+        finally:
+            config.EVENT_DISCOVERY_CACHE_DIR = original_cache_dir
+
+
 def test_event_fade_merge_sample_scanner_writes_merged_jsonl():
     import contextlib
     import io

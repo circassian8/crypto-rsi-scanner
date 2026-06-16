@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Warn on empty event-fade review bundles · Codex
+**Why:** A configured-source refresh can be source-ready but still produce zero
+candidate rows when live providers rate-limit, forbid access, or return no
+usable evidence. The cache review bundle previously looked like a normal
+completed workspace with `needing_review=0`, which could be misread as no
+remaining validation work.
+**Changes:**
+- Added an explicit empty-review-bundle warning to CLI output,
+  `README.md`, and `manifest.json` for `--event-fade-review-bundle` and
+  `--event-fade-cache-review-bundle` when no validation rows are available.
+- Added a regression test for empty cached review bundles.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the empty-cache guardrail.
+**Verify:** Probed opt-in public live sources:
+  GDELT returned HTTP 429 and Bybit returned HTTP 403 in this environment, both
+  producing zero cache rows. The empty-cache bundle smoke now prints the warning
+  and records it in README/manifest. `make verify` passes, including 226/226
+  tests, alert render smoke, backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This does not create real reviewed validation evidence. The
+next validation step still requires at least one working research event source
+or local event evidence feed.
+
 ## 2026-06-16 — Add event-discovery provider readiness report · Codex
 **Why:** The configured-source review cycle can only build real validation rows
 when at least one event source is enabled. On the current local config, no event

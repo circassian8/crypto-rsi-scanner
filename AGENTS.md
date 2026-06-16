@@ -304,8 +304,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `--event-fade-review-bundle-reviewed` it may first merge prior reviewed
   labels/notes/outcomes that still match the fresh evidence fingerprint. It also
   writes a `manifest.json` for bundle provenance/counts/price-export/merge
-  status. It must not infer labels, write live storage, route alerts, open paper
-  trades, or imply promotion.
+  status. Empty bundles must warn that no validation rows were produced and
+  point back to provider status/source refresh, rather than looking like
+  completed review work. It must not infer labels, write live storage, route
+  alerts, open paper trades, or imply promotion.
 - Event-fade validation merges are artifact-only. `main.py --event-fade-merge-sample`
   may copy nonblank human labels/notes/outcomes from a previously reviewed
   JSONL/CSV sample into a fresh export by event/asset/relationship identity only
@@ -447,7 +449,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   queue, packet, template, review report, manifest, README, and optional
   outcome-filled sample into one local review workspace. `main.py
   --event-fade-cache-review-bundle OUT_DIR` builds the same workspace directly
-  from latest cached candidate snapshots. `make event-fade-review-cycle` runs
+  from latest cached candidate snapshots. Empty bundles warn in CLI output,
+  README, and manifest when no validation rows were produced. `make event-fade-review-cycle` runs
   the fixture-backed cache refresh and cache review-bundle export with the same
   `EVENT_DISCOVERY_CACHE_DIR`; `make event-fade-configured-review-cycle` runs
   the same bundle workflow after a refresh that uses only configured

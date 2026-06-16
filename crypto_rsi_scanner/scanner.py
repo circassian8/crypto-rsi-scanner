@@ -1395,6 +1395,8 @@ def event_fade_review_bundle(
         f"showing={result['queue'].shown_rows}, "
         f"dir={result['bundle_dir']}"
     )
+    if result["rows"] == 0:
+        print(_empty_review_bundle_message(sample_path))
     _print_review_merge_summary(review_merge)
     if result["price_export"] is not None:
         price_export = result["price_export"]
@@ -1447,6 +1449,8 @@ def event_fade_cache_review_bundle(
         f"showing={result['queue'].shown_rows}, "
         f"dir={result['bundle_dir']}"
     )
+    if result["rows"] == 0:
+        print(_empty_review_bundle_message(f"cache:{read.cache_dir}"))
     _print_review_merge_summary(review_merge)
     if result["price_export"] is not None:
         price_export = result["price_export"]
@@ -1486,6 +1490,14 @@ def _print_review_merge_summary(
     evidence_changes = event_validation.format_merge_evidence_changes(review_merge)
     if evidence_changes:
         print(evidence_changes)
+
+
+def _empty_review_bundle_message(sample_path: str) -> str:
+    return (
+        "No validation rows were available for this review bundle. "
+        f"Source={sample_path}. Run `main.py --event-discovery-status`, check live provider "
+        "warnings/rate limits, then refresh event-discovery cache with at least one working event source."
+    )
 
 
 def _write_event_fade_review_bundle(
@@ -1549,6 +1561,7 @@ def _write_event_fade_review_bundle(
     queue = event_validation.build_labeling_queue(review_rows, limit=limit)
     review = event_validation.review_validation_sample(review_rows)
     template_rows = event_validation.build_review_template_rows(review_rows, limit=limit)
+    bundle_warnings = tuple([_empty_review_bundle_message(sample_path)] if not review_rows else [])
 
     queue_path = bundle_dir / "labeling_queue.txt"
     packet_path = bundle_dir / "review_packet.md"
@@ -1587,6 +1600,7 @@ def _write_event_fade_review_bundle(
         refresh_price_cache=refresh_price_cache,
         reviewed_path=reviewed_path,
         review_merge=review_merge,
+        warnings=bundle_warnings,
     )
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
@@ -1609,6 +1623,7 @@ def _write_event_fade_review_bundle(
             auto_export_prices=auto_export_prices,
             reviewed_path=reviewed_path,
             review_merge=review_merge,
+            warnings=bundle_warnings,
         ),
         encoding="utf-8",
     )
@@ -1648,6 +1663,7 @@ def _event_fade_review_bundle_manifest(
     refresh_price_cache: bool,
     reviewed_path: str | None,
     review_merge: event_validation.ValidationSampleMergeResult | None,
+    warnings: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     files = {
         "readme": readme_path.name,
@@ -1685,6 +1701,7 @@ def _event_fade_review_bundle_manifest(
             "source_rows": source_rows,
             "review_rows": review_rows,
         },
+        "warnings": list(warnings),
         "files": files,
         "queue": {
             "limit": limit,
@@ -1869,6 +1886,7 @@ def _event_fade_review_bundle_readme(
     auto_export_prices: bool,
     reviewed_path: str | None,
     review_merge: event_validation.ValidationSampleMergeResult | None,
+    warnings: tuple[str, ...] = (),
 ) -> str:
     price_line = (
         f"- `{price_export.out_path.name}`: bundle-local OHLCV price fixture"
@@ -1889,6 +1907,7 @@ def _event_fade_review_bundle_readme(
             f"{review_merge.evidence_changed_rows} evidence-changed, "
             f"{review_merge.copied_fields} copied field(s)."
         )
+    warning_lines = ["Warnings:", *(f"- {warning}" for warning in warnings), ""] if warnings else []
     return "\n".join([
         "# Event-Fade Validation Review Bundle",
         "",
@@ -1898,6 +1917,7 @@ def _event_fade_review_bundle_readme(
         f"Rows: {rows}",
         f"Rows needing labels/status/outcomes: {queue.needed_rows}",
         f"Rows shown in queue/template/packet: {queue.shown_rows}",
+        *warning_lines,
         f"Auto price export: {'yes' if auto_export_prices else 'no'}",
         f"Outcome fill: {fill_summary}",
         "Review merge:",

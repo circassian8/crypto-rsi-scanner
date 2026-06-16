@@ -547,7 +547,10 @@ directly from latest cached candidate snapshots under
 `RSI_EVENT_DISCOVERY_CACHE_DIR`. This is the preferred review handoff after
 running `main.py --event-discovery-refresh`, because it avoids the extra
 export-sample step and keeps the review bundle tied to the point-in-time cache.
-It writes only under `OUT_DIR`.
+It writes only under `OUT_DIR`. If the cache has no candidate snapshots, the
+CLI output, README, and manifest warn that no validation rows were produced and
+point the operator back to provider readiness, live-source warnings/rate limits,
+and a refreshed event source.
 
 `make event-fade-review-cycle` runs the fixture-backed cache refresh and then
 writes the cache-backed review bundle using the same `EVENT_DISCOVERY_CACHE_DIR`.
