@@ -19,7 +19,8 @@ EVENT_DISCOVERY_CACHE_DIR ?= event_fade_cache
 EVENT_FADE_OUTCOME_PRICES ?= fixtures/event_discovery/outcome_prices.json
 EVENT_FADE_OUTCOME_PRICES_OUT ?= /tmp/event_fade_outcome_prices.json
 EVENT_FADE_PRICE_DAYS ?= 30
-EVENT_FADE_PRICE_FIXTURE_DIR ?= fixtures/event_discovery/outcome_klines
+EVENT_FADE_PRICE_FIXTURE_DIR ?=
+EVENT_FADE_PRICE_FIXTURE_ARG = $(if $(strip $(EVENT_FADE_PRICE_FIXTURE_DIR)),--event-fade-price-fixture-dir $(EVENT_FADE_PRICE_FIXTURE_DIR),)
 
 .PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-refresh event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
@@ -207,11 +208,11 @@ event-fade-apply-review-template:
 	$(PYTHON) main.py --event-fade-apply-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE) $(EVENT_FADE_SAMPLE_REVIEW_APPLIED)
 
 event-fade-review-bundle:
-	$(PYTHON) main.py --event-fade-review-bundle $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),) $(if $(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES),--event-fade-review-bundle-export-prices --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) --event-fade-price-fixture-dir $(EVENT_FADE_PRICE_FIXTURE_DIR),)
+	$(PYTHON) main.py --event-fade-review-bundle $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),) $(if $(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES),--event-fade-review-bundle-export-prices --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) $(EVENT_FADE_PRICE_FIXTURE_ARG),)
 
 event-fade-cache-review-bundle:
 	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
-	$(PYTHON) main.py --event-fade-cache-review-bundle $(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),) $(if $(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES),--event-fade-review-bundle-export-prices --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) --event-fade-price-fixture-dir $(EVENT_FADE_PRICE_FIXTURE_DIR),)
+	$(PYTHON) main.py --event-fade-cache-review-bundle $(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),) $(if $(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES),--event-fade-review-bundle-export-prices --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) $(EVENT_FADE_PRICE_FIXTURE_ARG),)
 
 event-fade-review-cycle:
 	$(MAKE) event-discovery-refresh EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR)
@@ -221,7 +222,7 @@ event-fade-merge-sample:
 	$(PYTHON) main.py --event-fade-merge-sample $(EVENT_FADE_SAMPLE_FRESH) $(EVENT_FADE_SAMPLE_REVIEWED) $(EVENT_FADE_SAMPLE_MERGED)
 
 event-fade-export-outcome-prices:
-	$(PYTHON) main.py --event-fade-export-outcome-prices $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_OUTCOME_PRICES_OUT) --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) --event-fade-price-fixture-dir $(EVENT_FADE_PRICE_FIXTURE_DIR)
+	$(PYTHON) main.py --event-fade-export-outcome-prices $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_OUTCOME_PRICES_OUT) --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) $(EVENT_FADE_PRICE_FIXTURE_ARG)
 
 event-fade-fill-outcomes:
 	$(PYTHON) main.py --event-fade-fill-outcomes $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_OUTCOME_PRICES) $(EVENT_FADE_SAMPLE_OUTCOMES)

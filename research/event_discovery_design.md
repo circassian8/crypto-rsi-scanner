@@ -845,6 +845,10 @@ EVENT_FADE_OUTCOME_PRICES_OUT=/tmp/event_fade_outcome_prices.json \
   make event-fade-export-outcome-prices
 ```
 
+By default this uses the research Binance daily-kline fetch/cache path. For
+offline smoke work, set
+`EVENT_FADE_PRICE_FIXTURE_DIR=fixtures/event_discovery/outcome_klines`.
+
 Fill triggered-row outcomes from local price candles:
 
 ```bash
@@ -906,6 +910,11 @@ EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1 \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-review-bundle
 ```
+
+For an offline bundle smoke, add
+`EVENT_FADE_PRICE_FIXTURE_DIR=fixtures/event_discovery/outcome_klines`; otherwise
+auto-exported bundle prices use the research Binance daily-kline fetch/cache
+path.
 
 Write a local review workspace from the latest research cache:
 

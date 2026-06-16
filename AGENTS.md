@@ -293,7 +293,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   also fill outcome fields into a bundle-local sample copy, and with
   `--event-fade-review-bundle-export-prices` it may first export a bundle-local
   OHLCV price fixture for triggered rows using the existing research price
-  export path. With
+  export path. Makefile price export/review-bundle targets default to that
+  Binance daily-kline fetch/cache path; set
+  `EVENT_FADE_PRICE_FIXTURE_DIR=fixtures/event_discovery/outcome_klines` only
+  for offline fixture smoke. With
   `--event-fade-review-bundle-reviewed` it may first merge prior reviewed
   labels/notes/outcomes that still match the fresh evidence fingerprint. It also
   writes a `manifest.json` for bundle provenance/counts/price-export/merge

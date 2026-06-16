@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Default event-fade price export to real kline cache · Codex
+**Why:** The review-bundle auto-price workflow defaulted through the checked-in
+fixture kline directory, which is correct for offline tests but wrong for real
+validation samples. A real review cycle should use the research Binance
+daily-kline fetch/cache path unless the operator explicitly asks for fixtures.
+**Changes:**
+- Changed Makefile event-fade price export/review-bundle targets so
+  `--event-fade-price-fixture-dir` is only passed when
+  `EVENT_FADE_PRICE_FIXTURE_DIR` is set.
+- Kept fixture smoke support by documenting
+  `EVENT_FADE_PRICE_FIXTURE_DIR=fixtures/event_discovery/outcome_klines`.
+- Updated `AGENTS.md` and `research/event_discovery_design.md` with the default
+  real-price-cache behavior and explicit fixture override.
+**Verify:** `make -n event-fade-export-outcome-prices` omits the fixture dir by
+default and includes it when `EVENT_FADE_PRICE_FIXTURE_DIR=fixtures/event_discovery/outcome_klines`;
+`make -n event-fade-cache-review-bundle EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1`
+does the same for review bundles. `make verify` passes, including tests, alert
+render smoke, backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This only changes Makefile defaults and docs. Running the
+price-export/review-bundle target with auto-price enabled may now fetch Binance
+daily klines unless a fixture dir is supplied; it still writes only local review
+artifacts and never routes alerts, opens paper trades, or writes live storage.
+
 ## 2026-06-16 — Auto-fill event-fade review bundle outcomes · Codex
 **Why:** Building a useful event-fade review bundle still required a separate
 price-fixture export before outcome fields could be filled. The validation plan
