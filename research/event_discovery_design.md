@@ -1,7 +1,8 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1 fixture-only framework, research-only
+**Status:** Phase 1/2 fixture framework with clean CoinGecko universe bridge,
+research-only
 
 ## Goal
 
@@ -29,9 +30,23 @@ Phase 1 files:
 - `event_models.py`: immutable discovery/classification data models
 - `event_providers/base.py`: provider protocols
 - `event_providers/manual_json.py`: local JSON fixture provider
+- `event_providers/coingecko_universe.py`: local CoinGecko market fixture
+  provider that reuses shared universe hygiene filters
 - `event_resolver.py`: alias-aware asset resolver
 - `event_classification.py`: deterministic proxy/direct classifier
 - `event_discovery.py`: normalizer, deduper, orchestrator, report formatter
+
+## Universe Integration
+
+Manual aliases remain the safest way to resolve one-off proxy tokens and known
+test cases. `RSI_EVENT_DISCOVERY_UNIVERSE_PATH` can additionally point to a
+CoinGecko-style market fixture, either a `top_markets.json` file or a directory
+containing that file. The provider applies `universe.filter_markets_with_audit`
+before producing `DiscoveredAsset` rows, so stablecoins, wrapped/staked receipts,
+synthetics, bad identity rows, and low-quality market rows are screened by the
+same logic used by live scans and backtests.
+
+This is still an offline fixture path. It does not fetch CoinGecko directly.
 
 ## Classification Rules
 
@@ -77,12 +92,17 @@ more dangerous than missed setups.
 - TESTPUMP ambiguous pump with no dated catalyst
 - COLLIDE ticker collision that must not resolve confidently
 
+`fixtures/coingecko_smoke/top_markets.json` is also used for universe-provider
+coverage. BTC/ETH/SOL become discovery assets, while Tether is excluded by the
+shared hygiene filter.
+
 ## CLI
 
 Run the research report with:
 
 ```bash
 RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
+RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report
 ```
 

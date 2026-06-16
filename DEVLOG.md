@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Bridge event discovery to clean CoinGecko universe fixtures · Codex
+**Why:** The event radar could resolve only manually aliased assets. The next
+step was to let discovery use the same cleaned CoinGecko-style universe fixture
+as the live scanner/backtest path, while staying offline and research-only.
+**Changes:**
+- Added `event_providers/coingecko_universe.py`, which loads local CoinGecko
+  market rows, applies shared `universe.py` hygiene filters, and converts kept
+  rows into `DiscoveredAsset` objects.
+- Added optional `RSI_EVENT_DISCOVERY_UNIVERSE_PATH` and
+  `RSI_EVENT_DISCOVERY_UNIVERSE_LIMIT` config, plus orchestration support to
+  merge manual aliases with cleaned universe assets.
+- Updated `make event-discovery-report` to exercise the checked-in
+  `fixtures/coingecko_smoke/top_markets.json` universe fixture with no network
+  calls, DB writes, alerts, paper trades, or execution.
+- Added offline tests proving BTC/ETH/SOL become discovery assets, Tether is
+  filtered out by shared hygiene, and the BTC ETF fixture can resolve to real
+  `bitcoin` as a direct-beneficiary no-trade candidate.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the Phase 2 universe bridge status and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 155/155.
+`make event-discovery-report` prints the research-only radar with cleaned BTC
+universe resolution and no writes/sends/trades. `make verify` passes.
+**Notes/risks:** The universe bridge is fixture-only. It does not fetch
+CoinGecko live data and does not add any live event provider.
+
 ## 2026-06-16 — Add fixture-only event discovery radar · Codex
 **Why:** Event-fade scoring is structurally solid, but events were still manual
 one-off inputs. Phase 1 needed a research-only radar that can normalize event

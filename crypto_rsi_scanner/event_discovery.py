@@ -20,6 +20,7 @@ from .event_models import (
     NormalizedEvent,
     RawDiscoveredEvent,
 )
+from .event_providers.coingecko_universe import CoinGeckoUniverseProvider
 from .event_providers.manual_json import ManualJsonEventProvider, parse_datetime
 from .event_resolver import clean_text, load_asset_aliases, resolve_event_assets
 
@@ -171,6 +172,8 @@ def run_manual_discovery(
     event_path: str | Path | None,
     alias_path: str | Path | None,
     *,
+    universe_path: str | Path | None = None,
+    universe_limit: int | None = None,
     cfg: EventDiscoveryConfig | None = None,
     fade_cfg: event_fade.EventFadeConfig | None = None,
     now: datetime | None = None,
@@ -180,8 +183,36 @@ def run_manual_discovery(
     start = now - timedelta(hours=cfg.lookback_hours)
     end = now + timedelta(days=cfg.horizon_days)
     raw_events = ManualJsonEventProvider(event_path).fetch_events(start, end)
-    assets = load_asset_aliases(alias_path)
+    assets = load_discovery_assets(alias_path, universe_path=universe_path, universe_limit=universe_limit)
     return run_discovery(raw_events, assets, cfg=cfg, fade_cfg=fade_cfg, now=now)
+
+
+def load_discovery_assets(
+    alias_path: str | Path | None,
+    *,
+    universe_path: str | Path | None = None,
+    universe_limit: int | None = None,
+) -> list[DiscoveredAsset]:
+    """Load manual aliases plus an optional cleaned CoinGecko-style universe."""
+    assets: list[DiscoveredAsset] = []
+    assets.extend(load_asset_aliases(alias_path))
+    if universe_path:
+        assets.extend(CoinGeckoUniverseProvider(universe_path, limit=universe_limit).fetch_assets())
+    return merge_discovered_assets(assets)
+
+
+def merge_discovered_assets(assets: Iterable[DiscoveredAsset]) -> list[DiscoveredAsset]:
+    by_id: dict[str, DiscoveredAsset] = {}
+    order: list[str] = []
+    for asset in assets:
+        if not asset.coin_id:
+            continue
+        if asset.coin_id not in by_id:
+            by_id[asset.coin_id] = asset
+            order.append(asset.coin_id)
+            continue
+        by_id[asset.coin_id] = _merge_asset(by_id[asset.coin_id], asset)
+    return [by_id[coin_id] for coin_id in order]
 
 
 def build_fade_candidate(
@@ -284,6 +315,34 @@ def _infer_event_type(title: str, body: str | None) -> str:
     if "world cup" in text or "match" in text:
         return "sports_event"
     return "other"
+
+
+def _merge_asset(base: DiscoveredAsset, other: DiscoveredAsset) -> DiscoveredAsset:
+    return DiscoveredAsset(
+        coin_id=base.coin_id or other.coin_id,
+        symbol=base.symbol or other.symbol,
+        name=base.name or other.name,
+        market_cap=base.market_cap if base.market_cap is not None else other.market_cap,
+        volume_24h=base.volume_24h if base.volume_24h is not None else other.volume_24h,
+        price=base.price if base.price is not None else other.price,
+        categories=_unique((*base.categories, *other.categories)),
+        contract_addresses={**other.contract_addresses, **base.contract_addresses},
+        source=base.source if base.source == other.source else f"{base.source}+{other.source}",
+        aliases=_unique((*base.aliases, *other.aliases)),
+    )
+
+
+def _unique(values: Iterable[str]) -> tuple[str, ...]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value)
+        key = clean_text(text)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(text)
+    return tuple(out)
 
 
 def _event_id(*parts: object) -> str:

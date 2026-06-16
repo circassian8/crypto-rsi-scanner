@@ -58,7 +58,7 @@ event-fade-report:
 	$(PYTHON) main.py --event-fade-report
 
 event-discovery-report:
-	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json $(PYTHON) main.py --event-discovery-report
+	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json $(PYTHON) main.py --event-discovery-report
 
 status:
 	$(PYTHON) main.py --status

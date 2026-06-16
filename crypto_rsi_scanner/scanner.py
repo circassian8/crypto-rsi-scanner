@@ -1056,6 +1056,8 @@ def event_discovery_report(verbose: bool = False) -> None:
     result = event_discovery.run_manual_discovery(
         path,
         config.EVENT_DISCOVERY_ALIASES_PATH,
+        universe_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        universe_limit=config.EVENT_DISCOVERY_UNIVERSE_LIMIT or None,
         cfg=cfg,
         fade_cfg=event_fade.runtime_config(config),
     )

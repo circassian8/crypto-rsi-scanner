@@ -536,6 +536,12 @@ def _event_discovery_fixture_paths():
     return root / "raw_events.json", root / "asset_aliases.json"
 
 
+def _coingecko_universe_fixture_path():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parent.parent / "fixtures" / "coingecko_smoke" / "top_markets.json"
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -588,6 +594,18 @@ def test_event_discovery_manual_provider_fixture_and_missing_path():
             raise AssertionError("required malformed manual fixture should fail")
 
 
+def test_event_discovery_coingecko_universe_provider_uses_hygiene():
+    from crypto_rsi_scanner.event_providers.coingecko_universe import CoinGeckoUniverseProvider
+
+    assets = CoinGeckoUniverseProvider(_coingecko_universe_fixture_path(), required=True).fetch_assets()
+    by_id = {asset.coin_id: asset for asset in assets}
+    assert set(by_id) == {"bitcoin", "ethereum", "solana"}
+    assert by_id["bitcoin"].symbol == "BTC"
+    assert by_id["bitcoin"].price == 68000.0
+    assert by_id["bitcoin"].source == "coingecko_universe"
+    assert "tether" not in by_id
+
+
 def test_event_discovery_normalizes_and_dedupes_events():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -632,6 +650,37 @@ def test_event_resolver_aliases_and_rejects_ticker_collision():
     assert resolve_event_assets(collision, assets) == []
     low_conf = resolve_event_assets(collision, assets, min_confidence=0.0)
     assert all(link.link_confidence < 0.80 for link in low_conf)
+
+
+def test_event_discovery_resolves_real_assets_from_clean_universe_fixture():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+
+    events_path, _aliases_path = _event_discovery_fixture_paths()
+    raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
+        datetime(2026, 6, 12, tzinfo=timezone.utc),
+        datetime(2026, 6, 17, tzinfo=timezone.utc),
+    )
+    assets = event_discovery.load_discovery_assets(
+        None,
+        universe_path=_coingecko_universe_fixture_path(),
+    )
+    assert {asset.coin_id for asset in assets} == {"bitcoin", "ethereum", "solana"}
+
+    result = event_discovery.run_discovery(
+        raw,
+        assets,
+        now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+    )
+    by_coin = {candidate.asset.coin_id: candidate for candidate in result.candidates}
+    assert set(by_coin) == {"bitcoin"}
+    btc = by_coin["bitcoin"]
+    assert btc.asset.symbol == "BTC"
+    assert btc.asset.price == 68000.0
+    assert btc.classification.is_direct_beneficiary is True
+    assert btc.fade_signal.signal_type == FadeSignalType.NO_TRADE
 
 
 def test_event_classification_proxy_direct_and_ambiguous_cases():
@@ -690,8 +739,10 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     events_path, aliases_path = _event_discovery_fixture_paths()
     orig_events = config.EVENT_DISCOVERY_EVENTS_PATH
     orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
+    orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = events_path
     config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -704,6 +755,7 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     finally:
         config.EVENT_DISCOVERY_EVENTS_PATH = orig_events
         config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
 
 def test_conviction_monotonic_with_severity():
