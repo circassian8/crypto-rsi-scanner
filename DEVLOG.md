@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade review bundle manifest · Codex
+**Why:** Review bundles are now the main handoff artifact for building the
+event-fade validation sample. They need a machine-readable provenance/counts
+file so humans, Claude, and Codex can audit what bundle was generated without
+parsing the README and reports by hand.
+**Changes:**
+- Added `manifest.json` to `--event-fade-review-bundle` and
+  `--event-fade-cache-review-bundle` outputs.
+- The manifest records generated time, source sample/cache path, bundle file
+  names, row counts, queue counts, promotion blockers, next-sample work, and
+  optional outcome-fill stats.
+- Updated bundle README text, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to include the manifest as part of the
+  review workspace contract.
+- Extended sample-backed and cache-backed bundle tests to assert manifest
+  presence and key source/count/outcome fields.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 216/216.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This remains artifact-only. The manifest is written only inside
+the requested bundle directory and does not infer labels, route alerts, write
+live storage, or open paper trades.
+
 ## 2026-06-16 — Add cache-backed event-fade review bundle · Codex
 **Why:** The real event-fade validation loop should hand off the latest
 point-in-time discovery cache for human review without requiring a separate

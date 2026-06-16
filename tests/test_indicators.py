@@ -3370,6 +3370,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
 
         expected = {
             "README.md",
+            "manifest.json",
             "validation_sample.jsonl",
             "validation_sample_with_outcomes.jsonl",
             "labeling_queue.txt",
@@ -3382,6 +3383,15 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
         assert "Research-only" in readme
         assert "validation_sample_with_outcomes.jsonl" in readme
+        assert "manifest.json" in readme
+
+        manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["source"]["sample_path"] == str(sample_path)
+        assert manifest["source"]["review_rows"] == 17
+        assert manifest["queue"]["shown_rows"] == 1
+        assert manifest["files"]["review_template"] == "review_template.csv"
+        assert manifest["outcome_fill"]["filled_rows"] == 1
+        assert manifest["review"]["promotion_ready"] is False
 
         packet = (bundle_dir / "review_packet.md").read_text(encoding="utf-8")
         assert "## 1. TESTVELVET - SpaceX IPO trading start" in packet
@@ -3391,14 +3401,15 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "EVENT FADE VALIDATION SAMPLE REVIEW" in report
         assert "reviewed proxy candidates 0/25" in report
 
-        template_rows = list(csv.DictReader((bundle_dir / "review_template.csv").read_text(encoding="utf-8").splitlines()))
+        template_text = (bundle_dir / "review_template.csv").read_text(encoding="utf-8")
+        template_rows = list(csv.DictReader(template_text.splitlines()))
         assert len(template_rows) == 1
         assert template_rows[0]["asset_symbol"] == "TESTVELVET"
 
-        filled_rows = [
-            json.loads(line)
-            for line in (bundle_dir / "validation_sample_with_outcomes.jsonl").read_text(encoding="utf-8").splitlines()
-        ]
+        filled_text = (bundle_dir / "validation_sample_with_outcomes.jsonl").read_text(
+            encoding="utf-8"
+        )
+        filled_rows = [json.loads(line) for line in filled_text.splitlines()]
         velvet = next(row for row in filled_rows if row["asset_symbol"] == "TESTVELVET")
         assert round(velvet["post_event_return_72h"], 4) == -0.2083
 
@@ -3440,6 +3451,7 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
 
             expected = {
                 "README.md",
+                "manifest.json",
                 "validation_sample.jsonl",
                 "validation_sample_with_outcomes.jsonl",
                 "labeling_queue.txt",
@@ -3451,6 +3463,12 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
 
             readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
             assert f"Input sample: `cache:{cache_dir}`" in readme
+
+            manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+            assert manifest["source"]["sample_path"] == f"cache:{cache_dir}"
+            assert manifest["source"]["review_rows"] == 17
+            assert manifest["queue"]["shown_rows"] == 1
+            assert manifest["outcome_fill"]["prices_path"] == str(_outcome_prices_fixture_path())
 
             template_text = (bundle_dir / "review_template.csv").read_text(encoding="utf-8")
             template_rows = list(csv.DictReader(template_text.splitlines()))

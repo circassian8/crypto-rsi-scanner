@@ -507,6 +507,8 @@ workspace for a validation sample. The bundle contains:
 - `review_packet.md`: human-readable evidence packet
 - `review_template.csv`: compact editable sidecar
 - `review_report.txt`: current metrics and promotion blockers
+- `manifest.json`: machine-readable bundle provenance, file map, review counts,
+  blockers, next-sample work, and optional outcome-fill stats
 - `README.md`: suggested manual workflow
 
 The bundle is a convenience wrapper around existing artifact-only commands. It

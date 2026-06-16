@@ -1436,6 +1436,7 @@ def _write_event_fade_review_bundle(
     )
     review_rows = source_rows
     fill_summary = "No price fixture supplied; outcome fields were not filled."
+    fill_result: event_validation.ValidationOutcomeFillResult | None = None
     outcome_sample: Path | None = None
     if prices_path:
         prices = event_validation.load_outcome_price_fixture(prices_path)
@@ -1464,12 +1465,36 @@ def _write_event_fade_review_bundle(
     packet_path = bundle_dir / "review_packet.md"
     template_path = bundle_dir / "review_template.csv"
     report_path = bundle_dir / "review_report.txt"
+    manifest_path = bundle_dir / "manifest.json"
     readme_path = bundle_dir / "README.md"
 
     queue_path.write_text(event_validation.format_labeling_queue(queue) + "\n", encoding="utf-8")
     packet_path.write_text(event_validation.format_review_packet(review_rows, limit=limit) + "\n", encoding="utf-8")
     template_path.write_text(event_validation.format_review_template_csv(template_rows), encoding="utf-8")
     report_path.write_text(event_validation.format_validation_review(review) + "\n", encoding="utf-8")
+    manifest = _event_fade_review_bundle_manifest(
+        sample_path=sample_path,
+        prices_path=prices_path,
+        overwrite_outcomes=overwrite_outcomes,
+        copied_sample=copied_sample,
+        outcome_sample=outcome_sample,
+        queue_path=queue_path,
+        packet_path=packet_path,
+        template_path=template_path,
+        report_path=report_path,
+        readme_path=readme_path,
+        source_rows=len(source_rows),
+        review_rows=len(review_rows),
+        queue=queue,
+        review=review,
+        limit=limit,
+        fill_summary=fill_summary,
+        fill_result=fill_result,
+    )
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     readme_path.write_text(
         _event_fade_review_bundle_readme(
             sample_path=sample_path,
@@ -1479,6 +1504,7 @@ def _write_event_fade_review_bundle(
             packet_path=packet_path,
             template_path=template_path,
             report_path=report_path,
+            manifest_path=manifest_path,
             rows=len(review_rows),
             queue=queue,
             fill_summary=fill_summary,
@@ -1490,6 +1516,83 @@ def _write_event_fade_review_bundle(
         "outcome_sample": outcome_sample,
         "queue": queue,
         "rows": len(review_rows),
+    }
+
+
+def _event_fade_review_bundle_manifest(
+    *,
+    sample_path: str,
+    prices_path: str | None,
+    overwrite_outcomes: bool,
+    copied_sample: Path,
+    outcome_sample: Path | None,
+    queue_path: Path,
+    packet_path: Path,
+    template_path: Path,
+    report_path: Path,
+    readme_path: Path,
+    source_rows: int,
+    review_rows: int,
+    queue: event_validation.ValidationLabelingQueue,
+    review: event_validation.EventFadeValidationReview,
+    limit: int | None,
+    fill_summary: str,
+    fill_result: event_validation.ValidationOutcomeFillResult | None,
+) -> dict[str, Any]:
+    files = {
+        "readme": readme_path.name,
+        "validation_sample": copied_sample.name,
+        "labeling_queue": queue_path.name,
+        "review_packet": packet_path.name,
+        "review_template": template_path.name,
+        "review_report": report_path.name,
+    }
+    if outcome_sample is not None:
+        files["validation_sample_with_outcomes"] = outcome_sample.name
+    outcome_fill: dict[str, Any] = {
+        "enabled": prices_path is not None,
+        "prices_path": prices_path,
+        "overwrite_outcomes": overwrite_outcomes,
+        "summary": fill_summary,
+    }
+    if fill_result is not None:
+        outcome_fill.update({
+            "sample_rows": fill_result.sample_rows,
+            "triggered_rows": fill_result.triggered_rows,
+            "filled_rows": fill_result.filled_rows,
+            "missing_history_rows": fill_result.missing_history_rows,
+            "insufficient_history_rows": fill_result.insufficient_history_rows,
+            "skipped_existing_rows": fill_result.skipped_existing_rows,
+        })
+
+    return {
+        "bundle_version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source": {
+            "sample_path": sample_path,
+            "source_rows": source_rows,
+            "review_rows": review_rows,
+        },
+        "files": files,
+        "queue": {
+            "limit": limit,
+            "needed_rows": queue.needed_rows,
+            "shown_rows": queue.shown_rows,
+            "total_rows": queue.total_rows,
+        },
+        "review": {
+            "promotion_ready": review.promotion_ready,
+            "promotion_blockers": list(review.promotion_blockers),
+            "reviewed_rows": review.reviewed_rows,
+            "reviewed_proxy_candidates": review.reviewed_proxy_candidates,
+            "reviewed_negative_controls": review.reviewed_negative_controls,
+            "triggered_reviewed": review.triggered_reviewed,
+            "missing_trigger_outcome_rows": review.missing_trigger_outcome_rows,
+            "point_in_time_violation_rows": review.point_in_time_violation_rows,
+            "post_decision_source_rows": review.post_decision_source_rows,
+            "next_sample_work": list(event_validation.validation_review_next_steps(review)),
+        },
+        "outcome_fill": outcome_fill,
     }
 
 
@@ -1571,6 +1674,7 @@ def _event_fade_review_bundle_readme(
     packet_path: Path,
     template_path: Path,
     report_path: Path,
+    manifest_path: Path,
     rows: int,
     queue: event_validation.ValidationLabelingQueue,
     fill_summary: str,
@@ -1598,6 +1702,7 @@ def _event_fade_review_bundle_readme(
         f"- `{packet_path.name}`: human-readable evidence packet",
         f"- `{template_path.name}`: compact editable CSV sidecar",
         f"- `{report_path.name}`: current review metrics and promotion blockers",
+        f"- `{manifest_path.name}`: machine-readable bundle provenance and counts",
         "",
         "Suggested workflow:",
         "1. Read `review_packet.md` for evidence.",
