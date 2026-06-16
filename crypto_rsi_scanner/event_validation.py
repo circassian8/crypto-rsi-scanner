@@ -69,6 +69,8 @@ REVIEW_TEMPLATE_FIELDS = (
     "event_name",
     "event_type",
     "event_time",
+    "event_time_confidence",
+    "event_time_source",
     "trigger_observed_at",
     "signal_type",
     "queue_category",
@@ -1105,7 +1107,11 @@ def _format_review_packet_row(
         f"- Suggested label: `{item.suggested_label}`",
         f"- Missing fields: `{missing}`",
         f"- Current label: `{current_label}`",
-        f"- Event: `{_packet_text(row.get('event_type'))}` at `{_packet_text(item.event_time or 'unknown')}`",
+        (
+            f"- Event: `{_packet_text(row.get('event_type'))}` at `{_packet_text(item.event_time or 'unknown')}` | "
+            f"time_source=`{_packet_text(row.get('event_time_source') or 'unknown')}` | "
+            f"time_confidence=`{_fmt_num(_num(row.get('event_time_confidence')))}`"
+        ),
         (
             f"- First seen: `{_packet_text(row.get('first_seen_time'))}` | "
             f"published=`{_packet_text(row.get('published_at_min'))}`..`{_packet_text(row.get('published_at_max'))}` | "

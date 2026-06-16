@@ -2272,11 +2272,18 @@ def test_event_discovery_proxy_article_with_text_date_becomes_dated_review_candi
 
     candidate = result.candidates[0]
     assert candidate.event.event_time.isoformat() == "2026-06-20T00:00:00+00:00"
+    assert candidate.event.event_time_source == "text_date"
     assert candidate.data_quality["has_event_time"] is True
     assert candidate.classification.is_proxy_narrative is True
     assert candidate.classification.relationship_type == "proxy_exposure"
     assert candidate.classification.asset_role == "proxy_instrument"
+    assert candidate.fade_candidate.event.confidence == 0.60
     assert candidate.fade_signal.signal_type == FadeSignalType.NO_TRADE
+    assert "not an eligible proxy event-fade candidate" in candidate.fade_signal.warnings
+
+    rows = event_discovery.event_fade_validation_sample_rows(result)
+    assert rows[0]["event_time_source"] == "text_date"
+    assert rows[0]["event_time_confidence"] == 0.60
 
 
 def test_event_discovery_proxy_article_without_event_time_stays_reviewable_no_trade():
@@ -2800,6 +2807,7 @@ def test_event_fade_validation_sample_rows_and_serializers():
     assert velvet["schema_version"] == "event_fade_validation_sample_v1"
     assert velvet["exported_at"] == "2026-06-16T12:05:00+00:00"
     assert velvet["event_name"] == "SpaceX IPO trading start"
+    assert velvet["event_time_source"] == "explicit"
     assert velvet["raw_ids"] == ["velvet-spacex-proxy-1", "velvet-spacex-proxy-duplicate"]
     assert len(velvet["raw_titles"]) == 2
     assert len(velvet["raw_content_hashes"]) == 2
@@ -3411,6 +3419,7 @@ def test_event_fade_validation_review_packet_formats_human_evidence():
     assert "- Queue category: `label_triggered_candidate`" in packet
     assert "- Suggested label: `valid_proxy_fade or false_positive`" in packet
     assert "- Missing fields: `human_label`" in packet
+    assert "time_source=`explicit` | time_confidence=`1.00`" in packet
     assert "trigger 72h=`-20.8%`" in packet
     assert "Event-time baseline: entry=`8.00` | 72h=`-20.0%` | trigger edge=`+0.8pp`" in packet
     assert "Classifier evidence:" in packet
@@ -3428,6 +3437,8 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     assert len(template_rows) == 2
     assert template_rows[0]["asset_symbol"] == "TESTVELVET"
     assert template_rows[0]["queue_category"] == "label_triggered_candidate"
+    assert template_rows[0]["event_time_confidence"] == 1.0
+    assert template_rows[0]["event_time_source"] == "explicit"
     assert template_rows[0]["suggested_label"] == "valid_proxy_fade or false_positive"
     assert template_rows[0]["missing_fields"] == [
         "human_label",

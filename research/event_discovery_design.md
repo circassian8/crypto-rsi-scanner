@@ -881,7 +881,11 @@ reuses the same news parser as fixtures, and remains research-only/fail-soft.
 The shared news parser may infer a lower-confidence `event_time` only from
 explicit source-text date phrases such as "by June 20, 2026" or "on
 2026-06-20"; it must not use publication time as the catalyst time. Rows without
-that explicit date evidence remain `proxy_attention` and `NO_TRADE`.
+that explicit date evidence remain `proxy_attention` and `NO_TRADE`. Inferred
+dates are exported with `event_time_source=text_date` and reduced
+`event_time_confidence`; fade-candidate confidence is capped by that
+event-time confidence so low-confidence text dates cannot satisfy the
+event-fade confidence gate by themselves.
 For a newline-separated URL list, set
 `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH`. The checked-in no-key starter
 list is `fixtures/event_discovery/public_rss_feeds.txt`; it includes broad
@@ -906,10 +910,11 @@ This target enables `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, points
 `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH` at the checked-in public feed
 list, sets a 30-day lookback, and enables broader live CoinGecko universe
 enrichment by default so real article mentions can resolve beyond the fixture
-aliases. Public RSS rows now include asset-role metadata and conservative
-source-text date inference in validation exports and review packets so reviewers
-can separate actual dated proxy instruments/venues from undated attention,
-background mentions, infrastructure rows, and ticker-word collisions.
+aliases. Public RSS rows now include asset-role metadata, conservative
+source-text date inference, and event-time source/confidence provenance in
+validation exports and review packets so reviewers can separate actual dated
+proxy instruments/venues from lower-confidence text-date rows, undated
+attention, background mentions, infrastructure rows, and ticker-word collisions.
 Provider/network failures remain warnings in `discovery_runs.jsonl`.
 
 The live Polymarket cycle is complementary to public RSS: it can produce dated

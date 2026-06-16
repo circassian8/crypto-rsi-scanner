@@ -265,7 +265,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   source-text date phrases such as "by June 20, 2026"; rows without a known or
   inferred event time may enter validation samples as `proxy_attention` review
   evidence, but they must remain `NO_TRADE` because the event-fade hard gate
-  still requires a real event time.
+  still requires a real event time. Inferred event times must keep their
+  `event_time_source`/`event_time_confidence` provenance in validation exports,
+  and fade-candidate confidence is capped by event-time confidence so
+  lower-confidence text dates cannot silently satisfy the event-confidence gate.
   Asset role classification is part of the proxy gate: only `proxy_instrument`
   and `proxy_venue` rows remain proxy candidates; `mentioned_asset`,
   `infrastructure`, and `ticker_word_collision` rows become `proxy_context`
@@ -439,8 +442,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   RSS/Atom feeds from explicit `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS` or
   newline URL files when `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, can
   infer common external assets such as SpaceX/OpenAI and conservative
-  lower-confidence source-text dates in news text, can preserve no-event-time
-  proxy-style articles as `proxy_attention` review rows that remain `NO_TRADE`,
+  lower-confidence source-text dates in news text, can export event-time source
+  provenance for review/merge evidence, can preserve no-event-time proxy-style
+  articles as `proxy_attention` review rows that remain `NO_TRADE`,
   can classify linked-asset roles so background mentions,
   infrastructure chains, and ticker-word collisions become `proxy_context`
   controls, can parse local external IPO,

@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Expose event-time provenance in validation · Codex
+**Why:** Source-text date inference made more RSS rows dated, but reviewers also
+need to see whether a timestamp came from explicit provider data or lower-
+confidence text parsing. The fade gate should not treat those sources as equal.
+**Changes:**
+- Added `event_time_source` to normalized events and validation sample exports.
+- Added event-time source/confidence to review packets and compact review
+  templates so review merges detect timing-provenance changes.
+- Capped fade-candidate confidence by `event_time_confidence`, preventing
+  lower-confidence `text_date` rows from silently satisfying the event-fade
+  confidence gate.
+- Added regression coverage for `text_date` exports, review packet/template
+  fields, and confidence-capped `NO_TRADE` behavior.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+**Verify:** `make verify` passes, including 239/239 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This preserves source-text dates as reviewable evidence, not
+promotion evidence. Explicit provider times and higher-confidence external
+catalyst rows still work normally.
+
 ## 2026-06-16 — Infer dated catalysts from news text · Codex
 **Why:** Public RSS produced proxy leads, but most were stuck as undated
 `proxy_attention` rows. The validation sample needs more dated review evidence

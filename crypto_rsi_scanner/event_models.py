@@ -42,6 +42,7 @@ class NormalizedEvent:
     external_asset: str | None
     description: str | None
     confidence: float
+    event_time_source: str | None = None
 
 
 @dataclass(frozen=True)

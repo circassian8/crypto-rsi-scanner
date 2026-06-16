@@ -58,6 +58,7 @@ VALIDATION_SAMPLE_FIELDS = (
     "external_asset",
     "event_time",
     "event_time_confidence",
+    "event_time_source",
     "first_seen_time",
     "raw_published_at",
     "raw_fetched_at",
@@ -178,6 +179,8 @@ def normalize_raw_event(raw: RawDiscoveredEvent) -> NormalizedEvent:
     event_time_confidence = (
         float(event_time_confidence_raw) if event_time_confidence_raw is not None else (1.0 if event_time else 0.0)
     )
+    event_time_source_raw = event_payload.get("event_time_source", payload.get("event_time_source"))
+    event_time_source = str(event_time_source_raw) if event_time_source_raw else ("explicit" if event_time else None)
     first_seen = raw.published_at or raw.fetched_at
     external_asset = event_payload.get("external_asset", payload.get("external_asset"))
     confidence_raw = event_payload.get("confidence", payload.get("confidence"))
@@ -196,6 +199,7 @@ def normalize_raw_event(raw: RawDiscoveredEvent) -> NormalizedEvent:
         event_type=event_type,
         event_time=event_time,
         event_time_confidence=event_time_confidence,
+        event_time_source=event_time_source,
         first_seen_time=first_seen,
         source=raw.provider,
         source_urls=tuple(u for u in (raw.source_url,) if u),
@@ -232,6 +236,7 @@ def dedupe_events(events: Iterable[NormalizedEvent]) -> list[NormalizedEvent]:
             event_type=first.event_type,
             event_time=first.event_time,
             event_time_confidence=max(event.event_time_confidence for event in group),
+            event_time_source=_best_event_time_source(group),
             first_seen_time=first.first_seen_time,
             source="+".join(sorted({event.source for event in group})),
             source_urls=urls,
@@ -240,6 +245,16 @@ def dedupe_events(events: Iterable[NormalizedEvent]) -> list[NormalizedEvent]:
             confidence=confidence,
         ))
     return sorted(out, key=lambda e: (e.event_time or e.first_seen_time, e.event_name))
+
+
+def _best_event_time_source(events: Iterable[NormalizedEvent]) -> str | None:
+    best: NormalizedEvent | None = None
+    for event in events:
+        if event.event_time_source is None:
+            continue
+        if best is None or event.event_time_confidence > best.event_time_confidence:
+            best = event
+    return best.event_time_source if best else None
 
 
 def run_discovery(
@@ -734,6 +749,11 @@ def build_fade_candidate(
 ) -> event_fade.FadeCandidate:
     raw = raw_by_id.get(event.raw_ids[0]) if event.raw_ids else None
     payload = raw.raw_json if raw and raw.raw_json else {}
+    catalyst_confidence = min(
+        event.confidence,
+        classification.confidence,
+        event.event_time_confidence if event.event_time else 1.0,
+    )
     catalyst = event_fade.CatalystEvent(
         event_id=event.event_id,
         coin_id=asset.coin_id,
@@ -744,7 +764,7 @@ def build_fade_candidate(
         first_seen_time=event.first_seen_time,
         source=event.source,
         source_url=event.source_urls[0] if event.source_urls else None,
-        confidence=min(event.confidence, classification.confidence),
+        confidence=catalyst_confidence,
         external_asset=event.external_asset,
         is_proxy_narrative=classification.is_proxy_narrative,
         is_direct_beneficiary=classification.is_direct_beneficiary,
@@ -1029,6 +1049,7 @@ def _validation_sample_row(
         "external_asset": candidate.event.external_asset,
         "event_time": _iso(candidate.event.event_time),
         "event_time_confidence": candidate.event.event_time_confidence,
+        "event_time_source": candidate.event.event_time_source,
         "first_seen_time": _iso(candidate.event.first_seen_time),
         "raw_published_at": [_iso(raw.published_at) for raw in raw_events],
         "raw_fetched_at": [_iso(raw.fetched_at) for raw in raw_events],
