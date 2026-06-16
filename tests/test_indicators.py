@@ -2135,7 +2135,7 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     <title>TESTRSS Blog</title>
     <item>
       <guid>testrss-openai-preipo</guid>
-      <title>TESTRSS offers synthetic exposure to OpenAI pre IPO event</title>
+      <title>TESTRSS offers synthetic exposure to OpenAI pre IPO event by June 20, 2026</title>
       <description>The project blog describes synthetic exposure to OpenAI.</description>
       <link>https://example.test/blog/testrss-openai</link>
       <pubDate>Tue, 16 Jun 2026 12:30:00 GMT</pubDate>
@@ -2182,12 +2182,15 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     assert all(timeout == 4.0 for _url, timeout, _accept in seen)
     assert all("application/rss+xml" in accept for _url, _timeout, accept in seen)
     by_title = {event.title: event for event in events}
-    rss_event = by_title["TESTRSS offers synthetic exposure to OpenAI pre IPO event"]
+    rss_event = by_title["TESTRSS offers synthetic exposure to OpenAI pre IPO event by June 20, 2026"]
     assert rss_event.provider == "project_blog_rss"
     assert rss_event.source_url == "https://example.test/blog/testrss-openai"
     assert rss_event.published_at.isoformat() == "2026-06-16T12:30:00+00:00"
     assert rss_event.fetched_at == fetched_at
     assert rss_event.raw_json["event"]["event_type"] == "ipo_proxy"
+    assert rss_event.raw_json["event"]["event_time"] == "2026-06-20T00:00:00+00:00"
+    assert rss_event.raw_json["event"]["event_time_confidence"] == 0.60
+    assert rss_event.raw_json["event"]["event_time_source"] == "text_date"
     atom_event = by_title["TESTATOM fan token rallies before Test FC World Cup match kickoff"]
     assert atom_event.source_url == "https://example.test/blog/testatom-world-cup"
     assert atom_event.published_at.isoformat() == "2026-06-16T13:30:00+00:00"
@@ -2202,6 +2205,78 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
         feed_urls=("https://example.test/rss",),
         opener=failing_opener,
     ).fetch_events(start, end) == []
+
+
+def test_event_discovery_proxy_article_with_text_date_becomes_dated_review_candidate():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_models import DiscoveredAsset
+    from crypto_rsi_scanner.event_providers.project_blog_rss import ProjectBlogRssProvider
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <guid>hype-spacex-dated-preipo</guid>
+      <title>Hyperliquid's HYPE token rallies as pre-IPO perpetual market for SpaceX launches by June 20, 2026</title>
+      <description>Trade.xyz launches synthetic exposure to SpaceX through crypto derivatives.</description>
+      <link>https://example.test/hype-spacex-dated-preipo</link>
+      <pubDate>Tue, 16 Jun 2026 12:30:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
+""".encode("utf-8")
+
+    start = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    raw = ProjectBlogRssProvider(
+        None,
+        live_enabled=True,
+        feed_urls=("https://example.test/rss",),
+        opener=lambda _request, _timeout: FakeResponse(),
+        fetched_at=datetime(2026, 6, 16, 13, 0, tzinfo=timezone.utc),
+    ).fetch_events(start, end)
+    assert raw[0].raw_json["event"]["event_time"] == "2026-06-20T00:00:00+00:00"
+    assert raw[0].raw_json["event"]["event_time_confidence"] == 0.60
+    assert raw[0].raw_json["event"]["event_time_source"] == "text_date"
+
+    result = event_discovery.run_discovery(
+        raw,
+        [
+            DiscoveredAsset(
+                coin_id="hyperliquid",
+                symbol="HYPE",
+                name="Hyperliquid",
+                market_cap=1_000_000_000,
+                volume_24h=200_000_000,
+                price=35.0,
+                categories=("perp-dex",),
+                contract_addresses={},
+                source="test",
+                aliases=("hyperliquid", "hype"),
+            )
+        ],
+        now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc),
+    )
+
+    candidate = result.candidates[0]
+    assert candidate.event.event_time.isoformat() == "2026-06-20T00:00:00+00:00"
+    assert candidate.data_quality["has_event_time"] is True
+    assert candidate.classification.is_proxy_narrative is True
+    assert candidate.classification.relationship_type == "proxy_exposure"
+    assert candidate.classification.asset_role == "proxy_instrument"
+    assert candidate.fade_signal.signal_type == FadeSignalType.NO_TRADE
 
 
 def test_event_discovery_proxy_article_without_event_time_stays_reviewable_no_trade():

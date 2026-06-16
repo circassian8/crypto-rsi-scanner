@@ -878,6 +878,10 @@ RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
 
 The live RSS path fetches only explicit feed URLs, parses RSS and Atom entries,
 reuses the same news parser as fixtures, and remains research-only/fail-soft.
+The shared news parser may infer a lower-confidence `event_time` only from
+explicit source-text date phrases such as "by June 20, 2026" or "on
+2026-06-20"; it must not use publication time as the catalyst time. Rows without
+that explicit date evidence remain `proxy_attention` and `NO_TRADE`.
 For a newline-separated URL list, set
 `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH`. The checked-in no-key starter
 list is `fixtures/event_discovery/public_rss_feeds.txt`; it includes broad
@@ -902,9 +906,10 @@ This target enables `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, points
 `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH` at the checked-in public feed
 list, sets a 30-day lookback, and enables broader live CoinGecko universe
 enrichment by default so real article mentions can resolve beyond the fixture
-aliases. Public RSS rows now include asset-role metadata in validation exports
-and review packets so reviewers can separate actual proxy instruments/venues
-from background mentions, infrastructure rows, and ticker-word collisions.
+aliases. Public RSS rows now include asset-role metadata and conservative
+source-text date inference in validation exports and review packets so reviewers
+can separate actual dated proxy instruments/venues from undated attention,
+background mentions, infrastructure rows, and ticker-word collisions.
 Provider/network failures remain warnings in `discovery_runs.jsonl`.
 
 The live Polymarket cycle is complementary to public RSS: it can produce dated
@@ -924,8 +929,8 @@ EVENT_FADE_QUEUE_LIMIT=50 \
 ```
 
 This is the preferred no-key sample-expansion command because the resulting
-bundle can contain both RSS proxy-attention rows and Polymarket dated
-external-catalyst controls.
+bundle can contain RSS proxy-attention or source-text-dated proxy rows plus
+Polymarket dated external-catalyst controls.
 
 Validation review reports include asset-role cohorts alongside event-type,
 relationship, and BTC-risk cohorts. Use the asset-role section to verify that

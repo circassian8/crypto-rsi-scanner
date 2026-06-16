@@ -261,9 +261,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   The default manual alias file is `event_discovery_aliases.json`; fixture
   aliases in `fixtures/event_discovery/asset_aliases.json` are for fixture
   targets/tests only and must not pollute real-source review cycles.
-  Proxy-style news without a known event time may enter validation samples as
-  `proxy_attention` review evidence, but it must remain `NO_TRADE` because the
-  event-fade hard gate still requires a real event time.
+  Proxy-style news may infer lower-confidence event times only from explicit
+  source-text date phrases such as "by June 20, 2026"; rows without a known or
+  inferred event time may enter validation samples as `proxy_attention` review
+  evidence, but they must remain `NO_TRADE` because the event-fade hard gate
+  still requires a real event time.
   Asset role classification is part of the proxy gate: only `proxy_instrument`
   and `proxy_venue` rows remain proxy candidates; `mentioned_asset`,
   `infrastructure`, and `ticker_word_collision` rows become `proxy_context`
@@ -436,9 +438,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `RSI_EVENT_DISCOVERY_GDELT_LIVE=1`, can optionally fetch live
   RSS/Atom feeds from explicit `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS` or
   newline URL files when `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, can
-  infer common external assets such as SpaceX/OpenAI in news text, can preserve
-  no-event-time proxy-style articles as `proxy_attention` review rows that
-  remain `NO_TRADE`, can classify linked-asset roles so background mentions,
+  infer common external assets such as SpaceX/OpenAI and conservative
+  lower-confidence source-text dates in news text, can preserve no-event-time
+  proxy-style articles as `proxy_attention` review rows that remain `NO_TRADE`,
+  can classify linked-asset roles so background mentions,
   infrastructure chains, and ticker-word collisions become `proxy_context`
   controls, can parse local external IPO,
   sports, and prediction-market catalyst fixtures as radar evidence, can optionally

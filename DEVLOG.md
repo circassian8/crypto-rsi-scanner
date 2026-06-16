@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Infer dated catalysts from news text · Codex
+**Why:** Public RSS produced proxy leads, but most were stuck as undated
+`proxy_attention` rows. The validation sample needs more dated review evidence
+without weakening the event-fade hard gate.
+**Changes:**
+- Added conservative source-text date inference to shared news/RSS parsing for
+  phrases like "by June 20, 2026" or "on 2026-06-20".
+- Tagged inferred dates as lower-confidence `event_time_source=text_date`
+  evidence instead of treating them like explicit provider timestamps.
+- Added regression coverage for dated RSS proxy rows becoming `proxy_exposure`
+  review candidates while undated proxy rows stay `proxy_attention`/`NO_TRADE`.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+**Verify:** `make verify` passes, including 239/239 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard. A live `make
+event-fade-no-key-review-cycle` run in `/tmp` produced a 67-row mixed bundle
+with missing event-time rows reduced to 57, but still no dated proxy-fade
+candidate or trigger.
+**Notes/risks:** This is research evidence only. Inferred dates use source text,
+not publication time, and cannot bypass link/classifier confidence, proxy/direct
+eligibility, pre-event pump, or post-event failure gates.
+
 ## 2026-06-16 — Combine no-key event-fade review sources · Codex
 **Why:** Public RSS and Polymarket each contribute different useful validation
 evidence, but running them separately left reviewers with split bundles and no

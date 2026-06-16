@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+import re
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -25,6 +26,47 @@ EXTERNAL_ASSET_ALIASES = (
     ("Champions League", ("champions league",)),
     ("Iran", ("iran",)),
     ("US election", ("us election", "u.s. election", "presidential election")),
+)
+
+_MONTHS = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
+_DATE_PREFIX = r"(?:on|by|before|after|until|through|ahead\s+of|into|for)"
+_MONTH_PATTERN = "|".join(sorted(_MONTHS, key=len, reverse=True))
+_TEXT_MONTH_DATE_RE = re.compile(
+    rf"\b{_DATE_PREFIX}\s+(?:the\s+)?"
+    rf"(?:(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?[,]?\s+)?"
+    rf"(?P<month>{_MONTH_PATTERN})\.?\s+"
+    rf"(?P<day>\d{{1,2}})(?:st|nd|rd|th)?"
+    rf"(?:[,]?\s+(?P<year>20\d{{2}}))?\b",
+    re.IGNORECASE,
+)
+_TEXT_ISO_DATE_RE = re.compile(
+    rf"\b{_DATE_PREFIX}\s+(?P<year>20\d{{2}})-(?P<month>\d{{1,2}})-(?P<day>\d{{1,2}})\b",
+    re.IGNORECASE,
 )
 
 
@@ -169,12 +211,29 @@ def _infer_event_payload(title: str, body: str, row: Mapping[str, Any]) -> dict[
         event_type = "etf_approval"
 
     event_time = _parse_time(row.get("event_time") or row.get("eventTime") or row.get("catalyst_time"))
+    event_time_source = "explicit" if event_time else None
+    if event_time is None:
+        reference_time = (
+            _parse_time(
+                row.get("published_at")
+                or row.get("publishedAt")
+                or row.get("published_on")
+                or row.get("created_at")
+                or row.get("pubDate")
+                or row.get("seendate")
+            )
+            or _parse_time(row.get("fetched_at") or row.get("fetchedAt") or row.get("updated_at"))
+            or datetime.now(timezone.utc)
+        )
+        event_time = _infer_text_event_time(title, body, reference_time)
+        event_time_source = "text_date" if event_time else None
     external_asset = row.get("external_asset") or row.get("externalAsset") or _infer_external_asset(text)
     return {
         "event_name": str(row.get("event_name") or row.get("eventName") or title),
         "event_type": event_type,
         "event_time": event_time.isoformat() if event_time else None,
-        "event_time_confidence": 1.0 if event_time else 0.0,
+        "event_time_confidence": 1.0 if event_time_source == "explicit" else (0.60 if event_time else 0.0),
+        "event_time_source": event_time_source,
         "external_asset": external_asset,
         "confidence": float(row.get("source_confidence") or 0.65),
         "description": body or title,
@@ -206,6 +265,32 @@ def _parse_time(value: object) -> datetime | None:
             if dt is not None:
                 return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
     return parse_datetime(value)
+
+
+def _infer_text_event_time(title: str, body: str, reference_time: datetime) -> datetime | None:
+    text = f"{title} {body or ''}"
+    for pattern in (_TEXT_ISO_DATE_RE, _TEXT_MONTH_DATE_RE):
+        match = pattern.search(text)
+        if not match:
+            continue
+        try:
+            if pattern is _TEXT_ISO_DATE_RE:
+                year = int(match.group("year"))
+                month = int(match.group("month"))
+            else:
+                month = _MONTHS[match.group("month").lower().rstrip(".")]
+                year = int(match.group("year")) if match.group("year") else _as_utc(reference_time).year
+            day = int(match.group("day"))
+            inferred = datetime(year, month, day, tzinfo=timezone.utc)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if match.groupdict().get("year") is None and inferred + timedelta(days=2) < _as_utc(reference_time):
+            try:
+                inferred = inferred.replace(year=inferred.year + 1)
+            except ValueError:
+                continue
+        return inferred
+    return None
 
 
 def _as_utc(dt: datetime) -> datetime:
