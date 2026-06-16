@@ -3122,6 +3122,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert round(review.median_trigger_latency_hours, 2) == 22.5
     assert review.negative_trigger_latency_rows == 0
     assert review.reviewed_proxy_event_types == 2
+    assert review.reviewed_proxy_source_providers == 3
     assert review.triggered_btc_risk_buckets == 1
     assert review.missing_event_time_baseline_rows == 0
     assert review.low_confidence_trigger_event_time_rows == 0
@@ -3154,6 +3155,12 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert time_source_cohorts["explicit"].reviewed_proxy_candidates == 3
     assert time_source_cohorts["missing_event_time"].reviewed_negative_controls == 1
 
+    source_cohorts = {cohort.name: cohort for cohort in review.source_provider_cohorts}
+    assert source_cohorts["manual_json"].reviewed_rows == 3
+    assert source_cohorts["manual_json"].reviewed_proxy_candidates == 1
+    assert source_cohorts["cryptopanic"].reviewed_proxy_candidates == 1
+    assert source_cohorts["prediction_market_events"].reviewed_proxy_candidates == 1
+
     btc_cohorts = {cohort.name: cohort for cohort in review.btc_risk_cohorts}
     assert btc_cohorts["btc_risk_neutral"].triggered_reviewed == 1
     assert btc_cohorts["btc_risk_unknown"].reviewed_negative_controls == 2
@@ -3165,6 +3172,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "event-time short baseline" in report
     assert "trigger edge vs baseline=+10.0pp" in report
     assert "proxy event types: 2/2" in report
+    assert "proxy source providers: 3/2" in report
     assert "trigger BTC risk buckets: 1/1" in report
     assert "reviewed rows missing source timing: 0" in report
     assert "trigger latency: avg=22.5h" in report
@@ -3181,6 +3189,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "proxy_instrument" in report
     assert "By event time source:" in report
     assert "explicit" in report
+    assert "By source provider:" in report
+    assert "prediction_market_events" in report
     assert "By BTC risk bucket:" in report
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -3210,6 +3220,47 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
             min_proxy_event_types=2,
             min_trigger_btc_risk_buckets=1,
         ).promotion_ready
+
+
+def test_event_fade_validation_review_blocks_single_source_proxy_sample():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    for symbol in {"TESTAI", "TESTPRED"}:
+        row = next(row for row in rows if row["asset_symbol"] == symbol)
+        row["human_label"] = "valid_proxy_fade" if symbol == "TESTAI" else "false_positive"
+        row["review_status"] = "reviewed"
+        row["raw_providers"] = ("manual_json",)
+        row["source"] = "manual_json"
+        row["first_seen_time"] = "2026-06-12T00:00:00+00:00"
+        row["published_at_min"] = "2026-06-12T00:00:00+00:00"
+        row["published_at_max"] = "2026-06-12T00:00:00+00:00"
+        row["fetched_at_min"] = "2026-06-12T00:00:00+00:00"
+        row["fetched_at_max"] = "2026-06-12T00:00:00+00:00"
+        row["raw_published_at"] = ["2026-06-12T00:00:00+00:00"]
+        row["raw_fetched_at"] = ["2026-06-12T00:00:00+00:00"]
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=2,
+        min_negative_controls=0,
+        min_triggered_reviewed=0,
+        min_proxy_event_types=1,
+        min_proxy_source_providers=2,
+        min_trigger_btc_risk_buckets=0,
+    )
+    assert review.promotion_ready is False
+    assert review.reviewed_proxy_candidates == 2
+    assert review.reviewed_proxy_source_providers == 1
+    assert "reviewed proxy source providers 1/2" in review.promotion_blockers
+    assert (
+        "Add reviewed proxy examples from 1 more source provider(s) (current 1/2)."
+        in event_validation.validation_review_next_steps(review)
+    )
+    report = event_validation.format_validation_review(review)
+    assert "proxy source providers: 1/2" in report
+    assert "By source provider:" in report
+    assert "manual_json" in report
 
 
 def test_event_fade_validation_review_blocks_narrow_event_or_btc_samples():

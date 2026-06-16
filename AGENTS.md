@@ -302,9 +302,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   may read labeled JSONL/CSV sample artifacts and print coverage, trigger
   precision, trigger latency, point-in-time violations, MFE/MAE, post-event
   returns, event-time short baseline comparison,
-  event-type/relationship/BTC-risk cohorts, diversity gates, and promotion
-  blockers plus concrete next-sample work. A row only counts as reviewed
-  evidence when it has `review_status=reviewed` and a known `human_label`.
+  event-type/relationship/asset-role/event-time-source/source-provider/BTC-risk
+  cohorts, diversity gates, and promotion blockers plus concrete next-sample
+  work. Reviewed proxy evidence must not be dominated by one event type or one
+  source provider. A row only counts as reviewed evidence when it has
+  `review_status=reviewed` and a known `human_label`.
   Source-timing checks use `trigger_observed_at` for reviewed `SHORT_TRIGGERED`
   rows and `event_time` for other reviewed dated rows, including direct or
   ambiguous controls. Reviewed rows with no source timing evidence are blocked

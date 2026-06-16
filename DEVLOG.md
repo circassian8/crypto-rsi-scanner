@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Gate validation on source-provider diversity · Codex
+**Why:** The no-key event-fade review workflow can collect many rows from one
+RSS/feed/API source. A reviewed proxy sample should not look promotion-ready
+unless the evidence spans independent source providers.
+**Changes:**
+- Added reviewed proxy source-provider counts and a default two-provider
+  diversity gate to event-fade validation review.
+- Added source-provider cohorts to the formatted review report.
+- Added next-sample guidance when enough proxy rows exist but they all come
+  from too few source providers.
+- Added regression coverage for the positive multi-provider fixture sample and
+  the single-source proxy blocker.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+**Verify:** `make verify` passes, including 243/243 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This is validation/reporting only. It does not change event
+discovery, event-fade scoring, alerts, paper trades, live storage, or promotion
+automation.
+
 ## 2026-06-16 — Surface event-time confirmation in validation queue · Codex
 **Why:** Low-confidence trigger event times already block promotion, but the
 labeling queue could still treat a triggered row as complete once labels and

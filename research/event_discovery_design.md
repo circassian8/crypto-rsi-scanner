@@ -646,6 +646,9 @@ The reviewer currently checks:
 - reviewed `SHORT_TRIGGERED` precision against the 60% minimum target and
   false-positive rate
 - reviewed proxy event-type diversity against the two-event-type minimum target
+- reviewed proxy source-provider diversity against the two-provider minimum
+  target, so a sample dominated by one RSS/feed/API source cannot look
+  promotion-ready by itself
 - reviewed trigger BTC risk-bucket diversity against the two-bucket minimum
   target
 - direct/non-proxy rows that somehow became `SHORT_TRIGGERED`
@@ -665,15 +668,17 @@ The reviewer currently checks:
 - missing required outcome fields on reviewed triggered rows
 - missing event-time baseline fields on reviewed triggered rows
 - MFE/MAE ratio against the 1.5 minimum target
-- cohort summaries by event type, relationship type, and BTC risk-on bucket so
-  the reviewed sample can expose where the edge is concentrated or absent
+- cohort summaries by event type, relationship type, asset role, event-time
+  source, source provider, and BTC risk-on bucket so the reviewed sample can
+  expose where the edge is concentrated or absent
 
 The report also prints a `NEXT SAMPLE WORK` section that translates blockers
 into concrete work: how many more proxy candidates, direct/ambiguous controls,
 and reviewed `SHORT_TRIGGERED` rows are needed, which rows still need explicit
 review status or labels, which unsafe or missing point-in-time rows need
 review/removal, and which triggered rows still need trigger or event-time
-baseline outcomes.
+baseline outcomes, stronger event-time confirmation, or proxy examples from
+additional source providers.
 
 The command prints `BLOCKED` until coverage and outcome evidence are strong
 enough. Even when it prints `READY FOR HUMAN DECISION`, the repo decision still
@@ -940,13 +945,14 @@ This is the preferred no-key sample-expansion command because the resulting
 bundle can contain RSS proxy-attention or source-text-dated proxy rows plus
 Polymarket dated external-catalyst controls.
 
-Validation review reports include asset-role cohorts alongside event-type,
-relationship, event-time-source, and BTC-risk cohorts. Use the asset-role
-section to verify that reviewed proxy rows are not dominated by
-`mentioned_asset`, `infrastructure`, or `ticker_word_collision` controls, and
-use the event-time-source section to verify that triggered evidence is not
-dominated by lower-confidence `text_date` rows before treating the sample as
-promotion evidence.
+Validation review reports include asset-role and source-provider cohorts
+alongside event-type, relationship, event-time-source, and BTC-risk cohorts. Use
+the asset-role section to verify that reviewed proxy rows are not dominated by
+`mentioned_asset`, `infrastructure`, or `ticker_word_collision` controls, use
+the source-provider section to verify that proxy evidence is not all from one
+feed/API family, and use the event-time-source section to verify that triggered
+evidence is not dominated by lower-confidence `text_date` rows before treating
+the sample as promotion evidence.
 
 Labeling queues and review templates surface the same event-time source and
 confidence. Reviewed `SHORT_TRIGGERED` rows with low event-time confidence return
