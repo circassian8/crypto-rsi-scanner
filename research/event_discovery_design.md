@@ -338,7 +338,7 @@ Each row includes:
   component scores, feature fields, and missing-data markers
 - blank human-review and future outcome columns such as `human_label`,
   `human_notes`, `max_adverse_excursion`, `max_favorable_excursion`, and
-  post-event returns
+  trigger-time plus event-time-baseline post-event returns
 
 This export may write only the requested local artifact. It must not write live
 DB rows, send alerts, open paper trades, or imply execution.
@@ -401,20 +401,28 @@ symbol. Flat rows can use:
 - `timestamp` / `time` / `date`
 - `close`, with optional `high` and `low`
 
-The filler uses the row's `trigger_observed_at` as the decision time and
-`entry_reference_price` as the entry when present. It computes:
+The filler uses the row's `trigger_observed_at` as the confirmed decision time
+and `entry_reference_price` as the trigger entry when present. It also computes
+an event-time short baseline from the row's `event_time` and the closest local
+close at or before the event timestamp. It computes:
 
 - `post_event_return_24h`
 - `post_event_return_72h`
 - `post_event_return_7d`
 - `max_favorable_excursion`
 - `max_adverse_excursion`
+- `event_time_entry_price`
+- `event_time_post_event_return_24h`
+- `event_time_post_event_return_72h`
+- `event_time_post_event_return_7d`
+- `event_time_max_favorable_excursion`
+- `event_time_max_adverse_excursion`
 
 For event-fade shorts, negative post-event returns are favorable. MFE/MAE are
-positive magnitudes over the 7-day post-trigger window. Existing outcome fields
-are preserved unless `--event-fade-overwrite-outcomes` is supplied. The command
-writes only `OUT` and remains artifact-only: no live storage, notifications,
-paper trades, or execution.
+positive magnitudes over the 7-day post-trigger or post-event baseline window.
+Existing outcome fields are preserved unless `--event-fade-overwrite-outcomes`
+is supplied. The command writes only `OUT` and remains artifact-only: no live
+storage, notifications, paper trades, or execution.
 
 ## Validation Sample Labeling Queue
 
@@ -460,7 +468,9 @@ The reviewer currently checks:
   decision time
 - average MFE, MAE, MFE/MAE ratio, and post-event 24h/72h/7d returns for
   reviewed triggered rows
+- event-time short baseline 72h return and trigger-vs-baseline 72h edge
 - missing required outcome fields on reviewed triggered rows
+- missing event-time baseline fields on reviewed triggered rows
 - MFE/MAE ratio against the 1.5 minimum target
 - cohort summaries by event type, relationship type, and BTC risk-on bucket so
   the reviewed sample can expose where the edge is concentrated or absent

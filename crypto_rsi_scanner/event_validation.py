@@ -30,6 +30,9 @@ REQUIRED_TRIGGER_OUTCOME_FIELDS = (
     "max_favorable_excursion",
     "post_event_return_72h",
 )
+REQUIRED_EVENT_TIME_BASELINE_FIELDS = (
+    "event_time_post_event_return_72h",
+)
 REVIEW_FIELDS = (
     "review_status",
     "human_label",
@@ -39,6 +42,12 @@ REVIEW_FIELDS = (
     "post_event_return_24h",
     "post_event_return_72h",
     "post_event_return_7d",
+    "event_time_entry_price",
+    "event_time_max_adverse_excursion",
+    "event_time_max_favorable_excursion",
+    "event_time_post_event_return_24h",
+    "event_time_post_event_return_72h",
+    "event_time_post_event_return_7d",
 )
 OUTCOME_FIELDS = (
     "max_adverse_excursion",
@@ -46,6 +55,12 @@ OUTCOME_FIELDS = (
     "post_event_return_24h",
     "post_event_return_72h",
     "post_event_return_7d",
+    "event_time_entry_price",
+    "event_time_max_adverse_excursion",
+    "event_time_max_favorable_excursion",
+    "event_time_post_event_return_24h",
+    "event_time_post_event_return_72h",
+    "event_time_post_event_return_7d",
 )
 
 
@@ -90,7 +105,10 @@ class EventFadeValidationReview:
     avg_post_event_return_24h: float | None
     avg_post_event_return_72h: float | None
     avg_post_event_return_7d: float | None
+    avg_event_time_post_event_return_72h: float | None
+    avg_trigger_vs_event_time_return_72h_edge: float | None
     missing_trigger_outcome_rows: int
+    missing_event_time_baseline_rows: int
     point_in_time_violation_rows: int
     min_proxy_candidates: int
     min_negative_controls: int
@@ -227,16 +245,40 @@ def fill_validation_outcomes(
             insufficient_history += 1
             output.append(out)
             continue
-        outcome = _short_outcome(row, candles, decision_time)
-        if outcome is None:
+        trigger_outcome = _short_outcome(
+            candles,
+            decision_time,
+            entry_price=_num(row.get("entry_reference_price")),
+        )
+        if trigger_outcome is None:
             insufficient_history += 1
             output.append(out)
             continue
         changed = False
-        for field, value in outcome.items():
+        for field in OUTCOME_FIELDS:
+            if field.startswith("event_time_"):
+                continue
+            value = trigger_outcome.get(field)
+            if value is None:
+                continue
             if overwrite or _num(out.get(field)) is None:
                 out[field] = value
                 changed = True
+        event_time = _dt(row.get("event_time"))
+        if event_time is not None:
+            event_time_outcome = _short_outcome(
+                candles,
+                event_time,
+                entry_price=_close_asof(candles, event_time),
+            )
+            if event_time_outcome is not None:
+                event_time_fields = _event_time_outcome_fields(event_time_outcome)
+                for field, value in event_time_fields.items():
+                    if value is None:
+                        continue
+                    if overwrite or _num(out.get(field)) is None:
+                        out[field] = value
+                        changed = True
         if changed:
             filled += 1
         output.append(out)
@@ -401,6 +443,11 @@ def review_validation_sample(
         for row in triggered_reviewed
         if any(_num(row.get(field)) is None for field in REQUIRED_TRIGGER_OUTCOME_FIELDS)
     )
+    missing_event_time_baseline_rows = sum(
+        1
+        for row in triggered_reviewed
+        if any(_num(row.get(field)) is None for field in REQUIRED_EVENT_TIME_BASELINE_FIELDS)
+    )
     pit_violation_rows = sum(1 for row in reviewed if _point_in_time_violation(row))
     mfe_values = _nums(row.get("max_favorable_excursion") for row in triggered_reviewed)
     mae_values = _nums(row.get("max_adverse_excursion") for row in triggered_reviewed)
@@ -414,6 +461,8 @@ def review_validation_sample(
     avg_24h = _mean(_nums(row.get("post_event_return_24h") for row in triggered_reviewed))
     avg_72h = _mean(_nums(row.get("post_event_return_72h") for row in triggered_reviewed))
     avg_7d = _mean(_nums(row.get("post_event_return_7d") for row in triggered_reviewed))
+    avg_event_time_72h = _mean(_nums(row.get("event_time_post_event_return_72h") for row in triggered_reviewed))
+    trigger_vs_event_time_72h_edge = _mean(_trigger_vs_event_time_72h_edges(triggered_reviewed))
 
     blockers: list[str] = []
     if schema_mismatches:
@@ -448,6 +497,10 @@ def review_validation_sample(
         blockers.append(
             f"{missing_trigger_outcome_rows} reviewed SHORT_TRIGGERED row(s) are missing outcome fields"
         )
+    if missing_event_time_baseline_rows:
+        blockers.append(
+            f"{missing_event_time_baseline_rows} reviewed SHORT_TRIGGERED row(s) are missing event-time baseline fields"
+        )
     if (
         triggered_reviewed
         and not missing_trigger_outcome_rows
@@ -458,6 +511,13 @@ def review_validation_sample(
         )
     if avg_72h is not None and avg_72h >= 0:
         blockers.append("reviewed SHORT_TRIGGERED rows do not show favorable 72h short returns")
+    if (
+        triggered_reviewed
+        and not missing_event_time_baseline_rows
+        and trigger_vs_event_time_72h_edge is not None
+        and trigger_vs_event_time_72h_edge <= 0
+    ):
+        blockers.append("post-event trigger does not beat event-time short baseline at 72h")
 
     event_type_cohorts = _cohorts(data, lambda row: str(row.get("event_type") or "unknown"))
     relationship_type_cohorts = _cohorts(
@@ -487,7 +547,10 @@ def review_validation_sample(
         avg_post_event_return_24h=avg_24h,
         avg_post_event_return_72h=avg_72h,
         avg_post_event_return_7d=avg_7d,
+        avg_event_time_post_event_return_72h=avg_event_time_72h,
+        avg_trigger_vs_event_time_return_72h_edge=trigger_vs_event_time_72h_edge,
         missing_trigger_outcome_rows=missing_trigger_outcome_rows,
+        missing_event_time_baseline_rows=missing_event_time_baseline_rows,
         point_in_time_violation_rows=pit_violation_rows,
         min_proxy_candidates=min_proxy_candidates,
         min_negative_controls=min_negative_controls,
@@ -548,7 +611,13 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
             f"72h={_fmt_pct(review.avg_post_event_return_72h)} · "
             f"7d={_fmt_pct(review.avg_post_event_return_7d)}"
         ),
+        (
+            f"  event-time short baseline: "
+            f"72h={_fmt_pct(review.avg_event_time_post_event_return_72h)} · "
+            f"trigger edge vs baseline={_fmt_pp(review.avg_trigger_vs_event_time_return_72h_edge)}"
+        ),
         f"  reviewed triggered rows missing required outcomes: {review.missing_trigger_outcome_rows}",
+        f"  reviewed triggered rows missing event-time baseline: {review.missing_event_time_baseline_rows}",
         "",
         "COHORTS",
         "  By event type:",
@@ -659,11 +728,12 @@ def _candles_for_row(
 
 
 def _short_outcome(
-    row: Mapping[str, Any],
     candles: list[ValidationOutcomeCandle],
     decision_time: datetime,
+    *,
+    entry_price: float | None = None,
 ) -> dict[str, float] | None:
-    entry = _num(row.get("entry_reference_price")) or _close_asof(candles, decision_time)
+    entry = entry_price or _close_asof(candles, decision_time)
     if entry is None or entry <= 0:
         return None
     future = [
@@ -675,6 +745,7 @@ def _short_outcome(
     lows = [candle.low if candle.low is not None else candle.close for candle in future]
     highs = [candle.high if candle.high is not None else candle.close for candle in future]
     outcome: dict[str, float] = {
+        "entry_price": entry,
         "max_favorable_excursion": max(0.0, (entry - min(lows)) / entry),
         "max_adverse_excursion": max(0.0, (max(highs) - entry) / entry),
     }
@@ -687,6 +758,17 @@ def _short_outcome(
         if close is not None:
             outcome[field] = close / entry - 1.0
     return outcome if all(field in outcome for field in REQUIRED_TRIGGER_OUTCOME_FIELDS) else None
+
+
+def _event_time_outcome_fields(outcome: Mapping[str, float]) -> dict[str, float]:
+    return {
+        "event_time_entry_price": outcome.get("entry_price"),
+        "event_time_max_adverse_excursion": outcome.get("max_adverse_excursion"),
+        "event_time_max_favorable_excursion": outcome.get("max_favorable_excursion"),
+        "event_time_post_event_return_24h": outcome.get("post_event_return_24h"),
+        "event_time_post_event_return_72h": outcome.get("post_event_return_72h"),
+        "event_time_post_event_return_7d": outcome.get("post_event_return_7d"),
+    }
 
 
 def _close_asof(
@@ -717,6 +799,10 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     missing_trigger_outcomes = tuple(
         field for field in REQUIRED_TRIGGER_OUTCOME_FIELDS if _num(row.get(field)) is None
     )
+    missing_event_time_baseline = tuple(
+        field for field in REQUIRED_EVENT_TIME_BASELINE_FIELDS if _num(row.get(field)) is None
+    )
+    missing_required_outcomes = (*missing_trigger_outcomes, *missing_event_time_baseline)
 
     if label and label not in KNOWN_LABELS:
         return _queue_item(
@@ -740,15 +826,15 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
             priority=2,
             category="label_triggered_candidate",
             suggested_label=_suggested_label(row),
-            missing_fields=("human_label", *missing_trigger_outcomes),
+            missing_fields=("human_label", *missing_required_outcomes),
         )
-    if triggered and missing_trigger_outcomes:
+    if triggered and missing_required_outcomes:
         return _queue_item(
             row,
             priority=3,
             category="fill_trigger_outcomes",
             suggested_label=label or _suggested_label(row),
-            missing_fields=missing_trigger_outcomes,
+            missing_fields=missing_required_outcomes,
         )
     if not label and _is_proxy_candidate(row):
         return _queue_item(
@@ -921,6 +1007,19 @@ def _label_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     return counts
 
 
+def _trigger_vs_event_time_72h_edges(rows: Iterable[Mapping[str, Any]]) -> list[float]:
+    out: list[float] = []
+    for row in rows:
+        trigger_return = _num(row.get("post_event_return_72h"))
+        event_time_return = _num(row.get("event_time_post_event_return_72h"))
+        if trigger_return is None or event_time_return is None:
+            continue
+        # Lower post-entry returns are better for a short, so positive means
+        # the confirmed trigger beat a naive short at the event timestamp.
+        out.append(event_time_return - trigger_return)
+    return out
+
+
 def _cohorts(
     rows: Iterable[Mapping[str, Any]],
     key_fn,
@@ -1043,3 +1142,7 @@ def _fmt_pct(value: float | None) -> str:
 
 def _fmt_num(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.2f}"
+
+
+def _fmt_pp(value: float | None) -> str:
+    return "n/a" if value is None else f"{value * 100:+.1f}pp"

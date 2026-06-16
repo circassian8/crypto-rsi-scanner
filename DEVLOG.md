@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Compare event-fade triggers to event-time shorts · Codex
+**Why:** The event-fade plan explicitly requires proving that waiting for
+post-event failure beats simply shorting at the event timestamp. The validation
+sample could fill trigger outcomes, but it had no event-time baseline to make
+that comparison reviewable.
+**Changes:**
+- Added additive validation-sample fields for event-time baseline entry price,
+  MFE/MAE, and 24h/72h/7d post-event returns in
+  `crypto_rsi_scanner/event_discovery.py`.
+- Extended `crypto_rsi_scanner/event_validation.py` so
+  `fill_validation_outcomes()` fills both confirmed-trigger outcomes and the
+  event-time short baseline from local OHLCV candles.
+- The validation review now reports event-time baseline 72h return,
+  trigger-vs-baseline 72h edge, missing baseline fields, and blocks promotion
+  evidence when reviewed triggers lack a baseline or fail to beat it.
+- Updated validation labeling queues so triggered rows missing the event-time
+  baseline stay prioritized for outcome filling.
+- Expanded fixture prices and tests in `tests/test_indicators.py` to prove the
+  trigger-vs-event-time comparison and scanner price-export path.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to document the trigger/baseline
+  validation workflow.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 207/207.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This remains artifact-only validation. It does not promote
+event-fade alerts, write live storage, open paper trades, or approve routing.
+
 ## 2026-06-16 — Add event-fade validation cohort review metrics · Codex
 **Why:** The event-fade plan requires proving whether the edge survives by
 event type and market context, not just in aggregate. The validation reviewer

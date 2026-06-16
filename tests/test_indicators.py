@@ -2209,6 +2209,8 @@ def test_event_fade_validation_sample_rows_and_serializers():
     assert velvet["human_notes"] == ""
     assert velvet["max_adverse_excursion"] is None
     assert velvet["post_event_return_7d"] is None
+    assert velvet["event_time_entry_price"] is None
+    assert velvet["event_time_post_event_return_72h"] is None
 
     listing = next(
         row
@@ -2358,6 +2360,12 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     velvet["post_event_return_24h"] = -0.11
     velvet["post_event_return_72h"] = -0.22
     velvet["post_event_return_7d"] = -0.31
+    velvet["event_time_entry_price"] = 8.0
+    velvet["event_time_max_favorable_excursion"] = 0.33
+    velvet["event_time_max_adverse_excursion"] = 0.03
+    velvet["event_time_post_event_return_24h"] = -0.10
+    velvet["event_time_post_event_return_72h"] = -0.12
+    velvet["event_time_post_event_return_7d"] = -0.25
 
     pick("TESTAI")["human_label"] = "valid_proxy_fade"
     pick("TESTPRED")["human_label"] = "false_positive"
@@ -2387,6 +2395,9 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert review.avg_mae == 0.08
     assert round(review.mfe_mae_ratio, 2) == 5.25
     assert review.avg_post_event_return_72h == -0.22
+    assert review.avg_event_time_post_event_return_72h == -0.12
+    assert round(review.avg_trigger_vs_event_time_return_72h_edge, 2) == 0.10
+    assert review.missing_event_time_baseline_rows == 0
     assert review.point_in_time_violation_rows == 0
     assert review.promotion_blockers == ()
 
@@ -2410,6 +2421,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "READY FOR HUMAN DECISION" in report
     assert "precision: 100.0%" in report
     assert "72h=-22.0%" in report
+    assert "event-time short baseline" in report
+    assert "trigger edge vs baseline=+10.0pp" in report
     assert "COHORTS" in report
     assert "By event type:" in report
     assert "ipo_proxy" in report
@@ -2493,6 +2506,10 @@ def test_event_fade_validation_outcome_fill_from_local_prices():
     assert round(velvet["post_event_return_24h"], 4) == -0.1111
     assert round(velvet["post_event_return_72h"], 4) == -0.2083
     assert round(velvet["post_event_return_7d"], 4) == -0.2778
+    assert round(velvet["event_time_entry_price"], 4) == 8.0
+    assert round(velvet["event_time_post_event_return_24h"], 4) == -0.1
+    assert round(velvet["event_time_post_event_return_72h"], 4) == -0.2
+    assert round(velvet["event_time_post_event_return_7d"], 4) == -0.2875
 
     velvet["human_label"] = "valid_proxy_fade"
     queue = event_validation.build_labeling_queue(result.rows)
@@ -2520,20 +2537,21 @@ def test_event_fade_outcome_price_export_from_klines_fixture():
         )
         assert result.assets_requested == 1
         assert result.assets_written == 1
-        assert result.price_rows_written == 4
+        assert result.price_rows_written == 5
         assert result.missing_assets == ()
         payload = json.loads(out_path.read_text(encoding="utf-8"))
         assert payload["schema_version"] == event_price_history.PRICE_FIXTURE_SCHEMA_VERSION
         assert payload["source"].startswith("fixture:")
-        assert len(payload["prices"]) == 4
+        assert len(payload["prices"]) == 5
         assert payload["prices"][0]["asset_coin_id"] == "testvelvet"
-        assert payload["prices"][1]["high"] == 7.8
+        assert payload["prices"][2]["high"] == 7.8
 
         prices = event_validation.load_outcome_price_fixture(out_path)
         filled = event_validation.fill_validation_outcomes(rows, prices)
         velvet = next(row for row in filled.rows if row["asset_symbol"] == "TESTVELVET")
         assert round(velvet["max_adverse_excursion"], 4) == 0.0833
         assert round(velvet["post_event_return_7d"], 4) == -0.2778
+        assert round(velvet["event_time_post_event_return_72h"], 4) == -0.2
 
 
 def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
@@ -2554,6 +2572,7 @@ def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
         "max_adverse_excursion",
         "max_favorable_excursion",
         "post_event_return_72h",
+        "event_time_post_event_return_72h",
     )
 
     assert any(item.category == "label_proxy_candidate" for item in queue.items)
@@ -2580,6 +2599,7 @@ def test_event_fade_validation_labeling_queue_flags_reviewed_trigger_outcomes():
         "max_adverse_excursion",
         "max_favorable_excursion",
         "post_event_return_72h",
+        "event_time_post_event_return_72h",
     )
 
 
@@ -3076,7 +3096,7 @@ def test_event_fade_export_outcome_prices_scanner_writes_price_fixture():
         text = out.getvalue()
         assert "Event-fade outcome price export" in text
         assert "assets=1/1" in text
-        assert "price_rows=4" in text
+        assert "price_rows=5" in text
         payload = json.loads(out_path.read_text(encoding="utf-8"))
         assert payload["prices"][0]["asset_symbol"] == "TESTVELVET"
 
