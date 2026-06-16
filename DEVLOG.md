@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Require explicit reviewed status for event-fade samples · Codex
+**Why:** The validation reviewer counted any row with a `human_label` as
+reviewed evidence. That made half-edited sidecars risky: a label without an
+explicit review status could accidentally contribute to promotion metrics.
+**Changes:**
+- Tightened `crypto_rsi_scanner/event_validation.py` so review evidence requires
+  both `review_status=reviewed` and a known `human_label`.
+- Added review metrics, blockers, queue categories, and next-step text for
+  labels missing review status, reviewed rows missing labels, and invalid label
+  values.
+- Updated queue/report/CLI wording to say status/labels/outcomes rather than
+  labels/outcomes only.
+- Added regression coverage for invalid labels, missing review status, and
+  reviewed rows missing labels.
+- Fixed a date-sensitive event-discovery fixture report test by pinning its
+  lookback/horizon window.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the stricter reviewed-row definition.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 215/215.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** Older samples still load, but rows with labels and no
+`review_status=reviewed` no longer count as reviewed evidence. They now appear
+in the labeling queue and promotion blockers.
+
 ## 2026-06-16 — Add event-fade validation next-step checklist · Codex
 **Why:** The event-fade validation report listed blockers, but the next action
 still had to be inferred by a human or the next agent. The remaining Pro-plan

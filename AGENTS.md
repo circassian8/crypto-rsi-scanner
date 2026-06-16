@@ -107,21 +107,22 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-fade-review-sample PATH` (read a labeled JSONL/CSV sample and
   print review metrics/cohorts, concrete next-sample work, and promotion
   blockers; research-only/no writes) ·
-  `main.py --event-fade-labeling-queue PATH` (prioritize unlabeled rows and
-  triggered rows missing required outcomes; research-only/no writes) ·
+  `main.py --event-fade-labeling-queue PATH` (prioritize unlabeled rows, missing
+  review status/labels, and triggered rows missing required outcomes;
+  research-only/no writes) ·
   `main.py --event-fade-review-packet SAMPLE OUT` (write a Markdown packet with
   prioritized rows, source evidence, classifier rationale, signal/outcome
   fields, and human review fields; writes only `OUT`) ·
   `main.py --event-fade-export-review-template SAMPLE OUT` (write compact
   editable review sidecar rows; writes only `OUT`) ·
   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` (copy
-  sidecar human labels/outcomes back into a validation sample; writes only
+  sidecar human review status/labels/outcomes back into a validation sample; writes only
   `OUT`) ·
   `main.py --event-fade-review-bundle SAMPLE OUT_DIR` (write a local manual
   review workspace with copied sample, optional outcome-filled sample, queue,
   packet, sidecar, review report, and README; writes only under `OUT_DIR`) ·
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT` (copy prior human
-  labels/outcomes into a fresh validation export; writes only `OUT`) ·
+  review status/labels/outcomes into a fresh validation export; writes only `OUT`) ·
   `main.py --event-fade-export-outcome-prices SAMPLE OUT` (build a local OHLCV
   price fixture for `SHORT_TRIGGERED` sample rows, optionally from fixture
   klines; writes only `OUT`) ·
@@ -258,13 +259,15 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   precision, trigger latency, point-in-time violations, MFE/MAE, post-event
   returns, event-time short baseline comparison,
   event-type/relationship/BTC-risk cohorts, diversity gates, and promotion
-  blockers plus concrete next-sample work, but it must not automatically
-  promote alerts, write live storage, open paper trades, or imply execution.
+  blockers plus concrete next-sample work. A row only counts as reviewed
+  evidence when it has `review_status=reviewed` and a known `human_label`.
+  The review command must not automatically promote alerts, write live storage,
+  open paper trades, or imply execution.
 - Event-fade validation labeling queues are artifact-only. `main.py
   --event-fade-labeling-queue` may prioritize unlabeled proxy/control rows and
-  reviewed triggered rows missing required outcomes or source-timing review,
-  but it must not auto-label rows, modify sample files, write storage, route
-  alerts, open paper trades, or imply promotion.
+  reviewed triggered rows missing required outcomes, source-timing review, or
+  explicit review status/labels, but it must not auto-label rows, modify sample
+  files, write storage, route alerts, open paper trades, or imply promotion.
 - Event-fade validation review packets are artifact-only. `main.py
   --event-fade-review-packet SAMPLE OUT` may write a Markdown packet for manual
   validation review, but it must not auto-label rows, modify the source sample,
@@ -403,21 +406,22 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   event-type/relationship/BTC-risk cohorts, and blockers such as too few
   reviewed proxy/control/trigger cases, too-narrow event/BTC-risk diversity, or
   weak edge-quality metrics. It also prints concrete next-sample work so the
-  reviewer knows which cases/outcomes to add next.
+  reviewer knows which cases, labels, statuses, or outcomes to add next.
   `main.py --event-fade-labeling-queue PATH`
-  prioritizes the next rows to label and triggered rows missing required
-  outcome fields. `main.py --event-fade-review-packet SAMPLE OUT` writes a
+  prioritizes the next rows to label, rows missing explicit review status, and
+  triggered rows missing required outcome fields.
+  `main.py --event-fade-review-packet SAMPLE OUT` writes a
   Markdown packet for the same prioritized rows with source URLs, raw titles,
   classifier evidence, signal/risk fields, trigger/event-time outcomes, and the
   human fields to fill. `main.py --event-fade-export-review-template SAMPLE OUT`
   writes a compact editable sidecar for those rows, and
   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` applies
-  nonblank sidecar labels/outcomes back into a requested sample artifact.
+  nonblank sidecar review status/labels/outcomes back into a requested sample artifact.
   `main.py --event-fade-review-bundle SAMPLE OUT_DIR` writes the sample copy,
   queue, packet, template, review report, README, and optional outcome-filled
   sample into one local review workspace.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
-  preserves prior human labels/outcomes when regenerating a fresh export. Beyond
+  preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,
   RSS/Atom feed fetches, and Coinalyze derivatives enrichment, no network
   event/news/derivatives/supply providers,
@@ -444,9 +448,9 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 4. Use `main.py --event-fade-export-sample PATH` to build a manually reviewed
    event-fade sample from discovery fixtures, use
    `main.py --event-fade-merge-sample FRESH REVIEWED OUT` to preserve prior
-   labels/outcomes across refreshes, use
+   review status/labels/outcomes across refreshes, use
    `main.py --event-fade-labeling-queue PATH` to prioritize missing
-   labels/outcomes, optionally write a review packet with
+   review status/labels/outcomes, optionally write a review packet with
    `main.py --event-fade-review-packet SAMPLE OUT`, fill a compact sidecar from
    `main.py --event-fade-export-review-template SAMPLE OUT`, apply it with
    `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`, optionally

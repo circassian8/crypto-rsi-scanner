@@ -1273,7 +1273,7 @@ def event_fade_export_cache_sample(path: str, verbose: bool = False) -> None:
 
 
 def event_fade_review_sample(path: str, verbose: bool = False) -> None:
-    """Review labels/outcomes and next sample work for an event-fade validation export."""
+    """Review status/labels/outcomes and next sample work for an event-fade validation export."""
     _setup_event_discovery_logging(verbose)
     rows = event_validation.load_validation_sample(path)
     review = event_validation.review_validation_sample(rows)
@@ -1438,7 +1438,7 @@ def event_fade_review_bundle(
 
 
 def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, verbose: bool = False) -> None:
-    """Merge manual labels/outcomes from a reviewed sample into a fresh export."""
+    """Merge manual review status, labels, and outcomes into a fresh export."""
     _setup_event_discovery_logging(verbose)
     fresh = event_validation.load_validation_sample(fresh_path)
     reviewed = event_validation.load_validation_sample(reviewed_path)
@@ -1531,14 +1531,14 @@ def _event_fade_review_bundle_readme(
         "",
         f"Input sample: `{sample_path}`",
         f"Rows: {rows}",
-        f"Rows needing labels/outcomes: {queue.needed_rows}",
+        f"Rows needing labels/status/outcomes: {queue.needed_rows}",
         f"Rows shown in queue/template/packet: {queue.shown_rows}",
         f"Outcome fill: {fill_summary}",
         "",
         "Files:",
         f"- `{copied_sample.name}`: copied source validation sample",
         outcome_line,
-        f"- `{queue_path.name}`: prioritized queue for missing labels/outcomes",
+        f"- `{queue_path.name}`: prioritized queue for missing labels/status/outcomes",
         f"- `{packet_path.name}`: human-readable evidence packet",
         f"- `{template_path.name}`: compact editable CSV sidecar",
         f"- `{report_path.name}`: current review metrics and promotion blockers",
@@ -1760,12 +1760,12 @@ def cli() -> None:
     parser.add_argument(
         "--event-fade-review-sample",
         metavar="PATH",
-        help="Review labels/outcomes and next sample work in a research-only event-fade validation sample export.",
+        help="Review status/labels/outcomes and next sample work in a research-only event-fade validation sample export.",
     )
     parser.add_argument(
         "--event-fade-labeling-queue",
         metavar="PATH",
-        help="Print prioritized validation sample rows that need human labels/outcomes.",
+        help="Print prioritized validation sample rows that need human review status, labels, or outcomes.",
     )
     parser.add_argument(
         "--event-fade-review-packet",
@@ -1810,7 +1810,7 @@ def cli() -> None:
         "--event-fade-merge-sample",
         nargs=3,
         metavar=("FRESH", "REVIEWED", "OUT"),
-        help="Merge human labels/outcomes from REVIEWED into FRESH and write OUT.",
+        help="Merge human review status, labels, and outcomes from REVIEWED into FRESH and write OUT.",
     )
     parser.add_argument(
         "--event-fade-fill-outcomes",

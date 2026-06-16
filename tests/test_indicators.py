@@ -2354,6 +2354,49 @@ def test_event_fade_validation_review_blocks_unlabeled_export():
     assert "BLOCKED" in report
 
 
+def test_event_fade_validation_review_requires_explicit_review_status_and_label():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    labeled_without_status = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+    labeled_without_status["human_label"] = "valid_proxy_fade"
+    labeled_without_status["max_favorable_excursion"] = 0.42
+    labeled_without_status["max_adverse_excursion"] = 0.08
+    labeled_without_status["post_event_return_72h"] = -0.22
+    labeled_without_status["event_time_post_event_return_72h"] = -0.12
+    reviewed_without_label = next(row for row in rows if row["asset_symbol"] == "TESTBTC")
+    reviewed_without_label["review_status"] = "reviewed"
+    invalid_label = next(row for row in rows if row["asset_symbol"] == "TESTAI")
+    invalid_label["human_label"] = "valid_proxy"
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=1,
+        min_negative_controls=1,
+        min_triggered_reviewed=1,
+    )
+    assert review.reviewed_rows == 0
+    assert review.unknown_label_rows == 1
+    assert review.missing_review_status_rows == 2
+    assert review.missing_human_label_rows == 1
+    assert "1 labeled row(s) use unknown human_label values" in review.promotion_blockers
+    assert "2 labeled row(s) are missing review_status=reviewed" in review.promotion_blockers
+    assert "1 reviewed row(s) are missing human_label" in review.promotion_blockers
+    next_steps = event_validation.validation_review_next_steps(review)
+    assert "Fix 1 labeled row(s) with unknown human_label values." in next_steps
+    assert (
+        "Set review_status=reviewed for 2 labeled row(s), or clear labels that are not fully reviewed."
+        in next_steps
+    )
+    assert "Fill human_label for 1 row(s) marked reviewed." in next_steps
+
+    queue = event_validation.build_labeling_queue(rows, limit=3)
+    categories = [item.category for item in queue.items]
+    assert categories[0] == "fix_unknown_label"
+    assert "fill_review_label" in categories
+    assert "mark_reviewed_status" in categories
+
+
 def test_event_fade_validation_review_metrics_and_file_loaders():
     import tempfile
     from pathlib import Path
@@ -2370,9 +2413,13 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
             return row
         raise AssertionError(f"missing row for {symbol}")
 
-    velvet = pick("TESTVELVET")
-    velvet["human_label"] = "valid_proxy_fade"
-    velvet["review_status"] = "reviewed"
+    def mark(symbol, label, relationship=None):
+        row = pick(symbol, relationship)
+        row["human_label"] = label
+        row["review_status"] = "reviewed"
+        return row
+
+    velvet = mark("TESTVELVET", "valid_proxy_fade")
     velvet["max_favorable_excursion"] = 0.42
     velvet["max_adverse_excursion"] = 0.08
     velvet["post_event_return_24h"] = -0.11
@@ -2385,11 +2432,11 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     velvet["event_time_post_event_return_72h"] = -0.12
     velvet["event_time_post_event_return_7d"] = -0.25
 
-    pick("TESTAI")["human_label"] = "valid_proxy_fade"
-    pick("TESTPRED")["human_label"] = "false_positive"
-    pick("TESTBTC")["human_label"] = "direct_event"
-    pick("TESTLIST", "direct_listing")["human_label"] = "direct_event"
-    pick("TESTPUMP")["human_label"] = "ambiguous"
+    mark("TESTAI", "valid_proxy_fade")
+    mark("TESTPRED", "false_positive")
+    mark("TESTBTC", "direct_event")
+    mark("TESTLIST", "direct_event", "direct_listing")
+    mark("TESTPUMP", "ambiguous")
 
     review = event_validation.review_validation_sample(
         rows,
@@ -2403,6 +2450,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     )
     assert review.promotion_ready is True
     assert review.reviewed_rows == 6
+    assert review.missing_review_status_rows == 0
+    assert review.missing_human_label_rows == 0
     assert review.reviewed_proxy_candidates == 3
     assert review.reviewed_negative_controls == 3
     assert review.label_counts["valid_proxy_fade"] == 2
@@ -2456,6 +2505,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "trigger BTC risk buckets: 1/1" in report
     assert "trigger latency: avg=22.5h" in report
     assert "rows with post-decision source evidence: 0" in report
+    assert "labeled rows missing review_status=reviewed: 0" in report
+    assert "reviewed rows missing human_label: 0" in report
     assert "NEXT SAMPLE WORK" in report
     assert "explicit human approval is still required" in report
     assert "COHORTS" in report
@@ -2499,8 +2550,10 @@ def test_event_fade_validation_review_blocks_narrow_event_or_btc_samples():
     for row in rows:
         if row["asset_symbol"] in {"TESTVELVET", "TESTAI"}:
             row["human_label"] = "valid_proxy_fade"
+            row["review_status"] = "reviewed"
         elif row["asset_symbol"] in {"TESTBTC", "TESTPUMP"}:
             row["human_label"] = "direct_event" if row["asset_symbol"] == "TESTBTC" else "ambiguous"
+            row["review_status"] = "reviewed"
 
     velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
     velvet["max_favorable_excursion"] = 0.42
@@ -2584,6 +2637,7 @@ def test_event_fade_validation_outcome_fill_from_local_prices():
     assert round(velvet["event_time_post_event_return_7d"], 4) == -0.2875
 
     velvet["human_label"] = "valid_proxy_fade"
+    velvet["review_status"] = "reviewed"
     queue = event_validation.build_labeling_queue(result.rows)
     assert not any(item.asset_symbol == "TESTVELVET" for item in queue.items)
 
@@ -2652,7 +2706,7 @@ def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
 
     report = event_validation.format_labeling_queue(queue)
     assert "EVENT FADE VALIDATION LABELING QUEUE" in report
-    assert "needing labels/outcomes: 17" in report
+    assert "needing labels/status/outcomes: 17" in report
     assert "label_triggered_candidate" in report
     assert "TESTVELVET" in report
     assert "valid_proxy_fade or false_positive" in report
@@ -2667,7 +2721,7 @@ def test_event_fade_validation_review_packet_formats_human_evidence():
     packet = event_validation.format_review_packet(filled.rows, limit=1)
 
     assert "# Event-Fade Validation Review Packet" in packet
-    assert "Rows: 17 | needing labels/outcomes: 17 | showing: 1" in packet
+    assert "Rows: 17 | needing labels/status/outcomes: 17 | showing: 1" in packet
     assert "## 1. TESTVELVET - SpaceX IPO trading start" in packet
     assert "- Queue category: `label_triggered_candidate`" in packet
     assert "- Suggested label: `valid_proxy_fade or false_positive`" in packet
@@ -2729,6 +2783,7 @@ def test_event_fade_validation_labeling_queue_flags_reviewed_trigger_outcomes():
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
     triggered["human_label"] = "valid_proxy_fade"
+    triggered["review_status"] = "reviewed"
     queue = event_validation.build_labeling_queue(rows)
     item = next(item for item in queue.items if item.asset_symbol == "TESTVELVET")
     assert item.category == "fill_trigger_outcomes"
@@ -2746,6 +2801,7 @@ def test_event_fade_validation_review_blocks_late_or_weak_trigger_evidence():
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
     triggered["human_label"] = "false_positive"
+    triggered["review_status"] = "reviewed"
     triggered["first_seen_time"] = "2026-06-14T00:00:00+00:00"
     triggered["fetched_at_min"] = "2026-06-14T00:00:00+00:00"
     triggered["published_at_min"] = "2026-06-14T00:00:00+00:00"
@@ -2785,6 +2841,7 @@ def test_event_fade_validation_review_flags_mixed_late_source_evidence():
     rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
     triggered["human_label"] = "valid_proxy_fade"
+    triggered["review_status"] = "reviewed"
     triggered["max_favorable_excursion"] = 0.42
     triggered["max_adverse_excursion"] = 0.08
     triggered["post_event_return_72h"] = -0.22
@@ -2839,6 +2896,8 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     orig_prediction = config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
+    orig_lookback = config.EVENT_DISCOVERY_LOOKBACK_HOURS
+    orig_horizon = config.EVENT_DISCOVERY_HORIZON_DAYS
     config.EVENT_DISCOVERY_EVENTS_PATH = events_path
     config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
     config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
@@ -2853,6 +2912,8 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    config.EVENT_DISCOVERY_LOOKBACK_HOURS = 120
+    config.EVENT_DISCOVERY_HORIZON_DAYS = 2
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -2877,6 +2938,8 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
         config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
+        config.EVENT_DISCOVERY_LOOKBACK_HOURS = orig_lookback
+        config.EVENT_DISCOVERY_HORIZON_DAYS = orig_horizon
 
 
 def test_event_discovery_refresh_scanner_writes_cache_fixture():

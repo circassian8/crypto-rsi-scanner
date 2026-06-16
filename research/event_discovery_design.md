@@ -428,20 +428,22 @@ storage, notifications, paper trades, or execution.
 ## Validation Sample Labeling Queue
 
 `main.py --event-fade-labeling-queue PATH` reads a JSONL/CSV validation sample
-and prints the next rows that need human review. It is a read-only report; it
-does not auto-label rows or write the sample.
+and prints the next rows that need human review status, labels, or outcomes. It
+is a read-only report; it does not auto-label rows or write the sample.
 
 Queue priority is:
 
 1. unknown `human_label` values
-2. reviewed rows with point-in-time evidence violations
-3. reviewed rows with any source evidence after the decision time
-4. unlabeled `SHORT_TRIGGERED` rows
-5. reviewed `SHORT_TRIGGERED` rows missing required outcome fields:
+2. rows marked `review_status=reviewed` but missing `human_label`
+3. labeled rows missing `review_status=reviewed`
+4. reviewed rows with point-in-time evidence violations
+5. reviewed rows with any source evidence after the decision time
+6. unlabeled `SHORT_TRIGGERED` rows
+7. reviewed `SHORT_TRIGGERED` rows missing required outcome fields:
    `max_adverse_excursion`, `max_favorable_excursion`, and
    `post_event_return_72h`
-6. unlabeled proxy candidates
-7. unlabeled direct/ambiguous negative controls
+8. unlabeled proxy candidates
+9. unlabeled direct/ambiguous negative controls
 
 The report shows the event, asset, signal type, relationship, event time,
 trigger time, missing fields, suggested label category, and source URLs. It is a
@@ -465,7 +467,7 @@ It uses the queue priority order, then expands each selected row with:
 
 The packet is a human workflow artifact only. It does not auto-label rows,
 modify the source sample, write live storage, route alerts, open paper trades,
-or imply promotion. After labels/outcomes are filled in the sample, use
+or imply promotion. After review status, labels, and outcomes are filled in the sample, use
 `main.py --event-fade-review-sample PATH` to measure coverage, trigger quality,
 and promotion blockers.
 
@@ -486,9 +488,11 @@ sidecar keeps stable identity/context fields plus editable review fields:
 
 After a human edits the sidecar, `main.py --event-fade-apply-review-template
 SAMPLE TEMPLATE OUT` copies nonblank review fields back into a full validation
-sample artifact. The apply command uses stable event/asset/relationship identity
-and writes only `OUT`; it does not infer labels, alter the source sample, write
-live storage, route alerts, open paper trades, or imply promotion.
+sample artifact. A row only counts as reviewed evidence when it has both
+`review_status=reviewed` and a known `human_label`. The apply command uses
+stable event/asset/relationship identity and writes only `OUT`; it does not
+infer labels, alter the source sample, write live storage, route alerts, open
+paper trades, or imply promotion.
 
 ## Validation Review Bundle
 
@@ -498,7 +502,8 @@ workspace for a validation sample. The bundle contains:
 - `validation_sample.jsonl`: copied source sample
 - `validation_sample_with_outcomes.jsonl`: optional outcome-filled sample when
   `--event-fade-review-bundle-prices PRICES` is supplied
-- `labeling_queue.txt`: prioritized rows needing labels/outcomes
+- `labeling_queue.txt`: prioritized rows needing review status, labels, or
+  outcomes
 - `review_packet.md`: human-readable evidence packet
 - `review_template.csv`: compact editable sidecar
 - `review_report.txt`: current metrics and promotion blockers
@@ -518,7 +523,9 @@ does not promote event-fade output automatically.
 
 The reviewer currently checks:
 
-- reviewed rows vs unlabeled rows
+- reviewed rows vs unreviewed/incomplete rows
+- labeled rows missing `review_status=reviewed`, and rows marked reviewed but
+  missing `human_label`
 - reviewed proxy candidate count against the 25-case minimum target
 - reviewed direct/ambiguous control count against the 50-case minimum target
 - label counts for `valid_proxy_fade`, `false_positive`, `direct_event`, and
@@ -547,9 +554,9 @@ The reviewer currently checks:
 
 The report also prints a `NEXT SAMPLE WORK` section that translates blockers
 into concrete work: how many more proxy candidates, direct/ambiguous controls,
-and reviewed `SHORT_TRIGGERED` rows are needed, which unsafe point-in-time rows
-need review/removal, and which triggered rows still need trigger or event-time
-baseline outcomes.
+and reviewed `SHORT_TRIGGERED` rows are needed, which rows still need explicit
+review status or labels, which unsafe point-in-time rows need review/removal,
+and which triggered rows still need trigger or event-time baseline outcomes.
 
 The command prints `BLOCKED` until coverage and outcome evidence are strong
 enough. Even when it prints `READY FOR HUMAN DECISION`, the repo decision still
@@ -816,7 +823,7 @@ make event-fade-review-sample
 EVENT_FADE_SAMPLE_IN=/path/to/labeled_sample.csv make event-fade-review-sample
 ```
 
-Print a review queue for missing labels/outcomes:
+Print a review queue for missing review status, labels, or outcomes:
 
 ```bash
 make event-fade-labeling-queue
@@ -861,7 +868,7 @@ EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-review-bundle
 ```
 
-Preserve labels/outcomes across a refreshed export:
+Preserve review status/labels/outcomes across a refreshed export:
 
 ```bash
 make event-fade-merge-sample

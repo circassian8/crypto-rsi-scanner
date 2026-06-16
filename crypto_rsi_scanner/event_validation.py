@@ -1,8 +1,9 @@
 """Review metrics for event-fade validation sample exports.
 
 This module is research-only. It reads local JSONL/CSV artifacts produced by
-the event-discovery exporter and summarizes manual labels/outcomes. It never
-routes alerts, opens paper trades, writes live storage, or implies execution.
+the event-discovery exporter and summarizes manual review status, labels, and
+outcomes. It never routes alerts, opens paper trades, writes live storage, or
+implies execution.
 """
 
 from __future__ import annotations
@@ -123,6 +124,8 @@ class EventFadeValidationReview:
     total_rows: int
     reviewed_rows: int
     unlabeled_rows: int
+    missing_review_status_rows: int
+    missing_human_label_rows: int
     schema_mismatches: int
     unknown_label_rows: int
     label_counts: dict[str, int]
@@ -340,7 +343,7 @@ def merge_review_fields(
     fresh_rows: Iterable[Mapping[str, Any]],
     reviewed_rows: Iterable[Mapping[str, Any]],
 ) -> ValidationSampleMergeResult:
-    """Copy human labels/outcomes from an older reviewed sample into fresh rows."""
+    """Copy human review status, labels, and outcomes from older rows into fresh rows."""
     fresh = [dict(row) for row in fresh_rows]
     reviewed = [dict(row) for row in reviewed_rows]
     reviewed_by_key = {
@@ -378,7 +381,7 @@ def build_labeling_queue(
     *,
     limit: int | None = None,
 ) -> ValidationLabelingQueue:
-    """Prioritize validation rows that still need human labels or outcomes."""
+    """Prioritize validation rows that still need human review status, labels, or outcomes."""
     data = [dict(row) for row in rows]
     items = [_labeling_queue_item(row) for row in data]
     needed = sorted(
@@ -465,7 +468,7 @@ def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
         "EVENT FADE VALIDATION LABELING QUEUE (research-only; no alerts, DB writes, paper trades, or orders)",
         "=" * 78,
         (
-            f"Rows: {queue.total_rows} · needing labels/outcomes: {queue.needed_rows} · "
+            f"Rows: {queue.total_rows} · needing labels/status/outcomes: {queue.needed_rows} · "
             f"showing: {queue.shown_rows}"
         ),
     ]
@@ -473,7 +476,7 @@ def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
         rows.append(f"Limit: {queue.limit}")
     if not queue.items:
         rows.append("")
-        rows.append("No rows need labels or required trigger outcomes.")
+        rows.append("No rows need labels, review status, or required trigger outcomes.")
         return "\n".join(rows)
 
     rows.append("")
@@ -511,7 +514,7 @@ def format_review_packet(
         "Research-only: no alerts, DB writes, paper trades, or orders.",
         "",
         (
-            f"Rows: {queue.total_rows} | needing labels/outcomes: {queue.needed_rows} | "
+            f"Rows: {queue.total_rows} | needing labels/status/outcomes: {queue.needed_rows} | "
             f"showing: {queue.shown_rows}"
         ),
     ]
@@ -521,7 +524,7 @@ def format_review_packet(
         message = (
             "No rows shown by the current limit."
             if queue.needed_rows
-            else "No rows need labels or required trigger outcomes."
+            else "No rows need labels, review status, or required trigger outcomes."
         )
         out.extend(["", message])
         return "\n".join(out)
@@ -544,11 +547,25 @@ def review_validation_sample(
     min_proxy_event_types: int = 2,
     min_trigger_btc_risk_buckets: int = 2,
 ) -> EventFadeValidationReview:
-    """Summarize manual labels/outcomes and promotion blockers."""
+    """Summarize manual review status, labels, outcomes, and promotion blockers."""
     data = [dict(row) for row in rows]
-    reviewed = [row for row in data if _label(row)]
+    missing_review_status_rows = sum(
+        1 for row in data if _label(row) and _review_status(row) != "reviewed"
+    )
+    missing_human_label_rows = sum(
+        1 for row in data if _review_status(row) == "reviewed" and not _label(row)
+    )
+    unknown_label_rows = sum(
+        1
+        for row in data
+        if _label(row) and _label(row) not in KNOWN_LABELS
+    )
+    reviewed = [
+        row
+        for row in data
+        if _review_status(row) == "reviewed" and _label(row) in KNOWN_LABELS
+    ]
     label_counts = _label_counts(reviewed)
-    unknown_label_rows = sum(1 for row in reviewed if _label(row) not in KNOWN_LABELS)
     schema_mismatches = sum(
         1
         for row in data
@@ -616,7 +633,15 @@ def review_validation_sample(
     if schema_mismatches:
         blockers.append(f"{schema_mismatches} row(s) have an unknown schema_version")
     if unknown_label_rows:
-        blockers.append(f"{unknown_label_rows} reviewed row(s) use unknown human_label values")
+        blockers.append(f"{unknown_label_rows} labeled row(s) use unknown human_label values")
+    if missing_review_status_rows:
+        blockers.append(
+            f"{missing_review_status_rows} labeled row(s) are missing review_status=reviewed"
+        )
+    if missing_human_label_rows:
+        blockers.append(
+            f"{missing_human_label_rows} reviewed row(s) are missing human_label"
+        )
     if len(reviewed_proxy) < min_proxy_candidates:
         blockers.append(
             f"reviewed proxy candidates {len(reviewed_proxy)}/{min_proxy_candidates}"
@@ -700,6 +725,8 @@ def review_validation_sample(
         total_rows=len(data),
         reviewed_rows=len(reviewed),
         unlabeled_rows=len(data) - len(reviewed),
+        missing_review_status_rows=missing_review_status_rows,
+        missing_human_label_rows=missing_human_label_rows,
         schema_mismatches=schema_mismatches,
         unknown_label_rows=unknown_label_rows,
         label_counts=label_counts,
@@ -747,7 +774,10 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         "=" * 78,
         "EVENT FADE VALIDATION SAMPLE REVIEW (research-only; no alerts, DB writes, paper trades, or orders)",
         "=" * 78,
-        f"Rows: {review.total_rows} · reviewed: {review.reviewed_rows} · unlabeled: {review.unlabeled_rows}",
+        (
+            f"Rows: {review.total_rows} · reviewed: {review.reviewed_rows} · "
+            f"unreviewed/incomplete: {review.unlabeled_rows}"
+        ),
         (
             "Coverage: "
             f"proxy={review.reviewed_proxy_candidates}/{review.min_proxy_candidates} · "
@@ -783,6 +813,8 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
             f"negative rows={review.negative_trigger_latency_rows}"
         ),
         f"  direct/non-proxy SHORT_TRIGGERED rows: {review.direct_or_nonproxy_triggered}",
+        f"  labeled rows missing review_status=reviewed: {review.missing_review_status_rows}",
+        f"  reviewed rows missing human_label: {review.missing_human_label_rows}",
         f"  point-in-time evidence violations: {review.point_in_time_violation_rows}",
         f"  rows with post-decision source evidence: {review.post_decision_source_rows}",
         "",
@@ -838,7 +870,16 @@ def validation_review_next_steps(review: EventFadeValidationReview) -> tuple[str
         )
     if review.unknown_label_rows:
         steps.append(
-            f"Fix {review.unknown_label_rows} reviewed row(s) with unknown human_label values."
+            f"Fix {review.unknown_label_rows} labeled row(s) with unknown human_label values."
+        )
+    if review.missing_review_status_rows:
+        steps.append(
+            f"Set review_status=reviewed for {review.missing_review_status_rows} labeled row(s), "
+            "or clear labels that are not fully reviewed."
+        )
+    if review.missing_human_label_rows:
+        steps.append(
+            f"Fill human_label for {review.missing_human_label_rows} row(s) marked reviewed."
         )
     if review.point_in_time_violation_rows:
         steps.append(
@@ -1245,12 +1286,28 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
             priority=0,
             category="fix_unknown_label",
             suggested_label=", ".join(sorted(KNOWN_LABELS)),
-            missing_fields=(),
+            missing_fields=("human_label",),
+        )
+    if _review_status(row) == "reviewed" and not label:
+        return _queue_item(
+            row,
+            priority=1,
+            category="fill_review_label",
+            suggested_label=_suggested_label(row),
+            missing_fields=("human_label",),
+        )
+    if label and _review_status(row) != "reviewed":
+        return _queue_item(
+            row,
+            priority=2,
+            category="mark_reviewed_status",
+            suggested_label=label,
+            missing_fields=("review_status",),
         )
     if label and _point_in_time_violation(row):
         return _queue_item(
             row,
-            priority=1,
+            priority=3,
             category="fix_point_in_time_evidence",
             suggested_label=label,
             missing_fields=(),
@@ -1258,7 +1315,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if label and _post_decision_source(row):
         return _queue_item(
             row,
-            priority=2,
+            priority=4,
             category="review_post_decision_source",
             suggested_label=label,
             missing_fields=(),
@@ -1266,7 +1323,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if triggered and not label:
         return _queue_item(
             row,
-            priority=3,
+            priority=5,
             category="label_triggered_candidate",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label", *missing_required_outcomes),
@@ -1274,7 +1331,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if triggered and missing_required_outcomes:
         return _queue_item(
             row,
-            priority=4,
+            priority=6,
             category="fill_trigger_outcomes",
             suggested_label=label or _suggested_label(row),
             missing_fields=missing_required_outcomes,
@@ -1282,7 +1339,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_proxy_candidate(row):
         return _queue_item(
             row,
-            priority=5,
+            priority=7,
             category="label_proxy_candidate",
             suggested_label="valid_proxy_fade or false_positive",
             missing_fields=("human_label",),
@@ -1290,7 +1347,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_direct_or_ambiguous(row):
         return _queue_item(
             row,
-            priority=6,
+            priority=8,
             category="label_negative_control",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label",),
@@ -1362,6 +1419,10 @@ def _parse_csv_cell(value: str | None) -> Any:
 
 def _label(row: Mapping[str, Any]) -> str:
     return str(row.get("human_label") or "").strip()
+
+
+def _review_status(row: Mapping[str, Any]) -> str:
+    return str(row.get("review_status") or "").strip().casefold()
 
 
 def _signal_type(row: Mapping[str, Any]) -> str:
