@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Harden event-fade validation promotion blockers · Codex
+**Why:** The review command summarized labels/outcomes, but it could still mark
+a tiny or point-in-time-invalid sample as ready if thresholds were lowered. The
+Pro plan explicitly requires point-in-time correctness and stronger evidence
+before any promotion discussion.
+**Changes:**
+- Strengthened `event_validation.review_validation_sample()` with default
+  blockers for fewer than 10 reviewed `SHORT_TRIGGERED` rows, trigger precision
+  below 60%, MFE/MAE below 1.5, and source evidence first seen after the
+  decision time.
+- The review report now prints reviewed trigger minimums, minimum precision,
+  point-in-time violation counts, and minimum MFE/MAE.
+- Added a regression test proving a bad labeled trigger is blocked for late
+  evidence, false-positive label, weak MFE/MAE, and unfavorable 72h short
+  return.
+- Updated `AGENTS.md` and `research/event_discovery_design.md` with the stricter
+  review criteria.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 181/181.
+`git diff --check` passes. `make verify` passes.
+**Notes/risks:** This still only affects local validation review. It does not
+route alerts, write live storage, open paper trades, or imply execution.
+
 ## 2026-06-16 — Add event-fade validation review metrics · Codex
 **Why:** The validation exporter produced review artifacts, but the plan also
 needs a way to evaluate labeled samples against promotion criteria before any

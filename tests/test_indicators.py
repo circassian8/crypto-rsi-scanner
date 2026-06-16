@@ -1447,7 +1447,7 @@ def test_event_fade_validation_review_blocks_unlabeled_export():
     assert review.promotion_ready is False
     assert "reviewed proxy candidates 0/25" in review.promotion_blockers
     assert "reviewed direct/ambiguous controls 0/50" in review.promotion_blockers
-    assert "no reviewed SHORT_TRIGGERED candidates" in review.promotion_blockers
+    assert "reviewed SHORT_TRIGGERED candidates 0/10" in review.promotion_blockers
 
     report = event_validation.format_validation_review(review)
     assert "EVENT FADE VALIDATION SAMPLE REVIEW" in report
@@ -1491,6 +1491,9 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
         rows,
         min_proxy_candidates=3,
         min_negative_controls=3,
+        min_triggered_reviewed=1,
+        min_trigger_precision=0.90,
+        min_mfe_mae_ratio=2.0,
     )
     assert review.promotion_ready is True
     assert review.reviewed_rows == 6
@@ -1506,6 +1509,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert review.avg_mae == 0.08
     assert round(review.mfe_mae_ratio, 2) == 5.25
     assert review.avg_post_event_return_72h == -0.22
+    assert review.point_in_time_violation_rows == 0
     assert review.promotion_blockers == ()
 
     report = event_validation.format_validation_review(review)
@@ -1524,12 +1528,49 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
             loaded_jsonl,
             min_proxy_candidates=3,
             min_negative_controls=3,
+            min_triggered_reviewed=1,
+            min_trigger_precision=0.90,
+            min_mfe_mae_ratio=2.0,
         ).promotion_ready
         assert event_validation.review_validation_sample(
             loaded_csv,
             min_proxy_candidates=3,
             min_negative_controls=3,
+            min_triggered_reviewed=1,
+            min_trigger_precision=0.90,
+            min_mfe_mae_ratio=2.0,
         ).promotion_ready
+
+
+def test_event_fade_validation_review_blocks_late_or_weak_trigger_evidence():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+    triggered["human_label"] = "false_positive"
+    triggered["first_seen_time"] = "2026-06-14T00:00:00+00:00"
+    triggered["fetched_at_min"] = "2026-06-14T00:00:00+00:00"
+    triggered["published_at_min"] = "2026-06-14T00:00:00+00:00"
+    triggered["trigger_observed_at"] = "2026-06-13T12:00:00+00:00"
+    triggered["max_favorable_excursion"] = 0.03
+    triggered["max_adverse_excursion"] = 0.08
+    triggered["post_event_return_72h"] = 0.04
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=1,
+        min_negative_controls=0,
+        min_triggered_reviewed=1,
+        min_trigger_precision=0.60,
+        min_mfe_mae_ratio=1.5,
+    )
+    assert review.promotion_ready is False
+    assert review.trigger_precision == 0.0
+    assert review.point_in_time_violation_rows == 1
+    assert any("trigger precision 0.0% below 60.0%" == blocker for blocker in review.promotion_blockers)
+    assert any("evidence first seen after the decision time" in blocker for blocker in review.promotion_blockers)
+    assert any("MFE/MAE 0.38 below 1.50" == blocker for blocker in review.promotion_blockers)
+    assert "reviewed SHORT_TRIGGERED rows do not show favorable 72h short returns" in review.promotion_blockers
 
 
 def test_event_discovery_scanner_report_uses_local_fixtures():

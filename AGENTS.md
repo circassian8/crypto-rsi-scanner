@@ -202,9 +202,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   fixture evidence takes precedence over provider rows.
 - Event-fade validation review is research-only. `main.py --event-fade-review-sample`
   may read labeled JSONL/CSV sample artifacts and print coverage, trigger
-  precision, MFE/MAE, post-event returns, and promotion blockers, but it must
-  not automatically promote alerts, write live storage, open paper trades, or
-  imply execution.
+  precision, point-in-time violations, MFE/MAE, post-event returns, and
+  promotion blockers, but it must not automatically promote alerts, write live
+  storage, open paper trades, or imply execution.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.
@@ -298,8 +298,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   source evidence, point-in-time timestamps, link/classifier evidence, fade
   features, missing-data fields, and blank human-review/outcome columns.
   `main.py --event-fade-review-sample PATH` reads labeled sample artifacts and
-  reports sample coverage, trigger precision, false-positive rate, MFE/MAE,
-  post-event returns, and blockers such as too few reviewed proxy/control cases.
+  reports sample coverage, reviewed trigger count, trigger precision,
+  false-positive rate, point-in-time evidence violations, MFE/MAE, post-event
+  returns, and blockers such as too few reviewed proxy/control/trigger cases or
+  weak edge-quality metrics.
   No network event/news/derivatives/supply providers, cache writes, live DB
   writes, notifications, or paper trades are enabled.
 - Caveats: the plain Binance backtest path is survivorship-biased (today's

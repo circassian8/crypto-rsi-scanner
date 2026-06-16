@@ -261,11 +261,16 @@ The reviewer currently checks:
 - reviewed direct/ambiguous control count against the 50-case minimum target
 - label counts for `valid_proxy_fade`, `false_positive`, `direct_event`, and
   `ambiguous`
-- reviewed `SHORT_TRIGGERED` precision and false-positive rate
+- reviewed `SHORT_TRIGGERED` count against the 10-trigger minimum target
+- reviewed `SHORT_TRIGGERED` precision against the 60% minimum target and
+  false-positive rate
 - direct/non-proxy rows that somehow became `SHORT_TRIGGERED`
+- point-in-time evidence violations where the source was first seen after the
+  decision time
 - average MFE, MAE, MFE/MAE ratio, and post-event 24h/72h/7d returns for
   reviewed triggered rows
 - missing required outcome fields on reviewed triggered rows
+- MFE/MAE ratio against the 1.5 minimum target
 
 The command prints `BLOCKED` until coverage and outcome evidence are strong
 enough. Even when it prints `READY FOR HUMAN DECISION`, the repo decision still
