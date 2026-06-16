@@ -349,7 +349,8 @@ DB rows, send alerts, open paper trades, or imply execution.
 `main.py --event-fade-merge-sample FRESH REVIEWED OUT` preserves human work when
 the discovery export is regenerated. It reads a fresh JSONL/CSV export and a
 previously reviewed JSONL/CSV sample, matches rows by stable event id, asset id,
-and relationship type, then copies nonblank review fields into the fresh rows:
+and relationship type, then copies nonblank review fields into the fresh rows
+only when the validation evidence fingerprint is unchanged:
 
 - `review_status`
 - `human_label`
@@ -361,8 +362,11 @@ and relationship type, then copies nonblank review fields into the fresh rows:
 - `post_event_return_7d`
 
 The merge writes only the requested `OUT` artifact and reports matched/unmatched
-reviewed rows. It does not change live storage, routing, paper trades, or event
-state.
+reviewed rows, evidence-changed matched rows, and copied fields. Evidence-changed
+rows intentionally remain unreviewed so they return to the labeling queue instead
+of carrying stale human labels or outcomes. The compact review-template apply
+path performs the same check against the evidence fields present in the sidecar.
+Neither command changes live storage, routing, paper trades, or event state.
 
 ## Validation Price Fixture Export
 

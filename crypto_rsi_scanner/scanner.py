@@ -1352,6 +1352,7 @@ def event_fade_apply_review_template(
     print(
         "Event-fade review template apply: "
         f"{result.matched_rows} matched row(s), "
+        f"{result.evidence_changed_rows} evidence-changed row(s), "
         f"{result.unmatched_reviewed_rows} unmatched reviewed row(s), "
         f"{result.copied_fields} copied field(s), wrote {len(result.rows)} row(s) to {out}"
     )
@@ -1610,6 +1611,7 @@ def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, 
     print(
         "Event-fade validation sample merge: "
         f"{result.matched_rows} matched row(s), "
+        f"{result.evidence_changed_rows} evidence-changed row(s), "
         f"{result.unmatched_reviewed_rows} unmatched reviewed row(s), "
         f"{result.copied_fields} copied field(s), wrote {len(result.rows)} row(s) to {out}"
     )

@@ -2611,6 +2611,7 @@ def test_event_fade_validation_merge_preserves_review_fields():
     assert result.fresh_rows == len(fresh)
     assert result.reviewed_rows == len(reviewed)
     assert result.matched_rows == 1
+    assert result.evidence_changed_rows == 0
     assert result.unmatched_reviewed_rows == 1
     assert result.copied_fields == 8
 
@@ -2621,6 +2622,31 @@ def test_event_fade_validation_merge_preserves_review_fields():
     assert merged["post_event_return_72h"] == -0.22
     other = next(row for row in result.rows if row["asset_symbol"] == "TESTPUMP")
     assert other["human_label"] == ""
+
+
+def test_event_fade_validation_merge_skips_changed_evidence():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    fresh = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    reviewed = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    fresh_row = next(row for row in fresh if row["asset_symbol"] == "TESTVELVET")
+    source = next(row for row in reviewed if row["asset_symbol"] == "TESTVELVET")
+    source["review_status"] = "reviewed"
+    source["human_label"] = "valid_proxy_fade"
+    source["human_notes"] = "Reviewed original source evidence."
+    source["post_event_return_72h"] = -0.22
+    fresh_row["raw_content_hashes"] = ["changed-source-hash"]
+
+    result = event_validation.merge_review_fields(fresh, reviewed)
+    assert result.matched_rows == 1
+    assert result.evidence_changed_rows == 1
+    assert result.copied_fields == 0
+
+    merged = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
+    assert merged["review_status"] == ""
+    assert merged["human_label"] == ""
+    assert merged["human_notes"] == ""
+    assert merged["post_event_return_72h"] is None
 
 
 def test_event_fade_validation_outcome_fill_from_local_prices():
@@ -2769,6 +2795,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     template_rows[0]["post_event_return_72h"] = -0.21
     result = event_validation.apply_review_template(rows, template_rows)
     assert result.matched_rows == 1
+    assert result.evidence_changed_rows == 0
     assert result.copied_fields == 4
     velvet = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
     assert velvet["review_status"] == "reviewed"
@@ -2786,6 +2813,26 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
         assert csv_rows[0]["asset_symbol"] == "TESTVELVET"
         assert csv_rows[0]["missing_fields"][0] == "human_label"
         assert jsonl_rows[0]["asset_symbol"] == "TESTVELVET"
+
+
+def test_event_fade_validation_review_template_skips_changed_sidecar_evidence():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    template_rows = event_validation.build_review_template_rows(rows, limit=1)
+    template_rows[0]["review_status"] = "reviewed"
+    template_rows[0]["human_label"] = "valid_proxy_fade"
+    template_rows[0]["human_notes"] = "Reviewed compact source evidence."
+    sample_row = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+    sample_row["source_urls"] = ["https://example.test/changed-source"]
+
+    result = event_validation.apply_review_template(rows, template_rows)
+    assert result.matched_rows == 1
+    assert result.evidence_changed_rows == 1
+    assert result.copied_fields == 0
+    velvet = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
+    assert velvet["review_status"] == ""
+    assert velvet["human_label"] == ""
 
 
 def test_event_fade_validation_labeling_queue_flags_reviewed_trigger_outcomes():
@@ -3417,6 +3464,7 @@ def test_event_fade_review_template_scanner_exports_and_applies_sidecar():
         text = out.getvalue()
         assert "Event-fade review template apply" in text
         assert "1 matched row(s)" in text
+        assert "0 evidence-changed row(s)" in text
         assert "EVENT FADE VALIDATION SAMPLE REVIEW" in text
         assert "Rows: 17" in text
         assert "reviewed: 1" in text
@@ -3600,6 +3648,7 @@ def test_event_fade_merge_sample_scanner_writes_merged_jsonl():
             scanner.event_fade_merge_sample(str(fresh_path), str(reviewed_path), str(merged_path))
         text = out.getvalue()
         assert "matched row(s)" in text
+        assert "0 evidence-changed row(s)" in text
         rows = [json.loads(line) for line in merged_path.read_text(encoding="utf-8").splitlines()]
         velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
         assert velvet["human_label"] == "valid_proxy_fade"

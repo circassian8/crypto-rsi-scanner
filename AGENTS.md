@@ -284,8 +284,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   --event-fade-export-review-template SAMPLE OUT` may write compact editable
   sidecar rows, and `main.py --event-fade-apply-review-template SAMPLE TEMPLATE
   OUT` may copy nonblank human labels/notes/outcomes from that sidecar into a
-  validation-sample artifact. They must not infer labels, write live storage,
-  route alerts, open paper trades, or imply promotion.
+  validation-sample artifact only when the sidecar evidence fields still match
+  the sample row. They must not infer labels, write live storage, route alerts,
+  open paper trades, or imply promotion.
 - Event-fade validation review bundles are artifact-only. `main.py
   --event-fade-review-bundle SAMPLE OUT_DIR` may copy the sample and write local
   review aids under `OUT_DIR`; with `--event-fade-review-bundle-prices` it may
@@ -294,8 +295,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   live storage, route alerts, open paper trades, or imply promotion.
 - Event-fade validation merges are artifact-only. `main.py --event-fade-merge-sample`
   may copy nonblank human labels/notes/outcomes from a previously reviewed
-  JSONL/CSV sample into a fresh export by event/asset/relationship identity, but
-  it must only write the requested output artifact.
+  JSONL/CSV sample into a fresh export by event/asset/relationship identity only
+  when the validation evidence fingerprint is unchanged. Evidence-changed rows
+  must remain unreviewed so they return to the labeling queue. The command must
+  only write the requested output artifact.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.

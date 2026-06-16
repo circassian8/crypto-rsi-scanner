@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from .event_discovery import VALIDATION_SAMPLE_SCHEMA_VERSION
+from .event_discovery import VALIDATION_SAMPLE_FIELDS, VALIDATION_SAMPLE_SCHEMA_VERSION
 
 
 POSITIVE_LABEL = "valid_proxy_fade"
@@ -49,6 +49,10 @@ REVIEW_FIELDS = (
     "event_time_post_event_return_24h",
     "event_time_post_event_return_72h",
     "event_time_post_event_return_7d",
+)
+REVIEW_MERGE_IGNORED_FIELDS = frozenset({"exported_at", *REVIEW_FIELDS})
+REVIEW_EVIDENCE_FIELDS = tuple(
+    field for field in VALIDATION_SAMPLE_FIELDS if field not in REVIEW_MERGE_IGNORED_FIELDS
 )
 REVIEW_TEMPLATE_FIELDS = (
     "event_id",
@@ -84,6 +88,16 @@ REVIEW_TEMPLATE_FIELDS = (
     "event_time_post_event_return_24h",
     "event_time_post_event_return_72h",
     "event_time_post_event_return_7d",
+)
+REVIEW_TEMPLATE_DERIVED_FIELDS = frozenset({
+    "queue_category",
+    "suggested_label",
+    "missing_fields",
+})
+REVIEW_TEMPLATE_EVIDENCE_FIELDS = tuple(
+    field
+    for field in REVIEW_TEMPLATE_FIELDS
+    if field not in REVIEW_MERGE_IGNORED_FIELDS and field not in REVIEW_TEMPLATE_DERIVED_FIELDS
 )
 OUTCOME_FIELDS = (
     "max_adverse_excursion",
@@ -194,6 +208,7 @@ class ValidationSampleMergeResult:
     fresh_rows: int
     reviewed_rows: int
     matched_rows: int
+    evidence_changed_rows: int
     unmatched_reviewed_rows: int
     copied_fields: int
 
@@ -344,15 +359,26 @@ def merge_review_fields(
     fresh_rows: Iterable[Mapping[str, Any]],
     reviewed_rows: Iterable[Mapping[str, Any]],
 ) -> ValidationSampleMergeResult:
-    """Copy human review status, labels, and outcomes from older rows into fresh rows."""
+    """Copy human review fields only when the row's evidence fingerprint is unchanged."""
+    return _merge_review_fields(fresh_rows, reviewed_rows, evidence_fields=REVIEW_EVIDENCE_FIELDS)
+
+
+def _merge_review_fields(
+    fresh_rows: Iterable[Mapping[str, Any]],
+    reviewed_rows: Iterable[Mapping[str, Any]],
+    *,
+    evidence_fields: Iterable[str],
+) -> ValidationSampleMergeResult:
     fresh = [dict(row) for row in fresh_rows]
     reviewed = [dict(row) for row in reviewed_rows]
+    evidence_field_tuple = tuple(evidence_fields)
     reviewed_by_key = {
         key: row
         for row in reviewed
         if (key := _sample_key(row)) is not None and _has_review_data(row)
     }
     matched_keys: set[tuple[str, str, str]] = set()
+    evidence_changed = 0
     copied_fields = 0
     merged: list[dict[str, Any]] = []
     for row in fresh:
@@ -361,6 +387,10 @@ def merge_review_fields(
         source = reviewed_by_key.get(key) if key is not None else None
         if source is not None:
             matched_keys.add(key)
+            if _review_evidence_changed(out, source, evidence_field_tuple):
+                evidence_changed += 1
+                merged.append(out)
+                continue
             for field in REVIEW_FIELDS:
                 value = source.get(field)
                 if _has_value(value):
@@ -372,6 +402,7 @@ def merge_review_fields(
         fresh_rows=len(fresh),
         reviewed_rows=len(reviewed),
         matched_rows=len(matched_keys),
+        evidence_changed_rows=evidence_changed,
         unmatched_reviewed_rows=max(0, len(reviewed_by_key) - len(matched_keys)),
         copied_fields=copied_fields,
     )
@@ -460,7 +491,11 @@ def apply_review_template(
     reviewed_template_rows: Iterable[Mapping[str, Any]],
 ) -> ValidationSampleMergeResult:
     """Copy human review fields from a compact sidecar into validation rows."""
-    return merge_review_fields(sample_rows, reviewed_template_rows)
+    return _merge_review_fields(
+        sample_rows,
+        reviewed_template_rows,
+        evidence_fields=REVIEW_TEMPLATE_EVIDENCE_FIELDS,
+    )
 
 
 def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
@@ -1464,6 +1499,66 @@ def _sample_key(row: Mapping[str, Any]) -> tuple[str, str, str] | None:
 
 def _has_review_data(row: Mapping[str, Any]) -> bool:
     return any(_has_value(row.get(field)) for field in REVIEW_FIELDS)
+
+
+def _review_evidence_changed(
+    fresh: Mapping[str, Any],
+    reviewed: Mapping[str, Any],
+    evidence_fields: Iterable[str],
+) -> bool:
+    return _review_evidence_fingerprint(fresh, evidence_fields) != _review_evidence_fingerprint(
+        reviewed,
+        evidence_fields,
+    )
+
+
+def _review_evidence_fingerprint(
+    row: Mapping[str, Any],
+    evidence_fields: Iterable[str],
+) -> tuple[tuple[str, str], ...]:
+    return tuple((field, _fingerprint_value(row.get(field))) for field in evidence_fields)
+
+
+def _fingerprint_value(value: object) -> str:
+    normalized = _fingerprint_normalized(value)
+    return json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+
+
+def _fingerprint_normalized(value: object) -> object:
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        raw = value.strip()
+        if raw == "":
+            return None
+        if raw in {"True", "true"}:
+            return True
+        if raw in {"False", "false"}:
+            return False
+        if raw.startswith(("{", "[")):
+            try:
+                return _fingerprint_normalized(json.loads(raw))
+            except json.JSONDecodeError:
+                return raw
+        return raw
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return format(value, ".12g")
+    if isinstance(value, Mapping):
+        return {
+            str(key): _fingerprint_normalized(nested)
+            for key, nested in sorted(value.items(), key=lambda item: str(item[0]))
+        }
+    if isinstance(value, (list, tuple, set)):
+        normalized = [_fingerprint_normalized(item) for item in value]
+        return sorted(
+            normalized,
+            key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")),
+        )
+    return str(value).strip()
 
 
 def _has_value(value: object) -> bool:

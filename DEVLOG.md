@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Guard event-fade review merges against evidence drift · Codex
+**Why:** Review labels and outcome fields are only valid for the evidence the
+human actually reviewed. A regenerated validation sample could previously carry
+old labels/outcomes forward by event/asset identity even if the source,
+classifier, timing, or signal evidence changed.
+**Changes:**
+- Added validation-sample evidence fingerprints to
+  `crypto_rsi_scanner/event_validation.py`; full sample merges now copy review
+  fields only when the evidence fingerprint is unchanged.
+- Kept compact review-template application separate, with a narrower evidence
+  check against the sidecar fields it actually contains.
+- Updated scanner merge/apply output to report evidence-changed matched rows.
+- Added regression tests for unchanged merges, changed-evidence merge skips, and
+  changed-evidence sidecar skips.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the new merge rule.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 220/220.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** Evidence-changed rows intentionally remain unreviewed so they
+return to the labeling queue. This is artifact-only validation hardening; it
+does not change event discovery, event-fade scoring, alert routing, live
+storage, or paper trading.
+
 ## 2026-06-16 — Block reviewed event-fade rows missing source timing · Codex
 **Why:** Point-in-time validation can catch late source evidence, but a reviewed
 row with no source timestamps at all was effectively unaudited. The validation
