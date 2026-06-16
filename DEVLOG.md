@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade review-cycle make target · Codex
+**Why:** The validation-sample workflow depends on refreshing the observational
+event cache and then building a cache-backed review bundle from that same cache.
+The Makefile let those steps use different cache dirs when `EVENT_DISCOVERY_CACHE_DIR`
+was overridden, which could silently hand off stale or missing rows.
+**Changes:**
+- `make event-discovery-refresh` and `make event-discovery-binance-listen` now
+  pass `EVENT_DISCOVERY_CACHE_DIR` through to `RSI_EVENT_DISCOVERY_CACHE_DIR`.
+- Added `make event-fade-review-cycle`, which runs the fixture-backed cache
+  refresh and cache-backed review-bundle export with the same cache directory.
+- Updated Make help, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the review-cycle workflow.
+**Verify:** `make event-fade-review-cycle EVENT_DISCOVERY_CACHE_DIR=/tmp/event_fade_cycle_cache EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_cycle_bundle EVENT_FADE_QUEUE_LIMIT=2`
+wrote 17 cached candidate snapshots and a 17-row review bundle from the same
+cache. `.venv/bin/python tests/test_indicators.py` passes 216/216. `make verify`
+passes, including tests, alert render smoke, backtest fixture smoke, and paper
+scoreboard.
+**Notes/risks:** This remains research-only and artifact-only. The new target
+uses checked-in fixtures by default, respects the configured cache dir, and does
+not route alerts, write live storage, infer labels, or open paper trades.
+
 ## 2026-06-16 — Print validation review after sidecar apply · Codex
 **Why:** The manual event-fade review loop wrote a reviewed sample after applying
 the editable sidecar, but it still required a separate `--event-fade-review-sample`

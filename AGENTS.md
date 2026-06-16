@@ -426,7 +426,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   queue, packet, template, review report, manifest, README, and optional
   outcome-filled sample into one local review workspace. `main.py
   --event-fade-cache-review-bundle OUT_DIR` builds the same workspace directly
-  from latest cached candidate snapshots.
+  from latest cached candidate snapshots. `make event-fade-review-cycle` runs
+  the fixture-backed cache refresh and cache review-bundle export with the same
+  `EVENT_DISCOVERY_CACHE_DIR`.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,

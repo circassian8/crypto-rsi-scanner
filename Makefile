@@ -19,7 +19,7 @@ EVENT_FADE_OUTCOME_PRICES_OUT ?= /tmp/event_fade_outcome_prices.json
 EVENT_FADE_PRICE_DAYS ?= 30
 EVENT_FADE_PRICE_FIXTURE_DIR ?= fixtures/event_discovery/outcome_klines
 
-.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-refresh event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-refresh event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -46,6 +46,7 @@ help:
 	@echo "  make event-fade-apply-review-template  Apply edited review sidecar to sample"
 	@echo "  make event-fade-review-bundle  Write manual review workspace"
 	@echo "  make event-fade-cache-review-bundle  Write manual review workspace from cache"
+	@echo "  make event-fade-review-cycle  Refresh research cache and write review workspace"
 	@echo "  make event-fade-merge-sample  Preserve review status/labels/outcomes in fresh sample"
 	@echo "  make event-fade-export-outcome-prices  Build local validation price fixture"
 	@echo "  make event-fade-fill-outcomes  Fill validation outcomes from local prices"
@@ -114,6 +115,7 @@ event-discovery-report:
 	$(PYTHON) main.py --event-discovery-report
 
 event-discovery-refresh:
+	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
 	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
 	RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH=fixtures/event_discovery/binance_announcements.json \
 	RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH=fixtures/event_discovery/bybit_announcements.json \
@@ -136,6 +138,7 @@ event-discovery-refresh:
 	$(PYTHON) main.py --event-discovery-refresh
 
 event-discovery-binance-listen:
+	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
 	$(PYTHON) main.py --event-discovery-binance-listen
 
 event-fade-auto-report:
@@ -207,6 +210,10 @@ event-fade-review-bundle:
 event-fade-cache-review-bundle:
 	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
 	$(PYTHON) main.py --event-fade-cache-review-bundle $(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),)
+
+event-fade-review-cycle:
+	$(MAKE) event-discovery-refresh EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR)
+	$(MAKE) event-fade-cache-review-bundle EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=$(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) EVENT_FADE_QUEUE_LIMIT=$(EVENT_FADE_QUEUE_LIMIT) EVENT_FADE_REVIEW_BUNDLE_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_PRICES)
 
 event-fade-merge-sample:
 	$(PYTHON) main.py --event-fade-merge-sample $(EVENT_FADE_SAMPLE_FRESH) $(EVENT_FADE_SAMPLE_REVIEWED) $(EVENT_FADE_SAMPLE_MERGED)

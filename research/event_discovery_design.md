@@ -524,6 +524,9 @@ running `main.py --event-discovery-refresh`, because it avoids the extra
 export-sample step and keeps the review bundle tied to the point-in-time cache.
 It writes only under `OUT_DIR`.
 
+`make event-fade-review-cycle` runs the fixture-backed cache refresh and then
+writes the cache-backed review bundle using the same `EVENT_DISCOVERY_CACHE_DIR`.
+
 ## Validation Sample Review
 
 `main.py --event-fade-review-sample PATH` reads a labeled JSONL/CSV validation
@@ -887,6 +890,17 @@ EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_cache_review_bundle \
 EVENT_FADE_REVIEW_BUNDLE_PRICES=/path/to/outcome_prices.json \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-cache-review-bundle
+```
+
+Refresh the fixture-backed research cache and write the review bundle in one
+step:
+
+```bash
+make event-fade-review-cycle
+EVENT_DISCOVERY_CACHE_DIR=event_fade_cache \
+EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_cache_review_bundle \
+EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-review-cycle
 ```
 
 Preserve review status/labels/outcomes across a refreshed export:
