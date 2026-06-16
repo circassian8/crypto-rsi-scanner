@@ -313,9 +313,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   open paper trades, or imply execution.
 - Event-fade validation labeling queues are artifact-only. `main.py
   --event-fade-labeling-queue` may prioritize unlabeled proxy/control rows and
-  reviewed triggered rows missing required outcomes, source-timing review, or
-  explicit review status/labels, but it must not auto-label rows, modify sample
-  files, write storage, route alerts, open paper trades, or imply promotion.
+  reviewed triggered rows missing required outcomes, source-timing review,
+  low-confidence event-time confirmation, or explicit review status/labels. The
+  queue surfaces event-time source/confidence and ranks higher-confidence
+  explicit event times before weaker source-text dates inside the same review
+  bucket, but it must not auto-label rows, modify sample files, write storage,
+  route alerts, open paper trades, or imply promotion.
 - Event-fade validation review packets are artifact-only. `main.py
   --event-fade-review-packet SAMPLE OUT` may write a Markdown packet for manual
   validation review, but it must not auto-label rows, modify the source sample,

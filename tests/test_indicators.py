@@ -3433,6 +3433,8 @@ def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
     first = queue.items[0]
     assert first.asset_symbol == "TESTVELVET"
     assert first.category == "label_triggered_candidate"
+    assert first.event_time_source == "explicit"
+    assert first.event_time_confidence == 1.0
     assert first.suggested_label == "valid_proxy_fade or false_positive"
     assert first.missing_fields == (
         "human_label",
@@ -3450,7 +3452,93 @@ def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
     assert "needing labels/status/outcomes: 17" in report
     assert "label_triggered_candidate" in report
     assert "TESTVELVET" in report
+    assert "source: explicit" in report
+    assert "confidence: 100.0%" in report
     assert "valid_proxy_fade or false_positive" in report
+
+
+def test_event_fade_validation_labeling_queue_flags_low_confidence_trigger_time():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    prices = event_validation.load_outcome_price_fixture(_outcome_prices_fixture_path())
+    filled = event_validation.fill_validation_outcomes(rows, prices)
+    triggered = next(row for row in filled.rows if row["asset_symbol"] == "TESTVELVET")
+    triggered["human_label"] = "valid_proxy_fade"
+    triggered["review_status"] = "reviewed"
+    triggered["event_time_source"] = "text_date"
+    triggered["event_time_confidence"] = 0.60
+
+    queue = event_validation.build_labeling_queue(filled.rows)
+    item = next(item for item in queue.items if item.asset_symbol == "TESTVELVET")
+    assert item.category == "confirm_trigger_event_time"
+    assert item.suggested_label == "valid_proxy_fade"
+    assert item.missing_fields == ("event_time_source", "event_time_confidence")
+    assert item.event_time_source == "text_date"
+    assert item.event_time_confidence == 0.60
+
+    report = event_validation.format_labeling_queue(queue)
+    assert "confirm_trigger_event_time" in report
+    assert "source: text_date" in report
+    assert "confidence: 60.0%" in report
+
+    template_rows = event_validation.build_review_template_rows(filled.rows, limit=1)
+    assert template_rows[0]["asset_symbol"] == "TESTVELVET"
+    assert template_rows[0]["queue_category"] == "confirm_trigger_event_time"
+
+
+def test_event_fade_validation_labeling_queue_prefers_explicit_event_times():
+    from crypto_rsi_scanner import event_validation
+
+    rows = [
+        {
+            "event_id": "event-text-date",
+            "asset_symbol": "TEXTDATE",
+            "asset_coin_id": "textdate",
+            "event_name": "Text Date Proxy",
+            "relationship_type": "proxy_exposure",
+            "signal_type": "NO_TRADE",
+            "event_time": "2026-06-10T00:00:00+00:00",
+            "event_time_source": "text_date",
+            "event_time_confidence": 0.60,
+            "is_proxy_narrative": True,
+            "is_direct_beneficiary": False,
+        },
+        {
+            "event_id": "event-missing-time",
+            "asset_symbol": "MISSINGTIME",
+            "asset_coin_id": "missingtime",
+            "event_name": "Missing Time Proxy",
+            "relationship_type": "proxy_exposure",
+            "signal_type": "NO_TRADE",
+            "event_time": "",
+            "event_time_source": "",
+            "event_time_confidence": None,
+            "is_proxy_narrative": True,
+            "is_direct_beneficiary": False,
+        },
+        {
+            "event_id": "event-explicit",
+            "asset_symbol": "EXPLICIT",
+            "asset_coin_id": "explicit",
+            "event_name": "Explicit Proxy",
+            "relationship_type": "proxy_exposure",
+            "signal_type": "NO_TRADE",
+            "event_time": "2026-06-20T00:00:00+00:00",
+            "event_time_source": "explicit",
+            "event_time_confidence": 1.0,
+            "is_proxy_narrative": True,
+            "is_direct_beneficiary": False,
+        },
+    ]
+
+    queue = event_validation.build_labeling_queue(rows)
+    assert [item.asset_symbol for item in queue.items] == [
+        "EXPLICIT",
+        "TEXTDATE",
+        "MISSINGTIME",
+    ]
+    assert all(item.category == "label_proxy_candidate" for item in queue.items)
 
 
 def test_event_fade_validation_review_packet_formats_human_evidence():

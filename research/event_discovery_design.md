@@ -948,6 +948,13 @@ use the event-time-source section to verify that triggered evidence is not
 dominated by lower-confidence `text_date` rows before treating the sample as
 promotion evidence.
 
+Labeling queues and review templates surface the same event-time source and
+confidence. Reviewed `SHORT_TRIGGERED` rows with low event-time confidence return
+to the queue as `confirm_trigger_event_time` even if labels and outcomes are
+already filled, and same-priority review rows are ordered so explicit,
+high-confidence event times come before weaker source-text dates or missing
+times.
+
 Review bundles also write a compact sample summary into `manifest.json` and
 `README.md`: event types, relationship types, asset roles, signal types, source
 providers, proxy candidate count, proxy-context control count, direct

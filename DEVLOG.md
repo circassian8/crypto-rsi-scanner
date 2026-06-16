@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Surface event-time confirmation in validation queue · Codex
+**Why:** Low-confidence trigger event times already block promotion, but the
+labeling queue could still treat a triggered row as complete once labels and
+outcomes were filled. Reviewers need that timing issue surfaced as concrete
+queue work.
+**Changes:**
+- Added event-time source/confidence to validation labeling queue items and
+  formatted queue output.
+- Added a `confirm_trigger_event_time` queue category for reviewed
+  `SHORT_TRIGGERED` rows below the event-time confidence threshold.
+- Reused one queue sort key for labeling queues, review packets, and review
+  templates, ranking explicit/high-confidence event times before weaker
+  source-text or missing event times inside the same review bucket.
+- Added regression coverage for low-confidence triggered rows and same-priority
+  event-time quality ordering.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+**Verify:** `make verify` passes, including 242/242 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This is artifact-only review workflow behavior. It does not
+change event discovery, event-fade scoring, alert routing, paper trades, live
+storage, or promotion thresholds.
+
 ## 2026-06-16 — Gate validation on event-time confidence · Codex
 **Why:** Source-text date inference is useful for review, but a validation
 sample should not become promotion-ready when triggered examples rely on weak

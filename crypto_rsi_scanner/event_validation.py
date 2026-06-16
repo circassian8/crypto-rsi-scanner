@@ -19,6 +19,7 @@ from .event_discovery import VALIDATION_SAMPLE_FIELDS, VALIDATION_SAMPLE_SCHEMA_
 
 
 POSITIVE_LABEL = "valid_proxy_fade"
+DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE = 0.80
 KNOWN_LABELS = frozenset({
     POSITIVE_LABEL,
     "false_positive",
@@ -247,6 +248,8 @@ class ValidationLabelingQueueItem:
     relationship_type: str
     signal_type: str
     event_time: str | None
+    event_time_source: str
+    event_time_confidence: float | None
     trigger_observed_at: str | None
     human_label: str
     suggested_label: str
@@ -443,12 +446,7 @@ def build_labeling_queue(
     items = [_labeling_queue_item(row) for row in data]
     needed = sorted(
         (item for item in items if item is not None),
-        key=lambda item: (
-            item.priority,
-            item.event_time or "",
-            item.asset_symbol,
-            item.event_name,
-        ),
+        key=_labeling_queue_sort_key,
     )
     shown = needed[: max(0, limit)] if limit is not None else needed
     return ValidationLabelingQueue(
@@ -568,6 +566,8 @@ def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
     for idx, item in enumerate(queue.items, 1):
         missing = ", ".join(item.missing_fields) if item.missing_fields else "review required"
         event_time = item.event_time or "unknown"
+        event_time_source = item.event_time_source or "unknown"
+        event_time_confidence = _fmt_pct(item.event_time_confidence)
         trigger_time = item.trigger_observed_at or "n/a"
         label = item.human_label or "unlabeled"
         rows.append(
@@ -575,7 +575,10 @@ def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
             f"signal={item.signal_type or 'NO_TRADE'} · rel={item.relationship_type}"
         )
         rows.append(f"   event: {item.event_name}")
-        rows.append(f"   event_time: {event_time} · trigger: {trigger_time}")
+        rows.append(
+            f"   event_time: {event_time} · source: {event_time_source} · "
+            f"confidence: {event_time_confidence} · trigger: {trigger_time}"
+        )
         rows.append(
             f"   label: {label} · suggested: {item.suggested_label} · missing: {missing}"
         )
@@ -629,7 +632,7 @@ def review_validation_sample(
     min_triggered_reviewed: int = 10,
     min_trigger_precision: float = 0.60,
     min_mfe_mae_ratio: float = 1.50,
-    min_trigger_event_time_confidence: float = 0.80,
+    min_trigger_event_time_confidence: float = DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE,
     min_proxy_event_types: int = 2,
     min_trigger_btc_risk_buckets: int = 2,
 ) -> EventFadeValidationReview:
@@ -1108,12 +1111,7 @@ def _review_packet_items(
         if item is not None:
             pairs.append((item, row))
     pairs.sort(
-        key=lambda pair: (
-            pair[0].priority,
-            pair[0].event_time or "",
-            pair[0].asset_symbol,
-            pair[0].event_name,
-        )
+        key=lambda pair: _labeling_queue_sort_key(pair[0])
     )
     return pairs[: max(0, limit)] if limit is not None else pairs
 
@@ -1459,10 +1457,18 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
             suggested_label=label,
             missing_fields=("first_seen_time", "raw_published_at", "raw_fetched_at"),
         )
-    if triggered and not label:
+    if label and triggered and _trigger_event_time_needs_confirmation(row):
         return _queue_item(
             row,
             priority=6,
+            category="confirm_trigger_event_time",
+            suggested_label=label,
+            missing_fields=("event_time_source", "event_time_confidence"),
+        )
+    if triggered and not label:
+        return _queue_item(
+            row,
+            priority=7,
             category="label_triggered_candidate",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label", *missing_required_outcomes),
@@ -1470,7 +1476,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if triggered and missing_required_outcomes:
         return _queue_item(
             row,
-            priority=7,
+            priority=8,
             category="fill_trigger_outcomes",
             suggested_label=label or _suggested_label(row),
             missing_fields=missing_required_outcomes,
@@ -1478,7 +1484,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_proxy_candidate(row):
         return _queue_item(
             row,
-            priority=8,
+            priority=9,
             category="label_proxy_candidate",
             suggested_label="valid_proxy_fade or false_positive",
             missing_fields=("human_label",),
@@ -1486,7 +1492,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_direct_or_ambiguous(row):
         return _queue_item(
             row,
-            priority=9,
+            priority=10,
             category="label_negative_control",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label",),
@@ -1512,12 +1518,47 @@ def _queue_item(
         relationship_type=str(row.get("relationship_type") or ""),
         signal_type=_signal_type(row),
         event_time=_string_or_none(row.get("event_time")),
+        event_time_source=str(row.get("event_time_source") or ""),
+        event_time_confidence=_num(row.get("event_time_confidence")),
         trigger_observed_at=_string_or_none(row.get("trigger_observed_at")),
         human_label=_label(row),
         suggested_label=suggested_label,
         missing_fields=missing_fields,
         source_urls=tuple(str(value) for value in _list_values(row.get("source_urls")) if value),
     )
+
+
+def _trigger_event_time_needs_confirmation(row: Mapping[str, Any]) -> bool:
+    if _signal_type(row) != "SHORT_TRIGGERED":
+        return False
+    confidence = _num(row.get("event_time_confidence")) or 0.0
+    return confidence < DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE
+
+
+def _labeling_queue_sort_key(
+    item: ValidationLabelingQueueItem,
+) -> tuple[int, int, float, str, str, str]:
+    return (
+        item.priority,
+        _event_time_quality_rank(item),
+        -(item.event_time_confidence or 0.0),
+        item.event_time or "",
+        item.asset_symbol,
+        item.event_name,
+    )
+
+
+def _event_time_quality_rank(item: ValidationLabelingQueueItem) -> int:
+    if not item.event_time:
+        return 4
+    confidence = item.event_time_confidence
+    if confidence is None:
+        return 3
+    if item.event_time_source == "explicit" and confidence >= DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE:
+        return 0
+    if confidence >= DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE:
+        return 1
+    return 2
 
 
 def _suggested_label(row: Mapping[str, Any]) -> str:
