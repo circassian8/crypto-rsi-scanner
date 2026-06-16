@@ -294,6 +294,9 @@ runs the discovery pipeline, and appends local JSONL artifacts under
 `RSI_EVENT_DISCOVERY_CACHE_DIR` (`event_fade_cache` by default, gitignored).
 The cache preserves point-in-time evidence for review and future backtests. It
 does not write SQLite, live signal/outcome/paper tables, Telegram, or orders.
+`main.py --event-discovery-status` prints a redacted readiness report for event
+sources and enrichment providers. Use it before a configured-source refresh; an
+enrichment-only setup is not enough to build validation rows.
 `make event-discovery-refresh` is fixture-backed for deterministic local smoke
 work; `make event-discovery-refresh-configured` avoids Makefile fixture
 injection and uses only sources configured through the environment/`.env`.
@@ -809,6 +812,18 @@ RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
 
 The live RSS path fetches only explicit feed URLs, parses RSS and Atom entries,
 reuses the same news parser as fixtures, and remains research-only/fail-soft.
+
+Inspect configured provider readiness without printing secrets:
+
+```bash
+make event-discovery-status
+.venv/bin/python main.py --event-discovery-status --json
+```
+
+The status report separates event sources from enrichment. At least one event
+source must be ready before `make event-fade-configured-review-cycle` can
+produce review rows; universe, derivatives, or supply enrichment alone cannot
+create events.
 
 Write the local observational JSONL cache with the fixture set:
 

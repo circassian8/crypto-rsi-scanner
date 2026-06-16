@@ -93,7 +93,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   configured event-discovery sources and append research-only JSONL cache
   artifacts under `RSI_EVENT_DISCOVERY_CACHE_DIR`; no live DB writes; use
   `make event-discovery-refresh-configured` when you want the Makefile to avoid
-  injecting fixture paths) ·
+  injecting fixture paths) · `main.py --event-discovery-status` (redacted
+  source/enrichment readiness report; use before configured-source cycles to
+  catch missing provider flags/keys without printing secrets) ·
   `main.py --event-discovery-binance-listen` (listen to Binance's signed CMS
   WebSocket for the configured window and append raw research cache evidence
   only; no live DB writes) ·
@@ -457,7 +459,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   event/news/derivatives/supply providers,
   live DB writes, notifications, or paper trades
   are enabled. `main.py --event-discovery-refresh` can write the local
-  observational JSONL cache only. Bybit listings/perp listings are direct events
+  observational JSONL cache only. `main.py --event-discovery-status` prints
+  redacted provider readiness and treats enrichment-only configuration as not
+  ready for the configured review cycle. Bybit listings/perp listings are direct events
   and must remain `NO_TRADE` unless separate evidence proves a true proxy
   relationship.
 - Caveats: the plain Binance backtest path is survivorship-biased (today's
@@ -475,7 +479,9 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
 3. Confirm the 2026-06-09 state-slice candidates via cached PIT/live data before any
    live conviction or routing change.
-4. Use `main.py --event-fade-export-sample PATH` to build a manually reviewed
+4. Use `main.py --event-discovery-status` to confirm at least one real event
+   source is ready, then use the configured-source review cycle or
+   `main.py --event-fade-export-sample PATH` to build a manually reviewed
    event-fade sample from discovery fixtures, use
    `main.py --event-fade-merge-sample FRESH REVIEWED OUT` to preserve prior
    review status/labels/outcomes across refreshes, use

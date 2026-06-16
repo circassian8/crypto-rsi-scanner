@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-discovery provider readiness report · Codex
+**Why:** The configured-source review cycle can only build real validation rows
+when at least one event source is enabled. On the current local config, no event
+sources are ready, so the workflow needed a redacted preflight that catches
+that state instead of letting an empty refresh look useful.
+**Changes:**
+- Added `crypto_rsi_scanner/event_provider_status.py` with a pure readiness
+  report that separates event sources from enrichment and never prints secret
+  values.
+- Added `main.py --event-discovery-status` plus `make event-discovery-status`
+  for human/agent preflight before configured-source cache refreshes.
+- Reused the same readiness logic in scanner event-discovery guards, so
+  enrichment-only configuration no longer counts as a valid event source.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the provider-status workflow.
+**Verify:** `.venv/bin/python main.py --event-discovery-status` and `--json`
+show the current local state with 0/11 event sources ready and no secret values.
+`make -n event-discovery-status` expands to the expected CLI.
+`main.py --event-discovery-refresh` now prints the no-source readiness message
+instead of running an empty refresh. `make verify` passes, including 225/225
+tests, alert render smoke, backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This is still research-only workflow support. The current
+machine has no configured event sources enabled; the next validation progress
+requires enabling at least one research event source before running
+`make event-fade-configured-review-cycle`.
+
 ## 2026-06-16 — Add configured event-fade review cycle · Codex
 **Why:** The one-command review cycle was fixture-backed, which is correct for
 deterministic smoke work but not enough for collecting real event-fade

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -29,7 +30,7 @@ from crypto_rsi_scanner.indicators import (
     wilder_rsi,
 )
 from crypto_rsi_scanner.scanner import classify_tier
-from crypto_rsi_scanner import formatting
+from crypto_rsi_scanner import event_provider_status, formatting
 
 
 def test_rsi_bounds():
@@ -236,6 +237,86 @@ def test_divergence_bearish():
 
 
 # --- event-fade research sleeve ---------------------------------------------
+
+def _event_provider_status_cfg(**overrides):
+    values = {
+        "EVENT_DISCOVERY_MODE": "research_only",
+        "EVENT_DISCOVERY_CACHE_DIR": "/tmp/event_fade_cache",
+        "EVENT_DISCOVERY_LOOKBACK_HOURS": 72,
+        "EVENT_DISCOVERY_HORIZON_DAYS": 14,
+        "EVENT_DISCOVERY_EVENTS_PATH": None,
+        "EVENT_DISCOVERY_ALIASES_PATH": "fixtures/event_discovery/asset_aliases.json",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH": None,
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE": False,
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY": "",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET": "",
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH": None,
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE": False,
+        "EVENT_DISCOVERY_COINMARKETCAL_PATH": None,
+        "EVENT_DISCOVERY_TOKENOMIST_PATH": None,
+        "EVENT_DISCOVERY_CRYPTOPANIC_PATH": None,
+        "EVENT_DISCOVERY_CRYPTOPANIC_LIVE": False,
+        "EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN": "",
+        "EVENT_DISCOVERY_GDELT_PATH": None,
+        "EVENT_DISCOVERY_GDELT_LIVE": False,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH": None,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": False,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS": (),
+        "EVENT_DISCOVERY_EXTERNAL_IPO_PATH": None,
+        "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH": None,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH": None,
+        "EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH": None,
+        "EVENT_DISCOVERY_COINALYZE_LIVE": False,
+        "EVENT_DISCOVERY_COINALYZE_API_KEY": "",
+        "EVENT_DISCOVERY_COINALYZE_SYMBOLS": (),
+        "EVENT_DISCOVERY_COINALYZE_AUTO_SYMBOLS": True,
+        "EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH": None,
+        "EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH": None,
+        "EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH": None,
+        "EVENT_DISCOVERY_DUNE_SUPPLY_PATH": None,
+        "EVENT_DISCOVERY_UNIVERSE_PATH": None,
+        "EVENT_DISCOVERY_UNIVERSE_LIVE": False,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def test_event_provider_status_blocks_enrichment_only_config():
+    cfg = _event_provider_status_cfg(
+        EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH="fixtures/event_discovery/coinalyze_derivatives.json",
+        EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH="fixtures/event_discovery/tokenomist_supply.json",
+    )
+    report = event_provider_status.build_event_discovery_provider_status(cfg)
+    text = event_provider_status.format_event_discovery_provider_status(report)
+    as_dict = event_provider_status.provider_status_to_dict(report)
+
+    assert report.ready_event_source_count == 0
+    assert report.ready_enrichment_count >= 3  # aliases plus the two explicit fixtures
+    assert not report.ready_for_configured_review_cycle
+    assert "No event sources are ready" in text
+    assert "configured review cycle ready: no" in text
+    assert as_dict["ready_for_configured_review_cycle"] is False
+
+
+def test_event_provider_status_ready_with_live_source_and_redacted_credentials():
+    cfg = _event_provider_status_cfg(
+        EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE=True,
+        EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY="secret-key",
+        EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET="secret-value",
+        EVENT_DISCOVERY_CRYPTOPANIC_LIVE=True,
+    )
+    report = event_provider_status.build_event_discovery_provider_status(cfg)
+    text = event_provider_status.format_event_discovery_provider_status(report)
+
+    assert report.ready_event_source_count == 1
+    assert report.ready_for_configured_review_cycle
+    assert "binance_announcements" in text
+    assert "api_key=present" in text
+    assert "api_secret=present" in text
+    assert "secret-key" not in text
+    assert "secret-value" not in text
+    assert "CryptoPanic live mode is enabled but the API token is missing" in text
+
 
 def _event_fade_velvet_candidate(now=None, *, direct=False, no_event_time=False, btc_risk_on=35):
     from datetime import datetime, timezone, timedelta

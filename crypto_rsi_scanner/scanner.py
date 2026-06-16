@@ -62,6 +62,7 @@ from . import paper
 from . import event_fade
 from . import event_cache
 from . import event_discovery
+from . import event_provider_status
 from . import event_price_history
 from . import event_validation
 from .event_models import EventDiscoveryResult
@@ -1043,30 +1044,9 @@ def event_fade_report(verbose: bool = False) -> None:
 
 
 def _event_discovery_paths_configured() -> bool:
-    paths = (
-        config.EVENT_DISCOVERY_EVENTS_PATH,
-        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
-        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE,
-        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
-        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE,
-        config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
-        config.EVENT_DISCOVERY_TOKENOMIST_PATH,
-        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
-        config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
-        config.EVENT_DISCOVERY_GDELT_PATH,
-        config.EVENT_DISCOVERY_GDELT_LIVE,
-        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
-        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE,
-        config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH,
-        config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH,
-        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
-        config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
-        config.EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH,
-        config.EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH,
-        config.EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH,
-        config.EVENT_DISCOVERY_DUNE_SUPPLY_PATH,
-    )
-    return any(paths)
+    return event_provider_status.build_event_discovery_provider_status(
+        config
+    ).ready_for_configured_review_cycle
 
 
 def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResult:
@@ -1157,12 +1137,22 @@ def event_discovery_report(verbose: bool = False) -> None:
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
         print(
-            "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
-            "or another event-discovery fixture path, or opt into a live research provider."
+            "No event-discovery sources ready. Set RSI_EVENT_DISCOVERY_EVENTS_PATH, "
+            "another event-discovery fixture path, or opt into a live research provider. "
+            "Run --event-discovery-status for a redacted readiness report."
         )
         return
     result = _event_discovery_result_from_config()
     print(event_discovery.format_discovery_report(result))
+
+
+def event_discovery_status(json_output: bool = False) -> None:
+    """Print redacted readiness for research-only event-discovery providers."""
+    status_report = event_provider_status.build_event_discovery_provider_status(config)
+    if json_output:
+        print(json.dumps(event_provider_status.provider_status_to_dict(status_report), indent=2, sort_keys=True))
+    else:
+        print(event_provider_status.format_event_discovery_provider_status(status_report))
 
 
 def event_discovery_refresh(verbose: bool = False) -> None:
@@ -1170,8 +1160,9 @@ def event_discovery_refresh(verbose: bool = False) -> None:
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
         print(
-            "No event-discovery sources configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
-            "or another event-discovery fixture path, or opt into a live research provider."
+            "No event-discovery sources ready. Set RSI_EVENT_DISCOVERY_EVENTS_PATH, "
+            "another event-discovery fixture path, or opt into a live research provider. "
+            "Run --event-discovery-status for a redacted readiness report."
         )
         return
     result = _event_discovery_result_from_config()
@@ -1232,8 +1223,9 @@ def event_fade_auto_report(verbose: bool = False) -> None:
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
         print(
-            "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
-            "or another event-discovery fixture path, or opt into a live research provider."
+            "No event-discovery sources ready. Set RSI_EVENT_DISCOVERY_EVENTS_PATH, "
+            "another event-discovery fixture path, or opt into a live research provider. "
+            "Run --event-discovery-status for a redacted readiness report."
         )
         return
     result = _event_discovery_result_from_config()
@@ -1245,8 +1237,9 @@ def event_fade_export_sample(path: str, verbose: bool = False) -> None:
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
         print(
-            "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
-            "or another event-discovery fixture path, or opt into a live research provider."
+            "No event-discovery sources ready. Set RSI_EVENT_DISCOVERY_EVENTS_PATH, "
+            "another event-discovery fixture path, or opt into a live research provider. "
+            "Run --event-discovery-status for a redacted readiness report."
         )
         return
     result = _event_discovery_result_from_config()
@@ -2115,6 +2108,11 @@ def cli() -> None:
         help="Fetch configured event-discovery sources and append research-only JSONL cache artifacts.",
     )
     parser.add_argument(
+        "--event-discovery-status",
+        action="store_true",
+        help="Print redacted readiness for research-only event-discovery providers.",
+    )
+    parser.add_argument(
         "--event-discovery-binance-listen",
         action="store_true",
         help="Listen briefly to live Binance announcements and append raw research JSONL cache artifacts.",
@@ -2328,6 +2326,9 @@ def cli() -> None:
         return
     if args.event_discovery_refresh:
         event_discovery_refresh(verbose=args.verbose)
+        return
+    if args.event_discovery_status:
+        event_discovery_status(json_output=args.json)
         return
     if args.event_discovery_binance_listen:
         event_discovery_binance_listen(verbose=args.verbose)
