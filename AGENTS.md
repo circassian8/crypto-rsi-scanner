@@ -457,9 +457,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   false-positive rate, trigger latency, point-in-time evidence violations,
   post-decision source evidence,
   MFE/MAE, post-event returns, event-time short baseline comparison,
-  event-type/relationship/BTC-risk cohorts, and blockers such as too few
-  reviewed proxy/control/trigger cases, too-narrow event/BTC-risk diversity, or
-  weak edge-quality metrics. It also prints concrete next-sample work so the
+  event-type/relationship/asset-role/BTC-risk cohorts, and blockers such as too
+  few reviewed proxy/control/trigger cases, too-narrow event/BTC-risk diversity,
+  or weak edge-quality metrics. It also prints concrete next-sample work so the
   reviewer knows which cases, labels, statuses, or outcomes to add next.
   `main.py --event-fade-labeling-queue PATH`
   prioritizes the next rows to label, rows missing explicit review status, and

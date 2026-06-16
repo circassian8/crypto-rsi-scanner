@@ -885,6 +885,11 @@ and review packets so reviewers can separate actual proxy instruments/venues
 from background mentions, infrastructure rows, and ticker-word collisions.
 Provider/network failures remain warnings in `discovery_runs.jsonl`.
 
+Validation review reports include asset-role cohorts alongside event-type,
+relationship, and BTC-risk cohorts. Use the asset-role section to verify that
+reviewed proxy rows are not dominated by `mentioned_asset`, `infrastructure`, or
+`ticker_word_collision` controls before treating the sample as evidence.
+
 Inspect configured provider readiness without printing secrets:
 
 ```bash

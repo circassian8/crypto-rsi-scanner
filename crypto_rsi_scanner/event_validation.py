@@ -185,6 +185,7 @@ class EventFadeValidationReview:
     triggered_btc_risk_buckets: int
     event_type_cohorts: tuple["ValidationCohort", ...]
     relationship_type_cohorts: tuple["ValidationCohort", ...]
+    asset_role_cohorts: tuple["ValidationCohort", ...]
     btc_risk_cohorts: tuple["ValidationCohort", ...]
     promotion_blockers: tuple[str, ...]
 
@@ -803,6 +804,7 @@ def review_validation_sample(
         data,
         lambda row: str(row.get("relationship_type") or "unknown"),
     )
+    asset_role_cohorts = _cohorts(data, lambda row: str(row.get("asset_role") or "unknown"))
     btc_risk_cohorts = _cohorts(data, _btc_risk_bucket)
 
     return EventFadeValidationReview(
@@ -849,6 +851,7 @@ def review_validation_sample(
         triggered_btc_risk_buckets=triggered_btc_risk_buckets,
         event_type_cohorts=event_type_cohorts,
         relationship_type_cohorts=relationship_type_cohorts,
+        asset_role_cohorts=asset_role_cohorts,
         btc_risk_cohorts=btc_risk_cohorts,
         promotion_blockers=tuple(blockers),
     )
@@ -930,6 +933,8 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         *_format_cohort_lines(review.event_type_cohorts),
         "  By relationship type:",
         *_format_cohort_lines(review.relationship_type_cohorts),
+        "  By asset role:",
+        *_format_cohort_lines(review.asset_role_cohorts),
         "  By BTC risk bucket:",
         *_format_cohort_lines(review.btc_risk_cohorts),
         "",

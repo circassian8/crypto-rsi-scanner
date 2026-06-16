@@ -2881,6 +2881,11 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert relationship_cohorts["direct_listing"].reviewed_negative_controls == 1
     assert relationship_cohorts["ambiguous"].reviewed_negative_controls == 1
 
+    asset_role_cohorts = {cohort.name: cohort for cohort in review.asset_role_cohorts}
+    assert asset_role_cohorts["proxy_instrument"].reviewed_proxy_candidates == 3
+    assert asset_role_cohorts["direct_beneficiary"].reviewed_negative_controls == 2
+    assert asset_role_cohorts["ambiguous"].reviewed_negative_controls == 1
+
     btc_cohorts = {cohort.name: cohort for cohort in review.btc_risk_cohorts}
     assert btc_cohorts["btc_risk_neutral"].triggered_reviewed == 1
     assert btc_cohorts["btc_risk_unknown"].reviewed_negative_controls == 2
@@ -2903,6 +2908,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "COHORTS" in report
     assert "By event type:" in report
     assert "ipo_proxy" in report
+    assert "By asset role:" in report
+    assert "proxy_instrument" in report
     assert "By BTC risk bucket:" in report
 
     with tempfile.TemporaryDirectory() as tmp:

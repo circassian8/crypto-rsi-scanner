@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add asset-role cohorts to event-fade review reports · Codex
+**Why:** Asset-role classification made public RSS samples cleaner, but the
+review summary still only grouped by event type, relationship type, and BTC
+risk. Reviewers need to see whether the sample is dominated by real proxy
+instruments/venues or by context-control rows.
+**Changes:**
+- Added `asset_role_cohorts` to the validation review model and formatted review
+  report.
+- Kept the cohort behavior aligned with the existing event-type, relationship,
+  and BTC-risk cohort metrics.
+- Added regression coverage that reviewed rows are counted by asset role and
+  that the report includes the `By asset role` section.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the asset-role cohort workflow.
+**Verify:** `make verify` passes, including 234/234 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard. A local review of
+`/tmp/event_fade_role_rss_bundle/validation_sample.jsonl` prints the new
+`By asset role` section with `proxy_venue` and `proxy_instrument` rows.
+**Notes/risks:** This is read-only validation reporting. It does not change
+classification, event-fade scoring, alerts, paper trades, or live storage.
+
 ## 2026-06-16 — Add event-discovery asset-role classification · Codex
 **Why:** The public RSS bundle started surfacing proxy-style rows, but it still
 treated background mentions and infrastructure rows inside SpaceX/HYPE articles
