@@ -94,10 +94,16 @@ Current files:
 ## Universe Integration
 
 Manual aliases remain the safest way to resolve one-off proxy tokens and known
-test cases. `RSI_EVENT_DISCOVERY_UNIVERSE_PATH` can additionally point to a
-CoinGecko-style market fixture, either a `top_markets.json` file or a directory
-containing that file. The provider applies `universe.filter_markets_with_audit`
-before producing `DiscoveredAsset` rows, so stablecoins, wrapped/staked receipts,
+project aliases, but they are high-confidence resolver evidence and must be
+curated carefully. The runtime default alias file is
+`event_discovery_aliases.json`, which starts empty. Fixture aliases live in
+`fixtures/event_discovery/asset_aliases.json` and are explicitly injected by
+fixture Make targets only; do not use them for real-source review cycles or they
+will create fake `TEST*` candidates. `RSI_EVENT_DISCOVERY_UNIVERSE_PATH` can
+additionally point to a CoinGecko-style market fixture, either a
+`top_markets.json` file or a directory containing that file. The provider
+applies `universe.filter_markets_with_audit` before producing `DiscoveredAsset`
+rows, so stablecoins, wrapped/staked receipts,
 synthetics, bad identity rows, and low-quality market rows are screened by the
 same logic used by live scans and backtests.
 
@@ -660,7 +666,8 @@ more dangerous than missed setups.
 ## Fixture Coverage
 
 `fixtures/event_discovery/raw_events.json` and
-`fixtures/event_discovery/asset_aliases.json` cover:
+`fixtures/event_discovery/asset_aliases.json` cover deterministic test assets
+only:
 
 - TESTVELVET + SpaceX IPO proxy article
 - TESTBTC + BTC ETF direct-beneficiary article

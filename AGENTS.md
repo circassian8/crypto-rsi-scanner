@@ -252,6 +252,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   reports/exports/cache refreshes, not live routing. Event discovery must not
   write live signal/outcome/paper tables or route notifications.
   Ticker-only/ambiguous asset matches must stay below trigger confidence.
+  The default manual alias file is `event_discovery_aliases.json`; fixture
+  aliases in `fixtures/event_discovery/asset_aliases.json` are for fixture
+  targets/tests only and must not pollute real-source review cycles.
   Provider enrichment is evidence, not eligibility; raw reviewed fixture
   evidence takes precedence over provider rows.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When

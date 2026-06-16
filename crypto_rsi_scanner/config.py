@@ -191,7 +191,7 @@ EVENT_DISCOVERY_MODE = os.getenv("RSI_EVENT_DISCOVERY_MODE", "research_only")
 _EVENT_DISCOVERY_EVENTS_PATH_RAW = os.getenv("RSI_EVENT_DISCOVERY_EVENTS_PATH", "")
 _EVENT_DISCOVERY_ALIASES_PATH_RAW = os.getenv(
     "RSI_EVENT_DISCOVERY_ALIASES_PATH",
-    "fixtures/event_discovery/asset_aliases.json",
+    "event_discovery_aliases.json",
 )
 _EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH_RAW = os.getenv(
     "RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH",

@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Keep fixture aliases out of real event-discovery cycles · Codex
+**Why:** The first public-RSS review bundle worked, but it exposed a serious
+validation-sample contamination issue: the default alias file was the fixture
+alias file, so real RSS rows produced fake `TESTBTC` candidates alongside real
+BTC candidates.
+**Changes:**
+- Changed the runtime default `RSI_EVENT_DISCOVERY_ALIASES_PATH` to the neutral
+  checked-in `event_discovery_aliases.json`, which starts empty for real
+  research sources.
+- Explicitly injected `fixtures/event_discovery/asset_aliases.json` only in
+  fixture-backed Make targets.
+- Added a regression test that `make event-discovery-refresh-public-rss` does
+  not inject the fixture alias file.
+- Updated `.env.example`, `AGENTS.md`, and
+  `research/event_discovery_design.md` to distinguish curated runtime aliases
+  from fixture aliases.
+**Verify:** A fresh no-key public RSS refresh into
+`/tmp/event_fade_public_rss_cache2` collected 55 raw RSS events and produced 48
+candidate snapshots; the resulting review sample had zero `TEST*` asset
+symbols. `make verify` passes, including 231/231 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** The neutral alias file is intentionally empty. Real one-off
+proxy tokens still need curated aliases added there or a clean CoinGecko
+universe match; fixture aliases remain available for deterministic tests and
+fixture reports only.
+
 ## 2026-06-16 — Add no-key public RSS review cycle · Codex
 **Why:** The configured event-fade review cycle still had no ready event source
 on this machine, so the validation workflow needed a credential-free way to

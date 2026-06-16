@@ -359,6 +359,21 @@ def test_config_load_url_list_dedupes_comments_and_inline_notes():
     assert urls == ("https://example.test/rss", "https://example.test/atom")
 
 
+def test_public_rss_make_target_does_not_inject_fixture_aliases():
+    import subprocess
+
+    result = subprocess.run(
+        ["make", "-n", "event-discovery-refresh-public-rss"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH=fixtures/event_discovery/public_rss_feeds.txt" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1" in result.stdout
+    assert "fixtures/event_discovery/asset_aliases.json" not in result.stdout
+
+
 def _event_fade_velvet_candidate(now=None, *, direct=False, no_event_time=False, btc_risk_on=35):
     from datetime import datetime, timezone, timedelta
     from crypto_rsi_scanner import event_fade as ef
