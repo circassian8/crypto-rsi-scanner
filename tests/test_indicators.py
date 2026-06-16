@@ -410,6 +410,23 @@ def test_polymarket_make_target_uses_live_prediction_market_source():
     assert "event-fade-cache-review-bundle" in result.stdout
 
 
+def test_no_key_make_target_combines_public_rss_and_polymarket_sources():
+    import subprocess
+
+    result = subprocess.run(
+        ["make", "-n", "event-fade-no-key-review-cycle"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "event-discovery-refresh-public-rss" in result.stdout
+    assert "event-discovery-refresh-polymarket" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1" in result.stdout
+    assert "event-fade-cache-review-bundle" in result.stdout
+
+
 def _event_fade_velvet_candidate(now=None, *, direct=False, no_event_time=False, btc_risk_on=35):
     from datetime import datetime, timezone, timedelta
     from crypto_rsi_scanner import event_fade as ef
@@ -4213,9 +4230,14 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert manifest["sample_summary"]["short_triggered_rows"] == 1
         assert manifest["sample_summary"]["asset_roles"]["proxy_instrument"] == 6
         assert manifest["sample_summary"]["source_providers"]["manual_json"] == 5
+        assert manifest["sample_summary"]["source_provider_summary"]["manual_json"]["rows"] == 5
+        assert manifest["sample_summary"]["source_provider_summary"]["manual_json"]["short_triggered_rows"] == 1
+        assert manifest["sample_summary"]["source_provider_summary"]["cryptopanic"]["direct_beneficiaries"] == 2
         assert "Sample summary:" in readme
         assert "Proxy candidates: 6" in readme
         assert "Asset roles: direct_beneficiary=9, proxy_instrument=6, ambiguous=2" in readme
+        assert "Source provider detail:" in readme
+        assert "manual_json: rows=5, proxy=1, direct=3, triggered=1, missing_time=1" in readme
 
         packet = (bundle_dir / "review_packet.md").read_text(encoding="utf-8")
         assert "## 1. TESTVELVET - SpaceX IPO trading start" in packet
@@ -4426,6 +4448,7 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
             assert manifest["outcome_fill"]["prices_path"] == str(_outcome_prices_fixture_path())
             assert manifest["sample_summary"]["rows"] == 17
             assert manifest["sample_summary"]["asset_roles"]["proxy_instrument"] == 6
+            assert manifest["sample_summary"]["source_provider_summary"]["manual_json"]["short_triggered_rows"] == 1
 
             template_text = (bundle_dir / "review_template.csv").read_text(encoding="utf-8")
             template_rows = list(csv.DictReader(template_text.splitlines()))
@@ -4469,6 +4492,7 @@ def test_event_fade_cache_review_bundle_warns_on_empty_cache():
             assert manifest["source"]["review_rows"] == 0
             assert manifest["sample_summary"]["rows"] == 0
             assert manifest["sample_summary"]["asset_roles"] == {}
+            assert manifest["sample_summary"]["source_provider_summary"] == {}
             assert manifest["warnings"]
             assert "No validation rows were available" in manifest["warnings"][0]
 

@@ -106,7 +106,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `make event-discovery-refresh-polymarket` / `make
   event-fade-polymarket-review-cycle` (opt-in no-key Polymarket Gamma dated
   catalyst source with optional live CoinGecko universe enrichment; research
-  cache/review artifacts only) ·
+  cache/review artifacts only) · `make event-fade-no-key-review-cycle` (runs
+  public RSS and Polymarket refreshes into the same cache, then writes one
+  mixed-source review bundle) ·
   `main.py --event-discovery-binance-listen` (listen to Binance's signed CMS
   WebSocket for the configured window and append raw research cache evidence
   only; no live DB writes) ·
@@ -485,7 +487,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   --event-fade-cache-review-bundle OUT_DIR` builds the same workspace directly
   from latest cached candidate snapshots. The manifest/README summary includes
   event type, relationship, asset role, signal type, source-provider, proxy,
-  direct, trigger, and missing-event-time counts. Empty bundles warn in CLI output,
+  direct, trigger, missing-event-time, and per-source provider quality counts.
+  Empty bundles warn in CLI output,
   README, and manifest when no validation rows were produced. `make event-fade-review-cycle` runs
   the fixture-backed cache refresh and cache review-bundle export with the same
   `EVENT_DISCOVERY_CACHE_DIR`; `make event-fade-configured-review-cycle` runs
@@ -500,6 +503,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `make event-fade-polymarket-review-cycle` is the no-key convenience path for
   Polymarket Gamma dated catalyst events. It defaults to live CoinGecko universe
   enrichment and writes only research cache/review artifacts.
+  `make event-fade-no-key-review-cycle` runs public RSS and Polymarket into the
+  same cache before writing a single mixed-source review bundle.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,

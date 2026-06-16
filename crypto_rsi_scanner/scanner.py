@@ -1883,6 +1883,7 @@ def _event_fade_review_merge_manifest(
 
 def _event_fade_review_sample_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Build compact sample-quality counts for review bundle manifests/READMEs."""
+    source_provider_summary = _event_fade_review_source_provider_summary(rows)
     return {
         "rows": len(rows),
         "review_status": _count_values(row.get("review_status") or "missing" for row in rows),
@@ -1902,7 +1903,41 @@ def _event_fade_review_sample_summary(rows: list[dict[str, Any]]) -> dict[str, A
         "eligible_rows": sum(1 for row in rows if _bundle_bool(row.get("eligible"))),
         "short_triggered_rows": sum(1 for row in rows if row.get("signal_type") == "SHORT_TRIGGERED"),
         "missing_event_time_rows": sum(1 for row in rows if not row.get("event_time")),
+        "source_provider_summary": source_provider_summary,
     }
+
+
+def _event_fade_review_source_provider_summary(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    summary: dict[str, dict[str, int]] = {}
+    for row in rows:
+        providers = _bundle_list_values(row.get("raw_providers")) or _bundle_list_values(row.get("source")) or ["unknown"]
+        for provider in providers:
+            bucket = summary.setdefault(provider, {
+                "rows": 0,
+                "proxy_candidates": 0,
+                "proxy_context_controls": 0,
+                "direct_beneficiaries": 0,
+                "eligible_rows": 0,
+                "short_triggered_rows": 0,
+                "missing_event_time_rows": 0,
+            })
+            bucket["rows"] += 1
+            if _bundle_bool(row.get("is_proxy_narrative")):
+                bucket["proxy_candidates"] += 1
+            if row.get("relationship_type") == "proxy_context":
+                bucket["proxy_context_controls"] += 1
+            if _bundle_bool(row.get("is_direct_beneficiary")):
+                bucket["direct_beneficiaries"] += 1
+            if _bundle_bool(row.get("eligible")):
+                bucket["eligible_rows"] += 1
+            if row.get("signal_type") == "SHORT_TRIGGERED":
+                bucket["short_triggered_rows"] += 1
+            if not row.get("event_time"):
+                bucket["missing_event_time_rows"] += 1
+    return dict(sorted(
+        summary.items(),
+        key=lambda item: (-item[1]["rows"], item[0]),
+    ))
 
 
 def _count_values(values: Any) -> dict[str, int]:
@@ -2105,6 +2140,7 @@ def _event_fade_review_bundle_summary_lines(sample_summary: dict[str, Any]) -> l
         "- Asset roles: " + _summary_count_line(sample_summary.get("asset_roles")),
         "- Relationships: " + _summary_count_line(sample_summary.get("relationship_types")),
         "- Source providers: " + _summary_count_line(sample_summary.get("source_providers")),
+        "- Source provider detail: " + _source_provider_summary_line(sample_summary.get("source_provider_summary")),
         "",
     ]
 
@@ -2117,6 +2153,26 @@ def _summary_count_line(counts: object, *, limit: int = 6) -> str:
     if remaining > 0:
         parts.append(f"+{remaining} more")
     return ", ".join(parts)
+
+
+def _source_provider_summary_line(summary: object, *, limit: int = 4) -> str:
+    if not isinstance(summary, dict) or not summary:
+        return "none"
+    parts: list[str] = []
+    for provider, raw_counts in list(summary.items())[:limit]:
+        if not isinstance(raw_counts, dict):
+            continue
+        parts.append(
+            f"{provider}: rows={raw_counts.get('rows', 0)}, "
+            f"proxy={raw_counts.get('proxy_candidates', 0)}, "
+            f"direct={raw_counts.get('direct_beneficiaries', 0)}, "
+            f"triggered={raw_counts.get('short_triggered_rows', 0)}, "
+            f"missing_time={raw_counts.get('missing_event_time_rows', 0)}"
+        )
+    remaining = len(summary) - len(parts)
+    if remaining > 0:
+        parts.append(f"+{remaining} more")
+    return "; ".join(parts) if parts else "none"
 
 
 def status() -> None:

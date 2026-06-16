@@ -912,6 +912,21 @@ external-catalyst/control rows even when RSS rows are undated, but current publi
 Polymarket data may still resolve mostly ambiguous controls. Treat that as
 useful negative-control evidence, not proof of a proxy-fade edge.
 
+For a mixed no-key review bundle, run both public RSS and Polymarket into the
+same cache and write one review workspace:
+
+```bash
+EVENT_DISCOVERY_CACHE_DIR=event_fade_cache \
+EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_no_key_bundle \
+EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1 \
+EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-no-key-review-cycle
+```
+
+This is the preferred no-key sample-expansion command because the resulting
+bundle can contain both RSS proxy-attention rows and Polymarket dated
+external-catalyst controls.
+
 Validation review reports include asset-role cohorts alongside event-type,
 relationship, and BTC-risk cohorts. Use the asset-role section to verify that
 reviewed proxy rows are not dominated by `mentioned_asset`, `infrastructure`, or
@@ -920,9 +935,9 @@ reviewed proxy rows are not dominated by `mentioned_asset`, `infrastructure`, or
 Review bundles also write a compact sample summary into `manifest.json` and
 `README.md`: event types, relationship types, asset roles, signal types, source
 providers, proxy candidate count, proxy-context control count, direct
-beneficiary count, SHORT_TRIGGERED count, and missing-event-time count. This is
-the fastest way to sanity-check a fresh public RSS bundle before filling the
-sidecar labels.
+beneficiary count, SHORT_TRIGGERED count, missing-event-time count, and
+per-source provider quality counts. This is the fastest way to sanity-check a
+fresh RSS/Polymarket bundle before filling the sidecar labels.
 
 Inspect configured provider readiness without printing secrets:
 

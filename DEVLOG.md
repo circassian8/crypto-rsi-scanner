@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Combine no-key event-fade review sources · Codex
+**Why:** Public RSS and Polymarket each contribute different useful validation
+evidence, but running them separately left reviewers with split bundles and no
+source-level quality breakdown.
+**Changes:**
+- Added `make event-fade-no-key-review-cycle` to run public RSS and Polymarket
+  refreshes into the same research cache before writing one review bundle.
+- Added `source_provider_summary` to review bundle manifests and README output,
+  showing per-provider row, proxy/direct, trigger, and missing-time counts.
+- Covered the combined Make wiring plus normal and empty review-bundle source
+  summaries in regression tests.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+**Verify:** `make verify` passes, including 238/238 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard. `make
+event-fade-no-key-review-cycle` in `/tmp` fetched 138 RSS raw rows and 35
+Polymarket raw rows, producing a 68-row mixed review bundle with 3 RSS proxy
+leads and 3 dated Polymarket controls.
+**Notes/risks:** This stays review-only: no live DB writes, alerts, paper
+trades, or event-fade promotion. Current no-key sources still need human
+labels/outcomes before they prove edge.
+
 ## 2026-06-16 — Add no-key Polymarket catalyst discovery · Codex
 **Why:** The fresh public RSS review bundle produced review rows, but every row
 was missing `event_time`, so it could only provide undated attention/control
