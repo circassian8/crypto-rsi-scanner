@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Export validation samples from event-discovery cache · Codex
+**Why:** The event-fade validation workflow could write point-in-time cache
+snapshots, but review artifacts still had to be generated from the current
+discovery run. Cached live/refreshed observations need a direct path into the
+same human-review sample schema.
+**Changes:**
+- Added `event_cache.load_cached_validation_sample()` to unwrap
+  `candidate_snapshots.jsonl` into normal `event_fade_validation_sample_v1`
+  rows and keep only the latest snapshot per event/asset/relationship identity
+  by default.
+- Added `main.py --event-fade-export-cache-sample PATH` and
+  `make event-fade-export-cache-sample` to export cached snapshots as JSONL/CSV
+  validation samples.
+- Added regression tests for cache snapshot unwrapping, latest-row dedupe, and
+  scanner CLI export from a refreshed temp cache.
+- Updated `AGENTS.md`, `ROADMAP.md`, `DECISIONS.md`, and
+  `research/event_discovery_design.md` with the cached-sample workflow and
+  research-only guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 190/190.
+Temp-cache workflow smoke passes:
+`make event-discovery-refresh` → `make event-fade-export-cache-sample` →
+`make event-fade-review-sample`, with the review correctly blocked because rows
+are not human-labeled yet.
+**Notes/risks:** This only writes the requested local sample artifact. It does
+not write live SQLite signal/outcome/paper tables, send notifications, open
+paper trades, or imply event-fade promotion.
+
 ## 2026-06-16 — Add event-discovery JSONL cache refresh · Codex
 **Why:** Live/refreshed event sources need point-in-time preservation before
 they can support manual validation or backtests. `RSI_EVENT_DISCOVERY_CACHE_DIR`

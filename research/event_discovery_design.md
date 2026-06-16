@@ -255,6 +255,13 @@ Stable evidence files dedupe already-seen rows by source/event identity where
 possible. `candidate_snapshots.jsonl` appends every refresh so later analysis
 can inspect how scores and missing data looked at each observed time.
 
+`main.py --event-fade-export-cache-sample PATH` turns the latest cached
+candidate snapshot for each stable event/asset/relationship identity back into
+the normal `event_fade_validation_sample_v1` schema. This is the preferred
+review input once live/refreshed sources are running, because it uses the
+point-in-time cache instead of only the current fixture run. The command writes
+only the requested JSONL/CSV artifact and remains research-only.
+
 ## Validation Sample Export
 
 `main.py --event-fade-export-sample PATH` runs the same fixture-only discovery
@@ -492,6 +499,15 @@ Export the validation-sample rows with the same fixture set:
 ```bash
 make event-fade-export-sample
 EVENT_FADE_SAMPLE_OUT=/tmp/event_fade_validation_sample.csv make event-fade-export-sample
+```
+
+Export latest cached candidate snapshots into the validation-sample schema:
+
+```bash
+make event-fade-export-cache-sample
+EVENT_DISCOVERY_CACHE_DIR=/path/to/event_fade_cache \
+EVENT_FADE_SAMPLE_OUT=/tmp/event_fade_cached_sample.csv \
+  make event-fade-export-cache-sample
 ```
 
 Review a labeled sample:

@@ -23,7 +23,8 @@ configured `RSI_EVENT_DISCOVERY_CACHE_DIR` for raw events, normalized events,
 asset links, classifications, candidate snapshots, and discovery-run metadata.
 This cache is observational research storage only; it must not write live
 signal/outcome/paper tables, route notifications, open paper trades, or imply
-execution.
+execution. Cached candidate snapshots may be exported back into the validation
+sample schema for manual review, but only as requested local JSONL/CSV artifacts.
 **Why:** The event-fade validation plan requires point-in-time evidence. Live or
 refreshed providers are not useful for review/backtesting unless the system
 preserves what was known, when it was observed, and which source supplied it.

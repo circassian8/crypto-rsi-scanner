@@ -46,6 +46,7 @@ Usage:
   python main.py --event-discovery-refresh # write research-only event JSONL cache
   python main.py --event-fade-auto-report # grouped event-fade report from discovery fixtures
   python main.py --event-fade-export-sample sample.jsonl # validation sample export
+  python main.py --event-fade-export-cache-sample sample.jsonl # validation sample from cache
   python main.py --event-fade-review-sample sample.jsonl # review labels/outcomes
   python main.py --event-fade-labeling-queue sample.jsonl # prioritize labels/outcomes
   python main.py --event-fade-merge-sample fresh.jsonl reviewed.csv merged.jsonl # preserve labels

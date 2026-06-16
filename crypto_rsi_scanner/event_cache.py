@@ -32,6 +32,14 @@ class EventDiscoveryCacheWriteResult:
     runs_written: int
 
 
+@dataclass(frozen=True)
+class EventDiscoveryCacheReadResult:
+    cache_dir: Path
+    snapshots_read: int
+    rows: list[dict[str, Any]]
+    latest_per_identity: bool
+
+
 def write_event_discovery_cache(
     result: EventDiscoveryResult,
     cache_dir: str | Path,
@@ -105,6 +113,33 @@ def write_event_discovery_cache(
     )
 
 
+def load_cached_validation_sample(
+    cache_dir: str | Path,
+    *,
+    latest_per_identity: bool = True,
+) -> EventDiscoveryCacheReadResult:
+    """Load cached candidate snapshots as validation-sample rows."""
+    root = Path(cache_dir).expanduser()
+    path = root / "candidate_snapshots.jsonl"
+    rows: list[dict[str, Any]] = []
+    snapshots_read = 0
+    for cache_row in _read_jsonl(path):
+        if cache_row.get("row_type") != "candidate_snapshot":
+            continue
+        snapshots_read += 1
+        sample_row = _unwrap_candidate_snapshot(cache_row)
+        if sample_row is not None:
+            rows.append(sample_row)
+    if latest_per_identity:
+        rows = _latest_validation_rows(rows)
+    return EventDiscoveryCacheReadResult(
+        cache_dir=root,
+        snapshots_read=snapshots_read,
+        rows=rows,
+        latest_per_identity=latest_per_identity,
+    )
+
+
 def _cache_row(row_type: str, payload: Mapping[str, Any], run_id: str, observed_at: str) -> dict[str, Any]:
     data = dict(payload)
     payload_schema = data.pop("schema_version", None)
@@ -151,6 +186,23 @@ def _append_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> int:
     return len(data)
 
 
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            row = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
 def _existing_keys(path: Path, key_fields: tuple[str, ...]) -> set[tuple[str, ...]]:
     if not path.exists():
         return set()
@@ -164,6 +216,62 @@ def _existing_keys(path: Path, key_fields: tuple[str, ...]) -> set[tuple[str, ..
             continue
         keys.add(_row_key(row, key_fields))
     return keys
+
+
+def _unwrap_candidate_snapshot(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    schema = row.get("payload_schema_version")
+    if schema != event_discovery.VALIDATION_SAMPLE_SCHEMA_VERSION:
+        return None
+    sample = {
+        field: row.get(field)
+        for field in event_discovery.VALIDATION_SAMPLE_FIELDS
+    }
+    sample["schema_version"] = schema
+    sample["row_type"] = row.get("payload_row_type") or "candidate"
+    return sample
+
+
+def _latest_validation_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    latest: dict[tuple[str, str, str], tuple[datetime, int, dict[str, Any]]] = {}
+    passthrough: list[dict[str, Any]] = []
+    for idx, row in enumerate(rows):
+        data = dict(row)
+        key = _validation_identity(data)
+        if key is None:
+            passthrough.append(data)
+            continue
+        observed = _parse_iso(data.get("exported_at"))
+        current = latest.get(key)
+        if current is None or (observed, idx) >= (current[0], current[1]):
+            latest[key] = (observed, idx, data)
+    selected = [value[2] for value in latest.values()]
+    selected.extend(passthrough)
+    return sorted(
+        selected,
+        key=lambda row: (
+            str(row.get("event_time") or row.get("first_seen_time") or row.get("exported_at") or ""),
+            str(row.get("asset_symbol") or ""),
+            str(row.get("event_id") or ""),
+        ),
+    )
+
+
+def _validation_identity(row: Mapping[str, Any]) -> tuple[str, str, str] | None:
+    event_id = row.get("event_id")
+    coin_id = row.get("asset_coin_id")
+    relationship = row.get("relationship_type")
+    if not event_id or not coin_id or not relationship:
+        return None
+    return (str(event_id), str(coin_id), str(relationship))
+
+
+def _parse_iso(value: Any) -> datetime:
+    if not isinstance(value, str) or not value:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _row_key(row: Mapping[str, Any], key_fields: tuple[str, ...]) -> tuple[str, ...]:

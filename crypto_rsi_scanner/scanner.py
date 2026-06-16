@@ -1173,6 +1173,21 @@ def event_fade_export_sample(path: str, verbose: bool = False) -> None:
     print(f"Event-fade validation sample: wrote {len(rows)} row(s) to {out}")
 
 
+def event_fade_export_cache_sample(path: str, verbose: bool = False) -> None:
+    """Export latest cached event-discovery snapshots as validation sample rows."""
+    _setup_event_discovery_logging(verbose)
+    read = event_cache.load_cached_validation_sample(config.EVENT_DISCOVERY_CACHE_DIR)
+    if path == "-":
+        print(event_discovery.format_validation_sample_jsonl(read.rows))
+        return
+    out = event_discovery.write_validation_sample(read.rows, path)
+    print(
+        "Event-fade cached validation sample: "
+        f"read {read.snapshots_read} snapshot(s), "
+        f"exported {len(read.rows)} latest row(s) to {out}"
+    )
+
+
 def event_fade_review_sample(path: str, verbose: bool = False) -> None:
     """Review manual labels/outcomes in an event-fade validation sample export."""
     _setup_event_discovery_logging(verbose)
@@ -1400,6 +1415,11 @@ def cli() -> None:
         help="Export a research-only event-fade validation sample from discovery fixtures (.jsonl/.csv or '-' for JSONL stdout).",
     )
     parser.add_argument(
+        "--event-fade-export-cache-sample",
+        metavar="PATH",
+        help="Export latest research-cache candidate snapshots as a validation sample (.jsonl/.csv or '-' for JSONL stdout).",
+    )
+    parser.add_argument(
         "--event-fade-review-sample",
         metavar="PATH",
         help="Review labels/outcomes in a research-only event-fade validation sample export.",
@@ -1515,6 +1535,9 @@ def cli() -> None:
         return
     if args.event_fade_export_sample:
         event_fade_export_sample(args.event_fade_export_sample, verbose=args.verbose)
+        return
+    if args.event_fade_export_cache_sample:
+        event_fade_export_cache_sample(args.event_fade_export_cache_sample, verbose=args.verbose)
         return
     if args.event_fade_review_sample:
         event_fade_review_sample(args.event_fade_review_sample, verbose=args.verbose)

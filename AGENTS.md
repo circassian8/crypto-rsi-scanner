@@ -96,6 +96,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-fade-export-sample PATH` (JSONL/CSV validation-sample export
   from discovery fixtures, with source evidence, features, and blank human/outcome
   fields; research-only/no writes except the requested artifact) ·
+  `main.py --event-fade-export-cache-sample PATH` (JSONL/CSV validation-sample
+  export from latest cached candidate snapshots under `RSI_EVENT_DISCOVERY_CACHE_DIR`;
+  research-only/no writes except the requested artifact) ·
   `main.py --event-fade-review-sample PATH` (read a labeled JSONL/CSV sample and
   print review metrics plus promotion blockers; research-only/no writes) ·
   `main.py --event-fade-labeling-queue PATH` (prioritize unlabeled rows and

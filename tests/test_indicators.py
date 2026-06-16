@@ -1567,12 +1567,29 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
         assert velvet["exported_at"] == "2026-06-16T12:30:00+00:00"
         assert velvet["signal_type"] == "SHORT_TRIGGERED"
 
-        second = event_cache.write_event_discovery_cache(result, cache_dir, observed_at=observed_at)
+        later_observed_at = datetime(2026, 6, 16, 12, 31, tzinfo=timezone.utc)
+        second = event_cache.write_event_discovery_cache(result, cache_dir, observed_at=later_observed_at)
         assert second.raw_events_written == 0
         assert second.normalized_events_written == 0
         assert second.event_asset_links_written == 0
         assert second.classifications_written == 0
         assert second.candidate_snapshots_written == len(result.candidates)
+
+        all_snapshots = event_cache.load_cached_validation_sample(cache_dir, latest_per_identity=False)
+        assert all_snapshots.snapshots_read == len(result.candidates) * 2
+        assert len(all_snapshots.rows) == len(result.candidates) * 2
+
+        latest = event_cache.load_cached_validation_sample(cache_dir)
+        assert latest.cache_dir == cache_dir
+        assert latest.latest_per_identity is True
+        assert latest.snapshots_read == len(result.candidates) * 2
+        assert len(latest.rows) == len(result.candidates)
+        latest_velvet = next(row for row in latest.rows if row["asset_symbol"] == "TESTVELVET")
+        assert latest_velvet["schema_version"] == "event_fade_validation_sample_v1"
+        assert latest_velvet["row_type"] == "candidate"
+        assert latest_velvet["exported_at"] == "2026-06-16T12:31:00+00:00"
+        assert "payload_schema_version" not in latest_velvet
+        assert latest_velvet["signal_type"] == "SHORT_TRIGGERED"
 
 
 def test_event_fade_validation_review_blocks_unlabeled_export():
@@ -1882,6 +1899,50 @@ def test_event_discovery_refresh_scanner_writes_cache_fixture():
             run = json.loads(run_path.read_text(encoding="utf-8").splitlines()[0])
             assert run["row_type"] == "discovery_run"
             assert run["candidate_snapshots"] == 17
+        finally:
+            for name, value in original.items():
+                setattr(config, name, value)
+
+
+def test_event_fade_export_cache_sample_scanner_writes_latest_cached_rows():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+
+    values = _full_event_discovery_config_values()
+    attrs = tuple(values) + ("EVENT_DISCOVERY_CACHE_DIR",)
+    original = {name: getattr(config, name) for name in attrs}
+    for name, value in values.items():
+        setattr(config, name, value)
+    with tempfile.TemporaryDirectory() as tmp:
+        cache_dir = Path(tmp) / "cache"
+        out_path = Path(tmp) / "cached_sample.jsonl"
+        config.EVENT_DISCOVERY_CACHE_DIR = cache_dir
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                scanner.event_discovery_refresh()
+                scanner.event_discovery_refresh()
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_fade_export_cache_sample(str(out_path))
+            text = out.getvalue()
+            assert "Event-fade cached validation sample" in text
+            assert "read 34 snapshot(s)" in text
+            assert "exported 17 latest row(s)" in text
+
+            rows = [
+                json.loads(line)
+                for line in out_path.read_text(encoding="utf-8").splitlines()
+            ]
+            assert len(rows) == 17
+            velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+            assert velvet["schema_version"] == "event_fade_validation_sample_v1"
+            assert velvet["row_type"] == "candidate"
+            assert velvet["signal_type"] == "SHORT_TRIGGERED"
+            assert "payload_row_type" not in velvet
         finally:
             for name, value in original.items():
                 setattr(config, name, value)
