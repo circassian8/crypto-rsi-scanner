@@ -203,12 +203,22 @@ class ValidationCohort:
 
 
 @dataclass(frozen=True)
+class ValidationSampleEvidenceChange:
+    event_id: str
+    asset_symbol: str
+    asset_coin_id: str
+    relationship_type: str
+    changed_fields: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ValidationSampleMergeResult:
     rows: list[dict[str, Any]]
     fresh_rows: int
     reviewed_rows: int
     matched_rows: int
     evidence_changed_rows: int
+    evidence_changes: tuple[ValidationSampleEvidenceChange, ...]
     unmatched_reviewed_rows: int
     copied_fields: int
 
@@ -378,7 +388,7 @@ def _merge_review_fields(
         if (key := _sample_key(row)) is not None and _has_review_data(row)
     }
     matched_keys: set[tuple[str, str, str]] = set()
-    evidence_changed = 0
+    evidence_changes: list[ValidationSampleEvidenceChange] = []
     copied_fields = 0
     merged: list[dict[str, Any]] = []
     for row in fresh:
@@ -387,8 +397,9 @@ def _merge_review_fields(
         source = reviewed_by_key.get(key) if key is not None else None
         if source is not None:
             matched_keys.add(key)
-            if _review_evidence_changed(out, source, evidence_field_tuple):
-                evidence_changed += 1
+            changed_fields = _changed_evidence_fields(out, source, evidence_field_tuple)
+            if changed_fields:
+                evidence_changes.append(_evidence_change_item(out, changed_fields))
                 merged.append(out)
                 continue
             for field in REVIEW_FIELDS:
@@ -402,7 +413,8 @@ def _merge_review_fields(
         fresh_rows=len(fresh),
         reviewed_rows=len(reviewed),
         matched_rows=len(matched_keys),
-        evidence_changed_rows=evidence_changed,
+        evidence_changed_rows=len(evidence_changes),
+        evidence_changes=tuple(evidence_changes),
         unmatched_reviewed_rows=max(0, len(reviewed_by_key) - len(matched_keys)),
         copied_fields=copied_fields,
     )
@@ -496,6 +508,30 @@ def apply_review_template(
         reviewed_template_rows,
         evidence_fields=REVIEW_TEMPLATE_EVIDENCE_FIELDS,
     )
+
+
+def format_merge_evidence_changes(
+    result: ValidationSampleMergeResult,
+    *,
+    limit: int = 10,
+) -> str:
+    """Format rows whose prior review was skipped because evidence changed."""
+    if not result.evidence_changes:
+        return ""
+    shown = result.evidence_changes[:limit]
+    rows = ["Evidence-changed rows (review fields were not copied):"]
+    for item in shown:
+        label = item.asset_symbol or item.asset_coin_id or "unknown-asset"
+        event_id = item.event_id or "unknown-event"
+        relationship = item.relationship_type or "unknown"
+        fields = ", ".join(item.changed_fields[:8])
+        if len(item.changed_fields) > 8:
+            fields += f", +{len(item.changed_fields) - 8} more"
+        rows.append(f"- {label} {event_id} `{relationship}` changed: {fields}")
+    remaining = len(result.evidence_changes) - len(shown)
+    if remaining > 0:
+        rows.append(f"- ... {remaining} more evidence-changed row(s)")
+    return "\n".join(rows)
 
 
 def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
@@ -1501,22 +1537,29 @@ def _has_review_data(row: Mapping[str, Any]) -> bool:
     return any(_has_value(row.get(field)) for field in REVIEW_FIELDS)
 
 
-def _review_evidence_changed(
+def _changed_evidence_fields(
     fresh: Mapping[str, Any],
     reviewed: Mapping[str, Any],
     evidence_fields: Iterable[str],
-) -> bool:
-    return _review_evidence_fingerprint(fresh, evidence_fields) != _review_evidence_fingerprint(
-        reviewed,
-        evidence_fields,
+) -> tuple[str, ...]:
+    return tuple(
+        field
+        for field in evidence_fields
+        if _fingerprint_value(fresh.get(field)) != _fingerprint_value(reviewed.get(field))
     )
 
 
-def _review_evidence_fingerprint(
+def _evidence_change_item(
     row: Mapping[str, Any],
-    evidence_fields: Iterable[str],
-) -> tuple[tuple[str, str], ...]:
-    return tuple((field, _fingerprint_value(row.get(field))) for field in evidence_fields)
+    changed_fields: tuple[str, ...],
+) -> ValidationSampleEvidenceChange:
+    return ValidationSampleEvidenceChange(
+        event_id=str(row.get("event_id") or ""),
+        asset_symbol=str(row.get("asset_symbol") or ""),
+        asset_coin_id=str(row.get("asset_coin_id") or ""),
+        relationship_type=str(row.get("relationship_type") or ""),
+        changed_fields=changed_fields,
+    )
 
 
 def _fingerprint_value(value: object) -> str:

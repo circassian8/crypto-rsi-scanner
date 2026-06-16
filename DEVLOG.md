@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Report event-fade review merge evidence drift · Codex
+**Why:** Evidence-drift protection blocked stale review labels/outcomes, but a
+reviewer still needed to know which rows were skipped and why. Counts alone are
+not enough when the next task is manually reconciling a validation sample.
+**Changes:**
+- Added `ValidationSampleEvidenceChange` details to
+  `crypto_rsi_scanner/event_validation.py`, including asset, event,
+  relationship, and changed evidence field names.
+- Added `format_merge_evidence_changes()` and wired scanner merge/template-apply
+  commands to print skipped rows when evidence changed.
+- Added tests for direct merge evidence-change details, sidecar evidence-change
+  details, and scanner output that names the changed field.
+- Updated `AGENTS.md` and `research/event_discovery_design.md` with the more
+  inspectable merge/apply behavior.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 221/221.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This remains artifact-only validation workflow support. It does
+not alter event discovery, event-fade scoring, alert routing, live storage, or
+paper trading.
+
 ## 2026-06-16 — Guard event-fade review merges against evidence drift · Codex
 **Why:** Review labels and outcome fields are only valid for the evidence the
 human actually reviewed. A regenerated validation sample could previously carry

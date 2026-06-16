@@ -362,10 +362,11 @@ only when the validation evidence fingerprint is unchanged:
 - `post_event_return_7d`
 
 The merge writes only the requested `OUT` artifact and reports matched/unmatched
-reviewed rows, evidence-changed matched rows, and copied fields. Evidence-changed
-rows intentionally remain unreviewed so they return to the labeling queue instead
-of carrying stale human labels or outcomes. The compact review-template apply
-path performs the same check against the evidence fields present in the sidecar.
+reviewed rows, evidence-changed matched rows, copied fields, and the affected
+asset/event/relationship plus changed evidence field names. Evidence-changed rows
+intentionally remain unreviewed so they return to the labeling queue instead of
+carrying stale human labels or outcomes. The compact review-template apply path
+performs the same check against the evidence fields present in the sidecar.
 Neither command changes live storage, routing, paper trades, or event state.
 
 ## Validation Price Fixture Export

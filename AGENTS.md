@@ -297,8 +297,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   may copy nonblank human labels/notes/outcomes from a previously reviewed
   JSONL/CSV sample into a fresh export by event/asset/relationship identity only
   when the validation evidence fingerprint is unchanged. Evidence-changed rows
-  must remain unreviewed so they return to the labeling queue. The command must
-  only write the requested output artifact.
+  must remain unreviewed so they return to the labeling queue; merge/apply
+  commands should report the affected row and changed evidence fields. The
+  command must only write the requested output artifact.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.

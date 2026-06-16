@@ -2641,6 +2641,12 @@ def test_event_fade_validation_merge_skips_changed_evidence():
     assert result.matched_rows == 1
     assert result.evidence_changed_rows == 1
     assert result.copied_fields == 0
+    assert len(result.evidence_changes) == 1
+    assert result.evidence_changes[0].asset_symbol == "TESTVELVET"
+    assert result.evidence_changes[0].changed_fields == ("raw_content_hashes",)
+    evidence_report = event_validation.format_merge_evidence_changes(result)
+    assert "TESTVELVET" in evidence_report
+    assert "raw_content_hashes" in evidence_report
 
     merged = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
     assert merged["review_status"] == ""
@@ -2830,6 +2836,7 @@ def test_event_fade_validation_review_template_skips_changed_sidecar_evidence():
     assert result.matched_rows == 1
     assert result.evidence_changed_rows == 1
     assert result.copied_fields == 0
+    assert result.evidence_changes[0].changed_fields == ("source_urls",)
     velvet = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
     assert velvet["review_status"] == ""
     assert velvet["human_label"] == ""
@@ -3653,6 +3660,42 @@ def test_event_fade_merge_sample_scanner_writes_merged_jsonl():
         velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
         assert velvet["human_label"] == "valid_proxy_fade"
         assert velvet["post_event_return_72h"] == -0.22
+
+
+def test_event_fade_merge_sample_scanner_reports_changed_evidence():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    fresh = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    reviewed = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    fresh_row = next(row for row in fresh if row["asset_symbol"] == "TESTVELVET")
+    fresh_row["raw_content_hashes"] = ["changed-source-hash"]
+    reviewed_row = next(row for row in reviewed if row["asset_symbol"] == "TESTVELVET")
+    reviewed_row["review_status"] = "reviewed"
+    reviewed_row["human_label"] = "valid_proxy_fade"
+    reviewed_row["post_event_return_72h"] = -0.22
+    with tempfile.TemporaryDirectory() as tmp:
+        fresh_path = Path(tmp) / "fresh.jsonl"
+        reviewed_path = Path(tmp) / "reviewed.jsonl"
+        merged_path = Path(tmp) / "merged.jsonl"
+        event_discovery.write_validation_sample(fresh, fresh_path)
+        event_discovery.write_validation_sample(reviewed, reviewed_path)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_merge_sample(str(fresh_path), str(reviewed_path), str(merged_path))
+        text = out.getvalue()
+        assert "1 evidence-changed row(s)" in text
+        assert "Evidence-changed rows" in text
+        assert "TESTVELVET" in text
+        assert "raw_content_hashes" in text
+        rows = [json.loads(line) for line in merged_path.read_text(encoding="utf-8").splitlines()]
+        velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+        assert velvet["human_label"] == ""
+        assert velvet["post_event_return_72h"] is None
 
 
 def test_event_fade_fill_outcomes_scanner_writes_outcome_jsonl():

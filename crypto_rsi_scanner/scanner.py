@@ -1356,6 +1356,9 @@ def event_fade_apply_review_template(
         f"{result.unmatched_reviewed_rows} unmatched reviewed row(s), "
         f"{result.copied_fields} copied field(s), wrote {len(result.rows)} row(s) to {out}"
     )
+    evidence_changes = event_validation.format_merge_evidence_changes(result)
+    if evidence_changes:
+        print(evidence_changes)
     print("")
     print(event_validation.format_validation_review(review))
 
@@ -1615,6 +1618,9 @@ def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, 
         f"{result.unmatched_reviewed_rows} unmatched reviewed row(s), "
         f"{result.copied_fields} copied field(s), wrote {len(result.rows)} row(s) to {out}"
     )
+    evidence_changes = event_validation.format_merge_evidence_changes(result)
+    if evidence_changes:
+        print(evidence_changes)
 
 
 def event_fade_fill_outcomes(
