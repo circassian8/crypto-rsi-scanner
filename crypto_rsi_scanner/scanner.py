@@ -1219,6 +1219,30 @@ def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, 
     )
 
 
+def event_fade_fill_outcomes(
+    sample_path: str,
+    prices_path: str,
+    out_path: str,
+    *,
+    overwrite: bool = False,
+    verbose: bool = False,
+) -> None:
+    """Fill validation-sample outcome fields from local OHLCV fixtures."""
+    _setup_event_discovery_logging(verbose)
+    rows = event_validation.load_validation_sample(sample_path)
+    prices = event_validation.load_outcome_price_fixture(prices_path)
+    result = event_validation.fill_validation_outcomes(rows, prices, overwrite=overwrite)
+    out = event_discovery.write_validation_sample(result.rows, out_path)
+    print(
+        "Event-fade validation outcome fill: "
+        f"{result.filled_rows}/{result.triggered_rows} triggered row(s) filled, "
+        f"missing_history={result.missing_history_rows}, "
+        f"insufficient_history={result.insufficient_history_rows}, "
+        f"skipped_existing={result.skipped_existing_rows}, "
+        f"wrote {len(result.rows)} row(s) to {out}"
+    )
+
+
 def status() -> None:
     """Print operational scan/listener health and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -1442,6 +1466,17 @@ def cli() -> None:
         help="Merge human labels/outcomes from REVIEWED into FRESH and write OUT.",
     )
     parser.add_argument(
+        "--event-fade-fill-outcomes",
+        nargs=3,
+        metavar=("SAMPLE", "PRICES", "OUT"),
+        help="Fill SHORT_TRIGGERED validation outcome fields from local price fixture PRICES and write OUT.",
+    )
+    parser.add_argument(
+        "--event-fade-overwrite-outcomes",
+        action="store_true",
+        help="With --event-fade-fill-outcomes, replace existing outcome fields instead of only filling blanks.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for commands that support it.",
@@ -1552,6 +1587,16 @@ def cli() -> None:
     if args.event_fade_merge_sample:
         fresh_path, reviewed_path, out_path = args.event_fade_merge_sample
         event_fade_merge_sample(fresh_path, reviewed_path, out_path, verbose=args.verbose)
+        return
+    if args.event_fade_fill_outcomes:
+        sample_path, prices_path, out_path = args.event_fade_fill_outcomes
+        event_fade_fill_outcomes(
+            sample_path,
+            prices_path,
+            out_path,
+            overwrite=args.event_fade_overwrite_outcomes,
+            verbose=args.verbose,
+        )
         return
     if args.status:
         status()

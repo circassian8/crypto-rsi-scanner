@@ -105,6 +105,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   triggered rows missing required outcomes; research-only/no writes) ·
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT` (copy prior human
   labels/outcomes into a fresh validation export; writes only `OUT`) ·
+  `main.py --event-fade-fill-outcomes SAMPLE PRICES OUT` (fill
+  `SHORT_TRIGGERED` validation outcome fields from local OHLCV fixtures; writes
+  only `OUT`) ·
   `main.py --universe-audit` (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks

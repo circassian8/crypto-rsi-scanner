@@ -307,6 +307,33 @@ The merge writes only the requested `OUT` artifact and reports matched/unmatched
 reviewed rows. It does not change live storage, routing, paper trades, or event
 state.
 
+## Validation Outcome Fill
+
+`main.py --event-fade-fill-outcomes SAMPLE PRICES OUT` fills blank outcome
+fields for `SHORT_TRIGGERED` validation rows from a local OHLCV fixture. The
+price fixture may be either a flat list of candles or a mapping by `coin_id`/
+symbol. Flat rows can use:
+
+- `asset_coin_id` or `coin_id`
+- `asset_symbol` or `symbol`
+- `timestamp` / `time` / `date`
+- `close`, with optional `high` and `low`
+
+The filler uses the row's `trigger_observed_at` as the decision time and
+`entry_reference_price` as the entry when present. It computes:
+
+- `post_event_return_24h`
+- `post_event_return_72h`
+- `post_event_return_7d`
+- `max_favorable_excursion`
+- `max_adverse_excursion`
+
+For event-fade shorts, negative post-event returns are favorable. MFE/MAE are
+positive magnitudes over the 7-day post-trigger window. Existing outcome fields
+are preserved unless `--event-fade-overwrite-outcomes` is supplied. The command
+writes only `OUT` and remains artifact-only: no live storage, notifications,
+paper trades, or execution.
+
 ## Validation Sample Labeling Queue
 
 `main.py --event-fade-labeling-queue PATH` reads a JSONL/CSV validation sample
@@ -508,6 +535,16 @@ make event-fade-export-cache-sample
 EVENT_DISCOVERY_CACHE_DIR=/path/to/event_fade_cache \
 EVENT_FADE_SAMPLE_OUT=/tmp/event_fade_cached_sample.csv \
   make event-fade-export-cache-sample
+```
+
+Fill triggered-row outcomes from local price candles:
+
+```bash
+make event-fade-fill-outcomes
+EVENT_FADE_SAMPLE_IN=/tmp/event_fade_cached_sample.jsonl \
+EVENT_FADE_OUTCOME_PRICES=/path/to/outcome_prices.json \
+EVENT_FADE_SAMPLE_OUTCOMES=/tmp/event_fade_with_outcomes.jsonl \
+  make event-fade-fill-outcomes
 ```
 
 Review a labeled sample:

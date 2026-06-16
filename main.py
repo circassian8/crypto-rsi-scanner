@@ -50,6 +50,7 @@ Usage:
   python main.py --event-fade-review-sample sample.jsonl # review labels/outcomes
   python main.py --event-fade-labeling-queue sample.jsonl # prioritize labels/outcomes
   python main.py --event-fade-merge-sample fresh.jsonl reviewed.csv merged.jsonl # preserve labels
+  python main.py --event-fade-fill-outcomes sample.jsonl prices.json out.jsonl # fill outcome fields
   python main.py --backup-db     # safe SQLite backup + integrity check
   python main.py --verify-restore # restore-check latest SQLite backup
   python main.py --maintenance   # backup + restore drill + log rotation

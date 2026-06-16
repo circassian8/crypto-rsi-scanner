@@ -588,6 +588,12 @@ def _supply_fixture_paths():
     )
 
 
+def _outcome_prices_fixture_path():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "outcome_prices.json"
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -1732,6 +1738,35 @@ def test_event_fade_validation_merge_preserves_review_fields():
     assert other["human_label"] == ""
 
 
+def test_event_fade_validation_outcome_fill_from_local_prices():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    prices = event_validation.load_outcome_price_fixture(_outcome_prices_fixture_path())
+    result = event_validation.fill_validation_outcomes(rows, prices)
+    assert result.sample_rows == len(rows)
+    assert result.triggered_rows == 1
+    assert result.filled_rows == 1
+    assert result.missing_history_rows == 0
+    assert result.insufficient_history_rows == 0
+    assert result.skipped_existing_rows == 0
+
+    velvet = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
+    assert round(velvet["max_favorable_excursion"], 4) == 0.3333
+    assert round(velvet["max_adverse_excursion"], 4) == 0.0833
+    assert round(velvet["post_event_return_24h"], 4) == -0.1111
+    assert round(velvet["post_event_return_72h"], 4) == -0.2083
+    assert round(velvet["post_event_return_7d"], 4) == -0.2778
+
+    velvet["human_label"] = "valid_proxy_fade"
+    queue = event_validation.build_labeling_queue(result.rows)
+    assert not any(item.asset_symbol == "TESTVELVET" for item in queue.items)
+
+    second = event_validation.fill_validation_outcomes(result.rows, prices)
+    assert second.filled_rows == 0
+    assert second.skipped_existing_rows == 1
+
+
 def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
     from crypto_rsi_scanner import event_discovery, event_validation
 
@@ -2119,6 +2154,36 @@ def test_event_fade_merge_sample_scanner_writes_merged_jsonl():
         velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
         assert velvet["human_label"] == "valid_proxy_fade"
         assert velvet["post_event_return_72h"] == -0.22
+
+
+def test_event_fade_fill_outcomes_scanner_writes_outcome_jsonl():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        sample_path = Path(tmp) / "sample.jsonl"
+        out_path = Path(tmp) / "with_outcomes.jsonl"
+        event_discovery.write_validation_sample(rows, sample_path)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_fill_outcomes(
+                str(sample_path),
+                str(_outcome_prices_fixture_path()),
+                str(out_path),
+            )
+        text = out.getvalue()
+        assert "Event-fade validation outcome fill" in text
+        assert "1/1 triggered row(s) filled" in text
+
+        written = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines()]
+        velvet = next(row for row in written if row["asset_symbol"] == "TESTVELVET")
+        assert round(velvet["post_event_return_72h"], 4) == -0.2083
+        assert round(velvet["max_favorable_excursion"], 4) == 0.3333
 
 
 def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():

@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add validation outcome filling from local prices · Codex
+**Why:** Event-fade validation samples had blank outcome fields, and the review
+tool correctly blocked reviewed triggered rows without MFE/MAE and 72h
+post-event returns. The workflow needed an artifact-only way to fill those
+fields from local price histories before human review.
+**Changes:**
+- Added `event_validation.load_outcome_price_fixture()` and
+  `fill_validation_outcomes()` to fill `SHORT_TRIGGERED` sample rows from local
+  OHLCV candles while preserving existing fields unless overwrite is requested.
+- Added `main.py --event-fade-fill-outcomes SAMPLE PRICES OUT` plus
+  `make event-fade-fill-outcomes`.
+- Added `fixtures/event_discovery/outcome_prices.json` for offline regression
+  coverage of the TESTVELVET short outcome path.
+- Added tests for outcome math, skipped-existing behavior, labeling-queue
+  interaction, and scanner CLI file output.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the outcome-fill workflow.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 192/192.
+Offline workflow smoke passes:
+`make event-fade-export-sample` → `make event-fade-fill-outcomes` →
+`make event-fade-labeling-queue` → `make event-fade-review-sample`. After
+filling, the triggered row only needs `human_label`; the review remains blocked
+on missing human labels/sample coverage.
+**Notes/risks:** This is artifact-only validation tooling. It writes only the
+requested output sample and does not write live SQLite signal/outcome/paper
+tables, send notifications, open paper trades, or imply promotion.
+
 ## 2026-06-16 — Export validation samples from event-discovery cache · Codex
 **Why:** The event-fade validation workflow could write point-in-time cache
 snapshots, but review artifacts still had to be generated from the current
