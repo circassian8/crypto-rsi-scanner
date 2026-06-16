@@ -562,6 +562,13 @@ def _derivatives_fixture_path():
     return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "coinalyze_derivatives.json"
 
 
+def _news_fixture_paths():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery"
+    return root / "cryptopanic_news.json", root / "gdelt_news.json", root / "project_blog_rss.json"
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -932,6 +939,97 @@ def test_event_discovery_derivatives_enrich_candidates_without_overriding_raw():
     assert velvet.fade_signal.signal_type == FadeSignalType.SHORT_TRIGGERED
 
 
+def test_event_discovery_news_providers_parse_fixtures():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner.event_providers.cryptopanic import CryptoPanicProvider
+    from crypto_rsi_scanner.event_providers.gdelt import GdeltProvider
+    from crypto_rsi_scanner.event_providers.project_blog_rss import ProjectBlogRssProvider
+
+    cryptopanic_path, gdelt_path, blog_path = _news_fixture_paths()
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    cryptopanic = CryptoPanicProvider(cryptopanic_path, required=True).fetch_events(start, end)
+    gdelt = GdeltProvider(gdelt_path, required=True).fetch_events(start, end)
+    blog = ProjectBlogRssProvider(blog_path, required=True).fetch_events(start, end)
+    assert len(cryptopanic) == 2
+    assert len(gdelt) == 1
+    assert len(blog) == 2
+    assert cryptopanic[0].provider == "cryptopanic"
+    assert cryptopanic[0].raw_json["event"]["event_type"] == "ipo_proxy"
+    assert gdelt[0].provider == "gdelt"
+    assert gdelt[0].raw_json["event"]["event_type"] == "sports_event"
+    assert blog[0].provider == "project_blog_rss"
+    assert blog[0].raw_json["event"]["event_id"] == "testlate-anthropic-demo"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_path = Path(tmp) / "bad_news.json"
+        bad_path.write_text(json.dumps({"results": ["not an object"]}), encoding="utf-8")
+        assert CryptoPanicProvider(bad_path).fetch_events(start, end) == []
+        try:
+            CryptoPanicProvider(bad_path, required=True).fetch_events(start, end)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("required malformed news fixture should fail")
+
+
+def test_event_discovery_news_pipeline_proxy_direct_late_and_ambiguous_safety():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    cryptopanic_path, gdelt_path, blog_path = _news_fixture_paths()
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    raw = event_discovery.load_discovery_events(
+        None,
+        start,
+        end,
+        cryptopanic_path=cryptopanic_path,
+        gdelt_path=gdelt_path,
+        project_blog_rss_path=blog_path,
+    )
+    assets = load_asset_aliases(aliases_path)
+    result = event_discovery.run_discovery(
+        raw,
+        assets,
+        now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc),
+    )
+    by_symbol = {candidate.asset.symbol: candidate for candidate in result.candidates}
+    assert len(raw) == 5
+    assert set(by_symbol) == {"TESTAI", "TESTBTC", "TESTFAN", "TESTLATE", "TESTAMBIG"}
+
+    ai = by_symbol["TESTAI"]
+    assert ai.classification.is_proxy_narrative is True
+    assert ai.classification.is_direct_beneficiary is False
+    assert ai.fade_signal.signal_type == FadeSignalType.SHORT_TRIGGERED
+
+    btc = by_symbol["TESTBTC"]
+    assert btc.classification.is_direct_beneficiary is True
+    assert btc.classification.relationship_type == "direct_token_event"
+    assert btc.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    fan = by_symbol["TESTFAN"]
+    assert fan.classification.is_proxy_narrative is True
+    assert fan.classification.relationship_type in ("proxy_exposure", "proxy_attention")
+    assert fan.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    late = by_symbol["TESTLATE"]
+    assert late.classification.is_proxy_narrative is True
+    assert late.fade_candidate.component_scores["event_clarity"] < 70
+    assert late.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    ambiguous = by_symbol["TESTAMBIG"]
+    assert ambiguous.classification.relationship_type == "ambiguous"
+    assert ambiguous.data_quality["classifier_pass"] is False
+    assert ambiguous.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+
 def test_event_classification_proxy_direct_and_ambiguous_cases():
     result = _event_discovery_fixture_result()
     by_coin = {classification.coin_id: classification for classification in result.classifications}
@@ -992,6 +1090,9 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
     orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
     orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
+    orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
+    orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = events_path
@@ -1000,6 +1101,9 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
     config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
     config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+    config.EVENT_DISCOVERY_GDELT_PATH = None
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
@@ -1018,6 +1122,9 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
         config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
         config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
+        config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
@@ -1035,6 +1142,9 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
     orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
     orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
     orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
+    orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
+    orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
@@ -1043,6 +1153,9 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
     config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = bybit_path
     config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
     config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+    config.EVENT_DISCOVERY_GDELT_PATH = None
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
@@ -1060,6 +1173,9 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
         config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
         config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
+        config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
@@ -1078,6 +1194,9 @@ def test_event_discovery_scanner_report_accepts_derivatives_fixture():
     orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
     orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
     orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
+    orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
+    orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
@@ -1086,6 +1205,9 @@ def test_event_discovery_scanner_report_accepts_derivatives_fixture():
     config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = bybit_path
     config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
     config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+    config.EVENT_DISCOVERY_GDELT_PATH = None
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = derivatives_path
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
@@ -1104,6 +1226,63 @@ def test_event_discovery_scanner_report_accepts_derivatives_fixture():
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
         config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
         config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
+        config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
+        config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
+
+
+def test_event_discovery_scanner_report_accepts_news_fixtures():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    cryptopanic_path, gdelt_path, blog_path = _news_fixture_paths()
+    orig_events = config.EVENT_DISCOVERY_EVENTS_PATH
+    orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
+    orig_binance = config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH
+    orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
+    orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
+    orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
+    orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
+    orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
+    orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
+    orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
+    config.EVENT_DISCOVERY_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = cryptopanic_path
+    config.EVENT_DISCOVERY_GDELT_PATH = gdelt_path
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = blog_path
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_discovery_report()
+        text = out.getvalue()
+        assert "TESTAI" in text
+        assert "TESTFAN" in text
+        assert "TESTLATE" in text
+        assert "TESTAMBIG" in text
+        assert "proxy" in text
+        assert "NO_TRADE/DISCOVERED" in text
+    finally:
+        config.EVENT_DISCOVERY_EVENTS_PATH = orig_events
+        config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = orig_binance
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
+        config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
+        config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
+        config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
@@ -1121,6 +1300,9 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
     orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
     orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
     orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
+    orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
+    orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
@@ -1129,6 +1311,9 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
     config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
     config.EVENT_DISCOVERY_COINMARKETCAL_PATH = coinmarketcal_path
     config.EVENT_DISCOVERY_TOKENOMIST_PATH = tokenomist_path
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+    config.EVENT_DISCOVERY_GDELT_PATH = None
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
@@ -1146,6 +1331,9 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
         config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
         config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
+        config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 

@@ -97,6 +97,54 @@
       "source": "fixture"
     },
     {
+      "coin_id": "testai",
+      "symbol": "TESTAI",
+      "name": "Test AI Proxy",
+      "aliases": ["testai", "test ai proxy", "openai access token"],
+      "categories": ["proxy-news-fixture"],
+      "contract_addresses": {},
+      "market_cap": 60000000,
+      "volume_24h": 150000000,
+      "price": 3.75,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "testfan",
+      "symbol": "TESTFAN",
+      "name": "Test Fan Token",
+      "aliases": ["testfan", "test fan token", "test fc fan token"],
+      "categories": ["fan-token-fixture"],
+      "contract_addresses": {},
+      "market_cap": 25000000,
+      "volume_24h": 80000000,
+      "price": 0.88,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "testlate",
+      "symbol": "TESTLATE",
+      "name": "Test Late Proxy",
+      "aliases": ["testlate", "late proxy token"],
+      "categories": ["late-news-fixture"],
+      "contract_addresses": {},
+      "market_cap": 18000000,
+      "volume_24h": 45000000,
+      "price": 1.1,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "testambignews",
+      "symbol": "TESTAMBIG",
+      "name": "Test Ambiguous News",
+      "aliases": ["testambig", "test ambiguous news"],
+      "categories": ["ambiguous-news-fixture"],
+      "contract_addresses": {},
+      "market_cap": 22000000,
+      "volume_24h": 30000000,
+      "price": 0.51,
+      "source": "fixture"
+    },
+    {
       "coin_id": "collision-alpha",
       "symbol": "COLLIDE",
       "name": "Collision Alpha",

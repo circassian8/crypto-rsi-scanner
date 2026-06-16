@@ -1049,6 +1049,9 @@ def event_discovery_report(verbose: bool = False) -> None:
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
         config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
         config.EVENT_DISCOVERY_TOKENOMIST_PATH,
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+        config.EVENT_DISCOVERY_GDELT_PATH,
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
     )
     if not any(paths):
@@ -1070,6 +1073,9 @@ def event_discovery_report(verbose: bool = False) -> None:
         bybit_announcements_path=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
         coinmarketcal_path=config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
         tokenomist_path=config.EVENT_DISCOVERY_TOKENOMIST_PATH,
+        cryptopanic_path=config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+        gdelt_path=config.EVENT_DISCOVERY_GDELT_PATH,
+        project_blog_rss_path=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
         coinalyze_derivatives_path=config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
         universe_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
         universe_limit=config.EVENT_DISCOVERY_UNIVERSE_LIMIT or None,

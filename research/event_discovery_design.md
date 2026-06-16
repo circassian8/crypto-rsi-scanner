@@ -1,9 +1,10 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1-5 fixture framework with clean CoinGecko universe bridge,
+**Status:** Phase 1-6 fixture framework with clean CoinGecko universe bridge,
 fixture-backed exchange announcement providers, structured calendar/unlock
-providers, and Coinalyze-style derivatives enrichment, research-only
+providers, news/proxy-narrative providers, and Coinalyze-style derivatives
+enrichment, research-only
 
 ## Goal
 
@@ -41,6 +42,12 @@ Phase 1 files:
   for dated crypto events
 - `event_providers/tokenomist.py`: local unlock fixture provider that also
   populates supply-pressure fields
+- `event_providers/cryptopanic.py`: local CryptoPanic-style news fixture
+  provider for proxy/direct/ambiguous narrative evidence
+- `event_providers/gdelt.py`: local GDELT-style news fixture provider for
+  external catalyst and attention-event evidence
+- `event_providers/project_blog_rss.py`: local project-blog/RSS fixture provider
+  for project-sourced narrative evidence
 - `derivatives_providers/coinalyze.py`: local derivatives fixture provider that
   maps Coinalyze-style OI/funding/crowding rows to discovery candidates
 - `event_resolver.py`: alias-aware asset resolver
@@ -89,6 +96,28 @@ direct token-specific catalysts by default:
 
 They must remain `NO_TRADE` under the proxy-fade gate unless a separate source
 later proves a true proxy relationship.
+
+## News And Proxy-Narrative Providers
+
+CryptoPanic-, GDELT-, and project-blog/RSS-style providers currently read local
+JSON fixtures only. They normalize common article shapes such as `results`,
+`features`, and `items` into `RawDiscoveredEvent` rows, preserving explicit
+fixture event metadata when provided and otherwise inferring only coarse event
+types.
+
+These providers are the first radar layer aimed at VELVET-style narrative
+setups:
+
+- proxy exposure news, such as synthetic pre-IPO access to OpenAI/Anthropic
+- fan-token or attention-token news around dated sports/political catalysts
+- direct-beneficiary crypto news, such as BTC/BTC ETF, as negative controls
+- ambiguous momentum/news chatter with no dated catalyst
+- post-event articles that must not create pre-event discovery evidence
+
+News evidence can classify an asset as proxy/direct/ambiguous, but it still
+feeds the same hard event-fade gate. Articles first seen after the event time
+must not create a `SHORT_TRIGGERED` candidate even if the price/technical fields
+look strong.
 
 ## Derivatives Enrichment
 
@@ -159,6 +188,13 @@ more dangerous than missed setups.
 - TESTPERP Bybit perpetual-listing announcement fixture
 - TESTCAL CoinMarketCal-style mainnet-launch fixture
 - TESTUNLOCK Tokenomist-style unlock fixture with supply-pressure fields
+- TESTAI CryptoPanic-style OpenAI pre-IPO proxy article that can trigger once
+  post-event failure is confirmed in the fixed-time test path
+- TESTBTC CryptoPanic-style BTC ETF direct-beneficiary article
+- TESTFAN GDELT-style fan-token World Cup proxy attention article
+- TESTLATE project-blog post-event proxy article that must remain `NO_TRADE`
+  because it was first seen after the catalyst
+- TESTAMBIG project-blog ambiguous momentum article with no dated catalyst
 - TESTLIST Coinalyze-style high derivatives crowding fixture that still remains
   `NO_TRADE` because the listing is direct
 - TESTPERP Coinalyze-style no-perp snapshot fixture
@@ -179,6 +215,9 @@ RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH=fixtures/event_discovery/binance_
 RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH=fixtures/event_discovery/bybit_announcements.json \
 RSI_EVENT_DISCOVERY_COINMARKETCAL_PATH=fixtures/event_discovery/coinmarketcal_events.json \
 RSI_EVENT_DISCOVERY_TOKENOMIST_PATH=fixtures/event_discovery/tokenomist_unlocks.json \
+RSI_EVENT_DISCOVERY_CRYPTOPANIC_PATH=fixtures/event_discovery/cryptopanic_news.json \
+RSI_EVENT_DISCOVERY_GDELT_PATH=fixtures/event_discovery/gdelt_news.json \
+RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH=fixtures/event_discovery/project_blog_rss.json \
 RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH=fixtures/event_discovery/coinalyze_derivatives.json \
 RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report

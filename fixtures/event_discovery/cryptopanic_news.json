@@ -1,0 +1,123 @@
+{
+  "results": [
+    {
+      "id": "cryptopanic-testai-openai-proxy",
+      "title": "TESTAI offers synthetic exposure to OpenAI pre-IPO markets before product event",
+      "description": "Traders are using TESTAI as a tokenized stock style proxy to trade OpenAI pre-IPO exposure ahead of the dated product event.",
+      "published_at": "2026-06-15T10:00:00Z",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "url": "https://example.test/cryptopanic/testai-openai-proxy",
+      "source_confidence": 0.88,
+      "event": {
+        "event_id": "testai-openai-product-event",
+        "event_name": "OpenAI product event",
+        "event_type": "ipo_proxy",
+        "event_time": "2026-06-16T13:30:00Z",
+        "event_time_confidence": 1.0,
+        "external_asset": "OpenAI",
+        "confidence": 0.88,
+        "description": "TESTAI is being used as a synthetic OpenAI pre-IPO exposure proxy."
+      },
+      "market": {
+        "symbol": "TESTAI",
+        "coin_id": "testai",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "price": 3.75,
+        "volume_24h": 150000000,
+        "spot_volume_24h": 9000000,
+        "market_cap": 60000000,
+        "return_24h": 0.95,
+        "return_72h": 2.7,
+        "return_7d": 5.4,
+        "distance_from_20d_ma": 1.3,
+        "volume_zscore_24h": 5.8,
+        "order_book_depth_2pct": 22000,
+        "spread_bps": 60
+      },
+      "derivatives": {
+        "symbol": "TESTAI",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "perp_available": true,
+        "open_interest_24h_change_pct": 0.58,
+        "open_interest_to_market_cap": 0.32,
+        "funding_rate_8h": 0.0011,
+        "perp_spot_volume_ratio": 18,
+        "long_short_ratio": 2.0,
+        "basis": 0.023
+      },
+      "supply": {
+        "symbol": "TESTAI",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "large_holder_exchange_inflow": true,
+        "cex_inflow_pct_supply": 0.015,
+        "top_holder_concentration": 0.58
+      },
+      "rsi": {
+        "symbol": "TESTAI",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "rsi_daily": 84,
+        "rsi_4h": 77,
+        "rsi_weekly": 71,
+        "target_overbought_score": 88,
+        "btc_risk_on_score": 35,
+        "rsi_rollover_confirmed": true,
+        "bearish_rsi_divergence": true
+      },
+      "technical": {
+        "symbol": "TESTAI",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "event_vwap": 4.2,
+        "price_below_event_vwap": true,
+        "failed_reclaim_event_vwap": true,
+        "lower_high_confirmed": true,
+        "first_support_broken": true,
+        "invalidation_level": 4.25,
+        "entry_reference_price": 3.75
+      }
+    },
+    {
+      "id": "cryptopanic-testbtc-etf-direct",
+      "title": "TESTBTC rallies before final spot BTC ETF decision",
+      "description": "The decision directly affects Bitcoin demand and TESTBTC is the direct beneficiary rather than a proxy token.",
+      "published_at": "2026-06-15T11:00:00Z",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "url": "https://example.test/cryptopanic/testbtc-etf-direct",
+      "source_confidence": 0.90,
+      "event": {
+        "event_id": "cryptopanic-testbtc-etf-decision",
+        "event_name": "Final spot BTC ETF decision",
+        "event_type": "etf_approval",
+        "event_time": "2026-06-16T13:30:00Z",
+        "event_time_confidence": 1.0,
+        "external_asset": "Bitcoin",
+        "confidence": 0.90,
+        "description": "TESTBTC is the direct beneficiary of a BTC ETF event."
+      },
+      "market": {
+        "symbol": "TESTBTC",
+        "coin_id": "testbtc",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "price": 65000,
+        "return_24h": 0.90,
+        "return_72h": 2.2,
+        "return_7d": 4.5,
+        "volume_zscore_24h": 5.0
+      },
+      "rsi": {
+        "symbol": "TESTBTC",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "target_overbought_score": 90,
+        "rsi_rollover_confirmed": true
+      },
+      "technical": {
+        "symbol": "TESTBTC",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "price_below_event_vwap": true,
+        "failed_reclaim_event_vwap": true,
+        "lower_high_confirmed": true,
+        "first_support_broken": true,
+        "entry_reference_price": 65000
+      }
+    }
+  ]
+}

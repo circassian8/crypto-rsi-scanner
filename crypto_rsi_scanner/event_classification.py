@@ -35,6 +35,8 @@ DIRECT_TYPES = {
     "mainnet_launch",
     "governance",
     "protocol_upgrade",
+    "etf_approval",
+    "etf_launch",
 }
 
 DIRECT_KEYWORDS = (

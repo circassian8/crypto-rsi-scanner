@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add fixture news/proxy narrative discovery · Codex
+**Why:** The event-fade radar needs narrative/news sources to discover
+VELVET-style proxy setups, not only structured crypto calendars and exchange
+announcements. Phase 6 adds offline news fixtures while preserving the
+research-only/no-routing boundary.
+**Changes:**
+- Added fixture-backed CryptoPanic-, GDELT-, and project-blog/RSS-style news
+  providers over a shared news parser that accepts common API-like shapes such
+  as `results`, `features`, and `items`.
+- Added optional config/report paths:
+  `RSI_EVENT_DISCOVERY_CRYPTOPANIC_PATH`, `RSI_EVENT_DISCOVERY_GDELT_PATH`, and
+  `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH`.
+- Added fixtures for TESTAI/OpenAI proxy exposure, TESTBTC/BTC ETF direct
+  beneficiary news, TESTFAN sports/fan-token proxy attention, TESTLATE
+  post-event proxy evidence, and TESTAMBIG ambiguous momentum news.
+- Expanded aliases for the new news fixture assets.
+- Tightened deterministic classification so `etf_approval` and `etf_launch`
+  event types classify as direct token events even when article wording is not
+  exactly "ETF approval".
+- Expanded offline tests for news provider parsing, malformed fixture fail-soft
+  behavior, proxy/direct/ambiguous classification, post-event first-seen safety,
+  deterministic fixed-time trigger behavior, and scanner report wiring.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with Phase 6 status and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 167/167.
+`make event-discovery-report` prints 15 raw events / 14 normalized events with
+TESTAI, TESTFAN, TESTLATE, and TESTAMBIG included; direct/ambiguous/late cases
+remain `NO_TRADE`. `git diff --check` passes. `make verify` passes.
+**Notes/risks:** Providers remain fixture-backed only. No live CryptoPanic,
+GDELT, RSS, cache, DB, notification, paper-trading, or execution path was added.
+
 ## 2026-06-16 — Add fixture derivatives enrichment for event discovery · Codex
 **Why:** Event-fade validation needs crowding evidence, not just dated events.
 Phase 5 adds local Coinalyze-style derivatives snapshots so the research radar

@@ -1,0 +1,83 @@
+{
+  "items": [
+    {
+      "id": "blog-testlate-post-event-proxy",
+      "title": "TESTLATE launches late proxy dashboard for Anthropic pre-IPO exposure",
+      "summary": "The late proxy token lets traders get synthetic exposure to Anthropic after the dated catalyst has already passed.",
+      "pubDate": "2026-06-16T15:30:00Z",
+      "fetched_at": "2026-06-16T15:45:00Z",
+      "link": "https://example.test/blog/testlate-anthropic-late",
+      "source_confidence": 0.89,
+      "event": {
+        "event_id": "testlate-anthropic-demo",
+        "event_name": "Anthropic product demo",
+        "event_type": "ipo_proxy",
+        "event_time": "2026-06-16T13:00:00Z",
+        "event_time_confidence": 1.0,
+        "external_asset": "Anthropic",
+        "confidence": 0.89,
+        "description": "TESTLATE article was first seen after the dated catalyst had passed."
+      },
+      "market": {
+        "symbol": "TESTLATE",
+        "coin_id": "testlate",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "price": 1.1,
+        "volume_24h": 45000000,
+        "spot_volume_24h": 3000000,
+        "market_cap": 18000000,
+        "return_24h": 1.3,
+        "return_72h": 3.0,
+        "return_7d": 6.0,
+        "volume_zscore_24h": 5.5,
+        "order_book_depth_2pct": 8000,
+        "spread_bps": 140
+      },
+      "derivatives": {
+        "symbol": "TESTLATE",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "perp_available": true,
+        "open_interest_24h_change_pct": 0.75,
+        "open_interest_to_market_cap": 0.45,
+        "funding_rate_8h": 0.0014,
+        "perp_spot_volume_ratio": 25,
+        "long_short_ratio": 2.3,
+        "basis": 0.03
+      },
+      "supply": {
+        "symbol": "TESTLATE",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "large_holder_exchange_inflow": true,
+        "cex_inflow_pct_supply": 0.03,
+        "team_or_mm_wallet_activity": true
+      },
+      "rsi": {
+        "symbol": "TESTLATE",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "target_overbought_score": 92,
+        "btc_risk_on_score": 30,
+        "rsi_rollover_confirmed": true,
+        "bearish_rsi_divergence": true
+      },
+      "technical": {
+        "symbol": "TESTLATE",
+        "timestamp": "2026-06-16T16:00:00Z",
+        "price_below_event_vwap": true,
+        "failed_reclaim_event_vwap": true,
+        "lower_high_confirmed": true,
+        "first_support_broken": true,
+        "invalidation_level": 1.3,
+        "entry_reference_price": 1.1
+      }
+    },
+    {
+      "id": "blog-testambig-momentum",
+      "title": "TESTAMBIG momentum accelerates as traders discuss a possible announcement",
+      "summary": "No dated external catalyst, no proxy evidence, and no direct token-specific event is confirmed.",
+      "pubDate": "2026-06-16T11:30:00Z",
+      "fetched_at": "2026-06-16T11:45:00Z",
+      "link": "https://example.test/blog/testambig-momentum",
+      "source_confidence": 0.55
+    }
+  ]
+}

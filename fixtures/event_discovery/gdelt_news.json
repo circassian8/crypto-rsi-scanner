@@ -1,0 +1,17 @@
+{
+  "features": [
+    {
+      "properties": {
+        "id": "gdelt-testfan-match-proxy",
+        "title": "TESTFAN fan token surges before Test FC World Cup match kickoff",
+        "description": "The fan token is a proxy attention trade for Test FC's World Cup fixture rather than a direct protocol catalyst.",
+        "seendate": "2026-06-16T09:30:00Z",
+        "fetched_at": "2026-06-16T10:00:00Z",
+        "url": "https://example.test/gdelt/testfan-world-cup",
+        "source_confidence": 0.82,
+        "event_time": "2026-06-16T18:00:00Z",
+        "external_asset": "Test FC"
+      }
+    }
+  ]
+}
