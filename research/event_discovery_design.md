@@ -66,7 +66,8 @@ Current files:
 - `event_providers/sports_fixtures.py`: local sports-fixture provider for
   dated team/match catalysts
 - `event_providers/prediction_market_events.py`: local prediction-market
-  fixture provider for external attention/catalyst markets
+  fixture provider plus opt-in live Polymarket Gamma event fetch for dated
+  external attention/catalyst markets
 - `derivatives_providers/coinalyze.py`: derivatives provider that maps
   Coinalyze-style OI/funding/crowding fixture rows or opt-in live Coinalyze REST
   snapshots to discovery candidates
@@ -225,12 +226,33 @@ eligibility.
 
 ## External Catalyst Providers
 
-External IPO, sports-fixture, and prediction-market providers currently read
-local JSON fixtures only. They turn non-crypto catalysts into radar events:
+External IPO and sports-fixture providers currently read local JSON fixtures
+only. The prediction-market provider can read local fixtures or, when explicitly
+opted in, fetch no-key live Polymarket Gamma events. They turn non-crypto
+catalysts into radar events:
 
 - external IPO/calendar entries
 - sports matches or fixtures
 - prediction-market questions around dated external events
+
+Run an opt-in live Polymarket catalyst pass:
+
+```bash
+RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1 \
+RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 \
+RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT=250 \
+  .venv/bin/python main.py --event-discovery-refresh
+```
+
+Or use the no-key Make convenience target:
+
+```bash
+make event-fade-polymarket-review-cycle
+```
+
+The live Polymarket path fetches Gamma events ordered by 24h volume, preserves
+event end dates as `event_time`, and remains research-only/fail-soft. It is a
+dated external-catalyst source, not a proxy classifier by itself.
 
 External catalysts are radar-first. An external event by itself does not resolve
 to a crypto asset and therefore cannot produce a fade candidate. A crypto
@@ -884,6 +906,11 @@ aliases. Public RSS rows now include asset-role metadata in validation exports
 and review packets so reviewers can separate actual proxy instruments/venues
 from background mentions, infrastructure rows, and ticker-word collisions.
 Provider/network failures remain warnings in `discovery_runs.jsonl`.
+
+The live Polymarket cycle is complementary to public RSS: it can produce dated
+external-catalyst/control rows even when RSS rows are undated, but current public
+Polymarket data may still resolve mostly ambiguous controls. Treat that as
+useful negative-control evidence, not proof of a proxy-fade edge.
 
 Validation review reports include asset-role cohorts alongside event-type,
 relationship, and BTC-risk cohorts. Use the asset-role section to verify that

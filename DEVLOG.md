@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add no-key Polymarket catalyst discovery · Codex
+**Why:** The fresh public RSS review bundle produced review rows, but every row
+was missing `event_time`, so it could only provide undated attention/control
+leads. The validation workflow needs dated external catalysts too.
+**Changes:**
+- Added opt-in live Polymarket Gamma fetching to
+  `event_providers/prediction_market_events.py`, preserving event end dates as
+  `event_time` and preferring active nested market end dates when available.
+- Wired `RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE` plus base URL,
+  limit, and timeout settings through config, scanner, and provider readiness.
+- Added `make event-discovery-refresh-polymarket` and
+  `make event-fade-polymarket-review-cycle` for no-key research cache/review
+  bundle generation.
+- Hardened the resolver against the live Polymarket `BILL`/`bill` false
+  positive where legislative text matched the Billions Network token.
+- Updated `.env.example`, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+**Verify:** `make verify` passes, including 237/237 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard. `make
+event-fade-polymarket-review-cycle` in `/tmp` fetched 17 dated raw Polymarket
+events, built one current ambiguous-control review row after the `BILL` guard,
+and wrote a research-only review bundle.
+**Notes/risks:** Polymarket currently adds useful dated control evidence, not
+proxy-fade proof. It remains opt-in, fail-soft, research-only, and unable to
+bypass the event-fade proxy/direct hard gate.
+
 ## 2026-06-16 — Summarize event-fade review bundles · Codex
 **Why:** The public RSS validation workflow now produces cleaner rows, but a
 reviewer still had to inspect the sample or report to understand whether a

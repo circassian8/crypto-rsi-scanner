@@ -25,8 +25,11 @@ EVENT_DISCOVERY_RSS_URLS_PATH ?= fixtures/event_discovery/public_rss_feeds.txt
 EVENT_DISCOVERY_RSS_UNIVERSE_LIVE ?= 1
 EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT ?= 250
 EVENT_DISCOVERY_RSS_LOOKBACK_HOURS ?= 720
+EVENT_DISCOVERY_POLYMARKET_LIMIT ?= 100
+EVENT_DISCOVERY_POLYMARKET_UNIVERSE_LIVE ?= 1
+EVENT_DISCOVERY_POLYMARKET_UNIVERSE_FETCH_LIMIT ?= 250
 
-.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-polymarket event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-polymarket-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -46,6 +49,7 @@ help:
 	@echo "  make event-discovery-refresh  Write research-only event JSONL cache"
 	@echo "  make event-discovery-refresh-configured  Cache configured event sources"
 	@echo "  make event-discovery-refresh-public-rss  Cache no-key public RSS event evidence"
+	@echo "  make event-discovery-refresh-polymarket  Cache no-key Polymarket dated catalysts"
 	@echo "  make event-discovery-binance-listen  Cache raw live Binance announcement evidence"
 	@echo "  make event-fade-auto-report  Print grouped event-fade discovery report"
 	@echo "  make event-fade-export-sample  Write validation sample from fixtures"
@@ -60,6 +64,7 @@ help:
 	@echo "  make event-fade-review-cycle  Refresh research cache and write review workspace"
 	@echo "  make event-fade-configured-review-cycle  Refresh configured sources and write review workspace"
 	@echo "  make event-fade-public-rss-review-cycle  Refresh public RSS sources and write review workspace"
+	@echo "  make event-fade-polymarket-review-cycle  Refresh Polymarket catalysts and write review workspace"
 	@echo "  make event-fade-merge-sample  Preserve review status/labels/outcomes in fresh sample"
 	@echo "  make event-fade-export-outcome-prices  Build local validation price fixture"
 	@echo "  make event-fade-fill-outcomes  Fill validation outcomes from local prices"
@@ -172,6 +177,14 @@ event-discovery-refresh-public-rss:
 	RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT=$(EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT) \
 	$(PYTHON) main.py --event-discovery-refresh
 
+event-discovery-refresh-polymarket:
+	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
+	RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1 \
+	RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT=$(EVENT_DISCOVERY_POLYMARKET_LIMIT) \
+	RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=$(EVENT_DISCOVERY_POLYMARKET_UNIVERSE_LIVE) \
+	RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT=$(EVENT_DISCOVERY_POLYMARKET_UNIVERSE_FETCH_LIMIT) \
+	$(PYTHON) main.py --event-discovery-refresh
+
 event-discovery-binance-listen:
 	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
 	$(PYTHON) main.py --event-discovery-binance-listen
@@ -258,6 +271,10 @@ event-fade-configured-review-cycle:
 
 event-fade-public-rss-review-cycle:
 	$(MAKE) event-discovery-refresh-public-rss EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_DISCOVERY_RSS_URLS_PATH=$(EVENT_DISCOVERY_RSS_URLS_PATH) EVENT_DISCOVERY_RSS_UNIVERSE_LIVE=$(EVENT_DISCOVERY_RSS_UNIVERSE_LIVE) EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT=$(EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT) EVENT_DISCOVERY_RSS_LOOKBACK_HOURS=$(EVENT_DISCOVERY_RSS_LOOKBACK_HOURS)
+	$(MAKE) event-fade-cache-review-bundle EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=$(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) EVENT_FADE_QUEUE_LIMIT=$(EVENT_FADE_QUEUE_LIMIT) EVENT_FADE_REVIEW_BUNDLE_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_PRICES) EVENT_FADE_REVIEW_BUNDLE_REVIEWED=$(EVENT_FADE_REVIEW_BUNDLE_REVIEWED) EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES) EVENT_FADE_PRICE_DAYS=$(EVENT_FADE_PRICE_DAYS) EVENT_FADE_PRICE_FIXTURE_DIR=$(EVENT_FADE_PRICE_FIXTURE_DIR)
+
+event-fade-polymarket-review-cycle:
+	$(MAKE) event-discovery-refresh-polymarket EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_DISCOVERY_POLYMARKET_LIMIT=$(EVENT_DISCOVERY_POLYMARKET_LIMIT) EVENT_DISCOVERY_POLYMARKET_UNIVERSE_LIVE=$(EVENT_DISCOVERY_POLYMARKET_UNIVERSE_LIVE) EVENT_DISCOVERY_POLYMARKET_UNIVERSE_FETCH_LIMIT=$(EVENT_DISCOVERY_POLYMARKET_UNIVERSE_FETCH_LIMIT)
 	$(MAKE) event-fade-cache-review-bundle EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=$(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) EVENT_FADE_QUEUE_LIMIT=$(EVENT_FADE_QUEUE_LIMIT) EVENT_FADE_REVIEW_BUNDLE_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_PRICES) EVENT_FADE_REVIEW_BUNDLE_REVIEWED=$(EVENT_FADE_REVIEW_BUNDLE_REVIEWED) EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES) EVENT_FADE_PRICE_DAYS=$(EVENT_FADE_PRICE_DAYS) EVENT_FADE_PRICE_FIXTURE_DIR=$(EVENT_FADE_PRICE_FIXTURE_DIR)
 
 event-fade-merge-sample:

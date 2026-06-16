@@ -85,7 +85,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   without running an alerting scan) · `main.py --event-fade-report` (score local
   event-fade fixtures, alert-only/no sends) · `main.py --event-discovery-report`
   (fixture event radar with optional exchange-announcement, structured calendar,
-  unlock, news/proxy-narrative, opt-in live Binance/Bybit/CryptoPanic/GDELT/RSS, external catalyst,
+  unlock, news/proxy-narrative, opt-in live Binance/Bybit/CryptoPanic/GDELT/RSS/Polymarket, external catalyst,
   Coinalyze-style derivatives with opt-in live Coinalyze enrichment,
   supply/on-chain enrichment, and clean CoinGecko
   universe fixtures or opt-in live CoinGecko universe resolver enrichment,
@@ -103,6 +103,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   event-fade-public-rss-review-cycle` (opt-in no-key public RSS source bundle
   with a 30-day lookback, targeted proxy-narrative search feed, and optional
   live CoinGecko universe enrichment; research cache/review artifacts only) ·
+  `make event-discovery-refresh-polymarket` / `make
+  event-fade-polymarket-review-cycle` (opt-in no-key Polymarket Gamma dated
+  catalyst source with optional live CoinGecko universe enrichment; research
+  cache/review artifacts only) ·
   `main.py --event-discovery-binance-listen` (listen to Binance's signed CMS
   WebSocket for the configured window and append raw research cache evidence
   only; no live DB writes) ·
@@ -196,7 +200,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
-| `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider plus opt-in live CoinGecko universe resolver enrichment, exchange announcement parsers with captured Binance CMS WebSocket payload support plus opt-in live Binance WebSocket and Bybit HTTP fetches, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers with opt-in live CryptoPanic posts, GDELT Article List, and project-blog RSS/Atom fetches, and external IPO/sports/prediction-market catalyst parsers |
+| `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider plus opt-in live CoinGecko universe resolver enrichment, exchange announcement parsers with captured Binance CMS WebSocket payload support plus opt-in live Binance WebSocket and Bybit HTTP fetches, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers with opt-in live CryptoPanic posts, GDELT Article List, and project-blog RSS/Atom fetches, and external IPO/sports/prediction-market catalyst parsers with opt-in live Polymarket Gamma events |
 | `derivatives_providers/` | derivatives enrichment adapters for event discovery, starting with Coinalyze-style OI/funding/crowding snapshots and opt-in live Coinalyze REST enrichment |
 | `supply_providers/` | fixture-backed supply/on-chain enrichment adapters for event discovery, starting with Tokenomist/Etherscan/Arkham/Dune-style snapshots; no live supply provider enabled yet |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
@@ -435,7 +439,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   remain `NO_TRADE`, can classify linked-asset roles so background mentions,
   infrastructure chains, and ticker-word collisions become `proxy_context`
   controls, can parse local external IPO,
-  sports, and prediction-market catalyst fixtures as radar evidence, can attach local
+  sports, and prediction-market catalyst fixtures as radar evidence, can optionally
+  fetch no-key live Polymarket Gamma dated catalyst events when
+  `RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1`, can attach local
   Coinalyze-style OI/funding/crowding snapshots from
   `RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH`, can optionally fetch live
   Coinalyze derivatives snapshots from explicit
@@ -491,10 +497,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   News RSS search for pre-IPO/tokenized-stock/prediction-market/fan-token
   narratives. It defaults to a 30-day lookback and a broader live CoinGecko
   resolver universe, and writes only research cache/review artifacts.
+  `make event-fade-polymarket-review-cycle` is the no-key convenience path for
+  Polymarket Gamma dated catalyst events. It defaults to live CoinGecko universe
+  enrichment and writes only research cache/review artifacts.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,
-  RSS/Atom feed fetches, and Coinalyze derivatives enrichment, no network
+  RSS/Atom feed fetches, Polymarket Gamma catalyst events, and Coinalyze derivatives enrichment, no network
   event/news/derivatives/supply providers,
   live DB writes, notifications, or paper trades
   are enabled. `main.py --event-discovery-refresh` can write the local

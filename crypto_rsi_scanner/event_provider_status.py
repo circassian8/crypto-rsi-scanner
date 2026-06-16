@@ -197,8 +197,16 @@ def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderSta
         _status(
             name="prediction_market_events",
             category="event_source",
-            ready=_is_path_configured(cfg.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH),
-            details=(_path_detail(cfg.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH),),
+            ready=(
+                _is_path_configured(cfg.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH)
+                or cfg.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE
+            ),
+            details=(
+                _path_detail(cfg.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH),
+                f"live={_flag(cfg.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE)}",
+                f"limit={int(getattr(cfg, 'EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT', 0) or 0)}",
+            ),
+            notes=("external catalyst evidence; cannot bypass proxy gate",),
         ),
     )
 
@@ -285,8 +293,9 @@ def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderSta
         warnings.append("Coinalyze live enrichment is enabled but the API key is missing.")
 
     next_steps = (
-        "Enable at least one event source, for example public RSS feeds, GDELT live, CryptoPanic live, or local event fixtures.",
+        "Enable at least one event source, for example public RSS feeds, Polymarket prediction events, GDELT live, CryptoPanic live, or local event fixtures.",
         "No-key option: make event-fade-public-rss-review-cycle EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1",
+        "Dated catalyst option: make event-fade-polymarket-review-cycle EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1",
         "Then run: make event-fade-configured-review-cycle EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1",
     )
     if any(item.ready for item in sources):

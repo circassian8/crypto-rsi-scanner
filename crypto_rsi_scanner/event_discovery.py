@@ -359,6 +359,10 @@ def run_manual_discovery(
     external_ipo_path: str | Path | None = None,
     sports_fixtures_path: str | Path | None = None,
     prediction_market_events_path: str | Path | None = None,
+    prediction_market_events_live: bool = False,
+    prediction_market_events_base_url: str = "https://gamma-api.polymarket.com/events",
+    prediction_market_events_limit: int = 100,
+    prediction_market_events_timeout: float = 10.0,
     coinalyze_derivatives_path: str | Path | None = None,
     coinalyze_live: bool = False,
     coinalyze_api_key: str = "",
@@ -431,6 +435,10 @@ def run_manual_discovery(
         external_ipo_path=external_ipo_path,
         sports_fixtures_path=sports_fixtures_path,
         prediction_market_events_path=prediction_market_events_path,
+        prediction_market_events_live=prediction_market_events_live,
+        prediction_market_events_base_url=prediction_market_events_base_url,
+        prediction_market_events_limit=prediction_market_events_limit,
+        prediction_market_events_timeout=prediction_market_events_timeout,
     )
     assets = load_discovery_assets(
         alias_path,
@@ -516,6 +524,10 @@ def load_discovery_events(
     external_ipo_path: str | Path | None = None,
     sports_fixtures_path: str | Path | None = None,
     prediction_market_events_path: str | Path | None = None,
+    prediction_market_events_live: bool = False,
+    prediction_market_events_base_url: str = "https://gamma-api.polymarket.com/events",
+    prediction_market_events_limit: int = 100,
+    prediction_market_events_timeout: float = 10.0,
 ) -> list[RawDiscoveredEvent]:
     """Load local event fixtures from every configured research source."""
     events: list[RawDiscoveredEvent] = []
@@ -581,8 +593,14 @@ def load_discovery_events(
         events.extend(ExternalIpoProvider(external_ipo_path).fetch_events(start, end))
     if sports_fixtures_path:
         events.extend(SportsFixturesProvider(sports_fixtures_path).fetch_events(start, end))
-    if prediction_market_events_path:
-        events.extend(PredictionMarketEventsProvider(prediction_market_events_path).fetch_events(start, end))
+    if prediction_market_events_path or prediction_market_events_live:
+        events.extend(PredictionMarketEventsProvider(
+            prediction_market_events_path,
+            live_enabled=prediction_market_events_live,
+            base_url=prediction_market_events_base_url,
+            limit=prediction_market_events_limit,
+            timeout=prediction_market_events_timeout,
+        ).fetch_events(start, end))
     return events
 
 

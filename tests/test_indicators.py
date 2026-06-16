@@ -266,6 +266,8 @@ def _event_provider_status_cfg(**overrides):
         "EVENT_DISCOVERY_EXTERNAL_IPO_PATH": None,
         "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH": None,
         "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH": None,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": False,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT": 100,
         "EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH": None,
         "EVENT_DISCOVERY_COINALYZE_LIVE": False,
         "EVENT_DISCOVERY_COINALYZE_API_KEY": "",
@@ -336,6 +338,21 @@ def test_event_provider_status_ready_with_rss_url_file():
     assert "Project blog/RSS live mode is enabled but no RSS/Atom URLs are configured" not in text
 
 
+def test_event_provider_status_ready_with_live_prediction_market_source():
+    cfg = _event_provider_status_cfg(
+        EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=True,
+        EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT=12,
+    )
+    report = event_provider_status.build_event_discovery_provider_status(cfg)
+    text = event_provider_status.format_event_discovery_provider_status(report)
+
+    assert report.ready_event_source_count == 1
+    assert report.ready_for_configured_review_cycle
+    assert "prediction_market_events" in text
+    assert "live=on" in text
+    assert "limit=12" in text
+
+
 def test_config_load_url_list_dedupes_comments_and_inline_notes():
     import tempfile
     from pathlib import Path
@@ -374,6 +391,23 @@ def test_public_rss_make_target_does_not_inject_fixture_aliases():
     assert "RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT=250" in result.stdout
     assert "RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=720" in result.stdout
     assert "fixtures/event_discovery/asset_aliases.json" not in result.stdout
+
+
+def test_polymarket_make_target_uses_live_prediction_market_source():
+    import subprocess
+
+    result = subprocess.run(
+        ["make", "-n", "event-fade-polymarket-review-cycle"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "event-discovery-refresh-polymarket" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT=100" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1" in result.stdout
+    assert "event-fade-cache-review-bundle" in result.stdout
 
 
 def _event_fade_velvet_candidate(now=None, *, direct=False, no_event_time=False, btc_risk_on=35):
@@ -1303,9 +1337,38 @@ def test_event_resolver_rejects_generic_live_universe_identity_terms():
         DiscoveredAsset("cash-4", "CASH", "Cash", 1, 1, 1, (), {}, "coingecko", ("cash-4", "Cash", "CASH")),
         DiscoveredAsset("just", "JST", "JUST", 1, 1, 1, (), {}, "coingecko", ("just", "JUST", "JST")),
         DiscoveredAsset("reallink", "REAL", "Reallink", 1, 1, 1, (), {}, "coingecko", ("real", "REAL")),
+        DiscoveredAsset(
+            "billions-network",
+            "BILL",
+            "Billions Network",
+            1,
+            1,
+            1,
+            (),
+            {},
+            "coingecko",
+            ("bill", "BILL"),
+        ),
     ]
 
     assert resolve_event_assets(event, noisy_assets) == []
+
+    legislature_event = NormalizedEvent(
+        event_id="state-legislature-secession",
+        raw_ids=("polymarket:1",),
+        event_name="Any US state legislature votes on secession by June 30, 2026?",
+        event_type="external_proxy_event",
+        event_time=datetime(2026, 6, 30, tzinfo=timezone.utc),
+        event_time_confidence=0.90,
+        first_seen_time=datetime(2026, 6, 16, tzinfo=timezone.utc),
+        source="prediction_market_events",
+        source_urls=("https://polymarket.com/event/state-secession",),
+        external_asset=None,
+        description="This market resolves Yes if a bill or resolution is formally voted on by a state legislature.",
+        confidence=0.78,
+    )
+
+    assert resolve_event_assets(legislature_event, noisy_assets) == []
 
 
 def test_event_discovery_resolves_real_assets_from_clean_universe_fixture():
@@ -2401,6 +2464,106 @@ def test_event_discovery_external_catalyst_providers_parse_fixtures():
             pass
         else:
             raise AssertionError("required malformed external catalyst fixture should fail")
+
+
+def test_event_discovery_prediction_market_live_provider_parses_polymarket_offline():
+    import json
+    from datetime import datetime, timezone
+    from urllib.parse import parse_qs, urlparse
+    from crypto_rsi_scanner.event_providers.prediction_market_events import PredictionMarketEventsProvider
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    seen = {}
+
+    def fake_opener(request, timeout):
+        seen["url"] = request.full_url
+        seen["timeout"] = timeout
+        seen["accept"] = request.headers.get("Accept")
+        return FakeResponse([
+            {
+                "id": "pm-spacex",
+                "slug": "will-spacex-launch-before-july",
+                "title": "Will SpaceX launch Starship before July?",
+                "description": "Prediction market attention around SpaceX.",
+                "createdAt": "2026-06-15T08:00:00Z",
+                "endDate": "2026-12-31T23:59:00Z",
+                "volume24hr": 125000,
+                "openInterest": 43000,
+                "markets": [
+                    {"endDate": "2026-06-20T23:59:00Z", "active": True, "closed": False},
+                    {"endDate": "2026-06-18T23:59:00Z", "active": False, "closed": True},
+                ],
+            },
+            {
+                "id": "pm-old",
+                "slug": "old-election-market",
+                "title": "Will the old election result be certified?",
+                "description": "Outside the requested event window.",
+                "createdAt": "2026-06-01T08:00:00Z",
+                "endDate": "2026-07-20T23:59:00Z",
+            },
+        ])
+
+    start = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 30, tzinfo=timezone.utc)
+    fetched_at = datetime(2026, 6, 16, 10, 0, tzinfo=timezone.utc)
+    provider = PredictionMarketEventsProvider(
+        None,
+        live_enabled=True,
+        base_url="https://gamma.test/events",
+        limit=7,
+        timeout=3.5,
+        opener=fake_opener,
+        fetched_at=fetched_at,
+    )
+    events = provider.fetch_events(start, end)
+
+    assert len(events) == 1
+    parsed = urlparse(seen["url"])
+    params = parse_qs(parsed.query)
+    assert parsed.scheme == "https"
+    assert parsed.netloc == "gamma.test"
+    assert params["active"] == ["true"]
+    assert params["closed"] == ["false"]
+    assert params["limit"] == ["7"]
+    assert params["order"] == ["volume_24hr"]
+    assert params["ascending"] == ["false"]
+    assert seen["timeout"] == 3.5
+    assert seen["accept"] == "application/json"
+
+    event = events[0]
+    assert event.provider == "prediction_market_events"
+    assert event.fetched_at == fetched_at
+    assert event.published_at.isoformat() == "2026-06-15T08:00:00+00:00"
+    assert event.source_url == "https://polymarket.com/event/will-spacex-launch-before-july"
+    assert event.raw_json["provider_source"] == "polymarket_gamma"
+    assert event.raw_json["event"]["event_type"] == "external_proxy_event"
+    assert event.raw_json["event"]["event_time"] == "2026-06-20T23:59:00+00:00"
+    assert event.raw_json["event"]["event_time_confidence"] == 0.90
+    assert event.raw_json["event"]["external_asset"] == "SpaceX"
+
+    def failing_opener(request, timeout):
+        raise TimeoutError("offline timeout")
+
+    assert PredictionMarketEventsProvider(
+        None,
+        live_enabled=True,
+        opener=failing_opener,
+    ).fetch_events(start, end) == []
 
 
 def test_event_discovery_external_catalysts_are_radar_first_and_link_narrowly():

@@ -11,6 +11,7 @@ from typing import Iterable
 from .event_models import DiscoveredAsset, EventAssetLink, NormalizedEvent
 
 GENERIC_ASSET_TERMS = {
+    "bill",
     "cash",
     "real",
     "just",
