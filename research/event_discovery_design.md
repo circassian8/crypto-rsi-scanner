@@ -1,11 +1,12 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1-9 fixture framework with clean CoinGecko universe bridge,
+**Status:** Phase 1-10 fixture framework with clean CoinGecko universe bridge,
 fixture-backed exchange announcement providers, structured calendar/unlock
 providers, news/proxy-narrative providers, external catalyst providers, and
 Coinalyze-style derivatives plus Tokenomist/Etherscan/Arkham/Dune-style
-supply/on-chain enrichment, plus grouped auto reporting, research-only
+supply/on-chain enrichment, plus grouped auto reporting and validation-sample
+exports, research-only
 
 ## Goal
 
@@ -68,7 +69,8 @@ Current files:
 - `event_resolver.py`: alias-aware asset resolver
 - `event_classification.py`: deterministic proxy/direct classifier
 - `event_discovery.py`: normalizer, deduper, orchestrator, flat radar report
-  formatter, and grouped event-fade auto report formatter
+  formatter, grouped event-fade auto report formatter, and validation-sample
+  export helpers
 
 ## Universe Integration
 
@@ -217,6 +219,31 @@ available.
 This remains local and observational. It does not send Telegram alerts, write
 live signal/outcome/paper tables, open paper trades, or imply execution.
 
+## Validation Sample Export
+
+`main.py --event-fade-export-sample PATH` runs the same fixture-only discovery
+path and writes a review artifact. A `.csv` suffix writes CSV; any other suffix
+writes JSONL; `-` prints JSONL to stdout. The exported rows are designed for
+manual labeling and future point-in-time backtests, not for alerts.
+
+Each row includes:
+
+- raw source ids, providers, titles, content hashes, URLs, and raw-source
+  timestamps
+- normalized event identity, event type, event time/confidence, first-seen time,
+  and external asset
+- resolved asset identity plus link confidence, match reason, and evidence
+- proxy/direct classification, classifier version, confidence, reason, and
+  evidence
+- fade state, signal type, score, eligibility, reason codes, warnings,
+  component scores, feature fields, and missing-data markers
+- blank human-review and future outcome columns such as `human_label`,
+  `human_notes`, `max_adverse_excursion`, `max_favorable_excursion`, and
+  post-event returns
+
+This export may write only the requested local artifact. It must not write live
+DB rows, send alerts, open paper trades, or imply execution.
+
 ## Classification Rules
 
 Proxy candidates need all of:
@@ -325,8 +352,15 @@ Run the grouped event-fade auto report with the same fixture set:
 make event-fade-auto-report
 ```
 
-Both reports are local and observational. They do not send alerts or write the
-DB.
+Export the validation-sample rows with the same fixture set:
+
+```bash
+make event-fade-export-sample
+EVENT_FADE_SAMPLE_OUT=/tmp/event_fade_validation_sample.csv make event-fade-export-sample
+```
+
+All three outputs are local and observational. They do not send alerts or write
+the DB.
 
 ## Promotion Requirements
 

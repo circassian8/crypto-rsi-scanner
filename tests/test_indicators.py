@@ -639,6 +639,37 @@ def _full_event_discovery_fixture_result():
     )
 
 
+def _full_event_discovery_config_values():
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    binance_path, bybit_path = _exchange_announcement_fixture_paths()
+    coinmarketcal_path, tokenomist_path = _structured_calendar_fixture_paths()
+    cryptopanic_path, gdelt_path, blog_path = _news_fixture_paths()
+    ipo_path, sports_path, prediction_path = _external_catalyst_fixture_paths()
+    tokenomist_supply_path, etherscan_supply_path, arkham_supply_path, dune_supply_path = _supply_fixture_paths()
+    return {
+        "EVENT_DISCOVERY_EVENTS_PATH": events_path,
+        "EVENT_DISCOVERY_ALIASES_PATH": aliases_path,
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH": binance_path,
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH": bybit_path,
+        "EVENT_DISCOVERY_COINMARKETCAL_PATH": coinmarketcal_path,
+        "EVENT_DISCOVERY_TOKENOMIST_PATH": tokenomist_path,
+        "EVENT_DISCOVERY_CRYPTOPANIC_PATH": cryptopanic_path,
+        "EVENT_DISCOVERY_GDELT_PATH": gdelt_path,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH": blog_path,
+        "EVENT_DISCOVERY_EXTERNAL_IPO_PATH": ipo_path,
+        "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH": sports_path,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH": prediction_path,
+        "EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH": _derivatives_fixture_path(),
+        "EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH": tokenomist_supply_path,
+        "EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH": etherscan_supply_path,
+        "EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH": arkham_supply_path,
+        "EVENT_DISCOVERY_DUNE_SUPPLY_PATH": dune_supply_path,
+        "EVENT_DISCOVERY_UNIVERSE_PATH": _coingecko_universe_fixture_path(),
+        "EVENT_DISCOVERY_LOOKBACK_HOURS": 120,
+        "EVENT_DISCOVERY_HORIZON_DAYS": 2,
+    }
+
+
 def test_event_discovery_manual_provider_fixture_and_missing_path():
     import json
     import tempfile
@@ -1336,6 +1367,75 @@ def test_event_fade_auto_report_groups_discovered_candidates():
     assert "invalidation: 8.65" in report
 
 
+def test_event_fade_validation_sample_rows_and_serializers():
+    import csv
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery
+
+    exported_at = datetime(2026, 6, 16, 12, 5, tzinfo=timezone.utc)
+    result = _full_event_discovery_fixture_result()
+    rows = event_discovery.event_fade_validation_sample_rows(result, exported_at=exported_at)
+    assert len(rows) == len(result.candidates)
+    assert set(rows[0]) == set(event_discovery.VALIDATION_SAMPLE_FIELDS)
+
+    velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+    assert velvet["schema_version"] == "event_fade_validation_sample_v1"
+    assert velvet["exported_at"] == "2026-06-16T12:05:00+00:00"
+    assert velvet["event_name"] == "SpaceX IPO trading start"
+    assert velvet["raw_ids"] == ["velvet-spacex-proxy-1", "velvet-spacex-proxy-duplicate"]
+    assert len(velvet["raw_titles"]) == 2
+    assert len(velvet["raw_content_hashes"]) == 2
+    assert velvet["source_count"] == 2
+    assert velvet["relationship_type"] == "proxy_exposure"
+    assert velvet["is_proxy_narrative"] is True
+    assert velvet["is_direct_beneficiary"] is False
+    assert velvet["signal_type"] == "SHORT_TRIGGERED"
+    assert velvet["fade_state"] == "TRIGGERED_SHORT"
+    assert velvet["eligible"] is True
+    assert velvet["component_scores"]["post_event_failure"] >= 80
+    assert velvet["reason_codes"]
+    assert velvet["warnings"] == ["alert-only mode; no live order placed"]
+    assert velvet["trigger_observed_at"] is not None
+    assert velvet["entry_reference_price"] == 7.2
+    assert velvet["invalidation_level"] == 8.65
+    assert velvet["human_label"] == ""
+    assert velvet["human_notes"] == ""
+    assert velvet["max_adverse_excursion"] is None
+    assert velvet["post_event_return_7d"] is None
+
+    listing = next(
+        row
+        for row in rows
+        if row["asset_symbol"] == "TESTLIST" and row["relationship_type"] == "direct_listing"
+    )
+    assert listing["eligible"] is False
+    assert listing["signal_type"] == "NO_TRADE"
+    assert listing["large_holder_exchange_inflow"] is True
+    assert listing["missing_data"] == ["technical"]
+
+    jsonl = event_discovery.format_validation_sample_jsonl(rows)
+    parsed = [json.loads(line) for line in jsonl.splitlines()]
+    assert len(parsed) == len(rows)
+    assert parsed[0]["schema_version"] == "event_fade_validation_sample_v1"
+
+    csv_text = event_discovery.format_validation_sample_csv(rows)
+    csv_rows = list(csv.DictReader(csv_text.splitlines()))
+    assert len(csv_rows) == len(rows)
+    assert json.loads(csv_rows[0]["component_scores"])
+    assert json.loads(csv_rows[0]["source_urls"])
+
+    with tempfile.TemporaryDirectory() as tmp:
+        jsonl_path = Path(tmp) / "sample.jsonl"
+        csv_path = Path(tmp) / "sample.csv"
+        event_discovery.write_validation_sample(rows, jsonl_path)
+        event_discovery.write_validation_sample(rows, csv_path)
+        assert len(jsonl_path.read_text(encoding="utf-8").splitlines()) == len(rows)
+        assert len(list(csv.DictReader(csv_path.read_text(encoding="utf-8").splitlines()))) == len(rows)
+
+
 def test_event_discovery_scanner_report_uses_local_fixtures():
     import contextlib
     import io
@@ -1462,6 +1562,36 @@ def test_event_fade_auto_scanner_report_uses_local_fixtures():
         assert "  TESTLIST     coin=testlist" in text
         assert "AMBIGUOUS" in text
         assert "  TESTPUMP     coin=testpump" in text
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
+
+
+def test_event_fade_export_sample_scanner_writes_jsonl_fixture():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+
+    values = _full_event_discovery_config_values()
+    original = {name: getattr(config, name) for name in values}
+    for name, value in values.items():
+        setattr(config, name, value)
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            out_path = Path(tmp) / "sample.jsonl"
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_fade_export_sample(str(out_path))
+            text = out.getvalue()
+            assert "wrote" in text
+            assert out_path.exists()
+            rows = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines()]
+            assert len(rows) == 17
+            assert any(row["asset_symbol"] == "TESTVELVET" for row in rows)
+            assert all(row["human_label"] == "" for row in rows)
     finally:
         for name, value in original.items():
             setattr(config, name, value)

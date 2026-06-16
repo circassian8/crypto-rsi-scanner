@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade validation sample export · Codex
+**Why:** Phase 10 needed a concrete review artifact so discovered event-fade
+candidates can become a manually labeled validation sample without promoting
+the research sleeve into alerts, paper trades, DB writes, or execution.
+**Changes:**
+- Added a versioned event-fade validation sample schema in
+  `crypto_rsi_scanner/event_discovery.py` with JSONL/CSV serializers and a
+  writer.
+- Export rows now preserve raw source ids/providers/titles/content hashes,
+  point-in-time event/source timestamps, source URLs, asset-link evidence,
+  proxy/direct classification evidence, fade state/signal, component scores,
+  feature fields, missing-data markers, and blank human-review/outcome columns.
+- Added `main.py --event-fade-export-sample PATH`; `.csv` writes CSV, other
+  suffixes write JSONL, and `-` prints JSONL to stdout.
+- Added `make event-fade-export-sample`, defaulting to
+  `/tmp/event_fade_validation_sample.jsonl`, using the full offline discovery
+  fixture stack.
+- Added offline tests for validation rows, JSONL/CSV serialization, file
+  writing, and scanner CLI plumbing.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with Phase 10 status and the remaining
+  human-labeling boundary.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 177/177.
+`make event-fade-export-sample` writes 17 rows to
+`/tmp/event_fade_validation_sample.jsonl`. `git diff --check` passes.
+`make verify` passes.
+**Notes/risks:** This is still fixture-backed and local-only. The exporter writes
+only the requested artifact; it does not write live signal/outcome/paper tables,
+send Telegram alerts, open paper trades, or imply execution. The next real step
+is expanding the reviewed sample and filling human labels/outcomes.
+
 ## 2026-06-16 — Add grouped event-fade auto report · Codex
 **Why:** The discovery pipeline had a flat radar/classification report, but the
 Phase 9 work order called for a clearer event-fade output grouped by candidate

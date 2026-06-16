@@ -1124,6 +1124,24 @@ def event_fade_auto_report(verbose: bool = False) -> None:
     print(event_discovery.format_event_fade_auto_report(result))
 
 
+def event_fade_export_sample(path: str, verbose: bool = False) -> None:
+    """Export discovery-fed event-fade validation sample rows."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_discovery_paths_configured():
+        print(
+            "No event-discovery fixtures configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH "
+            "or another event-discovery fixture path."
+        )
+        return
+    result = _event_discovery_result_from_config()
+    rows = event_discovery.event_fade_validation_sample_rows(result)
+    if path == "-":
+        print(event_discovery.format_validation_sample_jsonl(rows))
+        return
+    out = event_discovery.write_validation_sample(rows, path)
+    print(f"Event-fade validation sample: wrote {len(rows)} row(s) to {out}")
+
+
 def status() -> None:
     """Print operational scan/listener health and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -1310,6 +1328,11 @@ def cli() -> None:
         help="Print grouped research-only event-fade candidates from discovery fixtures.",
     )
     parser.add_argument(
+        "--event-fade-export-sample",
+        metavar="PATH",
+        help="Export a research-only event-fade validation sample from discovery fixtures (.jsonl/.csv or '-' for JSONL stdout).",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for commands that support it.",
@@ -1397,6 +1420,9 @@ def cli() -> None:
         return
     if args.event_fade_auto_report:
         event_fade_auto_report(verbose=args.verbose)
+        return
+    if args.event_fade_export_sample:
+        event_fade_export_sample(args.event_fade_export_sample, verbose=args.verbose)
         return
     if args.status:
         status()
