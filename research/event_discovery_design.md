@@ -42,7 +42,8 @@ Current files:
 - `event_providers/coingecko_universe.py`: local CoinGecko market fixture
   provider that reuses shared universe hygiene filters
 - `event_providers/binance_announcements.py`: local Binance announcement fixture
-  provider for spot/listing-style direct events
+  provider for spot/listing-style direct events, including captured official CMS
+  WebSocket `com_announcement_en` payloads
 - `event_providers/bybit_announcements.py`: local Bybit announcement fixture
   provider for listing/perp-style direct events
 - `event_providers/coinmarketcal.py`: local structured calendar fixture provider
@@ -101,6 +102,13 @@ This is still an offline fixture path. It does not fetch CoinGecko directly.
 ## Exchange Announcement Providers
 
 Binance and Bybit announcement providers read local JSON fixtures by default.
+Binance fixtures may be normalized listing-style rows or captured official CMS
+WebSocket `DATA` messages from topic `com_announcement_en`; the latter stores
+the announcement JSON string inside the `data` field with `catalogName`,
+`publishDate`, `title`, and `body`. A live Binance WebSocket listener/cache
+adapter is still future work, because the daily scanner provider interface is a
+bounded fetch rather than an always-on socket.
+
 Bybit can also fetch the official `GET /v5/announcements/index` endpoint when
 `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1`. The live fetch is still a
 research-only source for local reports/exports; it is not live routing. The
@@ -465,6 +473,7 @@ more dangerous than missed setups.
 - TESTPUMP ambiguous pump with no dated catalyst
 - COLLIDE ticker collision that must not resolve confidently
 - TESTLIST Binance spot-listing announcement fixture
+- TESTLIVE captured Binance CMS WebSocket announcement payload fixture shape
 - TESTPERP Bybit perpetual-listing announcement fixture
 - TESTCAL CoinMarketCal-style mainnet-launch fixture
 - TESTUNLOCK Tokenomist-style unlock fixture with supply-pressure fields

@@ -71,6 +71,10 @@ def _walk_announcement_items(raw: object) -> Iterable[Mapping[str, Any]]:
         return
     if not isinstance(raw, Mapping):
         return
+    cms_payload = _cms_data_payload(raw)
+    if cms_payload is not None:
+        yield cms_payload
+        return
     for key in ("announcements", "articles", "list", "rows", "items"):
         value = raw.get(key)
         if isinstance(value, list):
@@ -116,6 +120,7 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         or item.get("updatedAt")
         or item.get("updateTime")
         or item.get("releaseDate")
+        or item.get("publishDate")
         or item.get("publishTime")
         or item.get("dateTimestamp")
     ) or datetime.now(timezone.utc)
@@ -123,6 +128,7 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         item.get("published_at")
         or item.get("publishedAt")
         or item.get("releaseDate")
+        or item.get("publishDate")
         or item.get("publishTime")
         or item.get("publish_time")
         or item.get("dateTimestamp")
@@ -214,6 +220,28 @@ def _has_explicit_event_time(item: Mapping[str, Any]) -> bool:
             "startDataTimestamp",
         )
     )
+
+
+def _cms_data_payload(raw: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    data = raw.get("data")
+    if data is None or raw.get("type") != "DATA":
+        return None
+    parsed: object
+    if isinstance(data, str):
+        try:
+            parsed = json.loads(data)
+        except json.JSONDecodeError:
+            return None
+    else:
+        parsed = data
+    if not isinstance(parsed, Mapping):
+        return None
+    payload = dict(parsed)
+    if raw.get("topic") is not None:
+        payload["topic"] = raw.get("topic")
+    if raw.get("type") is not None:
+        payload["message_type"] = raw.get("type")
+    return payload
 
 
 def _as_utc(dt: datetime) -> datetime:

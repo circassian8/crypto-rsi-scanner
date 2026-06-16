@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Parse Binance CMS announcement payloads · Codex
+**Why:** Binance's official English announcement stream publishes CMS WebSocket
+`DATA` messages where the announcement content is a JSON string inside the
+`data` field. The existing Binance fixture parser only handled already-flattened
+announcement rows, so captured official payloads could not feed the
+event-discovery radar.
+**Changes:**
+- Extended `crypto_rsi_scanner/event_providers/_announcement_common.py` to unwrap
+  Binance CMS `DATA` messages, preserve `topic`/`message_type`, parse
+  `publishDate` timestamps, and feed the nested announcement through the same
+  direct listing/perp classification path as other announcement fixtures.
+- Added a regression test using the official `com_announcement_en` payload shape
+  with stringified `data`.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to record captured Binance CMS payload
+  support and keep the boundary clear: a true live Binance WebSocket
+  listener/cache adapter is still future work.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 198/198.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This is parser support for official captured payloads, not a
+new live listener. It preserves the research-only event-discovery boundary and
+does not route alerts, write live signal/outcome/paper tables, or promote
+event-fade signals.
+
 ## 2026-06-16 — Add opt-in live CryptoPanic discovery · Codex
 **Why:** The event-fade validation pipeline needs more real news coverage for
 proxy/direct/ambiguous narrative review. CryptoPanic was fixture-only; an

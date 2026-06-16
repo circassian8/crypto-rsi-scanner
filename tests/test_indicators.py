@@ -763,6 +763,44 @@ def test_event_discovery_exchange_announcement_providers_parse_fixtures():
             raise AssertionError("required malformed announcement fixture should fail")
 
 
+def test_event_discovery_binance_cms_websocket_payload_fixture():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner.event_providers.binance_announcements import BinanceAnnouncementProvider
+
+    payload = {
+        "type": "DATA",
+        "topic": "com_announcement_en",
+        "data": json.dumps({
+            "catalogId": 48,
+            "catalogName": "New Cryptocurrency Listing",
+            "publishDate": 1781514000000,
+            "title": "Binance Will List Test Live (TLIVE)",
+            "body": "Binance will list Test Live and open spot trading for TLIVE/USDT.",
+            "disclaimer": "Trade on-the-go.",
+        }),
+    }
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "binance_cms_payload.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        events = BinanceAnnouncementProvider(path, required=True).fetch_events(start, end)
+    assert len(events) == 1
+    event = events[0]
+    assert event.provider == "binance_announcements"
+    assert event.title == "Binance Will List Test Live (TLIVE)"
+    assert event.published_at.isoformat() == "2026-06-15T09:00:00+00:00"
+    assert event.raw_json["topic"] == "com_announcement_en"
+    assert event.raw_json["message_type"] == "DATA"
+    assert event.raw_json["catalogName"] == "New Cryptocurrency Listing"
+    assert event.raw_json["event"]["event_type"] == "exchange_listing"
+    assert event.raw_json["event"]["event_time"] == "2026-06-15T09:00:00+00:00"
+    assert event.raw_json["event"]["event_time_confidence"] == 0.60
+
+
 def test_event_discovery_bybit_live_provider_parses_documented_response_offline():
     import json
     from datetime import datetime, timezone
