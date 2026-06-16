@@ -316,6 +316,10 @@ Files:
 Stable evidence files dedupe already-seen rows by source/event identity where
 possible. `candidate_snapshots.jsonl` appends every refresh so later analysis
 can inspect how scores and missing data looked at each observed time.
+`discovery_runs.jsonl` stores redacted provider-readiness diagnostics and
+refresh warnings. Use those warnings to distinguish a healthy zero-result run
+from a provider problem, rate limit, bad credential, too-narrow query/window, or
+resolution/classification failure.
 
 `main.py --event-fade-export-cache-sample PATH` turns the latest cached
 candidate snapshot for each stable event/asset/relationship identity back into

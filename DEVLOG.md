@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Persist event-discovery refresh diagnostics · Codex
+**Why:** Source-ready live refreshes can still produce zero rows because of rate
+limits, forbidden endpoints, empty provider results, or unresolved raw events.
+The cache run row needs to preserve that context so a later reviewer can tell
+the difference between "no events existed" and "the source failed or built no
+candidates."
+**Changes:**
+- Added a redacted `diagnostics` object to event-discovery `discovery_runs.jsonl`
+  rows and the cache write result.
+- `main.py --event-discovery-refresh` now records provider readiness and prints/
+  caches refresh warnings for zero raw events or zero validation candidates.
+- Added regression coverage for run diagnostics and source-ready zero-output
+  refreshes without making network calls.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the run-diagnostics behavior.
+**Verify:** Fixture `make event-discovery-refresh` into `/tmp` writes
+`diagnostics.provider_status` and an empty `refresh_warnings` list for the
+healthy fixture run. `make verify` passes, including 227/227 tests, alert render
+smoke, backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** Diagnostics are redacted and observational only. They do not
+change provider fetching, event scoring, alert routing, paper trading, or live
+storage.
+
 ## 2026-06-16 — Warn on empty event-fade review bundles · Codex
 **Why:** A configured-source refresh can be source-ready but still produce zero
 candidate rows when live providers rate-limit, forbid access, or return no

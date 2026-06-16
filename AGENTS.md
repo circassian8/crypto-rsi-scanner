@@ -259,7 +259,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `RSI_EVENT_DISCOVERY_CACHE_DIR` for raw events, normalized events, links,
   classifications, candidate snapshots, and run metadata. It must not write the
   live SQLite signal/outcome/paper tables, route alerts, open paper trades, or
-  imply promotion. `main.py --event-discovery-binance-listen` may append raw
+  imply promotion. `discovery_runs.jsonl` includes redacted provider readiness
+  diagnostics and refresh warnings, such as source-ready runs that collected no
+  raw events or raw events that built no candidates. `main.py
+  --event-discovery-binance-listen` may append raw
   Binance announcement evidence and run metadata to the same cache; it must not
   normalize into live signals, route alerts, or paper trade.
 - Event-fade validation review is research-only. `main.py --event-fade-review-sample`

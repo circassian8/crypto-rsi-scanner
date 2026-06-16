@@ -1049,6 +1049,27 @@ def _event_discovery_paths_configured() -> bool:
     ).ready_for_configured_review_cycle
 
 
+def _event_discovery_refresh_diagnostics(
+    result: event_discovery.EventDiscoveryResult,
+    status_report: event_provider_status.EventDiscoveryProviderStatus,
+) -> dict[str, Any]:
+    warnings: list[str] = []
+    if not result.raw_events:
+        warnings.append(
+            "no_raw_events_collected: configured event sources produced zero raw events; "
+            "check provider warnings, credentials, rate limits, and query/window settings"
+        )
+    elif not result.candidates:
+        warnings.append(
+            "no_validation_candidates_built: raw events were collected but no high-confidence "
+            "asset/classification candidates were built"
+        )
+    return {
+        "provider_status": event_provider_status.provider_status_to_dict(status_report),
+        "refresh_warnings": warnings,
+    }
+
+
 def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResult:
     cfg = event_discovery.EventDiscoveryConfig(
         min_link_confidence=config.EVENT_DISCOVERY_MIN_LINK_CONFIDENCE,
@@ -1158,7 +1179,8 @@ def event_discovery_status(json_output: bool = False) -> None:
 def event_discovery_refresh(verbose: bool = False) -> None:
     """Fetch configured event-discovery sources and write observational cache artifacts."""
     _setup_event_discovery_logging(verbose)
-    if not _event_discovery_paths_configured():
+    status_report = event_provider_status.build_event_discovery_provider_status(config)
+    if not status_report.ready_for_configured_review_cycle:
         print(
             "No event-discovery sources ready. Set RSI_EVENT_DISCOVERY_EVENTS_PATH, "
             "another event-discovery fixture path, or opt into a live research provider. "
@@ -1166,7 +1188,12 @@ def event_discovery_refresh(verbose: bool = False) -> None:
         )
         return
     result = _event_discovery_result_from_config()
-    write = event_cache.write_event_discovery_cache(result, config.EVENT_DISCOVERY_CACHE_DIR)
+    diagnostics = _event_discovery_refresh_diagnostics(result, status_report)
+    write = event_cache.write_event_discovery_cache(
+        result,
+        config.EVENT_DISCOVERY_CACHE_DIR,
+        diagnostics=diagnostics,
+    )
     print(
         "Event-discovery cache refresh: "
         f"raw={write.raw_events_written}, "
@@ -1176,6 +1203,8 @@ def event_discovery_refresh(verbose: bool = False) -> None:
         f"candidate_snapshots={write.candidate_snapshots_written}, "
         f"run={write.run_id}, dir={write.cache_dir}"
     )
+    for warning in diagnostics["refresh_warnings"]:
+        print(f"WARNING: {warning}")
 
 
 def event_discovery_binance_listen(verbose: bool = False) -> None:

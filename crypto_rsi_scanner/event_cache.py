@@ -30,6 +30,7 @@ class EventDiscoveryCacheWriteResult:
     classifications_written: int
     candidate_snapshots_written: int
     runs_written: int
+    diagnostics: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ def write_event_discovery_cache(
     cache_dir: str | Path,
     *,
     observed_at: datetime | None = None,
+    diagnostics: Mapping[str, Any] | None = None,
 ) -> EventDiscoveryCacheWriteResult:
     """Write discovery evidence to a local observational JSONL cache."""
     observed = _as_utc(observed_at or datetime.now(timezone.utc))
@@ -99,6 +101,7 @@ def write_event_discovery_cache(
         "event_asset_links_written": links_written,
         "classifications_written": classifications_written,
         "candidate_snapshots_written": candidate_written,
+        "diagnostics": _json_ready(diagnostics or {}),
     }])
     return EventDiscoveryCacheWriteResult(
         cache_dir=root,
@@ -110,6 +113,7 @@ def write_event_discovery_cache(
         classifications_written=classifications_written,
         candidate_snapshots_written=candidate_written,
         runs_written=run_written,
+        diagnostics=dict(diagnostics or {}),
     )
 
 

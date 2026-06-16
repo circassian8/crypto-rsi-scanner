@@ -2346,13 +2346,19 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
     observed_at = datetime(2026, 6, 16, 12, 30, tzinfo=timezone.utc)
     with tempfile.TemporaryDirectory() as tmp:
         cache_dir = Path(tmp) / "event_fade_cache"
-        write = event_cache.write_event_discovery_cache(result, cache_dir, observed_at=observed_at)
+        write = event_cache.write_event_discovery_cache(
+            result,
+            cache_dir,
+            observed_at=observed_at,
+            diagnostics={"refresh_warnings": [], "provider_status": {"ready_for_configured_review_cycle": True}},
+        )
         assert write.raw_events_written == len(result.raw_events)
         assert write.normalized_events_written == len(result.normalized_events)
         assert write.event_asset_links_written == len(result.links)
         assert write.classifications_written == len(result.classifications)
         assert write.candidate_snapshots_written == len(result.candidates)
         assert write.runs_written == 1
+        assert write.diagnostics["provider_status"]["ready_for_configured_review_cycle"] is True
 
         expected_files = {
             "raw_events.jsonl",
@@ -2373,6 +2379,13 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
         assert raw_rows[0]["observed_at"] == "2026-06-16T12:30:00+00:00"
         assert raw_rows[0]["run_id"] == write.run_id
         assert raw_rows[0]["fetched_at"].endswith("+00:00")
+
+        run_rows = [
+            json.loads(line)
+            for line in (cache_dir / "discovery_runs.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        assert run_rows[0]["diagnostics"]["refresh_warnings"] == []
+        assert run_rows[0]["diagnostics"]["provider_status"]["ready_for_configured_review_cycle"] is True
 
         snapshot_rows = [
             json.loads(line)
@@ -3193,7 +3206,79 @@ def test_event_discovery_refresh_scanner_writes_cache_fixture():
             run = json.loads(run_path.read_text(encoding="utf-8").splitlines()[0])
             assert run["row_type"] == "discovery_run"
             assert run["candidate_snapshots"] == 17
+            assert run["diagnostics"]["refresh_warnings"] == []
+            assert run["diagnostics"]["provider_status"]["ready_for_configured_review_cycle"] is True
         finally:
+            for name, value in original.items():
+                setattr(config, name, value)
+
+
+def test_event_discovery_refresh_scanner_warns_and_caches_zero_output_diagnostics():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult
+
+    attrs = (
+        "EVENT_DISCOVERY_EVENTS_PATH",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE",
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH",
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE",
+        "EVENT_DISCOVERY_COINMARKETCAL_PATH",
+        "EVENT_DISCOVERY_TOKENOMIST_PATH",
+        "EVENT_DISCOVERY_CRYPTOPANIC_PATH",
+        "EVENT_DISCOVERY_CRYPTOPANIC_LIVE",
+        "EVENT_DISCOVERY_GDELT_PATH",
+        "EVENT_DISCOVERY_GDELT_LIVE",
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH",
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE",
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS",
+        "EVENT_DISCOVERY_EXTERNAL_IPO_PATH",
+        "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH",
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH",
+        "EVENT_DISCOVERY_CACHE_DIR",
+    )
+    original = {name: getattr(config, name) for name in attrs}
+    original_result_from_config = scanner._event_discovery_result_from_config
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            for name in attrs:
+                if name == "EVENT_DISCOVERY_CACHE_DIR":
+                    setattr(config, name, Path(tmp) / "cache")
+                elif name == "EVENT_DISCOVERY_GDELT_LIVE":
+                    setattr(config, name, True)
+                elif name == "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS":
+                    setattr(config, name, ())
+                elif name.endswith("_LIVE"):
+                    setattr(config, name, False)
+                else:
+                    setattr(config, name, None)
+            scanner._event_discovery_result_from_config = lambda: EventDiscoveryResult(
+                raw_events=(),
+                normalized_events=(),
+                links=(),
+                classifications=(),
+                candidates=(),
+            )
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_discovery_refresh()
+            text = out.getvalue()
+            assert "Event-discovery cache refresh" in text
+            assert "WARNING: no_raw_events_collected" in text
+            run_path = config.EVENT_DISCOVERY_CACHE_DIR / "discovery_runs.jsonl"
+            run = json.loads(run_path.read_text(encoding="utf-8").splitlines()[0])
+            assert run["raw_events"] == 0
+            assert run["candidate_snapshots"] == 0
+            assert run["diagnostics"]["provider_status"]["ready_for_configured_review_cycle"] is True
+            assert run["diagnostics"]["provider_status"]["ready_event_source_count"] == 1
+            assert run["diagnostics"]["refresh_warnings"][0].startswith("no_raw_events_collected")
+        finally:
+            scanner._event_discovery_result_from_config = original_result_from_config
             for name, value in original.items():
                 setattr(config, name, value)
 
