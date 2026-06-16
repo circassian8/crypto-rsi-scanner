@@ -99,6 +99,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-discovery-runs` (recent cache-refresh diagnostics from
   `discovery_runs.jsonl`; use after configured-source cycles to inspect
   zero-row/rate-limit/no-candidate warnings) ·
+  `make event-discovery-refresh-public-rss` / `make
+  event-fade-public-rss-review-cycle` (opt-in no-key public RSS source bundle
+  plus optional live CoinGecko universe enrichment; research cache/review
+  artifacts only) ·
   `main.py --event-discovery-binance-listen` (listen to Binance's signed CMS
   WebSocket for the configured window and append raw research cache evidence
   only; no live DB writes) ·
@@ -460,7 +464,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   the fixture-backed cache refresh and cache review-bundle export with the same
   `EVENT_DISCOVERY_CACHE_DIR`; `make event-fade-configured-review-cycle` runs
   the same bundle workflow after a refresh that uses only configured
-  event-discovery sources from the environment/`.env`.
+  event-discovery sources from the environment/`.env`. `make
+  event-fade-public-rss-review-cycle` is the no-key convenience path for
+  public RSS feeds listed in
+  `fixtures/event_discovery/public_rss_feeds.txt`, with optional live CoinGecko
+  universe enrichment, and writes only research cache/review artifacts.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,
@@ -489,7 +497,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 3. Confirm the 2026-06-09 state-slice candidates via cached PIT/live data before any
    live conviction or routing change.
 4. Use `main.py --event-discovery-status` to confirm at least one real event
-   source is ready, then use the configured-source review cycle or
+   source is ready, or use `make event-fade-public-rss-review-cycle` as the
+   no-key RSS starting point, then use the configured-source review cycle or
    `main.py --event-fade-export-sample PATH` to build a manually reviewed
    event-fade sample from discovery fixtures, use
    `main.py --event-fade-merge-sample FRESH REVIEWED OUT` to preserve prior

@@ -19,6 +19,43 @@ def _env_csv(name: str, default: str = "") -> tuple[str, ...]:
     return tuple(part.strip() for part in raw.split(",") if part.strip())
 
 
+def _load_url_list(path: Path | None) -> tuple[str, ...]:
+    if path is None:
+        return ()
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except FileNotFoundError:
+        log.warning("URL list file not found: %s", path)
+        return ()
+    except OSError as exc:
+        log.warning("URL list file could not be read: %s", exc)
+        return ()
+    urls: list[str] = []
+    seen: set[str] = set()
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        url = line.split("#", 1)[0].strip()
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        urls.append(url)
+    return tuple(urls)
+
+
+def _merge_csv_and_file_urls(csv_urls: tuple[str, ...], file_urls: tuple[str, ...]) -> tuple[str, ...]:
+    urls: list[str] = []
+    seen: set[str] = set()
+    for url in (*csv_urls, *file_urls):
+        clean = url.strip()
+        if not clean or clean in seen:
+            continue
+        seen.add(clean)
+        urls.append(clean)
+    return tuple(urls)
+
+
 def _load_dotenv(path: Path) -> None:
     """Minimal .env loader (no dependency). Existing env vars win."""
     if not path.exists():
@@ -235,7 +272,11 @@ EVENT_DISCOVERY_GDELT_MAX_RECORDS = int(os.getenv("RSI_EVENT_DISCOVERY_GDELT_MAX
 EVENT_DISCOVERY_GDELT_TIMEOUT = float(os.getenv("RSI_EVENT_DISCOVERY_GDELT_TIMEOUT", "10"))
 _EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH_RAW = os.getenv("RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH", "")
 EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE = _env_bool("RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE", False)
-EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = _env_csv("RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS")
+_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = _env_csv("RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS")
+_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH_RAW = os.getenv(
+    "RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH",
+    "",
+)
 EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT = float(os.getenv("RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT", "10"))
 _EVENT_DISCOVERY_EXTERNAL_IPO_PATH_RAW = os.getenv("RSI_EVENT_DISCOVERY_EXTERNAL_IPO_PATH", "")
 _EVENT_DISCOVERY_SPORTS_FIXTURES_PATH_RAW = os.getenv("RSI_EVENT_DISCOVERY_SPORTS_FIXTURES_PATH", "")
@@ -403,6 +444,20 @@ if (
     and not EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH.is_absolute()
 ):
     EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = DATA_DIR / EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
+EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH = (
+    Path(_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH_RAW).expanduser()
+    if _EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH_RAW
+    else None
+)
+if (
+    EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH is not None
+    and not EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH.is_absolute()
+):
+    EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH = DATA_DIR / EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH
+EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = _merge_csv_and_file_urls(
+    _EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS,
+    _load_url_list(EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH),
+)
 EVENT_DISCOVERY_EXTERNAL_IPO_PATH = (
     Path(_EVENT_DISCOVERY_EXTERNAL_IPO_PATH_RAW).expanduser()
     if _EVENT_DISCOVERY_EXTERNAL_IPO_PATH_RAW

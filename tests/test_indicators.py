@@ -262,6 +262,7 @@ def _event_provider_status_cfg(**overrides):
         "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH": None,
         "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": False,
         "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS": (),
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH": None,
         "EVENT_DISCOVERY_EXTERNAL_IPO_PATH": None,
         "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH": None,
         "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH": None,
@@ -316,6 +317,46 @@ def test_event_provider_status_ready_with_live_source_and_redacted_credentials()
     assert "secret-key" not in text
     assert "secret-value" not in text
     assert "CryptoPanic live mode is enabled but the API token is missing" in text
+
+
+def test_event_provider_status_ready_with_rss_url_file():
+    cfg = _event_provider_status_cfg(
+        EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=True,
+        EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS=("https://example.test/rss",),
+        EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH="public_rss_feeds.txt",
+    )
+    report = event_provider_status.build_event_discovery_provider_status(cfg)
+    text = event_provider_status.format_event_discovery_provider_status(report)
+
+    assert report.ready_event_source_count == 1
+    assert report.ready_for_configured_review_cycle
+    assert "project_blog_rss" in text
+    assert "url_count=1" in text
+    assert "url_file=public_rss_feeds.txt" in text
+    assert "Project blog/RSS live mode is enabled but no RSS/Atom URLs are configured" not in text
+
+
+def test_config_load_url_list_dedupes_comments_and_inline_notes():
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "feeds.txt"
+        path.write_text(
+            "\n".join([
+                "# public feeds",
+                "https://example.test/rss",
+                "https://example.test/rss  # duplicate",
+                "",
+                "https://example.test/atom",
+            ]),
+            encoding="utf-8",
+        )
+
+        urls = config._load_url_list(path)
+
+    assert urls == ("https://example.test/rss", "https://example.test/atom")
 
 
 def _event_fade_velvet_candidate(now=None, *, direct=False, no_event_time=False, btc_risk_on=35):

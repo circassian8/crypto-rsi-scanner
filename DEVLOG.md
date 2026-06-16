@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add no-key public RSS review cycle · Codex
+**Why:** The configured event-fade review cycle still had no ready event source
+on this machine, so the validation workflow needed a credential-free way to
+collect real news/RSS evidence before human labeling.
+**Changes:**
+- Added `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH` support for newline
+  RSS/Atom URL lists, merged with the existing comma-separated URL env var.
+- Added `fixtures/event_discovery/public_rss_feeds.txt` with verified public
+  crypto RSS feeds and a fail-soft warning note.
+- Added `make event-discovery-refresh-public-rss` and
+  `make event-fade-public-rss-review-cycle`, which opt into the public RSS list
+  and live CoinGecko universe enrichment while still writing only research cache
+  and review-bundle artifacts.
+- Updated provider status, `.env.example`, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the no-key RSS workflow.
+- Added offline tests for URL-file parsing/deduping and RSS provider readiness.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 230/230.
+`make -n event-discovery-refresh-public-rss` and
+`make -n event-fade-public-rss-review-cycle` expand to the expected opt-in env
+wiring.
+With `EVENT_DISCOVERY_CACHE_DIR=/tmp/event_fade_public_rss_cache`, `make
+event-discovery-refresh-public-rss` collected 55 raw RSS events and wrote 71
+candidate snapshots, and `make event-fade-cache-review-bundle` wrote a 71-row
+temporary review bundle. `make verify` passes, including 230/230 tests, alert
+render smoke, backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This does not promote event-fade output or make live routes.
+Public RSS publishers can rate-limit or change feeds; failures stay in
+`discovery_runs.jsonl` diagnostics and the review bundle still needs human
+labels/outcomes before any conclusion.
+
 ## 2026-06-16 — Add event-discovery run diagnostics report · Codex
 **Why:** Refresh diagnostics were persisted in `discovery_runs.jsonl`, but a
 reviewer still had to open JSONL by hand to see whether recent configured runs

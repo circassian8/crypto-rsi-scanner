@@ -821,6 +821,29 @@ RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
 
 The live RSS path fetches only explicit feed URLs, parses RSS and Atom entries,
 reuses the same news parser as fixtures, and remains research-only/fail-soft.
+For a newline-separated URL list, set
+`RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH`. The checked-in no-key starter
+list is `fixtures/event_discovery/public_rss_feeds.txt`; use it for local
+research cache collection, then inspect and label the resulting bundle before
+any conclusion-bearing review.
+
+Refresh the no-key public RSS source bundle and write a cache-backed review
+workspace in one step:
+
+```bash
+make event-fade-public-rss-review-cycle
+EVENT_DISCOVERY_CACHE_DIR=event_fade_cache \
+EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_public_rss_bundle \
+EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1 \
+EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-public-rss-review-cycle
+```
+
+This target enables `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, points
+`RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH` at the checked-in public feed
+list, and enables live CoinGecko universe enrichment by default so real article
+mentions can resolve beyond the fixture aliases. Provider/network failures
+remain warnings in `discovery_runs.jsonl`.
 
 Inspect configured provider readiness without printing secrets:
 
@@ -829,6 +852,7 @@ make event-discovery-status
 .venv/bin/python main.py --event-discovery-status --json
 make event-discovery-runs
 .venv/bin/python main.py --event-discovery-runs --json
+make event-discovery-refresh-public-rss
 ```
 
 The status report separates event sources from enrichment. At least one event

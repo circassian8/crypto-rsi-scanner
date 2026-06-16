@@ -62,6 +62,12 @@ def _path_detail(value: Any) -> str:
     return "fixture=yes" if _is_path_configured(value) else "fixture=no"
 
 
+def _optional_path_name(value: Any) -> str:
+    if not _is_path_configured(value):
+        return "none"
+    return Path(value).name
+
+
 def _status(
     *,
     name: str,
@@ -173,6 +179,7 @@ def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderSta
                 _path_detail(cfg.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH),
                 f"live={_flag(cfg.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE)}",
                 f"url_count={len(getattr(cfg, 'EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS', ()) or ())}",
+                f"url_file={_optional_path_name(getattr(cfg, 'EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH', None))}",
             ),
         ),
         _status(
@@ -278,7 +285,8 @@ def build_event_discovery_provider_status(cfg: Any) -> EventDiscoveryProviderSta
         warnings.append("Coinalyze live enrichment is enabled but the API key is missing.")
 
     next_steps = (
-        "Enable at least one event source, for example GDELT live, CryptoPanic live, RSS feeds, or local event fixtures.",
+        "Enable at least one event source, for example public RSS feeds, GDELT live, CryptoPanic live, or local event fixtures.",
+        "No-key option: make event-fade-public-rss-review-cycle EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1",
         "Then run: make event-fade-configured-review-cycle EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1",
     )
     if any(item.ready for item in sources):

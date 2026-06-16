@@ -1,0 +1,10 @@
+# No-key public RSS/Atom feeds for research-only event-discovery refreshes.
+# These are opt-in via RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH or:
+#   make event-fade-public-rss-review-cycle
+#
+# If a publisher changes or blocks a feed, the provider logs a warning and
+# continues with the remaining feeds.
+https://cointelegraph.com/rss
+https://decrypt.co/feed
+https://www.coindesk.com/arc/outboundfeeds/rss/
+https://www.theblock.co/rss.xml
