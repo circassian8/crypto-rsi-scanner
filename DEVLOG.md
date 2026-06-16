@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Run no-key event-fade review cycle · Codex
+**Why:** After the stabilization pass, the next Pro-plan step was to run the
+research collection workflow and see whether it produced reviewable proxy-fade
+evidence.
+**Changes:**
+- Ran `make event-fade-no-key-review-cycle` with 1h outcome price export enabled
+  and wrote a local review bundle under `/tmp/event_fade_no_key_review_bundle`.
+- Added `research/EVENT_FADE_NO_KEY_REVIEW_CYCLE_2026-06-17.md` summarizing the
+  run, bundle contents, provider results, blockers, and next review work.
+- Updated `ROADMAP.md` with the fresh 69-row bundle status and sample gaps.
+**Verify:** No-key cycle completed; RSS/Google News produced 66 candidate
+snapshots, Polymarket produced 3, GDELT returned HTTP 429, and the generated
+bundle reported 69 rows needing review, 0 eligible rows, and 0 triggers.
+**Notes/risks:** The sample is still unreviewed. The only proxy row was a
+`proxy_venue` HYPE/SpaceX row and was correctly forced `NO_TRADE`; next work is
+human labeling plus better dated proxy-instrument collection.
+
 ## 2026-06-17 — Stabilize event-fade discovery validation · Codex
 **Why:** The event-discovery pipeline had grown into a real research factory,
 but the next risk was weak evidence accidentally looking tradable before a
