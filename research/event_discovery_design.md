@@ -319,7 +319,9 @@ can inspect how scores and missing data looked at each observed time.
 `discovery_runs.jsonl` stores redacted provider-readiness diagnostics and
 refresh warnings. Use those warnings to distinguish a healthy zero-result run
 from a provider problem, rate limit, bad credential, too-narrow query/window, or
-resolution/classification failure.
+resolution/classification failure. `main.py --event-discovery-runs` prints the
+recent run rows in a compact form, and `--json` returns the cached run payloads
+for external review tooling.
 
 `main.py --event-fade-export-cache-sample PATH` turns the latest cached
 candidate snapshot for each stable event/asset/relationship identity back into
@@ -825,12 +827,15 @@ Inspect configured provider readiness without printing secrets:
 ```bash
 make event-discovery-status
 .venv/bin/python main.py --event-discovery-status --json
+make event-discovery-runs
+.venv/bin/python main.py --event-discovery-runs --json
 ```
 
 The status report separates event sources from enrichment. At least one event
 source must be ready before `make event-fade-configured-review-cycle` can
 produce review rows; universe, derivatives, or supply enrichment alone cannot
-create events.
+create events. The runs report is the post-refresh view: use it to inspect
+whether recent configured runs produced candidates or only warnings.
 
 Write the local observational JSONL cache with the fixture set:
 

@@ -2405,6 +2405,13 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
         assert second.classifications_written == 0
         assert second.candidate_snapshots_written == len(result.candidates)
 
+        recent_runs = event_cache.load_discovery_runs(cache_dir, limit=1)
+        assert recent_runs.cache_dir == cache_dir
+        assert recent_runs.runs_read == 2
+        assert recent_runs.limit == 1
+        assert len(recent_runs.rows) == 1
+        assert recent_runs.rows[0]["run_id"] == second.run_id
+
         all_snapshots = event_cache.load_cached_validation_sample(cache_dir, latest_per_identity=False)
         assert all_snapshots.snapshots_read == len(result.candidates) * 2
         assert len(all_snapshots.rows) == len(result.candidates) * 2
@@ -3281,6 +3288,53 @@ def test_event_discovery_refresh_scanner_warns_and_caches_zero_output_diagnostic
             scanner._event_discovery_result_from_config = original_result_from_config
             for name, value in original.items():
                 setattr(config, name, value)
+
+
+def test_event_discovery_runs_scanner_reports_recent_diagnostics():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import config, event_cache, scanner
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult
+
+    original_cache_dir = config.EVENT_DISCOVERY_CACHE_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        cache_dir = Path(tmp) / "cache"
+        config.EVENT_DISCOVERY_CACHE_DIR = cache_dir
+        try:
+            event_cache.write_event_discovery_cache(
+                EventDiscoveryResult(raw_events=(), normalized_events=(), links=(), classifications=(), candidates=()),
+                cache_dir,
+                observed_at=datetime(2026, 6, 16, 12, 30, tzinfo=timezone.utc),
+                diagnostics={
+                    "provider_status": {
+                        "ready_for_configured_review_cycle": True,
+                        "ready_event_source_count": 1,
+                    },
+                    "refresh_warnings": ["no_raw_events_collected: provider returned no rows"],
+                },
+            )
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_discovery_runs(limit=5)
+            text = out.getvalue()
+            assert "EVENT DISCOVERY CACHE RUNS" in text
+            assert "Runs shown: 1/1" in text
+            assert "ready_sources=1" in text
+            assert "warnings=1" in text
+            assert "no_raw_events_collected" in text
+
+            json_out = io.StringIO()
+            with contextlib.redirect_stdout(json_out):
+                scanner.event_discovery_runs(limit=5, json_output=True)
+            payload = json.loads(json_out.getvalue())
+            assert payload["runs_read"] == 1
+            assert payload["rows"][0]["diagnostics"]["refresh_warnings"][0].startswith("no_raw_events_collected")
+        finally:
+            config.EVENT_DISCOVERY_CACHE_DIR = original_cache_dir
 
 
 def test_event_discovery_binance_listen_scanner_writes_raw_cache():

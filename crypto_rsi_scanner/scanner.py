@@ -1176,6 +1176,53 @@ def event_discovery_status(json_output: bool = False) -> None:
         print(event_provider_status.format_event_discovery_provider_status(status_report))
 
 
+def event_discovery_runs(limit: int | None = 10, json_output: bool = False) -> None:
+    """Print recent event-discovery cache run diagnostics."""
+    read = event_cache.load_discovery_runs(config.EVENT_DISCOVERY_CACHE_DIR, limit=limit)
+    if json_output:
+        print(json.dumps({
+            "cache_dir": str(read.cache_dir),
+            "runs_read": read.runs_read,
+            "limit": read.limit,
+            "rows": read.rows,
+        }, indent=2, sort_keys=True))
+        return
+    print(_format_event_discovery_runs(read))
+
+
+def _format_event_discovery_runs(read: event_cache.EventDiscoveryRunsReadResult) -> str:
+    lines = [
+        "EVENT DISCOVERY CACHE RUNS",
+        f"Cache dir: {read.cache_dir}",
+        f"Runs shown: {len(read.rows)}/{read.runs_read}",
+    ]
+    if not read.rows:
+        lines.extend([
+            "",
+            "No discovery runs cached.",
+            "Run `main.py --event-discovery-status`, then `main.py --event-discovery-refresh` with a working event source.",
+        ])
+        return "\n".join(lines)
+    lines.append("")
+    for row in read.rows:
+        diagnostics = row.get("diagnostics") if isinstance(row.get("diagnostics"), dict) else {}
+        provider_status = diagnostics.get("provider_status") if isinstance(diagnostics.get("provider_status"), dict) else {}
+        warnings = diagnostics.get("refresh_warnings") if isinstance(diagnostics.get("refresh_warnings"), list) else []
+        ready_sources = provider_status.get("ready_event_source_count", "?")
+        ready = provider_status.get("ready_for_configured_review_cycle")
+        ready_text = "yes" if ready is True else "no" if ready is False else "unknown"
+        lines.append(
+            f"- {row.get('observed_at', '?')} run={row.get('run_id', '?')} "
+            f"raw={row.get('raw_events', 0)} normalized={row.get('normalized_events', 0)} "
+            f"links={row.get('event_asset_links', 0)} classifications={row.get('classifications', 0)} "
+            f"snapshots={row.get('candidate_snapshots', 0)} "
+            f"ready_sources={ready_sources} ready={ready_text} warnings={len(warnings)}"
+        )
+        for warning in warnings:
+            lines.append(f"  warning: {warning}")
+    return "\n".join(lines)
+
+
 def event_discovery_refresh(verbose: bool = False) -> None:
     """Fetch configured event-discovery sources and write observational cache artifacts."""
     _setup_event_discovery_logging(verbose)
@@ -2162,6 +2209,17 @@ def cli() -> None:
         help="Print redacted readiness for research-only event-discovery providers.",
     )
     parser.add_argument(
+        "--event-discovery-runs",
+        action="store_true",
+        help="Print recent research-cache event-discovery run diagnostics.",
+    )
+    parser.add_argument(
+        "--event-discovery-run-limit",
+        type=int,
+        default=10,
+        help="Maximum recent run rows to show for --event-discovery-runs.",
+    )
+    parser.add_argument(
         "--event-discovery-binance-listen",
         action="store_true",
         help="Listen briefly to live Binance announcements and append raw research JSONL cache artifacts.",
@@ -2378,6 +2436,9 @@ def cli() -> None:
         return
     if args.event_discovery_status:
         event_discovery_status(json_output=args.json)
+        return
+    if args.event_discovery_runs:
+        event_discovery_runs(limit=args.event_discovery_run_limit, json_output=args.json)
         return
     if args.event_discovery_binance_listen:
         event_discovery_binance_listen(verbose=args.verbose)

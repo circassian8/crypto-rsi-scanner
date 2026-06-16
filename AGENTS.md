@@ -96,6 +96,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   injecting fixture paths) · `main.py --event-discovery-status` (redacted
   source/enrichment readiness report; use before configured-source cycles to
   catch missing provider flags/keys without printing secrets) ·
+  `main.py --event-discovery-runs` (recent cache-refresh diagnostics from
+  `discovery_runs.jsonl`; use after configured-source cycles to inspect
+  zero-row/rate-limit/no-candidate warnings) ·
   `main.py --event-discovery-binance-listen` (listen to Binance's signed CMS
   WebSocket for the configured window and append raw research cache evidence
   only; no live DB writes) ·
@@ -261,8 +264,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   live SQLite signal/outcome/paper tables, route alerts, open paper trades, or
   imply promotion. `discovery_runs.jsonl` includes redacted provider readiness
   diagnostics and refresh warnings, such as source-ready runs that collected no
-  raw events or raw events that built no candidates. `main.py
-  --event-discovery-binance-listen` may append raw
+  raw events or raw events that built no candidates. Inspect recent runs with
+  `main.py --event-discovery-runs`. `main.py --event-discovery-binance-listen` may append raw
   Binance announcement evidence and run metadata to the same cache; it must not
   normalize into live signals, route alerts, or paper trade.
 - Event-fade validation review is research-only. `main.py --event-fade-review-sample`

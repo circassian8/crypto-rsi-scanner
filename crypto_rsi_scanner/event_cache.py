@@ -41,6 +41,14 @@ class EventDiscoveryCacheReadResult:
     latest_per_identity: bool
 
 
+@dataclass(frozen=True)
+class EventDiscoveryRunsReadResult:
+    cache_dir: Path
+    runs_read: int
+    rows: list[dict[str, Any]]
+    limit: int | None
+
+
 def write_event_discovery_cache(
     result: EventDiscoveryResult,
     cache_dir: str | Path,
@@ -141,6 +149,25 @@ def load_cached_validation_sample(
         snapshots_read=snapshots_read,
         rows=rows,
         latest_per_identity=latest_per_identity,
+    )
+
+
+def load_discovery_runs(
+    cache_dir: str | Path,
+    *,
+    limit: int | None = 10,
+) -> EventDiscoveryRunsReadResult:
+    """Load recent event-discovery cache run rows, newest first."""
+    root = Path(cache_dir).expanduser()
+    path = root / "discovery_runs.jsonl"
+    rows = [row for row in _read_jsonl(path) if row.get("row_type") == "discovery_run"]
+    selected = rows[-limit:] if limit and limit > 0 else rows
+    selected = list(reversed(selected))
+    return EventDiscoveryRunsReadResult(
+        cache_dir=root,
+        runs_read=len(rows),
+        rows=selected,
+        limit=limit,
     )
 
 

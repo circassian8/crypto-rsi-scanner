@@ -22,7 +22,7 @@ EVENT_FADE_PRICE_DAYS ?= 30
 EVENT_FADE_PRICE_FIXTURE_DIR ?=
 EVENT_FADE_PRICE_FIXTURE_ARG = $(if $(strip $(EVENT_FADE_PRICE_FIXTURE_DIR)),--event-fade-price-fixture-dir $(EVENT_FADE_PRICE_FIXTURE_DIR),)
 
-.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-refresh event-discovery-refresh-configured event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -38,6 +38,7 @@ help:
 	@echo "  make event-fade-report  Score local event-fade fixtures"
 	@echo "  make event-discovery-report  Print research-only event radar from fixtures"
 	@echo "  make event-discovery-status  Print redacted event provider readiness"
+	@echo "  make event-discovery-runs  Print recent cache refresh diagnostics"
 	@echo "  make event-discovery-refresh  Write research-only event JSONL cache"
 	@echo "  make event-discovery-refresh-configured  Cache configured event sources"
 	@echo "  make event-discovery-binance-listen  Cache raw live Binance announcement evidence"
@@ -122,6 +123,10 @@ event-discovery-report:
 
 event-discovery-status:
 	$(PYTHON) main.py --event-discovery-status
+
+event-discovery-runs:
+	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
+	$(PYTHON) main.py --event-discovery-runs
 
 event-discovery-refresh:
 	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \

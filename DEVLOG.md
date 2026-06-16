@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-discovery run diagnostics report · Codex
+**Why:** Refresh diagnostics were persisted in `discovery_runs.jsonl`, but a
+reviewer still had to open JSONL by hand to see whether recent configured runs
+collected events, built candidates, or hit zero-output warnings.
+**Changes:**
+- Added `event_cache.load_discovery_runs()` for recent cache run rows, newest
+  first.
+- Added `main.py --event-discovery-runs` and `make event-discovery-runs` with
+  text and JSON output for recent run counts, provider readiness, and refresh
+  warnings.
+- Added tests for cache run ordering/limits and scanner text/JSON output.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the new post-refresh diagnostics
+  workflow.
+**Verify:** Fixture `make event-discovery-refresh` into `/tmp` followed by
+`make event-discovery-runs` prints the recent run summary, and
+`main.py --event-discovery-runs --json` returns the cached run payload.
+`make verify` passes, including 228/228 tests, alert render smoke, backtest
+fixture smoke, and paper scoreboard.
+**Notes/risks:** This is read-only reporting over the local research cache. It
+does not fetch providers, route alerts, open paper trades, or write live
+storage.
+
 ## 2026-06-16 — Persist event-discovery refresh diagnostics · Codex
 **Why:** Source-ready live refreshes can still produce zero rows because of rate
 limits, forbidden endpoints, empty provider results, or unresolved raw events.
