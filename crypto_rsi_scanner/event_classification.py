@@ -6,7 +6,7 @@ from .event_models import DiscoveredAsset, EventAssetLink, EventClassification, 
 from .event_resolver import clean_text
 
 
-CLASSIFIER_VERSION = "rules_v1"
+CLASSIFIER_VERSION = "rules_v2"
 
 PROXY_KEYWORDS = (
     "exposure to",
@@ -84,16 +84,25 @@ def classify_event_asset(
     proxy_hits = [keyword for keyword in PROXY_KEYWORDS if keyword in text]
     external = clean_text(event.external_asset)
     asset_text = clean_text(f"{asset.name} {asset.symbol} {asset.coin_id}")
-    if external and external not in asset_text and proxy_hits and event.event_time is not None:
+    if external and external not in asset_text and proxy_hits:
+        has_event_time = event.event_time is not None
         return EventClassification(
             event_id=event.event_id,
             coin_id=asset.coin_id,
             is_proxy_narrative=True,
             is_direct_beneficiary=False,
-            relationship_type="proxy_exposure",
-            confidence=min(1.0, max(0.80, event.confidence, link.link_confidence)),
+            relationship_type="proxy_exposure" if has_event_time else "proxy_attention",
+            confidence=(
+                min(1.0, max(0.80, event.confidence, link.link_confidence))
+                if has_event_time
+                else min(0.85, max(0.70, event.confidence, link.link_confidence))
+            ),
             classifier_version=CLASSIFIER_VERSION,
-            reason="Linked asset appears to be a temporary proxy for an external dated catalyst.",
+            reason=(
+                "Linked asset appears to be a temporary proxy for an external dated catalyst."
+                if has_event_time
+                else "Linked asset appears to be proxy-narrative evidence, but event time is missing."
+            ),
             evidence=tuple(proxy_hits[:3] + list(link.evidence)),
         )
 

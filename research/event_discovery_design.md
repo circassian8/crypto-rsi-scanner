@@ -195,6 +195,16 @@ feeds the same hard event-fade gate. Articles first seen after the event time
 must not create a `SHORT_TRIGGERED` candidate even if the price/technical fields
 look strong.
 
+When a proxy-style article has strong narrative evidence but no precise
+`event_time`, it may remain in the validation sample as a `proxy_attention` row.
+That is review evidence only: the pure event-fade engine still requires a known
+event time before a candidate can become eligible or leave `NO_TRADE`. The news
+parser infers only a small set of common external assets such as SpaceX, OpenAI,
+Anthropic, Tesla, Nvidia, World Cup, Champions League, Iran, and US election.
+The resolver also rejects common identity words observed in public feeds
+(`cash`, `real`, `just`, `humanity`) so they do not become high-confidence
+asset matches from normal prose.
+
 ## External Catalyst Providers
 
 External IPO, sports-fixture, and prediction-market providers currently read
@@ -830,7 +840,9 @@ The live RSS path fetches only explicit feed URLs, parses RSS and Atom entries,
 reuses the same news parser as fixtures, and remains research-only/fail-soft.
 For a newline-separated URL list, set
 `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH`. The checked-in no-key starter
-list is `fixtures/event_discovery/public_rss_feeds.txt`; use it for local
+list is `fixtures/event_discovery/public_rss_feeds.txt`; it includes broad
+crypto publisher feeds plus a targeted Google News RSS search for pre-IPO,
+tokenized-stock, prediction-market, and fan-token narratives. Use it for local
 research cache collection, then inspect and label the resulting bundle before
 any conclusion-bearing review.
 
@@ -848,9 +860,9 @@ EVENT_FADE_QUEUE_LIMIT=50 \
 
 This target enables `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, points
 `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH` at the checked-in public feed
-list, and enables live CoinGecko universe enrichment by default so real article
-mentions can resolve beyond the fixture aliases. Provider/network failures
-remain warnings in `discovery_runs.jsonl`.
+list, sets a 30-day lookback, and enables broader live CoinGecko universe
+enrichment by default so real article mentions can resolve beyond the fixture
+aliases. Provider/network failures remain warnings in `discovery_runs.jsonl`.
 
 Inspect configured provider readiness without printing secrets:
 

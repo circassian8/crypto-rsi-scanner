@@ -101,8 +101,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   zero-row/rate-limit/no-candidate warnings) ·
   `make event-discovery-refresh-public-rss` / `make
   event-fade-public-rss-review-cycle` (opt-in no-key public RSS source bundle
-  plus optional live CoinGecko universe enrichment; research cache/review
-  artifacts only) ·
+  with a 30-day lookback, targeted proxy-narrative search feed, and optional
+  live CoinGecko universe enrichment; research cache/review artifacts only) ·
   `main.py --event-discovery-binance-listen` (listen to Binance's signed CMS
   WebSocket for the configured window and append raw research cache evidence
   only; no live DB writes) ·
@@ -255,6 +255,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   The default manual alias file is `event_discovery_aliases.json`; fixture
   aliases in `fixtures/event_discovery/asset_aliases.json` are for fixture
   targets/tests only and must not pollute real-source review cycles.
+  Proxy-style news without a known event time may enter validation samples as
+  `proxy_attention` review evidence, but it must remain `NO_TRADE` because the
+  event-fade hard gate still requires a real event time.
+  The resolver also guards common identity words observed in public feeds
+  (`cash`, `real`, `just`, `humanity`) from becoming high-confidence matches.
   Provider enrichment is evidence, not eligibility; raw reviewed fixture
   evidence takes precedence over provider rows.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When
@@ -419,8 +424,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   posts when `RSI_EVENT_DISCOVERY_CRYPTOPANIC_LIVE=1` and an API token is set,
   can optionally fetch live GDELT Article List JSON when
   `RSI_EVENT_DISCOVERY_GDELT_LIVE=1`, can optionally fetch live
-  RSS/Atom feeds from explicit `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS` when
-  `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, can parse local external IPO,
+  RSS/Atom feeds from explicit `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS` or
+  newline URL files when `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, can
+  infer common external assets such as SpaceX/OpenAI in news text, can preserve
+  no-event-time proxy-style articles as `proxy_attention` review rows that
+  remain `NO_TRADE`, can parse local external IPO,
   sports, and prediction-market catalyst fixtures as radar evidence, can attach local
   Coinalyze-style OI/funding/crowding snapshots from
   `RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH`, can optionally fetch live
@@ -470,8 +478,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   event-discovery sources from the environment/`.env`. `make
   event-fade-public-rss-review-cycle` is the no-key convenience path for
   public RSS feeds listed in
-  `fixtures/event_discovery/public_rss_feeds.txt`, with optional live CoinGecko
-  universe enrichment, and writes only research cache/review artifacts.
+  `fixtures/event_discovery/public_rss_feeds.txt`, including a targeted Google
+  News RSS search for pre-IPO/tokenized-stock/prediction-market/fan-token
+  narratives. It defaults to a 30-day lookback and a broader live CoinGecko
+  resolver universe, and writes only research cache/review artifacts.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,

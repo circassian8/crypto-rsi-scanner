@@ -371,6 +371,8 @@ def test_public_rss_make_target_does_not_inject_fixture_aliases():
 
     assert "RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH=fixtures/event_discovery/public_rss_feeds.txt" in result.stdout
     assert "RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT=250" in result.stdout
+    assert "RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=720" in result.stdout
     assert "fixtures/event_discovery/asset_aliases.json" not in result.stdout
 
 
@@ -1278,6 +1280,34 @@ def test_event_resolver_aliases_and_rejects_ticker_collision():
     assert all(link.link_confidence < 0.80 for link in low_conf)
 
 
+def test_event_resolver_rejects_generic_live_universe_identity_terms():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, NormalizedEvent
+    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+
+    event = NormalizedEvent(
+        event_id="spacex-tokenized-access",
+        raw_ids=("rss:1",),
+        event_name="SpaceX debut is a win for crypto price discovery but just a fail for tokenized access",
+        event_type="ipo_proxy",
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=datetime(2026, 6, 16, tzinfo=timezone.utc),
+        source="project_blog_rss",
+        source_urls=("https://example.test/spacex",),
+        external_asset="SpaceX",
+        description="Crypto exchanges cash in on SpaceX frenzy with real pre-IPO derivatives.",
+        confidence=0.75,
+    )
+    noisy_assets = [
+        DiscoveredAsset("cash-4", "CASH", "Cash", 1, 1, 1, (), {}, "coingecko", ("cash-4", "Cash", "CASH")),
+        DiscoveredAsset("just", "JST", "JUST", 1, 1, 1, (), {}, "coingecko", ("just", "JUST", "JST")),
+        DiscoveredAsset("reallink", "REAL", "Reallink", 1, 1, 1, (), {}, "coingecko", ("real", "REAL")),
+    ]
+
+    assert resolve_event_assets(event, noisy_assets) == []
+
+
 def test_event_discovery_resolves_real_assets_from_clean_universe_fixture():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -2092,6 +2122,76 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
         feed_urls=("https://example.test/rss",),
         opener=failing_opener,
     ).fetch_events(start, end) == []
+
+
+def test_event_discovery_proxy_article_without_event_time_stays_reviewable_no_trade():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_models import DiscoveredAsset
+    from crypto_rsi_scanner.event_providers.project_blog_rss import ProjectBlogRssProvider
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <guid>hype-spacex-preipo</guid>
+      <title>Hyperliquid's HYPE token rallies as pre-IPO perpetual market for SpaceX launches</title>
+      <description>Trade.xyz launches synthetic exposure to SpaceX through crypto derivatives.</description>
+      <link>https://example.test/hype-spacex-preipo</link>
+      <pubDate>Tue, 16 Jun 2026 12:30:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
+""".encode("utf-8")
+
+    start = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    raw = ProjectBlogRssProvider(
+        None,
+        live_enabled=True,
+        feed_urls=("https://example.test/rss",),
+        opener=lambda _request, _timeout: FakeResponse(),
+        fetched_at=datetime(2026, 6, 16, 13, 0, tzinfo=timezone.utc),
+    ).fetch_events(start, end)
+    assert raw[0].raw_json["event"]["event_type"] == "ipo_proxy"
+    assert raw[0].raw_json["event"]["external_asset"] == "SpaceX"
+    assert raw[0].raw_json["event"]["event_time"] is None
+
+    result = event_discovery.run_discovery(
+        raw,
+        [
+            DiscoveredAsset(
+                coin_id="hyperliquid",
+                symbol="HYPE",
+                name="Hyperliquid",
+                market_cap=1_000_000_000,
+                volume_24h=200_000_000,
+                price=35.0,
+                categories=("perp-dex",),
+                contract_addresses={},
+                source="test",
+                aliases=("hyperliquid", "hype"),
+            )
+        ],
+        now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc),
+    )
+
+    candidate = result.candidates[0]
+    assert candidate.classification.is_proxy_narrative is True
+    assert candidate.classification.relationship_type == "proxy_attention"
+    assert candidate.fade_signal.signal_type == FadeSignalType.NO_TRADE
+    assert "not an eligible proxy event-fade candidate" in candidate.fade_signal.warnings
 
 
 def test_event_discovery_news_pipeline_proxy_direct_late_and_ambiguous_safety():

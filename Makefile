@@ -23,7 +23,8 @@ EVENT_FADE_PRICE_FIXTURE_DIR ?=
 EVENT_FADE_PRICE_FIXTURE_ARG = $(if $(strip $(EVENT_FADE_PRICE_FIXTURE_DIR)),--event-fade-price-fixture-dir $(EVENT_FADE_PRICE_FIXTURE_DIR),)
 EVENT_DISCOVERY_RSS_URLS_PATH ?= fixtures/event_discovery/public_rss_feeds.txt
 EVENT_DISCOVERY_RSS_UNIVERSE_LIVE ?= 1
-EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT ?= 150
+EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT ?= 250
+EVENT_DISCOVERY_RSS_LOOKBACK_HOURS ?= 720
 
 .PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
@@ -164,6 +165,7 @@ event-discovery-refresh-configured:
 
 event-discovery-refresh-public-rss:
 	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
+	RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=$(EVENT_DISCOVERY_RSS_LOOKBACK_HOURS) \
 	RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1 \
 	RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH=$(EVENT_DISCOVERY_RSS_URLS_PATH) \
 	RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=$(EVENT_DISCOVERY_RSS_UNIVERSE_LIVE) \
@@ -255,7 +257,7 @@ event-fade-configured-review-cycle:
 	$(MAKE) event-fade-cache-review-bundle EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=$(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) EVENT_FADE_QUEUE_LIMIT=$(EVENT_FADE_QUEUE_LIMIT) EVENT_FADE_REVIEW_BUNDLE_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_PRICES) EVENT_FADE_REVIEW_BUNDLE_REVIEWED=$(EVENT_FADE_REVIEW_BUNDLE_REVIEWED) EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES) EVENT_FADE_PRICE_DAYS=$(EVENT_FADE_PRICE_DAYS) EVENT_FADE_PRICE_FIXTURE_DIR=$(EVENT_FADE_PRICE_FIXTURE_DIR)
 
 event-fade-public-rss-review-cycle:
-	$(MAKE) event-discovery-refresh-public-rss EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_DISCOVERY_RSS_URLS_PATH=$(EVENT_DISCOVERY_RSS_URLS_PATH) EVENT_DISCOVERY_RSS_UNIVERSE_LIVE=$(EVENT_DISCOVERY_RSS_UNIVERSE_LIVE) EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT=$(EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT)
+	$(MAKE) event-discovery-refresh-public-rss EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_DISCOVERY_RSS_URLS_PATH=$(EVENT_DISCOVERY_RSS_URLS_PATH) EVENT_DISCOVERY_RSS_UNIVERSE_LIVE=$(EVENT_DISCOVERY_RSS_UNIVERSE_LIVE) EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT=$(EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT) EVENT_DISCOVERY_RSS_LOOKBACK_HOURS=$(EVENT_DISCOVERY_RSS_LOOKBACK_HOURS)
 	$(MAKE) event-fade-cache-review-bundle EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=$(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) EVENT_FADE_QUEUE_LIMIT=$(EVENT_FADE_QUEUE_LIMIT) EVENT_FADE_REVIEW_BUNDLE_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_PRICES) EVENT_FADE_REVIEW_BUNDLE_REVIEWED=$(EVENT_FADE_REVIEW_BUNDLE_REVIEWED) EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=$(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES) EVENT_FADE_PRICE_DAYS=$(EVENT_FADE_PRICE_DAYS) EVENT_FADE_PRICE_FIXTURE_DIR=$(EVENT_FADE_PRICE_FIXTURE_DIR)
 
 event-fade-merge-sample:

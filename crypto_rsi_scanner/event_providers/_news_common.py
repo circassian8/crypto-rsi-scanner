@@ -15,6 +15,18 @@ from .manual_json import content_hash, parse_datetime
 
 log = logging.getLogger(__name__)
 
+EXTERNAL_ASSET_ALIASES = (
+    ("SpaceX", ("spacex", "spcx")),
+    ("OpenAI", ("openai", "open ai", "chatgpt")),
+    ("Anthropic", ("anthropic", "claude")),
+    ("Tesla", ("tesla",)),
+    ("Nvidia", ("nvidia",)),
+    ("World Cup", ("world cup",)),
+    ("Champions League", ("champions league",)),
+    ("Iran", ("iran",)),
+    ("US election", ("us election", "u.s. election", "presidential election")),
+)
+
 
 def fetch_news_events(
     path: str | Path | None,
@@ -157,7 +169,7 @@ def _infer_event_payload(title: str, body: str, row: Mapping[str, Any]) -> dict[
         event_type = "etf_approval"
 
     event_time = _parse_time(row.get("event_time") or row.get("eventTime") or row.get("catalyst_time"))
-    external_asset = row.get("external_asset") or row.get("externalAsset")
+    external_asset = row.get("external_asset") or row.get("externalAsset") or _infer_external_asset(text)
     return {
         "event_name": str(row.get("event_name") or row.get("eventName") or title),
         "event_type": event_type,
@@ -167,6 +179,13 @@ def _infer_event_payload(title: str, body: str, row: Mapping[str, Any]) -> dict[
         "confidence": float(row.get("source_confidence") or 0.65),
         "description": body or title,
     }
+
+
+def _infer_external_asset(text: str) -> str | None:
+    for name, aliases in EXTERNAL_ASSET_ALIASES:
+        if any(alias in text for alias in aliases):
+            return name
+    return None
 
 
 def _parse_time(value: object) -> datetime | None:

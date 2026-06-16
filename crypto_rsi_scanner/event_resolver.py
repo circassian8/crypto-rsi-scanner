@@ -10,6 +10,13 @@ from typing import Iterable
 
 from .event_models import DiscoveredAsset, EventAssetLink, NormalizedEvent
 
+GENERIC_ASSET_TERMS = {
+    "cash",
+    "real",
+    "just",
+    "humanity",
+}
+
 
 def clean_text(value: object) -> str:
     text = unicodedata.normalize("NFKC", str(value or ""))
@@ -91,7 +98,7 @@ def _score_asset_match(
     evidence: list[str] = []
     payload_text = text
     coin_id = clean_text(asset.coin_id)
-    if coin_id and _phrase_in_text(coin_id, payload_text):
+    if coin_id and not _is_generic_asset_term(coin_id) and _phrase_in_text(coin_id, payload_text):
         evidence.append(asset.coin_id)
         return 1.00, "coin_id", evidence
 
@@ -102,7 +109,11 @@ def _score_asset_match(
 
     alias_hits = [
         alias for alias in asset.aliases
-        if len(clean_text(alias)) >= 4 and _phrase_in_text(alias, payload_text)
+        if (
+            len(clean_text(alias)) >= 4
+            and not _is_generic_asset_term(alias)
+            and _phrase_in_text(alias, payload_text)
+        )
     ]
     if alias_hits:
         return 0.95, "known_alias", alias_hits[:3]
@@ -110,7 +121,7 @@ def _score_asset_match(
     name = clean_text(asset.name)
     symbol = asset.symbol.upper()
     symbol_hit = _symbol_in_text(symbol, event.event_name) or _symbol_in_text(symbol, event.description or "")
-    if name and len(name) >= 4 and _phrase_in_text(name, payload_text):
+    if name and len(name) >= 4 and not _is_generic_asset_term(name) and _phrase_in_text(name, payload_text):
         evidence.append(asset.name)
         if symbol_hit:
             evidence.append(symbol)
@@ -128,6 +139,10 @@ def _phrase_in_text(phrase: str, text: str) -> bool:
     if not cleaned:
         return False
     return re.search(rf"(?<![a-z0-9]){re.escape(cleaned)}(?![a-z0-9])", text) is not None
+
+
+def _is_generic_asset_term(value: object) -> bool:
+    return clean_text(value) in GENERIC_ASSET_TERMS
 
 
 def _symbol_in_text(symbol: str, text: str) -> bool:

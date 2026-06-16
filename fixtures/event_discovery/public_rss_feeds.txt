@@ -8,3 +8,8 @@ https://cointelegraph.com/rss
 https://decrypt.co/feed
 https://www.coindesk.com/arc/outboundfeeds/rss/
 https://www.theblock.co/rss.xml
+
+# Targeted no-key discovery feed for proxy-style narratives. Broad publisher
+# feeds mostly produce generic BTC controls; this search feed surfaces pre-IPO,
+# tokenized-stock, prediction-market, and fan-token stories for manual review.
+https://news.google.com/rss/search?q=%28crypto%20OR%20token%29%20%28%22pre-IPO%22%20OR%20%22pre%20IPO%22%20OR%20%22synthetic%20exposure%22%20OR%20%22tokenized%20stock%22%20OR%20%22fan%20token%22%20OR%20%22prediction%20market%22%29&hl=en-US&gl=US&ceid=US:en

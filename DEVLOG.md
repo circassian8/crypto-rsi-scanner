@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Surface public RSS proxy-attention review rows · Codex
+**Why:** The no-key public RSS review cycle was clean after removing fixture
+aliases, but it produced no proxy rows because broad publisher feeds mostly
+returned generic BTC/control news and the classifier dropped proxy-style
+articles when no precise event time was known.
+**Changes:**
+- Added a targeted Google News RSS search feed to the public RSS starter list
+  for pre-IPO, tokenized-stock, prediction-market, and fan-token narratives.
+- Let news providers infer common external assets such as SpaceX/OpenAI and let
+  proxy-style articles without an event time remain `proxy_attention` review
+  rows while still staying `NO_TRADE` under the event-fade hard gate.
+- Raised the public RSS cycle defaults to a 30-day lookback and a broader live
+  CoinGecko resolver universe.
+- Added generic identity guards in the resolver so common words such as `cash`,
+  `real`, `just`, and `humanity` do not create high-confidence asset matches
+  from real news text.
+- Added offline regression coverage for no-event-time proxy review rows, public
+  RSS Makefile wiring, and the generic identity guard.
+**Verify:** The guarded public RSS refresh wrote 138 raw / 136 normalized events
+and 65 candidate snapshots into `/tmp/event_fade_targeted_rss_guarded_cache`;
+the review bundle had 65 rows, including 8 `proxy_attention` rows, all
+`NO_TRADE` / `eligible=False`. `make verify` passes, including 233/233 tests,
+alert render smoke, backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** The public RSS sample still contains review noise such as
+infrastructure or mentioned-asset rows; the next sample-quality improvement is
+a role classifier that separates proxy instrument from venue/chain/mentioned
+asset. No live routing, paper trading, or live DB writes changed.
+
 ## 2026-06-16 — Keep fixture aliases out of real event-discovery cycles · Codex
 **Why:** The first public-RSS review bundle worked, but it exposed a serious
 validation-sample contamination issue: the default alias file was the fixture
