@@ -19,7 +19,7 @@ Status labels:
 | waiting | Observe live state cohorts | system | `state_json` now lands in scanner CSV/signals/paper trades; `--report` and `--score --cohorts` expose cohorts once enough matured outcomes/trades exist. |
 | waiting | Confirm state-slice candidate cohorts | system | Volume-PIT 5y run (`research/VOLUME_PIT_BACKTEST_2026-06-10.md`) replicated several candidates (breakdown_risk crisis-vol −19; mean_reversion washout +14 / risk_on −8); needs live-cohort cross-check before any live rule. |
 | todo | Review volume-PIT registry prior export | human | `research/registry_priors_volpit_2026-06-10.json` is the first full-cycle, survivorship-reduced calibration artifact. Review before any `RSI_REGISTRY_PRIORS` opt-in. |
-| todo | Build event-fade validation sample | open | Event-fade engine plus fixture event radar, clean CoinGecko-universe bridge, fixture-backed Binance/Bybit announcement parsers, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers, external IPO/sports/prediction-market catalyst parsers, and Coinalyze-style derivatives enrichment exist. Expand reviewed dated proxy/direct/ambiguous cases with first-seen, crowding, liquidity/supply, and post-event failure labels before any live routing or paper tracking. |
+| todo | Build event-fade validation sample | open | Event-fade engine plus fixture event radar, clean CoinGecko-universe bridge, fixture-backed Binance/Bybit announcement parsers, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers, external IPO/sports/prediction-market catalyst parsers, Coinalyze-style derivatives enrichment, and Tokenomist/Etherscan/Arkham/Dune-style supply/on-chain enrichment exist. Expand reviewed dated proxy/direct/ambiguous cases with first-seen, crowding, liquidity/supply, and post-event failure labels before any live routing or paper tracking. |
 | done | Extend PIT history depth beyond demo limits | — | Solved without a Pro key: `backtest --pit-volume` ranks the full Binance USDT pool by trailing 30d dollar volume per date (5y, point-in-time, cached). Details in `DEVLOG.md` 2026-06-10. |
 | done | Confirm bull/chop state cohorts | — | Volume-PIT 5y run covered BULL 60.9k / CHOP 23.8k / BEAR 46.7k base-days: gating-map directions all confirmed (mean_reversion CHOP +10 n=800; dip_buy/trend_continuation BULL positive-thin; breakdown_risk no edge). See `research/VOLUME_PIT_BACKTEST_2026-06-10.md`. |
 | todo | Walk-forward check of the CHOP mean_reversion edge | open | Run `--pit-volume --walk-forward` to confirm the +10 CHOP edge isn't one episode. Cached data makes this cheap. |
@@ -36,8 +36,8 @@ No ready later items. Current remaining work is waiting on live outcomes, the
 event-fade validation sample, or the next universe hygiene audit. Tooling now exists for
 `--score --cohorts`, cost-aware backtests, walk-forward checks, audit refreshes,
 event-fade fixture reports, event-discovery fixture/universe/exchange/calendar/
-news/external-catalyst/derivatives radar reports, and suspicious-kept audit
-leak detection.
+news/external-catalyst/derivatives/supply radar reports, and suspicious-kept
+audit leak detection.
 
 ## Maintenance Rules
 

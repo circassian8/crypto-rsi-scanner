@@ -1056,6 +1056,10 @@ def event_discovery_report(verbose: bool = False) -> None:
         config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH,
         config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
+        config.EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH,
+        config.EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH,
+        config.EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH,
+        config.EVENT_DISCOVERY_DUNE_SUPPLY_PATH,
     )
     if not any(paths):
         print(
@@ -1083,6 +1087,10 @@ def event_discovery_report(verbose: bool = False) -> None:
         sports_fixtures_path=config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH,
         prediction_market_events_path=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
         coinalyze_derivatives_path=config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
+        tokenomist_supply_path=config.EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH,
+        etherscan_supply_path=config.EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH,
+        arkham_supply_path=config.EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH,
+        dune_supply_path=config.EVENT_DISCOVERY_DUNE_SUPPLY_PATH,
         universe_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
         universe_limit=config.EVENT_DISCOVERY_UNIVERSE_LIMIT or None,
         cfg=cfg,

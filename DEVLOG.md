@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add fixture supply/on-chain enrichment for event discovery · Codex
+**Why:** The event-fade radar needs local supply and on-chain pressure evidence
+before validation-sample work, but those fields must remain research-only
+evidence and must not bypass the proxy/direct hard gate.
+**Changes:**
+- Added fixture-backed Tokenomist-, Etherscan-, Arkham-, and Dune-style supply
+  providers under `supply_providers/`.
+- Added optional config/report paths:
+  `RSI_EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH`,
+  `RSI_EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH`,
+  `RSI_EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH`, and
+  `RSI_EVENT_DISCOVERY_DUNE_SUPPLY_PATH`.
+- Wired supply snapshots into `event_discovery.run_manual_discovery()`,
+  `main.py --event-discovery-report`, and `make event-discovery-report`; the
+  report now prints `supply=yes/no` alongside derivatives coverage.
+- Added fixtures covering unlock pressure, CEX inflow, team/MM wallet activity,
+  holder concentration, admin/mint risk, and a conflicting TESTVELVET provider
+  row that proves raw event fixture supply evidence wins.
+- Expanded offline tests for supply fixture parsing, malformed fixture fail-soft
+  behavior, supply enrichment, raw-evidence precedence, scanner report wiring,
+  direct/non-proxy safety, and preserving explicit `0` / `False` supply values.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with Phase 8 status and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 173/173.
+`make event-discovery-report` prints 20 raw events / 19 normalized events and
+shows supply-enriched TESTLIST/TESTUNLOCK/TESTAI/TESTPRED/TESTFAN candidates
+while direct listing/unlock cases remain `NO_TRADE`. `git diff --check` passes.
+`make verify` passes.
+**Notes/risks:** Providers remain fixture-backed only. No live Tokenomist,
+Etherscan, Arkham, Dune, cache, DB, notification, paper-trading, or execution
+path was added.
+
 ## 2026-06-16 — Add fixture external catalyst providers · Codex
 **Why:** The event-fade radar needs external catalysts outside crypto, such as
 IPO calendars, sports fixtures, and prediction markets, but those sources must

@@ -34,6 +34,10 @@ from .event_providers.project_blog_rss import ProjectBlogRssProvider
 from .event_providers.sports_fixtures import SportsFixturesProvider
 from .event_providers.tokenomist import TokenomistProvider
 from .event_resolver import clean_text, load_asset_aliases, resolve_event_assets
+from .supply_providers.arkham import ArkhamSupplyProvider
+from .supply_providers.dune import DuneSupplyProvider
+from .supply_providers.etherscan import EtherscanSupplyProvider
+from .supply_providers.tokenomist import TokenomistSupplyProvider
 
 log = logging.getLogger(__name__)
 
@@ -130,6 +134,7 @@ def run_discovery(
     fade_cfg: event_fade.EventFadeConfig | None = None,
     now: datetime | None = None,
     derivatives_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
+    supply_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> EventDiscoveryResult:
     cfg = cfg or EventDiscoveryConfig()
     fade_cfg = fade_cfg or event_fade.EventFadeConfig()
@@ -159,6 +164,7 @@ def run_discovery(
                 raw_by_id,
                 now,
                 derivatives_by_asset=derivatives_by_asset,
+                supply_by_asset=supply_by_asset,
             )
             fade_signal = event_fade.generate_fade_signal(fade_candidate, fade_cfg, now) if fade_candidate else None
             candidates.append(DiscoveredEventFadeCandidate(
@@ -176,6 +182,7 @@ def run_discovery(
                     "classifier_pass": classification.confidence >= cfg.min_classifier_confidence,
                     "has_market_snapshot": fade_candidate is not None and fade_candidate.market.price > 0,
                     "has_derivatives_snapshot": fade_candidate is not None and fade_candidate.derivatives is not None,
+                    "has_supply_snapshot": fade_candidate is not None and fade_candidate.supply is not None,
                     "has_technical_snapshot": fade_candidate is not None and fade_candidate.technical is not None,
                 },
             ))
@@ -203,6 +210,10 @@ def run_manual_discovery(
     sports_fixtures_path: str | Path | None = None,
     prediction_market_events_path: str | Path | None = None,
     coinalyze_derivatives_path: str | Path | None = None,
+    tokenomist_supply_path: str | Path | None = None,
+    etherscan_supply_path: str | Path | None = None,
+    arkham_supply_path: str | Path | None = None,
+    dune_supply_path: str | Path | None = None,
     universe_path: str | Path | None = None,
     universe_limit: int | None = None,
     cfg: EventDiscoveryConfig | None = None,
@@ -229,8 +240,22 @@ def run_manual_discovery(
         prediction_market_events_path=prediction_market_events_path,
     )
     derivatives = load_derivatives_snapshots(coinalyze_derivatives_path)
+    supply = load_supply_snapshots(
+        tokenomist_supply_path=tokenomist_supply_path,
+        etherscan_supply_path=etherscan_supply_path,
+        arkham_supply_path=arkham_supply_path,
+        dune_supply_path=dune_supply_path,
+    )
     assets = load_discovery_assets(alias_path, universe_path=universe_path, universe_limit=universe_limit)
-    return run_discovery(raw_events, assets, cfg=cfg, fade_cfg=fade_cfg, now=now, derivatives_by_asset=derivatives)
+    return run_discovery(
+        raw_events,
+        assets,
+        cfg=cfg,
+        fade_cfg=fade_cfg,
+        now=now,
+        derivatives_by_asset=derivatives,
+        supply_by_asset=supply,
+    )
 
 
 def load_discovery_events(
@@ -299,6 +324,25 @@ def load_derivatives_snapshots(
     return CoinalyzeDerivativesProvider(coinalyze_derivatives_path).fetch_snapshots()
 
 
+def load_supply_snapshots(
+    *,
+    tokenomist_supply_path: str | Path | None = None,
+    etherscan_supply_path: str | Path | None = None,
+    arkham_supply_path: str | Path | None = None,
+    dune_supply_path: str | Path | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Load optional local supply/on-chain snapshots for event-candidate enrichment."""
+    out: dict[str, dict[str, Any]] = {}
+    for provider in (
+        TokenomistSupplyProvider(tokenomist_supply_path),
+        EtherscanSupplyProvider(etherscan_supply_path),
+        ArkhamSupplyProvider(arkham_supply_path),
+        DuneSupplyProvider(dune_supply_path),
+    ):
+        out.update(provider.fetch_snapshots())
+    return out
+
+
 def merge_discovered_assets(assets: Iterable[DiscoveredAsset]) -> list[DiscoveredAsset]:
     by_id: dict[str, DiscoveredAsset] = {}
     order: list[str] = []
@@ -321,6 +365,7 @@ def build_fade_candidate(
     now: datetime,
     *,
     derivatives_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
+    supply_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> event_fade.FadeCandidate:
     raw = raw_by_id.get(event.raw_ids[0]) if event.raw_ids else None
     payload = raw.raw_json if raw and raw.raw_json else {}
@@ -350,7 +395,7 @@ def build_fade_candidate(
             derivatives_by_asset,
             asset,
         ), now),
-        supply=_supply_snapshot(asset, payload.get("supply"), now),
+        supply=_supply_snapshot(asset, payload.get("supply") or _supply_for_asset(supply_by_asset, asset), now),
         rsi=_rsi_snapshot(asset, payload.get("rsi"), now),
         technical=_technical_snapshot(asset, payload.get("technical"), now),
     )
@@ -387,10 +432,11 @@ def format_discovery_report(result: EventDiscoveryResult) -> str:
         relation = cls.relationship_type
         proxy = "proxy" if cls.is_proxy_narrative else "direct" if cls.is_direct_beneficiary else "ambiguous"
         derivatives = "yes" if candidate.data_quality.get("has_derivatives_snapshot") else "no"
+        supply = "yes" if candidate.data_quality.get("has_supply_snapshot") else "no"
         rows.append(
             f"  {candidate.asset.symbol:<12} {relation:<22} {proxy:<9} "
             f"link={candidate.link.link_confidence:.2f} cls={cls.confidence:.2f} "
-            f"score={score:<3} deriv={derivatives:<3} signal={signal}/{state}"
+            f"score={score:<3} deriv={derivatives:<3} supply={supply:<3} signal={signal}/{state}"
         )
         rows.append(f"    event: {candidate.event.event_name}")
         rows.append(f"    reason: {cls.reason}")
@@ -462,8 +508,37 @@ def _derivatives_for_asset(
     return None
 
 
+def _supply_for_asset(
+    snapshots: Mapping[str, Mapping[str, Any]] | None,
+    asset: DiscoveredAsset,
+) -> Mapping[str, Any] | None:
+    if not snapshots:
+        return None
+    for key in _asset_supply_keys(asset):
+        if key in snapshots:
+            return snapshots[key]
+    return None
+
+
 def _asset_derivatives_keys(asset: DiscoveredAsset) -> tuple[str, ...]:
     raw_values = (asset.coin_id, asset.symbol, *asset.aliases)
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in raw_values:
+        for key in (clean_text(value), str(value).upper()):
+            if key and key not in seen:
+                seen.add(key)
+                out.append(key)
+    return tuple(out)
+
+
+def _asset_supply_keys(asset: DiscoveredAsset) -> tuple[str, ...]:
+    raw_values = (
+        asset.coin_id,
+        asset.symbol,
+        *asset.aliases,
+        *asset.contract_addresses.values(),
+    )
     out: list[str] = []
     seen: set[str] = set()
     for value in raw_values:

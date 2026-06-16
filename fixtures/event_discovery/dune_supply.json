@@ -1,0 +1,12 @@
+{
+  "snapshots": [
+    {
+      "coin_id": "testfan",
+      "symbol": "TESTFAN",
+      "timestamp": "2026-06-16T12:00:00Z",
+      "top_holder_concentration": 0.64,
+      "admin_or_mint_risk": true,
+      "notes": "Dune holder concentration and mint-risk fixture"
+    }
+  ]
+}

@@ -576,6 +576,18 @@ def _external_catalyst_fixture_paths():
     return root / "external_ipo_events.json", root / "sports_fixtures.json", root / "prediction_market_events.json"
 
 
+def _supply_fixture_paths():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery"
+    return (
+        root / "tokenomist_supply.json",
+        root / "etherscan_supply.json",
+        root / "arkham_supply.json",
+        root / "dune_supply.json",
+    )
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -943,6 +955,98 @@ def test_event_discovery_derivatives_enrich_candidates_without_overriding_raw():
     assert velvet.fade_candidate.derivatives is not None
     assert velvet.fade_candidate.derivatives.open_interest is None
     assert velvet.fade_candidate.derivatives.open_interest_to_market_cap == 0.4
+    assert velvet.fade_signal.signal_type == FadeSignalType.SHORT_TRIGGERED
+
+
+def test_event_discovery_supply_providers_parse_fixtures():
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner.supply_providers.arkham import ArkhamSupplyProvider
+    from crypto_rsi_scanner.supply_providers.dune import DuneSupplyProvider
+    from crypto_rsi_scanner.supply_providers.etherscan import EtherscanSupplyProvider
+    from crypto_rsi_scanner.supply_providers.tokenomist import TokenomistSupplyProvider
+
+    tokenomist_path, etherscan_path, arkham_path, dune_path = _supply_fixture_paths()
+    tokenomist = TokenomistSupplyProvider(tokenomist_path, required=True).fetch_snapshots()
+    etherscan = EtherscanSupplyProvider(etherscan_path, required=True).fetch_snapshots()
+    arkham = ArkhamSupplyProvider(arkham_path, required=True).fetch_snapshots()
+    dune = DuneSupplyProvider(dune_path, required=True).fetch_snapshots()
+    assert tokenomist["testprediction"]["unlock_pct_circulating"] == 0.08
+    assert tokenomist["TESTPRED"]["unlock_amount"] == 1800000.0
+    assert tokenomist["testvelvet"]["unlock_pct_circulating"] == 0.0
+    assert tokenomist["TESTVELVET"]["top_holder_concentration"] == 0.10
+    assert etherscan["testlist"]["large_holder_exchange_inflow"] is True
+    assert etherscan["TESTLIST"]["cex_inflow_pct_supply"] == 0.04
+    assert arkham["testai"]["team_or_mm_wallet_activity"] is True
+    assert dune["testfan"]["admin_or_mint_risk"] is True
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_path = Path(tmp) / "bad_supply.json"
+        bad_path.write_text(json.dumps({"snapshots": ["not an object"]}), encoding="utf-8")
+        assert TokenomistSupplyProvider(bad_path).fetch_snapshots() == {}
+        try:
+            TokenomistSupplyProvider(bad_path, required=True).fetch_snapshots()
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("required malformed supply fixture should fail")
+
+
+def test_event_discovery_supply_enriches_without_overriding_raw_or_bypassing_gates():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    binance_path, _bybit_path = _exchange_announcement_fixture_paths()
+    _cryptopanic_path, _gdelt_path, _blog_path = _news_fixture_paths()
+    _ipo_path, _sports_path, prediction_path = _external_catalyst_fixture_paths()
+    tokenomist_path, etherscan_path, arkham_path, dune_path = _supply_fixture_paths()
+    start = datetime(2026, 6, 13, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    raw = ManualJsonEventProvider(events_path, required=True).fetch_events(start, end)
+    raw.extend(event_discovery.load_discovery_events(
+        None,
+        start,
+        end,
+        binance_announcements_path=binance_path,
+        prediction_market_events_path=prediction_path,
+    ))
+    assets = load_asset_aliases(aliases_path)
+    supply = event_discovery.load_supply_snapshots(
+        tokenomist_supply_path=tokenomist_path,
+        etherscan_supply_path=etherscan_path,
+        arkham_supply_path=arkham_path,
+        dune_supply_path=dune_path,
+    )
+    result = event_discovery.run_discovery(
+        raw,
+        assets,
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+        supply_by_asset=supply,
+    )
+    by_symbol = {candidate.asset.symbol: candidate for candidate in result.candidates}
+
+    listing = by_symbol["TESTLIST"]
+    assert listing.fade_candidate.supply is not None
+    assert listing.fade_candidate.supply.large_holder_exchange_inflow is True
+    assert listing.fade_candidate.component_scores["supply_pressure"] >= 60
+    assert listing.classification.is_direct_beneficiary is True
+    assert listing.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    pred = by_symbol["TESTPRED"]
+    assert pred.fade_candidate.supply is not None
+    assert pred.fade_candidate.supply.unlock_pct_circulating == 0.08
+    assert pred.data_quality["has_supply_snapshot"] is True
+    assert pred.fade_signal.signal_type in {FadeSignalType.NO_TRADE, FadeSignalType.WATCHLIST}
+
+    velvet = by_symbol["TESTVELVET"]
+    assert velvet.fade_candidate.supply is not None
+    assert velvet.fade_candidate.supply.top_holder_concentration == 0.62
+    assert velvet.fade_candidate.supply.unlock_pct_circulating is None
     assert velvet.fade_signal.signal_type == FadeSignalType.SHORT_TRIGGERED
 
 
@@ -1345,6 +1449,79 @@ def test_event_discovery_scanner_report_accepts_derivatives_fixture():
         config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = orig_sports
         config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
+
+
+def test_event_discovery_scanner_report_accepts_supply_fixtures():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    binance_path, _bybit_path = _exchange_announcement_fixture_paths()
+    tokenomist_path, etherscan_path, arkham_path, dune_path = _supply_fixture_paths()
+    orig_events = config.EVENT_DISCOVERY_EVENTS_PATH
+    orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
+    orig_binance = config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH
+    orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
+    orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
+    orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
+    orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
+    orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
+    orig_external_ipo = config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH
+    orig_sports = config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH
+    orig_prediction = config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH
+    orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
+    orig_tokenomist_supply = config.EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH
+    orig_etherscan_supply = config.EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH
+    orig_arkham_supply = config.EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH
+    orig_dune_supply = config.EVENT_DISCOVERY_DUNE_SUPPLY_PATH
+    orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
+    config.EVENT_DISCOVERY_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = binance_path
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+    config.EVENT_DISCOVERY_GDELT_PATH = None
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = None
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = None
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH = tokenomist_path
+    config.EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH = etherscan_path
+    config.EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH = arkham_path
+    config.EVENT_DISCOVERY_DUNE_SUPPLY_PATH = dune_path
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_discovery_report()
+        text = out.getvalue()
+        assert "TESTLIST" in text
+        assert "supply=yes" in text
+        assert "NO_TRADE/DISCOVERED" in text
+    finally:
+        config.EVENT_DISCOVERY_EVENTS_PATH = orig_events
+        config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = orig_binance
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
+        config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
+        config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
+        config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
+        config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = orig_external_ipo
+        config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = orig_sports
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
+        config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
+        config.EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH = orig_tokenomist_supply
+        config.EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH = orig_etherscan_supply
+        config.EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH = orig_arkham_supply
+        config.EVENT_DISCOVERY_DUNE_SUPPLY_PATH = orig_dune_supply
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
 

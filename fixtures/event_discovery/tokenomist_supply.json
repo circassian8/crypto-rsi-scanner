@@ -1,0 +1,20 @@
+{
+  "snapshots": [
+    {
+      "coin_id": "testprediction",
+      "symbol": "TESTPRED",
+      "timestamp": "2026-06-16T12:00:00Z",
+      "unlock_amount": 1800000,
+      "unlock_pct_circulating": 0.08,
+      "notes": "Upcoming incentive unlock around prediction-market catalyst"
+    },
+    {
+      "coin_id": "testvelvet",
+      "symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T15:30:00Z",
+      "unlock_pct_circulating": 0.0,
+      "top_holder_concentration": 0.10,
+      "notes": "Conflicting fixture row; raw event supply should win"
+    }
+  ]
+}

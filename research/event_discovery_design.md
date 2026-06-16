@@ -1,10 +1,11 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1-7 fixture framework with clean CoinGecko universe bridge,
+**Status:** Phase 1-8 fixture framework with clean CoinGecko universe bridge,
 fixture-backed exchange announcement providers, structured calendar/unlock
 providers, news/proxy-narrative providers, external catalyst providers, and
-Coinalyze-style derivatives enrichment, research-only
+Coinalyze-style derivatives plus Tokenomist/Etherscan/Arkham/Dune-style
+supply/on-chain enrichment, research-only
 
 ## Goal
 
@@ -56,6 +57,14 @@ Current files:
   fixture provider for external attention/catalyst markets
 - `derivatives_providers/coinalyze.py`: local derivatives fixture provider that
   maps Coinalyze-style OI/funding/crowding rows to discovery candidates
+- `supply_providers/tokenomist.py`: local supply fixture provider for unlock and
+  vesting-style pressure snapshots
+- `supply_providers/etherscan.py`: local supply fixture provider for token
+  transfer / CEX-inflow style snapshots
+- `supply_providers/arkham.py`: local supply fixture provider for
+  entity-labeled team/MM activity style snapshots
+- `supply_providers/dune.py`: local supply fixture provider for custom
+  concentration/admin-risk style snapshots
 - `event_resolver.py`: alias-aware asset resolver
 - `event_classification.py`: deterministic proxy/direct classifier
 - `event_discovery.py`: normalizer, deduper, orchestrator, report formatter
@@ -163,6 +172,27 @@ Derivatives crowding is evidence, not eligibility. A direct exchange listing,
 token unlock, or other non-proxy event must remain `NO_TRADE` even when OI,
 funding, and perp/spot crowding are extreme.
 
+## Supply And On-Chain Enrichment
+
+Tokenomist-, Etherscan-, Arkham-, and Dune-style supply providers currently read
+local JSON fixtures only. They produce candidate enrichment keyed by coin id,
+symbol, contract address, or alias and fill `EventSupplyPressureSnapshot` fields
+used by `event_fade.py`:
+
+- large-holder / exchange-inflow flags
+- CEX inflow amount and percent of supply
+- unlock amount and percent of circulating supply
+- top-holder concentration
+- team or market-maker wallet activity
+- admin or mint-risk flags
+
+Raw event fixture data wins over provider enrichment. This keeps provider rows
+from overwriting hand-reviewed event evidence during fixture research.
+
+Supply pressure is evidence, not eligibility. A direct exchange listing, token
+unlock, or other non-proxy event must remain `NO_TRADE` even when exchange
+inflows, unlocks, concentration, and admin-risk flags are severe.
+
 ## Classification Rules
 
 Proxy candidates need all of:
@@ -227,6 +257,14 @@ more dangerous than missed setups.
 - TESTPERP Coinalyze-style no-perp snapshot fixture
 - TESTVELVET conflicting Coinalyze-style snapshot proving raw event derivatives
   are not overwritten
+- TESTPRED Tokenomist-style unlock/supply snapshot that enriches a proxy radar
+  candidate without forcing a trade
+- TESTLIST Etherscan-style exchange-inflow snapshot that raises supply-pressure
+  evidence while the direct listing still remains `NO_TRADE`
+- TESTAI Arkham-style team/MM wallet activity snapshot
+- TESTFAN Dune-style holder concentration and admin-risk snapshot
+- TESTVELVET conflicting Tokenomist-style supply snapshot proving raw event
+  supply evidence is not overwritten
 
 `fixtures/coingecko_smoke/top_markets.json` is also used for universe-provider
 coverage. BTC/ETH/SOL become discovery assets, while Tether is excluded by the
@@ -249,6 +287,10 @@ RSI_EVENT_DISCOVERY_EXTERNAL_IPO_PATH=fixtures/event_discovery/external_ipo_even
 RSI_EVENT_DISCOVERY_SPORTS_FIXTURES_PATH=fixtures/event_discovery/sports_fixtures.json \
 RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH=fixtures/event_discovery/prediction_market_events.json \
 RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH=fixtures/event_discovery/coinalyze_derivatives.json \
+RSI_EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH=fixtures/event_discovery/tokenomist_supply.json \
+RSI_EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH=fixtures/event_discovery/etherscan_supply.json \
+RSI_EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH=fixtures/event_discovery/arkham_supply.json \
+RSI_EVENT_DISCOVERY_DUNE_SUPPLY_PATH=fixtures/event_discovery/dune_supply.json \
 RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report
 ```

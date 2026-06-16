@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "coin_id": "testlist",
+      "symbol": "TESTLIST",
+      "timestamp": "2026-06-15T11:45:00Z",
+      "large_holder_exchange_inflow": true,
+      "cex_inflow_amount": 3500000,
+      "cex_inflow_pct_supply": 0.04,
+      "top_holder_concentration": 0.68,
+      "team_or_mm_wallet_activity": true,
+      "notes": "Large holder transfer to exchange before listing"
+    }
+  ]
+}

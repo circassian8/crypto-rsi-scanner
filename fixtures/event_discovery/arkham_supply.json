@@ -1,0 +1,10 @@
+[
+  {
+    "coin_id": "testai",
+    "symbol": "TESTAI",
+    "timestamp": "2026-06-16T12:30:00Z",
+    "team_or_mm_wallet_activity": true,
+    "top_holder_concentration": 0.52,
+    "notes": "Arkham-labeled team/MM wallet activity fixture"
+  }
+]
