@@ -2192,6 +2192,18 @@ def test_event_fade_validation_sample_rows_and_serializers():
     assert velvet["raw_ids"] == ["velvet-spacex-proxy-1", "velvet-spacex-proxy-duplicate"]
     assert len(velvet["raw_titles"]) == 2
     assert len(velvet["raw_content_hashes"]) == 2
+    assert velvet["raw_published_at"] == [
+        "2026-06-13T10:00:00+00:00",
+        "2026-06-13T11:00:00+00:00",
+    ]
+    assert velvet["raw_fetched_at"] == [
+        "2026-06-15T15:00:00+00:00",
+        "2026-06-15T15:30:00+00:00",
+    ]
+    assert velvet["published_at_min"] == "2026-06-13T10:00:00+00:00"
+    assert velvet["published_at_max"] == "2026-06-13T11:00:00+00:00"
+    assert velvet["fetched_at_min"] == "2026-06-15T15:00:00+00:00"
+    assert velvet["fetched_at_max"] == "2026-06-15T15:30:00+00:00"
     assert velvet["source_count"] == 2
     assert velvet["relationship_type"] == "proxy_exposure"
     assert velvet["is_proxy_narrative"] is True
@@ -2406,6 +2418,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert review.triggered_btc_risk_buckets == 1
     assert review.missing_event_time_baseline_rows == 0
     assert review.point_in_time_violation_rows == 0
+    assert review.post_decision_source_rows == 0
     assert review.promotion_blockers == ()
 
     event_type_cohorts = {cohort.name: cohort for cohort in review.event_type_cohorts}
@@ -2433,6 +2446,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "proxy event types: 2/2" in report
     assert "trigger BTC risk buckets: 1/1" in report
     assert "trigger latency: avg=22.5h" in report
+    assert "rows with post-decision source evidence: 0" in report
     assert "COHORTS" in report
     assert "By event type:" in report
     assert "ipo_proxy" in report
@@ -2724,6 +2738,8 @@ def test_event_fade_validation_review_blocks_late_or_weak_trigger_evidence():
     triggered["first_seen_time"] = "2026-06-14T00:00:00+00:00"
     triggered["fetched_at_min"] = "2026-06-14T00:00:00+00:00"
     triggered["published_at_min"] = "2026-06-14T00:00:00+00:00"
+    triggered["fetched_at_max"] = "2026-06-14T00:00:00+00:00"
+    triggered["published_at_max"] = "2026-06-14T00:00:00+00:00"
     triggered["trigger_observed_at"] = "2026-06-13T12:00:00+00:00"
     triggered["max_favorable_excursion"] = 0.03
     triggered["max_adverse_excursion"] = 0.08
@@ -2742,12 +2758,50 @@ def test_event_fade_validation_review_blocks_late_or_weak_trigger_evidence():
     assert review.promotion_ready is False
     assert review.trigger_precision == 0.0
     assert review.point_in_time_violation_rows == 1
+    assert review.post_decision_source_rows == 1
     assert any("trigger precision 0.0% below 60.0%" == blocker for blocker in review.promotion_blockers)
     assert any("evidence first seen after the decision time" in blocker for blocker in review.promotion_blockers)
+    assert any("source evidence after the decision time" in blocker for blocker in review.promotion_blockers)
     assert review.negative_trigger_latency_rows == 1
     assert any("trigger before event time" in blocker for blocker in review.promotion_blockers)
     assert any("MFE/MAE 0.38 below 1.50" == blocker for blocker in review.promotion_blockers)
     assert "reviewed SHORT_TRIGGERED rows do not show favorable 72h short returns" in review.promotion_blockers
+
+
+def test_event_fade_validation_review_flags_mixed_late_source_evidence():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+    triggered["human_label"] = "valid_proxy_fade"
+    triggered["max_favorable_excursion"] = 0.42
+    triggered["max_adverse_excursion"] = 0.08
+    triggered["post_event_return_72h"] = -0.22
+    triggered["event_time_post_event_return_72h"] = -0.12
+    triggered["fetched_at_min"] = "2026-06-15T12:00:00+00:00"
+    triggered["fetched_at_max"] = "2026-06-17T12:00:00+00:00"
+    triggered["raw_fetched_at"] = [
+        "2026-06-15T12:00:00+00:00",
+        "2026-06-17T12:00:00+00:00",
+    ]
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=1,
+        min_negative_controls=0,
+        min_triggered_reviewed=1,
+        min_trigger_precision=0.90,
+        min_mfe_mae_ratio=2.0,
+        min_proxy_event_types=1,
+        min_trigger_btc_risk_buckets=1,
+    )
+    assert review.point_in_time_violation_rows == 0
+    assert review.post_decision_source_rows == 1
+    assert "1 reviewed row(s) include source evidence after the decision time" in review.promotion_blockers
+
+    queue = event_validation.build_labeling_queue(rows)
+    item = next(item for item in queue.items if item.asset_symbol == "TESTVELVET")
+    assert item.category == "review_post_decision_source"
 
 
 def test_event_discovery_scanner_report_uses_local_fixtures():

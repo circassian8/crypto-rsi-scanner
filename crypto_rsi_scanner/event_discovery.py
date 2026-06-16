@@ -59,8 +59,12 @@ VALIDATION_SAMPLE_FIELDS = (
     "event_time",
     "event_time_confidence",
     "first_seen_time",
+    "raw_published_at",
+    "raw_fetched_at",
     "published_at_min",
+    "published_at_max",
     "fetched_at_min",
+    "fetched_at_max",
     "source",
     "source_urls",
     "source_count",
@@ -1001,8 +1005,12 @@ def _validation_sample_row(
         "event_time": _iso(candidate.event.event_time),
         "event_time_confidence": candidate.event.event_time_confidence,
         "first_seen_time": _iso(candidate.event.first_seen_time),
+        "raw_published_at": [_iso(raw.published_at) for raw in raw_events],
+        "raw_fetched_at": [_iso(raw.fetched_at) for raw in raw_events],
         "published_at_min": _iso(_min_dt(raw.published_at for raw in raw_events)),
+        "published_at_max": _iso(_max_dt(raw.published_at for raw in raw_events)),
         "fetched_at_min": _iso(_min_dt(raw.fetched_at for raw in raw_events)),
+        "fetched_at_max": _iso(_max_dt(raw.fetched_at for raw in raw_events)),
         "source": candidate.event.source,
         "source_urls": list(candidate.event.source_urls),
         "source_count": candidate.data_quality.get("source_count"),
@@ -1096,6 +1104,11 @@ def _validation_sample_row(
 def _min_dt(values: Iterable[datetime | None]) -> datetime | None:
     present = [_as_utc(value) for value in values if value is not None]
     return min(present) if present else None
+
+
+def _max_dt(values: Iterable[datetime | None]) -> datetime | None:
+    present = [_as_utc(value) for value in values if value is not None]
+    return max(present) if present else None
 
 
 def _iso(value: object) -> str | None:

@@ -328,7 +328,8 @@ manual labeling and future point-in-time backtests, not for alerts.
 Each row includes:
 
 - raw source ids, providers, titles, content hashes, URLs, and raw-source
-  timestamps
+  timestamps, including raw published/fetched arrays plus min/max timestamp
+  summaries for point-in-time leakage review
 - normalized event identity, event type, event time/confidence, first-seen time,
   and external asset
 - resolved asset identity plus link confidence, match reason, and evidence
@@ -477,6 +478,7 @@ sidecar keeps stable identity/context fields plus editable review fields:
 - `event_id`, `asset_coin_id`, `asset_symbol`, and `relationship_type`
 - event/signal context, queue category, suggested label, missing fields, and
   source URLs
+- raw/min/max source timestamps for point-in-time review
 - `review_status`, `human_label`, `human_notes`
 - trigger-time and event-time-baseline outcome fields when they need manual
   override or preservation
@@ -529,6 +531,8 @@ The reviewer currently checks:
 - direct/non-proxy rows that somehow became `SHORT_TRIGGERED`
 - point-in-time evidence violations where the source was first seen after the
   decision time
+- reviewed rows with any source evidence published/fetched after the decision
+  time, even if another source for the same event was available earlier
 - trigger latency from event time to `SHORT_TRIGGERED`, including negative
   latencies that imply invalid state progression
 - average MFE, MAE, MFE/MAE ratio, and post-event 24h/72h/7d returns for

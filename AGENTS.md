@@ -392,10 +392,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   and ambiguous sections with evidence/warnings. The validation-sample export is
   `main.py --event-fade-export-sample PATH` and writes JSONL/CSV rows with raw
   source evidence, point-in-time timestamps, link/classifier evidence, fade
-  features, missing-data fields, and blank human-review/outcome columns.
+  features, missing-data fields, raw/min/max source timestamps for leakage
+  review, and blank human-review/outcome columns.
   `main.py --event-fade-review-sample PATH` reads labeled sample artifacts and
   reports sample coverage, reviewed trigger count, trigger precision,
   false-positive rate, trigger latency, point-in-time evidence violations,
+  post-decision source evidence,
   MFE/MAE, post-event returns, event-time short baseline comparison,
   event-type/relationship/BTC-risk cohorts, and blockers such as too few
   reviewed proxy/control/trigger cases, too-narrow event/BTC-risk diversity, or

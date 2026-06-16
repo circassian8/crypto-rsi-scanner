@@ -63,6 +63,12 @@ REVIEW_TEMPLATE_FIELDS = (
     "suggested_label",
     "missing_fields",
     "source_urls",
+    "raw_published_at",
+    "raw_fetched_at",
+    "published_at_min",
+    "published_at_max",
+    "fetched_at_min",
+    "fetched_at_max",
     "review_status",
     "human_label",
     "human_notes",
@@ -142,6 +148,7 @@ class EventFadeValidationReview:
     missing_trigger_outcome_rows: int
     missing_event_time_baseline_rows: int
     point_in_time_violation_rows: int
+    post_decision_source_rows: int
     min_proxy_candidates: int
     min_negative_controls: int
     min_triggered_reviewed: int
@@ -583,6 +590,7 @@ def review_validation_sample(
         if any(_num(row.get(field)) is None for field in REQUIRED_EVENT_TIME_BASELINE_FIELDS)
     )
     pit_violation_rows = sum(1 for row in reviewed if _point_in_time_violation(row))
+    post_decision_source_rows = sum(1 for row in reviewed if _post_decision_source(row))
     mfe_values = _nums(row.get("max_favorable_excursion") for row in triggered_reviewed)
     mae_values = _nums(row.get("max_adverse_excursion") for row in triggered_reviewed)
     avg_mfe = _mean(mfe_values)
@@ -646,6 +654,10 @@ def review_validation_sample(
     if pit_violation_rows:
         blockers.append(
             f"{pit_violation_rows} reviewed row(s) use evidence first seen after the decision time"
+        )
+    if post_decision_source_rows:
+        blockers.append(
+            f"{post_decision_source_rows} reviewed row(s) include source evidence after the decision time"
         )
     if negative_trigger_latency_rows:
         blockers.append(
@@ -713,6 +725,7 @@ def review_validation_sample(
         missing_trigger_outcome_rows=missing_trigger_outcome_rows,
         missing_event_time_baseline_rows=missing_event_time_baseline_rows,
         point_in_time_violation_rows=pit_violation_rows,
+        post_decision_source_rows=post_decision_source_rows,
         min_proxy_candidates=min_proxy_candidates,
         min_negative_controls=min_negative_controls,
         min_triggered_reviewed=min_triggered_reviewed,
@@ -771,6 +784,7 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         ),
         f"  direct/non-proxy SHORT_TRIGGERED rows: {review.direct_or_nonproxy_triggered}",
         f"  point-in-time evidence violations: {review.point_in_time_violation_rows}",
+        f"  rows with post-decision source evidence: {review.post_decision_source_rows}",
         "",
         "OUTCOMES",
         (
@@ -873,8 +887,8 @@ def _format_review_packet_row(
         f"- Event: `{_packet_text(row.get('event_type'))}` at `{_packet_text(item.event_time or 'unknown')}`",
         (
             f"- First seen: `{_packet_text(row.get('first_seen_time'))}` | "
-            f"published: `{_packet_text(row.get('published_at_min'))}` | "
-            f"fetched: `{_packet_text(row.get('fetched_at_min'))}`"
+            f"published=`{_packet_text(row.get('published_at_min'))}`..`{_packet_text(row.get('published_at_max'))}` | "
+            f"fetched=`{_packet_text(row.get('fetched_at_min'))}`..`{_packet_text(row.get('fetched_at_max'))}`"
         ),
         (
             f"- Asset: `{symbol}` (`{coin_id}`) | relationship: "
@@ -1156,10 +1170,18 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
             suggested_label=label,
             missing_fields=(),
         )
-    if triggered and not label:
+    if label and _post_decision_source(row):
         return _queue_item(
             row,
             priority=2,
+            category="review_post_decision_source",
+            suggested_label=label,
+            missing_fields=(),
+        )
+    if triggered and not label:
+        return _queue_item(
+            row,
+            priority=3,
             category="label_triggered_candidate",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label", *missing_required_outcomes),
@@ -1167,7 +1189,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if triggered and missing_required_outcomes:
         return _queue_item(
             row,
-            priority=3,
+            priority=4,
             category="fill_trigger_outcomes",
             suggested_label=label or _suggested_label(row),
             missing_fields=missing_required_outcomes,
@@ -1175,7 +1197,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_proxy_candidate(row):
         return _queue_item(
             row,
-            priority=4,
+            priority=5,
             category="label_proxy_candidate",
             suggested_label="valid_proxy_fade or false_positive",
             missing_fields=("human_label",),
@@ -1183,7 +1205,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_direct_or_ambiguous(row):
         return _queue_item(
             row,
-            priority=5,
+            priority=6,
             category="label_negative_control",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label",),
@@ -1317,22 +1339,43 @@ def _is_direct_or_ambiguous(row: Mapping[str, Any]) -> bool:
 
 
 def _point_in_time_violation(row: Mapping[str, Any]) -> bool:
+    decision_time = _decision_time(row)
+    if decision_time is None:
+        return _signal_type(row) in {"WATCHLIST", "SHORT_TRIGGERED"}
+    known_times = _source_known_times(row, include_max=False)
+    return bool(known_times) and min(known_times) > decision_time
+
+
+def _post_decision_source(row: Mapping[str, Any]) -> bool:
+    decision_time = _decision_time(row)
+    if decision_time is None:
+        return False
+    return any(value > decision_time for value in _source_known_times(row, include_max=True))
+
+
+def _decision_time(row: Mapping[str, Any]) -> datetime | None:
     signal_type = _signal_type(row)
     if signal_type == "WATCHLIST":
-        decision_time = _dt(row.get("event_time"))
-    elif signal_type == "SHORT_TRIGGERED":
-        decision_time = _dt(row.get("trigger_observed_at"))
-    else:
-        return False
-    if decision_time is None:
-        return True
+        return _dt(row.get("event_time"))
+    if signal_type == "SHORT_TRIGGERED":
+        return _dt(row.get("trigger_observed_at"))
+    return None
+
+
+def _source_known_times(row: Mapping[str, Any], *, include_max: bool) -> list[datetime]:
     known_times = [
         _dt(row.get("first_seen_time")),
         _dt(row.get("fetched_at_min")),
         _dt(row.get("published_at_min")),
     ]
-    known_times = [value for value in known_times if value is not None]
-    return bool(known_times) and min(known_times) > decision_time
+    if include_max:
+        known_times.extend([
+            _dt(row.get("fetched_at_max")),
+            _dt(row.get("published_at_max")),
+        ])
+        known_times.extend(_dt(value) for value in _list_values(row.get("raw_fetched_at")))
+        known_times.extend(_dt(value) for value in _list_values(row.get("raw_published_at")))
+    return [value for value in known_times if value is not None]
 
 
 def _label_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:

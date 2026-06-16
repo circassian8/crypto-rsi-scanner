@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Harden event-fade point-in-time source audits · Codex
+**Why:** The validation sample tracked earliest source timestamps, but a
+multi-source event could still mix one pre-decision source with another
+post-decision source. The Pro plan explicitly requires point-in-time evidence,
+so reviewed samples need to expose and block this leakage risk.
+**Changes:**
+- Extended `crypto_rsi_scanner/event_discovery.py` validation rows with
+  `raw_published_at`, `raw_fetched_at`, `published_at_max`, and
+  `fetched_at_max` in addition to existing min timestamps.
+- Added `post_decision_source_rows` to
+  `crypto_rsi_scanner/event_validation.py`; review reports now count/block
+  reviewed rows containing any source evidence after the decision time.
+- The labeling queue now prioritizes reviewed rows that need post-decision
+  source review, and review packets/templates show min/max/raw source timing.
+- Added tests for raw timestamp export, clean reviewed samples, all-late
+  evidence, and mixed early/late source evidence.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the source-leakage guardrail.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 214/214.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This is an additive validation-sample/schema change under the
+same v1 artifact family; older samples without max/raw timestamp fields still
+load, but new exports are more auditable.
+
 ## 2026-06-16 — Add event-fade review bundle workspace · Codex
 **Why:** The validation workflow had all the individual pieces, but building a
 human-review workspace still required several commands in the right order. A
