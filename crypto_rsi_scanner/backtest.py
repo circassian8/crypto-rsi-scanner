@@ -150,10 +150,13 @@ def _klines_paged(host: str, symbol: str, days: int, session: requests.Session):
 
 def _klines_rows_to_frame(ordered: list) -> pd.DataFrame:
     """Kline rows (Binance array format, time-ordered) -> DataFrame indexed by UTC
-    day with close, volume (base asset) and quote_volume (USDT ≈ dollar volume,
-    field 7 — the basis for point-in-time volume-rank universe membership)."""
+    day with high/low/close, volume (base asset) and quote_volume (USDT ≈ dollar
+    volume, field 7 — the basis for point-in-time volume-rank universe
+    membership)."""
     idx = pd.to_datetime([r[0] for r in ordered], unit="ms", utc=True)
     return pd.DataFrame({
+        "high": pd.Series([float(r[2]) for r in ordered], index=idx, dtype=float),
+        "low": pd.Series([float(r[3]) for r in ordered], index=idx, dtype=float),
         "close": pd.Series([float(r[4]) for r in ordered], index=idx, dtype=float),
         "volume": pd.Series([float(r[5]) for r in ordered], index=idx, dtype=float),
         "quote_volume": pd.Series([float(r[7]) for r in ordered], index=idx, dtype=float),
@@ -235,8 +238,9 @@ def _fixture_klines_path(fixture_dir: str | Path, symbol: str) -> Path | None:
 def load_klines_fixture(symbol: str, days: int, fixture_dir: str | Path) -> pd.DataFrame | None:
     """Load a checked-in Binance-style daily OHLC fixture CSV.
 
-    Expected columns: `date`, `close`, and optional `volume`. Dates are parsed as
-    UTC, sorted, and tailed to `days` so one fixture can smoke multiple windows.
+    Expected columns: `date`, `close`, and optional `high`, `low`, `volume`, and
+    `quote_volume`. Dates are parsed as UTC, sorted, and tailed to `days` so one
+    fixture can smoke multiple windows.
     """
     path = _fixture_klines_path(fixture_dir, symbol)
     if path is None:
@@ -248,14 +252,32 @@ def load_klines_fixture(symbol: str, days: int, fixture_dir: str | Path) -> pd.D
             raise ValueError("fixture CSV must contain date and close columns")
         idx = pd.to_datetime(raw["date"], utc=True)
         close = pd.to_numeric(raw["close"], errors="coerce")
+        high = (
+            pd.to_numeric(raw["high"], errors="coerce")
+            if "high" in raw
+            else close
+        )
+        low = (
+            pd.to_numeric(raw["low"], errors="coerce")
+            if "low" in raw
+            else close
+        )
         volume = (
             pd.to_numeric(raw["volume"], errors="coerce")
             if "volume" in raw
             else pd.Series(0.0, index=raw.index)
         )
+        quote_volume = (
+            pd.to_numeric(raw["quote_volume"], errors="coerce")
+            if "quote_volume" in raw
+            else close * volume
+        )
         df = pd.DataFrame({
+            "high": high.to_numpy(),
+            "low": low.to_numpy(),
             "close": close.to_numpy(),
             "volume": volume.to_numpy(),
+            "quote_volume": quote_volume.to_numpy(),
         }, index=idx)
         df = df.sort_index().dropna(subset=["close"])
         return df.tail(days) if days > 0 else df

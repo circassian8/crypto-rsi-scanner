@@ -61,6 +61,7 @@ from . import paper
 from . import event_fade
 from . import event_cache
 from . import event_discovery
+from . import event_price_history
 from . import event_validation
 
 log = logging.getLogger(__name__)
@@ -1243,6 +1244,36 @@ def event_fade_fill_outcomes(
     )
 
 
+def event_fade_export_outcome_prices(
+    sample_path: str,
+    out_path: str,
+    *,
+    days: int | None = None,
+    fixture_dir: str | None = None,
+    refresh_cache: bool = False,
+    verbose: bool = False,
+) -> None:
+    """Export local OHLCV prices for event-fade validation outcome filling."""
+    _setup_event_discovery_logging(verbose)
+    rows = event_validation.load_validation_sample(sample_path)
+    result = event_price_history.export_outcome_price_fixture(
+        rows,
+        out_path,
+        days=days,
+        fixture_dir=fixture_dir,
+        cache_dir=config.BACKTEST_CACHE_DIR,
+        refresh_cache=refresh_cache,
+    )
+    missing = ", ".join(result.missing_assets) if result.missing_assets else "none"
+    print(
+        "Event-fade outcome price export: "
+        f"assets={result.assets_written}/{result.assets_requested}, "
+        f"price_rows={result.price_rows_written}, "
+        f"days={result.days}, source={result.source}, "
+        f"missing={missing}, wrote {result.out_path}"
+    )
+
+
 def status() -> None:
     """Print operational scan/listener health and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -1477,6 +1508,28 @@ def cli() -> None:
         help="With --event-fade-fill-outcomes, replace existing outcome fields instead of only filling blanks.",
     )
     parser.add_argument(
+        "--event-fade-export-outcome-prices",
+        nargs=2,
+        metavar=("SAMPLE", "OUT"),
+        help="Export local OHLCV price fixture for SHORT_TRIGGERED validation sample rows.",
+    )
+    parser.add_argument(
+        "--event-fade-price-days",
+        type=int,
+        default=None,
+        help="Days of daily kline history for --event-fade-export-outcome-prices; auto-sized when omitted.",
+    )
+    parser.add_argument(
+        "--event-fade-price-fixture-dir",
+        default=None,
+        help="Offline Binance-style kline fixture directory for --event-fade-export-outcome-prices.",
+    )
+    parser.add_argument(
+        "--event-fade-refresh-price-cache",
+        action="store_true",
+        help="Refetch Binance klines for --event-fade-export-outcome-prices instead of using cache.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for commands that support it.",
@@ -1595,6 +1648,17 @@ def cli() -> None:
             prices_path,
             out_path,
             overwrite=args.event_fade_overwrite_outcomes,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_fade_export_outcome_prices:
+        sample_path, out_path = args.event_fade_export_outcome_prices
+        event_fade_export_outcome_prices(
+            sample_path,
+            out_path,
+            days=args.event_fade_price_days,
+            fixture_dir=args.event_fade_price_fixture_dir,
+            refresh_cache=args.event_fade_refresh_price_cache,
             verbose=args.verbose,
         )
         return

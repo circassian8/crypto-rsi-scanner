@@ -594,6 +594,12 @@ def _outcome_prices_fixture_path():
     return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "outcome_prices.json"
 
 
+def _outcome_klines_fixture_dir():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "outcome_klines"
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -1767,6 +1773,39 @@ def test_event_fade_validation_outcome_fill_from_local_prices():
     assert second.skipped_existing_rows == 1
 
 
+def test_event_fade_outcome_price_export_from_klines_fixture():
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, event_price_history, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = Path(tmp) / "prices.json"
+        result = event_price_history.export_outcome_price_fixture(
+            rows,
+            out_path,
+            days=30,
+            fixture_dir=_outcome_klines_fixture_dir(),
+        )
+        assert result.assets_requested == 1
+        assert result.assets_written == 1
+        assert result.price_rows_written == 4
+        assert result.missing_assets == ()
+        payload = json.loads(out_path.read_text(encoding="utf-8"))
+        assert payload["schema_version"] == event_price_history.PRICE_FIXTURE_SCHEMA_VERSION
+        assert payload["source"].startswith("fixture:")
+        assert len(payload["prices"]) == 4
+        assert payload["prices"][0]["asset_coin_id"] == "testvelvet"
+        assert payload["prices"][1]["high"] == 7.8
+
+        prices = event_validation.load_outcome_price_fixture(out_path)
+        filled = event_validation.fill_validation_outcomes(rows, prices)
+        velvet = next(row for row in filled.rows if row["asset_symbol"] == "TESTVELVET")
+        assert round(velvet["max_adverse_excursion"], 4) == 0.0833
+        assert round(velvet["post_event_return_7d"], 4) == -0.2778
+
+
 def test_event_fade_validation_labeling_queue_prioritizes_missing_review_work():
     from crypto_rsi_scanner import event_discovery, event_validation
 
@@ -2184,6 +2223,35 @@ def test_event_fade_fill_outcomes_scanner_writes_outcome_jsonl():
         velvet = next(row for row in written if row["asset_symbol"] == "TESTVELVET")
         assert round(velvet["post_event_return_72h"], 4) == -0.2083
         assert round(velvet["max_favorable_excursion"], 4) == 0.3333
+
+
+def test_event_fade_export_outcome_prices_scanner_writes_price_fixture():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        sample_path = Path(tmp) / "sample.jsonl"
+        out_path = Path(tmp) / "prices.json"
+        event_discovery.write_validation_sample(rows, sample_path)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_export_outcome_prices(
+                str(sample_path),
+                str(out_path),
+                days=30,
+                fixture_dir=str(_outcome_klines_fixture_dir()),
+            )
+        text = out.getvalue()
+        assert "Event-fade outcome price export" in text
+        assert "assets=1/1" in text
+        assert "price_rows=4" in text
+        payload = json.loads(out_path.read_text(encoding="utf-8"))
+        assert payload["prices"][0]["asset_symbol"] == "TESTVELVET"
 
 
 def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
@@ -3908,6 +3976,8 @@ def test_backtest_klines_rows_to_frame_quote_volume():
     ]
     df = backtest._klines_rows_to_frame(rows)
     assert list(df["close"]) == [1.5, 1.8]
+    assert list(df["high"]) == [2.0, 2.0]
+    assert list(df["low"]) == [0.5, 1.0]
     assert list(df["volume"]) == [1000.0, 2000.0]
     assert list(df["quote_volume"]) == [1500.5, 3600.25]
     assert df.index.tz is not None
@@ -3923,6 +3993,8 @@ def test_backtest_binance_klines_cache_roundtrip():
     # cache hit must not touch the network: session=None would fail otherwise
     df = backtest.fetch_klines("AAAUSDT", 30, session=None, cache_dir=cache)
     assert df is not None and list(df["quote_volume"]) == [15.0]
+    assert list(df["high"]) == [2.0]
+    assert list(df["low"]) == [0.5]
     # no cache entry + no session -> None (still no network)
     assert backtest.fetch_klines("BBBUSDT", 30, session=None, cache_dir=cache) is None
 
@@ -3964,10 +4036,10 @@ def test_backtest_klines_fixture_loader_and_symbols():
     klines = root / "klines"
     klines.mkdir(parents=True)
     (klines / "BTCUSDT.csv").write_text(
-        "date,close,volume\n"
-        "2026-01-02T00:00:00Z,101,1000\n"
-        "2026-01-01T00:00:00Z,100,900\n"
-        "2026-01-03T00:00:00Z,103,1100\n"
+        "date,high,low,close,volume,quote_volume\n"
+        "2026-01-02T00:00:00Z,102,99,101,1000,101000\n"
+        "2026-01-01T00:00:00Z,101,98,100,900,90000\n"
+        "2026-01-03T00:00:00Z,104,100,103,1100,113300\n"
     )
     (klines / "ETHUSDT.csv").write_text(
         "date,close,volume\n"
@@ -3978,6 +4050,9 @@ def test_backtest_klines_fixture_loader_and_symbols():
     df = load_klines_fixture("BTCUSDT", 2, root)
     assert df is not None
     assert list(df["close"]) == [101, 103]
+    assert list(df["high"]) == [102, 104]
+    assert list(df["low"]) == [99, 100]
+    assert list(df["quote_volume"]) == [101000, 113300]
     assert str(df.index.tz) == "UTC"
 
 

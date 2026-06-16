@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Export validation price fixtures from sample rows · Codex
+**Why:** Outcome filling could consume local price JSON, but building that JSON
+still required hand-writing candles. The validation workflow needs a
+research-only path from a sample's triggered rows to local OHLCV fixtures before
+human review.
+**Changes:**
+- Added `crypto_rsi_scanner/event_price_history.py` to export local
+  `event_fade_outcome_prices_v1` JSON for `SHORT_TRIGGERED` validation rows,
+  using either Binance-style fixture CSVs or the existing cached Binance kline
+  fetch path.
+- Added `main.py --event-fade-export-outcome-prices SAMPLE OUT`, optional
+  fixture/price-days/cache-refresh flags, and
+  `make event-fade-export-outcome-prices`.
+- Extended shared Binance kline DataFrames with `high` and `low`, and taught
+  fixture CSV loading to preserve optional `high`, `low`, and `quote_volume`.
+- Added checked-in offline kline fixture
+  `fixtures/event_discovery/outcome_klines/TESTVELVETUSDT.csv`.
+- Added tests for high/low kline preservation, pure price-fixture export,
+  scanner CLI export, and export-prices → fill-outcomes integration.
+- Updated `AGENTS.md`, `ROADMAP.md`, `main.py`, and
+  `research/event_discovery_design.md` with the price-export workflow.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 194/194.
+Offline workflow smoke passes:
+`make event-fade-export-sample` → `make event-fade-export-outcome-prices` →
+`make event-fade-fill-outcomes` → `make event-fade-labeling-queue` →
+`make event-fade-review-sample`. Generated price export reports
+`assets=1/1` and `price_rows=4`.
+**Notes/risks:** The new export command is research-only and artifact-only. It
+may fetch Binance daily klines only when run without a fixture directory; it
+does not write live scanner storage, route alerts, open paper trades, or imply
+event-fade promotion.
+
 ## 2026-06-16 — Add validation outcome filling from local prices · Codex
 **Why:** Event-fade validation samples had blank outcome fields, and the review
 tool correctly blocked reviewed triggered rows without MFE/MAE and 72h

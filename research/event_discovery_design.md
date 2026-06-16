@@ -8,7 +8,8 @@ providers, news/proxy-narrative providers, external catalyst providers, and
 Coinalyze-style derivatives plus Tokenomist/Etherscan/Arkham/Dune-style
 supply/on-chain enrichment, plus grouped auto reporting and validation-sample
 exports, research-only JSONL cache refresh, validation-sample review metrics,
-labeling-queue support, and research-only merge support.
+labeling-queue support, research-only merge support, local outcome-price export,
+and outcome-fill support.
 
 ## Goal
 
@@ -76,8 +77,11 @@ Current files:
   export helpers
 - `event_cache.py`: local JSONL observational cache writer for point-in-time
   discovery evidence
+- `event_price_history.py`: local OHLCV price fixture exporter for triggered
+  validation rows
 - `event_validation.py`: local validation-sample loader/reviewer/labeling
-  queue/merger for human labels, outcome metrics, and promotion blockers
+  queue/merger/outcome filler for human labels, outcome metrics, and promotion
+  blockers
 
 ## Universe Integration
 
@@ -307,6 +311,32 @@ The merge writes only the requested `OUT` artifact and reports matched/unmatched
 reviewed rows. It does not change live storage, routing, paper trades, or event
 state.
 
+## Validation Price Fixture Export
+
+`main.py --event-fade-export-outcome-prices SAMPLE OUT` builds the local OHLCV
+price fixture consumed by outcome filling. It reads `SHORT_TRIGGERED` rows from
+a validation sample, infers each asset's Binance-style USDT pair from
+`asset_symbol`, and writes a JSON artifact with daily candles:
+
+- `asset_coin_id`
+- `asset_symbol`
+- `timestamp`
+- `high`
+- `low`
+- `close`
+- `volume`
+- `quote_volume`
+
+By default the command can use the existing Binance daily-kline fetch/cache path
+from the research backtester. For deterministic offline runs, pass
+`--event-fade-price-fixture-dir DIR`, where `DIR` contains Binance-style CSV
+fixtures such as `VELVETUSDT.csv` with `date`, `close`, and optional `high`,
+`low`, `volume`, and `quote_volume` columns.
+
+This command writes only the requested price fixture. It does not label samples,
+fill outcomes by itself, write live storage, route alerts, open paper trades, or
+execute orders.
+
 ## Validation Outcome Fill
 
 `main.py --event-fade-fill-outcomes SAMPLE PRICES OUT` fills blank outcome
@@ -535,6 +565,15 @@ make event-fade-export-cache-sample
 EVENT_DISCOVERY_CACHE_DIR=/path/to/event_fade_cache \
 EVENT_FADE_SAMPLE_OUT=/tmp/event_fade_cached_sample.csv \
   make event-fade-export-cache-sample
+```
+
+Build a local price fixture for triggered validation rows:
+
+```bash
+make event-fade-export-outcome-prices
+EVENT_FADE_SAMPLE_IN=/tmp/event_fade_cached_sample.jsonl \
+EVENT_FADE_OUTCOME_PRICES_OUT=/tmp/event_fade_outcome_prices.json \
+  make event-fade-export-outcome-prices
 ```
 
 Fill triggered-row outcomes from local price candles:
