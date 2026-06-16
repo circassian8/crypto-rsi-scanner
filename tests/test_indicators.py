@@ -1331,6 +1331,100 @@ def test_event_discovery_gdelt_live_provider_parses_article_list_offline():
     assert GdeltProvider(None, live_enabled=True, opener=failing_opener).fetch_events(start, end) == []
 
 
+def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner.event_providers.project_blog_rss import ProjectBlogRssProvider
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return self.body.encode("utf-8")
+
+    rss = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>TESTRSS Blog</title>
+    <item>
+      <guid>testrss-openai-preipo</guid>
+      <title>TESTRSS offers synthetic exposure to OpenAI pre IPO event</title>
+      <description>The project blog describes synthetic exposure to OpenAI.</description>
+      <link>https://example.test/blog/testrss-openai</link>
+      <pubDate>Tue, 16 Jun 2026 12:30:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
+"""
+    atom = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>TESTATOM Updates</title>
+  <entry>
+    <id>tag:example.test,2026:testatom</id>
+    <title>TESTATOM fan token rallies before Test FC World Cup match kickoff</title>
+    <summary>The fan token is a proxy attention trade for the dated match fixture.</summary>
+    <link rel="alternate" href="https://example.test/blog/testatom-world-cup" />
+    <published>2026-06-16T13:30:00Z</published>
+  </entry>
+</feed>
+"""
+    seen = []
+
+    def fake_opener(request, timeout):
+        seen.append((request.full_url, timeout, request.headers.get("Accept")))
+        if request.full_url.endswith("/rss"):
+            return FakeResponse(rss)
+        if request.full_url.endswith("/atom"):
+            return FakeResponse(atom)
+        return FakeResponse("<rss><channel /></rss>")
+
+    start = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    fetched_at = datetime(2026, 6, 16, 14, 0, tzinfo=timezone.utc)
+    provider = ProjectBlogRssProvider(
+        None,
+        live_enabled=True,
+        feed_urls=("https://example.test/rss", "https://example.test/atom"),
+        timeout=4.0,
+        opener=fake_opener,
+        fetched_at=fetched_at,
+    )
+    events = provider.fetch_events(start, end)
+    assert len(events) == 2
+    assert [url for url, _timeout, _accept in seen] == ["https://example.test/rss", "https://example.test/atom"]
+    assert all(timeout == 4.0 for _url, timeout, _accept in seen)
+    assert all("application/rss+xml" in accept for _url, _timeout, accept in seen)
+    by_title = {event.title: event for event in events}
+    rss_event = by_title["TESTRSS offers synthetic exposure to OpenAI pre IPO event"]
+    assert rss_event.provider == "project_blog_rss"
+    assert rss_event.source_url == "https://example.test/blog/testrss-openai"
+    assert rss_event.published_at.isoformat() == "2026-06-16T12:30:00+00:00"
+    assert rss_event.fetched_at == fetched_at
+    assert rss_event.raw_json["event"]["event_type"] == "ipo_proxy"
+    atom_event = by_title["TESTATOM fan token rallies before Test FC World Cup match kickoff"]
+    assert atom_event.source_url == "https://example.test/blog/testatom-world-cup"
+    assert atom_event.published_at.isoformat() == "2026-06-16T13:30:00+00:00"
+    assert atom_event.raw_json["event"]["event_type"] == "sports_event"
+
+    def failing_opener(request, timeout):
+        raise TimeoutError("offline timeout")
+
+    assert ProjectBlogRssProvider(
+        None,
+        live_enabled=True,
+        feed_urls=("https://example.test/rss",),
+        opener=failing_opener,
+    ).fetch_events(start, end) == []
+
+
 def test_event_discovery_news_pipeline_proxy_direct_late_and_ambiguous_safety():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery

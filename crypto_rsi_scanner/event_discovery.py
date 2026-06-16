@@ -319,6 +319,9 @@ def run_manual_discovery(
     gdelt_max_records: int = 50,
     gdelt_timeout: float = 10.0,
     project_blog_rss_path: str | Path | None = None,
+    project_blog_rss_live: bool = False,
+    project_blog_rss_urls: Iterable[str] | None = None,
+    project_blog_rss_timeout: float = 10.0,
     external_ipo_path: str | Path | None = None,
     sports_fixtures_path: str | Path | None = None,
     prediction_market_events_path: str | Path | None = None,
@@ -359,6 +362,9 @@ def run_manual_discovery(
         gdelt_max_records=gdelt_max_records,
         gdelt_timeout=gdelt_timeout,
         project_blog_rss_path=project_blog_rss_path,
+        project_blog_rss_live=project_blog_rss_live,
+        project_blog_rss_urls=project_blog_rss_urls,
+        project_blog_rss_timeout=project_blog_rss_timeout,
         external_ipo_path=external_ipo_path,
         sports_fixtures_path=sports_fixtures_path,
         prediction_market_events_path=prediction_market_events_path,
@@ -405,6 +411,9 @@ def load_discovery_events(
     gdelt_max_records: int = 50,
     gdelt_timeout: float = 10.0,
     project_blog_rss_path: str | Path | None = None,
+    project_blog_rss_live: bool = False,
+    project_blog_rss_urls: Iterable[str] | None = None,
+    project_blog_rss_timeout: float = 10.0,
     external_ipo_path: str | Path | None = None,
     sports_fixtures_path: str | Path | None = None,
     prediction_market_events_path: str | Path | None = None,
@@ -440,8 +449,13 @@ def load_discovery_events(
             max_records=gdelt_max_records,
             timeout=gdelt_timeout,
         ).fetch_events(start, end))
-    if project_blog_rss_path:
-        events.extend(ProjectBlogRssProvider(project_blog_rss_path).fetch_events(start, end))
+    if project_blog_rss_path or project_blog_rss_live:
+        events.extend(ProjectBlogRssProvider(
+            project_blog_rss_path,
+            live_enabled=project_blog_rss_live,
+            feed_urls=project_blog_rss_urls,
+            timeout=project_blog_rss_timeout,
+        ).fetch_events(start, end))
     if external_ipo_path:
         events.extend(ExternalIpoProvider(external_ipo_path).fetch_events(start, end))
     if sports_fixtures_path:

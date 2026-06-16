@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add opt-in live project-blog RSS discovery · Codex
+**Why:** The event-fade validation sample needs broader real narrative coverage,
+especially project-sourced posts that may announce synthetic/proxy exposure or
+dated catalysts. RSS/Atom feeds are a no-key source that can safely feed the
+research-only event radar.
+**Changes:**
+- Extended `crypto_rsi_scanner/event_providers/project_blog_rss.py` from
+  fixture-only to optional live RSS/Atom fetching from explicit feed URLs, with
+  injected opener support, deterministic fetched timestamps for tests, and
+  fail-soft per-feed behavior.
+- Added RSS item and Atom entry parsing into the existing news-row pipeline so
+  live feed entries reuse the same event-type inference, point-in-time
+  timestamps, and proxy/direct no-trade safety rules as fixtures.
+- Added RFC 2822/RSS date parsing in
+  `crypto_rsi_scanner/event_providers/_news_common.py`.
+- Wired `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE`,
+  `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS`, and timeout config through
+  `config.py`, `event_discovery.py`, and `scanner.py`.
+- Updated `.env.example`, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`; cleaned inline comments from
+  `.env.example` value lines so copying the file cannot create invalid env
+  values under the repo's minimal dotenv loader.
+- Added offline tests for RSS and Atom parsing, RFC date handling, request
+  timeout/headers, and fail-soft feed errors.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 196/196.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** Live RSS is opt-in and research-only. It only feeds local
+reports/cache/export paths and does not route Telegram alerts, write live
+signal/outcome/paper tables, open paper trades, or promote event-fade signals.
+
 ## 2026-06-16 — Add opt-in live GDELT event discovery · Codex
 **Why:** The event-fade validation pipeline needs more real narrative/event
 coverage, but live discovery sources must remain research-only and fail-soft.

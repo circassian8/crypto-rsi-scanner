@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -178,6 +179,13 @@ def _parse_time(value: object) -> datetime | None:
         raw = value.strip()
         if raw.isdigit() and len(raw) == 14:
             return datetime.strptime(raw, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+        if "," in raw:
+            try:
+                dt = parsedate_to_datetime(raw)
+            except (TypeError, ValueError):
+                dt = None
+            if dt is not None:
+                return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
     return parse_datetime(value)
 
 

@@ -85,7 +85,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   without running an alerting scan) · `main.py --event-fade-report` (score local
   event-fade fixtures, alert-only/no sends) · `main.py --event-discovery-report`
   (fixture event radar with optional exchange-announcement, structured calendar,
-  unlock, news/proxy-narrative, opt-in live GDELT, external catalyst,
+  unlock, news/proxy-narrative, opt-in live GDELT/RSS, external catalyst,
   Coinalyze-style derivatives, supply/on-chain enrichment, and clean CoinGecko
   universe fixtures,
   research-only/no writes) · `main.py --event-discovery-refresh` (fetch
@@ -164,7 +164,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
-| `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider, exchange announcement parsers with opt-in live Bybit fetch, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers with opt-in live GDELT Article List fetch, and external IPO/sports/prediction-market catalyst parsers |
+| `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider, exchange announcement parsers with opt-in live Bybit fetch, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers with opt-in live GDELT Article List and project-blog RSS/Atom fetches, and external IPO/sports/prediction-market catalyst parsers |
 | `derivatives_providers/` | fixture-backed derivatives enrichment adapters for event discovery, starting with Coinalyze-style OI/funding/crowding snapshots; no live derivatives provider enabled yet |
 | `supply_providers/` | fixture-backed supply/on-chain enrichment adapters for event discovery, starting with Tokenomist/Etherscan/Arkham/Dune-style snapshots; no live supply provider enabled yet |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
@@ -209,18 +209,18 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   backtest/manual-review evidence and a new decision. Proxy eligibility is a
   hard gate: direct-beneficiary or non-proxy events must remain `NO_TRADE` even
   if pump, crowding, RSI, and post-event failure scores are high.
-- Event discovery is radar-first and fixture-backed by default. It may normalize, resolve,
-  classify, dedupe, print local reports, and export JSONL/CSV validation-sample
-  artifacts, and it may load local exchange announcement, structured calendar,
-  unlock, news/proxy-narrative, external catalyst, derivatives, supply/on-chain,
-  and clean CoinGecko market fixtures through the shared `universe.py` hygiene
-  filters. Opt-in live Bybit announcement and GDELT Article List fetching are
-  allowed only for local research reports/exports/cache refreshes, not live
-  routing. Event discovery must not write
-  live signal/outcome/paper tables or route notifications. Ticker-only/ambiguous
-  asset matches must stay below trigger confidence. Provider enrichment is
-  evidence, not eligibility; raw reviewed fixture evidence takes precedence over
-  provider rows.
+- Event discovery is radar-first and fixture-backed by default. It may
+  normalize, resolve, classify, dedupe, print local reports, and export JSONL/CSV
+  validation-sample artifacts, and it may load local exchange announcement,
+  structured calendar, unlock, news/proxy-narrative, external catalyst,
+  derivatives, supply/on-chain, and clean CoinGecko market fixtures through the
+  shared `universe.py` hygiene filters. Opt-in live Bybit announcement, GDELT
+  Article List, and project-blog RSS/Atom fetching are allowed only for local
+  research reports/exports/cache refreshes, not live routing. Event discovery
+  must not write live signal/outcome/paper tables or route notifications.
+  Ticker-only/ambiguous asset matches must stay below trigger confidence.
+  Provider enrichment is evidence, not eligibility; raw reviewed fixture
+  evidence takes precedence over provider rows.
 - Event-discovery cache writes are observational only. `main.py
   --event-discovery-refresh` may append JSONL files under
   `RSI_EVENT_DISCOVERY_CACHE_DIR` for raw events, normalized events, links,
@@ -323,9 +323,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   CoinMarketCal-style calendar fixtures and Tokenomist-style unlock fixtures as
   direct events, can parse local CryptoPanic/GDELT/project-blog fixtures as
   proxy/direct/ambiguous news evidence, can optionally fetch live GDELT Article
-  List JSON when `RSI_EVENT_DISCOVERY_GDELT_LIVE=1`, can parse local external IPO, sports,
-  and prediction-market catalyst fixtures as radar evidence, can attach local Coinalyze-style
-  OI/funding/crowding snapshots from
+  List JSON when `RSI_EVENT_DISCOVERY_GDELT_LIVE=1`, can optionally fetch live
+  RSS/Atom feeds from explicit `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS` when
+  `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, can parse local external IPO,
+  sports, and prediction-market catalyst fixtures as radar evidence, can attach local
+  Coinalyze-style OI/funding/crowding snapshots from
   `RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH`, can attach local
   Tokenomist/Etherscan/Arkham/Dune-style supply and on-chain snapshots from the
   `RSI_EVENT_DISCOVERY_*_SUPPLY_PATH` env vars, and feeds structured candidates
@@ -344,8 +346,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   prioritizes the next rows to label and triggered rows missing required
   outcome fields. `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human labels/outcomes when regenerating a fresh export. Beyond
-  the explicit opt-in Bybit announcement and GDELT news fetches, no network event/news/
-  derivatives/supply providers, live DB writes, notifications, or paper trades
+  the explicit opt-in Bybit announcement, GDELT news, and RSS/Atom feed fetches,
+  no network event/news/derivatives/supply providers, live DB writes,
+  notifications, or paper trades
   are enabled. `main.py --event-discovery-refresh` can write the local
   observational JSONL cache only. Bybit listings/perp listings are direct events
   and must remain `NO_TRADE` unless separate evidence proves a true proxy

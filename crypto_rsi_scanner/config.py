@@ -14,6 +14,11 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.lower() not in ("0", "false", "no", "off")
 
 
+def _env_csv(name: str, default: str = "") -> tuple[str, ...]:
+    raw = os.getenv(name, default)
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
 def _load_dotenv(path: Path) -> None:
     """Minimal .env loader (no dependency). Existing env vars win."""
     if not path.exists():
@@ -193,6 +198,9 @@ EVENT_DISCOVERY_GDELT_QUERY = os.getenv(
 EVENT_DISCOVERY_GDELT_MAX_RECORDS = int(os.getenv("RSI_EVENT_DISCOVERY_GDELT_MAX_RECORDS", "50"))
 EVENT_DISCOVERY_GDELT_TIMEOUT = float(os.getenv("RSI_EVENT_DISCOVERY_GDELT_TIMEOUT", "10"))
 _EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH_RAW = os.getenv("RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH", "")
+EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE = _env_bool("RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE", False)
+EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = _env_csv("RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS")
+EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT = float(os.getenv("RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT", "10"))
 _EVENT_DISCOVERY_EXTERNAL_IPO_PATH_RAW = os.getenv("RSI_EVENT_DISCOVERY_EXTERNAL_IPO_PATH", "")
 _EVENT_DISCOVERY_SPORTS_FIXTURES_PATH_RAW = os.getenv("RSI_EVENT_DISCOVERY_SPORTS_FIXTURES_PATH", "")
 _EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH_RAW = os.getenv(

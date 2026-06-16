@@ -4,8 +4,8 @@
 **Status:** Phase 1-10 framework with clean CoinGecko universe bridge,
 fixture-backed exchange announcement providers plus opt-in live Bybit
 announcement fetch, structured calendar/unlock providers, news/proxy-narrative
-providers plus opt-in live GDELT Article List fetch, external catalyst
-providers, and Coinalyze-style derivatives plus
+providers plus opt-in live GDELT Article List and project-blog RSS/Atom fetches,
+external catalyst providers, and Coinalyze-style derivatives plus
 Tokenomist/Etherscan/Arkham/Dune-style supply/on-chain enrichment, plus grouped
 auto reporting and validation-sample exports, research-only JSONL cache refresh,
 validation-sample review metrics, labeling-queue support, research-only merge
@@ -54,7 +54,7 @@ Current files:
   opt-in live GDELT Article List fetch for external catalyst and attention-event
   evidence
 - `event_providers/project_blog_rss.py`: local project-blog/RSS fixture provider
-  for project-sourced narrative evidence
+  plus opt-in live RSS/Atom fetch for project-sourced narrative evidence
 - `event_providers/external_ipo.py`: local IPO-calendar fixture provider for
   external-company catalysts
 - `event_providers/sports_fixtures.py`: local sports-fixture provider for
@@ -137,11 +137,12 @@ later proves a true proxy relationship.
 
 ## News And Proxy-Narrative Providers
 
-CryptoPanic-, GDELT-, and project-blog/RSS-style providers currently read local
-JSON fixtures only. They normalize common article shapes such as `results`,
-`features`, and `items` into `RawDiscoveredEvent` rows, preserving explicit
-fixture event metadata when provided and otherwise inferring only coarse event
-types.
+CryptoPanic-, GDELT-, and project-blog/RSS-style providers read local JSON
+fixtures by default. GDELT can optionally fetch live Article List JSON, and
+project-blog/RSS can optionally fetch explicit RSS/Atom feed URLs. All paths
+normalize article/feed shapes into `RawDiscoveredEvent` rows, preserving
+explicit fixture event metadata when provided and otherwise inferring only
+coarse event types.
 
 These providers are the first radar layer aimed at VELVET-style narrative
 setups:
@@ -544,6 +545,18 @@ RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
 The live GDELT path queries Article List JSON, reuses the same news parser as
 fixtures, and remains research-only/fail-soft. It should add narrative evidence
 for human review or local cache export, not route event-fade signals live.
+
+Run an opt-in live project-blog/RSS radar pass:
+
+```bash
+RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1 \
+RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS=https://example.test/feed.xml,https://example.test/atom.xml \
+RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
+  .venv/bin/python main.py --event-discovery-report
+```
+
+The live RSS path fetches only explicit feed URLs, parses RSS and Atom entries,
+reuses the same news parser as fixtures, and remains research-only/fail-soft.
 
 Write the local observational JSONL cache with the fixture set:
 
