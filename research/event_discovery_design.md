@@ -6,7 +6,7 @@ fixture-backed exchange announcement providers plus opt-in live Bybit
 announcement fetch, structured calendar/unlock providers, news/proxy-narrative
 providers plus opt-in live CryptoPanic posts, GDELT Article List, and
 project-blog RSS/Atom fetches, external catalyst providers, and
-Coinalyze-style derivatives plus
+Coinalyze-style derivatives plus opt-in live Coinalyze REST enrichment,
 Tokenomist/Etherscan/Arkham/Dune-style supply/on-chain enrichment, plus grouped
 auto reporting and validation-sample exports, research-only JSONL cache refresh,
 validation-sample review metrics, labeling-queue support, research-only merge
@@ -66,8 +66,9 @@ Current files:
   dated team/match catalysts
 - `event_providers/prediction_market_events.py`: local prediction-market
   fixture provider for external attention/catalyst markets
-- `derivatives_providers/coinalyze.py`: local derivatives fixture provider that
-  maps Coinalyze-style OI/funding/crowding rows to discovery candidates
+- `derivatives_providers/coinalyze.py`: derivatives provider that maps
+  Coinalyze-style OI/funding/crowding fixture rows or opt-in live Coinalyze REST
+  snapshots to discovery candidates
 - `supply_providers/tokenomist.py`: local supply fixture provider for unlock and
   vesting-style pressure snapshots
 - `supply_providers/etherscan.py`: local supply fixture provider for token
@@ -205,9 +206,16 @@ sample evidence, not trade triggers.
 
 ## Derivatives Enrichment
 
-The Coinalyze-style derivatives provider currently reads local JSON fixtures
-only. It produces candidate enrichment keyed by coin id, symbol, base symbol, or
-market symbol and fills `EventDerivativesSnapshot` fields used by
+The Coinalyze-style derivatives provider reads local JSON fixtures by default.
+It can also fetch live Coinalyze REST snapshots when
+`RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, `RSI_EVENT_DISCOVERY_COINALYZE_API_KEY`
+is set, and `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` contains explicit
+Coinalyze future symbols such as `BTCUSDT_PERP.A`. Live derivatives are
+enrichment only; enabling them without an event source does not create discovery
+events.
+
+The provider produces candidate enrichment keyed by coin id, symbol, base
+symbol, or market symbol and fills `EventDerivativesSnapshot` fields used by
 `event_fade.py`:
 
 - perp availability
@@ -217,6 +225,12 @@ market symbol and fills `EventDerivativesSnapshot` fields used by
 - futures volume
 - perp/spot volume ratio
 - liquidations, long/short ratio, and basis
+
+The live path uses Coinalyze's documented `open-interest`, `funding-rate`,
+`open-interest-history`, `liquidation-history`, `long-short-ratio-history`, and
+`ohlcv-history` endpoints. Current OI/funding fill the latest snapshot; 24h OI
+change, liquidations, long/short ratio, and futures volume are derived from the
+configured historical lookback.
 
 Raw event fixture data wins over provider enrichment. This keeps provider rows
 from overwriting hand-reviewed event evidence during fixture research.
@@ -584,6 +598,19 @@ RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS=300 \
 This command writes only `raw_events.jsonl` and `discovery_runs.jsonl` rows. Use
 `--event-discovery-refresh` or validation-sample exports for normalized
 candidate snapshots.
+
+Add opt-in live Coinalyze derivatives enrichment to a radar pass:
+
+```bash
+RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
+RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1 \
+RSI_EVENT_DISCOVERY_COINALYZE_API_KEY=... \
+RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS=BTCUSDT_PERP.A,ETHUSDT_PERP.A \
+  .venv/bin/python main.py --event-discovery-report
+```
+
+Live Coinalyze is enrichment only. It cannot create events by itself and must
+not bypass proxy/direct eligibility.
 
 Run an opt-in live CryptoPanic news radar pass:
 

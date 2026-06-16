@@ -1284,6 +1284,119 @@ def test_event_discovery_coinalyze_derivatives_provider_parses_fixture():
             raise AssertionError("required malformed derivatives fixture should fail")
 
 
+def test_event_discovery_coinalyze_live_provider_parses_offline():
+    import json
+    from urllib.parse import parse_qs, urlparse
+    from crypto_rsi_scanner.derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
+
+    seen = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def opener(request, timeout):
+        parsed = urlparse(request.full_url)
+        endpoint = parsed.path.rsplit("/", 1)[-1]
+        query = parse_qs(parsed.query)
+        header_value = next(
+            value
+            for key, value in request.headers.items()
+            if key.lower() == "api_key"
+        )
+        seen.append((endpoint, query, header_value, timeout))
+        payloads = {
+            "open-interest": [
+                {"symbol": "TESTLISTUSDT_PERP.A", "value": 18000000, "update": 1781513400},
+                {"symbol": "TESTPERPUSDT_PERP.A", "value": 3000000, "update": 1781513400},
+            ],
+            "funding-rate": [
+                {"symbol": "TESTLISTUSDT_PERP.A", "value": 0.0012, "update": 1781513400},
+                {"symbol": "TESTPERPUSDT_PERP.A", "value": -0.0002, "update": 1781513400},
+            ],
+            "open-interest-history": [
+                {
+                    "symbol": "TESTLISTUSDT_PERP.A",
+                    "history": [{"t": 1781427000, "c": 10000000}, {"t": 1781513400, "c": 18000000}],
+                },
+                {
+                    "symbol": "TESTPERPUSDT_PERP.A",
+                    "history": [{"t": 1781427000, "c": 3000000}, {"t": 1781513400, "c": 3000000}],
+                },
+            ],
+            "liquidation-history": [
+                {
+                    "symbol": "TESTLISTUSDT_PERP.A",
+                    "history": [{"t": 1781510000, "l": 1500000, "s": 1000000}],
+                }
+            ],
+            "long-short-ratio-history": [
+                {"symbol": "TESTLISTUSDT_PERP.A", "history": [{"t": 1781510000, "r": 1.8}, {"t": 1781513400, "r": 2.1}]}
+            ],
+            "ohlcv-history": [
+                {
+                    "symbol": "TESTLISTUSDT_PERP.A",
+                    "history": [{"t": 1781510000, "v": 50000000}, {"t": 1781513400, "v": 20000000}],
+                }
+            ],
+        }
+        return FakeResponse(payloads[endpoint])
+
+    snapshots = CoinalyzeDerivativesProvider(
+        None,
+        live_enabled=True,
+        api_key="coinalyze-key",
+        symbols=("TESTLISTUSDT_PERP.A", "TESTPERPUSDT_PERP.A"),
+        base_url="https://example.test/v1/",
+        timeout=3.0,
+        opener=opener,
+        clock=lambda: 1781513400,
+        required=True,
+    ).fetch_snapshots()
+
+    assert [row[0] for row in seen] == [
+        "open-interest",
+        "funding-rate",
+        "open-interest-history",
+        "liquidation-history",
+        "long-short-ratio-history",
+        "ohlcv-history",
+    ]
+    assert all(row[2] == "coinalyze-key" for row in seen)
+    assert seen[0][1]["symbols"] == ["TESTLISTUSDT_PERP.A,TESTPERPUSDT_PERP.A"]
+    assert seen[0][1]["convert_to_usd"] == ["true"]
+
+    listing = snapshots["TESTLIST"]
+    assert listing["symbol"] == "TESTLIST"
+    assert listing["open_interest"] == 18000000.0
+    assert listing["open_interest_24h_change_pct"] == 0.8
+    assert listing["funding_rate_8h"] == 0.0012
+    assert listing["liquidations_24h"] == 2500000.0
+    assert listing["long_short_ratio"] == 2.1
+    assert listing["futures_volume_24h"] == 70000000.0
+    assert snapshots["TESTPERP"]["open_interest_24h_change_pct"] == 0.0
+
+
+def test_event_discovery_coinalyze_live_provider_missing_config_fail_soft():
+    from crypto_rsi_scanner.derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
+
+    assert CoinalyzeDerivativesProvider(None, live_enabled=True).fetch_snapshots() == {}
+    assert CoinalyzeDerivativesProvider(
+        None,
+        live_enabled=True,
+        api_key="coinalyze-key",
+    ).fetch_snapshots() == {}
+
+
 def test_event_discovery_derivatives_enrich_candidates_without_overriding_raw():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery

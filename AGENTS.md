@@ -86,7 +86,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   event-fade fixtures, alert-only/no sends) · `main.py --event-discovery-report`
   (fixture event radar with optional exchange-announcement, structured calendar,
   unlock, news/proxy-narrative, opt-in live Binance/Bybit/CryptoPanic/GDELT/RSS, external catalyst,
-  Coinalyze-style derivatives, supply/on-chain enrichment, and clean CoinGecko
+  Coinalyze-style derivatives with opt-in live Coinalyze enrichment,
+  supply/on-chain enrichment, and clean CoinGecko
   universe fixtures or opt-in live CoinGecko universe resolver enrichment,
   research-only/no writes) · `main.py --event-discovery-refresh` (fetch
   configured event-discovery sources and append research-only JSONL cache
@@ -168,7 +169,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
 | `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider plus opt-in live CoinGecko universe resolver enrichment, exchange announcement parsers with captured Binance CMS WebSocket payload support plus opt-in live Binance WebSocket and Bybit HTTP fetches, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers with opt-in live CryptoPanic posts, GDELT Article List, and project-blog RSS/Atom fetches, and external IPO/sports/prediction-market catalyst parsers |
-| `derivatives_providers/` | fixture-backed derivatives enrichment adapters for event discovery, starting with Coinalyze-style OI/funding/crowding snapshots; no live derivatives provider enabled yet |
+| `derivatives_providers/` | derivatives enrichment adapters for event discovery, starting with Coinalyze-style OI/funding/crowding snapshots and opt-in live Coinalyze REST enrichment |
 | `supply_providers/` | fixture-backed supply/on-chain enrichment adapters for event discovery, starting with Tokenomist/Etherscan/Arkham/Dune-style snapshots; no live supply provider enabled yet |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
 | `indicators.py` | **PURE** functions: RSI, regime, setup taxonomy, market gating, conviction. Unit-tested — keep pure, add a test for new logic |
@@ -342,7 +343,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, can parse local external IPO,
   sports, and prediction-market catalyst fixtures as radar evidence, can attach local
   Coinalyze-style OI/funding/crowding snapshots from
-  `RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH`, can attach local
+  `RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH`, can optionally fetch live
+  Coinalyze derivatives snapshots from configured
+  `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` when
+  `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, can attach local
   Tokenomist/Etherscan/Arkham/Dune-style supply and on-chain snapshots from the
   `RSI_EVENT_DISCOVERY_*_SUPPLY_PATH` env vars, and feeds structured candidates
   through `event_fade.py` for flat radar and grouped auto reports. The grouped
@@ -360,8 +364,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   prioritizes the next rows to label and triggered rows missing required
   outcome fields. `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human labels/outcomes when regenerating a fresh export. Beyond
-  the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news, and
-  RSS/Atom feed fetches, no network event/news/derivatives/supply providers,
+  the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,
+  RSS/Atom feed fetches, and Coinalyze derivatives enrichment, no network
+  event/news/derivatives/supply providers,
   live DB writes, notifications, or paper trades
   are enabled. `main.py --event-discovery-refresh` can write the local
   observational JSONL cache only. Bybit listings/perp listings are direct events

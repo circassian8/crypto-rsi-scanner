@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add opt-in live Coinalyze derivatives enrichment · Codex
+**Why:** The event-fade plan depends on derivatives crowding evidence, but
+Coinalyze enrichment was fixture-only. Research radar runs need an opt-in live
+path for OI/funding/crowding snapshots without turning derivatives into event
+eligibility or live routing.
+**Changes:**
+- Extended `crypto_rsi_scanner/derivatives_providers/coinalyze.py` with an
+  opt-in live REST path using configured Coinalyze symbols and API key. It
+  fetches current OI/funding plus OI history, liquidations, long/short ratio,
+  and futures volume history over a configurable lookback.
+- Preserved legitimate zero values in the derivatives snapshot mapper and fixed
+  Coinalyze exchange-suffix symbols such as `TESTUSDT_PERP.A` so they key by
+  base asset correctly.
+- Added `RSI_EVENT_DISCOVERY_COINALYZE_*` config and `.env.example` settings,
+  wired through `event_discovery.py` and `scanner.py`.
+- Added offline tests for documented Coinalyze current/history response shapes,
+  symbol batching headers/params, missing-config fail-soft behavior, and live
+  snapshot field derivation.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to document live Coinalyze as
+  research-only enrichment.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 205/205.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** Live Coinalyze requires explicit symbols such as
+`BTCUSDT_PERP.A`; it does not discover events by itself and must not bypass the
+proxy/direct event-fade eligibility gate.
+
 ## 2026-06-16 — Add raw Binance announcement cache listener · Codex
 **Why:** Binance announcements are a push WebSocket feed, so report/refresh
 bounded fetches can miss source evidence between runs. The event-discovery plan

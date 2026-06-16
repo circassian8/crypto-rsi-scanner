@@ -344,6 +344,14 @@ def run_manual_discovery(
     sports_fixtures_path: str | Path | None = None,
     prediction_market_events_path: str | Path | None = None,
     coinalyze_derivatives_path: str | Path | None = None,
+    coinalyze_live: bool = False,
+    coinalyze_api_key: str = "",
+    coinalyze_symbols: Iterable[str] = (),
+    coinalyze_base_url: str = "https://api.coinalyze.net/v1/",
+    coinalyze_timeout: float = 10.0,
+    coinalyze_history_interval: str = "1hour",
+    coinalyze_lookback_hours: int = 24,
+    coinalyze_convert_to_usd: bool = True,
     tokenomist_supply_path: str | Path | None = None,
     etherscan_supply_path: str | Path | None = None,
     arkham_supply_path: str | Path | None = None,
@@ -407,7 +415,17 @@ def run_manual_discovery(
         sports_fixtures_path=sports_fixtures_path,
         prediction_market_events_path=prediction_market_events_path,
     )
-    derivatives = load_derivatives_snapshots(coinalyze_derivatives_path)
+    derivatives = load_derivatives_snapshots(
+        coinalyze_derivatives_path,
+        coinalyze_live=coinalyze_live,
+        coinalyze_api_key=coinalyze_api_key,
+        coinalyze_symbols=coinalyze_symbols,
+        coinalyze_base_url=coinalyze_base_url,
+        coinalyze_timeout=coinalyze_timeout,
+        coinalyze_history_interval=coinalyze_history_interval,
+        coinalyze_lookback_hours=coinalyze_lookback_hours,
+        coinalyze_convert_to_usd=coinalyze_convert_to_usd,
+    )
     supply = load_supply_snapshots(
         tokenomist_supply_path=tokenomist_supply_path,
         etherscan_supply_path=etherscan_supply_path,
@@ -574,11 +592,33 @@ def load_discovery_assets(
 
 def load_derivatives_snapshots(
     coinalyze_derivatives_path: str | Path | None,
+    *,
+    coinalyze_live: bool = False,
+    coinalyze_api_key: str = "",
+    coinalyze_symbols: Iterable[str] = (),
+    coinalyze_base_url: str = "https://api.coinalyze.net/v1/",
+    coinalyze_timeout: float = 10.0,
+    coinalyze_history_interval: str = "1hour",
+    coinalyze_lookback_hours: int = 24,
+    coinalyze_convert_to_usd: bool = True,
 ) -> dict[str, dict[str, Any]]:
-    """Load optional local derivatives snapshots for event-candidate enrichment."""
-    if not coinalyze_derivatives_path:
-        return {}
-    return CoinalyzeDerivativesProvider(coinalyze_derivatives_path).fetch_snapshots()
+    """Load optional local and/or live derivatives snapshots for event-candidate enrichment."""
+    snapshots: dict[str, dict[str, Any]] = {}
+    if coinalyze_derivatives_path:
+        snapshots.update(CoinalyzeDerivativesProvider(coinalyze_derivatives_path).fetch_snapshots())
+    if coinalyze_live:
+        snapshots.update(CoinalyzeDerivativesProvider(
+            None,
+            live_enabled=True,
+            api_key=coinalyze_api_key,
+            symbols=coinalyze_symbols,
+            base_url=coinalyze_base_url,
+            timeout=coinalyze_timeout,
+            history_interval=coinalyze_history_interval,
+            lookback_hours=coinalyze_lookback_hours,
+            convert_to_usd=coinalyze_convert_to_usd,
+        ).fetch_snapshots())
+    return snapshots
 
 
 def load_supply_snapshots(
