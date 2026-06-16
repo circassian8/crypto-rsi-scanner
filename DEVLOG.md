@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Align event-fade cohort counts with reviewed evidence · Codex
+**Why:** The validation report's top-level metrics required
+`review_status=reviewed` plus a known `human_label`, but cohort tables still
+counted any labeled row as reviewed. A half-edited sidecar could therefore
+inflate cohort counts even while the top-level review correctly blocked
+promotion.
+**Changes:**
+- Added a shared reviewed-evidence predicate in
+  `crypto_rsi_scanner/event_validation.py`.
+- Updated event-type, relationship, and BTC-risk cohort metrics to use the same
+  reviewed-evidence rule as the top-level validation review.
+- Added regression assertions so labeled-but-not-reviewed rows do not contribute
+  to cohort reviewed or triggered counts.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 216/216.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This only tightens research-review metrics. It does not change
+event-fade scoring, discovery, alert routing, live storage, or paper trading.
+
 ## 2026-06-16 — Add event-fade review-cycle make target · Codex
 **Why:** The validation-sample workflow depends on refreshing the observational
 event cache and then building a cache-backed review bundle from that same cache.

@@ -563,7 +563,7 @@ def review_validation_sample(
     reviewed = [
         row
         for row in data
-        if _review_status(row) == "reviewed" and _label(row) in KNOWN_LABELS
+        if _is_reviewed_evidence(row)
     ]
     label_counts = _label_counts(reviewed)
     schema_mismatches = sum(
@@ -1586,7 +1586,7 @@ def _cohorts(
 
 
 def _cohort(name: str, rows: list[Mapping[str, Any]]) -> ValidationCohort:
-    reviewed = [row for row in rows if _label(row)]
+    reviewed = [row for row in rows if _is_reviewed_evidence(row)]
     reviewed_proxy = [row for row in reviewed if _is_proxy_candidate(row)]
     negative_controls = [
         row
@@ -1624,6 +1624,10 @@ def _cohort(name: str, rows: list[Mapping[str, Any]]) -> ValidationCohort:
         mfe_mae_ratio=mfe_mae_ratio,
         avg_post_event_return_72h=avg_72h,
     )
+
+
+def _is_reviewed_evidence(row: Mapping[str, Any]) -> bool:
+    return _review_status(row) == "reviewed" and _label(row) in KNOWN_LABELS
 
 
 def _btc_risk_bucket(row: Mapping[str, Any]) -> str:

@@ -2376,6 +2376,8 @@ def test_event_fade_validation_review_requires_explicit_review_status_and_label(
         min_triggered_reviewed=1,
     )
     assert review.reviewed_rows == 0
+    assert sum(cohort.reviewed_rows for cohort in review.event_type_cohorts) == 0
+    assert sum(cohort.triggered_reviewed for cohort in review.event_type_cohorts) == 0
     assert review.unknown_label_rows == 1
     assert review.missing_review_status_rows == 2
     assert review.missing_human_label_rows == 1
