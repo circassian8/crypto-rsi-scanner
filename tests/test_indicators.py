@@ -549,6 +549,13 @@ def _exchange_announcement_fixture_paths():
     return root / "binance_announcements.json", root / "bybit_announcements.json"
 
 
+def _structured_calendar_fixture_paths():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery"
+    return root / "coinmarketcal_events.json", root / "tokenomist_unlocks.json"
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -644,6 +651,40 @@ def test_event_discovery_exchange_announcement_providers_parse_fixtures():
             pass
         else:
             raise AssertionError("required malformed announcement fixture should fail")
+
+
+def test_event_discovery_structured_calendar_providers_parse_fixtures():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner.event_providers.coinmarketcal import CoinMarketCalProvider
+    from crypto_rsi_scanner.event_providers.tokenomist import TokenomistProvider
+
+    coinmarketcal_path, tokenomist_path = _structured_calendar_fixture_paths()
+    start = datetime(2026, 6, 12, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    calendar_events = CoinMarketCalProvider(coinmarketcal_path, required=True).fetch_events(start, end)
+    unlock_events = TokenomistProvider(tokenomist_path, required=True).fetch_events(start, end)
+    assert len(calendar_events) == 1
+    assert len(unlock_events) == 1
+    assert calendar_events[0].provider == "coinmarketcal"
+    assert calendar_events[0].raw_json["event"]["event_type"] == "mainnet_launch"
+    assert "TESTCAL" in (calendar_events[0].body or "")
+    assert unlock_events[0].provider == "tokenomist"
+    assert unlock_events[0].raw_json["event"]["event_type"] == "token_unlock"
+    assert unlock_events[0].raw_json["supply"]["unlock_pct_circulating"] == 0.12
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_path = Path(tmp) / "bad_calendar.json"
+        bad_path.write_text(json.dumps({"events": ["not an object"]}), encoding="utf-8")
+        assert CoinMarketCalProvider(bad_path).fetch_events(start, end) == []
+        try:
+            CoinMarketCalProvider(bad_path, required=True).fetch_events(start, end)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("required malformed calendar fixture should fail")
 
 
 def test_event_discovery_normalizes_and_dedupes_events():
@@ -763,6 +804,48 @@ def test_event_discovery_exchange_announcements_are_direct_no_trade():
     assert perp.fade_signal.signal_type == FadeSignalType.NO_TRADE
 
 
+def test_event_discovery_calendar_and_unlock_events_are_direct_no_trade():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    coinmarketcal_path, tokenomist_path = _structured_calendar_fixture_paths()
+    start = datetime(2026, 6, 12, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    raw = event_discovery.load_discovery_events(
+        None,
+        start,
+        end,
+        coinmarketcal_path=coinmarketcal_path,
+        tokenomist_path=tokenomist_path,
+    )
+    assets = load_asset_aliases(aliases_path)
+    result = event_discovery.run_discovery(
+        raw,
+        assets,
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+    by_symbol = {candidate.asset.symbol: candidate for candidate in result.candidates}
+    assert len(raw) == 2
+    assert set(by_symbol) == {"TESTCAL", "TESTUNLOCK"}
+
+    calendar = by_symbol["TESTCAL"]
+    assert calendar.event.event_type == "mainnet_launch"
+    assert calendar.classification.relationship_type == "direct_protocol_upgrade"
+    assert calendar.classification.is_direct_beneficiary is True
+    assert calendar.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    unlock = by_symbol["TESTUNLOCK"]
+    assert unlock.event.event_type == "token_unlock"
+    assert unlock.classification.relationship_type == "direct_unlock"
+    assert unlock.classification.is_direct_beneficiary is True
+    assert unlock.fade_candidate.supply.unlock_pct_circulating == 0.12
+    assert unlock.fade_candidate.supply.unlock_amount == 2500000
+    assert unlock.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+
 def test_event_classification_proxy_direct_and_ambiguous_cases():
     result = _event_discovery_fixture_result()
     by_coin = {classification.coin_id: classification for classification in result.classifications}
@@ -821,11 +904,15 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
     orig_binance = config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH
     orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
+    orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
+    orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = events_path
     config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
     config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
     config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
         out = io.StringIO()
@@ -841,6 +928,8 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
         config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
         config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = orig_binance
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
+        config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
+        config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
 
@@ -855,11 +944,15 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
     orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
     orig_binance = config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH
     orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
+    orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
+    orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
     config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
     config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = binance_path
     config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = bybit_path
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
         out = io.StringIO()
@@ -874,6 +967,47 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
         config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
         config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = orig_binance
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
+        config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
+        config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
+
+
+def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    coinmarketcal_path, tokenomist_path = _structured_calendar_fixture_paths()
+    orig_events = config.EVENT_DISCOVERY_EVENTS_PATH
+    orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
+    orig_binance = config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH
+    orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
+    orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
+    orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
+    config.EVENT_DISCOVERY_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = coinmarketcal_path
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = tokenomist_path
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_discovery_report()
+        text = out.getvalue()
+        assert "TESTCAL" in text
+        assert "TESTUNLOCK" in text
+        assert "NO_TRADE/DISCOVERED" in text
+    finally:
+        config.EVENT_DISCOVERY_EVENTS_PATH = orig_events
+        config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = orig_binance
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
+        config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
+        config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
 

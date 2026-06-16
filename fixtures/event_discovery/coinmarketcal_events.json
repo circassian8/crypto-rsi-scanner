@@ -1,0 +1,38 @@
+{
+  "events": [
+    {
+      "id": "cmc-testcal-mainnet",
+      "title": "Test Calendar Mainnet Launch",
+      "description": "Test Calendar (TESTCAL) launches its mainnet.",
+      "date_event": "2026-06-16T10:00:00Z",
+      "created_at": "2026-06-14T09:00:00Z",
+      "updated_at": "2026-06-14T12:00:00Z",
+      "source_url": "https://coinmarketcal.com/en/event/testcal-mainnet",
+      "categories": ["mainnet"],
+      "coins": [
+        {
+          "id": "testcal",
+          "name": "Test Calendar",
+          "symbol": "TESTCAL"
+        }
+      ],
+      "source_confidence": 0.86
+    },
+    {
+      "id": "cmc-old-event",
+      "title": "Old Out-of-Window Event",
+      "description": "This should be ignored by the report window.",
+      "date_event": "2026-05-01T10:00:00Z",
+      "created_at": "2026-04-29T09:00:00Z",
+      "categories": ["mainnet"],
+      "coins": [
+        {
+          "id": "testcal",
+          "name": "Test Calendar",
+          "symbol": "TESTCAL"
+        }
+      ],
+      "source_confidence": 0.80
+    }
+  ]
+}

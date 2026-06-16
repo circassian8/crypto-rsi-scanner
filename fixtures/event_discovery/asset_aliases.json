@@ -73,6 +73,30 @@
       "source": "fixture"
     },
     {
+      "coin_id": "testcal",
+      "symbol": "TESTCAL",
+      "name": "Test Calendar",
+      "aliases": ["testcal", "test calendar"],
+      "categories": ["calendar-event-fixture"],
+      "contract_addresses": {},
+      "market_cap": 110000000,
+      "volume_24h": 45000000,
+      "price": 4.2,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "testunlock",
+      "symbol": "TESTUNLOCK",
+      "name": "Test Unlock",
+      "aliases": ["testunlock", "test unlock"],
+      "categories": ["unlock-fixture"],
+      "contract_addresses": {},
+      "market_cap": 120000000,
+      "volume_24h": 65000000,
+      "price": 1.8,
+      "source": "fixture"
+    },
+    {
       "coin_id": "collision-alpha",
       "symbol": "COLLIDE",
       "name": "Collision Alpha",

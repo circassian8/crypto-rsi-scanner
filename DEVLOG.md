@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add fixture structured calendar and unlock providers · Codex
+**Why:** The event-fade validation sample needs more dated direct/control
+events, including crypto calendar catalysts and supply unlocks, before any proxy
+fade result can be trusted. Phase 4 adds those sources as offline fixtures only.
+**Changes:**
+- Added fixture-backed `CoinMarketCalProvider` for structured dated crypto
+  calendar events and `TokenomistProvider` for token unlock events.
+- Added `fixtures/event_discovery/coinmarketcal_events.json` and
+  `fixtures/event_discovery/tokenomist_unlocks.json`, plus TESTCAL and
+  TESTUNLOCK alias rows.
+- Wired optional config/report paths:
+  `RSI_EVENT_DISCOVERY_COINMARKETCAL_PATH` and
+  `RSI_EVENT_DISCOVERY_TOKENOMIST_PATH`.
+- Tokenomist unlock fixtures now populate `supply.unlock_amount` and
+  `supply.unlock_pct_circulating` on the generated `FadeCandidate`, while still
+  classifying as direct unlocks that remain `NO_TRADE`.
+- Expanded offline tests for structured provider parsing, malformed fixture
+  fail-soft behavior, structured-only scanner reports, direct/no-trade calendar
+  behavior, and unlock supply enrichment.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the Phase 4 structured calendar/unlock status and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 161/161.
+`make event-discovery-report` prints TESTCAL as direct protocol upgrade and
+TESTUNLOCK as direct unlock, both `NO_TRADE/DISCOVERED`. `make verify` passes.
+**Notes/risks:** Providers remain fixture-backed only. No live API calls, cache
+writes, live DB writes, notifications, paper trades, or execution were added.
+
 ## 2026-06-16 — Add fixture-backed exchange announcement providers · Codex
 **Why:** The event radar needs direct exchange events in the dataset so proxy
 fades can be tested against realistic negative/control cases. Phase 3 adds

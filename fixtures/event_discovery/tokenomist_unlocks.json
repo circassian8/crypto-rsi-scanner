@@ -1,0 +1,28 @@
+{
+  "unlocks": [
+    {
+      "id": "tokenomist-testunlock-cliff",
+      "token_id": "testunlock",
+      "token_name": "Test Unlock",
+      "token_symbol": "TESTUNLOCK",
+      "title": "Test Unlock cliff unlock",
+      "description": "Team and investor cliff unlock for Test Unlock (TESTUNLOCK).",
+      "unlock_date": "2026-06-16T08:00:00Z",
+      "published_at": "2026-06-12T08:00:00Z",
+      "fetched_at": "2026-06-15T08:00:00Z",
+      "unlock_amount": 2500000,
+      "unlock_pct_circulating": 0.12,
+      "source_url": "https://tokenomist.ai/testunlock",
+      "source_confidence": 0.90
+    },
+    {
+      "id": "tokenomist-missing-time",
+      "token_name": "Incomplete Unlock",
+      "token_symbol": "MISS",
+      "description": "Missing date should be ignored.",
+      "unlock_amount": 1000,
+      "unlock_pct_circulating": 0.01,
+      "source_confidence": 0.70
+    }
+  ]
+}

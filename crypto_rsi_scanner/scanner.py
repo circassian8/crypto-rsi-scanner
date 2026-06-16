@@ -1047,6 +1047,8 @@ def event_discovery_report(verbose: bool = False) -> None:
         config.EVENT_DISCOVERY_EVENTS_PATH,
         config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
+        config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
+        config.EVENT_DISCOVERY_TOKENOMIST_PATH,
     )
     if not any(paths):
         print(
@@ -1065,6 +1067,8 @@ def event_discovery_report(verbose: bool = False) -> None:
         config.EVENT_DISCOVERY_ALIASES_PATH,
         binance_announcements_path=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
         bybit_announcements_path=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
+        coinmarketcal_path=config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
+        tokenomist_path=config.EVENT_DISCOVERY_TOKENOMIST_PATH,
         universe_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
         universe_limit=config.EVENT_DISCOVERY_UNIVERSE_LIMIT or None,
         cfg=cfg,

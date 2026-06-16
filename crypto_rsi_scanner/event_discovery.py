@@ -22,8 +22,10 @@ from .event_models import (
 )
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
 from .event_providers.bybit_announcements import BybitAnnouncementProvider
+from .event_providers.coinmarketcal import CoinMarketCalProvider
 from .event_providers.coingecko_universe import CoinGeckoUniverseProvider
 from .event_providers.manual_json import ManualJsonEventProvider, parse_datetime
+from .event_providers.tokenomist import TokenomistProvider
 from .event_resolver import clean_text, load_asset_aliases, resolve_event_assets
 
 log = logging.getLogger(__name__)
@@ -176,6 +178,8 @@ def run_manual_discovery(
     *,
     binance_announcements_path: str | Path | None = None,
     bybit_announcements_path: str | Path | None = None,
+    coinmarketcal_path: str | Path | None = None,
+    tokenomist_path: str | Path | None = None,
     universe_path: str | Path | None = None,
     universe_limit: int | None = None,
     cfg: EventDiscoveryConfig | None = None,
@@ -192,6 +196,8 @@ def run_manual_discovery(
         end,
         binance_announcements_path=binance_announcements_path,
         bybit_announcements_path=bybit_announcements_path,
+        coinmarketcal_path=coinmarketcal_path,
+        tokenomist_path=tokenomist_path,
     )
     assets = load_discovery_assets(alias_path, universe_path=universe_path, universe_limit=universe_limit)
     return run_discovery(raw_events, assets, cfg=cfg, fade_cfg=fade_cfg, now=now)
@@ -204,6 +210,8 @@ def load_discovery_events(
     *,
     binance_announcements_path: str | Path | None = None,
     bybit_announcements_path: str | Path | None = None,
+    coinmarketcal_path: str | Path | None = None,
+    tokenomist_path: str | Path | None = None,
 ) -> list[RawDiscoveredEvent]:
     """Load local event fixtures from every configured research source."""
     events: list[RawDiscoveredEvent] = []
@@ -213,6 +221,10 @@ def load_discovery_events(
         events.extend(BinanceAnnouncementProvider(binance_announcements_path).fetch_events(start, end))
     if bybit_announcements_path:
         events.extend(BybitAnnouncementProvider(bybit_announcements_path).fetch_events(start, end))
+    if coinmarketcal_path:
+        events.extend(CoinMarketCalProvider(coinmarketcal_path).fetch_events(start, end))
+    if tokenomist_path:
+        events.extend(TokenomistProvider(tokenomist_path).fetch_events(start, end))
     return events
 
 

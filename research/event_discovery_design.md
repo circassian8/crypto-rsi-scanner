@@ -1,8 +1,9 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1/2/3 fixture framework with clean CoinGecko universe bridge
-and fixture-backed exchange announcement providers, research-only
+**Status:** Phase 1-4 fixture framework with clean CoinGecko universe bridge,
+fixture-backed exchange announcement providers, and structured calendar/unlock
+providers, research-only
 
 ## Goal
 
@@ -36,6 +37,10 @@ Phase 1 files:
   provider for spot/listing-style direct events
 - `event_providers/bybit_announcements.py`: local Bybit announcement fixture
   provider for listing/perp-style direct events
+- `event_providers/coinmarketcal.py`: local structured calendar fixture provider
+  for dated crypto events
+- `event_providers/tokenomist.py`: local unlock fixture provider that also
+  populates supply-pressure fields
 - `event_resolver.py`: alias-aware asset resolver
 - `event_classification.py`: deterministic proxy/direct classifier
 - `event_discovery.py`: normalizer, deduper, orchestrator, report formatter
@@ -66,6 +71,22 @@ token-specific catalysts by default:
 
 Direct exchange events must remain `NO_TRADE` under the event-fade proxy gate
 unless a separate source later proves a true proxy relationship.
+
+## Structured Calendar And Unlock Providers
+
+CoinMarketCal-style fixtures add dated crypto-native events such as mainnet
+launches, governance, airdrops, TGEs, and protocol upgrades. Tokenomist-style
+fixtures add token unlocks and carry `unlock_amount` plus
+`unlock_pct_circulating` into the event-fade candidate's supply snapshot.
+
+These sources are useful for the radar and negative/control sample, but they are
+direct token-specific catalysts by default:
+
+- mainnet/protocol/governance calendar events -> direct protocol/token events
+- token unlocks -> `direct_unlock`
+
+They must remain `NO_TRADE` under the proxy-fade gate unless a separate source
+later proves a true proxy relationship.
 
 ## Classification Rules
 
@@ -112,6 +133,8 @@ more dangerous than missed setups.
 - COLLIDE ticker collision that must not resolve confidently
 - TESTLIST Binance spot-listing announcement fixture
 - TESTPERP Bybit perpetual-listing announcement fixture
+- TESTCAL CoinMarketCal-style mainnet-launch fixture
+- TESTUNLOCK Tokenomist-style unlock fixture with supply-pressure fields
 
 `fixtures/coingecko_smoke/top_markets.json` is also used for universe-provider
 coverage. BTC/ETH/SOL become discovery assets, while Tether is excluded by the
@@ -125,6 +148,8 @@ Run the research report with:
 RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
 RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH=fixtures/event_discovery/binance_announcements.json \
 RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH=fixtures/event_discovery/bybit_announcements.json \
+RSI_EVENT_DISCOVERY_COINMARKETCAL_PATH=fixtures/event_discovery/coinmarketcal_events.json \
+RSI_EVENT_DISCOVERY_TOKENOMIST_PATH=fixtures/event_discovery/tokenomist_unlocks.json \
 RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report
 ```
