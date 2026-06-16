@@ -815,6 +815,9 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         "  By BTC risk bucket:",
         *_format_cohort_lines(review.btc_risk_cohorts),
         "",
+        "NEXT SAMPLE WORK",
+        *_format_next_step_lines(validation_review_next_steps(review)),
+        "",
         "PROMOTION STATUS",
     ])
     if review.promotion_ready:
@@ -824,6 +827,88 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         for blocker in review.promotion_blockers:
             rows.append(f"  - {blocker}")
     return "\n".join(rows)
+
+
+def validation_review_next_steps(review: EventFadeValidationReview) -> tuple[str, ...]:
+    """Return concrete review work needed before event-fade promotion evidence is meaningful."""
+    steps: list[str] = []
+    if review.schema_mismatches:
+        steps.append(
+            f"Regenerate or migrate {review.schema_mismatches} row(s) with unknown schema_version."
+        )
+    if review.unknown_label_rows:
+        steps.append(
+            f"Fix {review.unknown_label_rows} reviewed row(s) with unknown human_label values."
+        )
+    if review.point_in_time_violation_rows:
+        steps.append(
+            f"Review or remove {review.point_in_time_violation_rows} row(s) first seen after decision time."
+        )
+    if review.post_decision_source_rows:
+        steps.append(
+            f"Review or remove {review.post_decision_source_rows} row(s) with post-decision source evidence."
+        )
+    proxy_gap = max(0, review.min_proxy_candidates - review.reviewed_proxy_candidates)
+    if proxy_gap:
+        steps.append(
+            f"Add/review {proxy_gap} more proxy candidate row(s) "
+            f"(current {review.reviewed_proxy_candidates}/{review.min_proxy_candidates})."
+        )
+    control_gap = max(0, review.min_negative_controls - review.reviewed_negative_controls)
+    if control_gap:
+        steps.append(
+            f"Add/review {control_gap} more direct or ambiguous control row(s) "
+            f"(current {review.reviewed_negative_controls}/{review.min_negative_controls})."
+        )
+    trigger_gap = max(0, review.min_triggered_reviewed - review.triggered_reviewed)
+    if trigger_gap:
+        steps.append(
+            f"Add/review {trigger_gap} more SHORT_TRIGGERED row(s) with outcomes "
+            f"(current {review.triggered_reviewed}/{review.min_triggered_reviewed})."
+        )
+    if (
+        review.reviewed_proxy_candidates >= review.min_proxy_candidates
+        and review.reviewed_proxy_event_types < review.min_proxy_event_types
+    ):
+        event_type_gap = review.min_proxy_event_types - review.reviewed_proxy_event_types
+        steps.append(
+            f"Add proxy examples from {event_type_gap} more event type(s) "
+            f"(current {review.reviewed_proxy_event_types}/{review.min_proxy_event_types})."
+        )
+    if (
+        review.triggered_reviewed >= review.min_triggered_reviewed
+        and review.triggered_btc_risk_buckets < review.min_trigger_btc_risk_buckets
+    ):
+        risk_bucket_gap = review.min_trigger_btc_risk_buckets - review.triggered_btc_risk_buckets
+        steps.append(
+            f"Add triggered examples from {risk_bucket_gap} more BTC risk bucket(s) "
+            f"(current {review.triggered_btc_risk_buckets}/{review.min_trigger_btc_risk_buckets})."
+        )
+    if review.missing_trigger_outcome_rows:
+        steps.append(
+            f"Fill trigger outcome fields for {review.missing_trigger_outcome_rows} reviewed triggered row(s)."
+        )
+    if review.missing_event_time_baseline_rows:
+        steps.append(
+            f"Fill event-time baseline outcomes for {review.missing_event_time_baseline_rows} reviewed triggered row(s)."
+        )
+    if review.negative_trigger_latency_rows:
+        steps.append(
+            f"Inspect {review.negative_trigger_latency_rows} triggered row(s) whose trigger precedes event time."
+        )
+    if steps:
+        return tuple(steps)
+    if review.promotion_ready:
+        return (
+            "Mechanical review gates are satisfied; explicit human approval is still required before promotion.",
+        )
+    return (
+        "Resolve the promotion blockers above before expanding or promoting the sample.",
+    )
+
+
+def _format_next_step_lines(steps: tuple[str, ...]) -> list[str]:
+    return [f"  - {step}" for step in steps]
 
 
 def _format_cohort_lines(cohorts: tuple[ValidationCohort, ...]) -> list[str]:

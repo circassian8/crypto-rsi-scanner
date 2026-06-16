@@ -435,12 +435,13 @@ Queue priority is:
 
 1. unknown `human_label` values
 2. reviewed rows with point-in-time evidence violations
-3. unlabeled `SHORT_TRIGGERED` rows
-4. reviewed `SHORT_TRIGGERED` rows missing required outcome fields:
+3. reviewed rows with any source evidence after the decision time
+4. unlabeled `SHORT_TRIGGERED` rows
+5. reviewed `SHORT_TRIGGERED` rows missing required outcome fields:
    `max_adverse_excursion`, `max_favorable_excursion`, and
    `post_event_return_72h`
-5. unlabeled proxy candidates
-6. unlabeled direct/ambiguous negative controls
+6. unlabeled proxy candidates
+7. unlabeled direct/ambiguous negative controls
 
 The report shows the event, asset, signal type, relationship, event time,
 trigger time, missing fields, suggested label category, and source URLs. It is a
@@ -543,6 +544,12 @@ The reviewer currently checks:
 - MFE/MAE ratio against the 1.5 minimum target
 - cohort summaries by event type, relationship type, and BTC risk-on bucket so
   the reviewed sample can expose where the edge is concentrated or absent
+
+The report also prints a `NEXT SAMPLE WORK` section that translates blockers
+into concrete work: how many more proxy candidates, direct/ambiguous controls,
+and reviewed `SHORT_TRIGGERED` rows are needed, which unsafe point-in-time rows
+need review/removal, and which triggered rows still need trigger or event-time
+baseline outcomes.
 
 The command prints `BLOCKED` until coverage and outcome evidence are strong
 enough. Even when it prints `READY FOR HUMAN DECISION`, the repo decision still

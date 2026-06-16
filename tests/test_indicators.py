@@ -2340,10 +2340,16 @@ def test_event_fade_validation_review_blocks_unlabeled_export():
     assert "reviewed proxy candidates 0/25" in review.promotion_blockers
     assert "reviewed direct/ambiguous controls 0/50" in review.promotion_blockers
     assert "reviewed SHORT_TRIGGERED candidates 0/10" in review.promotion_blockers
+    next_steps = event_validation.validation_review_next_steps(review)
+    assert "Add/review 25 more proxy candidate row(s) (current 0/25)." in next_steps
+    assert "Add/review 50 more direct or ambiguous control row(s) (current 0/50)." in next_steps
+    assert "Add/review 10 more SHORT_TRIGGERED row(s) with outcomes (current 0/10)." in next_steps
 
     report = event_validation.format_validation_review(review)
     assert "EVENT FADE VALIDATION SAMPLE REVIEW" in report
     assert "No reviewed labels yet" in report
+    assert "NEXT SAMPLE WORK" in report
+    assert "Add/review 25 more proxy candidate row(s)" in report
     assert "PROMOTION STATUS" in report
     assert "BLOCKED" in report
 
@@ -2420,6 +2426,9 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert review.point_in_time_violation_rows == 0
     assert review.post_decision_source_rows == 0
     assert review.promotion_blockers == ()
+    assert event_validation.validation_review_next_steps(review) == (
+        "Mechanical review gates are satisfied; explicit human approval is still required before promotion.",
+    )
 
     event_type_cohorts = {cohort.name: cohort for cohort in review.event_type_cohorts}
     assert event_type_cohorts["ipo_proxy"].reviewed_rows == 2
@@ -2447,6 +2456,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "trigger BTC risk buckets: 1/1" in report
     assert "trigger latency: avg=22.5h" in report
     assert "rows with post-decision source evidence: 0" in report
+    assert "NEXT SAMPLE WORK" in report
+    assert "explicit human approval is still required" in report
     assert "COHORTS" in report
     assert "By event type:" in report
     assert "ipo_proxy" in report
@@ -2798,6 +2809,10 @@ def test_event_fade_validation_review_flags_mixed_late_source_evidence():
     assert review.point_in_time_violation_rows == 0
     assert review.post_decision_source_rows == 1
     assert "1 reviewed row(s) include source evidence after the decision time" in review.promotion_blockers
+    assert (
+        "Review or remove 1 row(s) with post-decision source evidence."
+        in event_validation.validation_review_next_steps(review)
+    )
 
     queue = event_validation.build_labeling_queue(rows)
     item = next(item for item in queue.items if item.asset_symbol == "TESTVELVET")

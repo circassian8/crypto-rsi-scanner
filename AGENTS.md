@@ -105,7 +105,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   export from latest cached candidate snapshots under `RSI_EVENT_DISCOVERY_CACHE_DIR`;
   research-only/no writes except the requested artifact) ·
   `main.py --event-fade-review-sample PATH` (read a labeled JSONL/CSV sample and
-  print review metrics/cohorts plus promotion blockers; research-only/no writes) ·
+  print review metrics/cohorts, concrete next-sample work, and promotion
+  blockers; research-only/no writes) ·
   `main.py --event-fade-labeling-queue PATH` (prioritize unlabeled rows and
   triggered rows missing required outcomes; research-only/no writes) ·
   `main.py --event-fade-review-packet SAMPLE OUT` (write a Markdown packet with
@@ -257,13 +258,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   precision, trigger latency, point-in-time violations, MFE/MAE, post-event
   returns, event-time short baseline comparison,
   event-type/relationship/BTC-risk cohorts, diversity gates, and promotion
-  blockers, but it must not automatically promote alerts, write live storage,
-  open paper trades, or imply execution.
+  blockers plus concrete next-sample work, but it must not automatically
+  promote alerts, write live storage, open paper trades, or imply execution.
 - Event-fade validation labeling queues are artifact-only. `main.py
   --event-fade-labeling-queue` may prioritize unlabeled proxy/control rows and
-  reviewed triggered rows missing required outcomes, but it must not auto-label
-  rows, modify sample files, write storage, route alerts, open paper trades, or
-  imply promotion.
+  reviewed triggered rows missing required outcomes or source-timing review,
+  but it must not auto-label rows, modify sample files, write storage, route
+  alerts, open paper trades, or imply promotion.
 - Event-fade validation review packets are artifact-only. `main.py
   --event-fade-review-packet SAMPLE OUT` may write a Markdown packet for manual
   validation review, but it must not auto-label rows, modify the source sample,
@@ -401,7 +402,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   MFE/MAE, post-event returns, event-time short baseline comparison,
   event-type/relationship/BTC-risk cohorts, and blockers such as too few
   reviewed proxy/control/trigger cases, too-narrow event/BTC-risk diversity, or
-  weak edge-quality metrics. `main.py --event-fade-labeling-queue PATH`
+  weak edge-quality metrics. It also prints concrete next-sample work so the
+  reviewer knows which cases/outcomes to add next.
+  `main.py --event-fade-labeling-queue PATH`
   prioritizes the next rows to label and triggered rows missing required
   outcome fields. `main.py --event-fade-review-packet SAMPLE OUT` writes a
   Markdown packet for the same prioritized rows with source URLs, raw titles,

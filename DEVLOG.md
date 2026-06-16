@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade validation next-step checklist · Codex
+**Why:** The event-fade validation report listed blockers, but the next action
+still had to be inferred by a human or the next agent. The remaining Pro-plan
+work is sample building, so the report should say exactly which coverage,
+outcome, or point-in-time rows need attention next.
+**Changes:**
+- Added `validation_review_next_steps()` and a `NEXT SAMPLE WORK` section to
+  `crypto_rsi_scanner/event_validation.py`, translating review metrics into
+  concrete sample-building actions.
+- Updated `main.py --event-fade-review-sample` help text to mention next-sample
+  work.
+- Expanded validation tests to cover blocked/unlabeled samples, promotion-ready
+  samples, and mixed post-decision source evidence.
+- Fixed the event-discovery design note's labeling-queue priority list to
+  include post-decision source review, and updated `AGENTS.md`/`ROADMAP.md`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 214/214.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This is reporting-only. It does not auto-label rows, infer
+promotion readiness, route alerts, write live storage, open paper trades, or
+change event-fade scoring.
+
 ## 2026-06-16 — Harden event-fade point-in-time source audits · Codex
 **Why:** The validation sample tracked earliest source timestamps, but a
 multi-source event could still mix one pre-decision source with another

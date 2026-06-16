@@ -1273,7 +1273,7 @@ def event_fade_export_cache_sample(path: str, verbose: bool = False) -> None:
 
 
 def event_fade_review_sample(path: str, verbose: bool = False) -> None:
-    """Review manual labels/outcomes in an event-fade validation sample export."""
+    """Review labels/outcomes and next sample work for an event-fade validation export."""
     _setup_event_discovery_logging(verbose)
     rows = event_validation.load_validation_sample(path)
     review = event_validation.review_validation_sample(rows)
@@ -1760,7 +1760,7 @@ def cli() -> None:
     parser.add_argument(
         "--event-fade-review-sample",
         metavar="PATH",
-        help="Review labels/outcomes in a research-only event-fade validation sample export.",
+        help="Review labels/outcomes and next sample work in a research-only event-fade validation sample export.",
     )
     parser.add_argument(
         "--event-fade-labeling-queue",
