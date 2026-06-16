@@ -40,11 +40,27 @@ def fetch_news_events(
         log.warning("%s news fixture load failed: %s", provider, exc)
         return []
 
+    return news_events_from_items(rows, provider=provider, start=start, end=end)
+
+
+def news_events_from_items(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    provider: str,
+    start: datetime,
+    end: datetime,
+    fetched_at: datetime | None = None,
+) -> list[RawDiscoveredEvent]:
+    """Convert already-loaded news rows into filtered raw discovery events."""
     start_utc = _as_utc(start)
     end_utc = _as_utc(end)
+    fetched_at_utc = _as_utc(fetched_at) if fetched_at else None
     out: list[RawDiscoveredEvent] = []
     for row in rows:
-        event = _raw_event_from_row(row, provider)
+        payload = dict(row)
+        if fetched_at_utc and not any(k in payload for k in ("fetched_at", "fetchedAt", "updated_at")):
+            payload["fetched_at"] = fetched_at_utc.isoformat()
+        event = _raw_event_from_row(payload, provider)
         if event is None:
             continue
         reference_time = event.published_at or event.fetched_at
@@ -53,9 +69,9 @@ def fetch_news_events(
     return out
 
 
-def _news_items(raw: object) -> list[Mapping[str, Any]]:
+def _news_items(raw: object, *, allow_empty: bool = False) -> list[Mapping[str, Any]]:
     rows = list(_walk_items(raw))
-    if not rows:
+    if not rows and not allow_empty:
         raise ValueError("news fixture does not contain any article objects")
     return rows
 
@@ -158,6 +174,10 @@ def _parse_time(value: object) -> datetime | None:
     if isinstance(value, (int, float)):
         seconds = float(value) / 1000.0 if float(value) > 10_000_000_000 else float(value)
         return datetime.fromtimestamp(seconds, tz=timezone.utc)
+    if isinstance(value, str):
+        raw = value.strip()
+        if raw.isdigit() and len(raw) == 14:
+            return datetime.strptime(raw, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
     return parse_datetime(value)
 
 

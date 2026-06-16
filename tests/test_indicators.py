@@ -1247,6 +1247,90 @@ def test_event_discovery_news_providers_parse_fixtures():
             raise AssertionError("required malformed news fixture should fail")
 
 
+def test_event_discovery_gdelt_live_provider_parses_article_list_offline():
+    import json
+    from datetime import datetime, timezone
+    from urllib.parse import parse_qs, urlparse
+    from crypto_rsi_scanner.event_providers.gdelt import GdeltProvider
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    seen = {}
+
+    def fake_opener(request, timeout):
+        seen["url"] = request.full_url
+        seen["timeout"] = timeout
+        return FakeResponse({
+            "articles": [
+                {
+                    "url": "https://example.test/news/testai-openai-preipo",
+                    "title": "TESTAI offers synthetic exposure to OpenAI pre IPO event",
+                    "seendate": "20260615143000",
+                    "domain": "example.test",
+                    "language": "English",
+                    "sourceCountry": "US",
+                },
+            ],
+        })
+
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    fetched_at = datetime(2026, 6, 15, 14, 45, tzinfo=timezone.utc)
+    provider = GdeltProvider(
+        None,
+        live_enabled=True,
+        base_url="https://api.gdelt.test/api/v2/doc/doc",
+        query='("pre-ipo" OR "synthetic exposure")',
+        max_records=7,
+        timeout=3.5,
+        opener=fake_opener,
+        fetched_at=fetched_at,
+    )
+    events = provider.fetch_events(start, end)
+    assert len(events) == 1
+    parsed = urlparse(seen["url"])
+    params = parse_qs(parsed.query)
+    assert parsed.scheme == "https"
+    assert parsed.netloc == "api.gdelt.test"
+    assert params["query"] == ['("pre-ipo" OR "synthetic exposure")']
+    assert params["mode"] == ["artlist"]
+    assert params["format"] == ["json"]
+    assert params["maxrecords"] == ["7"]
+    assert params["sort"] == ["datedesc"]
+    assert params["startdatetime"] == ["20260615000000"]
+    assert params["enddatetime"] == ["20260616000000"]
+    assert seen["timeout"] == 3.5
+    event = events[0]
+    assert event.provider == "gdelt"
+    assert event.source_url == "https://example.test/news/testai-openai-preipo"
+    assert event.published_at.isoformat() == "2026-06-15T14:30:00+00:00"
+    assert event.fetched_at == fetched_at
+    assert event.raw_json["event"]["event_type"] == "ipo_proxy"
+
+    def empty_opener(request, timeout):
+        return FakeResponse({"articles": []})
+
+    assert GdeltProvider(None, live_enabled=True, opener=empty_opener).fetch_events(start, end) == []
+
+    def failing_opener(request, timeout):
+        raise TimeoutError("offline timeout")
+
+    assert GdeltProvider(None, live_enabled=True, opener=failing_opener).fetch_events(start, end) == []
+
+
 def test_event_discovery_news_pipeline_proxy_direct_late_and_ambiguous_safety():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery

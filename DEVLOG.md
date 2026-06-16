@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add opt-in live GDELT event discovery · Codex
+**Why:** The event-fade validation pipeline needs more real narrative/event
+coverage, but live discovery sources must remain research-only and fail-soft.
+GDELT is a useful no-key news source for proxy-catalyst radar coverage.
+**Changes:**
+- Extended `crypto_rsi_scanner/event_providers/gdelt.py` from fixture-only to
+  optional live GDELT Article List JSON fetching with request-time bounds,
+  configurable query/max-records/timeout, injected opener support for tests,
+  and fail-soft behavior.
+- Added shared news-row conversion and compact `YYYYMMDDHHMMSS` timestamp
+  parsing in `crypto_rsi_scanner/event_providers/_news_common.py`.
+- Wired `RSI_EVENT_DISCOVERY_GDELT_LIVE`, query, max-record, timeout, and base
+  URL settings through `config.py`, `event_discovery.py`, and `scanner.py`.
+- Added offline provider regression coverage for GDELT request parameters,
+  compact timestamp parsing, empty responses, and fetch failures.
+- Updated `.env.example`, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`; also moved live-provider comments in
+  `.env.example` off value lines so the minimal dotenv loader cannot treat them
+  as truthy values.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 195/195.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** GDELT live fetching is opt-in and research-only. It feeds local
+reports/cache/export paths only; it does not route Telegram alerts, write live
+signal/outcome/paper tables, open paper trades, or promote event-fade signals.
+
 ## 2026-06-16 — Export validation price fixtures from sample rows · Codex
 **Why:** Outcome filling could consume local price JSON, but building that JSON
 still required hand-writing candles. The validation workflow needs a

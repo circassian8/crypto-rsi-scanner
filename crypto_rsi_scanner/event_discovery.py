@@ -29,7 +29,7 @@ from .event_providers.coinmarketcal import CoinMarketCalProvider
 from .event_providers.coingecko_universe import CoinGeckoUniverseProvider
 from .event_providers.cryptopanic import CryptoPanicProvider
 from .event_providers.external_ipo import ExternalIpoProvider
-from .event_providers.gdelt import GdeltProvider
+from .event_providers.gdelt import DEFAULT_GDELT_QUERY, GdeltProvider
 from .event_providers.manual_json import ManualJsonEventProvider, parse_datetime
 from .event_providers.prediction_market_events import PredictionMarketEventsProvider
 from .event_providers.project_blog_rss import ProjectBlogRssProvider
@@ -313,6 +313,11 @@ def run_manual_discovery(
     tokenomist_path: str | Path | None = None,
     cryptopanic_path: str | Path | None = None,
     gdelt_path: str | Path | None = None,
+    gdelt_live: bool = False,
+    gdelt_base_url: str = "https://api.gdeltproject.org/api/v2/doc/doc",
+    gdelt_query: str = "",
+    gdelt_max_records: int = 50,
+    gdelt_timeout: float = 10.0,
     project_blog_rss_path: str | Path | None = None,
     external_ipo_path: str | Path | None = None,
     sports_fixtures_path: str | Path | None = None,
@@ -348,6 +353,11 @@ def run_manual_discovery(
         tokenomist_path=tokenomist_path,
         cryptopanic_path=cryptopanic_path,
         gdelt_path=gdelt_path,
+        gdelt_live=gdelt_live,
+        gdelt_base_url=gdelt_base_url,
+        gdelt_query=gdelt_query,
+        gdelt_max_records=gdelt_max_records,
+        gdelt_timeout=gdelt_timeout,
         project_blog_rss_path=project_blog_rss_path,
         external_ipo_path=external_ipo_path,
         sports_fixtures_path=sports_fixtures_path,
@@ -389,6 +399,11 @@ def load_discovery_events(
     tokenomist_path: str | Path | None = None,
     cryptopanic_path: str | Path | None = None,
     gdelt_path: str | Path | None = None,
+    gdelt_live: bool = False,
+    gdelt_base_url: str = "https://api.gdeltproject.org/api/v2/doc/doc",
+    gdelt_query: str = "",
+    gdelt_max_records: int = 50,
+    gdelt_timeout: float = 10.0,
     project_blog_rss_path: str | Path | None = None,
     external_ipo_path: str | Path | None = None,
     sports_fixtures_path: str | Path | None = None,
@@ -416,8 +431,15 @@ def load_discovery_events(
         events.extend(TokenomistProvider(tokenomist_path).fetch_events(start, end))
     if cryptopanic_path:
         events.extend(CryptoPanicProvider(cryptopanic_path).fetch_events(start, end))
-    if gdelt_path:
-        events.extend(GdeltProvider(gdelt_path).fetch_events(start, end))
+    if gdelt_path or gdelt_live:
+        events.extend(GdeltProvider(
+            gdelt_path,
+            live_enabled=gdelt_live,
+            base_url=gdelt_base_url,
+            query=gdelt_query or DEFAULT_GDELT_QUERY,
+            max_records=gdelt_max_records,
+            timeout=gdelt_timeout,
+        ).fetch_events(start, end))
     if project_blog_rss_path:
         events.extend(ProjectBlogRssProvider(project_blog_rss_path).fetch_events(start, end))
     if external_ipo_path:

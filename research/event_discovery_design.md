@@ -3,13 +3,13 @@
 **Date:** 2026-06-16
 **Status:** Phase 1-10 framework with clean CoinGecko universe bridge,
 fixture-backed exchange announcement providers plus opt-in live Bybit
-announcement fetch, structured calendar/unlock
-providers, news/proxy-narrative providers, external catalyst providers, and
-Coinalyze-style derivatives plus Tokenomist/Etherscan/Arkham/Dune-style
-supply/on-chain enrichment, plus grouped auto reporting and validation-sample
-exports, research-only JSONL cache refresh, validation-sample review metrics,
-labeling-queue support, research-only merge support, local outcome-price export,
-and outcome-fill support.
+announcement fetch, structured calendar/unlock providers, news/proxy-narrative
+providers plus opt-in live GDELT Article List fetch, external catalyst
+providers, and Coinalyze-style derivatives plus
+Tokenomist/Etherscan/Arkham/Dune-style supply/on-chain enrichment, plus grouped
+auto reporting and validation-sample exports, research-only JSONL cache refresh,
+validation-sample review metrics, labeling-queue support, research-only merge
+support, local outcome-price export, and outcome-fill support.
 
 ## Goal
 
@@ -50,8 +50,9 @@ Current files:
   populates supply-pressure fields
 - `event_providers/cryptopanic.py`: local CryptoPanic-style news fixture
   provider for proxy/direct/ambiguous narrative evidence
-- `event_providers/gdelt.py`: local GDELT-style news fixture provider for
-  external catalyst and attention-event evidence
+- `event_providers/gdelt.py`: local GDELT-style news fixture provider plus
+  opt-in live GDELT Article List fetch for external catalyst and attention-event
+  evidence
 - `event_providers/project_blog_rss.py`: local project-blog/RSS fixture provider
   for project-sourced narrative evidence
 - `event_providers/external_ipo.py`: local IPO-calendar fixture provider for
@@ -530,6 +531,19 @@ RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
 The live Bybit path is research-only and fail-soft. It should only add direct
 exchange-listing/perp-listing evidence to the radar unless another source later
 proves a proxy relationship.
+
+Run an opt-in live GDELT news radar pass:
+
+```bash
+RSI_EVENT_DISCOVERY_GDELT_LIVE=1 \
+RSI_EVENT_DISCOVERY_GDELT_QUERY='("pre-ipo" OR "pre ipo" OR "synthetic exposure" OR "tokenized stock" OR "prediction market" OR "fan token")' \
+RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
+  .venv/bin/python main.py --event-discovery-report
+```
+
+The live GDELT path queries Article List JSON, reuses the same news parser as
+fixtures, and remains research-only/fail-soft. It should add narrative evidence
+for human review or local cache export, not route event-fade signals live.
 
 Write the local observational JSONL cache with the fixture set:
 
