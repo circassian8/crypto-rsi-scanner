@@ -60,6 +60,7 @@ from . import macro
 from . import paper
 from . import event_fade
 from . import event_discovery
+from . import event_validation
 
 log = logging.getLogger(__name__)
 
@@ -1142,6 +1143,14 @@ def event_fade_export_sample(path: str, verbose: bool = False) -> None:
     print(f"Event-fade validation sample: wrote {len(rows)} row(s) to {out}")
 
 
+def event_fade_review_sample(path: str, verbose: bool = False) -> None:
+    """Review manual labels/outcomes in an event-fade validation sample export."""
+    _setup_event_discovery_logging(verbose)
+    rows = event_validation.load_validation_sample(path)
+    review = event_validation.review_validation_sample(rows)
+    print(event_validation.format_validation_review(review))
+
+
 def status() -> None:
     """Print operational scan/listener health and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -1333,6 +1342,11 @@ def cli() -> None:
         help="Export a research-only event-fade validation sample from discovery fixtures (.jsonl/.csv or '-' for JSONL stdout).",
     )
     parser.add_argument(
+        "--event-fade-review-sample",
+        metavar="PATH",
+        help="Review labels/outcomes in a research-only event-fade validation sample export.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for commands that support it.",
@@ -1423,6 +1437,9 @@ def cli() -> None:
         return
     if args.event_fade_export_sample:
         event_fade_export_sample(args.event_fade_export_sample, verbose=args.verbose)
+        return
+    if args.event_fade_review_sample:
+        event_fade_review_sample(args.event_fade_review_sample, verbose=args.verbose)
         return
     if args.status:
         status()

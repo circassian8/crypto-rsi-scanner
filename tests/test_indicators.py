@@ -1436,6 +1436,102 @@ def test_event_fade_validation_sample_rows_and_serializers():
         assert len(list(csv.DictReader(csv_path.read_text(encoding="utf-8").splitlines()))) == len(rows)
 
 
+def test_event_fade_validation_review_blocks_unlabeled_export():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    review = event_validation.review_validation_sample(rows)
+    assert review.total_rows == len(rows)
+    assert review.reviewed_rows == 0
+    assert review.unlabeled_rows == len(rows)
+    assert review.promotion_ready is False
+    assert "reviewed proxy candidates 0/25" in review.promotion_blockers
+    assert "reviewed direct/ambiguous controls 0/50" in review.promotion_blockers
+    assert "no reviewed SHORT_TRIGGERED candidates" in review.promotion_blockers
+
+    report = event_validation.format_validation_review(review)
+    assert "EVENT FADE VALIDATION SAMPLE REVIEW" in report
+    assert "No reviewed labels yet" in report
+    assert "PROMOTION STATUS" in report
+    assert "BLOCKED" in report
+
+
+def test_event_fade_validation_review_metrics_and_file_loaders():
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+
+    def pick(symbol, relationship=None):
+        for row in rows:
+            if row["asset_symbol"] != symbol:
+                continue
+            if relationship is not None and row["relationship_type"] != relationship:
+                continue
+            return row
+        raise AssertionError(f"missing row for {symbol}")
+
+    velvet = pick("TESTVELVET")
+    velvet["human_label"] = "valid_proxy_fade"
+    velvet["review_status"] = "reviewed"
+    velvet["max_favorable_excursion"] = 0.42
+    velvet["max_adverse_excursion"] = 0.08
+    velvet["post_event_return_24h"] = -0.11
+    velvet["post_event_return_72h"] = -0.22
+    velvet["post_event_return_7d"] = -0.31
+
+    pick("TESTAI")["human_label"] = "valid_proxy_fade"
+    pick("TESTPRED")["human_label"] = "false_positive"
+    pick("TESTBTC")["human_label"] = "direct_event"
+    pick("TESTLIST", "direct_listing")["human_label"] = "direct_event"
+    pick("TESTPUMP")["human_label"] = "ambiguous"
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=3,
+        min_negative_controls=3,
+    )
+    assert review.promotion_ready is True
+    assert review.reviewed_rows == 6
+    assert review.reviewed_proxy_candidates == 3
+    assert review.reviewed_negative_controls == 3
+    assert review.label_counts["valid_proxy_fade"] == 2
+    assert review.label_counts["false_positive"] == 1
+    assert review.triggered_reviewed == 1
+    assert review.triggered_valid == 1
+    assert review.trigger_precision == 1.0
+    assert review.trigger_false_positive_rate == 0.0
+    assert review.avg_mfe == 0.42
+    assert review.avg_mae == 0.08
+    assert round(review.mfe_mae_ratio, 2) == 5.25
+    assert review.avg_post_event_return_72h == -0.22
+    assert review.promotion_blockers == ()
+
+    report = event_validation.format_validation_review(review)
+    assert "READY FOR HUMAN DECISION" in report
+    assert "precision: 100.0%" in report
+    assert "72h=-22.0%" in report
+
+    with tempfile.TemporaryDirectory() as tmp:
+        jsonl_path = Path(tmp) / "reviewed.jsonl"
+        csv_path = Path(tmp) / "reviewed.csv"
+        event_discovery.write_validation_sample(rows, jsonl_path)
+        event_discovery.write_validation_sample(rows, csv_path)
+        loaded_jsonl = event_validation.load_validation_sample(jsonl_path)
+        loaded_csv = event_validation.load_validation_sample(csv_path)
+        assert event_validation.review_validation_sample(
+            loaded_jsonl,
+            min_proxy_candidates=3,
+            min_negative_controls=3,
+        ).promotion_ready
+        assert event_validation.review_validation_sample(
+            loaded_csv,
+            min_proxy_candidates=3,
+            min_negative_controls=3,
+        ).promotion_ready
+
+
 def test_event_discovery_scanner_report_uses_local_fixtures():
     import contextlib
     import io
@@ -1595,6 +1691,27 @@ def test_event_fade_export_sample_scanner_writes_jsonl_fixture():
     finally:
         for name, value in original.items():
             setattr(config, name, value)
+
+
+def test_event_fade_review_sample_scanner_reads_jsonl_fixture():
+    import contextlib
+    import io
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        out_path = Path(tmp) / "sample.jsonl"
+        event_discovery.write_validation_sample(rows, out_path)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_review_sample(str(out_path))
+        text = out.getvalue()
+        assert "EVENT FADE VALIDATION SAMPLE REVIEW" in text
+        assert "Rows: 17" in text
+        assert "BLOCKED" in text
+        assert "reviewed proxy candidates 0/25" in text
 
 
 def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():

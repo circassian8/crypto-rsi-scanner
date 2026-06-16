@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade validation review metrics · Codex
+**Why:** The validation exporter produced review artifacts, but the plan also
+needs a way to evaluate labeled samples against promotion criteria before any
+alert or paper-trading discussion.
+**Changes:**
+- Added `crypto_rsi_scanner/event_validation.py` to load JSONL/CSV validation
+  samples, summarize labels/outcomes, compute trigger precision, false-positive
+  rate, MFE/MAE, post-event returns, and emit conservative promotion blockers.
+- Added `main.py --event-fade-review-sample PATH` and
+  `make event-fade-review-sample`; the Make target reads
+  `EVENT_FADE_SAMPLE_IN` so hand-labeled files are not overwritten by export.
+- Added offline tests for unlabeled exports, labeled metric summaries, JSONL/CSV
+  loading, and scanner CLI plumbing.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the export → label → review workflow
+  and the non-promotion guardrail.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 180/180.
+`make event-fade-export-sample && make event-fade-review-sample` reads the
+17-row blank export and correctly prints `BLOCKED` for missing reviewed proxy,
+control, and triggered samples. `git diff --check` passes. `make verify` passes.
+**Notes/risks:** The reviewer is evidence only. Even a clean report says
+`READY FOR HUMAN DECISION`; it does not change routing, storage, paper trading,
+or execution behavior.
+
 ## 2026-06-16 — Add event-fade validation sample export · Codex
 **Why:** Phase 10 needed a concrete review artifact so discovered event-fade
 candidates can become a manually labeled validation sample without promoting

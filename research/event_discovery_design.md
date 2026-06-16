@@ -6,7 +6,7 @@ fixture-backed exchange announcement providers, structured calendar/unlock
 providers, news/proxy-narrative providers, external catalyst providers, and
 Coinalyze-style derivatives plus Tokenomist/Etherscan/Arkham/Dune-style
 supply/on-chain enrichment, plus grouped auto reporting and validation-sample
-exports, research-only
+exports plus validation-sample review metrics, research-only
 
 ## Goal
 
@@ -25,7 +25,8 @@ an alerting, paper-trading, storage, or execution path.
 ## Boundary
 
 `event_fade.py` remains pure and side-effect free. Discovery code may normalize,
-resolve, classify, dedupe, and report local fixture data. It must not mutate
+resolve, classify, dedupe, report local fixture data, export local validation
+artifacts, and review labeled local validation artifacts. It must not mutate
 live scanner state, send Telegram messages, write signal/outcome/paper tables,
 or imply an order.
 
@@ -71,6 +72,8 @@ Current files:
 - `event_discovery.py`: normalizer, deduper, orchestrator, flat radar report
   formatter, grouped event-fade auto report formatter, and validation-sample
   export helpers
+- `event_validation.py`: local validation-sample loader/reviewer for human
+  labels, outcome metrics, and promotion blockers
 
 ## Universe Integration
 
@@ -244,6 +247,31 @@ Each row includes:
 This export may write only the requested local artifact. It must not write live
 DB rows, send alerts, open paper trades, or imply execution.
 
+## Validation Sample Review
+
+`main.py --event-fade-review-sample PATH` reads a labeled JSONL/CSV validation
+sample and prints a research-only review report. It is intentionally
+conservative: a report can say a sample is ready for a human decision, but it
+does not promote event-fade output automatically.
+
+The reviewer currently checks:
+
+- reviewed rows vs unlabeled rows
+- reviewed proxy candidate count against the 25-case minimum target
+- reviewed direct/ambiguous control count against the 50-case minimum target
+- label counts for `valid_proxy_fade`, `false_positive`, `direct_event`, and
+  `ambiguous`
+- reviewed `SHORT_TRIGGERED` precision and false-positive rate
+- direct/non-proxy rows that somehow became `SHORT_TRIGGERED`
+- average MFE, MAE, MFE/MAE ratio, and post-event 24h/72h/7d returns for
+  reviewed triggered rows
+- missing required outcome fields on reviewed triggered rows
+
+The command prints `BLOCKED` until coverage and outcome evidence are strong
+enough. Even when it prints `READY FOR HUMAN DECISION`, the repo decision still
+requires explicit human approval before any Telegram, paper-trading, storage,
+or execution promotion.
+
 ## Classification Rules
 
 Proxy candidates need all of:
@@ -359,11 +387,19 @@ make event-fade-export-sample
 EVENT_FADE_SAMPLE_OUT=/tmp/event_fade_validation_sample.csv make event-fade-export-sample
 ```
 
-All three outputs are local and observational. They do not send alerts or write
+Review a labeled sample:
+
+```bash
+make event-fade-review-sample
+EVENT_FADE_SAMPLE_IN=/path/to/labeled_sample.csv make event-fade-review-sample
+```
+
+All four outputs are local and observational. They do not send alerts or write
 the DB.
 
 ## Promotion Requirements
 
 Do not route discovered event-fade candidates to Telegram or paper trading until
 a reviewed event sample shows positive edge and acceptable false-positive rates.
-First promotion, if approved later, should still be notification-only.
+The review report is evidence, not approval. First promotion, if approved later,
+should still be notification-only.
