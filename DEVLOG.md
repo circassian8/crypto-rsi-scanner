@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Auto-fill event-fade review bundle outcomes · Codex
+**Why:** Building a useful event-fade review bundle still required a separate
+price-fixture export before outcome fields could be filled. The validation plan
+needs a low-friction loop where refreshed cache rows, prior labels, price
+evidence, and outcome fields can land in one local review workspace.
+**Changes:**
+- Added `--event-fade-review-bundle-export-prices` for review-bundle commands;
+  when no explicit price fixture is supplied, the bundle writes a local
+  `outcome_prices.json` and fills trigger/event-time outcome fields from it.
+- Reused the existing research-only Binance/fixture kline export path and kept
+  output limited to the requested bundle directory.
+- Added price-export provenance and counts to review-bundle manifests and
+  README output.
+- Added `EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES` to Makefile review-bundle and
+  review-cycle targets.
+- Added offline regression coverage using checked-in event-fade outcome kline
+  fixtures.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the one-step price/export/outcome-fill workflow.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 223/223.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This is artifact-only review workflow support. It can fetch
+Binance daily klines only when explicitly requested without a fixture path; it
+does not write live storage, route alerts, open paper trades, or change
+event-fade scoring.
+
 ## 2026-06-16 — Let event-fade review bundles preserve prior labels · Codex
 **Why:** The review-cycle workflow could refresh the event-discovery cache and
 write a new review bundle, but preserving valid labels/outcomes from a prior

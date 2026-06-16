@@ -1369,6 +1369,10 @@ def event_fade_review_bundle(
     *,
     limit: int | None = 20,
     prices_path: str | None = None,
+    auto_export_prices: bool = False,
+    price_days: int | None = None,
+    price_fixture_dir: str | None = None,
+    refresh_price_cache: bool = False,
     reviewed_path: str | None = None,
     overwrite_outcomes: bool = False,
     verbose: bool = False,
@@ -1383,6 +1387,10 @@ def event_fade_review_bundle(
         out_dir=out_dir,
         limit=limit,
         prices_path=prices_path,
+        auto_export_prices=auto_export_prices,
+        price_days=price_days,
+        price_fixture_dir=price_fixture_dir,
+        refresh_price_cache=refresh_price_cache,
         reviewed_path=reviewed_path,
         review_merge=review_merge,
         overwrite_outcomes=overwrite_outcomes,
@@ -1395,6 +1403,14 @@ def event_fade_review_bundle(
         f"dir={result['bundle_dir']}"
     )
     _print_review_merge_summary(review_merge)
+    if result["price_export"] is not None:
+        price_export = result["price_export"]
+        print(
+            "Outcome price fixture: "
+            f"assets={price_export.assets_written}/{price_export.assets_requested}, "
+            f"price_rows={price_export.price_rows_written}, "
+            f"source={price_export.source}, wrote {price_export.out_path}"
+        )
     if result["outcome_sample"] is not None:
         print(f"Outcome-filled sample: {result['outcome_sample']}")
 
@@ -1404,6 +1420,10 @@ def event_fade_cache_review_bundle(
     *,
     limit: int | None = 20,
     prices_path: str | None = None,
+    auto_export_prices: bool = False,
+    price_days: int | None = None,
+    price_fixture_dir: str | None = None,
+    refresh_price_cache: bool = False,
     reviewed_path: str | None = None,
     overwrite_outcomes: bool = False,
     verbose: bool = False,
@@ -1418,6 +1438,10 @@ def event_fade_cache_review_bundle(
         out_dir=out_dir,
         limit=limit,
         prices_path=prices_path,
+        auto_export_prices=auto_export_prices,
+        price_days=price_days,
+        price_fixture_dir=price_fixture_dir,
+        refresh_price_cache=refresh_price_cache,
         reviewed_path=reviewed_path,
         review_merge=review_merge,
         overwrite_outcomes=overwrite_outcomes,
@@ -1431,6 +1455,14 @@ def event_fade_cache_review_bundle(
         f"dir={result['bundle_dir']}"
     )
     _print_review_merge_summary(review_merge)
+    if result["price_export"] is not None:
+        price_export = result["price_export"]
+        print(
+            "Outcome price fixture: "
+            f"assets={price_export.assets_written}/{price_export.assets_requested}, "
+            f"price_rows={price_export.price_rows_written}, "
+            f"source={price_export.source}, wrote {price_export.out_path}"
+        )
     if result["outcome_sample"] is not None:
         print(f"Outcome-filled sample: {result['outcome_sample']}")
 
@@ -1470,6 +1502,10 @@ def _write_event_fade_review_bundle(
     out_dir: str,
     limit: int | None,
     prices_path: str | None,
+    auto_export_prices: bool,
+    price_days: int | None,
+    price_fixture_dir: str | None,
+    refresh_price_cache: bool,
     reviewed_path: str | None,
     review_merge: event_validation.ValidationSampleMergeResult | None,
     overwrite_outcomes: bool,
@@ -1482,11 +1518,24 @@ def _write_event_fade_review_bundle(
         bundle_dir / "validation_sample.jsonl",
     )
     review_rows = source_rows
+    effective_prices_path = prices_path
+    price_export_result: event_price_history.EventFadeOutcomePriceExportResult | None = None
+    if auto_export_prices and not effective_prices_path:
+        price_export_result = event_price_history.export_outcome_price_fixture(
+            source_rows,
+            bundle_dir / "outcome_prices.json",
+            days=price_days,
+            fixture_dir=price_fixture_dir,
+            cache_dir=config.BACKTEST_CACHE_DIR,
+            refresh_cache=refresh_price_cache,
+        )
+        effective_prices_path = str(price_export_result.out_path)
+
     fill_summary = "No price fixture supplied; outcome fields were not filled."
     fill_result: event_validation.ValidationOutcomeFillResult | None = None
     outcome_sample: Path | None = None
-    if prices_path:
-        prices = event_validation.load_outcome_price_fixture(prices_path)
+    if effective_prices_path:
+        prices = event_validation.load_outcome_price_fixture(effective_prices_path)
         fill_result = event_validation.fill_validation_outcomes(
             source_rows,
             prices,
@@ -1524,6 +1573,7 @@ def _write_event_fade_review_bundle(
         prices_path=prices_path,
         overwrite_outcomes=overwrite_outcomes,
         copied_sample=copied_sample,
+        price_export=price_export_result,
         outcome_sample=outcome_sample,
         queue_path=queue_path,
         packet_path=packet_path,
@@ -1537,6 +1587,11 @@ def _write_event_fade_review_bundle(
         limit=limit,
         fill_summary=fill_summary,
         fill_result=fill_result,
+        effective_prices_path=effective_prices_path,
+        auto_export_prices=auto_export_prices,
+        price_days=price_days,
+        price_fixture_dir=price_fixture_dir,
+        refresh_price_cache=refresh_price_cache,
         reviewed_path=reviewed_path,
         review_merge=review_merge,
     )
@@ -1548,6 +1603,7 @@ def _write_event_fade_review_bundle(
         _event_fade_review_bundle_readme(
             sample_path=sample_path,
             copied_sample=copied_sample,
+            price_export=price_export_result,
             outcome_sample=outcome_sample,
             queue_path=queue_path,
             packet_path=packet_path,
@@ -1557,6 +1613,7 @@ def _write_event_fade_review_bundle(
             rows=len(review_rows),
             queue=queue,
             fill_summary=fill_summary,
+            auto_export_prices=auto_export_prices,
             reviewed_path=reviewed_path,
             review_merge=review_merge,
         ),
@@ -1564,6 +1621,7 @@ def _write_event_fade_review_bundle(
     )
     return {
         "bundle_dir": bundle_dir,
+        "price_export": price_export_result,
         "outcome_sample": outcome_sample,
         "queue": queue,
         "rows": len(review_rows),
@@ -1576,6 +1634,7 @@ def _event_fade_review_bundle_manifest(
     prices_path: str | None,
     overwrite_outcomes: bool,
     copied_sample: Path,
+    price_export: event_price_history.EventFadeOutcomePriceExportResult | None,
     outcome_sample: Path | None,
     queue_path: Path,
     packet_path: Path,
@@ -1589,6 +1648,11 @@ def _event_fade_review_bundle_manifest(
     limit: int | None,
     fill_summary: str,
     fill_result: event_validation.ValidationOutcomeFillResult | None,
+    effective_prices_path: str | None,
+    auto_export_prices: bool,
+    price_days: int | None,
+    price_fixture_dir: str | None,
+    refresh_price_cache: bool,
     reviewed_path: str | None,
     review_merge: event_validation.ValidationSampleMergeResult | None,
 ) -> dict[str, Any]:
@@ -1600,11 +1664,13 @@ def _event_fade_review_bundle_manifest(
         "review_template": template_path.name,
         "review_report": report_path.name,
     }
+    if price_export is not None:
+        files["outcome_prices"] = price_export.out_path.name
     if outcome_sample is not None:
         files["validation_sample_with_outcomes"] = outcome_sample.name
     outcome_fill: dict[str, Any] = {
-        "enabled": prices_path is not None,
-        "prices_path": prices_path,
+        "enabled": effective_prices_path is not None,
+        "prices_path": effective_prices_path,
         "overwrite_outcomes": overwrite_outcomes,
         "summary": fill_summary,
     }
@@ -1646,9 +1712,47 @@ def _event_fade_review_bundle_manifest(
             "missing_source_timing_rows": review.missing_source_timing_rows,
             "next_sample_work": list(event_validation.validation_review_next_steps(review)),
         },
+        "price_export": _event_fade_review_price_export_manifest(
+            auto_export_prices=auto_export_prices,
+            explicit_prices_path=prices_path,
+            price_days=price_days,
+            price_fixture_dir=price_fixture_dir,
+            refresh_price_cache=refresh_price_cache,
+            result=price_export,
+        ),
         "outcome_fill": outcome_fill,
         "review_merge": _event_fade_review_merge_manifest(reviewed_path, review_merge),
     }
+
+
+def _event_fade_review_price_export_manifest(
+    *,
+    auto_export_prices: bool,
+    explicit_prices_path: str | None,
+    price_days: int | None,
+    price_fixture_dir: str | None,
+    refresh_price_cache: bool,
+    result: event_price_history.EventFadeOutcomePriceExportResult | None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "enabled": auto_export_prices,
+        "exported": result is not None,
+        "explicit_prices_path": explicit_prices_path,
+        "requested_days": price_days,
+        "fixture_dir": price_fixture_dir,
+        "refresh_cache": refresh_price_cache,
+    }
+    if result is not None:
+        payload.update({
+            "out_path": str(result.out_path),
+            "assets_requested": result.assets_requested,
+            "assets_written": result.assets_written,
+            "price_rows_written": result.price_rows_written,
+            "missing_assets": list(result.missing_assets),
+            "days": result.days,
+            "source": result.source,
+        })
+    return payload
 
 
 def _event_fade_review_merge_manifest(
@@ -1759,6 +1863,7 @@ def _event_fade_review_bundle_readme(
     *,
     sample_path: str,
     copied_sample: Path,
+    price_export: event_price_history.EventFadeOutcomePriceExportResult | None,
     outcome_sample: Path | None,
     queue_path: Path,
     packet_path: Path,
@@ -1768,9 +1873,15 @@ def _event_fade_review_bundle_readme(
     rows: int,
     queue: event_validation.ValidationLabelingQueue,
     fill_summary: str,
+    auto_export_prices: bool,
     reviewed_path: str | None,
     review_merge: event_validation.ValidationSampleMergeResult | None,
 ) -> str:
+    price_line = (
+        f"- `{price_export.out_path.name}`: bundle-local OHLCV price fixture"
+        if price_export is not None
+        else "- No bundle-local price fixture was exported."
+    )
     outcome_line = (
         f"- `{outcome_sample.name}`: sample with locally filled trigger/baseline outcomes"
         if outcome_sample is not None
@@ -1794,12 +1905,14 @@ def _event_fade_review_bundle_readme(
         f"Rows: {rows}",
         f"Rows needing labels/status/outcomes: {queue.needed_rows}",
         f"Rows shown in queue/template/packet: {queue.shown_rows}",
+        f"Auto price export: {'yes' if auto_export_prices else 'no'}",
         f"Outcome fill: {fill_summary}",
         "Review merge:",
         merge_line,
         "",
         "Files:",
         f"- `{copied_sample.name}`: copied source validation sample",
+        price_line,
         outcome_line,
         f"- `{queue_path.name}`: prioritized queue for missing labels/status/outcomes",
         f"- `{packet_path.name}`: human-readable evidence packet",
@@ -2066,6 +2179,14 @@ def cli() -> None:
         help="Optional local OHLCV price fixture for review-bundle outcome filling.",
     )
     parser.add_argument(
+        "--event-fade-review-bundle-export-prices",
+        action="store_true",
+        help=(
+            "With review-bundle commands, export a bundle-local outcome price fixture "
+            "when --event-fade-review-bundle-prices is not supplied."
+        ),
+    )
+    parser.add_argument(
         "--event-fade-review-bundle-reviewed",
         metavar="REVIEWED_SAMPLE",
         help="Optional prior reviewed sample to merge into review-bundle rows before writing artifacts.",
@@ -2264,6 +2385,10 @@ def cli() -> None:
             out_dir,
             limit=args.event_fade_queue_limit,
             prices_path=args.event_fade_review_bundle_prices,
+            auto_export_prices=args.event_fade_review_bundle_export_prices,
+            price_days=args.event_fade_price_days,
+            price_fixture_dir=args.event_fade_price_fixture_dir,
+            refresh_price_cache=args.event_fade_refresh_price_cache,
             reviewed_path=args.event_fade_review_bundle_reviewed,
             overwrite_outcomes=args.event_fade_overwrite_outcomes,
             verbose=args.verbose,
@@ -2274,6 +2399,10 @@ def cli() -> None:
             args.event_fade_cache_review_bundle,
             limit=args.event_fade_queue_limit,
             prices_path=args.event_fade_review_bundle_prices,
+            auto_export_prices=args.event_fade_review_bundle_export_prices,
+            price_days=args.event_fade_price_days,
+            price_fixture_dir=args.event_fade_price_fixture_dir,
+            refresh_price_cache=args.event_fade_refresh_price_cache,
             reviewed_path=args.event_fade_review_bundle_reviewed,
             overwrite_outcomes=args.event_fade_overwrite_outcomes,
             verbose=args.verbose,

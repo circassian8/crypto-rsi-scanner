@@ -120,8 +120,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   print the resulting review report/next work; writes only `OUT`) ·
   `main.py --event-fade-review-bundle SAMPLE OUT_DIR` (write a local manual
   review workspace with copied/optionally prior-review-merged sample, optional
-  outcome-filled sample, queue, packet, sidecar, review report, manifest, and
-  README; writes only under `OUT_DIR`) ·
+  bundle-local price fixture, optional outcome-filled sample, queue, packet,
+  sidecar, review report, manifest, and README; writes only under `OUT_DIR`) ·
   `main.py --event-fade-cache-review-bundle OUT_DIR` (same review workspace,
   sourced from latest cached candidate snapshots under
   `RSI_EVENT_DISCOVERY_CACHE_DIR`; writes only under `OUT_DIR`) ·
@@ -291,11 +291,14 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   --event-fade-review-bundle SAMPLE OUT_DIR` may copy the sample and write local
   review aids under `OUT_DIR`; with `--event-fade-review-bundle-prices` it may
   also fill outcome fields into a bundle-local sample copy, and with
+  `--event-fade-review-bundle-export-prices` it may first export a bundle-local
+  OHLCV price fixture for triggered rows using the existing research price
+  export path. With
   `--event-fade-review-bundle-reviewed` it may first merge prior reviewed
   labels/notes/outcomes that still match the fresh evidence fingerprint. It also
-  writes a `manifest.json` for bundle provenance/counts/merge status. It must
-  not infer labels, write live storage, route alerts, open paper trades, or
-  imply promotion.
+  writes a `manifest.json` for bundle provenance/counts/price-export/merge
+  status. It must not infer labels, write live storage, route alerts, open paper
+  trades, or imply promotion.
 - Event-fade validation merges are artifact-only. `main.py --event-fade-merge-sample`
   may copy nonblank human labels/notes/outcomes from a previously reviewed
   JSONL/CSV sample into a fresh export by event/asset/relationship identity only

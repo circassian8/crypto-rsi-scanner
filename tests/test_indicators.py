@@ -3624,6 +3624,73 @@ def test_event_fade_review_bundle_scanner_merges_prior_reviewed_sample():
         assert round(filled_velvet["post_event_return_72h"], 4) == -0.2083
 
 
+def test_event_fade_review_bundle_scanner_auto_exports_price_fixture():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        sample_path = Path(tmp) / "sample.jsonl"
+        bundle_dir = Path(tmp) / "review_bundle"
+        event_discovery.write_validation_sample(rows, sample_path)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_review_bundle(
+                str(sample_path),
+                str(bundle_dir),
+                limit=1,
+                auto_export_prices=True,
+                price_days=30,
+                price_fixture_dir=str(_outcome_klines_fixture_dir()),
+            )
+        text = out.getvalue()
+        assert "Outcome price fixture" in text
+        assert "Outcome-filled sample" in text
+
+        expected = {
+            "README.md",
+            "manifest.json",
+            "validation_sample.jsonl",
+            "validation_sample_with_outcomes.jsonl",
+            "outcome_prices.json",
+            "labeling_queue.txt",
+            "review_packet.md",
+            "review_template.csv",
+            "review_report.txt",
+        }
+        assert expected == {path.name for path in bundle_dir.iterdir()}
+
+        manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["price_export"]["exported"] is True
+        assert manifest["price_export"]["assets_written"] == 1
+        assert manifest["price_export"]["price_rows_written"] == 5
+        assert manifest["files"]["outcome_prices"] == "outcome_prices.json"
+        assert manifest["outcome_fill"]["prices_path"] == str(bundle_dir / "outcome_prices.json")
+        assert manifest["outcome_fill"]["filled_rows"] == 1
+
+        readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
+        assert "Auto price export: yes" in readme
+        assert "`outcome_prices.json`" in readme
+
+        prices = json.loads((bundle_dir / "outcome_prices.json").read_text(encoding="utf-8"))
+        assert prices["schema_version"] == "event_fade_outcome_prices_v1"
+        assert len(prices["prices"]) == 5
+
+        filled_rows = [
+            json.loads(line)
+            for line in (bundle_dir / "validation_sample_with_outcomes.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
+        ]
+        velvet = next(row for row in filled_rows if row["asset_symbol"] == "TESTVELVET")
+        assert round(velvet["post_event_return_72h"], 4) == -0.2083
+
+
 def test_event_fade_cache_review_bundle_scanner_writes_workspace():
     import contextlib
     import csv

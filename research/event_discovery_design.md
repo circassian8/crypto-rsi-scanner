@@ -509,6 +509,9 @@ workspace for a validation sample. The bundle contains:
 - `validation_sample.jsonl`: copied source sample
 - `validation_sample_with_outcomes.jsonl`: optional outcome-filled sample when
   `--event-fade-review-bundle-prices PRICES` is supplied
+- `outcome_prices.json`: optional bundle-local OHLCV fixture when
+  `--event-fade-review-bundle-export-prices` is supplied and no explicit
+  `--event-fade-review-bundle-prices` file is supplied
 - `labeling_queue.txt`: prioritized rows needing review status, labels, or
   outcomes
 - `review_packet.md`: human-readable evidence packet
@@ -522,11 +525,16 @@ The bundle is a convenience wrapper around existing artifact-only commands. It
 does not infer labels, alter the source sample, write live storage, route
 alerts, open paper trades, or imply promotion. If a local price fixture is
 supplied, outcome filling is applied only to the bundle-local sample copy.
+If `--event-fade-review-bundle-export-prices` is supplied without an explicit
+price fixture, the bundle writes `outcome_prices.json` under `OUT_DIR` using the
+same research-only Binance/fixture kline path as
+`--event-fade-export-outcome-prices`, then fills outcomes from that local file.
 If `--event-fade-review-bundle-reviewed REVIEWED_SAMPLE` is supplied, the
 bundle first merges matching prior review fields into the bundle-local
 `validation_sample.jsonl` using the same evidence-fingerprint guard as
 `--event-fade-merge-sample`. The manifest records matched rows, copied fields,
-evidence-changed rows, and any skipped evidence-change details.
+evidence-changed rows, any skipped evidence-change details, price-export counts,
+and outcome-fill counts.
 
 `main.py --event-fade-cache-review-bundle OUT_DIR` writes the same workspace
 directly from latest cached candidate snapshots under
@@ -894,7 +902,7 @@ Write a local review workspace:
 make event-fade-review-bundle
 EVENT_FADE_SAMPLE_IN=/path/to/sample.jsonl \
 EVENT_FADE_REVIEW_BUNDLE_DIR=/tmp/event_fade_review_bundle \
-EVENT_FADE_REVIEW_BUNDLE_PRICES=/path/to/outcome_prices.json \
+EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1 \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-review-bundle
 ```
@@ -905,7 +913,7 @@ Write a local review workspace from the latest research cache:
 make event-fade-cache-review-bundle
 EVENT_DISCOVERY_CACHE_DIR=event_fade_cache \
 EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_cache_review_bundle \
-EVENT_FADE_REVIEW_BUNDLE_PRICES=/path/to/outcome_prices.json \
+EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1 \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-cache-review-bundle
 ```
@@ -917,6 +925,7 @@ step:
 make event-fade-review-cycle
 EVENT_DISCOVERY_CACHE_DIR=event_fade_cache \
 EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_cache_review_bundle \
+EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1 \
 EVENT_FADE_REVIEW_BUNDLE_REVIEWED=/path/to/previous_reviewed_sample.jsonl \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-review-cycle
