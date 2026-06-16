@@ -1348,12 +1348,15 @@ def event_fade_apply_review_template(
     template_rows = event_validation.load_validation_sample(template_path)
     result = event_validation.apply_review_template(sample_rows, template_rows)
     out = event_discovery.write_validation_sample(result.rows, out_path)
+    review = event_validation.review_validation_sample(result.rows)
     print(
         "Event-fade review template apply: "
         f"{result.matched_rows} matched row(s), "
         f"{result.unmatched_reviewed_rows} unmatched reviewed row(s), "
         f"{result.copied_fields} copied field(s), wrote {len(result.rows)} row(s) to {out}"
     )
+    print("")
+    print(event_validation.format_validation_review(review))
 
 
 def event_fade_review_bundle(

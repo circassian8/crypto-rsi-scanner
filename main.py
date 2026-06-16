@@ -52,7 +52,7 @@ Usage:
   python main.py --event-fade-labeling-queue sample.jsonl # prioritize status/labels/outcomes
   python main.py --event-fade-review-packet sample.jsonl packet.md # manual review packet
   python main.py --event-fade-export-review-template sample.jsonl labels.csv # editable review sidecar
-  python main.py --event-fade-apply-review-template sample.jsonl labels.csv reviewed.jsonl # apply labels
+  python main.py --event-fade-apply-review-template sample.jsonl labels.csv reviewed.jsonl # apply labels + review
   python main.py --event-fade-review-bundle sample.jsonl review_dir # write review workspace
   python main.py --event-fade-cache-review-bundle review_dir # review workspace from cache
   python main.py --event-fade-merge-sample fresh.jsonl reviewed.csv merged.jsonl # preserve review fields

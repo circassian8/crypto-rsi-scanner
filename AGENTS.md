@@ -116,8 +116,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-fade-export-review-template SAMPLE OUT` (write compact
   editable review sidecar rows; writes only `OUT`) ·
   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` (copy
-  sidecar human review status/labels/outcomes back into a validation sample; writes only
-  `OUT`) ·
+  sidecar human review status/labels/outcomes back into a validation sample and
+  print the resulting review report/next work; writes only `OUT`) ·
   `main.py --event-fade-review-bundle SAMPLE OUT_DIR` (write a local manual
   review workspace with copied sample, optional outcome-filled sample, queue,
   packet, sidecar, review report, manifest, and README; writes only under
@@ -420,7 +420,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   human fields to fill. `main.py --event-fade-export-review-template SAMPLE OUT`
   writes a compact editable sidecar for those rows, and
   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` applies
-  nonblank sidecar review status/labels/outcomes back into a requested sample artifact.
+  nonblank sidecar review status/labels/outcomes back into a requested sample
+  artifact, then prints the resulting review report and next-sample work.
   `main.py --event-fade-review-bundle SAMPLE OUT_DIR` writes the sample copy,
   queue, packet, template, review report, manifest, README, and optional
   outcome-filled sample into one local review workspace. `main.py

@@ -488,11 +488,12 @@ sidecar keeps stable identity/context fields plus editable review fields:
 
 After a human edits the sidecar, `main.py --event-fade-apply-review-template
 SAMPLE TEMPLATE OUT` copies nonblank review fields back into a full validation
-sample artifact. A row only counts as reviewed evidence when it has both
-`review_status=reviewed` and a known `human_label`. The apply command uses
-stable event/asset/relationship identity and writes only `OUT`; it does not
-infer labels, alter the source sample, write live storage, route alerts, open
-paper trades, or imply promotion.
+sample artifact and immediately prints the resulting review report and
+next-sample work. A row only counts as reviewed evidence when it has both
+`review_status=reviewed` and a known `human_label`. The apply command uses stable
+event/asset/relationship identity and writes only `OUT`; it does not infer
+labels, alter the source sample, write live storage, route alerts, open paper
+trades, or imply promotion.
 
 ## Validation Review Bundle
 

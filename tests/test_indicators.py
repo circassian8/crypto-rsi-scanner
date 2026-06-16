@@ -3330,6 +3330,10 @@ def test_event_fade_review_template_scanner_exports_and_applies_sidecar():
         text = out.getvalue()
         assert "Event-fade review template apply" in text
         assert "1 matched row(s)" in text
+        assert "EVENT FADE VALIDATION SAMPLE REVIEW" in text
+        assert "Rows: 17" in text
+        assert "reviewed: 1" in text
+        assert "NEXT SAMPLE WORK" in text
 
         written = [
             json.loads(line)

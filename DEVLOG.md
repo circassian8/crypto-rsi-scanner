@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Print validation review after sidecar apply · Codex
+**Why:** The manual event-fade review loop wrote a reviewed sample after applying
+the editable sidecar, but it still required a separate `--event-fade-review-sample`
+run to see remaining blockers. That is an easy step to forget while building the
+real reviewed validation dataset.
+**Changes:**
+- `main.py --event-fade-apply-review-template` now prints the resulting
+  validation review report and next-sample work immediately after writing the
+  reviewed sample.
+- Updated scanner-level regression coverage for the apply command's self-audit
+  output.
+- Updated `main.py` usage text, `AGENTS.md`, and
+  `research/event_discovery_design.md` to document the self-auditing apply step.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 216/216.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This is output-only. It still writes only the requested reviewed
+sample artifact and does not infer labels, write live storage, route alerts, or
+open paper trades.
+
 ## 2026-06-16 — Add event-fade review bundle manifest · Codex
 **Why:** Review bundles are now the main handoff artifact for building the
 event-fade validation sample. They need a machine-readable provenance/counts
