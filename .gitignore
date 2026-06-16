@@ -13,6 +13,7 @@ maintenance.log
 universe_hygiene_latest.json
 backups/
 backtest_cache/
+event_fade_cache/
 
 # Python
 __pycache__/

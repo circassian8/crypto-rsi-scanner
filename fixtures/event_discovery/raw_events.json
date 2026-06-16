@@ -1,0 +1,209 @@
+[
+  {
+    "raw_id": "velvet-spacex-proxy-1",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:00:00Z",
+    "published_at": "2026-06-13T10:00:00Z",
+    "source_url": "https://example.test/velvet-spacex-pre-ipo",
+    "title": "TestVelvet offers synthetic exposure to SpaceX pre-IPO trading before launch",
+    "body": "Velvet Capital users can trade SpaceX pre-IPO exposure through TESTVELVET before the SpaceX IPO trading start.",
+    "source_confidence": 0.95,
+    "event": {
+      "event_id": "testvelvet-spacex-ipo",
+      "event_name": "SpaceX IPO trading start",
+      "event_type": "ipo_proxy",
+      "event_time": "2026-06-15T13:30:00Z",
+      "event_time_confidence": 1.0,
+      "external_asset": "SpaceX",
+      "confidence": 0.95,
+      "description": "TESTVELVET is being used as a proxy for SpaceX pre-IPO exposure."
+    },
+    "market": {
+      "symbol": "TESTVELVET",
+      "coin_id": "testvelvet",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "price": 7.2,
+      "volume_24h": 120000000,
+      "spot_volume_24h": 8000000,
+      "market_cap": 45000000,
+      "return_24h": 1.2,
+      "return_72h": 3.5,
+      "return_7d": 8.5,
+      "distance_from_20d_ma": 2.0,
+      "volume_zscore_24h": 6.2,
+      "order_book_depth_1pct": 8000,
+      "order_book_depth_2pct": 25000,
+      "spread_bps": 45
+    },
+    "derivatives": {
+      "symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "perp_available": true,
+      "open_interest_24h_change_pct": 0.65,
+      "open_interest_to_market_cap": 0.4,
+      "funding_rate_8h": 0.0012,
+      "perp_spot_volume_ratio": 22,
+      "long_short_ratio": 2.1,
+      "basis": 0.025
+    },
+    "supply": {
+      "symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "large_holder_exchange_inflow": true,
+      "cex_inflow_pct_supply": 0.02,
+      "top_holder_concentration": 0.62,
+      "team_or_mm_wallet_activity": true
+    },
+    "rsi": {
+      "symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "rsi_daily": 86,
+      "rsi_4h": 78,
+      "rsi_weekly": 72,
+      "target_overbought_score": 90,
+      "btc_risk_on_score": 35,
+      "rsi_rollover_confirmed": true,
+      "bearish_rsi_divergence": true
+    },
+    "technical": {
+      "symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "event_vwap": 8.1,
+      "price_below_event_vwap": true,
+      "failed_reclaim_event_vwap": true,
+      "lower_high_confirmed": true,
+      "first_support_broken": true,
+      "post_event_high": 9.4,
+      "post_event_lower_high": 8.6,
+      "invalidation_level": 8.65,
+      "entry_reference_price": 7.2
+    }
+  },
+  {
+    "raw_id": "velvet-spacex-proxy-duplicate",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:30:00Z",
+    "published_at": "2026-06-13T11:00:00Z",
+    "source_url": "https://example.test/velvet-spacex-duplicate",
+    "title": "TestVelvet offers synthetic exposure to SpaceX pre-IPO trading before launch",
+    "body": "Duplicate fixture for dedupe testing.",
+    "source_confidence": 0.80,
+    "event": {
+      "event_id": "testvelvet-spacex-ipo",
+      "event_name": "SpaceX IPO trading start",
+      "event_type": "ipo_proxy",
+      "event_time": "2026-06-15T13:30:00Z",
+      "event_time_confidence": 1.0,
+      "external_asset": "SpaceX",
+      "confidence": 0.80,
+      "description": "TESTVELVET is being used as a proxy for SpaceX pre-IPO exposure."
+    }
+  },
+  {
+    "raw_id": "testbtc-etf-direct",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:00:00Z",
+    "published_at": "2026-06-14T09:00:00Z",
+    "source_url": "https://example.test/testbtc-etf",
+    "title": "TESTBTC rallies before spot BTC ETF approval decision",
+    "body": "The event directly affects Bitcoin demand and TESTBTC is the direct beneficiary, not a proxy.",
+    "source_confidence": 0.92,
+    "event": {
+      "event_id": "testbtc-etf-approval",
+      "event_name": "Spot BTC ETF approval decision",
+      "event_type": "etf_approval",
+      "event_time": "2026-06-15T13:30:00Z",
+      "event_time_confidence": 1.0,
+      "external_asset": "Bitcoin",
+      "confidence": 0.92,
+      "description": "TESTBTC is the direct beneficiary of a BTC ETF event."
+    },
+    "market": {
+      "symbol": "TESTBTC",
+      "coin_id": "testbtc",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "price": 65000,
+      "return_24h": 1.2,
+      "return_72h": 3.5,
+      "return_7d": 8.5,
+      "volume_zscore_24h": 6.2
+    },
+    "rsi": {
+      "symbol": "TESTBTC",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "target_overbought_score": 90,
+      "btc_risk_on_score": 35,
+      "rsi_rollover_confirmed": true
+    },
+    "technical": {
+      "symbol": "TESTBTC",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "price_below_event_vwap": true,
+      "failed_reclaim_event_vwap": true,
+      "lower_high_confirmed": true,
+      "first_support_broken": true,
+      "invalidation_level": 69000,
+      "entry_reference_price": 65000
+    }
+  },
+  {
+    "raw_id": "testtoken-binance-listing",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:00:00Z",
+    "published_at": "2026-06-14T12:00:00Z",
+    "source_url": "https://example.test/binance-listing",
+    "title": "Binance will list Test Token (TESTTOKEN)",
+    "body": "Binance listing announcement for TESTTOKEN.",
+    "source_confidence": 0.90,
+    "event": {
+      "event_id": "testtoken-binance-listing",
+      "event_name": "Binance TESTTOKEN listing",
+      "event_type": "exchange_listing",
+      "event_time": "2026-06-15T12:00:00Z",
+      "event_time_confidence": 1.0,
+      "external_asset": null,
+      "confidence": 0.90,
+      "description": "Direct exchange listing for TESTTOKEN."
+    }
+  },
+  {
+    "raw_id": "testpump-ambiguous",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:00:00Z",
+    "published_at": "2026-06-15T14:00:00Z",
+    "source_url": "https://example.test/testpump-up",
+    "title": "TESTPUMP explodes higher with traders chasing momentum",
+    "body": "No dated catalyst or external asset is provided.",
+    "source_confidence": 0.50,
+    "event": {
+      "event_id": "testpump-ambiguous",
+      "event_name": "TESTPUMP momentum chatter",
+      "event_type": "other",
+      "event_time": null,
+      "event_time_confidence": 0.0,
+      "external_asset": null,
+      "confidence": 0.50,
+      "description": "Ambiguous pump with no dated catalyst."
+    }
+  },
+  {
+    "raw_id": "collision-ticker-only",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:00:00Z",
+    "published_at": "2026-06-15T14:30:00Z",
+    "source_url": "https://example.test/collide",
+    "title": "$COLLIDE pumps before mystery event",
+    "body": "Ticker-only collision fixture. There are multiple assets using COLLIDE.",
+    "source_confidence": 0.55,
+    "event": {
+      "event_id": "collide-ticker-only",
+      "event_name": "$COLLIDE mystery event",
+      "event_type": "other",
+      "event_time": "2026-06-16T12:00:00Z",
+      "event_time_confidence": 0.30,
+      "external_asset": null,
+      "confidence": 0.55,
+      "description": "Ticker-only mention must not resolve confidently."
+    }
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "assets": [
+    {
+      "coin_id": "testvelvet",
+      "symbol": "TESTVELVET",
+      "name": "Test Velvet",
+      "aliases": ["testvelvet", "velvet", "velvet capital", "velvet.trade"],
+      "categories": ["synthetic-exposure"],
+      "contract_addresses": {},
+      "market_cap": 45000000,
+      "volume_24h": 120000000,
+      "price": 7.2,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "testbtc",
+      "symbol": "TESTBTC",
+      "name": "Test Bitcoin",
+      "aliases": ["testbtc", "bitcoin", "btc"],
+      "categories": ["layer-1"],
+      "contract_addresses": {},
+      "market_cap": 1000000000000,
+      "volume_24h": 35000000000,
+      "price": 65000,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "testtoken",
+      "symbol": "TESTTOKEN",
+      "name": "Test Token",
+      "aliases": ["testtoken", "test token"],
+      "categories": ["exchange-listing-fixture"],
+      "contract_addresses": {},
+      "market_cap": 150000000,
+      "volume_24h": 90000000,
+      "price": 1.25,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "testpump",
+      "symbol": "TESTPUMP",
+      "name": "Test Pump",
+      "aliases": ["testpump", "test pump"],
+      "categories": ["ambiguous"],
+      "contract_addresses": {},
+      "market_cap": 20000000,
+      "volume_24h": 60000000,
+      "price": 0.42,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "collision-alpha",
+      "symbol": "COLLIDE",
+      "name": "Collision Alpha",
+      "aliases": ["collision alpha"],
+      "categories": ["collision-test"],
+      "contract_addresses": {},
+      "market_cap": 10000000,
+      "volume_24h": 1000000,
+      "price": 0.11,
+      "source": "fixture"
+    },
+    {
+      "coin_id": "collision-beta",
+      "symbol": "COLLIDE",
+      "name": "Collision Beta",
+      "aliases": ["collision beta"],
+      "categories": ["collision-test"],
+      "contract_addresses": {},
+      "market_cap": 9000000,
+      "volume_24h": 800000,
+      "price": 0.09,
+      "source": "fixture"
+    }
+  ]
+}

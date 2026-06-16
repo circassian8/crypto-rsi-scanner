@@ -1,6 +1,6 @@
 PYTHON := .venv/bin/python
 
-.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make score-cohorts  Print paper-trade scoreboard with state cohorts"
 	@echo "  make report   Print signal outcome report"
 	@echo "  make event-fade-report  Score local event-fade fixtures"
+	@echo "  make event-discovery-report  Print research-only event radar from fixtures"
 	@echo "  make status   Print operational scan/listener health"
 	@echo "  make backup-db  Create and verify a SQLite backup"
 	@echo "  make verify-restore  Restore-check the newest SQLite backup"
@@ -55,6 +56,9 @@ report:
 
 event-fade-report:
 	$(PYTHON) main.py --event-fade-report
+
+event-discovery-report:
+	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json $(PYTHON) main.py --event-discovery-report
 
 status:
 	$(PYTHON) main.py --status

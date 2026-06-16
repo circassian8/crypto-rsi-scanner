@@ -527,6 +527,185 @@ def test_event_fade_json_loader_and_feature_vector():
     assert ef.event_fade_feature_vector(candidate, ef.EventFadeConfig(min_watchlist_score=95))["signal_type"] == "NO_TRADE"
 
 
+# --- event discovery research sleeve ----------------------------------------
+
+def _event_discovery_fixture_paths():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery"
+    return root / "raw_events.json", root / "asset_aliases.json"
+
+
+def _event_discovery_fixture_result():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
+        datetime(2026, 6, 12, tzinfo=timezone.utc),
+        datetime(2026, 6, 17, tzinfo=timezone.utc),
+    )
+    assets = load_asset_aliases(aliases_path)
+    return event_discovery.run_discovery(raw, assets, now=now)
+
+
+def test_event_discovery_manual_provider_fixture_and_missing_path():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+
+    events_path, _ = _event_discovery_fixture_paths()
+    start = datetime(2026, 6, 12, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    events = ManualJsonEventProvider(events_path, required=True).fetch_events(start, end)
+    assert len(events) == 6
+    assert events[0].content_hash
+    assert events[0].published_at <= events[0].fetched_at
+    assert ManualJsonEventProvider(Path("/definitely/missing.json")).fetch_events(start, end) == []
+
+    try:
+        ManualJsonEventProvider(Path("/definitely/missing.json"), required=True).fetch_events(start, end)
+    except FileNotFoundError:
+        pass
+    else:
+        raise AssertionError("required missing manual fixture should fail")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_path = Path(tmp) / "bad.json"
+        bad_path.write_text(json.dumps({"not": "a list"}), encoding="utf-8")
+        assert ManualJsonEventProvider(bad_path).fetch_events(start, end) == []
+
+        try:
+            ManualJsonEventProvider(bad_path, required=True).fetch_events(start, end)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("required malformed manual fixture should fail")
+
+
+def test_event_discovery_normalizes_and_dedupes_events():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+
+    events_path, _ = _event_discovery_fixture_paths()
+    raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
+        datetime(2026, 6, 12, tzinfo=timezone.utc),
+        datetime(2026, 6, 17, tzinfo=timezone.utc),
+    )
+    normalized = [event_discovery.normalize_raw_event(event) for event in raw]
+    assert len(normalized) == 6
+    deduped = event_discovery.dedupe_events(normalized)
+    assert len(deduped) == 5
+    spacex = [event for event in deduped if event.event_name == "SpaceX IPO trading start"][0]
+    assert spacex.event_type == "ipo_proxy"
+    assert spacex.external_asset == "SpaceX"
+    assert len(spacex.raw_ids) == 2
+    assert spacex.confidence == 1.0
+
+
+def test_event_resolver_aliases_and_rejects_ticker_collision():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases, resolve_event_assets
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
+        datetime(2026, 6, 12, tzinfo=timezone.utc),
+        datetime(2026, 6, 17, tzinfo=timezone.utc),
+    )
+    assets = load_asset_aliases(aliases_path)
+    normalized = event_discovery.dedupe_events(event_discovery.normalize_raw_event(event) for event in raw)
+    spacex = [event for event in normalized if event.event_name == "SpaceX IPO trading start"][0]
+    links = resolve_event_assets(spacex, assets)
+    assert links[0].coin_id == "testvelvet"
+    assert links[0].link_confidence >= 0.95
+    assert links[0].match_reason in ("coin_id", "known_alias")
+
+    collision = [event for event in normalized if event.event_id == "collide-ticker-only"][0]
+    assert resolve_event_assets(collision, assets) == []
+    low_conf = resolve_event_assets(collision, assets, min_confidence=0.0)
+    assert all(link.link_confidence < 0.80 for link in low_conf)
+
+
+def test_event_classification_proxy_direct_and_ambiguous_cases():
+    result = _event_discovery_fixture_result()
+    by_coin = {classification.coin_id: classification for classification in result.classifications}
+    assert by_coin["testvelvet"].is_proxy_narrative is True
+    assert by_coin["testvelvet"].is_direct_beneficiary is False
+    assert by_coin["testvelvet"].relationship_type == "proxy_exposure"
+    assert by_coin["testbtc"].is_proxy_narrative is False
+    assert by_coin["testbtc"].is_direct_beneficiary is True
+    assert by_coin["testbtc"].relationship_type == "direct_token_event"
+    assert by_coin["testtoken"].relationship_type == "direct_listing"
+    assert by_coin["testpump"].relationship_type == "ambiguous"
+
+
+def test_event_discovery_pipeline_and_event_fade_safety():
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+
+    result = _event_discovery_fixture_result()
+    by_symbol = {candidate.asset.symbol: candidate for candidate in result.candidates}
+    assert len(result.raw_events) == 6
+    assert len(result.normalized_events) == 5
+    assert "COLLIDE" not in by_symbol
+
+    velvet = by_symbol["TESTVELVET"]
+    assert velvet.classification.is_proxy_narrative is True
+    assert velvet.fade_signal.signal_type == FadeSignalType.SHORT_TRIGGERED
+
+    btc = by_symbol["TESTBTC"]
+    assert btc.classification.is_direct_beneficiary is True
+    assert btc.fade_signal.signal_type == FadeSignalType.NO_TRADE
+    assert btc.fade_candidate.state.value == "DISCOVERED"
+
+    listing = by_symbol["TESTTOKEN"]
+    assert listing.classification.relationship_type == "direct_listing"
+    assert listing.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    ambiguous = by_symbol["TESTPUMP"]
+    assert ambiguous.classification.relationship_type == "ambiguous"
+    assert ambiguous.fade_signal.signal_type == FadeSignalType.NO_TRADE
+    assert ambiguous.data_quality["classifier_pass"] is False
+
+    report = event_discovery.format_discovery_report(result)
+    assert "EVENT DISCOVERY REPORT" in report
+    assert "EVENT RADAR" in report
+    assert "TESTVELVET" in report
+    assert "TESTBTC" in report
+
+
+def test_event_discovery_scanner_report_uses_local_fixtures():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    orig_events = config.EVENT_DISCOVERY_EVENTS_PATH
+    orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
+    config.EVENT_DISCOVERY_EVENTS_PATH = events_path
+    config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_discovery_report()
+        text = out.getvalue()
+        assert "EVENT DISCOVERY REPORT" in text
+        assert "TESTVELVET" in text
+        assert "TESTBTC" in text
+        assert "no alerts, DB writes, or trades" in text
+    finally:
+        config.EVENT_DISCOVERY_EVENTS_PATH = orig_events
+        config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
+
+
 def test_conviction_monotonic_with_severity():
     base = {"flag": "OB", "rsi_z": 0.0, "volume_ratio": 1.0}
     watch = conviction_score({**base, "severity": "WATCH"})

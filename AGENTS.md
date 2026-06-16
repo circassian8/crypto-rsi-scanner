@@ -83,8 +83,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --score --cohorts` (state cohort scoreboard) · `main.py --status`
   (scan/listener health) · `main.py --refresh-paper` (close matured paper trades
   without running an alerting scan) · `main.py --event-fade-report` (score local
-  event-fade fixtures, alert-only/no sends) · `main.py --universe-audit` (latest
-  hygiene audit)
+  event-fade fixtures, alert-only/no sends) · `main.py --event-discovery-report`
+  (fixture-only event radar, research-only/no writes) · `main.py --universe-audit`
+  (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks
   the newest retained backup.
@@ -131,6 +132,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `universe.py` | CoinGecko universe hygiene filters/audit shared by live scan/backtest |
 | `state_features.py` | pure market-state features: volatility, breadth, relative strength, beta, liquidity, risk buckets |
 | `event_fade.py` | pure alert-only sell-the-news event-fade research sleeve; no storage, alerts, paper trades, or execution |
+| `event_models.py` | immutable event-discovery dataclasses for raw events, normalized events, links, classifications, and candidates |
+| `event_discovery.py` | fixture-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring report |
+| `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
+| `event_providers/` | research event provider interfaces and manual JSON fixture provider; no live provider enabled yet |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
 | `indicators.py` | **PURE** functions: RSI, regime, setup taxonomy, market gating, conviction. Unit-tested — keep pure, add a test for new logic |
 | `scanner.py` | orchestration: scan → analyze → build message → route notifications; CLI |
@@ -173,6 +178,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   backtest/manual-review evidence and a new decision. Proxy eligibility is a
   hard gate: direct-beneficiary or non-proxy events must remain `NO_TRADE` even
   if pump, crowding, RSI, and post-event failure scores are high.
+- Event discovery is radar-first and fixture-only in Phase 1. It may normalize,
+  resolve, classify, dedupe, and print local reports, but must not write live
+  signal/outcome/paper tables or route notifications. Ticker-only/ambiguous
+  asset matches must stay below trigger confidence.
 - `indicators.py` stays pure and tested. New signal logic → add a test.
 - Alert/formatting changes must keep `make smoke-alerts` passing; it checks
   representative Telegram/plain-text renders without sending anything.
@@ -244,6 +253,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   + post-event failure. The proxy/direct-beneficiary check is a hard gate, not a
   score nudge. It is not part of the RSI setup registry, does not trade, and
   should not affect live routing until validated on an event sample.
+- **Event discovery Phase 1 (2026-06-16):** Local fixture radar exists via
+  `main.py --event-discovery-report`. It finds raw events, resolves assets with
+  aliases, classifies proxy/direct/ambiguous relationships, rejects ticker
+  collisions, and feeds structured candidates through `event_fade.py` for a
+  research-only report. No network providers or cache writes are enabled.
 - Caveats: the plain Binance backtest path is survivorship-biased (today's
   top-N). Prefer `--pit-volume` for any conclusion-bearing research; `--pit`
   (CoinGecko mcap) remains for cross-checking but is capped at 365d on the demo
@@ -259,8 +273,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 2. Validate whether edge-prior conviction buckets outperform the old heuristic.
 3. Confirm the 2026-06-09 state-slice candidates via cached PIT/live data before any
    live conviction or routing change.
-4. Build a manually reviewed event-fade sample before promoting event-fade output
-   beyond local reports.
+4. Build a manually reviewed event-fade sample using the event-discovery fixtures
+   before promoting event-fade output beyond local reports.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
 6. Use `make dry-run-fixture` before network dry-runs when validating scanner
    plumbing that does not need live CoinGecko data.

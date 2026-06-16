@@ -59,6 +59,7 @@ from . import heartbeat
 from . import macro
 from . import paper
 from . import event_fade
+from . import event_discovery
 
 log = logging.getLogger(__name__)
 
@@ -1035,6 +1036,32 @@ def event_fade_report(verbose: bool = False) -> None:
     print(event_fade.format_fade_report(candidates, cfg, now))
 
 
+def event_discovery_report(verbose: bool = False) -> None:
+    """Print research-only event-discovery radar from local fixtures."""
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-5s %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    path = config.EVENT_DISCOVERY_EVENTS_PATH
+    if not path:
+        print("No event-discovery event file configured. Set RSI_EVENT_DISCOVERY_EVENTS_PATH to a local JSON file.")
+        return
+    cfg = event_discovery.EventDiscoveryConfig(
+        min_link_confidence=config.EVENT_DISCOVERY_MIN_LINK_CONFIDENCE,
+        min_classifier_confidence=config.EVENT_DISCOVERY_MIN_CLASSIFIER_CONFIDENCE,
+        lookback_hours=config.EVENT_DISCOVERY_LOOKBACK_HOURS,
+        horizon_days=config.EVENT_DISCOVERY_HORIZON_DAYS,
+    )
+    result = event_discovery.run_manual_discovery(
+        path,
+        config.EVENT_DISCOVERY_ALIASES_PATH,
+        cfg=cfg,
+        fade_cfg=event_fade.runtime_config(config),
+    )
+    print(event_discovery.format_discovery_report(result))
+
+
 def status() -> None:
     """Print operational scan/listener health and exit."""
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
@@ -1211,6 +1238,11 @@ def cli() -> None:
         help="Score local event-fade JSON fixtures and print an alert-only report.",
     )
     parser.add_argument(
+        "--event-discovery-report",
+        action="store_true",
+        help="Print research-only event radar from local discovery fixtures.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for commands that support it.",
@@ -1292,6 +1324,9 @@ def cli() -> None:
         return
     if args.event_fade_report:
         event_fade_report(verbose=args.verbose)
+        return
+    if args.event_discovery_report:
+        event_discovery_report(verbose=args.verbose)
         return
     if args.status:
         status()

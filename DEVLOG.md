@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add fixture-only event discovery radar · Codex
+**Why:** Event-fade scoring is structurally solid, but events were still manual
+one-off inputs. Phase 1 needed a research-only radar that can normalize event
+evidence, resolve assets conservatively, classify proxy vs direct-beneficiary
+relationships, and feed structured candidates into `event_fade.py` without live
+routing or storage.
+**Changes:**
+- Added discovery models and pipeline modules: `event_models.py`,
+  `event_discovery.py`, `event_resolver.py`, `event_classification.py`, and
+  `event_providers/` with a fixture-only manual JSON provider.
+- Added `fixtures/event_discovery/raw_events.json` and
+  `fixtures/event_discovery/asset_aliases.json` covering TESTVELVET/SpaceX proxy,
+  TESTBTC ETF direct beneficiary, TESTTOKEN listing, TESTPUMP ambiguous pump,
+  and a COLLIDE ticker collision that must not resolve confidently.
+- Added research-only config and CLI/report wiring:
+  `main.py --event-discovery-report` / `make event-discovery-report`. The report
+  reads local fixtures only and does not write DB rows, send alerts, open paper
+  trades, or execute anything.
+- Added offline tests for provider loading, normalization/dedupe, alias
+  resolution, ticker-collision rejection, proxy/direct/ambiguous classification,
+  full pipeline output, event-fade safety, and scanner report plumbing.
+- Added `research/event_discovery_design.md`, updated `AGENTS.md` architecture
+  notes, and updated `ROADMAP.md` to reflect that the next work is expanding the
+  reviewed validation sample.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 153/153.
+`RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json .venv/bin/python main.py --event-discovery-report`
+prints the research-only event radar with TESTVELVET as proxy, TESTBTC/TESTTOKEN
+as direct, TESTPUMP as ambiguous, and COLLIDE unresolved. `make verify` passes.
+**Notes/risks:** This is still fixture-only. No network providers, JSONL cache
+writes, live DB writes, Telegram routing, paper trades, or execution were added.
+
 ## 2026-06-16 — Self-score event-fade feature exports · Codex
 **Why:** Review noted that `event_fade_feature_vector()` assumed callers had
 already populated `component_scores`, which could silently export zeroed scores
