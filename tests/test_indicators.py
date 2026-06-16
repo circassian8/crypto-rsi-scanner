@@ -556,6 +556,12 @@ def _structured_calendar_fixture_paths():
     return root / "coinmarketcal_events.json", root / "tokenomist_unlocks.json"
 
 
+def _derivatives_fixture_path():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "coinalyze_derivatives.json"
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -846,6 +852,86 @@ def test_event_discovery_calendar_and_unlock_events_are_direct_no_trade():
     assert unlock.fade_signal.signal_type == FadeSignalType.NO_TRADE
 
 
+def test_event_discovery_coinalyze_derivatives_provider_parses_fixture():
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner.derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
+
+    snapshots = CoinalyzeDerivativesProvider(_derivatives_fixture_path(), required=True).fetch_snapshots()
+    assert "testlist" in snapshots
+    assert "TESTLIST" in snapshots
+    assert "TESTLISTUSDT_PERP" in snapshots
+    assert "TEST" not in snapshots
+    listing = snapshots["testlist"]
+    assert listing["symbol"] == "TESTLIST"
+    assert listing["perp_available"] is True
+    assert listing["funding_rate_8h"] == 0.0012
+    assert listing["perp_spot_volume_ratio"] == 22.0
+    assert snapshots["testperp"]["perp_available"] is False
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_path = Path(tmp) / "bad_derivatives.json"
+        bad_path.write_text(json.dumps({"snapshots": ["not an object"]}), encoding="utf-8")
+        assert CoinalyzeDerivativesProvider(bad_path).fetch_snapshots() == {}
+        try:
+            CoinalyzeDerivativesProvider(bad_path, required=True).fetch_snapshots()
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("required malformed derivatives fixture should fail")
+
+
+def test_event_discovery_derivatives_enrich_candidates_without_overriding_raw():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    binance_path, bybit_path = _exchange_announcement_fixture_paths()
+    start = datetime(2026, 6, 12, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    raw = ManualJsonEventProvider(events_path, required=True).fetch_events(start, end)
+    raw.extend(event_discovery.load_discovery_events(
+        None,
+        start,
+        end,
+        binance_announcements_path=binance_path,
+        bybit_announcements_path=bybit_path,
+    ))
+    assets = load_asset_aliases(aliases_path)
+    derivatives = event_discovery.load_derivatives_snapshots(_derivatives_fixture_path())
+    result = event_discovery.run_discovery(
+        raw,
+        assets,
+        now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+        derivatives_by_asset=derivatives,
+    )
+    by_symbol = {candidate.asset.symbol: candidate for candidate in result.candidates}
+
+    listing = by_symbol["TESTLIST"]
+    assert listing.fade_candidate.derivatives is not None
+    assert listing.fade_candidate.derivatives.open_interest_24h_change_pct == 0.65
+    assert listing.fade_candidate.component_scores["derivatives_crowding"] == 100
+    assert listing.data_quality["has_derivatives_snapshot"] is True
+    assert listing.classification.is_direct_beneficiary is True
+    assert listing.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    perp = by_symbol["TESTPERP"]
+    assert perp.fade_candidate.derivatives is not None
+    assert perp.fade_candidate.derivatives.perp_available is False
+    assert perp.fade_candidate.component_scores["derivatives_crowding"] == 30
+    assert perp.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    velvet = by_symbol["TESTVELVET"]
+    assert velvet.fade_candidate.derivatives is not None
+    assert velvet.fade_candidate.derivatives.open_interest is None
+    assert velvet.fade_candidate.derivatives.open_interest_to_market_cap == 0.4
+    assert velvet.fade_signal.signal_type == FadeSignalType.SHORT_TRIGGERED
+
+
 def test_event_classification_proxy_direct_and_ambiguous_cases():
     result = _event_discovery_fixture_result()
     by_coin = {classification.coin_id: classification for classification in result.classifications}
@@ -906,6 +992,7 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
     orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
     orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = events_path
     config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
@@ -913,6 +1000,7 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
     config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
     config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
         out = io.StringIO()
@@ -930,6 +1018,7 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
         config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
         config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
 
@@ -946,6 +1035,7 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
     orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
     orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
     orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
     config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
@@ -953,6 +1043,7 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
     config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = bybit_path
     config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
     config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
         out = io.StringIO()
@@ -969,6 +1060,51 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
         config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
         config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
+
+
+def test_event_discovery_scanner_report_accepts_derivatives_fixture():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    binance_path, bybit_path = _exchange_announcement_fixture_paths()
+    derivatives_path = _derivatives_fixture_path()
+    orig_events = config.EVENT_DISCOVERY_EVENTS_PATH
+    orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
+    orig_binance = config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH
+    orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
+    orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
+    orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
+    orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
+    config.EVENT_DISCOVERY_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = binance_path
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = bybit_path
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = derivatives_path
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_discovery_report()
+        text = out.getvalue()
+        assert "TESTLIST" in text
+        assert "TESTPERP" in text
+        assert "deriv=yes" in text
+        assert "NO_TRADE/DISCOVERED" in text
+    finally:
+        config.EVENT_DISCOVERY_EVENTS_PATH = orig_events
+        config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = orig_binance
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
+        config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
+        config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
 
@@ -985,6 +1121,7 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
     orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
     orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
     orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
     config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
@@ -992,6 +1129,7 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
     config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
     config.EVENT_DISCOVERY_COINMARKETCAL_PATH = coinmarketcal_path
     config.EVENT_DISCOVERY_TOKENOMIST_PATH = tokenomist_path
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
         out = io.StringIO()
@@ -1008,6 +1146,7 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
         config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
         config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
         config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
 

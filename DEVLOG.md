@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add fixture derivatives enrichment for event discovery · Codex
+**Why:** Event-fade validation needs crowding evidence, not just dated events.
+Phase 5 adds local Coinalyze-style derivatives snapshots so the research radar
+can score OI/funding/perp crowding while staying offline and alert-only.
+**Changes:**
+- Added `derivatives_providers/` with a fixture-backed
+  `CoinalyzeDerivativesProvider` for OI, funding, futures volume,
+  perp/spot-volume ratio, liquidations, long/short ratio, and basis snapshots.
+- Added `RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH` and wired optional
+  derivatives enrichment through `event_discovery.run_manual_discovery()` and
+  `main.py --event-discovery-report`.
+- Added `fixtures/event_discovery/coinalyze_derivatives.json` covering high
+  TESTLIST crowding, TESTPERP no-perp availability, and a conflicting
+  TESTVELVET row that proves raw event fixture derivatives take precedence.
+- The discovery report now prints candidate fade score and `deriv=yes/no` so
+  enrichment is visible from local reports.
+- Hardened derivatives symbol normalization so coin symbols ending in `PERP`
+  are not over-stripped into false resolver keys.
+- Expanded offline tests for derivatives fixture parsing, malformed fixture
+  fail-soft behavior, candidate enrichment, raw-snapshot precedence, direct
+  listing/no-trade safety under high crowding, and scanner report plumbing.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the Phase 5 status and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 164/164.
+`make event-discovery-report` prints TESTLIST and TESTPERP with `deriv=yes` but
+both still `NO_TRADE/DISCOVERED`; TESTVELVET remains the only proxy trigger
+fixture. `git diff --check` passes. `make verify` passes.
+**Notes/risks:** This is still fixture-backed research tooling only. No live
+Coinalyze calls, cache writes, live DB writes, notifications, paper trades, or
+execution were added.
+
 ## 2026-06-16 — Add fixture structured calendar and unlock providers · Codex
 **Why:** The event-fade validation sample needs more dated direct/control
 events, including crypto calendar catalysts and supply unlocks, before any proxy

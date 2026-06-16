@@ -1,9 +1,9 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1-4 fixture framework with clean CoinGecko universe bridge,
-fixture-backed exchange announcement providers, and structured calendar/unlock
-providers, research-only
+**Status:** Phase 1-5 fixture framework with clean CoinGecko universe bridge,
+fixture-backed exchange announcement providers, structured calendar/unlock
+providers, and Coinalyze-style derivatives enrichment, research-only
 
 ## Goal
 
@@ -41,6 +41,8 @@ Phase 1 files:
   for dated crypto events
 - `event_providers/tokenomist.py`: local unlock fixture provider that also
   populates supply-pressure fields
+- `derivatives_providers/coinalyze.py`: local derivatives fixture provider that
+  maps Coinalyze-style OI/funding/crowding rows to discovery candidates
 - `event_resolver.py`: alias-aware asset resolver
 - `event_classification.py`: deterministic proxy/direct classifier
 - `event_discovery.py`: normalizer, deduper, orchestrator, report formatter
@@ -87,6 +89,28 @@ direct token-specific catalysts by default:
 
 They must remain `NO_TRADE` under the proxy-fade gate unless a separate source
 later proves a true proxy relationship.
+
+## Derivatives Enrichment
+
+The Coinalyze-style derivatives provider currently reads local JSON fixtures
+only. It produces candidate enrichment keyed by coin id, symbol, base symbol, or
+market symbol and fills `EventDerivativesSnapshot` fields used by
+`event_fade.py`:
+
+- perp availability
+- open interest and 24h OI change
+- OI-to-market-cap
+- funding rate / percentile
+- futures volume
+- perp/spot volume ratio
+- liquidations, long/short ratio, and basis
+
+Raw event fixture data wins over provider enrichment. This keeps provider rows
+from overwriting hand-reviewed event evidence during fixture research.
+
+Derivatives crowding is evidence, not eligibility. A direct exchange listing,
+token unlock, or other non-proxy event must remain `NO_TRADE` even when OI,
+funding, and perp/spot crowding are extreme.
 
 ## Classification Rules
 
@@ -135,6 +159,11 @@ more dangerous than missed setups.
 - TESTPERP Bybit perpetual-listing announcement fixture
 - TESTCAL CoinMarketCal-style mainnet-launch fixture
 - TESTUNLOCK Tokenomist-style unlock fixture with supply-pressure fields
+- TESTLIST Coinalyze-style high derivatives crowding fixture that still remains
+  `NO_TRADE` because the listing is direct
+- TESTPERP Coinalyze-style no-perp snapshot fixture
+- TESTVELVET conflicting Coinalyze-style snapshot proving raw event derivatives
+  are not overwritten
 
 `fixtures/coingecko_smoke/top_markets.json` is also used for universe-provider
 coverage. BTC/ETH/SOL become discovery assets, while Tether is excluded by the
@@ -150,6 +179,7 @@ RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH=fixtures/event_discovery/binance_
 RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH=fixtures/event_discovery/bybit_announcements.json \
 RSI_EVENT_DISCOVERY_COINMARKETCAL_PATH=fixtures/event_discovery/coinmarketcal_events.json \
 RSI_EVENT_DISCOVERY_TOKENOMIST_PATH=fixtures/event_discovery/tokenomist_unlocks.json \
+RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH=fixtures/event_discovery/coinalyze_derivatives.json \
 RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report
 ```

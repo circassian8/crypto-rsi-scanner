@@ -1,0 +1,45 @@
+{
+  "snapshots": [
+    {
+      "coin_id": "testvelvet",
+      "symbol": "TESTVELVETUSDT_PERP",
+      "base_symbol": "TESTVELVET",
+      "timestamp": "2026-06-15T15:30:00Z",
+      "perp_available": true,
+      "open_interest": 3000000,
+      "open_interest_24h_change_pct": 0.01,
+      "open_interest_to_market_cap": 0.02,
+      "funding_rate_8h": 0.0001,
+      "funding_rate_percentile": 0.45,
+      "futures_volume_24h": 9000000,
+      "perp_spot_volume_ratio": 1.5,
+      "liquidations_24h": 150000,
+      "long_short_ratio": 1.1,
+      "basis": 0.002
+    },
+    {
+      "coin_id": "testlist",
+      "symbol": "TESTLISTUSDT_PERP",
+      "base_symbol": "TESTLIST",
+      "timestamp": "2026-06-15T11:30:00Z",
+      "perp_available": true,
+      "open_interest": 18000000,
+      "open_interest_24h_change_pct": 0.65,
+      "open_interest_to_market_cap": 0.24,
+      "funding_rate_8h": 0.0012,
+      "funding_rate_percentile": 0.96,
+      "futures_volume_24h": 70000000,
+      "perp_spot_volume_ratio": 22,
+      "liquidations_24h": 2500000,
+      "long_short_ratio": 2.1,
+      "basis": 0.025
+    },
+    {
+      "coin_id": "testperp",
+      "symbol": "TESTPERPUSDT_PERP",
+      "base_symbol": "TESTPERP",
+      "timestamp": "2026-06-15T13:30:00Z",
+      "perp_available": false
+    }
+  ]
+}

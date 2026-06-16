@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import event_fade
+from .derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
 from .event_classification import classify_event_asset
 from .event_models import (
     DiscoveredAsset,
@@ -122,6 +123,7 @@ def run_discovery(
     cfg: EventDiscoveryConfig | None = None,
     fade_cfg: event_fade.EventFadeConfig | None = None,
     now: datetime | None = None,
+    derivatives_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> EventDiscoveryResult:
     cfg = cfg or EventDiscoveryConfig()
     fade_cfg = fade_cfg or event_fade.EventFadeConfig()
@@ -144,7 +146,14 @@ def run_discovery(
                 continue
             classification = classify_event_asset(event, asset, link)
             classifications.append(classification)
-            fade_candidate = build_fade_candidate(event, asset, classification, raw_by_id, now)
+            fade_candidate = build_fade_candidate(
+                event,
+                asset,
+                classification,
+                raw_by_id,
+                now,
+                derivatives_by_asset=derivatives_by_asset,
+            )
             fade_signal = event_fade.generate_fade_signal(fade_candidate, fade_cfg, now) if fade_candidate else None
             candidates.append(DiscoveredEventFadeCandidate(
                 event=event,
@@ -160,6 +169,7 @@ def run_discovery(
                     "classifier_confidence": classification.confidence,
                     "classifier_pass": classification.confidence >= cfg.min_classifier_confidence,
                     "has_market_snapshot": fade_candidate is not None and fade_candidate.market.price > 0,
+                    "has_derivatives_snapshot": fade_candidate is not None and fade_candidate.derivatives is not None,
                     "has_technical_snapshot": fade_candidate is not None and fade_candidate.technical is not None,
                 },
             ))
@@ -180,6 +190,7 @@ def run_manual_discovery(
     bybit_announcements_path: str | Path | None = None,
     coinmarketcal_path: str | Path | None = None,
     tokenomist_path: str | Path | None = None,
+    coinalyze_derivatives_path: str | Path | None = None,
     universe_path: str | Path | None = None,
     universe_limit: int | None = None,
     cfg: EventDiscoveryConfig | None = None,
@@ -199,8 +210,9 @@ def run_manual_discovery(
         coinmarketcal_path=coinmarketcal_path,
         tokenomist_path=tokenomist_path,
     )
+    derivatives = load_derivatives_snapshots(coinalyze_derivatives_path)
     assets = load_discovery_assets(alias_path, universe_path=universe_path, universe_limit=universe_limit)
-    return run_discovery(raw_events, assets, cfg=cfg, fade_cfg=fade_cfg, now=now)
+    return run_discovery(raw_events, assets, cfg=cfg, fade_cfg=fade_cfg, now=now, derivatives_by_asset=derivatives)
 
 
 def load_discovery_events(
@@ -242,6 +254,15 @@ def load_discovery_assets(
     return merge_discovered_assets(assets)
 
 
+def load_derivatives_snapshots(
+    coinalyze_derivatives_path: str | Path | None,
+) -> dict[str, dict[str, Any]]:
+    """Load optional local derivatives snapshots for event-candidate enrichment."""
+    if not coinalyze_derivatives_path:
+        return {}
+    return CoinalyzeDerivativesProvider(coinalyze_derivatives_path).fetch_snapshots()
+
+
 def merge_discovered_assets(assets: Iterable[DiscoveredAsset]) -> list[DiscoveredAsset]:
     by_id: dict[str, DiscoveredAsset] = {}
     order: list[str] = []
@@ -262,6 +283,8 @@ def build_fade_candidate(
     classification: EventClassification,
     raw_by_id: Mapping[str, RawDiscoveredEvent],
     now: datetime,
+    *,
+    derivatives_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> event_fade.FadeCandidate:
     raw = raw_by_id.get(event.raw_ids[0]) if event.raw_ids else None
     payload = raw.raw_json if raw and raw.raw_json else {}
@@ -287,7 +310,10 @@ def build_fade_candidate(
         coin_id=asset.coin_id,
         event=catalyst,
         market=market,
-        derivatives=_derivatives_snapshot(asset, payload.get("derivatives"), now),
+        derivatives=_derivatives_snapshot(asset, payload.get("derivatives") or _derivatives_for_asset(
+            derivatives_by_asset,
+            asset,
+        ), now),
         supply=_supply_snapshot(asset, payload.get("supply"), now),
         rsi=_rsi_snapshot(asset, payload.get("rsi"), now),
         technical=_technical_snapshot(asset, payload.get("technical"), now),
@@ -321,12 +347,14 @@ def format_discovery_report(result: EventDiscoveryResult) -> str:
         cls = candidate.classification
         signal = candidate.fade_signal.signal_type.value if candidate.fade_signal else "NO_TRADE"
         state = candidate.fade_signal.state.value if candidate.fade_signal else "DISCOVERED"
+        score = candidate.fade_signal.fade_score if candidate.fade_signal else 0
         relation = cls.relationship_type
         proxy = "proxy" if cls.is_proxy_narrative else "direct" if cls.is_direct_beneficiary else "ambiguous"
+        derivatives = "yes" if candidate.data_quality.get("has_derivatives_snapshot") else "no"
         rows.append(
             f"  {candidate.asset.symbol:<12} {relation:<22} {proxy:<9} "
             f"link={candidate.link.link_confidence:.2f} cls={cls.confidence:.2f} "
-            f"signal={signal}/{state}"
+            f"score={score:<3} deriv={derivatives:<3} signal={signal}/{state}"
         )
         rows.append(f"    event: {candidate.event.event_name}")
         rows.append(f"    reason: {cls.reason}")
@@ -383,6 +411,30 @@ def _unique(values: Iterable[str]) -> tuple[str, ...]:
             continue
         seen.add(key)
         out.append(text)
+    return tuple(out)
+
+
+def _derivatives_for_asset(
+    snapshots: Mapping[str, Mapping[str, Any]] | None,
+    asset: DiscoveredAsset,
+) -> Mapping[str, Any] | None:
+    if not snapshots:
+        return None
+    for key in _asset_derivatives_keys(asset):
+        if key in snapshots:
+            return snapshots[key]
+    return None
+
+
+def _asset_derivatives_keys(asset: DiscoveredAsset) -> tuple[str, ...]:
+    raw_values = (asset.coin_id, asset.symbol, *asset.aliases)
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in raw_values:
+        for key in (clean_text(value), str(value).upper()):
+            if key and key not in seen:
+                seen.add(key)
+                out.append(key)
     return tuple(out)
 
 
