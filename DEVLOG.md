@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade validation cohort review metrics · Codex
+**Why:** The event-fade plan requires proving whether the edge survives by
+event type and market context, not just in aggregate. The validation reviewer
+only reported top-line trigger/outcome metrics, so it could miss a sample whose
+edge is concentrated in one event class or BTC risk bucket.
+**Changes:**
+- Extended `crypto_rsi_scanner/event_validation.py` with validation cohort
+  summaries by event type, relationship type, and BTC risk-on bucket.
+- The `--event-fade-review-sample` report now prints cohort rows with reviewed
+  counts, proxy/control coverage, reviewed triggers, trigger precision, MFE/MAE,
+  and 72h post-event return.
+- Added tests in `tests/test_indicators.py` proving cohort calculations and
+  formatted report output on the fixture validation sample.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to document cohort evidence as
+  research-only validation review output.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 207/207.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** Cohorts are evidence only. They do not relax promotion
+blockers, route alerts, write live storage, open paper trades, or approve
+event-fade promotion automatically.
+
 ## 2026-06-16 — Auto-resolve live Coinalyze derivatives symbols · Codex
 **Why:** Live Coinalyze derivatives enrichment still required hand-written
 future-market symbols, which made the event radar harder to run on newly

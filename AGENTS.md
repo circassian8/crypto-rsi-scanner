@@ -105,7 +105,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   export from latest cached candidate snapshots under `RSI_EVENT_DISCOVERY_CACHE_DIR`;
   research-only/no writes except the requested artifact) ·
   `main.py --event-fade-review-sample PATH` (read a labeled JSONL/CSV sample and
-  print review metrics plus promotion blockers; research-only/no writes) ·
+  print review metrics/cohorts plus promotion blockers; research-only/no writes) ·
   `main.py --event-fade-labeling-queue PATH` (prioritize unlabeled rows and
   triggered rows missing required outcomes; research-only/no writes) ·
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT` (copy prior human
@@ -243,9 +243,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   normalize into live signals, route alerts, or paper trade.
 - Event-fade validation review is research-only. `main.py --event-fade-review-sample`
   may read labeled JSONL/CSV sample artifacts and print coverage, trigger
-  precision, point-in-time violations, MFE/MAE, post-event returns, and
-  promotion blockers, but it must not automatically promote alerts, write live
-  storage, open paper trades, or imply execution.
+  precision, point-in-time violations, MFE/MAE, post-event returns,
+  event-type/relationship/BTC-risk cohorts, and promotion blockers, but it must
+  not automatically promote alerts, write live storage, open paper trades, or
+  imply execution.
 - Event-fade validation labeling queues are artifact-only. `main.py
   --event-fade-labeling-queue` may prioritize unlabeled proxy/control rows and
   reviewed triggered rows missing required outcomes, but it must not auto-label
@@ -367,7 +368,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-fade-review-sample PATH` reads labeled sample artifacts and
   reports sample coverage, reviewed trigger count, trigger precision,
   false-positive rate, point-in-time evidence violations, MFE/MAE, post-event
-  returns, and blockers such as too few reviewed proxy/control/trigger cases or
+  returns, event-type/relationship/BTC-risk cohorts, and blockers such as too
+  few reviewed proxy/control/trigger cases or
   weak edge-quality metrics. `main.py --event-fade-labeling-queue PATH`
   prioritizes the next rows to label and triggered rows missing required
   outcome fields. `main.py --event-fade-merge-sample FRESH REVIEWED OUT`

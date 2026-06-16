@@ -2390,10 +2390,30 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert review.point_in_time_violation_rows == 0
     assert review.promotion_blockers == ()
 
+    event_type_cohorts = {cohort.name: cohort for cohort in review.event_type_cohorts}
+    assert event_type_cohorts["ipo_proxy"].reviewed_rows == 2
+    assert event_type_cohorts["ipo_proxy"].triggered_reviewed == 1
+    assert event_type_cohorts["ipo_proxy"].trigger_precision == 1.0
+    assert event_type_cohorts["ipo_proxy"].avg_post_event_return_72h == -0.22
+    assert event_type_cohorts["etf_approval"].reviewed_negative_controls == 1
+
+    relationship_cohorts = {cohort.name: cohort for cohort in review.relationship_type_cohorts}
+    assert relationship_cohorts["proxy_exposure"].reviewed_proxy_candidates == 3
+    assert relationship_cohorts["direct_listing"].reviewed_negative_controls == 1
+    assert relationship_cohorts["ambiguous"].reviewed_negative_controls == 1
+
+    btc_cohorts = {cohort.name: cohort for cohort in review.btc_risk_cohorts}
+    assert btc_cohorts["btc_risk_neutral"].triggered_reviewed == 1
+    assert btc_cohorts["btc_risk_unknown"].reviewed_negative_controls == 2
+
     report = event_validation.format_validation_review(review)
     assert "READY FOR HUMAN DECISION" in report
     assert "precision: 100.0%" in report
     assert "72h=-22.0%" in report
+    assert "COHORTS" in report
+    assert "By event type:" in report
+    assert "ipo_proxy" in report
+    assert "By BTC risk bucket:" in report
 
     with tempfile.TemporaryDirectory() as tmp:
         jsonl_path = Path(tmp) / "reviewed.jsonl"

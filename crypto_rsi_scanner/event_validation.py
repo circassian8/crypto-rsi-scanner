@@ -97,11 +97,30 @@ class EventFadeValidationReview:
     min_triggered_reviewed: int
     min_trigger_precision: float
     min_mfe_mae_ratio: float
+    event_type_cohorts: tuple["ValidationCohort", ...]
+    relationship_type_cohorts: tuple["ValidationCohort", ...]
+    btc_risk_cohorts: tuple["ValidationCohort", ...]
     promotion_blockers: tuple[str, ...]
 
     @property
     def promotion_ready(self) -> bool:
         return not self.promotion_blockers
+
+
+@dataclass(frozen=True)
+class ValidationCohort:
+    name: str
+    total_rows: int
+    reviewed_rows: int
+    reviewed_proxy_candidates: int
+    reviewed_negative_controls: int
+    triggered_reviewed: int
+    triggered_valid: int
+    trigger_precision: float | None
+    avg_mfe: float | None
+    avg_mae: float | None
+    mfe_mae_ratio: float | None
+    avg_post_event_return_72h: float | None
 
 
 @dataclass(frozen=True)
@@ -440,6 +459,13 @@ def review_validation_sample(
     if avg_72h is not None and avg_72h >= 0:
         blockers.append("reviewed SHORT_TRIGGERED rows do not show favorable 72h short returns")
 
+    event_type_cohorts = _cohorts(data, lambda row: str(row.get("event_type") or "unknown"))
+    relationship_type_cohorts = _cohorts(
+        data,
+        lambda row: str(row.get("relationship_type") or "unknown"),
+    )
+    btc_risk_cohorts = _cohorts(data, _btc_risk_bucket)
+
     return EventFadeValidationReview(
         total_rows=len(data),
         reviewed_rows=len(reviewed),
@@ -468,6 +494,9 @@ def review_validation_sample(
         min_triggered_reviewed=min_triggered_reviewed,
         min_trigger_precision=min_trigger_precision,
         min_mfe_mae_ratio=min_mfe_mae_ratio,
+        event_type_cohorts=event_type_cohorts,
+        relationship_type_cohorts=relationship_type_cohorts,
+        btc_risk_cohorts=btc_risk_cohorts,
         promotion_blockers=tuple(blockers),
     )
 
@@ -521,6 +550,14 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         ),
         f"  reviewed triggered rows missing required outcomes: {review.missing_trigger_outcome_rows}",
         "",
+        "COHORTS",
+        "  By event type:",
+        *_format_cohort_lines(review.event_type_cohorts),
+        "  By relationship type:",
+        *_format_cohort_lines(review.relationship_type_cohorts),
+        "  By BTC risk bucket:",
+        *_format_cohort_lines(review.btc_risk_cohorts),
+        "",
         "PROMOTION STATUS",
     ])
     if review.promotion_ready:
@@ -530,6 +567,25 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         for blocker in review.promotion_blockers:
             rows.append(f"  - {blocker}")
     return "\n".join(rows)
+
+
+def _format_cohort_lines(cohorts: tuple[ValidationCohort, ...]) -> list[str]:
+    if not cohorts:
+        return ["    none"]
+    rows: list[str] = []
+    for cohort in cohorts:
+        rows.append(
+            "    "
+            f"{cohort.name:<24} rows={cohort.total_rows:<3} "
+            f"reviewed={cohort.reviewed_rows:<3} "
+            f"proxy={cohort.reviewed_proxy_candidates:<3} "
+            f"controls={cohort.reviewed_negative_controls:<3} "
+            f"trig={cohort.triggered_reviewed:<3} "
+            f"precision={_fmt_pct(cohort.trigger_precision):<6} "
+            f"mfe/mae={_fmt_num(cohort.mfe_mae_ratio):<5} "
+            f"72h={_fmt_pct(cohort.avg_post_event_return_72h)}"
+        )
+    return rows
 
 
 def _price_index_from_mapping(raw: Mapping[str, Any]) -> dict[str, list[ValidationOutcomeCandle]]:
@@ -863,6 +919,72 @@ def _label_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
         label = _label(row)
         counts[label] = counts.get(label, 0) + 1
     return counts
+
+
+def _cohorts(
+    rows: Iterable[Mapping[str, Any]],
+    key_fn,
+) -> tuple[ValidationCohort, ...]:
+    groups: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        key = str(key_fn(row) or "unknown").strip() or "unknown"
+        groups.setdefault(key, []).append(row)
+    cohorts = [_cohort(name, group) for name, group in groups.items()]
+    return tuple(sorted(cohorts, key=lambda item: (-item.reviewed_rows, -item.total_rows, item.name)))
+
+
+def _cohort(name: str, rows: list[Mapping[str, Any]]) -> ValidationCohort:
+    reviewed = [row for row in rows if _label(row)]
+    reviewed_proxy = [row for row in reviewed if _is_proxy_candidate(row)]
+    negative_controls = [
+        row
+        for row in reviewed
+        if _label(row) in CONTROL_LABELS or _is_direct_or_ambiguous(row)
+    ]
+    triggered_reviewed = [row for row in reviewed if _signal_type(row) == "SHORT_TRIGGERED"]
+    triggered_valid = [row for row in triggered_reviewed if _label(row) == POSITIVE_LABEL]
+    trigger_precision = (
+        len(triggered_valid) / len(triggered_reviewed)
+        if triggered_reviewed
+        else None
+    )
+    mfe_values = _nums(row.get("max_favorable_excursion") for row in triggered_reviewed)
+    mae_values = _nums(row.get("max_adverse_excursion") for row in triggered_reviewed)
+    avg_mfe = _mean(mfe_values)
+    avg_mae = _mean(mae_values)
+    mfe_mae_ratio = (
+        abs(avg_mfe) / abs(avg_mae)
+        if avg_mfe is not None and avg_mae not in (None, 0)
+        else None
+    )
+    avg_72h = _mean(_nums(row.get("post_event_return_72h") for row in triggered_reviewed))
+    return ValidationCohort(
+        name=name,
+        total_rows=len(rows),
+        reviewed_rows=len(reviewed),
+        reviewed_proxy_candidates=len(reviewed_proxy),
+        reviewed_negative_controls=len(negative_controls),
+        triggered_reviewed=len(triggered_reviewed),
+        triggered_valid=len(triggered_valid),
+        trigger_precision=trigger_precision,
+        avg_mfe=avg_mfe,
+        avg_mae=avg_mae,
+        mfe_mae_ratio=mfe_mae_ratio,
+        avg_post_event_return_72h=avg_72h,
+    )
+
+
+def _btc_risk_bucket(row: Mapping[str, Any]) -> str:
+    score = _num(row.get("btc_risk_on_score"))
+    if score is None:
+        return "btc_risk_unknown"
+    if score >= 80:
+        return "btc_risk_on_high"
+    if score >= 60:
+        return "btc_risk_on_elevated"
+    if score <= 30:
+        return "btc_risk_off"
+    return "btc_risk_neutral"
 
 
 def _bool(value: object) -> bool:

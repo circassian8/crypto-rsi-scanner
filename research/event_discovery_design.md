@@ -462,6 +462,8 @@ The reviewer currently checks:
   reviewed triggered rows
 - missing required outcome fields on reviewed triggered rows
 - MFE/MAE ratio against the 1.5 minimum target
+- cohort summaries by event type, relationship type, and BTC risk-on bucket so
+  the reviewed sample can expose where the edge is concentrated or absent
 
 The command prints `BLOCKED` until coverage and outcome evidence are strong
 enough. Even when it prints `READY FOR HUMAN DECISION`, the repo decision still
