@@ -111,6 +111,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-fade-review-packet SAMPLE OUT` (write a Markdown packet with
   prioritized rows, source evidence, classifier rationale, signal/outcome
   fields, and human review fields; writes only `OUT`) ·
+  `main.py --event-fade-export-review-template SAMPLE OUT` (write compact
+  editable review sidecar rows; writes only `OUT`) ·
+  `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` (copy
+  sidecar human labels/outcomes back into a validation sample; writes only
+  `OUT`) ·
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT` (copy prior human
   labels/outcomes into a fresh validation export; writes only `OUT`) ·
   `main.py --event-fade-export-outcome-prices SAMPLE OUT` (build a local OHLCV
@@ -260,6 +265,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   --event-fade-review-packet SAMPLE OUT` may write a Markdown packet for manual
   validation review, but it must not auto-label rows, modify the source sample,
   write storage, route alerts, open paper trades, or imply promotion.
+- Event-fade validation review templates are artifact-only. `main.py
+  --event-fade-export-review-template SAMPLE OUT` may write compact editable
+  sidecar rows, and `main.py --event-fade-apply-review-template SAMPLE TEMPLATE
+  OUT` may copy nonblank human labels/notes/outcomes from that sidecar into a
+  validation-sample artifact. They must not infer labels, write live storage,
+  route alerts, open paper trades, or imply promotion.
 - Event-fade validation merges are artifact-only. `main.py --event-fade-merge-sample`
   may copy nonblank human labels/notes/outcomes from a previously reviewed
   JSONL/CSV sample into a fresh export by event/asset/relationship identity, but
@@ -384,7 +395,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   outcome fields. `main.py --event-fade-review-packet SAMPLE OUT` writes a
   Markdown packet for the same prioritized rows with source URLs, raw titles,
   classifier evidence, signal/risk fields, trigger/event-time outcomes, and the
-  human fields to fill. `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
+  human fields to fill. `main.py --event-fade-export-review-template SAMPLE OUT`
+  writes a compact editable sidecar for those rows, and
+  `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` applies
+  nonblank sidecar labels/outcomes back into a requested sample artifact.
+  `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,
   RSS/Atom feed fetches, and Coinalyze derivatives enrichment, no network
@@ -415,7 +430,9 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
    labels/outcomes across refreshes, use
    `main.py --event-fade-labeling-queue PATH` to prioritize missing
    labels/outcomes, optionally write a review packet with
-   `main.py --event-fade-review-packet SAMPLE OUT`, fill human labels/outcomes, then use
+   `main.py --event-fade-review-packet SAMPLE OUT`, fill a compact sidecar from
+   `main.py --event-fade-export-review-template SAMPLE OUT`, apply it with
+   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`, then use
    `main.py --event-fade-review-sample PATH` before promoting event-fade output
    beyond local reports.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.

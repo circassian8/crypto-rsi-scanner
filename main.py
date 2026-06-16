@@ -50,6 +50,9 @@ Usage:
   python main.py --event-fade-export-cache-sample sample.jsonl # validation sample from cache
   python main.py --event-fade-review-sample sample.jsonl # review labels/outcomes
   python main.py --event-fade-labeling-queue sample.jsonl # prioritize labels/outcomes
+  python main.py --event-fade-review-packet sample.jsonl packet.md # manual review packet
+  python main.py --event-fade-export-review-template sample.jsonl labels.csv # editable review sidecar
+  python main.py --event-fade-apply-review-template sample.jsonl labels.csv reviewed.jsonl # apply labels
   python main.py --event-fade-merge-sample fresh.jsonl reviewed.csv merged.jsonl # preserve labels
   python main.py --event-fade-export-outcome-prices sample.jsonl prices.json # build price fixture
   python main.py --event-fade-fill-outcomes sample.jsonl prices.json out.jsonl # fill outcome fields

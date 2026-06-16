@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade review sidecar workflow · Codex
+**Why:** Review packets make candidate evidence readable, but a human still had
+to edit the full validation export to apply labels. A compact sidecar makes
+human labeling safer and easier while preserving the full sample artifact.
+**Changes:**
+- Added compact event-fade review-template rows in
+  `crypto_rsi_scanner/event_validation.py`, with stable event/asset/relationship
+  identity, queue context, suggested labels, source URLs, and editable
+  review/outcome fields.
+- Added `main.py --event-fade-export-review-template SAMPLE OUT` and
+  `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`; both are
+  artifact-only and never infer labels or touch live storage.
+- Added `make event-fade-export-review-template` and
+  `make event-fade-apply-review-template`, plus top-level usage text.
+- Added offline tests for sidecar export/load/apply and scanner command paths.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the sidecar workflow and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 212/212.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard. `.venv/bin/python main.py --help` exposes the new
+commands.
+**Notes/risks:** The actual event-fade sample still needs human labels and real
+local price outcomes before any promotion beyond local reports.
+
 ## 2026-06-16 — Add event-fade review packet export · Codex
 **Why:** The validation sample now has queue/review metrics, but manual labeling
 still required jumping between source evidence, classifier rationale, signal

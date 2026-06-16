@@ -2654,6 +2654,50 @@ def test_event_fade_validation_review_packet_formats_human_evidence():
     assert "human_label" in packet
 
 
+def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    template_rows = event_validation.build_review_template_rows(rows, limit=2)
+    assert len(template_rows) == 2
+    assert template_rows[0]["asset_symbol"] == "TESTVELVET"
+    assert template_rows[0]["queue_category"] == "label_triggered_candidate"
+    assert template_rows[0]["suggested_label"] == "valid_proxy_fade or false_positive"
+    assert template_rows[0]["missing_fields"] == [
+        "human_label",
+        "max_adverse_excursion",
+        "max_favorable_excursion",
+        "post_event_return_72h",
+        "event_time_post_event_return_72h",
+    ]
+
+    template_rows[0]["review_status"] = "reviewed"
+    template_rows[0]["human_label"] = "valid_proxy_fade"
+    template_rows[0]["human_notes"] = "Reviewed source evidence."
+    template_rows[0]["post_event_return_72h"] = -0.21
+    result = event_validation.apply_review_template(rows, template_rows)
+    assert result.matched_rows == 1
+    assert result.copied_fields == 4
+    velvet = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
+    assert velvet["review_status"] == "reviewed"
+    assert velvet["human_label"] == "valid_proxy_fade"
+    assert velvet["human_notes"] == "Reviewed source evidence."
+    assert velvet["post_event_return_72h"] == -0.21
+
+    with tempfile.TemporaryDirectory() as tmp:
+        csv_path = Path(tmp) / "review_template.csv"
+        jsonl_path = Path(tmp) / "review_template.jsonl"
+        event_validation.write_review_template(rows, csv_path, limit=1)
+        event_validation.write_review_template(rows, jsonl_path, limit=1)
+        csv_rows = event_validation.load_validation_sample(csv_path)
+        jsonl_rows = event_validation.load_validation_sample(jsonl_path)
+        assert csv_rows[0]["asset_symbol"] == "TESTVELVET"
+        assert csv_rows[0]["missing_fields"][0] == "human_label"
+        assert jsonl_rows[0]["asset_symbol"] == "TESTVELVET"
+
+
 def test_event_fade_validation_labeling_queue_flags_reviewed_trigger_outcomes():
     from crypto_rsi_scanner import event_discovery, event_validation
 
@@ -3107,6 +3151,61 @@ def test_event_fade_review_packet_scanner_writes_markdown_fixture():
         assert "# Event-Fade Validation Review Packet" in packet
         assert "## 1. TESTVELVET - SpaceX IPO trading start" in packet
         assert "Review fields to fill" in packet
+
+
+def test_event_fade_review_template_scanner_exports_and_applies_sidecar():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, event_validation, scanner
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        sample_path = Path(tmp) / "sample.jsonl"
+        template_path = Path(tmp) / "review_template.csv"
+        reviewed_path = Path(tmp) / "reviewed.jsonl"
+        event_discovery.write_validation_sample(rows, sample_path)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_export_review_template(
+                str(sample_path),
+                str(template_path),
+                limit=1,
+            )
+        text = out.getvalue()
+        assert "Event-fade review template" in text
+        assert "wrote 1/17 row(s) needing review" in text
+
+        template_rows = event_validation.load_validation_sample(template_path)
+        template_rows[0]["review_status"] = "reviewed"
+        template_rows[0]["human_label"] = "valid_proxy_fade"
+        template_rows[0]["human_notes"] = "Reviewed compact sidecar."
+        template_path.write_text(
+            event_validation.format_review_template_csv(template_rows),
+            encoding="utf-8",
+        )
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_apply_review_template(
+                str(sample_path),
+                str(template_path),
+                str(reviewed_path),
+            )
+        text = out.getvalue()
+        assert "Event-fade review template apply" in text
+        assert "1 matched row(s)" in text
+
+        written = [
+            json.loads(line)
+            for line in reviewed_path.read_text(encoding="utf-8").splitlines()
+        ]
+        velvet = next(row for row in written if row["asset_symbol"] == "TESTVELVET")
+        assert velvet["human_label"] == "valid_proxy_fade"
+        assert velvet["human_notes"] == "Reviewed compact sidecar."
 
 
 def test_event_fade_merge_sample_scanner_writes_merged_jsonl():

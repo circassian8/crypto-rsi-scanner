@@ -1312,6 +1312,49 @@ def event_fade_review_packet(
     )
 
 
+def event_fade_export_review_template(
+    sample_path: str,
+    out_path: str,
+    *,
+    limit: int | None = 20,
+    verbose: bool = False,
+) -> None:
+    """Export compact editable sidecar rows for event-fade validation review."""
+    _setup_event_discovery_logging(verbose)
+    rows = event_validation.load_validation_sample(sample_path)
+    queue = event_validation.build_labeling_queue(rows, limit=limit)
+    if out_path == "-":
+        template_rows = event_validation.build_review_template_rows(rows, limit=limit)
+        print(event_validation.format_review_template_jsonl(template_rows))
+        return
+    out = event_validation.write_review_template(rows, out_path, limit=limit)
+    print(
+        "Event-fade review template: "
+        f"wrote {queue.shown_rows}/{queue.needed_rows} row(s) needing review to {out}"
+    )
+
+
+def event_fade_apply_review_template(
+    sample_path: str,
+    template_path: str,
+    out_path: str,
+    *,
+    verbose: bool = False,
+) -> None:
+    """Apply edited compact review sidecar rows to a validation sample artifact."""
+    _setup_event_discovery_logging(verbose)
+    sample_rows = event_validation.load_validation_sample(sample_path)
+    template_rows = event_validation.load_validation_sample(template_path)
+    result = event_validation.apply_review_template(sample_rows, template_rows)
+    out = event_discovery.write_validation_sample(result.rows, out_path)
+    print(
+        "Event-fade review template apply: "
+        f"{result.matched_rows} matched row(s), "
+        f"{result.unmatched_reviewed_rows} unmatched reviewed row(s), "
+        f"{result.copied_fields} copied field(s), wrote {len(result.rows)} row(s) to {out}"
+    )
+
+
 def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, verbose: bool = False) -> None:
     """Merge manual labels/outcomes from a reviewed sample into a fresh export."""
     _setup_event_discovery_logging(verbose)
@@ -1603,10 +1646,25 @@ def cli() -> None:
         help="Write a Markdown manual-review packet for prioritized validation rows.",
     )
     parser.add_argument(
+        "--event-fade-export-review-template",
+        nargs=2,
+        metavar=("SAMPLE", "OUT"),
+        help="Write compact editable review sidecar rows for prioritized validation rows.",
+    )
+    parser.add_argument(
+        "--event-fade-apply-review-template",
+        nargs=3,
+        metavar=("SAMPLE", "TEMPLATE", "OUT"),
+        help="Apply edited compact review sidecar rows to SAMPLE and write OUT.",
+    )
+    parser.add_argument(
         "--event-fade-queue-limit",
         type=int,
         default=20,
-        help="Maximum rows to show for --event-fade-labeling-queue or --event-fade-review-packet.",
+        help=(
+            "Maximum rows to show for --event-fade-labeling-queue, "
+            "--event-fade-review-packet, or --event-fade-export-review-template."
+        ),
     )
     parser.add_argument(
         "--event-fade-merge-sample",
@@ -1764,6 +1822,24 @@ def cli() -> None:
             sample_path,
             out_path,
             limit=args.event_fade_queue_limit,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_fade_export_review_template:
+        sample_path, out_path = args.event_fade_export_review_template
+        event_fade_export_review_template(
+            sample_path,
+            out_path,
+            limit=args.event_fade_queue_limit,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_fade_apply_review_template:
+        sample_path, template_path, out_path = args.event_fade_apply_review_template
+        event_fade_apply_review_template(
+            sample_path,
+            template_path,
+            out_path,
             verbose=args.verbose,
         )
         return

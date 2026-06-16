@@ -49,6 +49,35 @@ REVIEW_FIELDS = (
     "event_time_post_event_return_72h",
     "event_time_post_event_return_7d",
 )
+REVIEW_TEMPLATE_FIELDS = (
+    "event_id",
+    "asset_coin_id",
+    "asset_symbol",
+    "relationship_type",
+    "event_name",
+    "event_type",
+    "event_time",
+    "trigger_observed_at",
+    "signal_type",
+    "queue_category",
+    "suggested_label",
+    "missing_fields",
+    "source_urls",
+    "review_status",
+    "human_label",
+    "human_notes",
+    "max_adverse_excursion",
+    "max_favorable_excursion",
+    "post_event_return_24h",
+    "post_event_return_72h",
+    "post_event_return_7d",
+    "event_time_entry_price",
+    "event_time_max_adverse_excursion",
+    "event_time_max_favorable_excursion",
+    "event_time_post_event_return_24h",
+    "event_time_post_event_return_72h",
+    "event_time_post_event_return_7d",
+)
 OUTCOME_FIELDS = (
     "max_adverse_excursion",
     "max_favorable_excursion",
@@ -362,6 +391,65 @@ def build_labeling_queue(
         limit=limit,
         items=tuple(shown),
     )
+
+
+def build_review_template_rows(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int | None = 20,
+) -> list[dict[str, Any]]:
+    """Build compact, editable sidecar rows for human validation review."""
+    data = [dict(row) for row in rows]
+    pairs = _review_packet_items(data, limit=limit)
+    return [_review_template_row(item, row) for item, row in pairs]
+
+
+def format_review_template_jsonl(rows: Iterable[Mapping[str, Any]]) -> str:
+    return "\n".join(
+        json.dumps(_review_template_json_ready(row), sort_keys=True, separators=(",", ":"))
+        for row in rows
+    )
+
+
+def format_review_template_csv(rows: Iterable[Mapping[str, Any]]) -> str:
+    from io import StringIO
+
+    out = StringIO()
+    writer = csv.DictWriter(out, fieldnames=list(REVIEW_TEMPLATE_FIELDS), extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({
+            field: _review_template_csv_cell(row.get(field))
+            for field in REVIEW_TEMPLATE_FIELDS
+        })
+    return out.getvalue()
+
+
+def write_review_template(
+    rows: Iterable[Mapping[str, Any]],
+    path: str | Path,
+    *,
+    limit: int | None = 20,
+) -> Path:
+    out = Path(path).expanduser()
+    template_rows = build_review_template_rows(rows, limit=limit)
+    if out.suffix.casefold() == ".csv":
+        text = format_review_template_csv(template_rows)
+    else:
+        text = format_review_template_jsonl(template_rows)
+        if text:
+            text += "\n"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    return out
+
+
+def apply_review_template(
+    sample_rows: Iterable[Mapping[str, Any]],
+    reviewed_template_rows: Iterable[Mapping[str, Any]],
+) -> ValidationSampleMergeResult:
+    """Copy human review fields from a compact sidecar into validation rows."""
+    return merge_review_fields(sample_rows, reviewed_template_rows)
 
 
 def format_labeling_queue(queue: ValidationLabelingQueue) -> str:
@@ -841,6 +929,20 @@ def _format_review_packet_row(
     return fields
 
 
+def _review_template_row(
+    item: ValidationLabelingQueueItem,
+    row: Mapping[str, Any],
+) -> dict[str, Any]:
+    out = {field: row.get(field) for field in REVIEW_TEMPLATE_FIELDS}
+    out.update({
+        "queue_category": item.category,
+        "suggested_label": item.suggested_label,
+        "missing_fields": list(item.missing_fields),
+        "source_urls": list(item.source_urls),
+    })
+    return out
+
+
 def _packet_bullets(label: str, value: object, *, max_items: int = 5) -> list[str]:
     values = [_packet_text(item) for item in _list_values(value) if _packet_text(item)]
     if not values:
@@ -862,6 +964,33 @@ def _packet_text(value: object) -> str:
         except TypeError:
             value = str(value)
     return " ".join(str(value).split())
+
+
+def _review_template_json_ready(row: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        field: _review_template_json_value(row.get(field))
+        for field in REVIEW_TEMPLATE_FIELDS
+    }
+
+
+def _review_template_json_value(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {str(key): _review_template_json_value(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_review_template_json_value(item) for item in value]
+    if isinstance(value, datetime):
+        return value.astimezone(timezone.utc).isoformat()
+    return value
+
+
+def _review_template_csv_cell(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (Mapping, list, tuple)):
+        return json.dumps(_review_template_json_value(value), sort_keys=True)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
 def _price_index_from_mapping(raw: Mapping[str, Any]) -> dict[str, list[ValidationOutcomeCandle]]:

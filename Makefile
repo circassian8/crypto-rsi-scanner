@@ -6,6 +6,9 @@ EVENT_FADE_SAMPLE_REVIEWED ?= $(EVENT_FADE_SAMPLE_IN)
 EVENT_FADE_SAMPLE_MERGED ?= /tmp/event_fade_validation_merged.jsonl
 EVENT_FADE_SAMPLE_OUTCOMES ?= /tmp/event_fade_validation_with_outcomes.jsonl
 EVENT_FADE_REVIEW_PACKET_OUT ?= /tmp/event_fade_review_packet.md
+EVENT_FADE_REVIEW_TEMPLATE_OUT ?= /tmp/event_fade_review_template.csv
+EVENT_FADE_REVIEW_TEMPLATE ?= $(EVENT_FADE_REVIEW_TEMPLATE_OUT)
+EVENT_FADE_SAMPLE_REVIEW_APPLIED ?= /tmp/event_fade_validation_review_applied.jsonl
 EVENT_FADE_QUEUE_LIMIT ?= 20
 EVENT_DISCOVERY_CACHE_DIR ?= event_fade_cache
 EVENT_FADE_OUTCOME_PRICES ?= fixtures/event_discovery/outcome_prices.json
@@ -13,7 +16,7 @@ EVENT_FADE_OUTCOME_PRICES_OUT ?= /tmp/event_fade_outcome_prices.json
 EVENT_FADE_PRICE_DAYS ?= 30
 EVENT_FADE_PRICE_FIXTURE_DIR ?= fixtures/event_discovery/outcome_klines
 
-.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-refresh event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-refresh event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -36,6 +39,8 @@ help:
 	@echo "  make event-fade-review-sample  Review labels/outcomes in validation sample"
 	@echo "  make event-fade-labeling-queue  Prioritize validation rows to label"
 	@echo "  make event-fade-review-packet  Write Markdown packet for manual validation review"
+	@echo "  make event-fade-export-review-template  Write compact editable review sidecar"
+	@echo "  make event-fade-apply-review-template  Apply edited review sidecar to sample"
 	@echo "  make event-fade-merge-sample  Preserve labels/outcomes in fresh sample"
 	@echo "  make event-fade-export-outcome-prices  Build local validation price fixture"
 	@echo "  make event-fade-fill-outcomes  Fill validation outcomes from local prices"
@@ -184,6 +189,12 @@ event-fade-labeling-queue:
 
 event-fade-review-packet:
 	$(PYTHON) main.py --event-fade-review-packet $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_PACKET_OUT) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT)
+
+event-fade-export-review-template:
+	$(PYTHON) main.py --event-fade-export-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE_OUT) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT)
+
+event-fade-apply-review-template:
+	$(PYTHON) main.py --event-fade-apply-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE) $(EVENT_FADE_SAMPLE_REVIEW_APPLIED)
 
 event-fade-merge-sample:
 	$(PYTHON) main.py --event-fade-merge-sample $(EVENT_FADE_SAMPLE_FRESH) $(EVENT_FADE_SAMPLE_REVIEWED) $(EVENT_FADE_SAMPLE_MERGED)

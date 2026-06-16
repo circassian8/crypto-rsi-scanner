@@ -467,6 +467,26 @@ or imply promotion. After labels/outcomes are filled in the sample, use
 `main.py --event-fade-review-sample PATH` to measure coverage, trigger quality,
 and promotion blockers.
 
+## Validation Review Template
+
+`main.py --event-fade-export-review-template SAMPLE OUT` writes a compact
+editable sidecar for the same prioritized rows used by the labeling queue and
+review packet. A `.csv` suffix writes CSV; any other suffix writes JSONL. The
+sidecar keeps stable identity/context fields plus editable review fields:
+
+- `event_id`, `asset_coin_id`, `asset_symbol`, and `relationship_type`
+- event/signal context, queue category, suggested label, missing fields, and
+  source URLs
+- `review_status`, `human_label`, `human_notes`
+- trigger-time and event-time-baseline outcome fields when they need manual
+  override or preservation
+
+After a human edits the sidecar, `main.py --event-fade-apply-review-template
+SAMPLE TEMPLATE OUT` copies nonblank review fields back into a full validation
+sample artifact. The apply command uses stable event/asset/relationship identity
+and writes only `OUT`; it does not infer labels, alter the source sample, write
+live storage, route alerts, open paper trades, or imply promotion.
+
 ## Validation Sample Review
 
 `main.py --event-fade-review-sample PATH` reads a labeled JSONL/CSV validation
@@ -782,6 +802,22 @@ EVENT_FADE_SAMPLE_IN=/path/to/labeled_sample.csv \
 EVENT_FADE_REVIEW_PACKET_OUT=/tmp/event_fade_review_packet.md \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-review-packet
+```
+
+Write and apply a compact editable review sidecar:
+
+```bash
+make event-fade-export-review-template
+EVENT_FADE_SAMPLE_IN=/path/to/sample.jsonl \
+EVENT_FADE_REVIEW_TEMPLATE_OUT=/tmp/event_fade_review_template.csv \
+EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-export-review-template
+
+make event-fade-apply-review-template
+EVENT_FADE_SAMPLE_IN=/path/to/sample.jsonl \
+EVENT_FADE_REVIEW_TEMPLATE=/tmp/event_fade_review_template.csv \
+EVENT_FADE_SAMPLE_REVIEW_APPLIED=/tmp/event_fade_reviewed.jsonl \
+  make event-fade-apply-review-template
 ```
 
 Preserve labels/outcomes across a refreshed export:
