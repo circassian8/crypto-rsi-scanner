@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add opt-in live Bybit announcement discovery · Codex
+**Why:** The Pro plan's event radar should eventually discover exchange events
+automatically, but the repo only had fixture-backed announcement parsing. Bybit
+has an official unauthenticated announcements endpoint that can be used as a
+safe first live source for research-only radar/export runs.
+**Changes:**
+- Extended the Bybit announcement provider with explicit opt-in live fetching
+  from `GET /v5/announcements/index`, while keeping fixture mode as the default.
+- Added Bybit live config knobs:
+  `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE`,
+  `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_BASE_URL`,
+  `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LOCALE`,
+  `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TYPE`,
+  `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIMIT`, and
+  `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TIMEOUT`.
+- Taught the shared announcement parser to understand Bybit's documented
+  `dateTimestamp`, `startDateTimestamp`, and `startDataTimestamp` fields.
+- Wired the opt-in live provider through discovery reports/exports, updated
+  `.env.example`, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+- Added an offline fake-HTTP regression test for the documented Bybit response
+  shape, URL construction, timestamp parsing, listing normalization, and
+  fail-soft behavior.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 187/187.
+An opt-in live smoke with `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1`
+exits cleanly and prints an empty report after Bybit returns HTTP 403 in this
+environment. `git diff --check` passes. `make verify` passes.
+**Notes/risks:** Live Bybit fetch is default-off and research-only. Bybit
+listings/perp listings are direct exchange events and remain `NO_TRADE` unless
+separate evidence proves a true proxy relationship.
+
 ## 2026-06-16 — Add event-fade validation labeling queue · Codex
 **Why:** The event-fade validation workflow could export, merge, and review
 samples, but it did not tell a reviewer which rows to label next or which

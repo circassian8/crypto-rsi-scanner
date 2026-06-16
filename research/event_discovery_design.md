@@ -1,8 +1,9 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1-10 fixture framework with clean CoinGecko universe bridge,
-fixture-backed exchange announcement providers, structured calendar/unlock
+**Status:** Phase 1-10 framework with clean CoinGecko universe bridge,
+fixture-backed exchange announcement providers plus opt-in live Bybit
+announcement fetch, structured calendar/unlock
 providers, news/proxy-narrative providers, external catalyst providers, and
 Coinalyze-style derivatives plus Tokenomist/Etherscan/Arkham/Dune-style
 supply/on-chain enrichment, plus grouped auto reporting and validation-sample
@@ -90,11 +91,19 @@ This is still an offline fixture path. It does not fetch CoinGecko directly.
 
 ## Exchange Announcement Providers
 
-Binance and Bybit announcement providers currently read local JSON fixtures only.
-They parse spot listing and perpetual/futures listing announcements into
-`RawDiscoveredEvent` rows with normalized event metadata. These events are
-valuable for the radar and negative/control sample, but they are direct
-token-specific catalysts by default:
+Binance and Bybit announcement providers read local JSON fixtures by default.
+Bybit can also fetch the official `GET /v5/announcements/index` endpoint when
+`RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1`. The live fetch is still a
+research-only source for local reports/exports; it is not live routing. The
+Bybit API docs define `locale`, optional `type`, `page`, and `limit` parameters,
+and return announcement rows under `result.list` with title, description, type,
+tags, URL, and timestamps:
+https://bybit-exchange.github.io/docs/v5/announcement
+
+The exchange providers parse spot listing and perpetual/futures listing
+announcements into `RawDiscoveredEvent` rows with normalized event metadata.
+These events are valuable for the radar and negative/control sample, but they
+are direct token-specific catalysts by default:
 
 - exchange listings -> `direct_listing`
 - perp/futures listings -> `direct_listing`
@@ -421,6 +430,19 @@ RSI_EVENT_DISCOVERY_DUNE_SUPPLY_PATH=fixtures/event_discovery/dune_supply.json \
 RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report
 ```
+
+Run an opt-in live Bybit announcement radar pass:
+
+```bash
+RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1 \
+RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TYPE=new_crypto \
+RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
+  .venv/bin/python main.py --event-discovery-report
+```
+
+The live Bybit path is research-only and fail-soft. It should only add direct
+exchange-listing/perp-listing evidence to the radar unless another source later
+proves a proxy relationship.
 
 Run the grouped event-fade auto report with the same fixture set:
 

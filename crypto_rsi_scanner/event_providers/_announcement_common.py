@@ -117,6 +117,7 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         or item.get("updateTime")
         or item.get("releaseDate")
         or item.get("publishTime")
+        or item.get("dateTimestamp")
     ) or datetime.now(timezone.utc)
     published_at = _parse_time(
         item.get("published_at")
@@ -124,6 +125,7 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         or item.get("releaseDate")
         or item.get("publishTime")
         or item.get("publish_time")
+        or item.get("dateTimestamp")
     )
     event_time = _parse_time(
         item.get("event_time")
@@ -132,6 +134,8 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         or item.get("tradingStartTime")
         or item.get("tradeStartTime")
         or item.get("launchTime")
+        or item.get("startDateTimestamp")
+        or item.get("startDataTimestamp")
     ) or published_at
     raw_id = str(
         item.get("raw_id")
@@ -199,7 +203,16 @@ def _parse_time(value: object) -> datetime | None:
 def _has_explicit_event_time(item: Mapping[str, Any]) -> bool:
     return any(
         item.get(key) not in (None, "")
-        for key in ("event_time", "listing_time", "listingTime", "tradingStartTime", "tradeStartTime", "launchTime")
+        for key in (
+            "event_time",
+            "listing_time",
+            "listingTime",
+            "tradingStartTime",
+            "tradeStartTime",
+            "launchTime",
+            "startDateTimestamp",
+            "startDataTimestamp",
+        )
     )
 
 

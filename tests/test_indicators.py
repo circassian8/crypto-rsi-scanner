@@ -751,6 +751,88 @@ def test_event_discovery_exchange_announcement_providers_parse_fixtures():
             raise AssertionError("required malformed announcement fixture should fail")
 
 
+def test_event_discovery_bybit_live_provider_parses_documented_response_offline():
+    import json
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner.event_providers.bybit_announcements import BybitAnnouncementProvider
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    seen = {}
+
+    def fake_opener(request, timeout):
+        seen["url"] = request.full_url
+        seen["timeout"] = timeout
+        return FakeResponse({
+            "retCode": 0,
+            "retMsg": "OK",
+            "result": {
+                "total": 2,
+                "list": [
+                    {
+                        "title": "New Listing: Test Live (TLIVE) — Deposit and Trade TLIVE",
+                        "description": "Bybit is excited to announce the listing of TLIVE on Spot.",
+                        "type": {"title": "New Listings", "key": "new_crypto"},
+                        "tags": ["Spot", "Spot Listings"],
+                        "url": "https://announcements.bybit.com/en-US/article/test-live/",
+                        "dateTimestamp": 1781514000000,
+                        "startDateTimestamp": 1781524800000,
+                    },
+                    {
+                        "title": "Bybit savings campaign for TLIVE holders",
+                        "description": "Earn rewards for completing tasks.",
+                        "type": {"title": "Latest Activities", "key": "latest_activities"},
+                        "dateTimestamp": 1781517600000,
+                    },
+                ],
+            },
+        })
+
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    provider = BybitAnnouncementProvider(
+        None,
+        live_enabled=True,
+        base_url="https://api.bybit.test",
+        locale="en-US",
+        announcement_type="new_crypto",
+        limit=2,
+        timeout=3.5,
+        opener=fake_opener,
+    )
+    events = provider.fetch_events(start, end)
+    assert len(events) == 1
+    assert seen["url"] == "https://api.bybit.test/v5/announcements/index?locale=en-US&page=1&limit=2&type=new_crypto"
+    assert seen["timeout"] == 3.5
+    event = events[0]
+    assert event.provider == "bybit_announcements"
+    assert event.source_url == "https://announcements.bybit.com/en-US/article/test-live/"
+    assert event.published_at.isoformat() == "2026-06-15T09:00:00+00:00"
+    assert event.raw_json["event"]["event_type"] == "exchange_listing"
+    assert event.raw_json["event"]["event_time"] == "2026-06-15T12:00:00+00:00"
+    assert event.raw_json["event"]["event_time_confidence"] == 1.0
+
+    def failing_opener(request, timeout):
+        raise TimeoutError("offline timeout")
+
+    assert BybitAnnouncementProvider(
+        None,
+        live_enabled=True,
+        opener=failing_opener,
+    ).fetch_events(start, end) == []
+
+
 def test_event_discovery_structured_calendar_providers_parse_fixtures():
     import json
     import tempfile

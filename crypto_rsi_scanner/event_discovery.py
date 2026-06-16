@@ -303,6 +303,12 @@ def run_manual_discovery(
     *,
     binance_announcements_path: str | Path | None = None,
     bybit_announcements_path: str | Path | None = None,
+    bybit_announcements_live: bool = False,
+    bybit_announcements_base_url: str = "https://api.bybit.com",
+    bybit_announcements_locale: str = "en-US",
+    bybit_announcements_type: str = "new_crypto",
+    bybit_announcements_limit: int = 20,
+    bybit_announcements_timeout: float = 10.0,
     coinmarketcal_path: str | Path | None = None,
     tokenomist_path: str | Path | None = None,
     cryptopanic_path: str | Path | None = None,
@@ -332,6 +338,12 @@ def run_manual_discovery(
         end,
         binance_announcements_path=binance_announcements_path,
         bybit_announcements_path=bybit_announcements_path,
+        bybit_announcements_live=bybit_announcements_live,
+        bybit_announcements_base_url=bybit_announcements_base_url,
+        bybit_announcements_locale=bybit_announcements_locale,
+        bybit_announcements_type=bybit_announcements_type,
+        bybit_announcements_limit=bybit_announcements_limit,
+        bybit_announcements_timeout=bybit_announcements_timeout,
         coinmarketcal_path=coinmarketcal_path,
         tokenomist_path=tokenomist_path,
         cryptopanic_path=cryptopanic_path,
@@ -367,6 +379,12 @@ def load_discovery_events(
     *,
     binance_announcements_path: str | Path | None = None,
     bybit_announcements_path: str | Path | None = None,
+    bybit_announcements_live: bool = False,
+    bybit_announcements_base_url: str = "https://api.bybit.com",
+    bybit_announcements_locale: str = "en-US",
+    bybit_announcements_type: str = "new_crypto",
+    bybit_announcements_limit: int = 20,
+    bybit_announcements_timeout: float = 10.0,
     coinmarketcal_path: str | Path | None = None,
     tokenomist_path: str | Path | None = None,
     cryptopanic_path: str | Path | None = None,
@@ -382,8 +400,16 @@ def load_discovery_events(
         events.extend(ManualJsonEventProvider(event_path).fetch_events(start, end))
     if binance_announcements_path:
         events.extend(BinanceAnnouncementProvider(binance_announcements_path).fetch_events(start, end))
-    if bybit_announcements_path:
-        events.extend(BybitAnnouncementProvider(bybit_announcements_path).fetch_events(start, end))
+    if bybit_announcements_path or bybit_announcements_live:
+        events.extend(BybitAnnouncementProvider(
+            bybit_announcements_path,
+            live_enabled=bybit_announcements_live,
+            base_url=bybit_announcements_base_url,
+            locale=bybit_announcements_locale,
+            announcement_type=bybit_announcements_type,
+            limit=bybit_announcements_limit,
+            timeout=bybit_announcements_timeout,
+        ).fetch_events(start, end))
     if coinmarketcal_path:
         events.extend(CoinMarketCalProvider(coinmarketcal_path).fetch_events(start, end))
     if tokenomist_path:
