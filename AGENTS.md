@@ -87,7 +87,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   (fixture event radar with optional exchange-announcement, structured calendar,
   unlock, news/proxy-narrative, opt-in live CryptoPanic/GDELT/RSS, external catalyst,
   Coinalyze-style derivatives, supply/on-chain enrichment, and clean CoinGecko
-  universe fixtures,
+  universe fixtures or opt-in live CoinGecko universe resolver enrichment,
   research-only/no writes) · `main.py --event-discovery-refresh` (fetch
   configured event-discovery sources and append research-only JSONL cache
   artifacts under `RSI_EVENT_DISCOVERY_CACHE_DIR`; no live DB writes) ·
@@ -164,7 +164,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
-| `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider, exchange announcement parsers with captured Binance CMS WebSocket payload support and opt-in live Bybit fetch, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers with opt-in live CryptoPanic posts, GDELT Article List, and project-blog RSS/Atom fetches, and external IPO/sports/prediction-market catalyst parsers |
+| `event_providers/` | research event provider interfaces, manual JSON event fixtures, cleaned CoinGecko universe fixture provider plus opt-in live CoinGecko universe resolver enrichment, exchange announcement parsers with captured Binance CMS WebSocket payload support and opt-in live Bybit fetch, structured calendar/unlock parsers, CryptoPanic/GDELT/project-blog news parsers with opt-in live CryptoPanic posts, GDELT Article List, and project-blog RSS/Atom fetches, and external IPO/sports/prediction-market catalyst parsers |
 | `derivatives_providers/` | fixture-backed derivatives enrichment adapters for event discovery, starting with Coinalyze-style OI/funding/crowding snapshots; no live derivatives provider enabled yet |
 | `supply_providers/` | fixture-backed supply/on-chain enrichment adapters for event discovery, starting with Tokenomist/Etherscan/Arkham/Dune-style snapshots; no live supply provider enabled yet |
 | `signal_registry.py` | canonical setup registry: setup intent, expected direction, market eligibility, edge priors |
@@ -317,7 +317,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-discovery-report`. It finds raw events, resolves assets with
   aliases, classifies proxy/direct/ambiguous relationships, rejects ticker
   collisions, can merge an optional cleaned CoinGecko market fixture from
-  `RSI_EVENT_DISCOVERY_UNIVERSE_PATH`, can parse local Binance/Bybit
+  `RSI_EVENT_DISCOVERY_UNIVERSE_PATH`, can opt into live CoinGecko universe
+  enrichment with `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1`, can parse local Binance/Bybit
   announcement fixtures as direct listing/perp events, can parse captured
   Binance CMS WebSocket `com_announcement_en` DATA payloads, can optionally fetch
   live Bybit `new_crypto` announcements when

@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
-from .. import universe
+from .. import config, universe
+from ..client import CoinGeckoClient
 from ..event_models import DiscoveredAsset
 
 log = logging.getLogger(__name__)
+
+CoinGeckoClientFactory = Callable[[], Any]
 
 
 class CoinGeckoUniverseProvider:
@@ -24,12 +28,20 @@ class CoinGeckoUniverseProvider:
         *,
         limit: int | None = None,
         required: bool = False,
+        live_enabled: bool = False,
+        live_fetch_limit: int | None = None,
+        client_factory: CoinGeckoClientFactory | None = None,
     ) -> None:
         self.path = Path(path).expanduser() if path else None
         self.limit = limit
         self.required = required
+        self.live_enabled = live_enabled
+        self.live_fetch_limit = live_fetch_limit
+        self.client_factory = client_factory or CoinGeckoClient
 
     def fetch_assets(self) -> list[DiscoveredAsset]:
+        if self.path is None and self.live_enabled:
+            return self._fetch_live_assets()
         if self.path is None:
             return []
         try:
@@ -40,6 +52,34 @@ class CoinGeckoUniverseProvider:
             log.warning("CoinGecko universe fixture load failed: %s", exc)
             return []
         return assets_from_markets(markets, limit=self.limit)
+
+    def _fetch_live_assets(self) -> list[DiscoveredAsset]:
+        try:
+            markets = _run_async(self._fetch_live_markets())
+        except Exception as exc:  # noqa: BLE001
+            if self.required:
+                raise
+            log.warning("CoinGecko live universe fetch failed: %s", exc)
+            return []
+        return assets_from_markets(markets, limit=self.limit)
+
+    async def _fetch_live_markets(self) -> list[dict[str, Any]]:
+        target = self.limit or config.TOP_N
+        fetch_n = self.live_fetch_limit or universe.candidate_count(target)
+        async with self.client_factory() as client:
+            rows = await client.get_top_markets(fetch_n)
+        return [dict(row) for row in rows if isinstance(row, Mapping)]
+
+
+def _run_async(coro: Any) -> Any:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    close = getattr(coro, "close", None)
+    if close:
+        close()
+    raise RuntimeError("CoinGecko live universe fetch cannot run inside an active event loop")
 
 
 def load_market_rows(path: str | Path) -> list[dict[str, Any]]:

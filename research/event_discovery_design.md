@@ -97,7 +97,12 @@ before producing `DiscoveredAsset` rows, so stablecoins, wrapped/staked receipts
 synthetics, bad identity rows, and low-quality market rows are screened by the
 same logic used by live scans and backtests.
 
-This is still an offline fixture path. It does not fetch CoinGecko directly.
+For live research passes, `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` fetches a clean
+CoinGecko universe through the existing rate-limited `CoinGeckoClient`, applies
+the same hygiene filter, and uses the result only for asset resolution. It is not
+an event source by itself, does not route alerts, and does not write live signal,
+paper, or outcome tables. `RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT` can
+override the overfetch count when a broader resolver universe is needed.
 
 ## Exchange Announcement Providers
 
@@ -537,12 +542,13 @@ Run an opt-in live Bybit announcement radar pass:
 ```bash
 RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1 \
 RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TYPE=new_crypto \
-RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
+RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 \
   .venv/bin/python main.py --event-discovery-report
 ```
 
-The live Bybit path is research-only and fail-soft. It should only add direct
-exchange-listing/perp-listing evidence to the radar unless another source later
+The live Bybit and live CoinGecko universe paths are research-only and fail-soft.
+They should only add direct exchange-listing/perp-listing evidence and resolver
+coverage to the radar unless another source later
 proves a proxy relationship.
 
 Run an opt-in live CryptoPanic news radar pass:

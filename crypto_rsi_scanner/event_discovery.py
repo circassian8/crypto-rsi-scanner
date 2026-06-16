@@ -342,6 +342,8 @@ def run_manual_discovery(
     dune_supply_path: str | Path | None = None,
     universe_path: str | Path | None = None,
     universe_limit: int | None = None,
+    universe_live: bool = False,
+    universe_fetch_limit: int | None = None,
     cfg: EventDiscoveryConfig | None = None,
     fade_cfg: event_fade.EventFadeConfig | None = None,
     now: datetime | None = None,
@@ -396,7 +398,13 @@ def run_manual_discovery(
         arkham_supply_path=arkham_supply_path,
         dune_supply_path=dune_supply_path,
     )
-    assets = load_discovery_assets(alias_path, universe_path=universe_path, universe_limit=universe_limit)
+    assets = load_discovery_assets(
+        alias_path,
+        universe_path=universe_path,
+        universe_limit=universe_limit,
+        universe_live=universe_live,
+        universe_fetch_limit=universe_fetch_limit,
+    )
     return run_discovery(
         raw_events,
         assets,
@@ -512,12 +520,21 @@ def load_discovery_assets(
     *,
     universe_path: str | Path | None = None,
     universe_limit: int | None = None,
+    universe_live: bool = False,
+    universe_fetch_limit: int | None = None,
 ) -> list[DiscoveredAsset]:
     """Load manual aliases plus an optional cleaned CoinGecko-style universe."""
     assets: list[DiscoveredAsset] = []
     assets.extend(load_asset_aliases(alias_path))
     if universe_path:
         assets.extend(CoinGeckoUniverseProvider(universe_path, limit=universe_limit).fetch_assets())
+    if universe_live:
+        assets.extend(CoinGeckoUniverseProvider(
+            None,
+            limit=universe_limit,
+            live_enabled=True,
+            live_fetch_limit=universe_fetch_limit,
+        ).fetch_assets())
     return merge_discovered_assets(assets)
 
 

@@ -1116,6 +1116,8 @@ def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResul
         dune_supply_path=config.EVENT_DISCOVERY_DUNE_SUPPLY_PATH,
         universe_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
         universe_limit=config.EVENT_DISCOVERY_UNIVERSE_LIMIT or None,
+        universe_live=config.EVENT_DISCOVERY_UNIVERSE_LIVE,
+        universe_fetch_limit=config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT or None,
         cfg=cfg,
         fade_cfg=event_fade.runtime_config(config),
     )

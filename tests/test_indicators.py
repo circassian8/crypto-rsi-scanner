@@ -730,6 +730,94 @@ def test_event_discovery_coingecko_universe_provider_uses_hygiene():
     assert "tether" not in by_id
 
 
+def test_event_discovery_coingecko_universe_provider_can_fetch_live_offline():
+    from crypto_rsi_scanner.event_providers.coingecko_universe import CoinGeckoUniverseProvider
+
+    calls = []
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_exc):
+            return None
+
+        async def get_top_markets(self, n):
+            calls.append(n)
+            return [
+                {
+                    "id": "bitcoin",
+                    "symbol": "btc",
+                    "name": "Bitcoin",
+                    "current_price": 68000.0,
+                    "market_cap": 1300000000000.0,
+                    "total_volume": 35000000000.0,
+                    "price_change_percentage_24h_in_currency": 1.2,
+                },
+                {
+                    "id": "tether",
+                    "symbol": "usdt",
+                    "name": "Tether",
+                    "current_price": 1.0,
+                    "market_cap": 110000000000.0,
+                    "total_volume": 60000000000.0,
+                    "price_change_percentage_24h_in_currency": 0.01,
+                },
+                {
+                    "id": "ethereum",
+                    "symbol": "eth",
+                    "name": "Ethereum",
+                    "current_price": 3600.0,
+                    "market_cap": 430000000000.0,
+                    "total_volume": 18000000000.0,
+                    "price_change_percentage_24h_in_currency": -0.8,
+                },
+                {
+                    "id": "solana",
+                    "symbol": "sol",
+                    "name": "Solana",
+                    "current_price": 160.0,
+                    "market_cap": 75000000000.0,
+                    "total_volume": 4500000000.0,
+                    "price_change_percentage_24h_in_currency": 3.4,
+                },
+            ]
+
+    assets = CoinGeckoUniverseProvider(
+        None,
+        live_enabled=True,
+        limit=2,
+        live_fetch_limit=4,
+        client_factory=lambda: FakeClient(),
+        required=True,
+    ).fetch_assets()
+
+    assert calls == [4]
+    assert [asset.coin_id for asset in assets] == ["bitcoin", "ethereum"]
+    assert assets[0].symbol == "BTC"
+    assert assets[1].price == 3600.0
+
+
+def test_event_discovery_coingecko_universe_provider_live_fail_soft():
+    from crypto_rsi_scanner.event_providers.coingecko_universe import CoinGeckoUniverseProvider
+
+    class FailingClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_exc):
+            return None
+
+        async def get_top_markets(self, _n):
+            raise TimeoutError("fixture timeout")
+
+    assert CoinGeckoUniverseProvider(
+        None,
+        live_enabled=True,
+        client_factory=lambda: FailingClient(),
+    ).fetch_assets() == []
+
+
 def test_event_discovery_exchange_announcement_providers_parse_fixtures():
     import json
     import tempfile

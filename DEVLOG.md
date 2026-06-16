@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add opt-in live CoinGecko discovery universe · Codex
+**Why:** Event discovery had live news/exchange inputs, but asset resolution
+still depended on local universe fixtures. Live research passes need the same
+clean CoinGecko universe hygiene used by the scanner, without making the
+universe itself an event source or promoting event-fade output.
+**Changes:**
+- Added `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE` and
+  `RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT` config/env examples, wired through
+  `scanner.py` and `event_discovery.run_manual_discovery()`.
+- Extended `crypto_rsi_scanner/event_providers/coingecko_universe.py` so it can
+  optionally fetch live top markets through the existing `CoinGeckoClient`, apply
+  `universe.filter_markets_with_audit`, and fail soft on provider errors.
+- Added offline tests with injected fake CoinGecko clients for live fetch,
+  hygiene filtering, overfetch limits, and fail-soft behavior.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to mark live CoinGecko as resolver
+  enrichment only: research-only, opt-in, no alert routing, no live DB writes,
+  no paper trades.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 200/200.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** Enabling `RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1` alone does not
+create radar events; another event source or fixture must be configured.
+
 ## 2026-06-16 — Parse Binance CMS announcement payloads · Codex
 **Why:** Binance's official English announcement stream publishes CMS WebSocket
 `DATA` messages where the announcement content is a JSON string inside the
