@@ -2380,6 +2380,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
         min_triggered_reviewed=1,
         min_trigger_precision=0.90,
         min_mfe_mae_ratio=2.0,
+        min_proxy_event_types=2,
+        min_trigger_btc_risk_buckets=1,
     )
     assert review.promotion_ready is True
     assert review.reviewed_rows == 6
@@ -2397,6 +2399,11 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert review.avg_post_event_return_72h == -0.22
     assert review.avg_event_time_post_event_return_72h == -0.12
     assert round(review.avg_trigger_vs_event_time_return_72h_edge, 2) == 0.10
+    assert round(review.avg_trigger_latency_hours, 2) == 22.5
+    assert round(review.median_trigger_latency_hours, 2) == 22.5
+    assert review.negative_trigger_latency_rows == 0
+    assert review.reviewed_proxy_event_types == 2
+    assert review.triggered_btc_risk_buckets == 1
     assert review.missing_event_time_baseline_rows == 0
     assert review.point_in_time_violation_rows == 0
     assert review.promotion_blockers == ()
@@ -2423,6 +2430,9 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "72h=-22.0%" in report
     assert "event-time short baseline" in report
     assert "trigger edge vs baseline=+10.0pp" in report
+    assert "proxy event types: 2/2" in report
+    assert "trigger BTC risk buckets: 1/1" in report
+    assert "trigger latency: avg=22.5h" in report
     assert "COHORTS" in report
     assert "By event type:" in report
     assert "ipo_proxy" in report
@@ -2442,6 +2452,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
             min_triggered_reviewed=1,
             min_trigger_precision=0.90,
             min_mfe_mae_ratio=2.0,
+            min_proxy_event_types=2,
+            min_trigger_btc_risk_buckets=1,
         ).promotion_ready
         assert event_validation.review_validation_sample(
             loaded_csv,
@@ -2450,7 +2462,42 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
             min_triggered_reviewed=1,
             min_trigger_precision=0.90,
             min_mfe_mae_ratio=2.0,
+            min_proxy_event_types=2,
+            min_trigger_btc_risk_buckets=1,
         ).promotion_ready
+
+
+def test_event_fade_validation_review_blocks_narrow_event_or_btc_samples():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    for row in rows:
+        if row["asset_symbol"] in {"TESTVELVET", "TESTAI"}:
+            row["human_label"] = "valid_proxy_fade"
+        elif row["asset_symbol"] in {"TESTBTC", "TESTPUMP"}:
+            row["human_label"] = "direct_event" if row["asset_symbol"] == "TESTBTC" else "ambiguous"
+
+    velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+    velvet["max_favorable_excursion"] = 0.42
+    velvet["max_adverse_excursion"] = 0.08
+    velvet["post_event_return_72h"] = -0.22
+    velvet["event_time_post_event_return_72h"] = -0.12
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=2,
+        min_negative_controls=2,
+        min_triggered_reviewed=1,
+        min_trigger_precision=0.90,
+        min_mfe_mae_ratio=2.0,
+        min_proxy_event_types=2,
+        min_trigger_btc_risk_buckets=2,
+    )
+    assert review.promotion_ready is False
+    assert review.reviewed_proxy_event_types == 1
+    assert review.triggered_btc_risk_buckets == 1
+    assert "reviewed proxy event types 1/2" in review.promotion_blockers
+    assert "reviewed trigger BTC risk buckets 1/2" in review.promotion_blockers
 
 
 def test_event_fade_validation_merge_preserves_review_fields():
@@ -2624,12 +2671,16 @@ def test_event_fade_validation_review_blocks_late_or_weak_trigger_evidence():
         min_triggered_reviewed=1,
         min_trigger_precision=0.60,
         min_mfe_mae_ratio=1.5,
+        min_proxy_event_types=1,
+        min_trigger_btc_risk_buckets=1,
     )
     assert review.promotion_ready is False
     assert review.trigger_precision == 0.0
     assert review.point_in_time_violation_rows == 1
     assert any("trigger precision 0.0% below 60.0%" == blocker for blocker in review.promotion_blockers)
     assert any("evidence first seen after the decision time" in blocker for blocker in review.promotion_blockers)
+    assert review.negative_trigger_latency_rows == 1
+    assert any("trigger before event time" in blocker for blocker in review.promotion_blockers)
     assert any("MFE/MAE 0.38 below 1.50" == blocker for blocker in review.promotion_blockers)
     assert "reviewed SHORT_TRIGGERED rows do not show favorable 72h short returns" in review.promotion_blockers
 

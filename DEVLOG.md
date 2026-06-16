@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade validation diversity and latency gates · Codex
+**Why:** The event-fade promotion plan requires evidence across more than one
+event type and market context, plus trigger-latency visibility. The reviewer
+showed cohorts, but it did not block too-narrow samples or report how long
+post-event confirmation took.
+**Changes:**
+- Extended `crypto_rsi_scanner/event_validation.py` with reviewed proxy
+  event-type diversity, reviewed trigger BTC-risk-bucket diversity, and
+  trigger-latency metrics.
+- `--event-fade-review-sample` now reports average/median trigger latency,
+  negative trigger-latency rows, proxy event-type coverage, and trigger BTC-risk
+  bucket coverage.
+- Promotion evidence is now blocked when a fully covered sample is still
+  concentrated in too few proxy event types or too few BTC-risk buckets, or when
+  reviewed triggers occur before their event time.
+- Added regression tests in `tests/test_indicators.py` for the new diversity
+  blockers and latency report fields.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to document latency/diversity review
+  gates.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 208/208.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** These are validation gates only. They do not promote
+event-fade, write live storage, route alerts, or open paper trades.
+
 ## 2026-06-16 — Compare event-fade triggers to event-time shorts · Codex
 **Why:** The event-fade plan explicitly requires proving that waiting for
 post-event failure beats simply shorting at the event timestamp. The validation

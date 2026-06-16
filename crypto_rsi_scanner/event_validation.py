@@ -107,6 +107,9 @@ class EventFadeValidationReview:
     avg_post_event_return_7d: float | None
     avg_event_time_post_event_return_72h: float | None
     avg_trigger_vs_event_time_return_72h_edge: float | None
+    avg_trigger_latency_hours: float | None
+    median_trigger_latency_hours: float | None
+    negative_trigger_latency_rows: int
     missing_trigger_outcome_rows: int
     missing_event_time_baseline_rows: int
     point_in_time_violation_rows: int
@@ -115,6 +118,10 @@ class EventFadeValidationReview:
     min_triggered_reviewed: int
     min_trigger_precision: float
     min_mfe_mae_ratio: float
+    min_proxy_event_types: int
+    min_trigger_btc_risk_buckets: int
+    reviewed_proxy_event_types: int
+    triggered_btc_risk_buckets: int
     event_type_cohorts: tuple["ValidationCohort", ...]
     relationship_type_cohorts: tuple["ValidationCohort", ...]
     btc_risk_cohorts: tuple["ValidationCohort", ...]
@@ -402,6 +409,8 @@ def review_validation_sample(
     min_triggered_reviewed: int = 10,
     min_trigger_precision: float = 0.60,
     min_mfe_mae_ratio: float = 1.50,
+    min_proxy_event_types: int = 2,
+    min_trigger_btc_risk_buckets: int = 2,
 ) -> EventFadeValidationReview:
     """Summarize manual labels/outcomes and promotion blockers."""
     data = [dict(row) for row in rows]
@@ -463,6 +472,12 @@ def review_validation_sample(
     avg_7d = _mean(_nums(row.get("post_event_return_7d") for row in triggered_reviewed))
     avg_event_time_72h = _mean(_nums(row.get("event_time_post_event_return_72h") for row in triggered_reviewed))
     trigger_vs_event_time_72h_edge = _mean(_trigger_vs_event_time_72h_edges(triggered_reviewed))
+    trigger_latencies = _trigger_latencies_hours(triggered_reviewed)
+    avg_trigger_latency = _mean(trigger_latencies)
+    median_trigger_latency = _median(trigger_latencies)
+    negative_trigger_latency_rows = sum(1 for value in trigger_latencies if value < 0)
+    reviewed_proxy_event_types = len(_event_types(reviewed_proxy))
+    triggered_btc_risk_buckets = len(_known_btc_risk_buckets(triggered_reviewed))
 
     blockers: list[str] = []
     if schema_mismatches:
@@ -481,6 +496,20 @@ def review_validation_sample(
         blockers.append(
             f"reviewed SHORT_TRIGGERED candidates {len(triggered_reviewed)}/{min_triggered_reviewed}"
         )
+    if (
+        len(reviewed_proxy) >= min_proxy_candidates
+        and reviewed_proxy_event_types < min_proxy_event_types
+    ):
+        blockers.append(
+            f"reviewed proxy event types {reviewed_proxy_event_types}/{min_proxy_event_types}"
+        )
+    if (
+        len(triggered_reviewed) >= min_triggered_reviewed
+        and triggered_btc_risk_buckets < min_trigger_btc_risk_buckets
+    ):
+        blockers.append(
+            f"reviewed trigger BTC risk buckets {triggered_btc_risk_buckets}/{min_trigger_btc_risk_buckets}"
+        )
     if trigger_precision is not None and trigger_precision < min_trigger_precision:
         blockers.append(
             f"trigger precision {_fmt_pct(trigger_precision)} below {_fmt_pct(min_trigger_precision)}"
@@ -492,6 +521,10 @@ def review_validation_sample(
     if pit_violation_rows:
         blockers.append(
             f"{pit_violation_rows} reviewed row(s) use evidence first seen after the decision time"
+        )
+    if negative_trigger_latency_rows:
+        blockers.append(
+            f"{negative_trigger_latency_rows} reviewed SHORT_TRIGGERED row(s) trigger before event time"
         )
     if missing_trigger_outcome_rows:
         blockers.append(
@@ -549,6 +582,9 @@ def review_validation_sample(
         avg_post_event_return_7d=avg_7d,
         avg_event_time_post_event_return_72h=avg_event_time_72h,
         avg_trigger_vs_event_time_return_72h_edge=trigger_vs_event_time_72h_edge,
+        avg_trigger_latency_hours=avg_trigger_latency,
+        median_trigger_latency_hours=median_trigger_latency,
+        negative_trigger_latency_rows=negative_trigger_latency_rows,
         missing_trigger_outcome_rows=missing_trigger_outcome_rows,
         missing_event_time_baseline_rows=missing_event_time_baseline_rows,
         point_in_time_violation_rows=pit_violation_rows,
@@ -557,6 +593,10 @@ def review_validation_sample(
         min_triggered_reviewed=min_triggered_reviewed,
         min_trigger_precision=min_trigger_precision,
         min_mfe_mae_ratio=min_mfe_mae_ratio,
+        min_proxy_event_types=min_proxy_event_types,
+        min_trigger_btc_risk_buckets=min_trigger_btc_risk_buckets,
+        reviewed_proxy_event_types=reviewed_proxy_event_types,
+        triggered_btc_risk_buckets=triggered_btc_risk_buckets,
         event_type_cohorts=event_type_cohorts,
         relationship_type_cohorts=relationship_type_cohorts,
         btc_risk_cohorts=btc_risk_cohorts,
@@ -594,6 +634,15 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
             f"precision: {_fmt_pct(review.trigger_precision)} · "
             f"minimum precision: {_fmt_pct(review.min_trigger_precision)} · "
             f"false-positive rate: {_fmt_pct(review.trigger_false_positive_rate)}"
+        ),
+        (
+            f"  proxy event types: {review.reviewed_proxy_event_types}/{review.min_proxy_event_types} · "
+            f"trigger BTC risk buckets: {review.triggered_btc_risk_buckets}/{review.min_trigger_btc_risk_buckets}"
+        ),
+        (
+            f"  trigger latency: avg={_fmt_hours(review.avg_trigger_latency_hours)} · "
+            f"median={_fmt_hours(review.median_trigger_latency_hours)} · "
+            f"negative rows={review.negative_trigger_latency_rows}"
         ),
         f"  direct/non-proxy SHORT_TRIGGERED rows: {review.direct_or_nonproxy_triggered}",
         f"  point-in-time evidence violations: {review.point_in_time_violation_rows}",
@@ -1020,6 +1069,34 @@ def _trigger_vs_event_time_72h_edges(rows: Iterable[Mapping[str, Any]]) -> list[
     return out
 
 
+def _trigger_latencies_hours(rows: Iterable[Mapping[str, Any]]) -> list[float]:
+    out: list[float] = []
+    for row in rows:
+        event_time = _dt(row.get("event_time"))
+        trigger_time = _dt(row.get("trigger_observed_at"))
+        if event_time is None or trigger_time is None:
+            continue
+        out.append((trigger_time - event_time).total_seconds() / 3600.0)
+    return out
+
+
+def _event_types(rows: Iterable[Mapping[str, Any]]) -> set[str]:
+    out: set[str] = set()
+    for row in rows:
+        value = str(row.get("event_type") or "").strip()
+        if value:
+            out.add(value)
+    return out
+
+
+def _known_btc_risk_buckets(rows: Iterable[Mapping[str, Any]]) -> set[str]:
+    return {
+        bucket
+        for row in rows
+        if (bucket := _btc_risk_bucket(row)) != "btc_risk_unknown"
+    }
+
+
 def _cohorts(
     rows: Iterable[Mapping[str, Any]],
     key_fn,
@@ -1136,6 +1213,16 @@ def _mean(values: list[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
+def _median(values: list[float]) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
 def _fmt_pct(value: float | None) -> str:
     return "n/a" if value is None else f"{value * 100:.1f}%"
 
@@ -1146,3 +1233,7 @@ def _fmt_num(value: float | None) -> str:
 
 def _fmt_pp(value: float | None) -> str:
     return "n/a" if value is None else f"{value * 100:+.1f}pp"
+
+
+def _fmt_hours(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.1f}h"

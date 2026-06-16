@@ -463,9 +463,14 @@ The reviewer currently checks:
 - reviewed `SHORT_TRIGGERED` count against the 10-trigger minimum target
 - reviewed `SHORT_TRIGGERED` precision against the 60% minimum target and
   false-positive rate
+- reviewed proxy event-type diversity against the two-event-type minimum target
+- reviewed trigger BTC risk-bucket diversity against the two-bucket minimum
+  target
 - direct/non-proxy rows that somehow became `SHORT_TRIGGERED`
 - point-in-time evidence violations where the source was first seen after the
   decision time
+- trigger latency from event time to `SHORT_TRIGGERED`, including negative
+  latencies that imply invalid state progression
 - average MFE, MAE, MFE/MAE ratio, and post-event 24h/72h/7d returns for
   reviewed triggered rows
 - event-time short baseline 72h return and trigger-vs-baseline 72h edge

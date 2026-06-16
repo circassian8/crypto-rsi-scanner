@@ -243,10 +243,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   normalize into live signals, route alerts, or paper trade.
 - Event-fade validation review is research-only. `main.py --event-fade-review-sample`
   may read labeled JSONL/CSV sample artifacts and print coverage, trigger
-  precision, point-in-time violations, MFE/MAE, post-event returns,
-  event-time short baseline comparison, event-type/relationship/BTC-risk
-  cohorts, and promotion blockers, but it must not automatically promote
-  alerts, write live storage, open paper trades, or imply execution.
+  precision, trigger latency, point-in-time violations, MFE/MAE, post-event
+  returns, event-time short baseline comparison,
+  event-type/relationship/BTC-risk cohorts, diversity gates, and promotion
+  blockers, but it must not automatically promote alerts, write live storage,
+  open paper trades, or imply execution.
 - Event-fade validation labeling queues are artifact-only. `main.py
   --event-fade-labeling-queue` may prioritize unlabeled proxy/control rows and
   reviewed triggered rows missing required outcomes, but it must not auto-label
@@ -367,10 +368,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   features, missing-data fields, and blank human-review/outcome columns.
   `main.py --event-fade-review-sample PATH` reads labeled sample artifacts and
   reports sample coverage, reviewed trigger count, trigger precision,
-  false-positive rate, point-in-time evidence violations, MFE/MAE, post-event
-  returns, event-time short baseline comparison,
+  false-positive rate, trigger latency, point-in-time evidence violations,
+  MFE/MAE, post-event returns, event-time short baseline comparison,
   event-type/relationship/BTC-risk cohorts, and blockers such as too few
-  reviewed proxy/control/trigger cases or
+  reviewed proxy/control/trigger cases, too-narrow event/BTC-risk diversity, or
   weak edge-quality metrics. `main.py --event-fade-labeling-queue PATH`
   prioritizes the next rows to label and triggered rows missing required
   outcome fields. `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
