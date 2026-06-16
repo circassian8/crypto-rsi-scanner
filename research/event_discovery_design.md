@@ -39,11 +39,13 @@ Current files:
 - `event_models.py`: immutable discovery/classification data models
 - `event_providers/base.py`: provider protocols
 - `event_providers/manual_json.py`: local JSON fixture provider
-- `event_providers/coingecko_universe.py`: local CoinGecko market fixture
-  provider that reuses shared universe hygiene filters
+- `event_providers/coingecko_universe.py`: CoinGecko market provider that
+  reuses shared universe hygiene filters for local fixtures or opt-in live
+  resolver enrichment
 - `event_providers/binance_announcements.py`: local Binance announcement fixture
   provider for spot/listing-style direct events, including captured official CMS
-  WebSocket `com_announcement_en` payloads
+  WebSocket `com_announcement_en` payloads and opt-in bounded live WebSocket
+  fetches
 - `event_providers/bybit_announcements.py`: local Bybit announcement fixture
   provider for listing/perp-style direct events
 - `event_providers/coinmarketcal.py`: local structured calendar fixture provider
@@ -110,9 +112,17 @@ Binance and Bybit announcement providers read local JSON fixtures by default.
 Binance fixtures may be normalized listing-style rows or captured official CMS
 WebSocket `DATA` messages from topic `com_announcement_en`; the latter stores
 the announcement JSON string inside the `data` field with `catalogName`,
-`publishDate`, `title`, and `body`. A live Binance WebSocket listener/cache
-adapter is still future work, because the daily scanner provider interface is a
-bounded fetch rather than an always-on socket.
+`publishDate`, `title`, and `body`.
+
+Binance can also listen briefly to the official signed CMS WebSocket when
+`RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE=1` and
+`RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY` /
+`RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET` are set. The default
+topic is `com_announcement_en`, the default URL is
+`wss://api.binance.com/sapi/wss`, and
+`RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS` controls the bounded
+listen window used by report/refresh commands. This is a short research fetch,
+not an always-on socket daemon; an always-on cache listener remains future work.
 
 Bybit can also fetch the official `GET /v5/announcements/index` endpoint when
 `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1`. The live fetch is still a
@@ -537,18 +547,22 @@ RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report
 ```
 
-Run an opt-in live Bybit announcement radar pass:
+Run an opt-in live Binance/Bybit announcement radar pass:
 
 ```bash
+RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE=1 \
+RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY=... \
+RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET=... \
+RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS=10 \
 RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1 \
 RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TYPE=new_crypto \
 RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 \
   .venv/bin/python main.py --event-discovery-report
 ```
 
-The live Bybit and live CoinGecko universe paths are research-only and fail-soft.
-They should only add direct exchange-listing/perp-listing evidence and resolver
-coverage to the radar unless another source later
+The live Binance, Bybit, and CoinGecko universe paths are research-only and
+fail-soft. They should only add direct exchange-listing/perp-listing evidence
+and resolver coverage to the radar unless another source later
 proves a proxy relationship.
 
 Run an opt-in live CryptoPanic news radar pass:

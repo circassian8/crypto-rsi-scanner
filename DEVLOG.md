@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add opt-in live Binance announcement discovery · Codex
+**Why:** The radar could parse captured Binance CMS announcement payloads, but
+it still could not ingest Binance's official signed WebSocket feed during
+research refresh/report runs. The Pro-plan exchange-provider phase calls for
+automatic discovery from exchange announcements while preserving the proxy gate.
+**Changes:**
+- Extended `crypto_rsi_scanner/event_providers/binance_announcements.py` with an
+  opt-in bounded live WebSocket fetch path for Binance CMS announcements. It
+  signs the `com_announcement_en` subscription URL, uses the API key header,
+  listens for a configurable short window, and reuses the same CMS DATA parser
+  as fixtures.
+- Added config and `.env.example` knobs for live Binance announcement research:
+  API key/secret, WebSocket URL, topic, recv window, listen seconds, and max
+  messages.
+- Wired the live Binance source through `event_discovery.py` and `scanner.py`,
+  including source-detection for report/refresh commands.
+- Added offline WebSocket tests covering signed URL/header construction, control
+  frame tolerance, CMS DATA parsing, and missing-credential fail-soft behavior.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to document the signed, opt-in,
+  research-only Binance path and keep always-on caching as future work.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 202/202.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This is a bounded report/refresh fetch, not an always-on
+listener. Binance listing/perp announcements remain direct events and stay
+`NO_TRADE` under the event-fade proxy gate unless another source proves a true
+proxy relationship.
+
 ## 2026-06-16 — Add opt-in live CoinGecko discovery universe · Codex
 **Why:** Event discovery had live news/exchange inputs, but asset resolution
 still depended on local universe fixtures. Live research passes need the same

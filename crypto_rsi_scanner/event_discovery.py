@@ -302,6 +302,14 @@ def run_manual_discovery(
     alias_path: str | Path | None,
     *,
     binance_announcements_path: str | Path | None = None,
+    binance_announcements_live: bool = False,
+    binance_announcements_api_key: str = "",
+    binance_announcements_api_secret: str = "",
+    binance_announcements_ws_url: str = "wss://api.binance.com/sapi/wss",
+    binance_announcements_topic: str = "com_announcement_en",
+    binance_announcements_recv_window_ms: int = 30000,
+    binance_announcements_listen_seconds: float = 5.0,
+    binance_announcements_max_messages: int = 20,
     bybit_announcements_path: str | Path | None = None,
     bybit_announcements_live: bool = False,
     bybit_announcements_base_url: str = "https://api.bybit.com",
@@ -357,6 +365,14 @@ def run_manual_discovery(
         start,
         end,
         binance_announcements_path=binance_announcements_path,
+        binance_announcements_live=binance_announcements_live,
+        binance_announcements_api_key=binance_announcements_api_key,
+        binance_announcements_api_secret=binance_announcements_api_secret,
+        binance_announcements_ws_url=binance_announcements_ws_url,
+        binance_announcements_topic=binance_announcements_topic,
+        binance_announcements_recv_window_ms=binance_announcements_recv_window_ms,
+        binance_announcements_listen_seconds=binance_announcements_listen_seconds,
+        binance_announcements_max_messages=binance_announcements_max_messages,
         bybit_announcements_path=bybit_announcements_path,
         bybit_announcements_live=bybit_announcements_live,
         bybit_announcements_base_url=bybit_announcements_base_url,
@@ -422,6 +438,14 @@ def load_discovery_events(
     end: datetime,
     *,
     binance_announcements_path: str | Path | None = None,
+    binance_announcements_live: bool = False,
+    binance_announcements_api_key: str = "",
+    binance_announcements_api_secret: str = "",
+    binance_announcements_ws_url: str = "wss://api.binance.com/sapi/wss",
+    binance_announcements_topic: str = "com_announcement_en",
+    binance_announcements_recv_window_ms: int = 30000,
+    binance_announcements_listen_seconds: float = 5.0,
+    binance_announcements_max_messages: int = 20,
     bybit_announcements_path: str | Path | None = None,
     bybit_announcements_live: bool = False,
     bybit_announcements_base_url: str = "https://api.bybit.com",
@@ -460,8 +484,18 @@ def load_discovery_events(
     events: list[RawDiscoveredEvent] = []
     if event_path:
         events.extend(ManualJsonEventProvider(event_path).fetch_events(start, end))
-    if binance_announcements_path:
-        events.extend(BinanceAnnouncementProvider(binance_announcements_path).fetch_events(start, end))
+    if binance_announcements_path or binance_announcements_live:
+        events.extend(BinanceAnnouncementProvider(
+            binance_announcements_path,
+            live_enabled=binance_announcements_live,
+            api_key=binance_announcements_api_key,
+            api_secret=binance_announcements_api_secret,
+            ws_url=binance_announcements_ws_url,
+            topic=binance_announcements_topic,
+            recv_window_ms=binance_announcements_recv_window_ms,
+            listen_seconds=binance_announcements_listen_seconds,
+            max_messages=binance_announcements_max_messages,
+        ).fetch_events(start, end))
     if bybit_announcements_path or bybit_announcements_live:
         events.extend(BybitAnnouncementProvider(
             bybit_announcements_path,

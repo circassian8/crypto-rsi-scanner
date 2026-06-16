@@ -889,6 +889,96 @@ def test_event_discovery_binance_cms_websocket_payload_fixture():
     assert event.raw_json["event"]["event_time_confidence"] == 0.60
 
 
+def test_event_discovery_binance_live_websocket_provider_parses_offline():
+    import hashlib
+    import hmac
+    import json
+    from datetime import datetime, timezone
+
+    import aiohttp
+
+    from crypto_rsi_scanner.event_providers.binance_announcements import BinanceAnnouncementProvider
+
+    payload = {
+        "type": "DATA",
+        "topic": "com_announcement_en",
+        "data": json.dumps({
+            "catalogId": 48,
+            "catalogName": "New Cryptocurrency Listing",
+            "publishDate": 1781514000000,
+            "title": "Binance Will List Test Live (TLIVE)",
+            "body": "Binance will list Test Live and open spot trading for TLIVE/USDT.",
+        }),
+    }
+    messages = [
+        type("Msg", (), {"type": aiohttp.WSMsgType.TEXT, "data": json.dumps({"type": "COMMAND", "code": "000000"})}),
+        type("Msg", (), {"type": aiohttp.WSMsgType.TEXT, "data": json.dumps(payload)}),
+        type("Msg", (), {"type": aiohttp.WSMsgType.CLOSED, "data": ""}),
+    ]
+    seen = {}
+
+    class FakeWs:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def receive(self):
+            return messages.pop(0)
+
+    class FakeSession:
+        def __init__(self, **kwargs):
+            seen["timeout"] = kwargs.get("timeout")
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def ws_connect(self, url, *, headers=None, heartbeat=None):
+            seen["url"] = url
+            seen["headers"] = headers
+            seen["heartbeat"] = heartbeat
+            return FakeWs()
+
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    events = BinanceAnnouncementProvider(
+        None,
+        live_enabled=True,
+        api_key="binance-key",
+        api_secret="binance-secret",
+        ws_url="wss://example.test/sapi/wss",
+        listen_seconds=1,
+        session_factory=FakeSession,
+        clock=lambda: 1781514000.0,
+        random_factory=lambda: "fixed-random",
+        required=True,
+    ).fetch_events(start, end)
+
+    signed_payload = "random=fixed-random&topic=com_announcement_en&recvWindow=30000&timestamp=1781514000000"
+    signature = hmac.new(b"binance-secret", signed_payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    assert seen["url"] == f"wss://example.test/sapi/wss?{signed_payload}&signature={signature}"
+    assert seen["headers"] == {"X-MBX-APIKEY": "binance-key"}
+    assert seen["heartbeat"] == 30.0
+    assert len(events) == 1
+    assert events[0].provider == "binance_announcements"
+    assert events[0].title == "Binance Will List Test Live (TLIVE)"
+    assert events[0].raw_json["message_type"] == "DATA"
+    assert events[0].raw_json["event"]["event_type"] == "exchange_listing"
+
+
+def test_event_discovery_binance_live_websocket_missing_credentials_fail_soft():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner.event_providers.binance_announcements import BinanceAnnouncementProvider
+
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    assert BinanceAnnouncementProvider(None, live_enabled=True).fetch_events(start, end) == []
+
+
 def test_event_discovery_bybit_live_provider_parses_documented_response_offline():
     import json
     from datetime import datetime, timezone
