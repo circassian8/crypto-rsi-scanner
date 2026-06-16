@@ -50,7 +50,13 @@ REVIEW_FIELDS = (
     "event_time_post_event_return_72h",
     "event_time_post_event_return_7d",
 )
-REVIEW_MERGE_IGNORED_FIELDS = frozenset({"exported_at", *REVIEW_FIELDS})
+ASSET_ROLE_REVIEW_METADATA_FIELDS = (
+    "asset_role",
+    "asset_role_confidence",
+    "asset_role_reason",
+    "asset_role_evidence",
+)
+REVIEW_MERGE_IGNORED_FIELDS = frozenset({"exported_at", *REVIEW_FIELDS, *ASSET_ROLE_REVIEW_METADATA_FIELDS})
 REVIEW_EVIDENCE_FIELDS = tuple(
     field for field in VALIDATION_SAMPLE_FIELDS if field not in REVIEW_MERGE_IGNORED_FIELDS
 )
@@ -58,6 +64,7 @@ REVIEW_TEMPLATE_FIELDS = (
     "event_id",
     "asset_coin_id",
     "asset_symbol",
+    "asset_role",
     "relationship_type",
     "event_name",
     "event_type",
@@ -1101,7 +1108,8 @@ def _format_review_packet_row(
         ),
         (
             f"- Asset: `{symbol}` (`{coin_id}`) | relationship: "
-            f"`{_packet_text(item.relationship_type or 'unknown')}`"
+            f"`{_packet_text(item.relationship_type or 'unknown')}` | "
+            f"role: `{_packet_text(row.get('asset_role') or 'unknown')}`"
         ),
         (
             "- Classification: "

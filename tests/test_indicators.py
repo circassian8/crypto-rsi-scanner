@@ -2190,8 +2190,127 @@ def test_event_discovery_proxy_article_without_event_time_stays_reviewable_no_tr
     candidate = result.candidates[0]
     assert candidate.classification.is_proxy_narrative is True
     assert candidate.classification.relationship_type == "proxy_attention"
+    assert candidate.classification.asset_role == "proxy_instrument"
     assert candidate.fade_signal.signal_type == FadeSignalType.NO_TRADE
     assert "not an eligible proxy event-fade candidate" in candidate.fade_signal.warnings
+
+
+def test_event_discovery_asset_role_demotes_proxy_context_noise():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_providers.manual_json import content_hash
+
+    def raw_event(raw_id, title, body, external_asset="SpaceX"):
+        payload = {
+            "raw_id": raw_id,
+            "title": title,
+            "body": body,
+            "event": {
+                "event_id": raw_id,
+                "event_name": title,
+                "event_type": "ipo_proxy",
+                "event_time": None,
+                "event_time_confidence": 0.0,
+                "external_asset": external_asset,
+                "confidence": 0.75,
+                "description": body,
+            },
+        }
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="test_rss",
+            fetched_at=datetime(2026, 6, 16, 13, 0, tzinfo=timezone.utc),
+            published_at=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body,
+            raw_json=payload,
+            source_confidence=0.75,
+            content_hash=content_hash(payload),
+        )
+
+    assets = [
+        DiscoveredAsset(
+            coin_id="bitcoin",
+            symbol="BTC",
+            name="Bitcoin",
+            market_cap=1_000_000_000_000,
+            volume_24h=20_000_000_000,
+            price=65_000,
+            categories=("store-of-value",),
+            contract_addresses={},
+            source="test",
+            aliases=("bitcoin", "btc"),
+        ),
+        DiscoveredAsset(
+            coin_id="hyperliquid",
+            symbol="HYPE",
+            name="Hyperliquid",
+            market_cap=1_000_000_000,
+            volume_24h=200_000_000,
+            price=35.0,
+            categories=("perp-dex",),
+            contract_addresses={},
+            source="test",
+            aliases=("hyperliquid", "hype"),
+        ),
+        DiscoveredAsset(
+            coin_id="solana",
+            symbol="SOL",
+            name="Solana",
+            market_cap=100_000_000_000,
+            volume_24h=5_000_000_000,
+            price=150.0,
+            categories=("layer-1",),
+            contract_addresses={},
+            source="test",
+            aliases=("solana", "sol"),
+        ),
+    ]
+    raw = [
+        raw_event(
+            "spacex-bitcoin-hyperliquid",
+            "SpaceX S-1 Reveals 18,712 Bitcoin as Hyperliquid's Pre-IPO Market Prices SPCX",
+            "Hyperliquid lists pre-IPO SpaceX contracts while the filing mentions Bitcoin holdings.",
+        ),
+        raw_event(
+            "spacex-hype-common-word",
+            "SpaceX Hype Spurs Crypto Shadow Market for Pre-IPO Bets",
+            "A shadow market is forming for SpaceX pre-IPO exposure, but the exchange token is not named.",
+        ),
+        raw_event(
+            "spacex-on-solana",
+            "SpaceX tokenized stock demand on Solana surged before allocations were canceled",
+            "Tokenized stock infrastructure on Solana saw demand, but Solana is the chain, not the proxy instrument.",
+        ),
+    ]
+
+    result = event_discovery.run_discovery(raw, assets, now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc))
+    by_event_asset = {
+        (candidate.event.event_id, candidate.asset.coin_id): candidate
+        for candidate in result.candidates
+    }
+
+    btc = by_event_asset[("spacex-bitcoin-hyperliquid", "bitcoin")]
+    assert btc.classification.relationship_type == "proxy_context"
+    assert btc.classification.asset_role == "mentioned_asset"
+    assert btc.classification.is_proxy_narrative is False
+
+    venue = by_event_asset[("spacex-bitcoin-hyperliquid", "hyperliquid")]
+    assert venue.classification.relationship_type == "proxy_attention"
+    assert venue.classification.asset_role == "proxy_venue"
+    assert venue.classification.is_proxy_narrative is True
+
+    ticker_word = by_event_asset[("spacex-hype-common-word", "hyperliquid")]
+    assert ticker_word.classification.relationship_type == "proxy_context"
+    assert ticker_word.classification.asset_role == "ticker_word_collision"
+    assert ticker_word.classification.is_proxy_narrative is False
+
+    sol = by_event_asset[("spacex-on-solana", "solana")]
+    assert sol.classification.relationship_type == "proxy_context"
+    assert sol.classification.asset_role == "infrastructure"
+    assert sol.classification.is_proxy_narrative is False
 
 
 def test_event_discovery_news_pipeline_proxy_direct_late_and_ambiguous_safety():
@@ -2445,6 +2564,10 @@ def test_event_fade_validation_sample_rows_and_serializers():
     assert velvet["relationship_type"] == "proxy_exposure"
     assert velvet["is_proxy_narrative"] is True
     assert velvet["is_direct_beneficiary"] is False
+    assert velvet["asset_role"] == "proxy_instrument"
+    assert velvet["asset_role_confidence"] >= 0.75
+    assert velvet["asset_role_reason"]
+    assert velvet["asset_role_evidence"]
     assert velvet["signal_type"] == "SHORT_TRIGGERED"
     assert velvet["fade_state"] == "TRIGGERED_SHORT"
     assert velvet["eligible"] is True

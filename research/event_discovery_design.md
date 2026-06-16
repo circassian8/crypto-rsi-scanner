@@ -205,6 +205,24 @@ The resolver also rejects common identity words observed in public feeds
 (`cash`, `real`, `just`, `humanity`) so they do not become high-confidence
 asset matches from normal prose.
 
+After an article resolves to an asset, the classifier assigns an asset role:
+
+- `proxy_instrument`: the token/instrument is explicitly framed as the proxy
+  exposure asset.
+- `proxy_venue`: the venue/platform token is explicitly tied to the proxy
+  market narrative.
+- `direct_beneficiary`: the event directly affects the token itself.
+- `mentioned_asset`: the asset is background market/treasury context.
+- `infrastructure`: the asset is the chain, network, or plumbing used by the
+  proxy market.
+- `ticker_word_collision`: a short ticker alias matched normal prose rather
+  than the crypto ticker.
+
+Only `proxy_instrument` and `proxy_venue` can remain `is_proxy_narrative=True`.
+`mentioned_asset`, `infrastructure`, and `ticker_word_collision` rows are kept
+as `proxy_context` controls for review, but they cannot pass event-fade
+eligibility.
+
 ## External Catalyst Providers
 
 External IPO, sports-fixture, and prediction-market providers currently read
@@ -862,7 +880,10 @@ This target enables `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, points
 `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH` at the checked-in public feed
 list, sets a 30-day lookback, and enables broader live CoinGecko universe
 enrichment by default so real article mentions can resolve beyond the fixture
-aliases. Provider/network failures remain warnings in `discovery_runs.jsonl`.
+aliases. Public RSS rows now include asset-role metadata in validation exports
+and review packets so reviewers can separate actual proxy instruments/venues
+from background mentions, infrastructure rows, and ticker-word collisions.
+Provider/network failures remain warnings in `discovery_runs.jsonl`.
 
 Inspect configured provider readiness without printing secrets:
 

@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-discovery asset-role classification · Codex
+**Why:** The public RSS bundle started surfacing proxy-style rows, but it still
+treated background mentions and infrastructure rows inside SpaceX/HYPE articles
+as proxy candidates. That polluted the manual validation queue before any human
+labeling.
+**Changes:**
+- Added asset-role metadata to `EventClassification`, validation exports,
+  discovery/auto reports, review packets, and review templates.
+- Classified proxy-style links as `proxy_instrument`, `proxy_venue`,
+  `mentioned_asset`, `infrastructure`, `ticker_word_collision`, or
+  `direct_beneficiary`.
+- Demoted non-instrument proxy-context rows to `relationship_type=proxy_context`
+  with `is_proxy_narrative=False`, so BTC treasury mentions, Solana chain rows,
+  and common-word HYPE matches stay negative/control evidence.
+- Kept role metadata as additive validation-sample fields and ignored those
+  fields during review-field merge comparisons unless the relationship itself
+  changes.
+- Documented the durable rule in `DECISIONS.md` and the event-discovery design.
+**Verify:** `make verify` passes, including 234/234 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard. A fresh public RSS cycle wrote
+137 raw / 135 normalized events and 64 candidate snapshots into
+`/tmp/event_fade_role_rss_cache`; the review bundle had 64 rows, with proxy
+rows reduced to 3 actual HYPE proxy-instrument/venue rows and 6 `proxy_context`
+controls for BTC/SOL/common-word Hype noise.
+**Notes/risks:** Venue-vs-infrastructure is still deterministic and may be too
+strict in borderline "on Hyperliquid" articles. This remains review-only and
+does not alter live routing, paper trading, or live DB writes.
+
 ## 2026-06-16 — Surface public RSS proxy-attention review rows · Codex
 **Why:** The no-key public RSS review cycle was clean after removing fixture
 aliases, but it produced no proxy rows because broad publisher feeds mostly

@@ -71,6 +71,10 @@ VALIDATION_SAMPLE_FIELDS = (
     "asset_coin_id",
     "asset_symbol",
     "asset_name",
+    "asset_role",
+    "asset_role_confidence",
+    "asset_role_reason",
+    "asset_role_evidence",
     "link_confidence",
     "match_reason",
     "link_evidence",
@@ -292,6 +296,8 @@ def run_discovery(
                     "link_confidence": link.link_confidence,
                     "classifier_confidence": classification.confidence,
                     "classifier_pass": classification.confidence >= cfg.min_classifier_confidence,
+                    "asset_role": classification.asset_role,
+                    "asset_role_confidence": classification.asset_role_confidence,
                     "has_market_snapshot": fade_candidate is not None and fade_candidate.market.price > 0,
                     "has_derivatives_snapshot": fade_candidate is not None and fade_candidate.derivatives is not None,
                     "has_supply_snapshot": fade_candidate is not None and fade_candidate.supply is not None,
@@ -775,7 +781,7 @@ def format_discovery_report(result: EventDiscoveryResult) -> str:
         derivatives = "yes" if candidate.data_quality.get("has_derivatives_snapshot") else "no"
         supply = "yes" if candidate.data_quality.get("has_supply_snapshot") else "no"
         rows.append(
-            f"  {candidate.asset.symbol:<12} {relation:<22} {proxy:<9} "
+            f"  {candidate.asset.symbol:<12} {relation:<22} {proxy:<9} role={cls.asset_role:<18} "
             f"link={candidate.link.link_confidence:.2f} cls={cls.confidence:.2f} "
             f"score={score:<3} deriv={derivatives:<3} supply={supply:<3} signal={signal}/{state}"
         )
@@ -915,6 +921,7 @@ def _format_auto_candidate(candidate: DiscoveredEventFadeCandidate) -> list[str]
     if candidate.event.source_urls:
         rows.append("    sources: " + ", ".join(candidate.event.source_urls[:3]))
     rows.append("    classification: " + cls.reason)
+    rows.append("    asset role: " + cls.asset_role_reason)
     return rows
 
 
@@ -1017,6 +1024,10 @@ def _validation_sample_row(
         "asset_coin_id": candidate.asset.coin_id,
         "asset_symbol": candidate.asset.symbol,
         "asset_name": candidate.asset.name,
+        "asset_role": candidate.classification.asset_role,
+        "asset_role_confidence": candidate.classification.asset_role_confidence,
+        "asset_role_reason": candidate.classification.asset_role_reason,
+        "asset_role_evidence": list(candidate.classification.asset_role_evidence),
         "link_confidence": candidate.link.link_confidence,
         "match_reason": candidate.link.match_reason,
         "link_evidence": list(candidate.link.evidence),

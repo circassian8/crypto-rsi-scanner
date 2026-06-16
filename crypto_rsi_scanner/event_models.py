@@ -80,6 +80,10 @@ class EventClassification:
     classifier_version: str
     reason: str
     evidence: tuple[str, ...]
+    asset_role: str = "ambiguous"
+    asset_role_confidence: float = 0.0
+    asset_role_reason: str = ""
+    asset_role_evidence: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

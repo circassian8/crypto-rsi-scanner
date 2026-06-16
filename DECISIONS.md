@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-16 - Classify event-fade asset roles before proxy eligibility
+**Status:** accepted
+**Decision:** Event discovery must distinguish the linked crypto asset's role
+inside a proxy-style article. Only assets classified as the proxy instrument or
+proxy venue/platform may remain `is_proxy_narrative=True`; background mentions,
+chain/venue infrastructure, and ticker-word collisions become `proxy_context`
+negative/control rows and must stay `NO_TRADE`.
+**Why:** Public RSS evidence can mention BTC treasuries, chains such as Solana,
+or common English words that collide with tickers inside otherwise valid
+SpaceX/OpenAI-style proxy narratives. Treating those as proxy candidates would
+pollute the validation sample and overstate discovery quality.
+**Revisit when:** A reviewed event-fade sample shows the role taxonomy is too
+strict or a stronger source-specific entity resolver replaces the deterministic
+rules.
+
 ## 2026-06-16 - Allow observational event-discovery JSONL cache
 **Status:** accepted
 **Decision:** Event discovery may write local JSONL cache artifacts under the

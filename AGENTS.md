@@ -258,6 +258,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   Proxy-style news without a known event time may enter validation samples as
   `proxy_attention` review evidence, but it must remain `NO_TRADE` because the
   event-fade hard gate still requires a real event time.
+  Asset role classification is part of the proxy gate: only `proxy_instrument`
+  and `proxy_venue` rows remain proxy candidates; `mentioned_asset`,
+  `infrastructure`, and `ticker_word_collision` rows become `proxy_context`
+  controls.
   The resolver also guards common identity words observed in public feeds
   (`cash`, `real`, `just`, `humanity`) from becoming high-confidence matches.
   Provider enrichment is evidence, not eligibility; raw reviewed fixture
@@ -428,7 +432,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   newline URL files when `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1`, can
   infer common external assets such as SpaceX/OpenAI in news text, can preserve
   no-event-time proxy-style articles as `proxy_attention` review rows that
-  remain `NO_TRADE`, can parse local external IPO,
+  remain `NO_TRADE`, can classify linked-asset roles so background mentions,
+  infrastructure chains, and ticker-word collisions become `proxy_context`
+  controls, can parse local external IPO,
   sports, and prediction-market catalyst fixtures as radar evidence, can attach local
   Coinalyze-style OI/funding/crowding snapshots from
   `RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH`, can optionally fetch live
@@ -444,8 +450,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   and ambiguous sections with evidence/warnings. The validation-sample export is
   `main.py --event-fade-export-sample PATH` and writes JSONL/CSV rows with raw
   source evidence, point-in-time timestamps, link/classifier evidence, fade
-  features, missing-data fields, raw/min/max source timestamps for leakage
-  review, and blank human-review/outcome columns.
+  features, asset-role metadata, missing-data fields, raw/min/max source
+  timestamps for leakage review, and blank human-review/outcome columns.
   `main.py --event-fade-review-sample PATH` reads labeled sample artifacts and
   reports sample coverage, reviewed trigger count, trigger precision,
   false-positive rate, trigger latency, point-in-time evidence violations,
