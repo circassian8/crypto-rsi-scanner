@@ -89,9 +89,12 @@ def write_event_discovery_cache(
         ),
         key_fields=("event_id", "coin_id", "classifier_version", "relationship_type"),
     )
+    previous_transitions = _latest_transition_state(root / "candidate_snapshots.jsonl")
+    sample_rows = event_discovery.event_fade_validation_sample_rows(result, exported_at=observed)
+    sample_rows = _apply_transition_timestamps(sample_rows, previous_transitions, observed_iso)
     candidate_rows = (
         _cache_row("candidate_snapshot", row, run_id, observed_iso)
-        for row in event_discovery.event_fade_validation_sample_rows(result, exported_at=observed)
+        for row in sample_rows
     )
     candidate_written = _append_jsonl(root / "candidate_snapshots.jsonl", candidate_rows)
     run_written = _append_jsonl(root / "discovery_runs.jsonl", [{
@@ -260,6 +263,85 @@ def _unwrap_candidate_snapshot(row: Mapping[str, Any]) -> dict[str, Any] | None:
     sample["schema_version"] = schema
     sample["row_type"] = row.get("payload_row_type") or "candidate"
     return sample
+
+
+def _latest_transition_state(path: Path) -> dict[tuple[str, str, str], dict[str, Any]]:
+    state: dict[tuple[str, str, str], tuple[datetime, int, dict[str, Any]]] = {}
+    for idx, row in enumerate(_read_jsonl(path)):
+        if row.get("row_type") != "candidate_snapshot":
+            continue
+        sample = _unwrap_candidate_snapshot(row)
+        if sample is None:
+            continue
+        key = _validation_identity(sample)
+        if key is None:
+            continue
+        observed = _parse_iso(sample.get("exported_at") or row.get("observed_at"))
+        current = state.get(key)
+        if current is None or (observed, idx) >= (current[0], current[1]):
+            state[key] = (observed, idx, sample)
+    return {key: value[2] for key, value in state.items()}
+
+
+def _apply_transition_timestamps(
+    rows: Iterable[Mapping[str, Any]],
+    previous: Mapping[tuple[str, str, str], Mapping[str, Any]],
+    observed_iso: str,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        data = dict(row)
+        key = _validation_identity(data)
+        prior = previous.get(key) if key is not None else None
+        first_seen = _first_nonempty(prior, "first_seen_at") if prior else None
+        first_seen = first_seen or observed_iso
+        data["first_seen_at"] = first_seen
+        data["last_seen_at"] = observed_iso
+
+        if _is_watchlisted(data):
+            data["first_watchlisted_at"] = _first_nonempty(prior, "first_watchlisted_at") if prior else None
+            data["first_watchlisted_at"] = data["first_watchlisted_at"] or observed_iso
+        elif prior and prior.get("first_watchlisted_at"):
+            data["first_watchlisted_at"] = prior.get("first_watchlisted_at")
+
+        if _is_armed(data):
+            data["first_armed_at"] = _first_nonempty(prior, "first_armed_at") if prior else None
+            data["first_armed_at"] = data["first_armed_at"] or observed_iso
+        elif prior and prior.get("first_armed_at"):
+            data["first_armed_at"] = prior.get("first_armed_at")
+
+        if _is_triggered(data):
+            data["first_triggered_at"] = _first_nonempty(prior, "first_triggered_at") if prior else None
+            data["first_triggered_at"] = data["first_triggered_at"] or data.get("trigger_observed_at") or observed_iso
+        elif prior and prior.get("first_triggered_at"):
+            data["first_triggered_at"] = prior.get("first_triggered_at")
+        out.append(data)
+    return out
+
+
+def _first_nonempty(row: Mapping[str, Any] | None, field: str) -> Any:
+    if not row:
+        return None
+    value = row.get(field)
+    return value if value not in (None, "") else None
+
+
+def _is_watchlisted(row: Mapping[str, Any]) -> bool:
+    return str(row.get("signal_type") or "") in {"WATCHLIST", "ARMED", "SHORT_TRIGGERED"} or str(
+        row.get("fade_state") or ""
+    ) in {"WATCHLISTED", "PRE_EVENT_HYPE", "BLOWOFF_RISK", "EVENT_PASSED", "ARMED", "TRIGGERED_SHORT"}
+
+
+def _is_armed(row: Mapping[str, Any]) -> bool:
+    return str(row.get("signal_type") or "") in {"ARMED", "SHORT_TRIGGERED"} or str(row.get("fade_state") or "") in {
+        "ARMED",
+        "TRIGGERED_SHORT",
+        "MANAGING_POSITION",
+    }
+
+
+def _is_triggered(row: Mapping[str, Any]) -> bool:
+    return str(row.get("signal_type") or "") == "SHORT_TRIGGERED" or str(row.get("fade_state") or "") == "TRIGGERED_SHORT"
 
 
 def _latest_validation_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:

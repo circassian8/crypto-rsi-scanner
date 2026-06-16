@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-17 - Keep weak discovery evidence review-only
+**Status:** accepted
+**Decision:** Event discovery may keep low-confidence classifier matches,
+low-confidence event-time rows, and `proxy_venue` rows in review artifacts, but
+they must force `NO_TRADE` by default before event-fade signals can trigger.
+`proxy_instrument` remains eligible if every hard gate passes; `proxy_venue`
+requires explicit opt-in via `RSI_EVENT_FADE_ALLOW_PROXY_VENUE_TRIGGER=1`.
+**Why:** Venue/platform mentions are noisier than true proxy instruments, and
+source-text dates or weak classifications can make backtests look tradable when
+the system would not have had strong enough evidence in real time.
+**Revisit when:** A reviewed event-fade sample proves venue-token fades or
+low-confidence timestamp/classification rows have durable edge after timing,
+costs, and negative-control checks.
+
 ## 2026-06-16 - Classify event-fade asset roles before proxy eligibility
 **Status:** accepted
 **Decision:** Event discovery must distinguish the linked crypto asset's role

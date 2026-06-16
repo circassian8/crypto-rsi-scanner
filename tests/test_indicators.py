@@ -125,6 +125,40 @@ def test_state_features_volatility_state_rules():
     assert sf.volatility_state(0.50, 0.35, 0.95) == "crisis"
 
 
+def test_makefile_has_clean_export_and_bootstrap_targets():
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+    assert "PYTHON ?= .venv/bin/python" in makefile
+    assert "check-python:" in makefile
+    assert "bootstrap:" in makefile
+    assert "python3 -m venv .venv" in makefile
+    assert "export-src:" in makefile
+    assert "git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD" in makefile
+    assert "Run 'make bootstrap' or override with 'make verify PYTHON=python3'." in makefile
+
+    export_dry = subprocess.run(
+        ["make", "-n", "export-src"],
+        cwd=root,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    assert "git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD" in export_dry.stdout
+
+    verify_dry = subprocess.run(
+        ["make", "-n", "verify", "PYTHON=python3"],
+        cwd=root,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    assert "python3 tests/test_indicators.py" in verify_dry.stdout
+    assert ".venv/bin/python tests/test_indicators.py" not in verify_dry.stdout
+
+
 def test_state_features_cross_sectional_ranks_monotonic():
     from crypto_rsi_scanner import state_features as sf
 
@@ -1327,6 +1361,76 @@ def test_event_discovery_normalizes_and_dedupes_events():
     assert spacex.confidence == 1.0
 
 
+def test_event_discovery_canonical_dedupe_merges_variant_headlines_and_payloads():
+    import copy
+    from dataclasses import replace
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider, content_hash
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
+        datetime(2026, 6, 12, tzinfo=timezone.utc),
+        datetime(2026, 6, 17, tzinfo=timezone.utc),
+    )
+    base = raw[0]
+
+    def variant(raw_id, title, body, *, keep_sections):
+        payload = copy.deepcopy(base.raw_json)
+        payload["raw_id"] = raw_id
+        payload["title"] = title
+        payload["body"] = body
+        payload["event"]["event_id"] = raw_id
+        payload["event"]["event_name"] = title
+        payload["event"]["description"] = body
+        for section in ("market", "derivatives", "supply", "rsi", "technical"):
+            if section not in keep_sections:
+                payload.pop(section, None)
+        return replace(
+            base,
+            raw_id=raw_id,
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body,
+            raw_json=payload,
+            content_hash=content_hash(payload),
+        )
+
+    first = variant(
+        "spacex-ipo-rich-market",
+        "TESTVELVET lets traders access SpaceX pre-IPO market before debut",
+        "TESTVELVET offers synthetic exposure to SpaceX before IPO trading starts.",
+        keep_sections={"market", "derivatives", "supply", "rsi"},
+    )
+    second = variant(
+        "spacex-nasdaq-rich-technical",
+        "SpaceX opens Nasdaq trading on June 15 as TESTVELVET proxy token demand peaks",
+        "TESTVELVET proxy token failed reclaim after the SpaceX pre-IPO proxy event.",
+        keep_sections={"technical"},
+    )
+    result = event_discovery.run_discovery(
+        [first, second],
+        load_asset_aliases(aliases_path),
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert len(result.normalized_events) == 1
+    event = result.normalized_events[0]
+    assert set(event.raw_ids) == {"spacex-ipo-rich-market", "spacex-nasdaq-rich-technical"}
+    assert set(event.source_urls) == {
+        "https://example.test/spacex-ipo-rich-market",
+        "https://example.test/spacex-nasdaq-rich-technical",
+    }
+    candidate = result.candidates[0]
+    assert candidate.data_quality["source_count"] == 2
+    assert candidate.fade_candidate.market.price == 7.2
+    assert candidate.fade_candidate.technical.failed_reclaim_event_vwap is True
+    assert candidate.fade_candidate.technical.entry_reference_price == 7.2
+    assert candidate.fade_signal.signal_type == FadeSignalType.SHORT_TRIGGERED
+
+
 def test_event_resolver_aliases_and_rejects_ticker_collision():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -2300,11 +2404,97 @@ def test_event_discovery_proxy_article_with_text_date_becomes_dated_review_candi
     assert candidate.classification.asset_role == "proxy_instrument"
     assert candidate.fade_candidate.event.confidence == 0.60
     assert candidate.fade_signal.signal_type == FadeSignalType.NO_TRADE
-    assert "not an eligible proxy event-fade candidate" in candidate.fade_signal.warnings
+    assert candidate.data_quality["event_time_confidence_pass"] is False
+    assert candidate.data_quality["forced_no_trade_reason"] == "low_event_time_confidence"
+    assert "event time confidence below discovery trigger threshold; review-only" in candidate.fade_signal.warnings
 
     rows = event_discovery.event_fade_validation_sample_rows(result)
     assert rows[0]["event_time_source"] == "text_date"
     assert rows[0]["event_time_confidence"] == 0.60
+
+
+def test_event_discovery_explicit_event_time_can_trigger_but_text_date_is_review_only():
+    import copy
+    from dataclasses import replace
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider, content_hash
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
+        datetime(2026, 6, 12, tzinfo=timezone.utc),
+        datetime(2026, 6, 17, tzinfo=timezone.utc),
+    )
+    assets = load_asset_aliases(aliases_path)
+    explicit = event_discovery.run_discovery(
+        [raw[0]],
+        assets,
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    ).candidates[0]
+    assert explicit.event.event_time_source == "explicit"
+    assert explicit.fade_signal.signal_type == FadeSignalType.SHORT_TRIGGERED
+    assert explicit.data_quality["forced_no_trade_reason"] is None
+
+    payload = copy.deepcopy(raw[0].raw_json)
+    payload["event"]["event_time_confidence"] = 0.60
+    payload["event"]["event_time_source"] = "text_date"
+    text_date_raw = replace(
+        raw[0],
+        raw_id="velvet-text-date-low-confidence",
+        raw_json=payload,
+        content_hash=content_hash(payload),
+    )
+    text_date = event_discovery.run_discovery(
+        [text_date_raw],
+        assets,
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    ).candidates[0]
+    assert text_date.event.event_time_source == "text_date"
+    assert text_date.fade_signal.fade_score >= 80
+    assert text_date.fade_signal.signal_type == FadeSignalType.NO_TRADE
+    assert text_date.data_quality["forced_no_trade_reason"] == "low_event_time_confidence"
+
+
+def test_event_discovery_forces_no_trade_on_low_classifier_confidence():
+    from dataclasses import replace
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    raw = ManualJsonEventProvider(events_path, required=True).fetch_events(
+        datetime(2026, 6, 12, tzinfo=timezone.utc),
+        datetime(2026, 6, 17, tzinfo=timezone.utc),
+    )
+    assets = load_asset_aliases(aliases_path)
+    original_classifier = event_discovery.classify_event_asset
+
+    def low_confidence_classifier(event, asset, link):
+        classification = original_classifier(event, asset, link)
+        if asset.coin_id == "testvelvet":
+            return replace(classification, confidence=0.79)
+        return classification
+
+    event_discovery.classify_event_asset = low_confidence_classifier
+    try:
+        candidate = event_discovery.run_discovery(
+            [raw[0]],
+            assets,
+            now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+        ).candidates[0]
+    finally:
+        event_discovery.classify_event_asset = original_classifier
+
+    assert candidate.fade_signal.fade_score >= 80
+    assert candidate.data_quality["has_technical_snapshot"] is True
+    assert candidate.data_quality["classifier_pass"] is False
+    assert candidate.data_quality["forced_no_trade_reason"] == "low_classifier_confidence"
+    assert candidate.fade_signal.signal_type == FadeSignalType.NO_TRADE
+    assert "classifier confidence below discovery trigger threshold; review-only" in candidate.fade_signal.warnings
 
 
 def test_event_discovery_proxy_article_without_event_time_stays_reviewable_no_trade():
@@ -2381,6 +2571,7 @@ def test_event_discovery_proxy_article_without_event_time_stays_reviewable_no_tr
 def test_event_discovery_asset_role_demotes_proxy_context_noise():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
     from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
     from crypto_rsi_scanner.event_providers.manual_json import content_hash
 
@@ -2484,6 +2675,9 @@ def test_event_discovery_asset_role_demotes_proxy_context_noise():
     assert venue.classification.relationship_type == "proxy_attention"
     assert venue.classification.asset_role == "proxy_venue"
     assert venue.classification.is_proxy_narrative is True
+    assert venue.data_quality["forced_no_trade_reason"] == "proxy_venue_review_only"
+    assert venue.fade_signal.signal_type == FadeSignalType.NO_TRADE
+    assert "proxy venue candidates are watchlist-only by default" in venue.fade_signal.warnings
 
     ticker_word = by_event_asset[("spacex-hype-common-word", "hyperliquid")]
     assert ticker_word.classification.relationship_type == "proxy_context"
@@ -2959,6 +3153,11 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
         assert velvet["schema_version"] == event_cache.CACHE_SCHEMA_VERSION
         assert velvet["exported_at"] == "2026-06-16T12:30:00+00:00"
         assert velvet["signal_type"] == "SHORT_TRIGGERED"
+        assert velvet["first_seen_at"] == "2026-06-16T12:30:00+00:00"
+        assert velvet["last_seen_at"] == "2026-06-16T12:30:00+00:00"
+        assert velvet["first_watchlisted_at"] == "2026-06-16T12:30:00+00:00"
+        assert velvet["first_armed_at"] == "2026-06-16T12:30:00+00:00"
+        assert velvet["first_triggered_at"] == "2026-06-16T12:00:00+00:00"
 
         later_observed_at = datetime(2026, 6, 16, 12, 31, tzinfo=timezone.utc)
         second = event_cache.write_event_discovery_cache(result, cache_dir, observed_at=later_observed_at)
@@ -2990,6 +3189,11 @@ def test_event_discovery_cache_writes_point_in_time_jsonl_artifacts():
         assert latest_velvet["exported_at"] == "2026-06-16T12:31:00+00:00"
         assert "payload_schema_version" not in latest_velvet
         assert latest_velvet["signal_type"] == "SHORT_TRIGGERED"
+        assert latest_velvet["first_seen_at"] == "2026-06-16T12:30:00+00:00"
+        assert latest_velvet["last_seen_at"] == "2026-06-16T12:31:00+00:00"
+        assert latest_velvet["first_watchlisted_at"] == "2026-06-16T12:30:00+00:00"
+        assert latest_velvet["first_armed_at"] == "2026-06-16T12:30:00+00:00"
+        assert latest_velvet["first_triggered_at"] == "2026-06-16T12:00:00+00:00"
 
 
 def test_event_fade_validation_review_blocks_unlabeled_export():
@@ -5020,8 +5224,67 @@ def test_event_fade_export_outcome_prices_scanner_writes_price_fixture():
         assert "Event-fade outcome price export" in text
         assert "assets=1/1" in text
         assert "price_rows=5" in text
+        assert "interval=1d" in text
         payload = json.loads(out_path.read_text(encoding="utf-8"))
+        assert payload["interval"] == "1d"
+        assert payload["source"].endswith(":1d")
         assert payload["prices"][0]["asset_symbol"] == "TESTVELVET"
+        assert payload["prices"][0]["interval"] == "1d"
+
+
+def test_event_fade_outcome_price_export_supports_1h_fixture_and_metadata():
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, event_price_history, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        fixture_dir = root / "klines"
+        fixture_dir.mkdir()
+        (fixture_dir / "TESTVELVETUSDT.csv").write_text(
+            "\n".join([
+                "date,high,low,close,volume,quote_volume",
+                "2026-06-15 13:30:00+00:00,8.2,7.9,8.0,1000,8000",
+                "2026-06-16 12:00:00+00:00,7.3,7.1,7.2,1000,7200",
+                "2026-06-16 13:00:00+00:00,7.5,6.6,6.8,1200,8160",
+                "2026-06-17 12:00:00+00:00,6.9,5.9,6.2,1200,7440",
+                "2026-06-19 12:00:00+00:00,6.4,5.5,5.8,1100,6380",
+                "2026-06-23 12:00:00+00:00,6.0,4.9,5.1,900,4590",
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        prices_path = root / "prices-1h.json"
+        result = event_price_history.export_outcome_price_fixture(
+            rows,
+            prices_path,
+            days=30,
+            fixture_dir=root,
+            interval="1h",
+            now=None,
+        )
+        assert result.interval == "1h"
+        assert result.source.endswith(":1h")
+        assert result.price_rows_written == 6
+
+        payload = json.loads(prices_path.read_text(encoding="utf-8"))
+        assert payload["interval"] == "1h"
+        assert payload["prices"][0]["interval"] == "1h"
+
+        filled = event_validation.fill_validation_outcomes(
+            rows,
+            event_validation.load_outcome_price_fixture(prices_path),
+        )
+        velvet = next(row for row in filled.rows if row["asset_symbol"] == "TESTVELVET")
+        assert velvet["outcome_price_interval"] == "1h"
+        assert velvet["outcome_price_source"].endswith(":1h")
+        assert round(velvet["max_adverse_excursion"], 4) == 0.0417
+        assert round(velvet["max_favorable_excursion"], 4) == 0.3194
+        assert round(velvet["post_event_return_72h"], 4) == -0.1944
+
+        packet = event_validation.format_review_packet([velvet], limit=1)
+        assert "prices=`1h/fixture:" in packet
 
 
 def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():

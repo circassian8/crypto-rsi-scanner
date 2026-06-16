@@ -66,7 +66,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 ## Run / test / deploy
 
 - **Python:** `.venv/bin/python` (3.13). Deps in `requirements.txt`. (Note: `pytest`
-  is NOT installed — use the standalone runner below.)
+  is NOT installed — use the standalone runner below.) `make bootstrap` creates
+  `.venv`; `make verify PYTHON=python3` is acceptable for source-archive review.
+- **Clean source export:** `make export-src` writes
+  `crypto-rsi-scanner-source.zip` via `git archive` so ignored local artifacts
+  such as `.env`, DBs, logs, caches, and `.venv` are not shared.
 - **Standard verification:** `make verify` (runs tests + alert render smoke +
   backtest fixture smoke + paper scoreboard).
 - **Tests (must all pass before you claim done):**
@@ -150,7 +154,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   review status/labels/outcomes into a fresh validation export; writes only `OUT`) ·
   `main.py --event-fade-export-outcome-prices SAMPLE OUT` (build a local OHLCV
   price fixture for `SHORT_TRIGGERED` sample rows, optionally from fixture
-  klines; writes only `OUT`) ·
+  klines; `--event-fade-price-interval 1d|1h`, default `1d`; writes only `OUT`) ·
   `main.py --event-fade-fill-outcomes SAMPLE PRICES OUT` (fill
   trigger-time and event-time-baseline `SHORT_TRIGGERED` validation outcome
   fields from local OHLCV fixtures; writes only `OUT`) ·
@@ -277,9 +281,17 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   reviewed `SHORT_TRIGGERED` rows have event-time confidence below the review
   threshold.
   Asset role classification is part of the proxy gate: only `proxy_instrument`
-  and `proxy_venue` rows remain proxy candidates; `mentioned_asset`,
-  `infrastructure`, and `ticker_word_collision` rows become `proxy_context`
-  controls.
+  and `proxy_venue` rows remain proxy candidates, but `proxy_venue` is
+  watchlist/review-only by default and cannot trigger unless
+  `RSI_EVENT_FADE_ALLOW_PROXY_VENUE_TRIGGER=1`. Low classifier confidence and
+  low event-time confidence explicitly force `NO_TRADE` with review-only reason
+  codes before event-fade signal emission. `mentioned_asset`, `infrastructure`,
+  and `ticker_word_collision` rows become `proxy_context` controls.
+  Dedupe runs exact matching first, then a canonical event-type/external-asset/
+  event-date/catalyst-term pass so obvious headline variants merge while all
+  raw source timing/evidence is preserved. Fade-candidate enrichment chooses the
+  richest point-in-time-safe market/derivatives/supply/RSI/technical payload
+  across the deduped raw sources instead of blindly using the first raw event.
   The resolver also guards common identity words observed in public feeds
   (`cash`, `real`, `just`, `humanity`) from becoming high-confidence matches.
   Provider enrichment is evidence, not eligibility; raw reviewed fixture
@@ -301,7 +313,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   raw events or raw events that built no candidates. Inspect recent runs with
   `main.py --event-discovery-runs`. `main.py --event-discovery-binance-listen` may append raw
   Binance announcement evidence and run metadata to the same cache; it must not
-  normalize into live signals, route alerts, or paper trade.
+  normalize into live signals, route alerts, or paper trade. Candidate snapshots
+  track research-only transition timestamps (`first_seen_at`,
+  `first_watchlisted_at`, `first_armed_at`, `first_triggered_at`,
+  `last_seen_at`) by event/asset/relationship identity; these are validation
+  evidence fields, not live state.
 - Event-fade validation review is research-only. `main.py --event-fade-review-sample`
   may read labeled JSONL/CSV sample artifacts and print coverage, trigger
   precision, trigger latency, point-in-time violations, MFE/MAE, post-event
@@ -346,7 +362,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `--event-fade-review-bundle-export-prices` it may first export a bundle-local
   OHLCV price fixture for triggered rows using the existing research price
   export path. Makefile price export/review-bundle targets default to that
-  Binance daily-kline fetch/cache path; set
+  Binance daily-kline fetch/cache path; set `EVENT_FADE_PRICE_INTERVAL=1h` for
+  hourly outcome export when the sample needs intraday MFE/MAE, and set
   `EVENT_FADE_PRICE_FIXTURE_DIR=fixtures/event_discovery/outcome_klines` only
   for offline fixture smoke. With
   `--event-fade-review-bundle-reviewed` it may first merge prior reviewed
@@ -464,7 +481,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   articles as `proxy_attention` review rows that remain `NO_TRADE`,
   can classify linked-asset roles so background mentions,
   infrastructure chains, and ticker-word collisions become `proxy_context`
-  controls, can parse local external IPO,
+  controls and proxy venues stay review-only by default, can explicitly force
+  `NO_TRADE` on low classifier confidence or low event-time confidence, can
+  canonically merge obvious duplicate catalyst headlines while preserving raw
+  source evidence, can merge enrichment payloads across deduped raw sources,
+  can parse local external IPO,
   sports, and prediction-market catalyst fixtures as radar evidence, can optionally
   fetch no-key live Polymarket Gamma dated catalyst events when
   `RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1`, can attach local
@@ -537,7 +558,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `make event-fade-no-key-review-cycle` runs public RSS, GDELT, and Polymarket
   into the same cache before writing a single mixed-source review bundle.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
-  preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
+  preserves prior human review status/labels/outcomes when regenerating a fresh export.
+  Cached candidate snapshots track first-seen/watchlisted/armed/triggered and
+  last-seen timestamps for research validation; outcome price exports support
+  daily or hourly candles and record interval/source in filled samples. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,
   RSS/Atom feed fetches, Polymarket Gamma catalyst events, and Coinalyze derivatives enrichment, no network
   event/news/derivatives/supply providers,

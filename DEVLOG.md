@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Stabilize event-fade discovery validation · Codex
+**Why:** The event-discovery pipeline had grown into a real research factory,
+but the next risk was weak evidence accidentally looking tradable before a
+reviewed validation sample exists. The review also flagged source-export and
+review-artifact ergonomics that should be fixed before sharing the repo again.
+**Changes:**
+- Added clean source sharing support: `.gitattributes` export ignores for local
+  artifacts, `make export-src`, `make bootstrap`, `PYTHON ?=`, and a helpful
+  missing-runtime check for `make verify`.
+- Added explicit discovery gates that force `NO_TRADE` for low classifier
+  confidence, low event-time confidence, and proxy-venue rows by default
+  (`RSI_EVENT_FADE_ALLOW_PROXY_VENUE_TRIGGER=0`).
+- Added canonical catalyst dedupe and point-in-time-safe merged enrichment
+  selection across deduped raw sources.
+- Added research-cache transition timestamps for first seen/watchlisted/armed/
+  triggered and last seen candidate snapshots.
+- Added 1d/1h validation price export support and outcome interval/source
+  metadata in filled samples/review packets.
+- Updated `AGENTS.md`, `DECISIONS.md`, `ROADMAP.md`,
+  `research/event_discovery_design.md`, and `.env.example`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 250/250
+tests, and `make verify` passes.
+**Notes/risks:** Event-fade remains research-only: no Telegram routing, paper
+trades, live DB writes, or execution. The next useful work is still building and
+labeling the reviewed event-fade sample, not adding more providers.
+
 ## 2026-06-17 — Surface source origins in review aids · Codex
 **Why:** Source-origin diversity is now measured in validation reviews, but the
 manual labeling artifacts still forced reviewers to infer publisher/domain

@@ -51,6 +51,8 @@ REVIEW_FIELDS = (
     "event_time_post_event_return_24h",
     "event_time_post_event_return_72h",
     "event_time_post_event_return_7d",
+    "outcome_price_interval",
+    "outcome_price_source",
 )
 ASSET_ROLE_REVIEW_METADATA_FIELDS = (
     "asset_role",
@@ -100,6 +102,8 @@ REVIEW_TEMPLATE_FIELDS = (
     "event_time_post_event_return_24h",
     "event_time_post_event_return_72h",
     "event_time_post_event_return_7d",
+    "outcome_price_interval",
+    "outcome_price_source",
 )
 REVIEW_TEMPLATE_DERIVED_FIELDS = frozenset({
     "queue_category",
@@ -133,6 +137,8 @@ class ValidationOutcomeCandle:
     close: float
     high: float | None = None
     low: float | None = None
+    interval: str | None = None
+    source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -296,7 +302,11 @@ def load_outcome_price_fixture(path: str | Path) -> dict[str, list[ValidationOut
     if isinstance(raw, Mapping):
         if isinstance(raw.get("prices"), list):
             items = raw["prices"]
-            return _price_index_from_flat_rows(items)
+            return _price_index_from_flat_rows(
+                items,
+                interval=str(raw.get("interval") or ""),
+                source=str(raw.get("source") or ""),
+            )
         return _price_index_from_mapping(raw)
     if isinstance(raw, list):
         return _price_index_from_flat_rows(raw)
@@ -377,6 +387,11 @@ def fill_validation_outcomes(
                         out[field] = value
                         changed = True
         if changed:
+            interval, source = _price_fixture_metadata(candles)
+            if interval and (overwrite or not out.get("outcome_price_interval")):
+                out["outcome_price_interval"] = interval
+            if source and (overwrite or not out.get("outcome_price_source")):
+                out["outcome_price_source"] = source
             filled += 1
         output.append(out)
     return ValidationOutcomeFillResult(
@@ -1218,7 +1233,9 @@ def _format_review_packet_row(
             f"trigger 72h=`{_fmt_pct(_num(row.get('post_event_return_72h')))}` | "
             f"trigger 7d=`{_fmt_pct(_num(row.get('post_event_return_7d')))}` | "
             f"MFE=`{_fmt_pct(_num(row.get('max_favorable_excursion')))}` | "
-            f"MAE=`{_fmt_pct(_num(row.get('max_adverse_excursion')))}`"
+            f"MAE=`{_fmt_pct(_num(row.get('max_adverse_excursion')))}` | "
+            f"prices=`{_packet_text(row.get('outcome_price_interval') or 'unknown')}/"
+            f"{_packet_text(row.get('outcome_price_source') or 'unknown')}`"
         ),
         (
             "- Event-time baseline: "
@@ -1323,12 +1340,17 @@ def _price_index_from_mapping(raw: Mapping[str, Any]) -> dict[str, list[Validati
     return out
 
 
-def _price_index_from_flat_rows(items: Iterable[Any]) -> dict[str, list[ValidationOutcomeCandle]]:
+def _price_index_from_flat_rows(
+    items: Iterable[Any],
+    *,
+    interval: str = "",
+    source: str = "",
+) -> dict[str, list[ValidationOutcomeCandle]]:
     out: dict[str, list[ValidationOutcomeCandle]] = {}
     for item in items:
         if not isinstance(item, Mapping):
             continue
-        candle = _parse_price_candle(item)
+        candle = _parse_price_candle(item, interval=interval, source=source)
         if candle is None:
             continue
         keys = _price_row_keys(item)
@@ -1340,18 +1362,27 @@ def _price_index_from_flat_rows(items: Iterable[Any]) -> dict[str, list[Validati
     }
 
 
-def _parse_price_candle(item: Mapping[str, Any]) -> ValidationOutcomeCandle | None:
+def _parse_price_candle(
+    item: Mapping[str, Any],
+    *,
+    interval: str = "",
+    source: str = "",
+) -> ValidationOutcomeCandle | None:
     ts = _dt(item.get("timestamp") or item.get("time") or item.get("date"))
     close = _num(item.get("close") or item.get("price"))
     if ts is None or close is None or close <= 0:
         return None
     high = _num(item.get("high"))
     low = _num(item.get("low"))
+    row_interval = str(item.get("interval") or interval or "")
+    row_source = str(item.get("source") or source or "")
     return ValidationOutcomeCandle(
         timestamp=ts,
         close=close,
         high=high if high is not None and high > 0 else None,
         low=low if low is not None and low > 0 else None,
+        interval=row_interval or None,
+        source=row_source or None,
     )
 
 
@@ -1377,6 +1408,13 @@ def _candles_for_row(
         if key and key in price_index:
             return price_index[key]
     return []
+
+
+def _price_fixture_metadata(candles: list[ValidationOutcomeCandle]) -> tuple[str | None, str | None]:
+    for candle in candles:
+        if candle.interval or candle.source:
+            return candle.interval, candle.source
+    return None, None
 
 
 def _short_outcome(

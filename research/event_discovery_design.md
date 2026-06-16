@@ -11,7 +11,11 @@ optional `future-markets` symbol auto-resolution,
 Tokenomist/Etherscan/Arkham/Dune-style supply/on-chain enrichment, plus grouped
 auto reporting and validation-sample exports, research-only JSONL cache refresh,
 validation-sample review metrics, labeling-queue support, research-only merge
-support, local outcome-price export, and outcome-fill support.
+support, local outcome-price export, and outcome-fill support. Stabilization
+rules now explicitly force `NO_TRADE` for weak classifier confidence, weak
+event-time confidence, and proxy-venue rows by default, merge obvious duplicate
+catalyst headlines, preserve transition timestamps in cached snapshots, and
+record outcome price interval/source metadata.
 
 ## Goal
 
@@ -219,10 +223,24 @@ After an article resolves to an asset, the classifier assigns an asset role:
 - `ticker_word_collision`: a short ticker alias matched normal prose rather
   than the crypto ticker.
 
-Only `proxy_instrument` and `proxy_venue` can remain `is_proxy_narrative=True`.
-`mentioned_asset`, `infrastructure`, and `ticker_word_collision` rows are kept
-as `proxy_context` controls for review, but they cannot pass event-fade
-eligibility.
+Only `proxy_instrument` and `proxy_venue` can remain `is_proxy_narrative=True`,
+but they are not equal for trigger eligibility. `proxy_instrument` can trigger
+only if all hard event-fade gates pass. `proxy_venue` is watchlist/review-only
+by default and must force `NO_TRADE` unless
+`RSI_EVENT_FADE_ALLOW_PROXY_VENUE_TRIGGER=1` is explicitly enabled after sample
+review. `mentioned_asset`, `infrastructure`, and `ticker_word_collision` rows
+are kept as `proxy_context` controls for review, but they cannot pass
+event-fade eligibility.
+
+The discovery orchestrator also applies explicit review-only gates before
+emitting the event-fade signal:
+
+- `classification.confidence < min_classifier_confidence`
+- `event_time_confidence < min_event_time_confidence`
+- `asset_role == proxy_venue` while venue triggers are disabled
+
+Rows blocked this way still appear in reports and validation samples with a
+`forced_no_trade_reason` in `data_quality`, but their signal is `NO_TRADE`.
 
 ## External Catalyst Providers
 
@@ -320,6 +338,22 @@ Supply pressure is evidence, not eligibility. A direct exchange listing, token
 unlock, or other non-proxy event must remain `NO_TRADE` even when exchange
 inflows, unlocks, concentration, and admin-risk flags are severe.
 
+## Dedupe And Enrichment Selection
+
+Discovery first merges exact duplicates by clean event name, event type, exact
+event time, and external asset. It then applies a conservative canonical merge
+for obvious headline variants using event type, external-asset slug, event-date
+bucket, and normalized catalyst terms such as IPO, listing, unlock, ETF,
+sports, political, or product launch. All raw ids, URLs, published/fetched
+timestamps, titles, and content hashes stay attached for point-in-time review.
+
+When a deduped event has several raw sources, candidate construction does not
+blindly use the first payload. It selects the richest point-in-time-safe
+market, derivatives, supply, RSI, and technical section for the resolved asset
+across all raw ids. Raw evidence published or fetched after the decision time is
+ignored for trigger-time enrichment so later articles cannot backfill a
+pre-event signal.
+
 ## Auto Report
 
 `main.py --event-fade-auto-report` runs the same fixture-only discovery path as
@@ -371,7 +405,12 @@ Files:
 
 Stable evidence files dedupe already-seen rows by source/event identity where
 possible. `candidate_snapshots.jsonl` appends every refresh so later analysis
-can inspect how scores and missing data looked at each observed time.
+can inspect how scores and missing data looked at each observed time. Snapshot
+rows also carry research-only transition timestamps by stable event/asset/
+relationship identity: `first_seen_at`, `first_watchlisted_at`,
+`first_armed_at`, `first_triggered_at`, and `last_seen_at`. These fields help
+separate scan observation time from first trigger time in validation samples;
+they are not live state and do not promote routing or paper trades.
 `discovery_runs.jsonl` stores redacted provider-readiness diagnostics and
 refresh warnings. Use those warnings to distinguish a healthy zero-result run
 from a provider problem, rate limit, bad credential, too-narrow query/window, or
@@ -405,6 +444,11 @@ Each row includes:
   evidence
 - fade state, signal type, score, eligibility, reason codes, warnings,
   component scores, feature fields, and missing-data markers
+- research cache transition fields such as `first_seen_at`,
+  `first_watchlisted_at`, `first_armed_at`, `first_triggered_at`, and
+  `last_seen_at` when exported from cache
+- outcome price metadata fields `outcome_price_interval` and
+  `outcome_price_source` after outcome filling
 - blank human-review and future outcome columns such as `human_label`,
   `human_notes`, `max_adverse_excursion`, `max_favorable_excursion`, and
   trigger-time plus event-time-baseline post-event returns
@@ -442,7 +486,7 @@ Neither command changes live storage, routing, paper trades, or event state.
 `main.py --event-fade-export-outcome-prices SAMPLE OUT` builds the local OHLCV
 price fixture consumed by outcome filling. It reads `SHORT_TRIGGERED` rows from
 a validation sample, infers each asset's Binance-style USDT pair from
-`asset_symbol`, and writes a JSON artifact with daily candles:
+`asset_symbol`, and writes a JSON artifact with candles:
 
 - `asset_coin_id`
 - `asset_symbol`
@@ -452,9 +496,13 @@ a validation sample, infers each asset's Binance-style USDT pair from
 - `close`
 - `volume`
 - `quote_volume`
+- `interval`
 
-By default the command can use the existing Binance daily-kline fetch/cache path
-from the research backtester. For deterministic offline runs, pass
+By default the command uses the existing Binance daily-kline fetch/cache path
+from the research backtester (`--event-fade-price-interval 1d`). For intraday
+review, use `--event-fade-price-interval 1h`; this uses Binance hourly klines
+or a local fixture and records the selected interval/source in the price
+artifact. For deterministic offline runs, pass
 `--event-fade-price-fixture-dir DIR`, where `DIR` contains Binance-style CSV
 fixtures such as `VELVETUSDT.csv` with `date`, `close`, and optional `high`,
 `low`, `volume`, and `quote_volume` columns.
@@ -478,7 +526,10 @@ symbol. Flat rows can use:
 The filler uses the row's `trigger_observed_at` as the confirmed decision time
 and `entry_reference_price` as the trigger entry when present. It also computes
 an event-time short baseline from the row's `event_time` and the closest local
-close at or before the event timestamp. It computes:
+close at or before the event timestamp. When the price fixture includes source
+metadata, the filler copies `outcome_price_interval` and `outcome_price_source`
+into filled rows so review reports can distinguish coarse daily outcomes from
+hourly/intraday validation. It computes:
 
 - `post_event_return_24h`
 - `post_event_return_72h`
@@ -1057,6 +1108,7 @@ EVENT_FADE_OUTCOME_PRICES_OUT=/tmp/event_fade_outcome_prices.json \
 ```
 
 By default this uses the research Binance daily-kline fetch/cache path. For
+hourly outcome fixtures, add `EVENT_FADE_PRICE_INTERVAL=1h`. For
 offline smoke work, set
 `EVENT_FADE_PRICE_FIXTURE_DIR=fixtures/event_discovery/outcome_klines`.
 
@@ -1125,7 +1177,8 @@ EVENT_FADE_QUEUE_LIMIT=50 \
 For an offline bundle smoke, add
 `EVENT_FADE_PRICE_FIXTURE_DIR=fixtures/event_discovery/outcome_klines`; otherwise
 auto-exported bundle prices use the research Binance daily-kline fetch/cache
-path.
+path. Add `EVENT_FADE_PRICE_INTERVAL=1h` when a review bundle should export
+hourly candles for intraday MFE/MAE checks.
 
 Write a local review workspace from the latest research cache:
 

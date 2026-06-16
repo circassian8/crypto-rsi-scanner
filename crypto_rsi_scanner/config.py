@@ -182,6 +182,7 @@ EVENT_FADE_DEFAULT_RISK_PCT = float(os.getenv("RSI_EVENT_FADE_DEFAULT_RISK_PCT",
 EVENT_FADE_MAX_RISK_PCT = float(os.getenv("RSI_EVENT_FADE_MAX_RISK_PCT", "0.01"))
 EVENT_FADE_MAX_LEVERAGE_HINT = float(os.getenv("RSI_EVENT_FADE_MAX_LEVERAGE_HINT", "2.0"))
 EVENT_FADE_MIN_FAILURE_CHECKS = int(os.getenv("RSI_EVENT_FADE_MIN_FAILURE_CHECKS", "2"))
+EVENT_FADE_ALLOW_PROXY_VENUE_TRIGGER = _env_bool("RSI_EVENT_FADE_ALLOW_PROXY_VENUE_TRIGGER", False)
 
 # Automatic event-discovery radar. This remains research-only: no live routing,
 # no paper trades, no DB writes, no execution. Providers are fixture-backed by
@@ -330,6 +331,7 @@ EVENT_DISCOVERY_UNIVERSE_LIVE = _env_bool("RSI_EVENT_DISCOVERY_UNIVERSE_LIVE", F
 EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT = int(os.getenv("RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT", "0"))
 EVENT_DISCOVERY_MIN_LINK_CONFIDENCE = float(os.getenv("RSI_EVENT_DISCOVERY_MIN_LINK_CONFIDENCE", "0.80"))
 EVENT_DISCOVERY_MIN_CLASSIFIER_CONFIDENCE = float(os.getenv("RSI_EVENT_DISCOVERY_MIN_CLASSIFIER_CONFIDENCE", "0.80"))
+EVENT_DISCOVERY_MIN_EVENT_TIME_CONFIDENCE = float(os.getenv("RSI_EVENT_DISCOVERY_MIN_EVENT_TIME_CONFIDENCE", "0.80"))
 
 # Macro context header in the digest (Fear & Greed + BTC trend + breadth).
 MACRO_ENABLED = (os.getenv("RSI_MACRO", "1").lower() not in ("0", "false", "no"))

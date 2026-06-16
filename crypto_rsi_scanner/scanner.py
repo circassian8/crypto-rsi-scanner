@@ -1074,6 +1074,8 @@ def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResul
     cfg = event_discovery.EventDiscoveryConfig(
         min_link_confidence=config.EVENT_DISCOVERY_MIN_LINK_CONFIDENCE,
         min_classifier_confidence=config.EVENT_DISCOVERY_MIN_CLASSIFIER_CONFIDENCE,
+        min_event_time_confidence=config.EVENT_DISCOVERY_MIN_EVENT_TIME_CONFIDENCE,
+        allow_proxy_venue_trigger=config.EVENT_FADE_ALLOW_PROXY_VENUE_TRIGGER,
         lookback_hours=config.EVENT_DISCOVERY_LOOKBACK_HOURS,
         horizon_days=config.EVENT_DISCOVERY_HORIZON_DAYS,
     )
@@ -1445,6 +1447,7 @@ def event_fade_review_bundle(
     auto_export_prices: bool = False,
     price_days: int | None = None,
     price_fixture_dir: str | None = None,
+    price_interval: str = "1d",
     refresh_price_cache: bool = False,
     reviewed_path: str | None = None,
     overwrite_outcomes: bool = False,
@@ -1463,6 +1466,7 @@ def event_fade_review_bundle(
         auto_export_prices=auto_export_prices,
         price_days=price_days,
         price_fixture_dir=price_fixture_dir,
+        price_interval=price_interval,
         refresh_price_cache=refresh_price_cache,
         reviewed_path=reviewed_path,
         review_merge=review_merge,
@@ -1484,7 +1488,7 @@ def event_fade_review_bundle(
             "Outcome price fixture: "
             f"assets={price_export.assets_written}/{price_export.assets_requested}, "
             f"price_rows={price_export.price_rows_written}, "
-            f"source={price_export.source}, wrote {price_export.out_path}"
+            f"interval={price_export.interval}, source={price_export.source}, wrote {price_export.out_path}"
         )
     if result["outcome_sample"] is not None:
         print(f"Outcome-filled sample: {result['outcome_sample']}")
@@ -1498,6 +1502,7 @@ def event_fade_cache_review_bundle(
     auto_export_prices: bool = False,
     price_days: int | None = None,
     price_fixture_dir: str | None = None,
+    price_interval: str = "1d",
     refresh_price_cache: bool = False,
     reviewed_path: str | None = None,
     overwrite_outcomes: bool = False,
@@ -1516,6 +1521,7 @@ def event_fade_cache_review_bundle(
         auto_export_prices=auto_export_prices,
         price_days=price_days,
         price_fixture_dir=price_fixture_dir,
+        price_interval=price_interval,
         refresh_price_cache=refresh_price_cache,
         reviewed_path=reviewed_path,
         review_merge=review_merge,
@@ -1538,7 +1544,7 @@ def event_fade_cache_review_bundle(
             "Outcome price fixture: "
             f"assets={price_export.assets_written}/{price_export.assets_requested}, "
             f"price_rows={price_export.price_rows_written}, "
-            f"source={price_export.source}, wrote {price_export.out_path}"
+            f"interval={price_export.interval}, source={price_export.source}, wrote {price_export.out_path}"
         )
     if result["outcome_sample"] is not None:
         print(f"Outcome-filled sample: {result['outcome_sample']}")
@@ -1590,6 +1596,7 @@ def _write_event_fade_review_bundle(
     auto_export_prices: bool,
     price_days: int | None,
     price_fixture_dir: str | None,
+    price_interval: str,
     refresh_price_cache: bool,
     reviewed_path: str | None,
     review_merge: event_validation.ValidationSampleMergeResult | None,
@@ -1613,6 +1620,7 @@ def _write_event_fade_review_bundle(
             fixture_dir=price_fixture_dir,
             cache_dir=config.BACKTEST_CACHE_DIR,
             refresh_cache=refresh_price_cache,
+            interval=price_interval,
         )
         effective_prices_path = str(price_export_result.out_path)
 
@@ -1679,6 +1687,7 @@ def _write_event_fade_review_bundle(
         auto_export_prices=auto_export_prices,
         price_days=price_days,
         price_fixture_dir=price_fixture_dir,
+        price_interval=price_interval,
         refresh_price_cache=refresh_price_cache,
         reviewed_path=reviewed_path,
         review_merge=review_merge,
@@ -1745,6 +1754,7 @@ def _event_fade_review_bundle_manifest(
     auto_export_prices: bool,
     price_days: int | None,
     price_fixture_dir: str | None,
+    price_interval: str,
     refresh_price_cache: bool,
     reviewed_path: str | None,
     review_merge: event_validation.ValidationSampleMergeResult | None,
@@ -1822,6 +1832,7 @@ def _event_fade_review_bundle_manifest(
             explicit_prices_path=prices_path,
             price_days=price_days,
             price_fixture_dir=price_fixture_dir,
+            price_interval=price_interval,
             refresh_price_cache=refresh_price_cache,
             result=price_export,
         ),
@@ -1836,6 +1847,7 @@ def _event_fade_review_price_export_manifest(
     explicit_prices_path: str | None,
     price_days: int | None,
     price_fixture_dir: str | None,
+    price_interval: str,
     refresh_price_cache: bool,
     result: event_price_history.EventFadeOutcomePriceExportResult | None,
 ) -> dict[str, Any]:
@@ -1844,6 +1856,7 @@ def _event_fade_review_price_export_manifest(
         "exported": result is not None,
         "explicit_prices_path": explicit_prices_path,
         "requested_days": price_days,
+        "requested_interval": price_interval,
         "fixture_dir": price_fixture_dir,
         "refresh_cache": refresh_price_cache,
     }
@@ -1855,6 +1868,7 @@ def _event_fade_review_price_export_manifest(
             "price_rows_written": result.price_rows_written,
             "missing_assets": list(result.missing_assets),
             "days": result.days,
+            "interval": result.interval,
             "source": result.source,
         })
     return payload
@@ -2079,6 +2093,7 @@ def event_fade_export_outcome_prices(
     *,
     days: int | None = None,
     fixture_dir: str | None = None,
+    interval: str = "1d",
     refresh_cache: bool = False,
     verbose: bool = False,
 ) -> None:
@@ -2092,13 +2107,14 @@ def event_fade_export_outcome_prices(
         fixture_dir=fixture_dir,
         cache_dir=config.BACKTEST_CACHE_DIR,
         refresh_cache=refresh_cache,
+        interval=interval,
     )
     missing = ", ".join(result.missing_assets) if result.missing_assets else "none"
     print(
         "Event-fade outcome price export: "
         f"assets={result.assets_written}/{result.assets_requested}, "
         f"price_rows={result.price_rows_written}, "
-        f"days={result.days}, source={result.source}, "
+        f"days={result.days}, interval={result.interval}, source={result.source}, "
         f"missing={missing}, wrote {result.out_path}"
     )
 
@@ -2581,6 +2597,12 @@ def cli() -> None:
         help="Offline Binance-style kline fixture directory for --event-fade-export-outcome-prices.",
     )
     parser.add_argument(
+        "--event-fade-price-interval",
+        choices=("1d", "1h"),
+        default="1d",
+        help="Kline interval for --event-fade-export-outcome-prices.",
+    )
+    parser.add_argument(
         "--event-fade-refresh-price-cache",
         action="store_true",
         help="Refetch Binance klines for --event-fade-export-outcome-prices instead of using cache.",
@@ -2739,6 +2761,7 @@ def cli() -> None:
             auto_export_prices=args.event_fade_review_bundle_export_prices,
             price_days=args.event_fade_price_days,
             price_fixture_dir=args.event_fade_price_fixture_dir,
+            price_interval=args.event_fade_price_interval,
             refresh_price_cache=args.event_fade_refresh_price_cache,
             reviewed_path=args.event_fade_review_bundle_reviewed,
             overwrite_outcomes=args.event_fade_overwrite_outcomes,
@@ -2753,6 +2776,7 @@ def cli() -> None:
             auto_export_prices=args.event_fade_review_bundle_export_prices,
             price_days=args.event_fade_price_days,
             price_fixture_dir=args.event_fade_price_fixture_dir,
+            price_interval=args.event_fade_price_interval,
             refresh_price_cache=args.event_fade_refresh_price_cache,
             reviewed_path=args.event_fade_review_bundle_reviewed,
             overwrite_outcomes=args.event_fade_overwrite_outcomes,
@@ -2780,6 +2804,7 @@ def cli() -> None:
             out_path,
             days=args.event_fade_price_days,
             fixture_dir=args.event_fade_price_fixture_dir,
+            interval=args.event_fade_price_interval,
             refresh_cache=args.event_fade_refresh_price_cache,
             verbose=args.verbose,
         )

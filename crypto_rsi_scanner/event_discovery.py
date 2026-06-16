@@ -142,6 +142,11 @@ VALIDATION_SAMPLE_FIELDS = (
     "entry_reference_price",
     "invalidation_level",
     "trigger_observed_at",
+    "first_seen_at",
+    "first_watchlisted_at",
+    "first_armed_at",
+    "first_triggered_at",
+    "last_seen_at",
     "max_adverse_excursion",
     "max_favorable_excursion",
     "post_event_return_24h",
@@ -153,6 +158,8 @@ VALIDATION_SAMPLE_FIELDS = (
     "event_time_post_event_return_24h",
     "event_time_post_event_return_72h",
     "event_time_post_event_return_7d",
+    "outcome_price_interval",
+    "outcome_price_source",
     "review_status",
     "human_label",
     "human_notes",
@@ -163,6 +170,8 @@ VALIDATION_SAMPLE_FIELDS = (
 class EventDiscoveryConfig:
     min_link_confidence: float = 0.80
     min_classifier_confidence: float = 0.80
+    min_event_time_confidence: float = 0.80
+    allow_proxy_venue_trigger: bool = False
     lookback_hours: int = 72
     horizon_days: int = 14
 
@@ -210,41 +219,119 @@ def normalize_raw_event(raw: RawDiscoveredEvent) -> NormalizedEvent:
 
 
 def dedupe_events(events: Iterable[NormalizedEvent]) -> list[NormalizedEvent]:
+    exact_merged = _merge_event_groups(events, key_func=_exact_dedupe_key)
+    canonical_groups: dict[tuple[str, str, str, str], list[NormalizedEvent]] = {}
+    passthrough: list[NormalizedEvent] = []
+    for event in exact_merged:
+        key = _canonical_dedupe_key(event)
+        if key is None:
+            passthrough.append(event)
+        else:
+            canonical_groups.setdefault(key, []).append(event)
+    out = [*passthrough]
+    out.extend(_merge_event_group(key, group) for key, group in canonical_groups.items())
+    return sorted(out, key=lambda e: (e.event_time or e.first_seen_time, e.event_name))
+
+
+def _merge_event_groups(
+    events: Iterable[NormalizedEvent],
+    *,
+    key_func,
+) -> list[NormalizedEvent]:
     grouped: dict[tuple[str, str, str, str], list[NormalizedEvent]] = {}
     for event in events:
-        key = (
-            clean_text(event.event_name),
-            event.event_type,
-            event.event_time.isoformat() if event.event_time else "",
-            clean_text(event.external_asset),
-        )
+        key = key_func(event)
         grouped.setdefault(key, []).append(event)
+    return [_merge_event_group(key, group) for key, group in grouped.items()]
 
-    out: list[NormalizedEvent] = []
-    for key, group in grouped.items():
-        if len(group) == 1:
-            out.append(group[0])
+
+def _merge_event_group(key: tuple[str, str, str, str], group: list[NormalizedEvent]) -> NormalizedEvent:
+    if len(group) == 1:
+        return group[0]
+    first = min(group, key=lambda e: e.first_seen_time)
+    raw_ids = tuple(sorted({raw_id for event in group for raw_id in event.raw_ids}))
+    urls = tuple(sorted({url for event in group for url in event.source_urls}))
+    confidence = min(1.0, max(event.confidence for event in group) + 0.05 * (len(group) - 1))
+    best_time = _best_event_time_event(group) or first
+    description = " ".join(_unique(
+        value
+        for event in group
+        for value in (event.event_name, event.description)
+        if value
+    )) or None
+    return NormalizedEvent(
+        event_id=_event_id(*key),
+        raw_ids=raw_ids,
+        event_name=first.event_name,
+        event_type=first.event_type,
+        event_time=best_time.event_time,
+        event_time_confidence=max(event.event_time_confidence for event in group),
+        event_time_source=_best_event_time_source(group),
+        first_seen_time=first.first_seen_time,
+        source="+".join(sorted({event.source for event in group})),
+        source_urls=urls,
+        external_asset=first.external_asset or next((event.external_asset for event in group if event.external_asset), None),
+        description=description,
+        confidence=confidence,
+    )
+
+
+def _exact_dedupe_key(event: NormalizedEvent) -> tuple[str, str, str, str]:
+    return (
+        clean_text(event.event_name),
+        event.event_type,
+        event.event_time.isoformat() if event.event_time else "",
+        clean_text(event.external_asset),
+    )
+
+
+def _canonical_dedupe_key(event: NormalizedEvent) -> tuple[str, str, str, str] | None:
+    if event.event_time is None or not event.external_asset:
+        return None
+    terms = _catalyst_terms(event)
+    if not terms:
+        return None
+    return (
+        event.event_type,
+        clean_text(event.external_asset),
+        event.event_time.date().isoformat(),
+        "+".join(terms),
+    )
+
+
+def _catalyst_terms(event: NormalizedEvent) -> tuple[str, ...]:
+    text = clean_text(" ".join((event.event_name, event.description or "", event.event_type)))
+    groups = {
+        "ipo": (
+            "ipo",
+            "pre ipo",
+            "pre-ipo",
+            "nasdaq",
+            "public offering",
+            "debut",
+            "trading start",
+            "trading starts",
+            "opens trading",
+        ),
+        "listing": ("listing", "listed", "exchange listing", "perp", "futures"),
+        "unlock": ("unlock", "vesting", "emission"),
+        "etf": ("etf", "approval", "launch"),
+        "sports": ("match", "world cup", "champions league", "fixture", "kickoff"),
+        "political": ("election", "inauguration", "vote", "certification"),
+        "product": ("launch", "release", "product event", "model event"),
+    }
+    hits = [name for name, markers in groups.items() if any(marker in text for marker in markers)]
+    return tuple(sorted(set(hits)))
+
+
+def _best_event_time_event(events: Iterable[NormalizedEvent]) -> NormalizedEvent | None:
+    best: NormalizedEvent | None = None
+    for event in events:
+        if event.event_time is None:
             continue
-        first = min(group, key=lambda e: e.first_seen_time)
-        raw_ids = tuple(sorted({raw_id for event in group for raw_id in event.raw_ids}))
-        urls = tuple(sorted({url for event in group for url in event.source_urls}))
-        confidence = min(1.0, max(event.confidence for event in group) + 0.05 * (len(group) - 1))
-        out.append(NormalizedEvent(
-            event_id=_event_id(*key),
-            raw_ids=raw_ids,
-            event_name=first.event_name,
-            event_type=first.event_type,
-            event_time=first.event_time,
-            event_time_confidence=max(event.event_time_confidence for event in group),
-            event_time_source=_best_event_time_source(group),
-            first_seen_time=first.first_seen_time,
-            source="+".join(sorted({event.source for event in group})),
-            source_urls=urls,
-            external_asset=first.external_asset,
-            description=first.description,
-            confidence=confidence,
-        ))
-    return sorted(out, key=lambda e: (e.event_time or e.first_seen_time, e.event_name))
+        if best is None or event.event_time_confidence > best.event_time_confidence:
+            best = event
+    return best
 
 
 def _best_event_time_source(events: Iterable[NormalizedEvent]) -> str | None:
@@ -297,7 +384,11 @@ def run_discovery(
                 derivatives_by_asset=derivatives_by_asset,
                 supply_by_asset=supply_by_asset,
             )
-            fade_signal = event_fade.generate_fade_signal(fade_candidate, fade_cfg, now) if fade_candidate else None
+            forced_no_trade_reasons = _forced_no_trade_reasons(event, classification, cfg)
+            if fade_candidate and forced_no_trade_reasons:
+                fade_signal = _forced_no_trade_signal(fade_candidate, fade_cfg, now, forced_no_trade_reasons)
+            else:
+                fade_signal = event_fade.generate_fade_signal(fade_candidate, fade_cfg, now) if fade_candidate else None
             candidates.append(DiscoveredEventFadeCandidate(
                 event=event,
                 asset=asset,
@@ -311,6 +402,13 @@ def run_discovery(
                     "link_confidence": link.link_confidence,
                     "classifier_confidence": classification.confidence,
                     "classifier_pass": classification.confidence >= cfg.min_classifier_confidence,
+                    "event_time_confidence_pass": (
+                        event.event_time is None
+                        or event.event_time_confidence >= cfg.min_event_time_confidence
+                    ),
+                    "proxy_venue_trigger_allowed": cfg.allow_proxy_venue_trigger,
+                    "forced_no_trade_reason": forced_no_trade_reasons[0] if forced_no_trade_reasons else None,
+                    "forced_no_trade_reasons": list(forced_no_trade_reasons),
                     "asset_role": classification.asset_role,
                     "asset_role_confidence": classification.asset_role_confidence,
                     "has_market_snapshot": fade_candidate is not None and fade_candidate.market.price > 0,
@@ -326,6 +424,56 @@ def run_discovery(
         classifications=tuple(classifications),
         candidates=tuple(candidates),
     )
+
+
+def _forced_no_trade_reasons(
+    event: NormalizedEvent,
+    classification: EventClassification,
+    cfg: EventDiscoveryConfig,
+) -> tuple[str, ...]:
+    reasons: list[str] = []
+    if classification.confidence < cfg.min_classifier_confidence:
+        reasons.append("low_classifier_confidence")
+    if event.event_time is not None and event.event_time_confidence < cfg.min_event_time_confidence:
+        reasons.append("low_event_time_confidence")
+    if classification.asset_role == "proxy_venue" and not cfg.allow_proxy_venue_trigger:
+        reasons.append("proxy_venue_review_only")
+    return tuple(reasons)
+
+
+def _forced_no_trade_signal(
+    candidate: event_fade.FadeCandidate,
+    cfg: event_fade.EventFadeConfig,
+    now: datetime,
+    reasons: tuple[str, ...],
+) -> event_fade.FadeSignal:
+    event_fade.calculate_fade_score(candidate, cfg, now)
+    warnings = [
+        *candidate.warnings,
+        *(_forced_no_trade_warning(reason) for reason in reasons),
+    ]
+    return event_fade.FadeSignal(
+        symbol=candidate.symbol,
+        timestamp=now,
+        signal_type=event_fade.FadeSignalType.NO_TRADE,
+        state=event_fade.FadeState.DISCOVERED,
+        fade_score=candidate.fade_score,
+        confidence=0.0,
+        reason_codes=list(_unique((*candidate.reason_codes, *(f"forced no trade: {reason}" for reason in reasons)))),
+        warnings=list(_unique(warnings)),
+        entry_reference_price=None,
+        invalidation_level=None,
+        take_profit_zones=None,
+        position_size_suggestion=None,
+    )
+
+
+def _forced_no_trade_warning(reason: str) -> str:
+    return {
+        "low_classifier_confidence": "classifier confidence below discovery trigger threshold; review-only",
+        "low_event_time_confidence": "event time confidence below discovery trigger threshold; review-only",
+        "proxy_venue_review_only": "proxy venue candidates are watchlist-only by default",
+    }.get(reason, f"{reason}; review-only")
 
 
 def run_manual_discovery(
@@ -747,8 +895,7 @@ def build_fade_candidate(
     derivatives_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
     supply_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> event_fade.FadeCandidate:
-    raw = raw_by_id.get(event.raw_ids[0]) if event.raw_ids else None
-    payload = raw.raw_json if raw and raw.raw_json else {}
+    payload = _merged_event_payload(event, asset, raw_by_id, now)
     catalyst_confidence = min(
         event.confidence,
         classification.confidence,
@@ -784,6 +931,78 @@ def build_fade_candidate(
         rsi=_rsi_snapshot(asset, payload.get("rsi"), now),
         technical=_technical_snapshot(asset, payload.get("technical"), now),
     )
+
+
+def _merged_event_payload(
+    event: NormalizedEvent,
+    asset: DiscoveredAsset,
+    raw_by_id: Mapping[str, RawDiscoveredEvent],
+    decision_time: datetime,
+) -> dict[str, Any]:
+    payloads: list[Mapping[str, Any]] = []
+    for raw_id in event.raw_ids:
+        raw = raw_by_id.get(raw_id)
+        if raw is None or not isinstance(raw.raw_json, Mapping):
+            continue
+        if not _raw_available_as_of(raw, decision_time):
+            continue
+        payloads.append(raw.raw_json)
+    out: dict[str, Any] = {}
+    for section in ("market", "derivatives", "supply", "rsi", "technical"):
+        best = _richest_payload_section(payloads, section, asset)
+        if best:
+            out[section] = best
+    return out
+
+
+def _raw_available_as_of(raw: RawDiscoveredEvent, decision_time: datetime) -> bool:
+    decision = _as_utc(decision_time)
+    if raw.fetched_at and _as_utc(raw.fetched_at) > decision:
+        return False
+    if raw.published_at and _as_utc(raw.published_at) > decision:
+        return False
+    return True
+
+
+def _richest_payload_section(
+    payloads: Iterable[Mapping[str, Any]],
+    section: str,
+    asset: DiscoveredAsset,
+) -> Mapping[str, Any] | None:
+    best: Mapping[str, Any] | None = None
+    best_score = -1
+    for payload in payloads:
+        raw_section = payload.get(section)
+        if not isinstance(raw_section, Mapping):
+            continue
+        if not _section_matches_asset(raw_section, asset):
+            continue
+        score = _payload_richness(raw_section)
+        if score > best_score:
+            best = raw_section
+            best_score = score
+    return best
+
+
+def _section_matches_asset(section: Mapping[str, Any], asset: DiscoveredAsset) -> bool:
+    symbol = clean_text(section.get("symbol"))
+    coin_id = clean_text(section.get("coin_id"))
+    if coin_id and coin_id != clean_text(asset.coin_id):
+        return False
+    if symbol:
+        expected = {clean_text(asset.symbol), clean_text(f"{asset.symbol}usdt")}
+        if symbol not in expected:
+            return False
+    return True
+
+
+def _payload_richness(payload: Mapping[str, Any]) -> int:
+    score = 0
+    for value in payload.values():
+        if value in (None, "", [], {}):
+            continue
+        score += 1
+    return score
 
 
 def format_discovery_report(result: EventDiscoveryResult) -> str:
@@ -1133,6 +1352,11 @@ def _validation_sample_row(
         "entry_reference_price": signal.entry_reference_price if signal else (technical.entry_reference_price if technical else None),
         "invalidation_level": signal.invalidation_level if signal else (technical.invalidation_level if technical else None),
         "trigger_observed_at": _iso(signal.timestamp) if signal and signal.signal_type == event_fade.FadeSignalType.SHORT_TRIGGERED else None,
+        "first_seen_at": None,
+        "first_watchlisted_at": None,
+        "first_armed_at": None,
+        "first_triggered_at": _iso(signal.timestamp) if signal and signal.signal_type == event_fade.FadeSignalType.SHORT_TRIGGERED else None,
+        "last_seen_at": None,
         "max_adverse_excursion": None,
         "max_favorable_excursion": None,
         "post_event_return_24h": None,
@@ -1144,6 +1368,8 @@ def _validation_sample_row(
         "event_time_post_event_return_24h": None,
         "event_time_post_event_return_72h": None,
         "event_time_post_event_return_7d": None,
+        "outcome_price_interval": None,
+        "outcome_price_source": None,
         "review_status": "",
         "human_label": "",
         "human_notes": "",
