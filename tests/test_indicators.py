@@ -2472,6 +2472,103 @@ def test_event_discovery_refresh_scanner_writes_cache_fixture():
                 setattr(config, name, value)
 
 
+def test_event_discovery_binance_listen_scanner_writes_raw_cache():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.event_providers.manual_json import content_hash
+
+    payload = {
+        "catalogId": 48,
+        "catalogName": "New Cryptocurrency Listing",
+        "publishDate": 1781514000000,
+        "title": "Binance Will List Test Live (TLIVE)",
+        "body": "Binance will list Test Live and open spot trading for TLIVE/USDT.",
+    }
+    event = RawDiscoveredEvent(
+        raw_id="binance_announcements:test-live",
+        provider="binance_announcements",
+        fetched_at=datetime(2026, 6, 15, 9, 0, tzinfo=timezone.utc),
+        published_at=datetime(2026, 6, 15, 9, 0, tzinfo=timezone.utc),
+        source_url=None,
+        title="Binance Will List Test Live (TLIVE)",
+        body="Binance will list Test Live and open spot trading for TLIVE/USDT.",
+        raw_json=payload,
+        source_confidence=0.85,
+        content_hash=content_hash(payload),
+    )
+    seen = {}
+
+    class FakeProvider:
+        def __init__(self, path, **kwargs):
+            seen["path"] = path
+            seen["kwargs"] = kwargs
+
+        def fetch_events(self, start, end):
+            seen["start"] = start
+            seen["end"] = end
+            return [event]
+
+    attrs = (
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_WS_URL",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_TOPIC",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_RECV_WINDOW_MS",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS",
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_MAX_MESSAGES",
+        "EVENT_DISCOVERY_LOOKBACK_HOURS",
+        "EVENT_DISCOVERY_HORIZON_DAYS",
+        "EVENT_DISCOVERY_CACHE_DIR",
+    )
+    original = {name: getattr(config, name) for name in attrs}
+    original_provider = scanner.BinanceAnnouncementProvider
+    with tempfile.TemporaryDirectory() as tmp:
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE = True
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY = "key"
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET = "secret"
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_WS_URL = "wss://example.test/sapi/wss"
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_TOPIC = "com_announcement_en"
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_RECV_WINDOW_MS = 30000
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS = 1
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_MAX_MESSAGES = 2
+        config.EVENT_DISCOVERY_LOOKBACK_HOURS = 24
+        config.EVENT_DISCOVERY_HORIZON_DAYS = 1
+        config.EVENT_DISCOVERY_CACHE_DIR = Path(tmp) / "cache"
+        scanner.BinanceAnnouncementProvider = FakeProvider
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_discovery_binance_listen()
+            text = out.getvalue()
+            assert "Binance announcement cache listen" in text
+            assert "seen=1" in text
+            assert "raw=1" in text
+            assert seen["path"] is None
+            assert seen["kwargs"]["live_enabled"] is True
+            assert seen["kwargs"]["api_key"] == "key"
+            raw_path = config.EVENT_DISCOVERY_CACHE_DIR / "raw_events.jsonl"
+            run_path = config.EVENT_DISCOVERY_CACHE_DIR / "discovery_runs.jsonl"
+            raw = json.loads(raw_path.read_text(encoding="utf-8").splitlines()[0])
+            run = json.loads(run_path.read_text(encoding="utf-8").splitlines()[0])
+            assert raw["row_type"] == "raw_event"
+            assert raw["provider"] == "binance_announcements"
+            assert raw["title"] == "Binance Will List Test Live (TLIVE)"
+            assert run["row_type"] == "discovery_run"
+            assert run["raw_events"] == 1
+            assert run["candidate_snapshots"] == 0
+        finally:
+            scanner.BinanceAnnouncementProvider = original_provider
+            for name, value in original.items():
+                setattr(config, name, value)
+
+
 def test_event_fade_export_cache_sample_scanner_writes_latest_cached_rows():
     import contextlib
     import io

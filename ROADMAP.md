@@ -38,7 +38,8 @@ Tooling now exists for `--score --cohorts`, cost-aware backtests, walk-forward
 checks, audit refreshes, event-fade fixture reports, event-discovery fixture/
 universe plus opt-in live CoinGecko resolver enrichment/exchange/calendar/news
 plus opt-in live Binance, Bybit, CryptoPanic, GDELT, and RSS/external-catalyst/derivatives/supply radar
-reports, research-only event-discovery JSONL cache refreshes, grouped
+reports, research-only event-discovery JSONL cache refreshes, raw Binance
+announcement cache listening, grouped
 event-fade auto reports, event-fade validation-sample exports from fixtures or
 cached snapshots, event-fade validation merge/price-export/outcome-fill/
 labeling-queue/review reports, and suspicious-kept audit leak detection.

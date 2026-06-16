@@ -63,6 +63,8 @@ from . import event_cache
 from . import event_discovery
 from . import event_price_history
 from . import event_validation
+from .event_models import EventDiscoveryResult
+from .event_providers.binance_announcements import BinanceAnnouncementProvider
 
 log = logging.getLogger(__name__)
 
@@ -1175,6 +1177,46 @@ def event_discovery_refresh(verbose: bool = False) -> None:
     )
 
 
+def event_discovery_binance_listen(verbose: bool = False) -> None:
+    """Listen briefly to Binance announcements and cache raw research evidence."""
+    _setup_event_discovery_logging(verbose)
+    if not config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE:
+        print(
+            "Binance announcement listener disabled. Set "
+            "RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE=1 and API credentials."
+        )
+        return
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(hours=config.EVENT_DISCOVERY_LOOKBACK_HOURS)
+    end = now + timedelta(days=config.EVENT_DISCOVERY_HORIZON_DAYS)
+    provider = BinanceAnnouncementProvider(
+        None,
+        live_enabled=True,
+        api_key=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY,
+        api_secret=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET,
+        ws_url=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_WS_URL,
+        topic=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_TOPIC,
+        recv_window_ms=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_RECV_WINDOW_MS,
+        listen_seconds=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS,
+        max_messages=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_MAX_MESSAGES,
+    )
+    raw_events = provider.fetch_events(start, end)
+    result = EventDiscoveryResult(
+        raw_events=tuple(raw_events),
+        normalized_events=(),
+        links=(),
+        classifications=(),
+        candidates=(),
+    )
+    write = event_cache.write_event_discovery_cache(result, config.EVENT_DISCOVERY_CACHE_DIR, observed_at=now)
+    print(
+        "Binance announcement cache listen: "
+        f"seen={len(raw_events)}, "
+        f"raw={write.raw_events_written}, "
+        f"run={write.run_id}, dir={write.cache_dir}"
+    )
+
+
 def event_fade_auto_report(verbose: bool = False) -> None:
     """Print grouped research-only event-fade candidates from discovery fixtures."""
     _setup_event_discovery_logging(verbose)
@@ -1492,6 +1534,11 @@ def cli() -> None:
         help="Fetch configured event-discovery sources and append research-only JSONL cache artifacts.",
     )
     parser.add_argument(
+        "--event-discovery-binance-listen",
+        action="store_true",
+        help="Listen briefly to live Binance announcements and append raw research JSONL cache artifacts.",
+    )
+    parser.add_argument(
         "--event-fade-auto-report",
         action="store_true",
         help="Print grouped research-only event-fade candidates from discovery fixtures.",
@@ -1649,6 +1696,9 @@ def cli() -> None:
         return
     if args.event_discovery_refresh:
         event_discovery_refresh(verbose=args.verbose)
+        return
+    if args.event_discovery_binance_listen:
+        event_discovery_binance_listen(verbose=args.verbose)
         return
     if args.event_fade_auto_report:
         event_fade_auto_report(verbose=args.verbose)

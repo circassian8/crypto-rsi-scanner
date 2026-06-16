@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add raw Binance announcement cache listener · Codex
+**Why:** Binance announcements are a push WebSocket feed, so report/refresh
+bounded fetches can miss source evidence between runs. The event-discovery plan
+needs point-in-time raw event evidence preserved before any classification or
+promotion work.
+**Changes:**
+- Added `main.py --event-discovery-binance-listen`, which uses the configured
+  signed Binance CMS WebSocket provider and appends raw announcement evidence to
+  the existing research-only JSONL cache.
+- Added `make event-discovery-binance-listen` and documented the command in
+  `main.py`, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+- The listener writes only `raw_events.jsonl` and `discovery_runs.jsonl` rows
+  via the existing cache writer. It does not normalize events, route alerts,
+  write live SQLite signal/outcome/paper tables, or open paper trades.
+- Added a scanner-level regression test that stubs the Binance provider and
+  verifies raw cache rows plus run metadata are written.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 203/203.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** Continuous collection still needs an ops wrapper such as a
+LaunchAgent/KeepAlive job. This command is the safe research capture primitive,
+not a trading promotion.
+
 ## 2026-06-16 — Add opt-in live Binance announcement discovery · Codex
 **Why:** The radar could parse captured Binance CMS announcement payloads, but
 it still could not ingest Binance's official signed WebSocket feed during

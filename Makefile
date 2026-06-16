@@ -12,7 +12,7 @@ EVENT_FADE_OUTCOME_PRICES_OUT ?= /tmp/event_fade_outcome_prices.json
 EVENT_FADE_PRICE_DAYS ?= 30
 EVENT_FADE_PRICE_FIXTURE_DIR ?= fixtures/event_discovery/outcome_klines
 
-.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-refresh event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-refresh event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -28,6 +28,7 @@ help:
 	@echo "  make event-fade-report  Score local event-fade fixtures"
 	@echo "  make event-discovery-report  Print research-only event radar from fixtures"
 	@echo "  make event-discovery-refresh  Write research-only event JSONL cache"
+	@echo "  make event-discovery-binance-listen  Cache raw live Binance announcement evidence"
 	@echo "  make event-fade-auto-report  Print grouped event-fade discovery report"
 	@echo "  make event-fade-export-sample  Write validation sample from fixtures"
 	@echo "  make event-fade-export-cache-sample  Write validation sample from cache"
@@ -121,6 +122,9 @@ event-discovery-refresh:
 	RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=120 \
 	RSI_EVENT_DISCOVERY_HORIZON_DAYS=2 \
 	$(PYTHON) main.py --event-discovery-refresh
+
+event-discovery-binance-listen:
+	$(PYTHON) main.py --event-discovery-binance-listen
 
 event-fade-auto-report:
 	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \

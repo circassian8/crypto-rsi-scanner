@@ -121,8 +121,11 @@ Binance can also listen briefly to the official signed CMS WebSocket when
 topic is `com_announcement_en`, the default URL is
 `wss://api.binance.com/sapi/wss`, and
 `RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS` controls the bounded
-listen window used by report/refresh commands. This is a short research fetch,
-not an always-on socket daemon; an always-on cache listener remains future work.
+listen window used by report/refresh commands and by
+`main.py --event-discovery-binance-listen`. The dedicated listen command writes
+raw Binance announcement evidence to the observational JSONL cache. It is still
+research-only; wrapping it in launchd/KeepAlive for continuous collection remains
+an ops task, not a trading promotion.
 
 Bybit can also fetch the official `GET /v5/announcements/index` endpoint when
 `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1`. The live fetch is still a
@@ -273,6 +276,9 @@ runs the discovery pipeline, and appends local JSONL artifacts under
 `RSI_EVENT_DISCOVERY_CACHE_DIR` (`event_fade_cache` by default, gitignored).
 The cache preserves point-in-time evidence for review and future backtests. It
 does not write SQLite, live signal/outcome/paper tables, Telegram, or orders.
+`main.py --event-discovery-binance-listen` appends raw Binance announcement rows
+and a run row to the same cache without normalization, classification, alerts,
+or paper trades.
 
 Files:
 
@@ -564,6 +570,20 @@ The live Binance, Bybit, and CoinGecko universe paths are research-only and
 fail-soft. They should only add direct exchange-listing/perp-listing evidence
 and resolver coverage to the radar unless another source later
 proves a proxy relationship.
+
+Listen for raw Binance WebSocket announcements and cache source evidence:
+
+```bash
+RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE=1 \
+RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY=... \
+RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET=... \
+RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS=300 \
+  .venv/bin/python main.py --event-discovery-binance-listen
+```
+
+This command writes only `raw_events.jsonl` and `discovery_runs.jsonl` rows. Use
+`--event-discovery-refresh` or validation-sample exports for normalized
+candidate snapshots.
 
 Run an opt-in live CryptoPanic news radar pass:
 

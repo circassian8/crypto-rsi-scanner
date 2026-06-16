@@ -91,6 +91,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   research-only/no writes) · `main.py --event-discovery-refresh` (fetch
   configured event-discovery sources and append research-only JSONL cache
   artifacts under `RSI_EVENT_DISCOVERY_CACHE_DIR`; no live DB writes) ·
+  `main.py --event-discovery-binance-listen` (listen to Binance's signed CMS
+  WebSocket for the configured window and append raw research cache evidence
+  only; no live DB writes) ·
   `main.py --event-fade-auto-report` (grouped
   discovery-fed event-fade sections: watchlist/blowoff/event-passed/armed/
   triggered/rejected/ambiguous, research-only/no writes) ·
@@ -227,7 +230,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `RSI_EVENT_DISCOVERY_CACHE_DIR` for raw events, normalized events, links,
   classifications, candidate snapshots, and run metadata. It must not write the
   live SQLite signal/outcome/paper tables, route alerts, open paper trades, or
-  imply promotion.
+  imply promotion. `main.py --event-discovery-binance-listen` may append raw
+  Binance announcement evidence and run metadata to the same cache; it must not
+  normalize into live signals, route alerts, or paper trade.
 - Event-fade validation review is research-only. `main.py --event-fade-review-sample`
   may read labeled JSONL/CSV sample artifacts and print coverage, trigger
   precision, point-in-time violations, MFE/MAE, post-event returns, and
@@ -323,6 +328,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   Binance CMS WebSocket `com_announcement_en` DATA payloads, can optionally
   listen briefly to Binance's signed CMS WebSocket when
   `RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE=1` and API credentials are set,
+  can cache raw Binance WebSocket evidence via
+  `main.py --event-discovery-binance-listen`,
   can optionally fetch live Bybit `new_crypto` announcements when
   `RSI_EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE=1`, can parse local
   CoinMarketCal-style calendar fixtures and Tokenomist-style unlock fixtures as
@@ -353,9 +360,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   prioritizes the next rows to label and triggered rows missing required
   outcome fields. `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human labels/outcomes when regenerating a fresh export. Beyond
-  the explicit opt-in Bybit announcement, CryptoPanic, GDELT news, and RSS/Atom
-  feed fetches, no network event/news/derivatives/supply providers, live DB
-  writes, notifications, or paper trades
+  the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news, and
+  RSS/Atom feed fetches, no network event/news/derivatives/supply providers,
+  live DB writes, notifications, or paper trades
   are enabled. `main.py --event-discovery-refresh` can write the local
   observational JSONL cache only. Bybit listings/perp listings are direct events
   and must remain `NO_TRADE` unless separate evidence proves a true proxy
