@@ -1052,6 +1052,9 @@ def event_discovery_report(verbose: bool = False) -> None:
         config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
         config.EVENT_DISCOVERY_GDELT_PATH,
         config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
+        config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH,
+        config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH,
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
     )
     if not any(paths):
@@ -1076,6 +1079,9 @@ def event_discovery_report(verbose: bool = False) -> None:
         cryptopanic_path=config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
         gdelt_path=config.EVENT_DISCOVERY_GDELT_PATH,
         project_blog_rss_path=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
+        external_ipo_path=config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH,
+        sports_fixtures_path=config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH,
+        prediction_market_events_path=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
         coinalyze_derivatives_path=config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
         universe_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
         universe_limit=config.EVENT_DISCOVERY_UNIVERSE_LIMIT or None,

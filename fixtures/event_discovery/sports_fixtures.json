@@ -1,0 +1,27 @@
+{
+  "fixtures": [
+    {
+      "id": "sports-testfc-clean-fixture",
+      "home_team": "Test FC",
+      "away_team": "Rival FC",
+      "description": "External sports fixture with no crypto asset mention. It should stay radar-only.",
+      "kickoff_time": "2026-06-16T18:00:00Z",
+      "published_at": "2026-06-16T08:00:00Z",
+      "fetched_at": "2026-06-16T08:05:00Z",
+      "source_url": "https://example.test/sports/testfc-rival",
+      "source_confidence": 0.84
+    },
+    {
+      "id": "sports-testfan-linked-fixture",
+      "home_team": "Test FC",
+      "away_team": "Rival FC",
+      "title": "TESTFAN fan token attention builds before Test FC vs Rival FC",
+      "description": "TESTFAN is trading as a fan token proxy attention trade before the World Cup fixture.",
+      "kickoff_time": "2026-06-16T18:00:00Z",
+      "published_at": "2026-06-16T08:30:00Z",
+      "fetched_at": "2026-06-16T08:35:00Z",
+      "source_url": "https://example.test/sports/testfan-fixture",
+      "source_confidence": 0.86
+    }
+  ]
+}

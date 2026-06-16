@@ -1,0 +1,15 @@
+{
+  "ipos": [
+    {
+      "id": "external-spacex-date-only",
+      "company": "SpaceX",
+      "title": "SpaceX IPO calendar placeholder",
+      "description": "External IPO calendar item with no crypto asset mention. This should enter the radar but not create a crypto candidate.",
+      "expected_date": "2026-06-17",
+      "announced_at": "2026-06-16T09:00:00Z",
+      "fetched_at": "2026-06-16T10:00:00Z",
+      "url": "https://example.test/ipo/spacex",
+      "source_confidence": 0.72
+    }
+  ]
+}

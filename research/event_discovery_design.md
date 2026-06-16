@@ -1,10 +1,10 @@
 # Event Discovery Design
 
 **Date:** 2026-06-16
-**Status:** Phase 1-6 fixture framework with clean CoinGecko universe bridge,
+**Status:** Phase 1-7 fixture framework with clean CoinGecko universe bridge,
 fixture-backed exchange announcement providers, structured calendar/unlock
-providers, news/proxy-narrative providers, and Coinalyze-style derivatives
-enrichment, research-only
+providers, news/proxy-narrative providers, external catalyst providers, and
+Coinalyze-style derivatives enrichment, research-only
 
 ## Goal
 
@@ -27,7 +27,7 @@ resolve, classify, dedupe, and report local fixture data. It must not mutate
 live scanner state, send Telegram messages, write signal/outcome/paper tables,
 or imply an order.
 
-Phase 1 files:
+Current files:
 
 - `event_models.py`: immutable discovery/classification data models
 - `event_providers/base.py`: provider protocols
@@ -48,6 +48,12 @@ Phase 1 files:
   external catalyst and attention-event evidence
 - `event_providers/project_blog_rss.py`: local project-blog/RSS fixture provider
   for project-sourced narrative evidence
+- `event_providers/external_ipo.py`: local IPO-calendar fixture provider for
+  external-company catalysts
+- `event_providers/sports_fixtures.py`: local sports-fixture provider for
+  dated team/match catalysts
+- `event_providers/prediction_market_events.py`: local prediction-market
+  fixture provider for external attention/catalyst markets
 - `derivatives_providers/coinalyze.py`: local derivatives fixture provider that
   maps Coinalyze-style OI/funding/crowding rows to discovery candidates
 - `event_resolver.py`: alias-aware asset resolver
@@ -118,6 +124,22 @@ News evidence can classify an asset as proxy/direct/ambiguous, but it still
 feeds the same hard event-fade gate. Articles first seen after the event time
 must not create a `SHORT_TRIGGERED` candidate even if the price/technical fields
 look strong.
+
+## External Catalyst Providers
+
+External IPO, sports-fixture, and prediction-market providers currently read
+local JSON fixtures only. They turn non-crypto catalysts into radar events:
+
+- external IPO/calendar entries
+- sports matches or fixtures
+- prediction-market questions around dated external events
+
+External catalysts are radar-first. An external event by itself does not resolve
+to a crypto asset and therefore cannot produce a fade candidate. A crypto
+candidate appears only when the source text also contains asset-link evidence
+such as a known token alias plus proxy narrative terms. Date-only catalyst rows
+are preserved with lower `event_time_confidence` and should remain validation
+sample evidence, not trade triggers.
 
 ## Derivatives Enrichment
 
@@ -195,6 +217,11 @@ more dangerous than missed setups.
 - TESTLATE project-blog post-event proxy article that must remain `NO_TRADE`
   because it was first seen after the catalyst
 - TESTAMBIG project-blog ambiguous momentum article with no dated catalyst
+- SpaceX IPO calendar placeholder with no crypto asset mention, radar-only
+- Test FC clean sports fixture with no crypto asset mention, radar-only
+- TESTFAN linked sports fixture, proxy watchlist/control only
+- TESTPRED prediction-market OpenAI catalyst with token proxy evidence
+- election prediction-market catalyst with no crypto asset mention, radar-only
 - TESTLIST Coinalyze-style high derivatives crowding fixture that still remains
   `NO_TRADE` because the listing is direct
 - TESTPERP Coinalyze-style no-perp snapshot fixture
@@ -218,6 +245,9 @@ RSI_EVENT_DISCOVERY_TOKENOMIST_PATH=fixtures/event_discovery/tokenomist_unlocks.
 RSI_EVENT_DISCOVERY_CRYPTOPANIC_PATH=fixtures/event_discovery/cryptopanic_news.json \
 RSI_EVENT_DISCOVERY_GDELT_PATH=fixtures/event_discovery/gdelt_news.json \
 RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH=fixtures/event_discovery/project_blog_rss.json \
+RSI_EVENT_DISCOVERY_EXTERNAL_IPO_PATH=fixtures/event_discovery/external_ipo_events.json \
+RSI_EVENT_DISCOVERY_SPORTS_FIXTURES_PATH=fixtures/event_discovery/sports_fixtures.json \
+RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH=fixtures/event_discovery/prediction_market_events.json \
 RSI_EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH=fixtures/event_discovery/coinalyze_derivatives.json \
 RSI_EVENT_DISCOVERY_UNIVERSE_PATH=fixtures/coingecko_smoke/top_markets.json \
   .venv/bin/python main.py --event-discovery-report

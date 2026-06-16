@@ -26,9 +26,12 @@ from .event_providers.bybit_announcements import BybitAnnouncementProvider
 from .event_providers.coinmarketcal import CoinMarketCalProvider
 from .event_providers.coingecko_universe import CoinGeckoUniverseProvider
 from .event_providers.cryptopanic import CryptoPanicProvider
+from .event_providers.external_ipo import ExternalIpoProvider
 from .event_providers.gdelt import GdeltProvider
 from .event_providers.manual_json import ManualJsonEventProvider, parse_datetime
+from .event_providers.prediction_market_events import PredictionMarketEventsProvider
 from .event_providers.project_blog_rss import ProjectBlogRssProvider
+from .event_providers.sports_fixtures import SportsFixturesProvider
 from .event_providers.tokenomist import TokenomistProvider
 from .event_resolver import clean_text, load_asset_aliases, resolve_event_assets
 
@@ -196,6 +199,9 @@ def run_manual_discovery(
     cryptopanic_path: str | Path | None = None,
     gdelt_path: str | Path | None = None,
     project_blog_rss_path: str | Path | None = None,
+    external_ipo_path: str | Path | None = None,
+    sports_fixtures_path: str | Path | None = None,
+    prediction_market_events_path: str | Path | None = None,
     coinalyze_derivatives_path: str | Path | None = None,
     universe_path: str | Path | None = None,
     universe_limit: int | None = None,
@@ -218,6 +224,9 @@ def run_manual_discovery(
         cryptopanic_path=cryptopanic_path,
         gdelt_path=gdelt_path,
         project_blog_rss_path=project_blog_rss_path,
+        external_ipo_path=external_ipo_path,
+        sports_fixtures_path=sports_fixtures_path,
+        prediction_market_events_path=prediction_market_events_path,
     )
     derivatives = load_derivatives_snapshots(coinalyze_derivatives_path)
     assets = load_discovery_assets(alias_path, universe_path=universe_path, universe_limit=universe_limit)
@@ -236,6 +245,9 @@ def load_discovery_events(
     cryptopanic_path: str | Path | None = None,
     gdelt_path: str | Path | None = None,
     project_blog_rss_path: str | Path | None = None,
+    external_ipo_path: str | Path | None = None,
+    sports_fixtures_path: str | Path | None = None,
+    prediction_market_events_path: str | Path | None = None,
 ) -> list[RawDiscoveredEvent]:
     """Load local event fixtures from every configured research source."""
     events: list[RawDiscoveredEvent] = []
@@ -255,6 +267,12 @@ def load_discovery_events(
         events.extend(GdeltProvider(gdelt_path).fetch_events(start, end))
     if project_blog_rss_path:
         events.extend(ProjectBlogRssProvider(project_blog_rss_path).fetch_events(start, end))
+    if external_ipo_path:
+        events.extend(ExternalIpoProvider(external_ipo_path).fetch_events(start, end))
+    if sports_fixtures_path:
+        events.extend(SportsFixturesProvider(sports_fixtures_path).fetch_events(start, end))
+    if prediction_market_events_path:
+        events.extend(PredictionMarketEventsProvider(prediction_market_events_path).fetch_events(start, end))
     return events
 
 

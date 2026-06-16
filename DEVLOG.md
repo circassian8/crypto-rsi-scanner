@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add fixture external catalyst providers · Codex
+**Why:** The event-fade radar needs external catalysts outside crypto, such as
+IPO calendars, sports fixtures, and prediction markets, but those sources must
+stay radar-first and must not create candidates without crypto asset evidence.
+Phase 7 adds that fixture-only layer.
+**Changes:**
+- Added fixture-backed external IPO, sports-fixture, and prediction-market event
+  providers over a shared external-catalyst parser.
+- Added optional config/report paths:
+  `RSI_EVENT_DISCOVERY_EXTERNAL_IPO_PATH`,
+  `RSI_EVENT_DISCOVERY_SPORTS_FIXTURES_PATH`, and
+  `RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH`.
+- Added fixtures for a SpaceX IPO date-only radar event, a clean Test FC sports
+  fixture, a linked TESTFAN sports proxy fixture, a linked TESTPRED/OpenAI
+  prediction-market catalyst, and an election prediction market with no crypto
+  asset evidence.
+- Expanded aliases for TESTPRED and wired the external fixtures into
+  `make event-discovery-report`.
+- Added offline tests for provider parsing, malformed fixture fail-soft
+  behavior, external-only radar/no-candidate safety, linked proxy candidates,
+  date-only event-time confidence, and scanner report wiring.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with Phase 7 status and guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 170/170.
+`make event-discovery-report` prints external IPO/sports/prediction events while
+external-only rows remain radar-only and linked rows stay non-executing local
+report candidates. `git diff --check` passes. `make verify` passes.
+**Notes/risks:** Providers remain fixture-backed only. No live IPO, sports,
+prediction-market, cache, DB, notification, paper-trading, or execution path was
+added.
+
 ## 2026-06-16 — Add fixture news/proxy narrative discovery · Codex
 **Why:** The event-fade radar needs narrative/news sources to discover
 VELVET-style proxy setups, not only structured crypto calendars and exchange

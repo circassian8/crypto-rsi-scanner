@@ -569,6 +569,13 @@ def _news_fixture_paths():
     return root / "cryptopanic_news.json", root / "gdelt_news.json", root / "project_blog_rss.json"
 
 
+def _external_catalyst_fixture_paths():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery"
+    return root / "external_ipo_events.json", root / "sports_fixtures.json", root / "prediction_market_events.json"
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -1030,6 +1037,87 @@ def test_event_discovery_news_pipeline_proxy_direct_late_and_ambiguous_safety():
     assert ambiguous.fade_signal.signal_type == FadeSignalType.NO_TRADE
 
 
+def test_event_discovery_external_catalyst_providers_parse_fixtures():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner.event_providers.external_ipo import ExternalIpoProvider
+    from crypto_rsi_scanner.event_providers.prediction_market_events import PredictionMarketEventsProvider
+    from crypto_rsi_scanner.event_providers.sports_fixtures import SportsFixturesProvider
+
+    ipo_path, sports_path, prediction_path = _external_catalyst_fixture_paths()
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    ipo_events = ExternalIpoProvider(ipo_path, required=True).fetch_events(start, end)
+    sports_events = SportsFixturesProvider(sports_path, required=True).fetch_events(start, end)
+    prediction_events = PredictionMarketEventsProvider(prediction_path, required=True).fetch_events(start, end)
+    assert len(ipo_events) == 1
+    assert len(sports_events) == 2
+    assert len(prediction_events) == 2
+    assert ipo_events[0].provider == "external_ipo"
+    assert ipo_events[0].raw_json["event"]["event_type"] == "ipo_proxy"
+    assert ipo_events[0].raw_json["event"]["event_time_confidence"] == 0.45
+    assert sports_events[0].raw_json["event"]["event_type"] == "sports_event"
+    assert prediction_events[0].raw_json["event"]["event_type"] == "external_proxy_event"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bad_path = Path(tmp) / "bad_external.json"
+        bad_path.write_text(json.dumps({"events": ["not an object"]}), encoding="utf-8")
+        assert ExternalIpoProvider(bad_path).fetch_events(start, end) == []
+        try:
+            ExternalIpoProvider(bad_path, required=True).fetch_events(start, end)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("required malformed external catalyst fixture should fail")
+
+
+def test_event_discovery_external_catalysts_are_radar_first_and_link_narrowly():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_fade import FadeSignalType
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    ipo_path, sports_path, prediction_path = _external_catalyst_fixture_paths()
+    start = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    raw = event_discovery.load_discovery_events(
+        None,
+        start,
+        end,
+        external_ipo_path=ipo_path,
+        sports_fixtures_path=sports_path,
+        prediction_market_events_path=prediction_path,
+    )
+    assets = load_asset_aliases(aliases_path)
+    result = event_discovery.run_discovery(
+        raw,
+        assets,
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+    assert len(raw) == 5
+    event_names = {event.event_name for event in result.normalized_events}
+    assert "SpaceX IPO calendar placeholder" in event_names
+    assert "Test FC vs Rival FC" in event_names
+    assert "Will the Example City election result be certified today?" in event_names
+
+    by_symbol = {candidate.asset.symbol: candidate for candidate in result.candidates}
+    assert set(by_symbol) == {"TESTFAN", "TESTPRED"}
+
+    fan = by_symbol["TESTFAN"]
+    assert fan.classification.is_proxy_narrative is True
+    assert fan.event.event_type == "sports_event"
+    assert fan.fade_signal.signal_type == FadeSignalType.NO_TRADE
+
+    pred = by_symbol["TESTPRED"]
+    assert pred.classification.is_proxy_narrative is True
+    assert pred.event.event_type == "external_proxy_event"
+    assert pred.fade_candidate.component_scores["pre_event_pump"] >= 60
+    assert pred.fade_signal.signal_type in {FadeSignalType.NO_TRADE, FadeSignalType.WATCHLIST}
+
+
 def test_event_classification_proxy_direct_and_ambiguous_cases():
     result = _event_discovery_fixture_result()
     by_coin = {classification.coin_id: classification for classification in result.classifications}
@@ -1093,6 +1181,9 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
     orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
     orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
+    orig_external_ipo = config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH
+    orig_sports = config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH
+    orig_prediction = config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = events_path
@@ -1104,6 +1195,9 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
     config.EVENT_DISCOVERY_GDELT_PATH = None
     config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = None
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = None
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
@@ -1125,6 +1219,9 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
         config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
         config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
         config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
+        config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = orig_external_ipo
+        config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = orig_sports
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
@@ -1145,6 +1242,9 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
     orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
     orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
     orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
+    orig_external_ipo = config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH
+    orig_sports = config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH
+    orig_prediction = config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
@@ -1156,6 +1256,9 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
     config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
     config.EVENT_DISCOVERY_GDELT_PATH = None
     config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = None
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = None
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
@@ -1176,6 +1279,9 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
         config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
         config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
         config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
+        config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = orig_external_ipo
+        config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = orig_sports
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
@@ -1197,6 +1303,9 @@ def test_event_discovery_scanner_report_accepts_derivatives_fixture():
     orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
     orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
     orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
+    orig_external_ipo = config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH
+    orig_sports = config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH
+    orig_prediction = config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
@@ -1208,6 +1317,9 @@ def test_event_discovery_scanner_report_accepts_derivatives_fixture():
     config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
     config.EVENT_DISCOVERY_GDELT_PATH = None
     config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = None
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = None
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = derivatives_path
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
@@ -1229,6 +1341,9 @@ def test_event_discovery_scanner_report_accepts_derivatives_fixture():
         config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
         config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
         config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
+        config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = orig_external_ipo
+        config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = orig_sports
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
@@ -1249,6 +1364,9 @@ def test_event_discovery_scanner_report_accepts_news_fixtures():
     orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
     orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
     orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
+    orig_external_ipo = config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH
+    orig_sports = config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH
+    orig_prediction = config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
@@ -1260,6 +1378,9 @@ def test_event_discovery_scanner_report_accepts_news_fixtures():
     config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = cryptopanic_path
     config.EVENT_DISCOVERY_GDELT_PATH = gdelt_path
     config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = blog_path
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = None
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = None
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
@@ -1283,6 +1404,70 @@ def test_event_discovery_scanner_report_accepts_news_fixtures():
         config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
         config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
         config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
+        config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = orig_external_ipo
+        config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = orig_sports
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
+        config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
+
+
+def test_event_discovery_scanner_report_accepts_external_catalyst_fixtures():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    _events_path, aliases_path = _event_discovery_fixture_paths()
+    ipo_path, sports_path, prediction_path = _external_catalyst_fixture_paths()
+    orig_events = config.EVENT_DISCOVERY_EVENTS_PATH
+    orig_aliases = config.EVENT_DISCOVERY_ALIASES_PATH
+    orig_binance = config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH
+    orig_bybit = config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH
+    orig_coinmarketcal = config.EVENT_DISCOVERY_COINMARKETCAL_PATH
+    orig_tokenomist = config.EVENT_DISCOVERY_TOKENOMIST_PATH
+    orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
+    orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
+    orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
+    orig_external_ipo = config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH
+    orig_sports = config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH
+    orig_prediction = config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH
+    orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
+    orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
+    config.EVENT_DISCOVERY_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+    config.EVENT_DISCOVERY_GDELT_PATH = None
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = ipo_path
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = sports_path
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = prediction_path
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_discovery_report()
+        text = out.getvalue()
+        assert "SpaceX IPO calendar placeholder" in text
+        assert "TESTFAN" in text
+        assert "TESTPRED" in text
+        assert "NO_TRADE/DISCOVERED" in text
+    finally:
+        config.EVENT_DISCOVERY_EVENTS_PATH = orig_events
+        config.EVENT_DISCOVERY_ALIASES_PATH = orig_aliases
+        config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = orig_binance
+        config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = orig_bybit
+        config.EVENT_DISCOVERY_COINMARKETCAL_PATH = orig_coinmarketcal
+        config.EVENT_DISCOVERY_TOKENOMIST_PATH = orig_tokenomist
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
+        config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
+        config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
+        config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = orig_external_ipo
+        config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = orig_sports
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 
@@ -1303,6 +1488,9 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
     orig_cryptopanic = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
     orig_gdelt = config.EVENT_DISCOVERY_GDELT_PATH
     orig_blog = config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH
+    orig_external_ipo = config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH
+    orig_sports = config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH
+    orig_prediction = config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH
     orig_derivatives = config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH
     orig_universe = config.EVENT_DISCOVERY_UNIVERSE_PATH
     config.EVENT_DISCOVERY_EVENTS_PATH = None
@@ -1314,6 +1502,9 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
     config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
     config.EVENT_DISCOVERY_GDELT_PATH = None
     config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = None
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = None
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
     config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
     config.EVENT_DISCOVERY_UNIVERSE_PATH = None
     try:
@@ -1334,6 +1525,9 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
         config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = orig_cryptopanic
         config.EVENT_DISCOVERY_GDELT_PATH = orig_gdelt
         config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = orig_blog
+        config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = orig_external_ipo
+        config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = orig_sports
+        config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = orig_prediction
         config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = orig_derivatives
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
 

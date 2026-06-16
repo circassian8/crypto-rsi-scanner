@@ -145,6 +145,18 @@
       "source": "fixture"
     },
     {
+      "coin_id": "testprediction",
+      "symbol": "TESTPRED",
+      "name": "Test Prediction Proxy",
+      "aliases": ["testpred", "test prediction proxy"],
+      "categories": ["prediction-market-fixture"],
+      "contract_addresses": {},
+      "market_cap": 32000000,
+      "volume_24h": 95000000,
+      "price": 1.42,
+      "source": "fixture"
+    },
+    {
       "coin_id": "collision-alpha",
       "symbol": "COLLIDE",
       "name": "Collision Alpha",
