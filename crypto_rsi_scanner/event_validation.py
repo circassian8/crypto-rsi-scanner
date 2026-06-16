@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+from urllib.parse import urlparse
 
 from .event_discovery import VALIDATION_SAMPLE_FIELDS, VALIDATION_SAMPLE_SCHEMA_VERSION
 
@@ -189,12 +190,14 @@ class EventFadeValidationReview:
     min_trigger_btc_risk_buckets: int
     reviewed_proxy_event_types: int
     reviewed_proxy_source_providers: int
+    reviewed_proxy_source_origins: int
     triggered_btc_risk_buckets: int
     event_type_cohorts: tuple["ValidationCohort", ...]
     relationship_type_cohorts: tuple["ValidationCohort", ...]
     asset_role_cohorts: tuple["ValidationCohort", ...]
     event_time_source_cohorts: tuple["ValidationCohort", ...]
     source_provider_cohorts: tuple["ValidationCohort", ...]
+    source_origin_cohorts: tuple["ValidationCohort", ...]
     btc_risk_cohorts: tuple["ValidationCohort", ...]
     promotion_blockers: tuple[str, ...]
 
@@ -727,6 +730,7 @@ def review_validation_sample(
     negative_trigger_latency_rows = sum(1 for value in trigger_latencies if value < 0)
     reviewed_proxy_event_types = len(_event_types(reviewed_proxy))
     reviewed_proxy_source_providers = len(_source_providers(reviewed_proxy))
+    reviewed_proxy_source_origins = len(_source_origins(reviewed_proxy))
     triggered_btc_risk_buckets = len(_known_btc_risk_buckets(triggered_reviewed))
 
     blockers: list[str] = []
@@ -839,6 +843,7 @@ def review_validation_sample(
     asset_role_cohorts = _cohorts(data, lambda row: str(row.get("asset_role") or "unknown"))
     event_time_source_cohorts = _cohorts(data, _event_time_source_bucket)
     source_provider_cohorts = _source_provider_cohorts(data)
+    source_origin_cohorts = _source_origin_cohorts(data)
     btc_risk_cohorts = _cohorts(data, _btc_risk_bucket)
 
     return EventFadeValidationReview(
@@ -886,12 +891,14 @@ def review_validation_sample(
         min_trigger_btc_risk_buckets=min_trigger_btc_risk_buckets,
         reviewed_proxy_event_types=reviewed_proxy_event_types,
         reviewed_proxy_source_providers=reviewed_proxy_source_providers,
+        reviewed_proxy_source_origins=reviewed_proxy_source_origins,
         triggered_btc_risk_buckets=triggered_btc_risk_buckets,
         event_type_cohorts=event_type_cohorts,
         relationship_type_cohorts=relationship_type_cohorts,
         asset_role_cohorts=asset_role_cohorts,
         event_time_source_cohorts=event_time_source_cohorts,
         source_provider_cohorts=source_provider_cohorts,
+        source_origin_cohorts=source_origin_cohorts,
         btc_risk_cohorts=btc_risk_cohorts,
         promotion_blockers=tuple(blockers),
     )
@@ -934,6 +941,7 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         (
             f"  proxy event types: {review.reviewed_proxy_event_types}/{review.min_proxy_event_types} · "
             f"proxy source providers: {review.reviewed_proxy_source_providers}/{review.min_proxy_source_providers} · "
+            f"proxy source origins: {review.reviewed_proxy_source_origins} · "
             f"trigger BTC risk buckets: {review.triggered_btc_risk_buckets}/{review.min_trigger_btc_risk_buckets}"
         ),
         (
@@ -984,6 +992,8 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         *_format_cohort_lines(review.event_time_source_cohorts),
         "  By source provider:",
         *_format_cohort_lines(review.source_provider_cohorts),
+        "  By source origin:",
+        *_format_cohort_lines(review.source_origin_cohorts),
         "  By BTC risk bucket:",
         *_format_cohort_lines(review.btc_risk_cohorts),
         "",
@@ -1873,6 +1883,15 @@ def _source_provider_cohorts(rows: Iterable[Mapping[str, Any]]) -> tuple[Validat
     return tuple(sorted(cohorts, key=lambda item: (-item.reviewed_rows, -item.total_rows, item.name)))
 
 
+def _source_origin_cohorts(rows: Iterable[Mapping[str, Any]]) -> tuple[ValidationCohort, ...]:
+    groups: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        for origin in source_origin_values(row):
+            groups.setdefault(origin, []).append(row)
+    cohorts = [_cohort(name, group) for name, group in groups.items()]
+    return tuple(sorted(cohorts, key=lambda item: (-item.reviewed_rows, -item.total_rows, item.name)))
+
+
 def _cohort(name: str, rows: list[Mapping[str, Any]]) -> ValidationCohort:
     reviewed = [row for row in rows if _is_reviewed_evidence(row)]
     reviewed_proxy = [row for row in reviewed if _is_proxy_candidate(row)]
@@ -1948,6 +1967,14 @@ def _source_providers(rows: Iterable[Mapping[str, Any]]) -> frozenset[str]:
     return frozenset(providers)
 
 
+def _source_origins(rows: Iterable[Mapping[str, Any]]) -> frozenset[str]:
+    origins: set[str] = set()
+    for row in rows:
+        origins.update(source_origin_values(row))
+    origins.discard("unknown_source_origin")
+    return frozenset(origins)
+
+
 def _source_provider_values(row: Mapping[str, Any]) -> tuple[str, ...]:
     values = _list_values(row.get("raw_providers"))
     if not values:
@@ -1962,6 +1989,57 @@ def _source_provider_values(row: Mapping[str, Any]) -> tuple[str, ...]:
     if not providers:
         providers.add("unknown_source_provider")
     return tuple(sorted(providers))
+
+
+def source_origin_values(row: Mapping[str, Any]) -> tuple[str, ...]:
+    """Return independent source origins from validation row evidence."""
+    urls = [str(value) for value in _list_values(row.get("source_urls")) if value not in (None, "")]
+    titles = [str(value) for value in _list_values(row.get("raw_titles")) if value not in (None, "")]
+    origins: set[str] = set()
+    for url in urls:
+        domain = _source_domain(url)
+        if domain in {"news.google.com"}:
+            publishers = _publishers_from_titles(titles)
+            origins.update(publishers or (domain,))
+        elif domain:
+            origins.add(domain)
+    if not origins:
+        origins.update(_source_provider_values(row))
+    if not origins:
+        origins.add("unknown_source_origin")
+    return tuple(sorted(origins))
+
+
+def _source_domain(url: str) -> str | None:
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
+    host = (parsed.netloc or "").casefold()
+    if "@" in host:
+        host = host.rsplit("@", 1)[-1]
+    host = host.split(":", 1)[0].removeprefix("www.")
+    return host or None
+
+
+def _publishers_from_titles(titles: Iterable[str]) -> tuple[str, ...]:
+    publishers: set[str] = set()
+    for title in titles:
+        publisher = _publisher_from_title(title)
+        if publisher:
+            publishers.add(publisher)
+    return tuple(sorted(publishers))
+
+
+def _publisher_from_title(title: str) -> str | None:
+    if " - " not in title:
+        return None
+    publisher = title.rsplit(" - ", 1)[-1].strip()
+    if not publisher:
+        return None
+    publisher = publisher.removeprefix("www.").casefold()
+    publisher = " ".join(publisher.split())
+    return publisher or None
 
 
 def _bool(value: object) -> bool:

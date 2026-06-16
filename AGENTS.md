@@ -306,7 +306,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   may read labeled JSONL/CSV sample artifacts and print coverage, trigger
   precision, trigger latency, point-in-time violations, MFE/MAE, post-event
   returns, event-time short baseline comparison,
-  event-type/relationship/asset-role/event-time-source/source-provider/BTC-risk
+  event-type/relationship/asset-role/event-time-source/source-provider/source-origin/BTC-risk
   cohorts, diversity gates, and promotion blockers plus concrete next-sample
   work. Reviewed proxy evidence must not be dominated by one event type or one
   source provider. A row only counts as reviewed evidence when it has
@@ -509,8 +509,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   review workspace. `main.py
   --event-fade-cache-review-bundle OUT_DIR` builds the same workspace directly
   from latest cached candidate snapshots. The manifest/README summary includes
-  event type, relationship, asset role, signal type, source-provider, proxy,
-  direct, trigger, missing-event-time, and per-source provider quality counts.
+  event type, relationship, asset role, signal type, source-provider,
+  source-origin, proxy, direct, trigger, missing-event-time, per-source provider,
+  and per-source origin quality counts.
   Empty bundles warn in CLI output,
   README, and manifest when no validation rows were produced. `make event-fade-review-cycle` runs
   the fixture-backed cache refresh and cache review-bundle export with the same
@@ -560,8 +561,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
 3. Confirm the 2026-06-09 state-slice candidates via cached PIT/live data before any
    live conviction or routing change.
 4. Use `main.py --event-discovery-status` to confirm at least one real event
-   source is ready, or use `make event-fade-public-rss-review-cycle` as the
-   no-key RSS starting point, then use the configured-source review cycle or
+   source is ready, or use `make event-fade-no-key-review-cycle` as the
+   no-key RSS/GDELT/Polymarket starting point, then use the configured-source review cycle or
    `main.py --event-fade-export-sample PATH` to build a manually reviewed
    event-fade sample from discovery fixtures, use
    `main.py --event-fade-merge-sample FRESH REVIEWED OUT` to preserve prior

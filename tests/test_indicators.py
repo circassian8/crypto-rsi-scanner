@@ -3144,6 +3144,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert review.negative_trigger_latency_rows == 0
     assert review.reviewed_proxy_event_types == 2
     assert review.reviewed_proxy_source_providers == 3
+    assert review.reviewed_proxy_source_origins == 1
     assert review.triggered_btc_risk_buckets == 1
     assert review.missing_event_time_baseline_rows == 0
     assert review.low_confidence_trigger_event_time_rows == 0
@@ -3182,6 +3183,11 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert source_cohorts["cryptopanic"].reviewed_proxy_candidates == 1
     assert source_cohorts["prediction_market_events"].reviewed_proxy_candidates == 1
 
+    origin_cohorts = {cohort.name: cohort for cohort in review.source_origin_cohorts}
+    assert origin_cohorts["example.test"].reviewed_proxy_candidates == 3
+    assert origin_cohorts["example.test"].reviewed_negative_controls == 2
+    assert origin_cohorts["binance.com"].reviewed_negative_controls == 1
+
     btc_cohorts = {cohort.name: cohort for cohort in review.btc_risk_cohorts}
     assert btc_cohorts["btc_risk_neutral"].triggered_reviewed == 1
     assert btc_cohorts["btc_risk_unknown"].reviewed_negative_controls == 2
@@ -3194,6 +3200,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "trigger edge vs baseline=+10.0pp" in report
     assert "proxy event types: 2/2" in report
     assert "proxy source providers: 3/2" in report
+    assert "proxy source origins: 1" in report
     assert "trigger BTC risk buckets: 1/1" in report
     assert "reviewed rows missing source timing: 0" in report
     assert "trigger latency: avg=22.5h" in report
@@ -3212,6 +3219,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "explicit" in report
     assert "By source provider:" in report
     assert "prediction_market_events" in report
+    assert "By source origin:" in report
+    assert "example.test" in report
     assert "By BTC risk bucket:" in report
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -3282,6 +3291,53 @@ def test_event_fade_validation_review_blocks_single_source_proxy_sample():
     assert "proxy source providers: 1/2" in report
     assert "By source provider:" in report
     assert "manual_json" in report
+
+
+def test_event_fade_validation_reports_google_news_publisher_origins():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    for symbol, title in (
+        ("TESTAI", "TESTAI offers OpenAI pre-IPO exposure - CoinDesk"),
+        ("TESTPRED", "TESTPRED opens prediction-market exposure - thedefiant.io"),
+    ):
+        row = next(row for row in rows if row["asset_symbol"] == symbol)
+        row["human_label"] = "valid_proxy_fade"
+        row["review_status"] = "reviewed"
+        row["raw_providers"] = ["project_blog_rss"]
+        row["source"] = "project_blog_rss"
+        row["source_urls"] = ["https://news.google.com/rss/articles/example?oc=5"]
+        row["raw_titles"] = [title]
+        row["first_seen_time"] = "2026-06-12T00:00:00+00:00"
+        row["published_at_min"] = "2026-06-12T00:00:00+00:00"
+        row["published_at_max"] = "2026-06-12T00:00:00+00:00"
+        row["fetched_at_min"] = "2026-06-12T00:00:00+00:00"
+        row["fetched_at_max"] = "2026-06-12T00:00:00+00:00"
+        row["raw_published_at"] = ["2026-06-12T00:00:00+00:00"]
+        row["raw_fetched_at"] = ["2026-06-12T00:00:00+00:00"]
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=2,
+        min_negative_controls=0,
+        min_triggered_reviewed=0,
+        min_proxy_event_types=1,
+        min_proxy_source_providers=2,
+        min_trigger_btc_risk_buckets=0,
+    )
+    assert review.reviewed_proxy_source_providers == 1
+    assert review.reviewed_proxy_source_origins == 2
+    assert "reviewed proxy source providers 1/2" in review.promotion_blockers
+
+    origin_cohorts = {cohort.name: cohort for cohort in review.source_origin_cohorts}
+    assert origin_cohorts["coindesk"].reviewed_proxy_candidates == 1
+    assert origin_cohorts["thedefiant.io"].reviewed_proxy_candidates == 1
+
+    report = event_validation.format_validation_review(review)
+    assert "proxy source origins: 2" in report
+    assert "By source origin:" in report
+    assert "coindesk" in report
+    assert "thedefiant.io" in report
 
 
 def test_event_fade_validation_review_blocks_narrow_event_or_btc_samples():
@@ -4522,6 +4578,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert manifest["review"]["min_proxy_event_types"] == 2
         assert manifest["review"]["reviewed_proxy_source_providers"] == 0
         assert manifest["review"]["min_proxy_source_providers"] == 2
+        assert manifest["review"]["reviewed_proxy_source_origins"] == 0
         assert manifest["review"]["low_confidence_trigger_event_time_rows"] == 0
         assert manifest["sample_summary"]["rows"] == 17
         assert manifest["sample_summary"]["proxy_candidates"] == 6
@@ -4532,12 +4589,16 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert manifest["sample_summary"]["source_provider_summary"]["manual_json"]["rows"] == 5
         assert manifest["sample_summary"]["source_provider_summary"]["manual_json"]["short_triggered_rows"] == 1
         assert manifest["sample_summary"]["source_provider_summary"]["cryptopanic"]["direct_beneficiaries"] == 2
+        assert manifest["sample_summary"]["source_origins"]["example.test"] == 13
+        assert manifest["sample_summary"]["source_origin_summary"]["example.test"]["short_triggered_rows"] == 1
         assert "Sample summary:" in readme
         assert "Proxy candidates: 6" in readme
         assert "Asset roles: direct_beneficiary=9, proxy_instrument=6, ambiguous=2" in readme
         assert "Source provider detail:" in readme
+        assert "Source origins:" in readme
+        assert "Source origin detail:" in readme
         assert "Review gates:" in readme
-        assert "Proxy diversity: event_types=0/2, source_providers=0/2" in readme
+        assert "Proxy diversity: event_types=0/2, source_providers=0/2, source_origins=0" in readme
         assert "manual_json: rows=5, proxy=1, direct=3, triggered=1, missing_time=1" in readme
 
         packet = (bundle_dir / "review_packet.md").read_text(encoding="utf-8")

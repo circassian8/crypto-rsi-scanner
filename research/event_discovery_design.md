@@ -653,6 +653,9 @@ The reviewer currently checks:
 - reviewed proxy source-provider diversity against the two-provider minimum
   target, so a sample dominated by one RSS/feed/API source cannot look
   promotion-ready by itself
+- reviewed proxy source-origin diversity as reporting context, derived from
+  source URL domains and Google News publisher suffixes, so reviewers can see
+  whether an RSS batch has one publisher or several independent publishers
 - reviewed trigger BTC risk-bucket diversity against the two-bucket minimum
   target
 - direct/non-proxy rows that somehow became `SHORT_TRIGGERED`
@@ -673,8 +676,8 @@ The reviewer currently checks:
 - missing event-time baseline fields on reviewed triggered rows
 - MFE/MAE ratio against the 1.5 minimum target
 - cohort summaries by event type, relationship type, asset role, event-time
-  source, source provider, and BTC risk-on bucket so the reviewed sample can
-  expose where the edge is concentrated or absent
+  source, source provider, source origin, and BTC risk-on bucket so the reviewed
+  sample can expose where the edge is concentrated or absent
 
 The report also prints a `NEXT SAMPLE WORK` section that translates blockers
 into concrete work: how many more proxy candidates, direct/ambiguous controls,
@@ -966,14 +969,16 @@ This is the preferred no-key sample-expansion command because the resulting
 bundle can contain RSS/GDELT proxy-attention or source-text-dated proxy rows
 plus Polymarket dated external-catalyst controls.
 
-Validation review reports include asset-role and source-provider cohorts
-alongside event-type, relationship, event-time-source, and BTC-risk cohorts. Use
-the asset-role section to verify that reviewed proxy rows are not dominated by
-`mentioned_asset`, `infrastructure`, or `ticker_word_collision` controls, use
-the source-provider section to verify that proxy evidence is not all from one
-feed/API family, and use the event-time-source section to verify that triggered
-evidence is not dominated by lower-confidence `text_date` rows before treating
-the sample as promotion evidence.
+Validation review reports include asset-role, source-provider, and source-origin
+cohorts alongside event-type, relationship, event-time-source, and BTC-risk
+cohorts. Use the asset-role section to verify that reviewed proxy rows are not
+dominated by `mentioned_asset`, `infrastructure`, or `ticker_word_collision`
+controls, use the source-provider section to verify that proxy evidence is not
+all from one feed/API family, use the source-origin section to inspect actual
+publisher/domain concentration inside RSS and Google News rows, and use the
+event-time-source section to verify that triggered evidence is not dominated by
+lower-confidence `text_date` rows before treating the sample as promotion
+evidence.
 
 Labeling queues and review templates surface the same event-time source and
 confidence. Reviewed `SHORT_TRIGGERED` rows with low event-time confidence return
@@ -984,10 +989,11 @@ times.
 
 Review bundles also write a compact sample summary into `manifest.json` and
 `README.md`: event types, relationship types, asset roles, signal types, source
-providers, proxy candidate count, proxy-context control count, direct
-beneficiary count, SHORT_TRIGGERED count, missing-event-time count, and
-per-source provider quality counts. This is the fastest way to sanity-check a
-fresh RSS/GDELT/Polymarket bundle before filling the sidecar labels.
+providers, source origins, proxy candidate count, proxy-context control count,
+direct beneficiary count, SHORT_TRIGGERED count, missing-event-time count,
+per-source provider quality counts, and per-source origin quality counts. This
+is the fastest way to sanity-check a fresh RSS/GDELT/Polymarket bundle before
+filling the sidecar labels.
 
 Inspect configured provider readiness without printing secrets:
 

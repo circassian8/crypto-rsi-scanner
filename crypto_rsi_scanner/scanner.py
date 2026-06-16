@@ -1805,6 +1805,7 @@ def _event_fade_review_bundle_manifest(
             "min_proxy_event_types": review.min_proxy_event_types,
             "reviewed_proxy_source_providers": review.reviewed_proxy_source_providers,
             "min_proxy_source_providers": review.min_proxy_source_providers,
+            "reviewed_proxy_source_origins": review.reviewed_proxy_source_origins,
             "triggered_reviewed": review.triggered_reviewed,
             "triggered_btc_risk_buckets": review.triggered_btc_risk_buckets,
             "min_trigger_btc_risk_buckets": review.min_trigger_btc_risk_buckets,
@@ -1893,6 +1894,7 @@ def _event_fade_review_merge_manifest(
 def _event_fade_review_sample_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """Build compact sample-quality counts for review bundle manifests/READMEs."""
     source_provider_summary = _event_fade_review_source_provider_summary(rows)
+    source_origin_summary = _event_fade_review_source_origin_summary(rows)
     return {
         "rows": len(rows),
         "review_status": _count_values(row.get("review_status") or "missing" for row in rows),
@@ -1906,6 +1908,11 @@ def _event_fade_review_sample_summary(rows: list[dict[str, Any]]) -> dict[str, A
             for row in rows
             for provider in _bundle_list_values(row.get("raw_providers"))
         ),
+        "source_origins": _count_values(
+            origin
+            for row in rows
+            for origin in event_validation.source_origin_values(row)
+        ),
         "proxy_candidates": sum(1 for row in rows if _bundle_bool(row.get("is_proxy_narrative"))),
         "proxy_context_controls": sum(1 for row in rows if row.get("relationship_type") == "proxy_context"),
         "direct_beneficiaries": sum(1 for row in rows if _bundle_bool(row.get("is_direct_beneficiary"))),
@@ -1913,6 +1920,7 @@ def _event_fade_review_sample_summary(rows: list[dict[str, Any]]) -> dict[str, A
         "short_triggered_rows": sum(1 for row in rows if row.get("signal_type") == "SHORT_TRIGGERED"),
         "missing_event_time_rows": sum(1 for row in rows if not row.get("event_time")),
         "source_provider_summary": source_provider_summary,
+        "source_origin_summary": source_origin_summary,
     }
 
 
@@ -1922,6 +1930,39 @@ def _event_fade_review_source_provider_summary(rows: list[dict[str, Any]]) -> di
         providers = _bundle_list_values(row.get("raw_providers")) or _bundle_list_values(row.get("source")) or ["unknown"]
         for provider in providers:
             bucket = summary.setdefault(provider, {
+                "rows": 0,
+                "proxy_candidates": 0,
+                "proxy_context_controls": 0,
+                "direct_beneficiaries": 0,
+                "eligible_rows": 0,
+                "short_triggered_rows": 0,
+                "missing_event_time_rows": 0,
+            })
+            bucket["rows"] += 1
+            if _bundle_bool(row.get("is_proxy_narrative")):
+                bucket["proxy_candidates"] += 1
+            if row.get("relationship_type") == "proxy_context":
+                bucket["proxy_context_controls"] += 1
+            if _bundle_bool(row.get("is_direct_beneficiary")):
+                bucket["direct_beneficiaries"] += 1
+            if _bundle_bool(row.get("eligible")):
+                bucket["eligible_rows"] += 1
+            if row.get("signal_type") == "SHORT_TRIGGERED":
+                bucket["short_triggered_rows"] += 1
+            if not row.get("event_time"):
+                bucket["missing_event_time_rows"] += 1
+    return dict(sorted(
+        summary.items(),
+        key=lambda item: (-item[1]["rows"], item[0]),
+    ))
+
+
+def _event_fade_review_source_origin_summary(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    summary: dict[str, dict[str, int]] = {}
+    for row in rows:
+        origins = event_validation.source_origin_values(row)
+        for origin in origins:
+            bucket = summary.setdefault(origin, {
                 "rows": 0,
                 "proxy_candidates": 0,
                 "proxy_context_controls": 0,
@@ -2154,6 +2195,8 @@ def _event_fade_review_bundle_summary_lines(sample_summary: dict[str, Any]) -> l
         "- Relationships: " + _summary_count_line(sample_summary.get("relationship_types")),
         "- Source providers: " + _summary_count_line(sample_summary.get("source_providers")),
         "- Source provider detail: " + _source_provider_summary_line(sample_summary.get("source_provider_summary")),
+        "- Source origins: " + _summary_count_line(sample_summary.get("source_origins")),
+        "- Source origin detail: " + _source_provider_summary_line(sample_summary.get("source_origin_summary")),
         "",
     ]
 
@@ -2168,7 +2211,8 @@ def _event_fade_review_gate_lines(review: event_validation.EventFadeValidationRe
         ),
         (
             f"- Proxy diversity: event_types={review.reviewed_proxy_event_types}/{review.min_proxy_event_types}, "
-            f"source_providers={review.reviewed_proxy_source_providers}/{review.min_proxy_source_providers}"
+            f"source_providers={review.reviewed_proxy_source_providers}/{review.min_proxy_source_providers}, "
+            f"source_origins={review.reviewed_proxy_source_origins}"
         ),
         (
             f"- Trigger diversity: btc_risk_buckets={review.triggered_btc_risk_buckets}/"

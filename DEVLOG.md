@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Surface event-fade source-origin diversity · Codex
+**Why:** The event-fade validation review already checks source-provider
+diversity, but RSS and Google News rows can hide multiple independent publishers
+behind one ingestion provider. Reviewers need domain/publisher concentration
+visible before treating a sample as broad evidence.
+**Changes:**
+- Added source-origin derivation from validation row `source_urls`, with Google
+  News wrapper links falling back to publisher suffixes in `raw_titles`.
+- Added reviewed proxy source-origin counts and source-origin cohorts to
+  `--event-fade-review-sample`.
+- Added source-origin counts and per-origin quality summaries to review bundle
+  manifests and READMEs.
+- Added regression coverage for normal URL-domain origins and Google News
+  publisher suffix extraction.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 245/245
+tests, and `make verify` passes.
+**Notes/risks:** This is validation/reporting only. It does not change event
+discovery, event-fade scoring, validation thresholds, alerts, paper trades,
+live storage, or promotion automation.
+
 ## 2026-06-16 — Add GDELT to no-key event-fade review cycle · Codex
 **Why:** The no-key validation workflow needs broader independent source
 coverage than public RSS plus Polymarket. GDELT was already implemented as an
