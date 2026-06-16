@@ -54,7 +54,8 @@ Usage:
   python main.py --event-fade-export-review-template sample.jsonl labels.csv # editable review sidecar
   python main.py --event-fade-apply-review-template sample.jsonl labels.csv reviewed.jsonl # apply labels
   python main.py --event-fade-review-bundle sample.jsonl review_dir # write review workspace
-  python main.py --event-fade-merge-sample fresh.jsonl reviewed.csv merged.jsonl # preserve labels
+  python main.py --event-fade-cache-review-bundle review_dir # review workspace from cache
+  python main.py --event-fade-merge-sample fresh.jsonl reviewed.csv merged.jsonl # preserve review fields
   python main.py --event-fade-export-outcome-prices sample.jsonl prices.json # build price fixture
   python main.py --event-fade-fill-outcomes sample.jsonl prices.json out.jsonl # fill outcome fields
   python main.py --backup-db     # safe SQLite backup + integrity check

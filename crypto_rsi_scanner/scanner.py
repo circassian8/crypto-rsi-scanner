@@ -6,6 +6,7 @@ import logging
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -1367,6 +1368,65 @@ def event_fade_review_bundle(
     """Write a local event-fade validation review workspace."""
     _setup_event_discovery_logging(verbose)
     source_rows = event_validation.load_validation_sample(sample_path)
+    result = _write_event_fade_review_bundle(
+        source_rows=source_rows,
+        sample_path=sample_path,
+        out_dir=out_dir,
+        limit=limit,
+        prices_path=prices_path,
+        overwrite_outcomes=overwrite_outcomes,
+    )
+    print(
+        "Event-fade review bundle: "
+        f"rows={result['rows']}, "
+        f"needing_review={result['queue'].needed_rows}, "
+        f"showing={result['queue'].shown_rows}, "
+        f"dir={result['bundle_dir']}"
+    )
+    if result["outcome_sample"] is not None:
+        print(f"Outcome-filled sample: {result['outcome_sample']}")
+
+
+def event_fade_cache_review_bundle(
+    out_dir: str,
+    *,
+    limit: int | None = 20,
+    prices_path: str | None = None,
+    overwrite_outcomes: bool = False,
+    verbose: bool = False,
+) -> None:
+    """Write a local review workspace from latest cached event-discovery snapshots."""
+    _setup_event_discovery_logging(verbose)
+    read = event_cache.load_cached_validation_sample(config.EVENT_DISCOVERY_CACHE_DIR)
+    result = _write_event_fade_review_bundle(
+        source_rows=read.rows,
+        sample_path=f"cache:{read.cache_dir}",
+        out_dir=out_dir,
+        limit=limit,
+        prices_path=prices_path,
+        overwrite_outcomes=overwrite_outcomes,
+    )
+    print(
+        "Event-fade cached review bundle: "
+        f"snapshots_read={read.snapshots_read}, "
+        f"rows={result['rows']}, "
+        f"needing_review={result['queue'].needed_rows}, "
+        f"showing={result['queue'].shown_rows}, "
+        f"dir={result['bundle_dir']}"
+    )
+    if result["outcome_sample"] is not None:
+        print(f"Outcome-filled sample: {result['outcome_sample']}")
+
+
+def _write_event_fade_review_bundle(
+    *,
+    source_rows: list[dict[str, Any]],
+    sample_path: str,
+    out_dir: str,
+    limit: int | None,
+    prices_path: str | None,
+    overwrite_outcomes: bool,
+) -> dict[str, Any]:
     bundle_dir = Path(out_dir).expanduser()
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1425,16 +1485,12 @@ def event_fade_review_bundle(
         ),
         encoding="utf-8",
     )
-
-    print(
-        "Event-fade review bundle: "
-        f"rows={len(review_rows)}, "
-        f"needing_review={queue.needed_rows}, "
-        f"showing={queue.shown_rows}, "
-        f"dir={bundle_dir}"
-    )
-    if outcome_sample is not None:
-        print(f"Outcome-filled sample: {outcome_sample}")
+    return {
+        "bundle_dir": bundle_dir,
+        "outcome_sample": outcome_sample,
+        "queue": queue,
+        "rows": len(review_rows),
+    }
 
 
 def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, verbose: bool = False) -> None:
@@ -1792,9 +1848,14 @@ def cli() -> None:
         help="Write a local manual-review workspace for an event-fade validation sample.",
     )
     parser.add_argument(
+        "--event-fade-cache-review-bundle",
+        metavar="OUT_DIR",
+        help="Write a local manual-review workspace from latest cached event-discovery snapshots.",
+    )
+    parser.add_argument(
         "--event-fade-review-bundle-prices",
         metavar="PRICES",
-        help="Optional local OHLCV price fixture for --event-fade-review-bundle outcome filling.",
+        help="Optional local OHLCV price fixture for review-bundle outcome filling.",
     )
     parser.add_argument(
         "--event-fade-queue-limit",
@@ -1988,6 +2049,15 @@ def cli() -> None:
         event_fade_review_bundle(
             sample_path,
             out_dir,
+            limit=args.event_fade_queue_limit,
+            prices_path=args.event_fade_review_bundle_prices,
+            overwrite_outcomes=args.event_fade_overwrite_outcomes,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_fade_cache_review_bundle:
+        event_fade_cache_review_bundle(
+            args.event_fade_cache_review_bundle,
             limit=args.event_fade_queue_limit,
             prices_path=args.event_fade_review_bundle_prices,
             overwrite_outcomes=args.event_fade_overwrite_outcomes,

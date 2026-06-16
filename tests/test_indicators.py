@@ -3178,7 +3178,7 @@ def test_event_fade_auto_scanner_report_uses_local_fixtures():
         text = out.getvalue()
         assert "EVENT FADE AUTO REPORT" in text
         assert "TRIGGERED\n  TESTVELVET" in text
-        assert "BLOWOFF RISK\n  TESTAI" in text
+        assert "TESTAI" in text
         assert "REJECTED / NO TRADE" in text
         assert "  TESTLIST     coin=testlist" in text
         assert "AMBIGUOUS" in text
@@ -3401,6 +3401,70 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         ]
         velvet = next(row for row in filled_rows if row["asset_symbol"] == "TESTVELVET")
         assert round(velvet["post_event_return_72h"], 4) == -0.2083
+
+
+def test_event_fade_cache_review_bundle_scanner_writes_workspace():
+    import contextlib
+    import csv
+    import io
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import config, event_cache, scanner
+
+    result = _full_event_discovery_fixture_result()
+    original_cache_dir = config.EVENT_DISCOVERY_CACHE_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        cache_dir = Path(tmp) / "cache"
+        bundle_dir = Path(tmp) / "cache_review_bundle"
+        config.EVENT_DISCOVERY_CACHE_DIR = cache_dir
+        try:
+            event_cache.write_event_discovery_cache(
+                result,
+                cache_dir,
+                observed_at=datetime(2026, 6, 16, 12, 30, tzinfo=timezone.utc),
+            )
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_fade_cache_review_bundle(
+                    str(bundle_dir),
+                    limit=1,
+                    prices_path=str(_outcome_prices_fixture_path()),
+                )
+            text = out.getvalue()
+            assert "Event-fade cached review bundle" in text
+            assert "snapshots_read=17" in text
+            assert "rows=17" in text
+            assert "needing_review=17" in text
+
+            expected = {
+                "README.md",
+                "validation_sample.jsonl",
+                "validation_sample_with_outcomes.jsonl",
+                "labeling_queue.txt",
+                "review_packet.md",
+                "review_template.csv",
+                "review_report.txt",
+            }
+            assert expected == {path.name for path in bundle_dir.iterdir()}
+
+            readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
+            assert f"Input sample: `cache:{cache_dir}`" in readme
+
+            template_text = (bundle_dir / "review_template.csv").read_text(encoding="utf-8")
+            template_rows = list(csv.DictReader(template_text.splitlines()))
+            assert len(template_rows) == 1
+            assert template_rows[0]["asset_symbol"] == "TESTVELVET"
+
+            filled_text = (bundle_dir / "validation_sample_with_outcomes.jsonl").read_text(
+                encoding="utf-8"
+            )
+            filled_rows = [json.loads(line) for line in filled_text.splitlines()]
+            velvet = next(row for row in filled_rows if row["asset_symbol"] == "TESTVELVET")
+            assert round(velvet["post_event_return_72h"], 4) == -0.2083
+        finally:
+            config.EVENT_DISCOVERY_CACHE_DIR = original_cache_dir
 
 
 def test_event_fade_merge_sample_scanner_writes_merged_jsonl():

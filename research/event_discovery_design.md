@@ -514,6 +514,13 @@ does not infer labels, alter the source sample, write live storage, route
 alerts, open paper trades, or imply promotion. If a local price fixture is
 supplied, outcome filling is applied only to the bundle-local sample copy.
 
+`main.py --event-fade-cache-review-bundle OUT_DIR` writes the same workspace
+directly from latest cached candidate snapshots under
+`RSI_EVENT_DISCOVERY_CACHE_DIR`. This is the preferred review handoff after
+running `main.py --event-discovery-refresh`, because it avoids the extra
+export-sample step and keeps the review bundle tied to the point-in-time cache.
+It writes only under `OUT_DIR`.
+
 ## Validation Sample Review
 
 `main.py --event-fade-review-sample PATH` reads a labeled JSONL/CSV validation
@@ -866,6 +873,17 @@ EVENT_FADE_REVIEW_BUNDLE_DIR=/tmp/event_fade_review_bundle \
 EVENT_FADE_REVIEW_BUNDLE_PRICES=/path/to/outcome_prices.json \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-review-bundle
+```
+
+Write a local review workspace from the latest research cache:
+
+```bash
+make event-fade-cache-review-bundle
+EVENT_DISCOVERY_CACHE_DIR=event_fade_cache \
+EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_cache_review_bundle \
+EVENT_FADE_REVIEW_BUNDLE_PRICES=/path/to/outcome_prices.json \
+EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-cache-review-bundle
 ```
 
 Preserve review status/labels/outcomes across a refreshed export:

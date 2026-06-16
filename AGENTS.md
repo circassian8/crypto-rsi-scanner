@@ -121,6 +121,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-fade-review-bundle SAMPLE OUT_DIR` (write a local manual
   review workspace with copied sample, optional outcome-filled sample, queue,
   packet, sidecar, review report, and README; writes only under `OUT_DIR`) ·
+  `main.py --event-fade-cache-review-bundle OUT_DIR` (same review workspace,
+  sourced from latest cached candidate snapshots under
+  `RSI_EVENT_DISCOVERY_CACHE_DIR`; writes only under `OUT_DIR`) ·
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT` (copy prior human
   review status/labels/outcomes into a fresh validation export; writes only `OUT`) ·
   `main.py --event-fade-export-outcome-prices SAMPLE OUT` (build a local OHLCV
@@ -419,7 +422,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   nonblank sidecar review status/labels/outcomes back into a requested sample artifact.
   `main.py --event-fade-review-bundle SAMPLE OUT_DIR` writes the sample copy,
   queue, packet, template, review report, README, and optional outcome-filled
-  sample into one local review workspace.
+  sample into one local review workspace. `main.py
+  --event-fade-cache-review-bundle OUT_DIR` builds the same workspace directly
+  from latest cached candidate snapshots.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human review status/labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,

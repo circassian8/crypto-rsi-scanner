@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add cache-backed event-fade review bundle · Codex
+**Why:** The real event-fade validation loop should hand off the latest
+point-in-time discovery cache for human review without requiring a separate
+manual export-sample step first.
+**Changes:**
+- Added `main.py --event-fade-cache-review-bundle OUT_DIR`, which reads latest
+  cached candidate snapshots from `RSI_EVENT_DISCOVERY_CACHE_DIR` and writes the
+  same local review workspace as `--event-fade-review-bundle`.
+- Refactored the review-bundle writer so sample-backed and cache-backed bundles
+  share queue, packet, sidecar, report, README, and optional outcome-fill
+  behavior.
+- Added `make event-fade-cache-review-bundle` plus top-level usage/help text.
+- Added an offline regression test that writes a temporary research cache and
+  builds a cache-backed bundle with local outcome prices.
+- Relaxed a date-sensitive auto-report fixture assertion for `TESTAI` after the
+  fixture event moved from pre-event blowoff risk into triggered state.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 216/216.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard.
+**Notes/risks:** This remains artifact-only. It reads the research cache and
+writes only the requested bundle directory; it does not route alerts, write live
+storage, open paper trades, or infer review labels.
+
 ## 2026-06-16 — Require explicit reviewed status for event-fade samples · Codex
 **Why:** The validation reviewer counted any row with a `human_label` as
 reviewed evidence. That made half-edited sidecars risky: a label without an
