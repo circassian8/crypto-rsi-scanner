@@ -473,10 +473,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   nonblank sidecar review status/labels/outcomes back into a requested sample
   artifact, then prints the resulting review report and next-sample work.
   `main.py --event-fade-review-bundle SAMPLE OUT_DIR` writes the sample copy,
-  queue, packet, template, review report, manifest, README, and optional
-  outcome-filled sample into one local review workspace. `main.py
+  queue, packet, template, review report, manifest, README, compact
+  sample-quality summary, and optional outcome-filled sample into one local
+  review workspace. `main.py
   --event-fade-cache-review-bundle OUT_DIR` builds the same workspace directly
-  from latest cached candidate snapshots. Empty bundles warn in CLI output,
+  from latest cached candidate snapshots. The manifest/README summary includes
+  event type, relationship, asset role, signal type, source-provider, proxy,
+  direct, trigger, and missing-event-time counts. Empty bundles warn in CLI output,
   README, and manifest when no validation rows were produced. `make event-fade-review-cycle` runs
   the fixture-backed cache refresh and cache review-bundle export with the same
   `EVENT_DISCOVERY_CACHE_DIR`; `make event-fade-configured-review-cycle` runs

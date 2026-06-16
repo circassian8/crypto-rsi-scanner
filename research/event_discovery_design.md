@@ -890,6 +890,13 @@ relationship, and BTC-risk cohorts. Use the asset-role section to verify that
 reviewed proxy rows are not dominated by `mentioned_asset`, `infrastructure`, or
 `ticker_word_collision` controls before treating the sample as evidence.
 
+Review bundles also write a compact sample summary into `manifest.json` and
+`README.md`: event types, relationship types, asset roles, signal types, source
+providers, proxy candidate count, proxy-context control count, direct
+beneficiary count, SHORT_TRIGGERED count, and missing-event-time count. This is
+the fastest way to sanity-check a fresh public RSS bundle before filling the
+sidecar labels.
+
 Inspect configured provider readiness without printing secrets:
 
 ```bash

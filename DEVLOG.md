@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Summarize event-fade review bundles · Codex
+**Why:** The public RSS validation workflow now produces cleaner rows, but a
+reviewer still had to inspect the sample or report to understand whether a
+fresh bundle contained real proxy candidates, proxy-context controls, direct
+events, trigger rows, or mostly missing event times.
+**Changes:**
+- Added a compact `sample_summary` block to review-bundle `manifest.json` with
+  event type, relationship, asset role, signal type, source-provider, proxy,
+  direct, trigger, and missing-event-time counts.
+- Added the same summary to bundle `README.md` for quick human triage before
+  editing the review sidecar.
+- Covered normal cache-backed bundles and empty-cache bundles in regression
+  tests.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the review-bundle summary behavior.
+**Verify:** `make verify` passes, including 234/234 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This only changes local review artifacts. It does not affect
+classification, event-fade scoring, alert routing, paper trades, or live
+storage.
+
 ## 2026-06-16 — Add asset-role cohorts to event-fade review reports · Codex
 **Why:** Asset-role classification made public RSS samples cleaner, but the
 review summary still only grouped by event type, relationship type, and BTC

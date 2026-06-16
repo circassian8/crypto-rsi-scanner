@@ -1636,6 +1636,7 @@ def _write_event_fade_review_bundle(
 
     queue = event_validation.build_labeling_queue(review_rows, limit=limit)
     review = event_validation.review_validation_sample(review_rows)
+    sample_summary = _event_fade_review_sample_summary(review_rows)
     template_rows = event_validation.build_review_template_rows(review_rows, limit=limit)
     bundle_warnings = tuple([_empty_review_bundle_message(sample_path)] if not review_rows else [])
 
@@ -1666,6 +1667,7 @@ def _write_event_fade_review_bundle(
         review_rows=len(review_rows),
         queue=queue,
         review=review,
+        sample_summary=sample_summary,
         limit=limit,
         fill_summary=fill_summary,
         fill_result=fill_result,
@@ -1695,6 +1697,7 @@ def _write_event_fade_review_bundle(
             manifest_path=manifest_path,
             rows=len(review_rows),
             queue=queue,
+            sample_summary=sample_summary,
             fill_summary=fill_summary,
             auto_export_prices=auto_export_prices,
             reviewed_path=reviewed_path,
@@ -1729,6 +1732,7 @@ def _event_fade_review_bundle_manifest(
     review_rows: int,
     queue: event_validation.ValidationLabelingQueue,
     review: event_validation.EventFadeValidationReview,
+    sample_summary: dict[str, Any],
     limit: int | None,
     fill_summary: str,
     fill_result: event_validation.ValidationOutcomeFillResult | None,
@@ -1778,6 +1782,7 @@ def _event_fade_review_bundle_manifest(
             "review_rows": review_rows,
         },
         "warnings": list(warnings),
+        "sample_summary": sample_summary,
         "files": files,
         "queue": {
             "limit": limit,
@@ -1872,6 +1877,70 @@ def _event_fade_review_merge_manifest(
     }
 
 
+def _event_fade_review_sample_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build compact sample-quality counts for review bundle manifests/READMEs."""
+    return {
+        "rows": len(rows),
+        "review_status": _count_values(row.get("review_status") or "missing" for row in rows),
+        "human_labels": _count_values(row.get("human_label") or "unlabeled" for row in rows),
+        "event_types": _count_values(row.get("event_type") or "unknown" for row in rows),
+        "relationship_types": _count_values(row.get("relationship_type") or "unknown" for row in rows),
+        "asset_roles": _count_values(row.get("asset_role") or "unknown" for row in rows),
+        "signal_types": _count_values(row.get("signal_type") or "NO_TRADE" for row in rows),
+        "source_providers": _count_values(
+            provider
+            for row in rows
+            for provider in _bundle_list_values(row.get("raw_providers"))
+        ),
+        "proxy_candidates": sum(1 for row in rows if _bundle_bool(row.get("is_proxy_narrative"))),
+        "proxy_context_controls": sum(1 for row in rows if row.get("relationship_type") == "proxy_context"),
+        "direct_beneficiaries": sum(1 for row in rows if _bundle_bool(row.get("is_direct_beneficiary"))),
+        "eligible_rows": sum(1 for row in rows if _bundle_bool(row.get("eligible"))),
+        "short_triggered_rows": sum(1 for row in rows if row.get("signal_type") == "SHORT_TRIGGERED"),
+        "missing_event_time_rows": sum(1 for row in rows if not row.get("event_time")),
+    }
+
+
+def _count_values(values: Any) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        key = str(value or "unknown")
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _bundle_list_values(value: object) -> list[str]:
+    if value in (None, ""):
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value if item not in (None, "")]
+    if isinstance(value, tuple):
+        return [str(item) for item in value if item not in (None, "")]
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return []
+        if raw.startswith("["):
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                return [raw]
+            if isinstance(parsed, list):
+                return [str(item) for item in parsed if item not in (None, "")]
+        return [raw]
+    return [str(value)]
+
+
+def _bundle_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().casefold() in {"1", "true", "yes", "y"}
+    return False
+
+
 def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, verbose: bool = False) -> None:
     """Merge manual review status, labels, and outcomes into a fresh export."""
     _setup_event_discovery_logging(verbose)
@@ -1958,6 +2027,7 @@ def _event_fade_review_bundle_readme(
     manifest_path: Path,
     rows: int,
     queue: event_validation.ValidationLabelingQueue,
+    sample_summary: dict[str, Any],
     fill_summary: str,
     auto_export_prices: bool,
     reviewed_path: str | None,
@@ -1993,6 +2063,9 @@ def _event_fade_review_bundle_readme(
         f"Rows: {rows}",
         f"Rows needing labels/status/outcomes: {queue.needed_rows}",
         f"Rows shown in queue/template/packet: {queue.shown_rows}",
+        "",
+        "Sample summary:",
+        *_event_fade_review_bundle_summary_lines(sample_summary),
         *warning_lines,
         f"Auto price export: {'yes' if auto_export_prices else 'no'}",
         f"Outcome fill: {fill_summary}",
@@ -2016,6 +2089,30 @@ def _event_fade_review_bundle_readme(
         "4. Run `main.py --event-fade-review-sample OUT` to inspect coverage and blockers.",
         "",
     ])
+
+
+def _event_fade_review_bundle_summary_lines(sample_summary: dict[str, Any]) -> list[str]:
+    return [
+        f"- Proxy candidates: {sample_summary.get('proxy_candidates', 0)}",
+        f"- Proxy-context controls: {sample_summary.get('proxy_context_controls', 0)}",
+        f"- Direct beneficiaries: {sample_summary.get('direct_beneficiaries', 0)}",
+        f"- SHORT_TRIGGERED rows: {sample_summary.get('short_triggered_rows', 0)}",
+        f"- Missing event time rows: {sample_summary.get('missing_event_time_rows', 0)}",
+        "- Asset roles: " + _summary_count_line(sample_summary.get("asset_roles")),
+        "- Relationships: " + _summary_count_line(sample_summary.get("relationship_types")),
+        "- Source providers: " + _summary_count_line(sample_summary.get("source_providers")),
+        "",
+    ]
+
+
+def _summary_count_line(counts: object, *, limit: int = 6) -> str:
+    if not isinstance(counts, dict) or not counts:
+        return "none"
+    parts = [f"{key}={value}" for key, value in list(counts.items())[:limit]]
+    remaining = len(counts) - len(parts)
+    if remaining > 0:
+        parts.append(f"+{remaining} more")
+    return ", ".join(parts)
 
 
 def status() -> None:

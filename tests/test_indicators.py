@@ -4044,6 +4044,15 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert manifest["files"]["review_template"] == "review_template.csv"
         assert manifest["outcome_fill"]["filled_rows"] == 1
         assert manifest["review"]["promotion_ready"] is False
+        assert manifest["sample_summary"]["rows"] == 17
+        assert manifest["sample_summary"]["proxy_candidates"] == 6
+        assert manifest["sample_summary"]["direct_beneficiaries"] == 9
+        assert manifest["sample_summary"]["short_triggered_rows"] == 1
+        assert manifest["sample_summary"]["asset_roles"]["proxy_instrument"] == 6
+        assert manifest["sample_summary"]["source_providers"]["manual_json"] == 5
+        assert "Sample summary:" in readme
+        assert "Proxy candidates: 6" in readme
+        assert "Asset roles: direct_beneficiary=9, proxy_instrument=6, ambiguous=2" in readme
 
         packet = (bundle_dir / "review_packet.md").read_text(encoding="utf-8")
         assert "## 1. TESTVELVET - SpaceX IPO trading start" in packet
@@ -4252,6 +4261,8 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
             assert manifest["source"]["review_rows"] == 17
             assert manifest["queue"]["shown_rows"] == 1
             assert manifest["outcome_fill"]["prices_path"] == str(_outcome_prices_fixture_path())
+            assert manifest["sample_summary"]["rows"] == 17
+            assert manifest["sample_summary"]["asset_roles"]["proxy_instrument"] == 6
 
             template_text = (bundle_dir / "review_template.csv").read_text(encoding="utf-8")
             template_rows = list(csv.DictReader(template_text.splitlines()))
@@ -4293,12 +4304,16 @@ def test_event_fade_cache_review_bundle_warns_on_empty_cache():
 
             manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
             assert manifest["source"]["review_rows"] == 0
+            assert manifest["sample_summary"]["rows"] == 0
+            assert manifest["sample_summary"]["asset_roles"] == {}
             assert manifest["warnings"]
             assert "No validation rows were available" in manifest["warnings"][0]
 
             readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
             assert "Warnings:" in readme
             assert "No validation rows were available" in readme
+            assert "Sample summary:" in readme
+            assert "Asset roles: none" in readme
         finally:
             config.EVENT_DISCOVERY_CACHE_DIR = original_cache_dir
 
