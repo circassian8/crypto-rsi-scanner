@@ -3208,6 +3208,69 @@ def test_event_fade_review_template_scanner_exports_and_applies_sidecar():
         assert velvet["human_notes"] == "Reviewed compact sidecar."
 
 
+def test_event_fade_review_bundle_scanner_writes_workspace():
+    import contextlib
+    import csv
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, scanner
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    with tempfile.TemporaryDirectory() as tmp:
+        sample_path = Path(tmp) / "sample.jsonl"
+        bundle_dir = Path(tmp) / "review_bundle"
+        event_discovery.write_validation_sample(rows, sample_path)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_review_bundle(
+                str(sample_path),
+                str(bundle_dir),
+                limit=1,
+                prices_path=str(_outcome_prices_fixture_path()),
+            )
+        text = out.getvalue()
+        assert "Event-fade review bundle" in text
+        assert "needing_review=17" in text
+        assert "showing=1" in text
+
+        expected = {
+            "README.md",
+            "validation_sample.jsonl",
+            "validation_sample_with_outcomes.jsonl",
+            "labeling_queue.txt",
+            "review_packet.md",
+            "review_template.csv",
+            "review_report.txt",
+        }
+        assert expected == {path.name for path in bundle_dir.iterdir()}
+
+        readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
+        assert "Research-only" in readme
+        assert "validation_sample_with_outcomes.jsonl" in readme
+
+        packet = (bundle_dir / "review_packet.md").read_text(encoding="utf-8")
+        assert "## 1. TESTVELVET - SpaceX IPO trading start" in packet
+        assert "trigger 72h=`-20.8%`" in packet
+
+        report = (bundle_dir / "review_report.txt").read_text(encoding="utf-8")
+        assert "EVENT FADE VALIDATION SAMPLE REVIEW" in report
+        assert "reviewed proxy candidates 0/25" in report
+
+        template_rows = list(csv.DictReader((bundle_dir / "review_template.csv").read_text(encoding="utf-8").splitlines()))
+        assert len(template_rows) == 1
+        assert template_rows[0]["asset_symbol"] == "TESTVELVET"
+
+        filled_rows = [
+            json.loads(line)
+            for line in (bundle_dir / "validation_sample_with_outcomes.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        velvet = next(row for row in filled_rows if row["asset_symbol"] == "TESTVELVET")
+        assert round(velvet["post_event_return_72h"], 4) == -0.2083
+
+
 def test_event_fade_merge_sample_scanner_writes_merged_jsonl():
     import contextlib
     import io

@@ -487,6 +487,25 @@ sample artifact. The apply command uses stable event/asset/relationship identity
 and writes only `OUT`; it does not infer labels, alter the source sample, write
 live storage, route alerts, open paper trades, or imply promotion.
 
+## Validation Review Bundle
+
+`main.py --event-fade-review-bundle SAMPLE OUT_DIR` writes a local manual-review
+workspace for a validation sample. The bundle contains:
+
+- `validation_sample.jsonl`: copied source sample
+- `validation_sample_with_outcomes.jsonl`: optional outcome-filled sample when
+  `--event-fade-review-bundle-prices PRICES` is supplied
+- `labeling_queue.txt`: prioritized rows needing labels/outcomes
+- `review_packet.md`: human-readable evidence packet
+- `review_template.csv`: compact editable sidecar
+- `review_report.txt`: current metrics and promotion blockers
+- `README.md`: suggested manual workflow
+
+The bundle is a convenience wrapper around existing artifact-only commands. It
+does not infer labels, alter the source sample, write live storage, route
+alerts, open paper trades, or imply promotion. If a local price fixture is
+supplied, outcome filling is applied only to the bundle-local sample copy.
+
 ## Validation Sample Review
 
 `main.py --event-fade-review-sample PATH` reads a labeled JSONL/CSV validation
@@ -818,6 +837,17 @@ EVENT_FADE_SAMPLE_IN=/path/to/sample.jsonl \
 EVENT_FADE_REVIEW_TEMPLATE=/tmp/event_fade_review_template.csv \
 EVENT_FADE_SAMPLE_REVIEW_APPLIED=/tmp/event_fade_reviewed.jsonl \
   make event-fade-apply-review-template
+```
+
+Write a local review workspace:
+
+```bash
+make event-fade-review-bundle
+EVENT_FADE_SAMPLE_IN=/path/to/sample.jsonl \
+EVENT_FADE_REVIEW_BUNDLE_DIR=/tmp/event_fade_review_bundle \
+EVENT_FADE_REVIEW_BUNDLE_PRICES=/path/to/outcome_prices.json \
+EVENT_FADE_QUEUE_LIMIT=50 \
+  make event-fade-review-bundle
 ```
 
 Preserve labels/outcomes across a refreshed export:

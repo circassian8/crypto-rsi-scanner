@@ -1355,6 +1355,88 @@ def event_fade_apply_review_template(
     )
 
 
+def event_fade_review_bundle(
+    sample_path: str,
+    out_dir: str,
+    *,
+    limit: int | None = 20,
+    prices_path: str | None = None,
+    overwrite_outcomes: bool = False,
+    verbose: bool = False,
+) -> None:
+    """Write a local event-fade validation review workspace."""
+    _setup_event_discovery_logging(verbose)
+    source_rows = event_validation.load_validation_sample(sample_path)
+    bundle_dir = Path(out_dir).expanduser()
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+
+    copied_sample = event_discovery.write_validation_sample(
+        source_rows,
+        bundle_dir / "validation_sample.jsonl",
+    )
+    review_rows = source_rows
+    fill_summary = "No price fixture supplied; outcome fields were not filled."
+    outcome_sample: Path | None = None
+    if prices_path:
+        prices = event_validation.load_outcome_price_fixture(prices_path)
+        fill_result = event_validation.fill_validation_outcomes(
+            source_rows,
+            prices,
+            overwrite=overwrite_outcomes,
+        )
+        review_rows = fill_result.rows
+        outcome_sample = event_discovery.write_validation_sample(
+            review_rows,
+            bundle_dir / "validation_sample_with_outcomes.jsonl",
+        )
+        fill_summary = (
+            f"Filled {fill_result.filled_rows}/{fill_result.triggered_rows} triggered row(s); "
+            f"missing_history={fill_result.missing_history_rows}, "
+            f"insufficient_history={fill_result.insufficient_history_rows}, "
+            f"skipped_existing={fill_result.skipped_existing_rows}."
+        )
+
+    queue = event_validation.build_labeling_queue(review_rows, limit=limit)
+    review = event_validation.review_validation_sample(review_rows)
+    template_rows = event_validation.build_review_template_rows(review_rows, limit=limit)
+
+    queue_path = bundle_dir / "labeling_queue.txt"
+    packet_path = bundle_dir / "review_packet.md"
+    template_path = bundle_dir / "review_template.csv"
+    report_path = bundle_dir / "review_report.txt"
+    readme_path = bundle_dir / "README.md"
+
+    queue_path.write_text(event_validation.format_labeling_queue(queue) + "\n", encoding="utf-8")
+    packet_path.write_text(event_validation.format_review_packet(review_rows, limit=limit) + "\n", encoding="utf-8")
+    template_path.write_text(event_validation.format_review_template_csv(template_rows), encoding="utf-8")
+    report_path.write_text(event_validation.format_validation_review(review) + "\n", encoding="utf-8")
+    readme_path.write_text(
+        _event_fade_review_bundle_readme(
+            sample_path=sample_path,
+            copied_sample=copied_sample,
+            outcome_sample=outcome_sample,
+            queue_path=queue_path,
+            packet_path=packet_path,
+            template_path=template_path,
+            report_path=report_path,
+            rows=len(review_rows),
+            queue=queue,
+            fill_summary=fill_summary,
+        ),
+        encoding="utf-8",
+    )
+
+    print(
+        "Event-fade review bundle: "
+        f"rows={len(review_rows)}, "
+        f"needing_review={queue.needed_rows}, "
+        f"showing={queue.shown_rows}, "
+        f"dir={bundle_dir}"
+    )
+    if outcome_sample is not None:
+        print(f"Outcome-filled sample: {outcome_sample}")
+
+
 def event_fade_merge_sample(fresh_path: str, reviewed_path: str, out_path: str, verbose: bool = False) -> None:
     """Merge manual labels/outcomes from a reviewed sample into a fresh export."""
     _setup_event_discovery_logging(verbose)
@@ -1422,6 +1504,52 @@ def event_fade_export_outcome_prices(
         f"days={result.days}, source={result.source}, "
         f"missing={missing}, wrote {result.out_path}"
     )
+
+
+def _event_fade_review_bundle_readme(
+    *,
+    sample_path: str,
+    copied_sample: Path,
+    outcome_sample: Path | None,
+    queue_path: Path,
+    packet_path: Path,
+    template_path: Path,
+    report_path: Path,
+    rows: int,
+    queue: event_validation.ValidationLabelingQueue,
+    fill_summary: str,
+) -> str:
+    outcome_line = (
+        f"- `{outcome_sample.name}`: sample with locally filled trigger/baseline outcomes"
+        if outcome_sample is not None
+        else "- No outcome-filled sample was written."
+    )
+    return "\n".join([
+        "# Event-Fade Validation Review Bundle",
+        "",
+        "Research-only: no alerts, live DB writes, paper trades, or orders.",
+        "",
+        f"Input sample: `{sample_path}`",
+        f"Rows: {rows}",
+        f"Rows needing labels/outcomes: {queue.needed_rows}",
+        f"Rows shown in queue/template/packet: {queue.shown_rows}",
+        f"Outcome fill: {fill_summary}",
+        "",
+        "Files:",
+        f"- `{copied_sample.name}`: copied source validation sample",
+        outcome_line,
+        f"- `{queue_path.name}`: prioritized queue for missing labels/outcomes",
+        f"- `{packet_path.name}`: human-readable evidence packet",
+        f"- `{template_path.name}`: compact editable CSV sidecar",
+        f"- `{report_path.name}`: current review metrics and promotion blockers",
+        "",
+        "Suggested workflow:",
+        "1. Read `review_packet.md` for evidence.",
+        "2. Edit `review_template.csv` with `review_status`, `human_label`, `human_notes`, and any missing outcomes.",
+        "3. Apply the edited sidecar with `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`.",
+        "4. Run `main.py --event-fade-review-sample OUT` to inspect coverage and blockers.",
+        "",
+    ])
 
 
 def status() -> None:
@@ -1658,12 +1786,24 @@ def cli() -> None:
         help="Apply edited compact review sidecar rows to SAMPLE and write OUT.",
     )
     parser.add_argument(
+        "--event-fade-review-bundle",
+        nargs=2,
+        metavar=("SAMPLE", "OUT_DIR"),
+        help="Write a local manual-review workspace for an event-fade validation sample.",
+    )
+    parser.add_argument(
+        "--event-fade-review-bundle-prices",
+        metavar="PRICES",
+        help="Optional local OHLCV price fixture for --event-fade-review-bundle outcome filling.",
+    )
+    parser.add_argument(
         "--event-fade-queue-limit",
         type=int,
         default=20,
         help=(
             "Maximum rows to show for --event-fade-labeling-queue, "
-            "--event-fade-review-packet, or --event-fade-export-review-template."
+            "--event-fade-review-packet, --event-fade-export-review-template, "
+            "or --event-fade-review-bundle."
         ),
     )
     parser.add_argument(
@@ -1840,6 +1980,17 @@ def cli() -> None:
             sample_path,
             template_path,
             out_path,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_fade_review_bundle:
+        sample_path, out_dir = args.event_fade_review_bundle
+        event_fade_review_bundle(
+            sample_path,
+            out_dir,
+            limit=args.event_fade_queue_limit,
+            prices_path=args.event_fade_review_bundle_prices,
+            overwrite_outcomes=args.event_fade_overwrite_outcomes,
             verbose=args.verbose,
         )
         return

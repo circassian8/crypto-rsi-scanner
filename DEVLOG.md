@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Add event-fade review bundle workspace · Codex
+**Why:** The validation workflow had all the individual pieces, but building a
+human-review workspace still required several commands in the right order. A
+single bundle command makes the reviewed event dataset easier to assemble
+without changing live behavior.
+**Changes:**
+- Added `main.py --event-fade-review-bundle SAMPLE OUT_DIR`, which writes a
+  local review workspace with `validation_sample.jsonl`, optional
+  `validation_sample_with_outcomes.jsonl`, `labeling_queue.txt`,
+  `review_packet.md`, `review_template.csv`, `review_report.txt`, and
+  `README.md`.
+- Added optional `--event-fade-review-bundle-prices PRICES` to fill trigger and
+  event-time baseline outcomes into the bundle-local sample copy.
+- Added `make event-fade-review-bundle` and top-level usage text.
+- Added an offline scanner regression test that verifies the bundle files and
+  outcome-filled sample contents.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` with the review-bundle workflow and
+  artifact-only guardrails.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes 213/213.
+`make verify` passes, including tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard. `.venv/bin/python main.py --help` exposes the new
+bundle command.
+**Notes/risks:** The bundle does not infer labels, write live storage, route
+alerts, open paper trades, or imply event-fade promotion. The actual validation
+sample still needs human labels and real local price outcomes.
+
 ## 2026-06-16 — Add event-fade review sidecar workflow · Codex
 **Why:** Review packets make candidate evidence readable, but a human still had
 to edit the full validation export to apply labels. A compact sidecar makes

@@ -116,6 +116,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` (copy
   sidecar human labels/outcomes back into a validation sample; writes only
   `OUT`) ·
+  `main.py --event-fade-review-bundle SAMPLE OUT_DIR` (write a local manual
+  review workspace with copied sample, optional outcome-filled sample, queue,
+  packet, sidecar, review report, and README; writes only under `OUT_DIR`) ·
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT` (copy prior human
   labels/outcomes into a fresh validation export; writes only `OUT`) ·
   `main.py --event-fade-export-outcome-prices SAMPLE OUT` (build a local OHLCV
@@ -271,6 +274,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   OUT` may copy nonblank human labels/notes/outcomes from that sidecar into a
   validation-sample artifact. They must not infer labels, write live storage,
   route alerts, open paper trades, or imply promotion.
+- Event-fade validation review bundles are artifact-only. `main.py
+  --event-fade-review-bundle SAMPLE OUT_DIR` may copy the sample and write local
+  review aids under `OUT_DIR`; with `--event-fade-review-bundle-prices` it may
+  also fill outcome fields into a bundle-local sample copy. It must not infer
+  labels, write live storage, route alerts, open paper trades, or imply
+  promotion.
 - Event-fade validation merges are artifact-only. `main.py --event-fade-merge-sample`
   may copy nonblank human labels/notes/outcomes from a previously reviewed
   JSONL/CSV sample into a fresh export by event/asset/relationship identity, but
@@ -399,6 +408,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   writes a compact editable sidecar for those rows, and
   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` applies
   nonblank sidecar labels/outcomes back into a requested sample artifact.
+  `main.py --event-fade-review-bundle SAMPLE OUT_DIR` writes the sample copy,
+  queue, packet, template, review report, README, and optional outcome-filled
+  sample into one local review workspace.
   `main.py --event-fade-merge-sample FRESH REVIEWED OUT`
   preserves prior human labels/outcomes when regenerating a fresh export. Beyond
   the explicit opt-in Binance/Bybit announcements, CryptoPanic, GDELT news,
@@ -432,7 +444,9 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
    labels/outcomes, optionally write a review packet with
    `main.py --event-fade-review-packet SAMPLE OUT`, fill a compact sidecar from
    `main.py --event-fade-export-review-template SAMPLE OUT`, apply it with
-   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`, then use
+   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`, optionally
+   build a review workspace with `main.py --event-fade-review-bundle SAMPLE
+   OUT_DIR`, then use
    `main.py --event-fade-review-sample PATH` before promoting event-fade output
    beyond local reports.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
