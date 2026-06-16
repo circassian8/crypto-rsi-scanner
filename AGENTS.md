@@ -269,6 +269,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `event_time_source`/`event_time_confidence` provenance in validation exports,
   and fade-candidate confidence is capped by event-time confidence so
   lower-confidence text dates cannot silently satisfy the event-confidence gate.
+  Validation review reports cohort by event-time source and block promotion if
+  reviewed `SHORT_TRIGGERED` rows have event-time confidence below the review
+  threshold.
   Asset role classification is part of the proxy gate: only `proxy_instrument`
   and `proxy_venue` rows remain proxy candidates; `mentioned_asset`,
   `infrastructure`, and `ticker_word_collision` rows become `proxy_context`
@@ -472,10 +475,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   false-positive rate, trigger latency, point-in-time evidence violations,
   post-decision source evidence,
   MFE/MAE, post-event returns, event-time short baseline comparison,
-  event-type/relationship/asset-role/BTC-risk cohorts, and blockers such as too
-  few reviewed proxy/control/trigger cases, too-narrow event/BTC-risk diversity,
-  or weak edge-quality metrics. It also prints concrete next-sample work so the
-  reviewer knows which cases, labels, statuses, or outcomes to add next.
+  event-type/relationship/asset-role/event-time-source/BTC-risk cohorts, and
+  blockers such as too few reviewed proxy/control/trigger cases, too-narrow
+  event/BTC-risk diversity, low-confidence trigger event times, or weak
+  edge-quality metrics. It also prints concrete next-sample work so the reviewer
+  knows which cases, labels, statuses, source-time confirmations, or outcomes to
+  add next.
   `main.py --event-fade-labeling-queue PATH`
   prioritizes the next rows to label, rows missing explicit review status, and
   triggered rows missing required outcome fields.

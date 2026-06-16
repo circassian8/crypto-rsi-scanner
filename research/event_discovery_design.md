@@ -885,7 +885,10 @@ that explicit date evidence remain `proxy_attention` and `NO_TRADE`. Inferred
 dates are exported with `event_time_source=text_date` and reduced
 `event_time_confidence`; fade-candidate confidence is capped by that
 event-time confidence so low-confidence text dates cannot satisfy the
-event-fade confidence gate by themselves.
+event-fade confidence gate by themselves. Validation review reports cohort rows
+by `event_time_source` and block promotion if reviewed `SHORT_TRIGGERED` rows
+have event-time confidence below the review threshold; text-date rows are leads
+until a stronger source confirms the catalyst time.
 For a newline-separated URL list, set
 `RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH`. The checked-in no-key starter
 list is `fixtures/event_discovery/public_rss_feeds.txt`; it includes broad
@@ -938,9 +941,12 @@ bundle can contain RSS proxy-attention or source-text-dated proxy rows plus
 Polymarket dated external-catalyst controls.
 
 Validation review reports include asset-role cohorts alongside event-type,
-relationship, and BTC-risk cohorts. Use the asset-role section to verify that
-reviewed proxy rows are not dominated by `mentioned_asset`, `infrastructure`, or
-`ticker_word_collision` controls before treating the sample as evidence.
+relationship, event-time-source, and BTC-risk cohorts. Use the asset-role
+section to verify that reviewed proxy rows are not dominated by
+`mentioned_asset`, `infrastructure`, or `ticker_word_collision` controls, and
+use the event-time-source section to verify that triggered evidence is not
+dominated by lower-confidence `text_date` rows before treating the sample as
+promotion evidence.
 
 Review bundles also write a compact sample summary into `manifest.json` and
 `README.md`: event types, relationship types, asset roles, signal types, source

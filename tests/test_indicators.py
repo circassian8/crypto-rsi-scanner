@@ -3124,6 +3124,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert review.reviewed_proxy_event_types == 2
     assert review.triggered_btc_risk_buckets == 1
     assert review.missing_event_time_baseline_rows == 0
+    assert review.low_confidence_trigger_event_time_rows == 0
     assert review.point_in_time_violation_rows == 0
     assert review.post_decision_source_rows == 0
     assert review.missing_source_timing_rows == 0
@@ -3149,6 +3150,10 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert asset_role_cohorts["direct_beneficiary"].reviewed_negative_controls == 2
     assert asset_role_cohorts["ambiguous"].reviewed_negative_controls == 1
 
+    time_source_cohorts = {cohort.name: cohort for cohort in review.event_time_source_cohorts}
+    assert time_source_cohorts["explicit"].reviewed_proxy_candidates == 3
+    assert time_source_cohorts["missing_event_time"].reviewed_negative_controls == 1
+
     btc_cohorts = {cohort.name: cohort for cohort in review.btc_risk_cohorts}
     assert btc_cohorts["btc_risk_neutral"].triggered_reviewed == 1
     assert btc_cohorts["btc_risk_unknown"].reviewed_negative_controls == 2
@@ -3163,6 +3168,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "trigger BTC risk buckets: 1/1" in report
     assert "reviewed rows missing source timing: 0" in report
     assert "trigger latency: avg=22.5h" in report
+    assert "low-confidence trigger event times: 0" in report
     assert "rows with post-decision source evidence: 0" in report
     assert "labeled rows missing review_status=reviewed: 0" in report
     assert "reviewed rows missing human_label: 0" in report
@@ -3173,6 +3179,8 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
     assert "ipo_proxy" in report
     assert "By asset role:" in report
     assert "proxy_instrument" in report
+    assert "By event time source:" in report
+    assert "explicit" in report
     assert "By BTC risk bucket:" in report
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -3237,6 +3245,46 @@ def test_event_fade_validation_review_blocks_narrow_event_or_btc_samples():
     assert review.triggered_btc_risk_buckets == 1
     assert "reviewed proxy event types 1/2" in review.promotion_blockers
     assert "reviewed trigger BTC risk buckets 1/2" in review.promotion_blockers
+
+
+def test_event_fade_validation_review_blocks_low_confidence_trigger_event_time():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+    triggered["human_label"] = "valid_proxy_fade"
+    triggered["review_status"] = "reviewed"
+    triggered["event_time_confidence"] = 0.60
+    triggered["event_time_source"] = "text_date"
+    triggered["max_favorable_excursion"] = 0.42
+    triggered["max_adverse_excursion"] = 0.08
+    triggered["post_event_return_72h"] = -0.22
+    triggered["event_time_post_event_return_72h"] = -0.12
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=1,
+        min_negative_controls=0,
+        min_triggered_reviewed=1,
+        min_trigger_precision=0.90,
+        min_mfe_mae_ratio=1.5,
+        min_trigger_event_time_confidence=0.80,
+        min_proxy_event_types=1,
+        min_trigger_btc_risk_buckets=1,
+    )
+    assert review.promotion_ready is False
+    assert review.low_confidence_trigger_event_time_rows == 1
+    assert (
+        "1 reviewed SHORT_TRIGGERED row(s) have event_time_confidence below 80.0%"
+        in review.promotion_blockers
+    )
+    assert event_validation.validation_review_next_steps(review) == (
+        "Confirm event times from explicit source evidence for 1 reviewed triggered row(s).",
+    )
+    report = event_validation.format_validation_review(review)
+    assert "low-confidence trigger event times: 1" in report
+    assert "By event time source:" in report
+    assert "text_date" in report
 
 
 def test_event_fade_validation_merge_preserves_review_fields():

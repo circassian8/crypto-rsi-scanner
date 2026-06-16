@@ -173,6 +173,7 @@ class EventFadeValidationReview:
     negative_trigger_latency_rows: int
     missing_trigger_outcome_rows: int
     missing_event_time_baseline_rows: int
+    low_confidence_trigger_event_time_rows: int
     point_in_time_violation_rows: int
     post_decision_source_rows: int
     missing_source_timing_rows: int
@@ -181,6 +182,7 @@ class EventFadeValidationReview:
     min_triggered_reviewed: int
     min_trigger_precision: float
     min_mfe_mae_ratio: float
+    min_trigger_event_time_confidence: float
     min_proxy_event_types: int
     min_trigger_btc_risk_buckets: int
     reviewed_proxy_event_types: int
@@ -188,6 +190,7 @@ class EventFadeValidationReview:
     event_type_cohorts: tuple["ValidationCohort", ...]
     relationship_type_cohorts: tuple["ValidationCohort", ...]
     asset_role_cohorts: tuple["ValidationCohort", ...]
+    event_time_source_cohorts: tuple["ValidationCohort", ...]
     btc_risk_cohorts: tuple["ValidationCohort", ...]
     promotion_blockers: tuple[str, ...]
 
@@ -626,6 +629,7 @@ def review_validation_sample(
     min_triggered_reviewed: int = 10,
     min_trigger_precision: float = 0.60,
     min_mfe_mae_ratio: float = 1.50,
+    min_trigger_event_time_confidence: float = 0.80,
     min_proxy_event_types: int = 2,
     min_trigger_btc_risk_buckets: int = 2,
 ) -> EventFadeValidationReview:
@@ -687,6 +691,11 @@ def review_validation_sample(
         1
         for row in triggered_reviewed
         if any(_num(row.get(field)) is None for field in REQUIRED_EVENT_TIME_BASELINE_FIELDS)
+    )
+    low_confidence_trigger_event_time_rows = sum(
+        1
+        for row in triggered_reviewed
+        if (_num(row.get("event_time_confidence")) or 0.0) < min_trigger_event_time_confidence
     )
     missing_source_timing_rows = sum(1 for row in reviewed if _missing_source_timing(row))
     pit_violation_rows = sum(1 for row in reviewed if _point_in_time_violation(row))
@@ -779,6 +788,11 @@ def review_validation_sample(
         blockers.append(
             f"{missing_event_time_baseline_rows} reviewed SHORT_TRIGGERED row(s) are missing event-time baseline fields"
         )
+    if low_confidence_trigger_event_time_rows:
+        blockers.append(
+            f"{low_confidence_trigger_event_time_rows} reviewed SHORT_TRIGGERED row(s) have event_time_confidence "
+            f"below {_fmt_pct(min_trigger_event_time_confidence)}"
+        )
     if missing_source_timing_rows:
         blockers.append(
             f"{missing_source_timing_rows} reviewed row(s) are missing source timing evidence"
@@ -807,6 +821,7 @@ def review_validation_sample(
         lambda row: str(row.get("relationship_type") or "unknown"),
     )
     asset_role_cohorts = _cohorts(data, lambda row: str(row.get("asset_role") or "unknown"))
+    event_time_source_cohorts = _cohorts(data, _event_time_source_bucket)
     btc_risk_cohorts = _cohorts(data, _btc_risk_bucket)
 
     return EventFadeValidationReview(
@@ -839,6 +854,7 @@ def review_validation_sample(
         negative_trigger_latency_rows=negative_trigger_latency_rows,
         missing_trigger_outcome_rows=missing_trigger_outcome_rows,
         missing_event_time_baseline_rows=missing_event_time_baseline_rows,
+        low_confidence_trigger_event_time_rows=low_confidence_trigger_event_time_rows,
         point_in_time_violation_rows=pit_violation_rows,
         post_decision_source_rows=post_decision_source_rows,
         missing_source_timing_rows=missing_source_timing_rows,
@@ -847,6 +863,7 @@ def review_validation_sample(
         min_triggered_reviewed=min_triggered_reviewed,
         min_trigger_precision=min_trigger_precision,
         min_mfe_mae_ratio=min_mfe_mae_ratio,
+        min_trigger_event_time_confidence=min_trigger_event_time_confidence,
         min_proxy_event_types=min_proxy_event_types,
         min_trigger_btc_risk_buckets=min_trigger_btc_risk_buckets,
         reviewed_proxy_event_types=reviewed_proxy_event_types,
@@ -854,6 +871,7 @@ def review_validation_sample(
         event_type_cohorts=event_type_cohorts,
         relationship_type_cohorts=relationship_type_cohorts,
         asset_role_cohorts=asset_role_cohorts,
+        event_time_source_cohorts=event_time_source_cohorts,
         btc_risk_cohorts=btc_risk_cohorts,
         promotion_blockers=tuple(blockers),
     )
@@ -902,6 +920,10 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
             f"median={_fmt_hours(review.median_trigger_latency_hours)} · "
             f"negative rows={review.negative_trigger_latency_rows}"
         ),
+        (
+            f"  low-confidence trigger event times: {review.low_confidence_trigger_event_time_rows} · "
+            f"minimum confidence: {_fmt_pct(review.min_trigger_event_time_confidence)}"
+        ),
         f"  direct/non-proxy SHORT_TRIGGERED rows: {review.direct_or_nonproxy_triggered}",
         f"  labeled rows missing review_status=reviewed: {review.missing_review_status_rows}",
         f"  reviewed rows missing human_label: {review.missing_human_label_rows}",
@@ -937,6 +959,8 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         *_format_cohort_lines(review.relationship_type_cohorts),
         "  By asset role:",
         *_format_cohort_lines(review.asset_role_cohorts),
+        "  By event time source:",
+        *_format_cohort_lines(review.event_time_source_cohorts),
         "  By BTC risk bucket:",
         *_format_cohort_lines(review.btc_risk_cohorts),
         "",
@@ -1029,6 +1053,11 @@ def validation_review_next_steps(review: EventFadeValidationReview) -> tuple[str
     if review.missing_event_time_baseline_rows:
         steps.append(
             f"Fill event-time baseline outcomes for {review.missing_event_time_baseline_rows} reviewed triggered row(s)."
+        )
+    if review.low_confidence_trigger_event_time_rows:
+        steps.append(
+            f"Confirm event times from explicit source evidence for {review.low_confidence_trigger_event_time_rows} "
+            "reviewed triggered row(s)."
         )
     if review.negative_trigger_latency_rows:
         steps.append(
@@ -1820,6 +1849,15 @@ def _btc_risk_bucket(row: Mapping[str, Any]) -> str:
     if score <= 30:
         return "btc_risk_off"
     return "btc_risk_neutral"
+
+
+def _event_time_source_bucket(row: Mapping[str, Any]) -> str:
+    source = str(row.get("event_time_source") or "").strip()
+    if source:
+        return source
+    if not row.get("event_time"):
+        return "missing_event_time"
+    return "unknown_event_time_source"
 
 
 def _bool(value: object) -> bool:

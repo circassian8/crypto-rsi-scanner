@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-16 — Gate validation on event-time confidence · Codex
+**Why:** Source-text date inference is useful for review, but a validation
+sample should not become promotion-ready when triggered examples rely on weak
+event-time evidence.
+**Changes:**
+- Added event-time-source cohorts to event-fade validation review reports.
+- Added a low-confidence trigger event-time count and promotion blocker for
+  reviewed `SHORT_TRIGGERED` rows below the event-time confidence threshold.
+- Added next-sample guidance to confirm low-confidence trigger times from
+  explicit source evidence.
+- Covered promotion-ready explicit timing and blocked `text_date` trigger
+  timing in regression tests.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+**Verify:** `make verify` passes, including 240/240 tests, alert render smoke,
+backtest fixture smoke, and paper scoreboard.
+**Notes/risks:** This is validation/reporting only. It does not change event
+discovery, scoring, alert routing, paper trades, or live storage.
+
 ## 2026-06-16 — Expose event-time provenance in validation · Codex
 **Why:** Source-text date inference made more RSS rows dated, but reviewers also
 need to see whether a timestamp came from explicit provider data or lower-
