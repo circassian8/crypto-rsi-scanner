@@ -17,6 +17,20 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Document review-bundle wrappers in agent rules · Codex
+**Why:** The new bundle-oriented review Make targets should be the shared
+default for Claude and Codex after a human labels the event-fade sidecar.
+`AGENTS.md` still pointed mostly at lower-level raw CLI commands.
+**Changes:**
+- Updated `AGENTS.md` reports/open-next-steps sections to mention
+  `event-fade-check-review-bundle`, `event-fade-apply-review-bundle`,
+  `event-fade-review-applied-bundle`, and
+  `event-fade-fill-review-bundle-outcomes`.
+**Verify:** `make verify` passed with 262/262 tests, alert render smoke, fixture
+backtest smoke, and paper scoreboard.
+**Notes/risks:** Documentation/protocol only. No labels, alerts, live DB writes,
+paper trades, or promotion changed.
+
 ## 2026-06-17 — Add review-bundle outcome wrapper · Codex
 **Why:** The reviewed-bundle workflow still had one long manual command for
 filling outcomes after reviewed trigger rows exist. A bundle-level Make target

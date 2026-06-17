@@ -162,6 +162,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-fade-fill-outcomes SAMPLE PRICES OUT` (fill
   trigger-time and event-time-baseline `SHORT_TRIGGERED` validation outcome
   fields from local OHLCV fixtures; writes only `OUT`) ·
+  bundle wrappers for the human-review handoff:
+  `EVENT_FADE_REVIEW_BUNDLE_DIR=/path/to/bundle make event-fade-check-review-bundle`,
+  `make event-fade-apply-review-bundle`,
+  `make event-fade-review-applied-bundle`, and
+  `make event-fade-fill-review-bundle-outcomes` (same research-only behavior,
+  using the bundle's balanced sidecar/applied sample/outcome fixture) ·
   `main.py --universe-audit` (latest hygiene audit)
 - **DB backup:** `main.py --backup-db` or `make backup-db` (SQLite online backup
   API + integrity check + retention); `main.py --verify-restore` restore-checks
@@ -621,21 +627,16 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
    live conviction or routing change.
 4. Use `main.py --event-discovery-status` to confirm at least one real event
    source is ready, or use `make event-fade-no-key-review-cycle` as the
-   no-key RSS/GDELT/Polymarket starting point, then use the configured-source review cycle or
-   `main.py --event-fade-export-sample PATH` to build a manually reviewed
-   event-fade sample from discovery fixtures, use
-   `main.py --event-fade-merge-sample FRESH REVIEWED OUT` to preserve prior
-   review status/labels/outcomes across refreshes, use
-   `main.py --event-fade-labeling-queue PATH` to prioritize missing
-   review status/labels/outcomes, optionally write a review packet with
-   `main.py --event-fade-review-packet SAMPLE OUT`, fill a compact sidecar from
-   `main.py --event-fade-export-review-template SAMPLE OUT`, dry-check it with
-   `main.py --event-fade-check-review-template SAMPLE TEMPLATE`, apply it with
-   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`, optionally
-   build a review workspace with `main.py --event-fade-review-bundle SAMPLE
-   OUT_DIR`, then use
-   `main.py --event-fade-review-sample PATH` before promoting event-fade output
-   beyond local reports.
+   no-key RSS/GDELT/Polymarket starting point. For review bundles, prefer the
+   bundle wrappers after the human fills `review_template_balanced.csv`:
+   `EVENT_FADE_REVIEW_BUNDLE_DIR=/path/to/bundle make event-fade-check-review-bundle`,
+   then `make event-fade-apply-review-bundle`, then
+   `make event-fade-review-applied-bundle`. If reviewed trigger rows exist, run
+   `make event-fade-fill-review-bundle-outcomes`. Use
+   `main.py --event-fade-merge-sample FRESH REVIEWED OUT` when regenerating a
+   fresh sample and preserving prior human review status/labels/outcomes. Do not
+   promote event-fade output beyond local reports until the reviewed sample
+   clears the review gates.
 5. Monitor universe hygiene false positives/negatives and tune thresholds.
 6. Use `make dry-run-fixture` before network dry-runs when validating scanner
    plumbing that does not need live CoinGecko data.
