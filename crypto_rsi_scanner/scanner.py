@@ -1650,11 +1650,13 @@ def _write_event_fade_review_bundle(
     review = event_validation.review_validation_sample(review_rows)
     sample_summary = _event_fade_review_sample_summary(review_rows)
     template_rows = event_validation.build_review_template_rows(review_rows, limit=limit)
+    balanced_template_rows = event_validation.build_balanced_review_template_rows(review_rows)
     bundle_warnings = tuple([_empty_review_bundle_message(sample_path)] if not review_rows else [])
 
     queue_path = bundle_dir / "labeling_queue.txt"
     packet_path = bundle_dir / "review_packet.md"
     template_path = bundle_dir / "review_template.csv"
+    balanced_template_path = bundle_dir / "review_template_balanced.csv"
     report_path = bundle_dir / "review_report.txt"
     guide_path = bundle_dir / "review_guide.md"
     manifest_path = bundle_dir / "manifest.json"
@@ -1663,6 +1665,10 @@ def _write_event_fade_review_bundle(
     queue_path.write_text(event_validation.format_labeling_queue(queue) + "\n", encoding="utf-8")
     packet_path.write_text(event_validation.format_review_packet(review_rows, limit=limit) + "\n", encoding="utf-8")
     template_path.write_text(event_validation.format_review_template_csv(template_rows), encoding="utf-8")
+    balanced_template_path.write_text(
+        event_validation.format_review_template_csv(balanced_template_rows),
+        encoding="utf-8",
+    )
     report_path.write_text(event_validation.format_validation_review(review) + "\n", encoding="utf-8")
     guide_path.write_text(_event_fade_review_guide(), encoding="utf-8")
     manifest = _event_fade_review_bundle_manifest(
@@ -1675,6 +1681,8 @@ def _write_event_fade_review_bundle(
         queue_path=queue_path,
         packet_path=packet_path,
         template_path=template_path,
+        balanced_template_path=balanced_template_path,
+        balanced_template_rows=len(balanced_template_rows),
         report_path=report_path,
         guide_path=guide_path,
         readme_path=readme_path,
@@ -1709,6 +1717,7 @@ def _write_event_fade_review_bundle(
             queue_path=queue_path,
             packet_path=packet_path,
             template_path=template_path,
+            balanced_template_path=balanced_template_path,
             report_path=report_path,
             guide_path=guide_path,
             manifest_path=manifest_path,
@@ -1744,6 +1753,8 @@ def _event_fade_review_bundle_manifest(
     queue_path: Path,
     packet_path: Path,
     template_path: Path,
+    balanced_template_path: Path,
+    balanced_template_rows: int,
     report_path: Path,
     guide_path: Path,
     readme_path: Path,
@@ -1771,6 +1782,7 @@ def _event_fade_review_bundle_manifest(
         "labeling_queue": queue_path.name,
         "review_packet": packet_path.name,
         "review_template": template_path.name,
+        "review_template_balanced": balanced_template_path.name,
         "review_report": report_path.name,
         "review_guide": guide_path.name,
     }
@@ -1810,6 +1822,11 @@ def _event_fade_review_bundle_manifest(
             "needed_rows": queue.needed_rows,
             "shown_rows": queue.shown_rows,
             "total_rows": queue.total_rows,
+        },
+        "balanced_review_template": {
+            "rows": balanced_template_rows,
+            "proxy_limit": event_validation.DEFAULT_BALANCED_PROXY_REVIEW_ROWS,
+            "control_limit": event_validation.DEFAULT_BALANCED_CONTROL_REVIEW_ROWS,
         },
         "review": {
             "promotion_ready": review.promotion_ready,
@@ -2135,6 +2152,7 @@ def _event_fade_review_bundle_readme(
     queue_path: Path,
     packet_path: Path,
     template_path: Path,
+    balanced_template_path: Path,
     report_path: Path,
     guide_path: Path,
     manifest_path: Path,
@@ -2196,6 +2214,7 @@ def _event_fade_review_bundle_readme(
         f"- `{queue_path.name}`: prioritized queue for missing labels/status/outcomes",
         f"- `{packet_path.name}`: human-readable evidence packet",
         f"- `{template_path.name}`: compact editable CSV sidecar",
+        f"- `{balanced_template_path.name}`: gate-balanced editable CSV sidecar with proxy candidates and negative controls",
         f"- `{guide_path.name}`: label taxonomy, review provenance, and event-time review rules",
         f"- `{report_path.name}`: current review metrics and promotion blockers",
         f"- `{manifest_path.name}`: machine-readable bundle provenance and counts",
@@ -2203,9 +2222,10 @@ def _event_fade_review_bundle_readme(
         "Suggested workflow:",
         "1. Read `review_guide.md` for label and timing rules.",
         "2. Read `review_packet.md` for row evidence.",
-        "3. Edit `review_template.csv` with `review_status`, `reviewed_by`, `reviewed_at`, `human_label`, `human_notes`, any human event-time confirmation, and any missing outcomes. Use `primary_source_url`, `primary_raw_title`, `review_prompt`, and `event_time_review_hint` as reviewer aids only.",
-        "4. Apply the edited sidecar with `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`.",
-        "5. Run `main.py --event-fade-review-sample OUT` to inspect coverage and blockers.",
+        "3. For fastest promotion-gate coverage, edit `review_template_balanced.csv`; for strict priority order, edit `review_template.csv`.",
+        "4. Fill `review_status`, `reviewed_by`, `reviewed_at`, `human_label`, `human_notes`, any human event-time confirmation, and any missing outcomes. Use `primary_source_url`, `primary_raw_title`, `review_prompt`, and `event_time_review_hint` as reviewer aids only.",
+        "5. Apply the edited sidecar with `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`.",
+        "6. Run `main.py --event-fade-review-sample OUT` to inspect coverage and blockers.",
         "",
     ])
 
@@ -2253,7 +2273,7 @@ def _event_fade_review_guide() -> str:
         "",
         "## Review Template Helper Columns",
         "",
-        "`review_template.csv` includes reviewer-only helper columns:",
+        "`review_template.csv` and `review_template_balanced.csv` include reviewer-only helper columns:",
         "",
         "- `primary_source_url`: first source URL to open for the row",
         "- `primary_source_origin`: first normalized publisher/origin",
@@ -2262,6 +2282,8 @@ def _event_fade_review_guide() -> str:
         "- `event_time_review_hint`: whether the event time is missing, inferred/weak, or explicit/high-confidence",
         "",
         "These helper columns are not copied back into validation samples and do not affect evidence matching. The fields that count are still `review_status`, `reviewed_by`, `reviewed_at`, `human_label`, `human_notes`, `human_event_time*`, and required outcome fields.",
+        "",
+        "`review_template.csv` follows strict labeling-queue priority. `review_template_balanced.csv` is better for building the validation sample because it includes triggered rows, proxy candidates, and direct/ambiguous negative controls in one sidecar.",
         "",
         "## Outcome Fields",
         "",

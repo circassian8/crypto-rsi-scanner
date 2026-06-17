@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add balanced event-fade review sidecar · Codex
+**Why:** The priority review template focused entirely on proxy event-time rows
+in the current no-key bundle, but the validation gate also needs 50 direct or
+ambiguous controls. Reviewers need one sidecar that can build the proxy/control
+sample in parallel.
+**Changes:**
+- Added `review_template_balanced.csv` to event-fade review bundles.
+- Added `build_balanced_review_template_rows`, which includes triggered rows,
+  up to 25 proxy candidates, and up to 50 direct/ambiguous negative controls
+  using the same strict sidecar fields and evidence matching as the normal
+  priority template.
+- Added a `review_slice` helper column so reviewers can see whether a row is in
+  the triggered, proxy-candidate, or negative-control slice.
+- Updated bundle manifests, README text, review guide text, `AGENTS.md`,
+  `ROADMAP.md`, and `research/event_discovery_design.md`.
+- Refreshed the latest no-key review bundle into
+  `/tmp/event_fade_no_key_review_bundle_20260617_032443_balanced`; its balanced
+  sidecar contains 75 rows: 25 proxy candidates and 50 controls.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 255/255
+tests.
+**Notes/risks:** This is review-workflow only. It does not infer labels, alter
+event-fade scoring, route alerts, write live DB signal/paper tables, or promote
+event fade beyond local reports.
+
 ## 2026-06-17 — Add review-template helper columns · Codex
 **Why:** The event-fade validation sample is blocked on human review, and the
 CSV sidecar was too machine-oriented for fast spreadsheet labeling. Reviewers

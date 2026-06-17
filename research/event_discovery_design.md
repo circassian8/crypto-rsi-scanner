@@ -646,12 +646,15 @@ workspace for a validation sample. The bundle contains:
   outcomes
 - `review_packet.md`: human-readable evidence packet
 - `review_template.csv`: compact editable sidecar
+- `review_template_balanced.csv`: gate-balanced editable sidecar with triggered
+  rows, proxy candidates, and direct/ambiguous negative controls
 - `review_report.txt`: current metrics and promotion blockers
 - `manifest.json`: machine-readable bundle provenance, file map, review counts,
   diversity/timing gate metrics, blockers, next-sample work, and optional
   outcome-fill stats
 - `review_guide.md`: label taxonomy, proxy/direct criteria, review provenance,
-  human event-time confirmation rules, outcome fields, and promotion reminder
+  human event-time confirmation rules, review-template helper columns, outcome
+  fields, and promotion reminder
 - `README.md`: suggested manual workflow
 
 The bundle is a convenience wrapper around existing artifact-only commands. It

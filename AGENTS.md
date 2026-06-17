@@ -146,7 +146,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-fade-review-bundle SAMPLE OUT_DIR` (write a local manual
   review workspace with copied/optionally prior-review-merged sample, optional
   bundle-local price fixture, optional outcome-filled sample, queue, packet,
-  sidecar, review report, manifest, and README; writes only under `OUT_DIR`) ·
+  priority sidecar, balanced proxy/control sidecar, review report, manifest, and
+  README; writes only under `OUT_DIR`) ·
   `main.py --event-fade-cache-review-bundle OUT_DIR` (same review workspace,
   sourced from latest cached candidate snapshots under
   `RSI_EVENT_DISCOVERY_CACHE_DIR`; writes only under `OUT_DIR`) ·
@@ -376,7 +377,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `--event-fade-review-bundle-reviewed` it may first merge prior reviewed
   labels/notes/outcomes that still match the fresh evidence fingerprint. It also
   writes a `manifest.json` for bundle provenance/counts/review-gate metrics/
-  price-export/merge status, a `review_guide.md` with label taxonomy, review
+  price-export/merge status, a priority `review_template.csv`, a
+  gate-balanced `review_template_balanced.csv` with proxy candidates and
+  negative controls, a `review_guide.md` with label taxonomy, review
   provenance fields, and human event-time rules, and its README summarizes the
   same coverage,
   diversity, timing, and promotion-readiness gates. Empty bundles must warn that

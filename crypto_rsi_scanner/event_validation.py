@@ -21,6 +21,8 @@ from .event_discovery import VALIDATION_SAMPLE_FIELDS, VALIDATION_SAMPLE_SCHEMA_
 
 POSITIVE_LABEL = "valid_proxy_fade"
 DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE = 0.80
+DEFAULT_BALANCED_PROXY_REVIEW_ROWS = 25
+DEFAULT_BALANCED_CONTROL_REVIEW_ROWS = 50
 KNOWN_LABELS = frozenset({
     POSITIVE_LABEL,
     "false_positive",
@@ -91,6 +93,7 @@ REVIEW_TEMPLATE_FIELDS = (
     "trigger_observed_at",
     "signal_type",
     "queue_category",
+    "review_slice",
     "suggested_label",
     "missing_fields",
     "review_prompt",
@@ -127,6 +130,7 @@ REVIEW_TEMPLATE_FIELDS = (
 )
 REVIEW_TEMPLATE_DERIVED_FIELDS = frozenset({
     "queue_category",
+    "review_slice",
     "suggested_label",
     "missing_fields",
     "review_prompt",
@@ -517,6 +521,64 @@ def build_review_template_rows(
     data = [dict(row) for row in rows]
     pairs = _review_packet_items(data, limit=limit)
     return [_review_template_row(item, row) for item, row in pairs]
+
+
+def build_balanced_review_template_rows(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    proxy_limit: int | None = DEFAULT_BALANCED_PROXY_REVIEW_ROWS,
+    control_limit: int | None = DEFAULT_BALANCED_CONTROL_REVIEW_ROWS,
+    triggered_limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """Build a review sidecar that samples the validation gates, not just priority order."""
+    data = [dict(row) for row in rows]
+    pairs = _review_packet_items(data, limit=None)
+    selected: list[dict[str, Any]] = []
+    used: set[tuple[str, str, str, str]] = set()
+
+    def pair_key(item: ValidationLabelingQueueItem) -> tuple[str, str, str, str]:
+        return (
+            item.event_id,
+            item.asset_coin_id,
+            item.relationship_type,
+            item.category,
+        )
+
+    def add_slice(
+        review_slice: str,
+        predicate,
+        limit: int | None,
+    ) -> None:
+        added = 0
+        for item, row in pairs:
+            key = pair_key(item)
+            if key in used or not predicate(item, row):
+                continue
+            out = _review_template_row(item, row)
+            out["review_slice"] = review_slice
+            selected.append(out)
+            used.add(key)
+            added += 1
+            if limit is not None and added >= max(0, limit):
+                break
+
+    add_slice(
+        "triggered",
+        lambda item, row: _signal_type(row) == "SHORT_TRIGGERED"
+        or item.category in {"label_triggered_candidate", "confirm_trigger_event_time", "fill_trigger_outcomes"},
+        triggered_limit,
+    )
+    add_slice(
+        "proxy_candidate",
+        lambda item, row: _is_proxy_candidate(row),
+        proxy_limit,
+    )
+    add_slice(
+        "negative_control",
+        lambda item, row: _is_direct_or_ambiguous(row),
+        control_limit,
+    )
+    return selected
 
 
 def format_review_template_jsonl(rows: Iterable[Mapping[str, Any]]) -> str:

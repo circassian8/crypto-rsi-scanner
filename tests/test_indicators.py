@@ -4233,6 +4233,29 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
         assert jsonl_rows[0]["asset_symbol"] == "TESTVELVET"
 
 
+def test_event_fade_validation_balanced_review_template_samples_gates():
+    from collections import Counter
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    template_rows = event_validation.build_balanced_review_template_rows(
+        rows,
+        proxy_limit=2,
+        control_limit=3,
+    )
+    slices = Counter(row["review_slice"] for row in template_rows)
+    assert slices["triggered"] == 1
+    assert slices["proxy_candidate"] == 2
+    assert slices["negative_control"] == 3
+    assert any(row["asset_symbol"] == "TESTVELVET" for row in template_rows)
+    assert any(row["suggested_label"] == "direct_event" for row in template_rows)
+    assert all("primary_source_url" in row for row in template_rows)
+
+    csv_text = event_validation.format_review_template_csv(template_rows)
+    assert "review_slice" in csv_text.splitlines()[0]
+    assert "negative_control" in csv_text
+
+
 def test_event_fade_validation_review_template_skips_changed_sidecar_evidence():
     from crypto_rsi_scanner import event_discovery, event_validation
 
@@ -5062,6 +5085,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
             "labeling_queue.txt",
             "review_packet.md",
             "review_template.csv",
+            "review_template_balanced.csv",
             "review_guide.md",
             "review_report.txt",
         }
@@ -5071,6 +5095,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "Research-only" in readme
         assert "validation_sample_with_outcomes.jsonl" in readme
         assert "review_guide.md" in readme
+        assert "review_template_balanced.csv" in readme
         assert "manifest.json" in readme
 
         guide = (bundle_dir / "review_guide.md").read_text(encoding="utf-8")
@@ -5085,13 +5110,18 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "primary_source_url" in guide
         assert "review_prompt" in guide
         assert "helper columns are not copied back" in guide
+        assert "review_template_balanced.csv" in guide
 
         manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
         assert manifest["source"]["sample_path"] == str(sample_path)
         assert manifest["source"]["review_rows"] == 17
         assert manifest["queue"]["shown_rows"] == 1
         assert manifest["files"]["review_template"] == "review_template.csv"
+        assert manifest["files"]["review_template_balanced"] == "review_template_balanced.csv"
         assert manifest["files"]["review_guide"] == "review_guide.md"
+        assert manifest["balanced_review_template"]["rows"] >= 1
+        assert manifest["balanced_review_template"]["proxy_limit"] == 25
+        assert manifest["balanced_review_template"]["control_limit"] == 50
         assert manifest["outcome_fill"]["filled_rows"] == 1
         assert manifest["review"]["promotion_ready"] is False
         assert manifest["review"]["reviewed_proxy_event_types"] == 0
@@ -5115,6 +5145,9 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "primary_source_url" in template_header
         assert "primary_raw_title" in template_header
         assert "event_time_review_hint" in template_header
+        balanced_header = (bundle_dir / "review_template_balanced.csv").read_text(encoding="utf-8").splitlines()[0]
+        assert "review_slice" in balanced_header
+        assert "primary_source_url" in balanced_header
         assert "Sample summary:" in readme
         assert "Proxy candidates: 6" in readme
         assert "Asset roles: direct_beneficiary=9, proxy_instrument=6, ambiguous=2" in readme
@@ -5250,6 +5283,7 @@ def test_event_fade_review_bundle_scanner_auto_exports_price_fixture():
             "labeling_queue.txt",
             "review_packet.md",
             "review_template.csv",
+            "review_template_balanced.csv",
             "review_guide.md",
             "review_report.txt",
         }
@@ -5260,6 +5294,7 @@ def test_event_fade_review_bundle_scanner_auto_exports_price_fixture():
         assert manifest["price_export"]["assets_written"] == 1
         assert manifest["price_export"]["price_rows_written"] == 5
         assert manifest["files"]["outcome_prices"] == "outcome_prices.json"
+        assert manifest["files"]["review_template_balanced"] == "review_template_balanced.csv"
         assert manifest["outcome_fill"]["prices_path"] == str(bundle_dir / "outcome_prices.json")
         assert manifest["outcome_fill"]["filled_rows"] == 1
 
@@ -5324,6 +5359,7 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
                 "labeling_queue.txt",
                 "review_packet.md",
                 "review_template.csv",
+                "review_template_balanced.csv",
                 "review_guide.md",
                 "review_report.txt",
             }
@@ -5336,6 +5372,7 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
             assert manifest["source"]["sample_path"] == f"cache:{cache_dir}"
             assert manifest["source"]["review_rows"] == 17
             assert manifest["queue"]["shown_rows"] == 1
+            assert manifest["balanced_review_template"]["rows"] >= 1
             assert manifest["outcome_fill"]["prices_path"] == str(_outcome_prices_fixture_path())
             assert manifest["sample_summary"]["rows"] == 17
             assert manifest["sample_summary"]["asset_roles"]["proxy_instrument"] == 6
