@@ -48,6 +48,19 @@ SOURCE_PUBLISHER_NAMES = {
     "beincrypto",
     "blockworks",
     "cryptoslate",
+    "cryptonews.net",
+    "cryptorank",
+    "crypto economy",
+    "the cryptonomist",
+    "thedefiant",
+    "thedefiant.io",
+    "banklesstimes",
+    "youhodler",
+    "sekbernews.id",
+    "investing.com",
+    "tradingview",
+    "yahoo finance",
+    "coinmarketcap",
     "kucoin",
     "binance",
     "bybit",
@@ -66,6 +79,19 @@ MARKET_RECAP_PATTERNS = (
     "price analysis",
     "markets today",
 )
+
+DIRECT_EXTERNAL_ASSET_EVENT_TYPES = {
+    "etf_approval",
+    "etf_launch",
+    "token_unlock",
+    "exchange_listing",
+    "perp_listing",
+    "airdrop",
+    "tge",
+    "mainnet_launch",
+    "governance",
+    "protocol_upgrade",
+}
 
 
 def clean_text(value: object) -> str:
@@ -128,10 +154,10 @@ def resolve_event_assets(
     min_confidence: float = 0.80,
 ) -> list[EventAssetLink]:
     title = strip_publisher_suffix(event.event_name)
+    description = strip_publisher_suffix(event.description or "")
     text = clean_text(" ".join([
         title,
-        event.description or "",
-        event.external_asset or "",
+        description,
     ]))
     assets_list = list(assets)
     symbol_counts = _symbol_counts(assets_list)
@@ -167,6 +193,8 @@ def _score_asset_match(
 ) -> tuple[float, str, list[str]]:
     evidence: list[str] = []
     payload_text = text
+    if _external_asset_can_identify_direct_asset(event):
+        payload_text = clean_text(f"{payload_text} {event.external_asset or ''}")
     coin_id = clean_text(asset.coin_id)
     if coin_id and _direct_name_match_allowed(coin_id, payload_text) and _phrase_in_text(coin_id, payload_text):
         evidence.append(asset.coin_id)
@@ -192,7 +220,7 @@ def _score_asset_match(
     symbol = asset.symbol.upper()
     symbol_hit = _symbol_in_text(symbol, strip_publisher_suffix(event.event_name)) or _symbol_in_text(
         symbol,
-        event.description or "",
+        strip_publisher_suffix(event.description or ""),
     )
     if name and len(name) >= 4 and _direct_name_match_allowed(name, payload_text) and _phrase_in_text(name, payload_text):
         evidence.append(asset.name)
@@ -205,6 +233,11 @@ def _score_asset_match(
         return _recap_adjusted(event, 0.80, "ticker_explicit_context"), "ticker_explicit_context", [symbol]
 
     return 0.0, "no_match", []
+
+
+def _external_asset_can_identify_direct_asset(event: NormalizedEvent) -> bool:
+    """Use external_asset for direct events, but not proxy-event asset discovery."""
+    return bool(event.external_asset) and event.event_type in DIRECT_EXTERNAL_ASSET_EVENT_TYPES
 
 
 def _phrase_in_text(phrase: str, text: str) -> bool:

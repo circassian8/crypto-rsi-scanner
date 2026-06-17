@@ -102,6 +102,18 @@ INFRASTRUCTURE_SUFFIXES = (
     "chain",
     "blockchain",
     "ecosystem",
+    "oracle",
+    "oracles",
+    "provider",
+)
+
+INFRASTRUCTURE_MARKERS = (
+    "oracle",
+    "oracles",
+    "provider",
+    "infrastructure",
+    "powered",
+    "powers",
 )
 
 BACKGROUND_VERBS = (
@@ -410,6 +422,8 @@ def _infrastructure_context(terms: tuple[str, ...], text: str) -> bool:
         for suffix in INFRASTRUCTURE_SUFFIXES:
             if _phrase_in_text(f"{term} {suffix}", text):
                 return True
+        if _window_contains(text, term, INFRASTRUCTURE_MARKERS, before=2, after=12):
+            return True
     return False
 
 

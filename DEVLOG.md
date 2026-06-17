@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Tighten event-alert false-positive guards · Codex
+**Why:** The Pro review found a few remaining research-alert false-positive
+paths: publisher names repeated in snippets, `external_asset` being too broad
+for proxy-event asset matching, and rejection gates not dominating inconsistent
+triggered signals.
+**Changes:**
+- Hardened `event_resolver.py` so publisher suffix stripping applies to
+  descriptions/snippets and `external_asset` is used as asset identity evidence
+  only for direct event types.
+- Expanded publisher/source noise terms for crypto/news sources seen in review
+  rows.
+- Adjusted `event_alerts.py` so rejection gates win before `SHORT_TRIGGERED`
+  tiering, while proxy venues no longer suppress other rejection reasons.
+- Expanded infrastructure classification for oracle/provider language so
+  Chainlink-style World Cup oracle articles demote to `proxy_context`.
+- Added regression tests for Bitcoin publisher-snippet noise,
+  external-asset-only proxy false positives, proxy-venue low-confidence
+  rejection, inconsistent triggered/direct candidate rejection, and Chainlink
+  oracle infrastructure demotion.
+**Verify:** Targeted regression tests passed. `python3 tests/test_indicators.py`
+passed 270/270. `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`make verify PYTHON=python3` passed 270/270 tests, alert render smoke, fixture
+backtest smoke, and paper scoreboard.
+**Notes/risks:** Event alerts remain research prompts only: no normal RSI
+signal routing, paper trades, live signal DB rows, or execution.
+
 ## 2026-06-17 — Add event research alert ranking · Codex
 **Why:** The event-discovery pipeline had validation/export tooling, but no
 separate way to surface manageable research candidates without treating them as

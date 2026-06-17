@@ -232,10 +232,10 @@ def _tier(
     rejected: str | None,
 ) -> EventAlertTier:
     signal_type = candidate.fade_signal.signal_type if candidate.fade_signal else event_fade.FadeSignalType.NO_TRADE
-    if signal_type == event_fade.FadeSignalType.SHORT_TRIGGERED:
-        return EventAlertTier.TRIGGERED_FADE
     if rejected:
         return EventAlertTier.STORE_ONLY
+    if signal_type == event_fade.FadeSignalType.SHORT_TRIGGERED:
+        return EventAlertTier.TRIGGERED_FADE
     if score < cfg.min_digest_score:
         return EventAlertTier.STORE_ONLY
     if candidate.classification.asset_role == ROLE_PROXY_VENUE and not cfg.allow_proxy_venue:
@@ -270,8 +270,6 @@ def _rejected_reason(candidate: DiscoveredEventFadeCandidate, cfg: EventAlertCon
         reasons.append("publisher/source-only asset evidence")
     if is_market_recap_event(candidate.event):
         reasons.append("market recap evidence only")
-    if cls.asset_role == ROLE_PROXY_VENUE and not cfg.allow_proxy_venue:
-        return None
     return "; ".join(dict.fromkeys(reasons)) or None
 
 

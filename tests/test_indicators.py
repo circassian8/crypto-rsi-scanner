@@ -1658,6 +1658,17 @@ def test_event_resolver_strips_publisher_suffixes_and_source_origin_noise():
         "Rain is expanding synthetic exposure products for private companies.",
         event_id="rain-bitcoin-news",
     )
+    rain_snippet_suffix = _test_normalized_event(
+        "Rain Commits New Liquidity to Tokenized Pre-IPO Markets - Bitcoin News",
+        "Rain is expanding synthetic exposure products for private companies - Bitcoin News",
+        event_id="rain-snippet-bitcoin-news",
+    )
+    external_bitcoin_only = _test_normalized_event(
+        "SpaceX pre-IPO market opens for prediction traders",
+        "No crypto asset is named in this article body.",
+        event_id="external-bitcoin-only",
+        external_asset="Bitcoin",
+    )
     source_origin = _test_normalized_event(
         "SpaceX pre-IPO market opens for prediction traders",
         "The source_origin is KuCoin, but no exchange token is named.",
@@ -1673,6 +1684,8 @@ def test_event_resolver_strips_publisher_suffixes_and_source_origin_noise():
 
     assert resolve_event_assets(msx, [btc]) == []
     assert resolve_event_assets(rain, [btc]) == []
+    assert resolve_event_assets(rain_snippet_suffix, [btc]) == []
+    assert resolve_event_assets(external_bitcoin_only, [btc]) == []
     assert resolve_event_assets(source_origin, [kcs]) == []
     links = resolve_event_assets(explicit_token, [kcs])
     assert links and links[0].coin_id == "kucoin-token"
@@ -2960,6 +2973,7 @@ def test_event_alerts_rank_proxy_candidates_without_human_review_fields():
 
 
 def test_event_alerts_proxy_venue_digest_only_unless_enabled():
+    from dataclasses import replace
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alerts, event_discovery
     from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
@@ -3033,6 +3047,21 @@ def test_event_alerts_proxy_venue_digest_only_unless_enabled():
     )[0]
     assert default_alert.tier == event_alerts.EventAlertTier.RADAR_DIGEST
 
+    low_confidence_result = replace(
+        result,
+        candidates=(replace(
+            result.candidates[0],
+            classification=replace(result.candidates[0].classification, confidence=0.60),
+        ),),
+    )
+    low_confidence_alert = event_alerts.build_event_alert_candidates(
+        low_confidence_result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc),
+    )[0]
+    assert low_confidence_alert.tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert "low classifier confidence" in (low_confidence_alert.rejected_reason or "")
+
     strict_alert = event_alerts.build_event_alert_candidates(
         result,
         cfg=event_alerts.EventAlertConfig(allow_proxy_venue=True),
@@ -3057,6 +3086,28 @@ def test_event_alerts_short_triggered_candidate_gets_triggered_fade_tier():
     by_symbol = {alert.symbol: alert for alert in alerts}
     assert by_symbol["TESTVELVET"].tier == event_alerts.EventAlertTier.TRIGGERED_FADE
     assert "SHORT_TRIGGERED" in by_symbol["TESTVELVET"].reason
+
+
+def test_event_alerts_rejection_gates_override_inconsistent_triggered_signal():
+    from dataclasses import replace
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts
+
+    result = _event_discovery_fixture_result()
+    by_symbol = {candidate.asset.symbol: candidate for candidate in result.candidates}
+    inconsistent_direct = replace(
+        by_symbol["TESTBTC"],
+        fade_signal=by_symbol["TESTVELVET"].fade_signal,
+    )
+    inconsistent_result = replace(result, candidates=(inconsistent_direct,))
+
+    alert = event_alerts.build_event_alert_candidates(
+        inconsistent_result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )[0]
+    assert alert.tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert "direct beneficiary" in (alert.rejected_reason or "")
 
 
 def test_event_discovery_asset_role_demotes_proxy_context_noise():
@@ -3132,6 +3183,18 @@ def test_event_discovery_asset_role_demotes_proxy_context_noise():
             source="test",
             aliases=("solana", "sol"),
         ),
+        DiscoveredAsset(
+            coin_id="chainlink",
+            symbol="LINK",
+            name="Chainlink",
+            market_cap=20_000_000_000,
+            volume_24h=1_000_000_000,
+            price=18.0,
+            categories=("oracle",),
+            contract_addresses={},
+            source="test",
+            aliases=("chainlink", "link"),
+        ),
     ]
     raw = [
         raw_event(
@@ -3148,6 +3211,12 @@ def test_event_discovery_asset_role_demotes_proxy_context_noise():
             "spacex-on-solana",
             "SpaceX tokenized stock demand on Solana surged before allocations were canceled",
             "Tokenized stock infrastructure on Solana saw demand, but Solana is the chain, not the proxy instrument.",
+        ),
+        raw_event(
+            "world-cup-chainlink-oracle",
+            "Chainlink Beat Polymarket and Kalshi to the World Cup",
+            "Chainlink powers the World Cup prediction market as an oracle provider, not the proxy token instrument.",
+            external_asset="World Cup",
         ),
     ]
 
@@ -3176,6 +3245,11 @@ def test_event_discovery_asset_role_demotes_proxy_context_noise():
     assert sol.classification.relationship_type == "proxy_context"
     assert sol.classification.asset_role == "infrastructure"
     assert sol.classification.is_proxy_narrative is False
+
+    link = by_event_asset[("world-cup-chainlink-oracle", "chainlink")]
+    assert link.classification.relationship_type == "proxy_context"
+    assert link.classification.asset_role == "infrastructure"
+    assert link.classification.is_proxy_narrative is False
 
 
 def test_event_discovery_news_pipeline_proxy_direct_late_and_ambiguous_safety():
