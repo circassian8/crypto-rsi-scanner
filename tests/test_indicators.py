@@ -145,6 +145,8 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "--event-fade-apply-review-template $(EVENT_FADE_REVIEW_BUNDLE_SAMPLE) $(EVENT_FADE_REVIEW_BUNDLE_TEMPLATE) $(EVENT_FADE_REVIEW_BUNDLE_APPLIED)" in makefile
     assert "event-fade-review-applied-bundle:" in makefile
     assert "--event-fade-review-sample $(EVENT_FADE_REVIEW_BUNDLE_APPLIED)" in makefile
+    assert "event-fade-fill-review-bundle-outcomes:" in makefile
+    assert "--event-fade-fill-outcomes $(EVENT_FADE_REVIEW_BUNDLE_APPLIED) $(EVENT_FADE_REVIEW_BUNDLE_OUTCOME_PRICES) $(EVENT_FADE_REVIEW_BUNDLE_OUTCOMES)" in makefile
     assert "Run 'make bootstrap' or override with 'make verify PYTHON=python3'." in makefile
 
     export_dry = subprocess.run(
@@ -184,6 +186,26 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
         "/tmp/review_bundle/validation_sample.jsonl "
         "/tmp/review_bundle/review_template_balanced.csv"
     ) in bundle_check_dry.stdout
+
+    bundle_outcomes_dry = subprocess.run(
+        [
+            "make",
+            "-n",
+            "event-fade-fill-review-bundle-outcomes",
+            "PYTHON=python3",
+            "EVENT_FADE_REVIEW_BUNDLE_DIR=/tmp/review_bundle",
+        ],
+        cwd=root,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    assert (
+        "python3 main.py --event-fade-fill-outcomes "
+        "/tmp/review_bundle/validation_sample_reviewed.jsonl "
+        "/tmp/review_bundle/outcome_prices.json "
+        "/tmp/review_bundle/validation_sample_reviewed_with_outcomes.jsonl"
+    ) in bundle_outcomes_dry.stdout
 
 
 def test_state_features_cross_sectional_ranks_monotonic():

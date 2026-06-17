@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add review-bundle outcome wrapper · Codex
+**Why:** The reviewed-bundle workflow still had one long manual command for
+filling outcomes after reviewed trigger rows exist. A bundle-level Make target
+keeps the post-label workflow consistent.
+**Changes:**
+- Added `event-fade-fill-review-bundle-outcomes`, driven by
+  `EVENT_FADE_REVIEW_BUNDLE_DIR`, to fill outcomes from a bundle's applied
+  sample and bundle-local `outcome_prices.json`.
+- Updated the event-fade review quickstart to use the new target.
+- Added Makefile dry-run coverage for the new wrapper.
+**Verify:** `make -n event-fade-fill-review-bundle-outcomes` expands to the
+expected latest-bundle fill command. `make verify` passed with 262/262 tests,
+alert render smoke, fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Workflow-only. This does not infer labels, create outcomes
+without reviewed trigger rows, route alerts, write live DB rows, paper trade, or
+promote event fade.
+
 ## 2026-06-17 — Add review-bundle Make wrappers · Codex
 **Why:** After a human labels the event-fade sidecar, the next commands should
 be hard to mistype. The existing Make targets required passing three separate

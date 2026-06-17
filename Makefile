@@ -13,6 +13,8 @@ EVENT_FADE_REVIEW_BUNDLE_DIR ?= /tmp/event_fade_review_bundle
 EVENT_FADE_REVIEW_BUNDLE_SAMPLE ?= $(EVENT_FADE_REVIEW_BUNDLE_DIR)/validation_sample.jsonl
 EVENT_FADE_REVIEW_BUNDLE_TEMPLATE ?= $(EVENT_FADE_REVIEW_BUNDLE_DIR)/review_template_balanced.csv
 EVENT_FADE_REVIEW_BUNDLE_APPLIED ?= $(EVENT_FADE_REVIEW_BUNDLE_DIR)/validation_sample_reviewed.jsonl
+EVENT_FADE_REVIEW_BUNDLE_OUTCOME_PRICES ?= $(EVENT_FADE_REVIEW_BUNDLE_DIR)/outcome_prices.json
+EVENT_FADE_REVIEW_BUNDLE_OUTCOMES ?= $(EVENT_FADE_REVIEW_BUNDLE_DIR)/validation_sample_reviewed_with_outcomes.jsonl
 EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR ?= /tmp/event_fade_cache_review_bundle
 EVENT_FADE_REVIEW_BUNDLE_PRICES ?=
 EVENT_FADE_REVIEW_BUNDLE_REVIEWED ?=
@@ -38,7 +40,7 @@ EVENT_DISCOVERY_POLYMARKET_LIMIT ?= 100
 EVENT_DISCOVERY_POLYMARKET_UNIVERSE_LIVE ?= 1
 EVENT_DISCOVERY_POLYMARKET_UNIVERSE_FETCH_LIMIT ?= 250
 
-.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -75,6 +77,7 @@ help:
 	@echo "  make event-fade-check-review-bundle  Dry-check a bundle's balanced sidecar"
 	@echo "  make event-fade-apply-review-bundle  Apply a bundle's balanced sidecar"
 	@echo "  make event-fade-review-applied-bundle  Review a bundle's applied sample"
+	@echo "  make event-fade-fill-review-bundle-outcomes  Fill outcomes for a bundle's applied sample"
 	@echo "  make event-fade-review-bundle  Write manual review workspace"
 	@echo "  make event-fade-cache-review-bundle  Write manual review workspace from cache"
 	@echo "  make event-fade-review-cycle  Refresh research cache and write review workspace"
@@ -307,6 +310,9 @@ event-fade-apply-review-bundle:
 
 event-fade-review-applied-bundle:
 	$(PYTHON) main.py --event-fade-review-sample $(EVENT_FADE_REVIEW_BUNDLE_APPLIED)
+
+event-fade-fill-review-bundle-outcomes:
+	$(PYTHON) main.py --event-fade-fill-outcomes $(EVENT_FADE_REVIEW_BUNDLE_APPLIED) $(EVENT_FADE_REVIEW_BUNDLE_OUTCOME_PRICES) $(EVENT_FADE_REVIEW_BUNDLE_OUTCOMES)
 
 event-fade-review-bundle:
 	$(PYTHON) main.py --event-fade-review-bundle $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),) $(if $(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES),--event-fade-review-bundle-export-prices --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) --event-fade-price-interval $(EVENT_FADE_PRICE_INTERVAL) $(EVENT_FADE_PRICE_FIXTURE_ARG),)

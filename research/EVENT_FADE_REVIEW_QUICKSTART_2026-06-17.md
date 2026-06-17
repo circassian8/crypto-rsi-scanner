@@ -101,10 +101,8 @@ If the reviewed sample later has `SHORT_TRIGGERED` rows, fill outcomes from loca
 prices before considering promotion:
 
 ```bash
-.venv/bin/python main.py --event-fade-fill-outcomes \
-  /tmp/event_fade_no_key_review_bundle_20260617_continue/validation_sample_reviewed.jsonl \
-  /tmp/event_fade_no_key_review_bundle_20260617_continue/outcome_prices.json \
-  /tmp/event_fade_no_key_review_bundle_20260617_continue/validation_sample_reviewed_with_outcomes.jsonl
+EVENT_FADE_REVIEW_BUNDLE_DIR=/tmp/event_fade_no_key_review_bundle_20260617_continue \
+  make event-fade-fill-review-bundle-outcomes
 ```
 
 ## Promotion Rule
