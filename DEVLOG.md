@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add event-fade review guide bundles · Codex
+**Why:** The review bundle had the evidence packet and editable sidecar, but it
+still assumed reviewers already knew the accepted label taxonomy, proxy/direct
+rules, event-time confirmation rules, and outcome fields. That made the next
+human-labeling step easier to do inconsistently.
+**Changes:**
+- Added `review_guide.md` to event-fade review bundles with the accepted
+  `human_label` values, proxy/direct criteria, human event-time confirmation
+  fields, outcome fields, and promotion reminder.
+- Included the guide in bundle manifests, README file lists, and suggested
+  workflow steps.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  to document the new bundle artifact.
+- Extended review-bundle regression tests to require the guide in normal,
+  auto-price, and cache-backed bundles.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 253/253
+tests, and `make verify` passes.
+**Notes/risks:** This is an artifact-only review aid. It does not infer labels,
+modify source samples, promote alerts, write live DB rows, or open paper trades.
+
 ## 2026-06-17 — Use human event times in validation metrics · Codex
 **Why:** Human-confirmed event times were being preserved in review artifacts,
 but validation metrics still ignored them. That would keep confirmed proxy rows

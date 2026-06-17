@@ -1656,6 +1656,7 @@ def _write_event_fade_review_bundle(
     packet_path = bundle_dir / "review_packet.md"
     template_path = bundle_dir / "review_template.csv"
     report_path = bundle_dir / "review_report.txt"
+    guide_path = bundle_dir / "review_guide.md"
     manifest_path = bundle_dir / "manifest.json"
     readme_path = bundle_dir / "README.md"
 
@@ -1663,6 +1664,7 @@ def _write_event_fade_review_bundle(
     packet_path.write_text(event_validation.format_review_packet(review_rows, limit=limit) + "\n", encoding="utf-8")
     template_path.write_text(event_validation.format_review_template_csv(template_rows), encoding="utf-8")
     report_path.write_text(event_validation.format_validation_review(review) + "\n", encoding="utf-8")
+    guide_path.write_text(_event_fade_review_guide(), encoding="utf-8")
     manifest = _event_fade_review_bundle_manifest(
         sample_path=sample_path,
         prices_path=prices_path,
@@ -1674,6 +1676,7 @@ def _write_event_fade_review_bundle(
         packet_path=packet_path,
         template_path=template_path,
         report_path=report_path,
+        guide_path=guide_path,
         readme_path=readme_path,
         source_rows=len(source_rows),
         review_rows=len(review_rows),
@@ -1707,6 +1710,7 @@ def _write_event_fade_review_bundle(
             packet_path=packet_path,
             template_path=template_path,
             report_path=report_path,
+            guide_path=guide_path,
             manifest_path=manifest_path,
             rows=len(review_rows),
             queue=queue,
@@ -1741,6 +1745,7 @@ def _event_fade_review_bundle_manifest(
     packet_path: Path,
     template_path: Path,
     report_path: Path,
+    guide_path: Path,
     readme_path: Path,
     source_rows: int,
     review_rows: int,
@@ -1767,6 +1772,7 @@ def _event_fade_review_bundle_manifest(
         "review_packet": packet_path.name,
         "review_template": template_path.name,
         "review_report": report_path.name,
+        "review_guide": guide_path.name,
     }
     if price_export is not None:
         files["outcome_prices"] = price_export.out_path.name
@@ -2129,6 +2135,7 @@ def _event_fade_review_bundle_readme(
     packet_path: Path,
     template_path: Path,
     report_path: Path,
+    guide_path: Path,
     manifest_path: Path,
     rows: int,
     queue: event_validation.ValidationLabelingQueue,
@@ -2188,14 +2195,73 @@ def _event_fade_review_bundle_readme(
         f"- `{queue_path.name}`: prioritized queue for missing labels/status/outcomes",
         f"- `{packet_path.name}`: human-readable evidence packet",
         f"- `{template_path.name}`: compact editable CSV sidecar",
+        f"- `{guide_path.name}`: label taxonomy and event-time review rules",
         f"- `{report_path.name}`: current review metrics and promotion blockers",
         f"- `{manifest_path.name}`: machine-readable bundle provenance and counts",
         "",
         "Suggested workflow:",
-        "1. Read `review_packet.md` for evidence.",
-        "2. Edit `review_template.csv` with `review_status`, `human_label`, `human_notes`, any human event-time confirmation, and any missing outcomes.",
-        "3. Apply the edited sidecar with `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`.",
-        "4. Run `main.py --event-fade-review-sample OUT` to inspect coverage and blockers.",
+        "1. Read `review_guide.md` for label and timing rules.",
+        "2. Read `review_packet.md` for row evidence.",
+        "3. Edit `review_template.csv` with `review_status`, `human_label`, `human_notes`, any human event-time confirmation, and any missing outcomes.",
+        "4. Apply the edited sidecar with `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`.",
+        "5. Run `main.py --event-fade-review-sample OUT` to inspect coverage and blockers.",
+        "",
+    ])
+
+
+def _event_fade_review_guide() -> str:
+    return "\n".join([
+        "# Event-Fade Review Guide",
+        "",
+        "Research-only: this guide is for labeling validation artifacts. It does not promote alerts, paper trades, or execution.",
+        "",
+        "## Label Rules",
+        "",
+        "Use exactly one `human_label` value per reviewed row:",
+        "",
+        "- `valid_proxy_fade`: the crypto asset is a true proxy instrument for a dated external catalyst, not the direct beneficiary, and the evidence would have been knowable before the decision time.",
+        "- `false_positive`: the row looked proxy-like to the system but manual review says it is not a valid proxy-fade setup.",
+        "- `direct_event`: the catalyst directly changes the asset's own listing, supply, emissions, protocol, utility, or structural demand.",
+        "- `ambiguous`: the evidence is too weak, ticker-only, generic market chatter, or cannot be resolved to a clear proxy/direct relationship.",
+        "",
+        "Set `review_status=reviewed` only after checking the source evidence. Rows with labels but without `review_status=reviewed` do not count as reviewed evidence.",
+        "",
+        "## Proxy Criteria",
+        "",
+        "A valid proxy-fade candidate should have all of these:",
+        "",
+        "- a dated external catalyst or expiry",
+        "- a crypto asset used as synthetic exposure, attention exposure, fan exposure, or prediction-market-style proxy",
+        "- `is_direct_beneficiary=false`",
+        "- source evidence available before the decision time",
+        "",
+        "Examples that should usually be `direct_event`: BTC/BTC ETF, ETH/ETH ETF, token unlocks, exchange listings, airdrops, TGEs, mainnet launches, and protocol upgrades.",
+        "",
+        "## Event-Time Confirmation",
+        "",
+        "If the machine `event_time` is blank, weak, or inferred from text, fill the separate human fields instead of editing `event_time`:",
+        "",
+        "- `human_event_time`: ISO timestamp for the catalyst, preferably UTC with an offset, for example `2026-06-20T13:30:00+00:00`",
+        "- `human_event_time_source`: URL or title proving that timestamp",
+        "- `human_event_time_confidence`: reviewer confidence from `0.0` to `1.0`; use `0.80` or higher only for explicit source evidence",
+        "- `human_event_time_notes`: short note explaining how the timestamp was confirmed",
+        "",
+        "Validation metrics may use high-confidence `human_event_time` for review-only timing checks and event-time baselines, but it remains separate from the machine-discovered `event_time`.",
+        "",
+        "## Outcome Fields",
+        "",
+        "For reviewed `SHORT_TRIGGERED` rows, fill or verify:",
+        "",
+        "- `max_adverse_excursion`",
+        "- `max_favorable_excursion`",
+        "- `post_event_return_72h`",
+        "- `event_time_post_event_return_72h`",
+        "",
+        "Prefer locally filled 1h outcomes when available; daily outcomes are coarse and can hide intraday squeeze risk.",
+        "",
+        "## Promotion Reminder",
+        "",
+        "Do not promote event fade beyond local reports until the review report clears the proxy/control/trigger sample-size, source-diversity, timing, and outcome-quality gates.",
         "",
     ])
 

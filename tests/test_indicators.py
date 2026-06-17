@@ -4966,6 +4966,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
             "labeling_queue.txt",
             "review_packet.md",
             "review_template.csv",
+            "review_guide.md",
             "review_report.txt",
         }
         assert expected == {path.name for path in bundle_dir.iterdir()}
@@ -4973,13 +4974,23 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
         assert "Research-only" in readme
         assert "validation_sample_with_outcomes.jsonl" in readme
+        assert "review_guide.md" in readme
         assert "manifest.json" in readme
+
+        guide = (bundle_dir / "review_guide.md").read_text(encoding="utf-8")
+        assert "Event-Fade Review Guide" in guide
+        assert "`valid_proxy_fade`" in guide
+        assert "`false_positive`" in guide
+        assert "`direct_event`" in guide
+        assert "`ambiguous`" in guide
+        assert "human_event_time" in guide
 
         manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
         assert manifest["source"]["sample_path"] == str(sample_path)
         assert manifest["source"]["review_rows"] == 17
         assert manifest["queue"]["shown_rows"] == 1
         assert manifest["files"]["review_template"] == "review_template.csv"
+        assert manifest["files"]["review_guide"] == "review_guide.md"
         assert manifest["outcome_fill"]["filled_rows"] == 1
         assert manifest["review"]["promotion_ready"] is False
         assert manifest["review"]["reviewed_proxy_event_types"] == 0
@@ -5131,6 +5142,7 @@ def test_event_fade_review_bundle_scanner_auto_exports_price_fixture():
             "labeling_queue.txt",
             "review_packet.md",
             "review_template.csv",
+            "review_guide.md",
             "review_report.txt",
         }
         assert expected == {path.name for path in bundle_dir.iterdir()}
@@ -5204,6 +5216,7 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
                 "labeling_queue.txt",
                 "review_packet.md",
                 "review_template.csv",
+                "review_guide.md",
                 "review_report.txt",
             }
             assert expected == {path.name for path in bundle_dir.iterdir()}

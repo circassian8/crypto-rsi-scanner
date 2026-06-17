@@ -375,7 +375,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `--event-fade-review-bundle-reviewed` it may first merge prior reviewed
   labels/notes/outcomes that still match the fresh evidence fingerprint. It also
   writes a `manifest.json` for bundle provenance/counts/review-gate metrics/
-  price-export/merge status, and its README summarizes the same coverage,
+  price-export/merge status, a `review_guide.md` with label taxonomy and
+  human event-time rules, and its README summarizes the same coverage,
   diversity, timing, and promotion-readiness gates. Empty bundles must warn that
   no validation rows were produced and point back to provider status/source
   refresh, rather than looking like completed review work. It must not infer
