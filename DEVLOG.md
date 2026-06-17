@@ -17,6 +17,19 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add Pro-plan completion audit · Codex
+**Why:** The remaining event-fade work kept converging on the same human-review
+blocker. A checked-in requirement audit makes clear which parts of the Pro plan
+are implemented and which parts still need human labels/live data.
+**Changes:**
+- Added `research/PRO_PLAN_COMPLETION_AUDIT_2026-06-17.md` with a
+  requirement-by-requirement status table, latest bundle counts, remaining
+  human-review steps, and promotion blockers.
+**Verify:** `make verify` passed with 262/262 tests, alert render smoke, fixture
+backtest smoke, and paper scoreboard.
+**Notes/risks:** No code, signal logic, alerts, live DB writes, paper trades, or
+promotion changed.
+
 ## 2026-06-17 — Refresh no-key event-fade review bundle · Codex
 **Why:** The Pro-model plan now depends on building a reviewed event-fade
 validation sample, so the shared roadmap should point at the freshest no-key
