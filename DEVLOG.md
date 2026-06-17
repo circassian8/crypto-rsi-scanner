@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add LLM shadow relationship analyzer · Codex
+**Why:** Event-discovery alerts need a research-only way to compare deterministic
+proxy/direct rules against structured LLM relationship analysis without letting
+the LLM influence trades, paper trades, normal alerts, or event-fade hard gates.
+**Changes:**
+- Added frozen LLM analysis models, a quote-verifying shadow analyzer, fixture
+  and optional OpenAI Responses API providers, and disabled-by-default runtime
+  config.
+- Added `main.py --event-llm-shadow-report` and `make event-llm-eval` for
+  offline fixture comparisons of rule role/relationship/tier vs LLM
+  role/relationship/action.
+- Added `fixtures/event_discovery/llm_golden_cases.json` with source-noise,
+  ticker-collision, infrastructure, proxy, direct-beneficiary, and invalid-quote
+  cases.
+- Kept all LLM output advisory only: no alert-tier mutation, Telegram routing,
+  paper trades, live DB writes, or event-fade eligibility changes.
+- Updated `AGENTS.md`, `ROADMAP.md`, and standalone tests for the new shadow
+  surface.
+**Verify:** Targeted LLM regression tests passed. `make event-llm-eval
+PYTHON=python3` passed. `python3 tests/test_indicators.py` passed 277/277.
+`python3 -m compileall -q crypto_rsi_scanner tests` passed. `make verify
+PYTHON=python3` passed 277/277 tests, alert render smoke, fixture backtest
+smoke, and paper scoreboard.
+**Notes/risks:** OpenAI live use requires explicit `RSI_EVENT_LLM_PROVIDER=openai`
+and `RSI_EVENT_LLM_ENABLED=1`; missing keys fail soft. Fixture mode remains the
+default and is suitable for offline tests/evals.
+
 ## 2026-06-17 — Tighten event-alert false-positive guards · Codex
 **Why:** The Pro review found a few remaining research-alert false-positive
 paths: publisher names repeated in snippets, `external_asset` being too broad

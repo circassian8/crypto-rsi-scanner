@@ -63,11 +63,14 @@ from . import event_fade
 from . import event_cache
 from . import event_discovery
 from . import event_alerts
+from . import event_llm_analyzer
 from . import event_provider_status
 from . import event_price_history
 from . import event_validation
 from .event_models import EventDiscoveryResult
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
+from .llm_providers.fixture import FixtureLLMRelationshipProvider
+from .llm_providers.openai_provider import OpenAILLMRelationshipProvider
 
 log = logging.getLogger(__name__)
 
@@ -1166,6 +1169,20 @@ def _event_alert_config_from_runtime() -> event_alerts.EventAlertConfig:
     )
 
 
+def _event_llm_config_from_runtime() -> event_llm_analyzer.EventLLMConfig:
+    return event_llm_analyzer.EventLLMConfig(
+        enabled=config.EVENT_LLM_ENABLED,
+        mode=config.EVENT_LLM_MODE,
+        provider=config.EVENT_LLM_PROVIDER,
+        model=config.EVENT_LLM_MODEL,
+        max_candidates_per_run=config.EVENT_LLM_MAX_CANDIDATES_PER_RUN,
+        min_prefilter_score=config.EVENT_LLM_MIN_PREFILTER_SCORE,
+        require_evidence_quotes=config.EVENT_LLM_REQUIRE_EVIDENCE_QUOTES,
+        cache_path=config.EVENT_LLM_CACHE_PATH,
+        prompt_version=config.EVENT_LLM_PROMPT_VERSION,
+    )
+
+
 def _setup_event_discovery_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -1204,6 +1221,52 @@ def event_alert_report(verbose: bool = False, send: bool = False) -> None:
     print(event_alerts.format_event_alert_report(alerts))
     if send:
         _send_event_alert_digest(alerts, cfg)
+
+
+def event_llm_shadow_report(verbose: bool = False) -> None:
+    """Print research-only shadow LLM relationship analysis for event candidates."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_discovery_paths_configured():
+        print(
+            "No event-discovery sources ready. Set RSI_EVENT_DISCOVERY_EVENTS_PATH, "
+            "another event-discovery fixture path, or opt into a live research provider. "
+            "Run --event-discovery-status for a redacted readiness report."
+        )
+        return
+    llm_cfg = _event_llm_config_from_runtime()
+    if llm_cfg.mode != "shadow":
+        print("Event LLM analysis blocked: RSI_EVENT_LLM_MODE must remain shadow in Phase 1.")
+        return
+    provider = _event_llm_provider(llm_cfg)
+    if provider is None:
+        return
+    alert_cfg = _event_alert_config_from_runtime()
+    result = _event_discovery_result_from_config()
+    alerts = event_alerts.build_event_alert_candidates(result, cfg=alert_cfg)
+    rows = event_llm_analyzer.analyze_event_candidates(
+        result,
+        alerts,
+        provider,
+        cfg=llm_cfg,
+    )
+    print(event_llm_analyzer.format_llm_shadow_report(rows))
+
+
+def _event_llm_provider(llm_cfg: event_llm_analyzer.EventLLMConfig):
+    provider_name = llm_cfg.provider.strip().lower()
+    if provider_name == "fixture":
+        return FixtureLLMRelationshipProvider()
+    if provider_name == "openai":
+        if not llm_cfg.enabled:
+            print("Event LLM OpenAI provider disabled. Set RSI_EVENT_LLM_ENABLED=1 to opt into live LLM calls.")
+            return None
+        return OpenAILLMRelationshipProvider(
+            api_key=config.OPENAI_API_KEY,
+            model=llm_cfg.model,
+            prompt_version=llm_cfg.prompt_version,
+        )
+    print(f"Unknown event LLM provider: {llm_cfg.provider}. Use fixture or openai.")
+    return None
 
 
 def _send_event_alert_digest(
@@ -2701,6 +2764,11 @@ def cli() -> None:
         help="Print ranked research-only event-alert candidates from discovery fixtures.",
     )
     parser.add_argument(
+        "--event-llm-shadow-report",
+        action="store_true",
+        help="Print research-only shadow LLM relationship analysis for event candidates.",
+    )
+    parser.add_argument(
         "--event-alert-send",
         action="store_true",
         help=(
@@ -2955,6 +3023,9 @@ def cli() -> None:
         return
     if args.event_alert_report:
         event_alert_report(verbose=args.verbose, send=args.event_alert_send)
+        return
+    if args.event_llm_shadow_report:
+        event_llm_shadow_report(verbose=args.verbose)
         return
     if args.event_discovery_refresh:
         event_discovery_refresh(verbose=args.verbose)

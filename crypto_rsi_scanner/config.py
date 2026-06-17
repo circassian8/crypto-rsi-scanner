@@ -345,6 +345,18 @@ EVENT_ALERT_MAX_INSTANT_PER_DAY = int(os.getenv("RSI_EVENT_ALERT_MAX_INSTANT_PER
 EVENT_ALERT_COOLDOWN_HOURS = float(os.getenv("RSI_EVENT_ALERT_COOLDOWN_HOURS", "12"))
 EVENT_ALERT_ALLOW_PROXY_VENUE = _env_bool("RSI_EVENT_ALERT_ALLOW_PROXY_VENUE", False)
 
+# Event-discovery LLM relationship analysis. Shadow-only by default: no normal
+# RSI alert routing, Telegram sends, paper trades, live DB writes, or execution.
+EVENT_LLM_ENABLED = _env_bool("RSI_EVENT_LLM_ENABLED", False)
+EVENT_LLM_MODE = os.getenv("RSI_EVENT_LLM_MODE", "shadow")
+EVENT_LLM_PROVIDER = os.getenv("RSI_EVENT_LLM_PROVIDER", "fixture")
+EVENT_LLM_MODEL = os.getenv("RSI_EVENT_LLM_MODEL", "") or None
+EVENT_LLM_MAX_CANDIDATES_PER_RUN = int(os.getenv("RSI_EVENT_LLM_MAX_CANDIDATES_PER_RUN", "20"))
+EVENT_LLM_MIN_PREFILTER_SCORE = int(os.getenv("RSI_EVENT_LLM_MIN_PREFILTER_SCORE", "45"))
+EVENT_LLM_REQUIRE_EVIDENCE_QUOTES = _env_bool("RSI_EVENT_LLM_REQUIRE_EVIDENCE_QUOTES", True)
+_EVENT_LLM_CACHE_PATH_RAW = os.getenv("RSI_EVENT_LLM_CACHE_PATH", "")
+EVENT_LLM_PROMPT_VERSION = os.getenv("RSI_EVENT_LLM_PROMPT_VERSION", "llm_proxy_context_v1")
+
 # Macro context header in the digest (Fear & Greed + BTC trend + breadth).
 MACRO_ENABLED = (os.getenv("RSI_MACRO", "1").lower() not in ("0", "false", "no"))
 
@@ -384,6 +396,7 @@ EXCLUDE_SYMBOLS = {
 
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
 COINGECKO_KEY_TYPE = (os.getenv("COINGECKO_KEY_TYPE") or "demo").lower()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 # One or more recipient chat IDs, comma-separated (e.g. "133428954,987654321").
@@ -565,6 +578,9 @@ if EVENT_DISCOVERY_UNIVERSE_PATH is not None and not EVENT_DISCOVERY_UNIVERSE_PA
 EVENT_DISCOVERY_CACHE_DIR = Path(_EVENT_DISCOVERY_CACHE_DIR_RAW).expanduser()
 if not EVENT_DISCOVERY_CACHE_DIR.is_absolute():
     EVENT_DISCOVERY_CACHE_DIR = DATA_DIR / EVENT_DISCOVERY_CACHE_DIR
+EVENT_LLM_CACHE_PATH = Path(_EVENT_LLM_CACHE_PATH_RAW).expanduser() if _EVENT_LLM_CACHE_PATH_RAW else None
+if EVENT_LLM_CACHE_PATH is not None and not EVENT_LLM_CACHE_PATH.is_absolute():
+    EVENT_LLM_CACHE_PATH = DATA_DIR / EVENT_LLM_CACHE_PATH
 
 _BACKUP_DIR_RAW = os.getenv("RSI_BACKUP_DIR", "backups")
 BACKUP_DIR = Path(_BACKUP_DIR_RAW).expanduser()

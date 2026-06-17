@@ -925,6 +925,12 @@ def _outcome_klines_fixture_dir():
     return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "outcome_klines"
 
 
+def _llm_golden_fixture_path():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "llm_golden_cases.json"
+
+
 def _stamp_review_provenance(row, reviewer="human", reviewed_at="2026-06-17T12:00:00+00:00"):
     row["reviewed_by"] = reviewer
     row["reviewed_at"] = reviewed_at
@@ -3108,6 +3114,201 @@ def test_event_alerts_rejection_gates_override_inconsistent_triggered_signal():
     )[0]
     assert alert.tier == event_alerts.EventAlertTier.STORE_ONLY
     assert "direct beneficiary" in (alert.rejected_reason or "")
+
+
+def _llm_golden_result():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+    from crypto_rsi_scanner.event_resolver import load_asset_aliases
+
+    path = _llm_golden_fixture_path()
+    raw = ManualJsonEventProvider(path, required=True).fetch_events(
+        datetime(2026, 6, 15, tzinfo=timezone.utc),
+        datetime(2026, 6, 21, tzinfo=timezone.utc),
+    )
+    assets = load_asset_aliases(path)
+    return event_discovery.run_discovery(
+        raw,
+        assets,
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+
+
+def _llm_packet_for(result, event_id, coin_id):
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts, event_llm_analyzer
+
+    alerts = event_alerts.build_event_alert_candidates(
+        result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+    raw_by_id = {raw.raw_id: raw for raw in result.raw_events}
+    links_by_event = {}
+    for link in result.links:
+        links_by_event.setdefault(link.event_id, []).append(link)
+    candidates = {
+        (candidate.event.event_id, candidate.asset.coin_id): candidate
+        for candidate in result.candidates
+    }
+    alert_by_key = {
+        (alert.discovery_candidate.event.event_id, alert.discovery_candidate.asset.coin_id): alert
+        for alert in alerts
+    }
+    key = (event_id, coin_id)
+    candidate = candidates[key]
+    return event_llm_analyzer.build_evidence_packet(
+        candidate,
+        raw_by_id=raw_by_id,
+        links=links_by_event.get(event_id, ()),
+        alert=alert_by_key[key],
+    )
+
+
+def test_event_llm_model_enums_and_invalid_output_rejection():
+    from crypto_rsi_scanner import event_llm_analyzer
+    from crypto_rsi_scanner.event_llm_models import (
+        ASSET_ROLE_VALUES,
+        RECOMMENDED_ALERT_ACTION_VALUES,
+        RELATIONSHIP_TYPE_VALUES,
+    )
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    assert "source_noise" in ASSET_ROLE_VALUES
+    assert "publisher_suffix_false_positive" in RELATIONSHIP_TYPE_VALUES
+    assert "triggered_fade_not_set_by_llm" in RECOMMENDED_ALERT_ACTION_VALUES
+
+    provider = FixtureLLMRelationshipProvider(_llm_golden_fixture_path(), required=True)
+    raw = provider.analyze_relationship({"case_id": "llm-velvet-spacex"}).raw
+    assert raw is not None
+    bad = dict(raw)
+    bad["asset_role"] = "trade_signal"
+    packet = {
+        "event": {"event_id": "llm-velvet-spacex", "external_asset": "SpaceX"},
+        "asset": {"coin_id": "velvet", "symbol": "VELVET"},
+    }
+    try:
+        event_llm_analyzer.validate_llm_analysis(
+            bad,
+            packet,
+            provider_name="fixture",
+            model=None,
+            prompt_version="llm_proxy_context_v1",
+        )
+    except event_llm_analyzer.EventLLMValidationError as exc:
+        assert "invalid LLM asset_role" in str(exc)
+    else:
+        raise AssertionError("invalid LLM enum should be rejected")
+
+
+def test_event_llm_fixture_provider_golden_outputs():
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    provider = FixtureLLMRelationshipProvider(_llm_golden_fixture_path(), required=True)
+    expected = {
+        "llm-btc-bitcoin-world": ("source_noise", "publisher_suffix_false_positive", "store_only"),
+        "llm-xrp-ripple-effects": ("ticker_word_collision", "word_collision_false_positive", "store_only"),
+        "llm-hype-word-collision": ("ticker_word_collision", "word_collision_false_positive", "store_only"),
+        "llm-kcs-kucoin-source": ("source_noise", "publisher_suffix_false_positive", "store_only"),
+        "llm-chainlink-world-cup": ("infrastructure", "infrastructure_provider", "store_only"),
+        "llm-velvet-spacex": ("proxy_venue", "proxy_exposure", "radar_digest"),
+        "llm-chz-world-cup": ("proxy_instrument", "proxy_attention", "watchlist"),
+        "llm-btc-etf": ("direct_beneficiary", "direct_protocol_event", "store_only"),
+    }
+    for case_id, values in expected.items():
+        raw = provider.analyze_relationship({"case_id": case_id}).raw
+        assert raw is not None
+        assert (raw["asset_role"], raw["relationship_type"], raw["recommended_alert_action"]) == values
+
+
+def test_event_llm_evidence_packet_and_quote_verification():
+    from crypto_rsi_scanner import event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    result = _llm_golden_result()
+    packet = _llm_packet_for(result, "llm-velvet-spacex", "velvet")
+    assert packet["event"]["clean_title"] == "Velvet Capital offers synthetic exposure to SpaceX pre-IPO trading"
+    assert "Velvet Capital offers synthetic exposure" in packet["event"]["original_titles"][0]
+    assert packet["resolver"]["candidate_assets"]
+    assert packet["external_catalyst"]["name"] == "SpaceX"
+
+    provider = FixtureLLMRelationshipProvider(_llm_golden_fixture_path(), required=True)
+    raw = provider.analyze_relationship(packet).raw
+    assert raw is not None
+    analysis = event_llm_analyzer.validate_llm_analysis(
+        raw,
+        packet,
+        provider_name="fixture",
+        model=None,
+        prompt_version="llm_proxy_context_v1",
+    )
+    assert analysis.asset_role == "proxy_venue"
+    assert analysis.relationship_type == "proxy_exposure"
+    assert all(quote.found_in_source for quote in analysis.evidence_quotes)
+
+
+def test_event_llm_missing_quote_clamps_confidence():
+    from crypto_rsi_scanner import event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    result = _llm_golden_result()
+    packet = _llm_packet_for(result, "llm-invalid-quote", "velvet")
+    provider = FixtureLLMRelationshipProvider(_llm_golden_fixture_path(), required=True)
+    raw = provider.analyze_relationship(packet).raw
+    assert raw is not None
+    analysis = event_llm_analyzer.validate_llm_analysis(
+        raw,
+        packet,
+        provider_name="fixture",
+        model=None,
+        prompt_version="llm_proxy_context_v1",
+    )
+    assert analysis.confidence == 0.50
+    assert any(not quote.found_in_source for quote in analysis.evidence_quotes)
+    assert any("not found in source text" in warning for warning in analysis.warnings)
+
+
+def test_event_llm_openai_provider_missing_key_fails_soft():
+    from crypto_rsi_scanner.llm_providers.openai_provider import OpenAILLMRelationshipProvider
+
+    result = OpenAILLMRelationshipProvider(api_key="", model="test-model").analyze_relationship({})
+    assert result.raw is None
+    assert result.warning and "missing OPENAI_API_KEY" in result.warning
+
+
+def test_event_llm_shadow_report_formats_disagreements_and_warnings():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts, event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    result = _llm_golden_result()
+    alerts = event_alerts.build_event_alert_candidates(
+        result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+    rows = event_llm_analyzer.analyze_event_candidates(
+        result,
+        alerts,
+        FixtureLLMRelationshipProvider(_llm_golden_fixture_path(), required=True),
+        cfg=event_llm_analyzer.EventLLMConfig(min_prefilter_score=0, max_candidates_per_run=50),
+    )
+    report = event_llm_analyzer.format_llm_shadow_report(rows)
+    assert "EVENT LLM SHADOW REPORT" in report
+    assert "rule:" in report
+    assert "llm:" in report
+    assert "DISAGREE" in report
+    assert "one or more evidence quotes were not found in source text" in report
+
+
+def test_makefile_has_event_llm_eval_target():
+    from pathlib import Path
+
+    text = Path("Makefile").read_text(encoding="utf-8")
+    assert "event-llm-eval:" in text
+    assert "RSI_EVENT_LLM_PROVIDER=fixture" in text
+    assert "main.py --event-llm-shadow-report" in text
 
 
 def test_event_discovery_asset_role_demotes_proxy_context_noise():

@@ -1,0 +1,419 @@
+{
+  "schema_version": "event_llm_golden_cases_v1",
+  "assets": [
+    {
+      "coin_id": "bitcoin",
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "aliases": ["bitcoin", "btc"],
+      "categories": ["layer-1"],
+      "market_cap": 1000000000000,
+      "volume_24h": 35000000000,
+      "price": 65000,
+      "source": "llm_fixture"
+    },
+    {
+      "coin_id": "xrp",
+      "symbol": "XRP",
+      "name": "XRP",
+      "aliases": ["xrp", "ripple"],
+      "categories": ["payments"],
+      "market_cap": 150000000000,
+      "volume_24h": 4000000000,
+      "price": 2.2,
+      "source": "llm_fixture"
+    },
+    {
+      "coin_id": "hyperliquid",
+      "symbol": "HYPE",
+      "name": "Hyperliquid",
+      "aliases": ["hyperliquid", "hype"],
+      "categories": ["perp-dex"],
+      "market_cap": 12000000000,
+      "volume_24h": 850000000,
+      "price": 35,
+      "source": "llm_fixture"
+    },
+    {
+      "coin_id": "kucoin-shares",
+      "symbol": "KCS",
+      "name": "KuCoin Token",
+      "aliases": ["kcs", "kucoin", "kucoin token"],
+      "categories": ["exchange-token"],
+      "market_cap": 1300000000,
+      "volume_24h": 12000000,
+      "price": 11,
+      "source": "llm_fixture"
+    },
+    {
+      "coin_id": "chainlink",
+      "symbol": "LINK",
+      "name": "Chainlink",
+      "aliases": ["chainlink", "link"],
+      "categories": ["oracle"],
+      "market_cap": 20000000000,
+      "volume_24h": 1000000000,
+      "price": 18,
+      "source": "llm_fixture"
+    },
+    {
+      "coin_id": "velvet",
+      "symbol": "VELVET",
+      "name": "Velvet Capital",
+      "aliases": ["velvet", "velvet capital", "velvet.trade"],
+      "categories": ["synthetic-exposure"],
+      "market_cap": 45000000,
+      "volume_24h": 120000000,
+      "price": 7.2,
+      "source": "llm_fixture"
+    },
+    {
+      "coin_id": "chiliz",
+      "symbol": "CHZ",
+      "name": "Chiliz",
+      "aliases": ["chiliz", "chz", "fan token"],
+      "categories": ["fan-token"],
+      "market_cap": 700000000,
+      "volume_24h": 250000000,
+      "price": 0.08,
+      "source": "llm_fixture"
+    }
+  ],
+  "raw_events": [
+    {
+      "raw_id": "llm-btc-bitcoin-world",
+      "provider": "llm_golden",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-16T10:00:00Z",
+      "source_url": "https://bitcoinworld.example/spacex-market",
+      "title": "SpaceX pre-IPO market opens for prediction traders - Bitcoin World",
+      "body": "Bitcoin World covers the SpaceX pre-IPO market, but the article is not about BTC exposure.",
+      "source_confidence": 0.75,
+      "event": {
+        "event_id": "llm-btc-bitcoin-world",
+        "event_name": "SpaceX pre-IPO market opens for prediction traders - Bitcoin World",
+        "event_type": "ipo_proxy",
+        "event_time": "2026-06-21T13:30:00Z",
+        "event_time_confidence": 0.85,
+        "external_asset": "SpaceX",
+        "confidence": 0.75,
+        "description": "Bitcoin World covers the SpaceX pre-IPO market, but the article is not about BTC exposure."
+      }
+    },
+    {
+      "raw_id": "llm-xrp-ripple-effects",
+      "provider": "llm_golden",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-16T10:05:00Z",
+      "source_url": "https://example.test/ripple-effects",
+      "title": "Ripple effects from SpaceX IPO hype hit prediction markets",
+      "body": "Analysts discuss ripple effects from the SpaceX listing narrative; XRP is not the proxy token.",
+      "source_confidence": 0.70,
+      "event": {
+        "event_id": "llm-xrp-ripple-effects",
+        "event_name": "Ripple effects from SpaceX IPO hype hit prediction markets",
+        "event_type": "ipo_proxy",
+        "event_time": "2026-06-22T13:30:00Z",
+        "event_time_confidence": 0.80,
+        "external_asset": "SpaceX",
+        "confidence": 0.70,
+        "description": "Analysts discuss ripple effects from the SpaceX listing narrative; XRP is not the proxy token."
+      }
+    },
+    {
+      "raw_id": "llm-hype-word-collision",
+      "provider": "llm_golden",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-16T10:10:00Z",
+      "source_url": "https://example.test/ipo-hype",
+      "title": "IPO hype token chatter rises before SpaceX debut",
+      "body": "The story uses hype as a normal word around IPO speculation and does not mention Hyperliquid or $HYPE.",
+      "source_confidence": 0.70,
+      "event": {
+        "event_id": "llm-hype-word-collision",
+        "event_name": "IPO hype token chatter rises before SpaceX debut",
+        "event_type": "ipo_proxy",
+        "event_time": "2026-06-23T13:30:00Z",
+        "event_time_confidence": 0.80,
+        "external_asset": "SpaceX",
+        "confidence": 0.70,
+        "description": "The story uses hype as a normal word around IPO speculation and does not mention Hyperliquid or $HYPE."
+      }
+    },
+    {
+      "raw_id": "llm-kcs-kucoin-source",
+      "provider": "llm_golden",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-16T10:15:00Z",
+      "source_url": "https://kucoin.example/news/spacex",
+      "title": "KuCoin source highlights SpaceX prediction market volume",
+      "body": "The KuCoin source discusses a SpaceX market; it does not say KCS token is the proxy instrument.",
+      "source_confidence": 0.70,
+      "event": {
+        "event_id": "llm-kcs-kucoin-source",
+        "event_name": "KuCoin source highlights SpaceX prediction market volume",
+        "event_type": "ipo_proxy",
+        "event_time": "2026-06-24T13:30:00Z",
+        "event_time_confidence": 0.80,
+        "external_asset": "SpaceX",
+        "confidence": 0.70,
+        "description": "The KuCoin source discusses a SpaceX market; it does not say KCS token is the proxy instrument."
+      }
+    },
+    {
+      "raw_id": "llm-chainlink-world-cup",
+      "provider": "llm_golden",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-16T10:20:00Z",
+      "source_url": "https://example.test/chainlink-world-cup",
+      "title": "Chainlink Beat Polymarket and Kalshi to the World Cup",
+      "body": "Chainlink powers the World Cup prediction market as an oracle provider, not the proxy token instrument.",
+      "source_confidence": 0.80,
+      "event": {
+        "event_id": "llm-chainlink-world-cup",
+        "event_name": "Chainlink Beat Polymarket and Kalshi to the World Cup",
+        "event_type": "sports_event",
+        "event_time": "2026-06-19T18:00:00Z",
+        "event_time_confidence": 0.90,
+        "external_asset": "World Cup",
+        "confidence": 0.80,
+        "description": "Chainlink powers the World Cup prediction market as an oracle provider, not the proxy token instrument."
+      }
+    },
+    {
+      "raw_id": "llm-velvet-spacex",
+      "provider": "llm_golden",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-16T10:25:00Z",
+      "source_url": "https://example.test/velvet-spacex",
+      "title": "Velvet Capital offers synthetic exposure to SpaceX pre-IPO trading",
+      "body": "Velvet Capital users can trade SpaceX pre-IPO exposure through Velvet markets before the SpaceX IPO.",
+      "source_confidence": 0.92,
+      "event": {
+        "event_id": "llm-velvet-spacex",
+        "event_name": "Velvet Capital offers synthetic exposure to SpaceX pre-IPO trading",
+        "event_type": "ipo_proxy",
+        "event_time": "2026-06-25T13:30:00Z",
+        "event_time_confidence": 0.95,
+        "external_asset": "SpaceX",
+        "confidence": 0.92,
+        "description": "Velvet Capital users can trade SpaceX pre-IPO exposure through Velvet markets before the SpaceX IPO."
+      }
+    },
+    {
+      "raw_id": "llm-chz-world-cup",
+      "provider": "llm_golden",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-16T10:30:00Z",
+      "source_url": "https://example.test/chz-world-cup",
+      "title": "CHZ fan token demand surges before World Cup kickoff",
+      "body": "CHZ is framed as a fan-token proxy for World Cup attention before kickoff.",
+      "source_confidence": 0.85,
+      "event": {
+        "event_id": "llm-chz-world-cup",
+        "event_name": "CHZ fan token demand surges before World Cup kickoff",
+        "event_type": "sports_event",
+        "event_time": "2026-06-18T18:00:00Z",
+        "event_time_confidence": 0.90,
+        "external_asset": "World Cup",
+        "confidence": 0.85,
+        "description": "CHZ is framed as a fan-token proxy for World Cup attention before kickoff."
+      }
+    },
+    {
+      "raw_id": "llm-btc-etf",
+      "provider": "llm_golden",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-16T10:35:00Z",
+      "source_url": "https://example.test/btc-etf",
+      "title": "BTC rallies before spot Bitcoin ETF approval decision",
+      "body": "The event directly affects Bitcoin demand; BTC is the direct beneficiary, not a proxy.",
+      "source_confidence": 0.90,
+      "event": {
+        "event_id": "llm-btc-etf",
+        "event_name": "Spot Bitcoin ETF approval decision",
+        "event_type": "etf_approval",
+        "event_time": "2026-06-18T13:30:00Z",
+        "event_time_confidence": 1.0,
+        "external_asset": "Bitcoin",
+        "confidence": 0.90,
+        "description": "The event directly affects Bitcoin demand; BTC is the direct beneficiary, not a proxy."
+      }
+    },
+    {
+      "raw_id": "llm-invalid-quote",
+      "provider": "llm_golden",
+      "fetched_at": "2026-06-16T12:00:00Z",
+      "published_at": "2026-06-16T10:40:00Z",
+      "source_url": "https://example.test/invalid-quote",
+      "title": "Velvet markets discuss SpaceX pre-IPO exposure",
+      "body": "Velvet markets discuss SpaceX pre-IPO exposure, with no claim about guaranteed short signals.",
+      "source_confidence": 0.90,
+      "event": {
+        "event_id": "llm-invalid-quote",
+        "event_name": "Velvet markets discuss SpaceX pre-IPO exposure",
+        "event_type": "ipo_proxy",
+        "event_time": "2026-06-20T13:30:00Z",
+        "event_time_confidence": 0.90,
+        "external_asset": "SpaceX",
+        "confidence": 0.90,
+        "description": "Velvet markets discuss SpaceX pre-IPO exposure, with no claim about guaranteed short signals."
+      }
+    }
+  ],
+  "llm_outputs": [
+    {
+      "case_id": "llm-btc-bitcoin-world",
+      "event_id": "llm-btc-bitcoin-world",
+      "coin_id": "bitcoin",
+      "symbol": "BTC",
+      "analysis": {
+        "asset_role": "source_noise",
+        "relationship_type": "publisher_suffix_false_positive",
+        "recommended_alert_action": "store_only",
+        "confidence": 0.92,
+        "reason": "Bitcoin appears as publisher/source context, not as the crypto proxy asset.",
+        "evidence_quotes": [{"text": "Bitcoin World covers the SpaceX pre-IPO market", "source_field": "raw_bodies", "supports": "publisher/source context"}],
+        "external_catalyst": {"name": "SpaceX", "catalyst_type": "ipo_proxy", "event_time": "2026-06-20T13:30:00Z", "confidence": 0.85, "evidence_quotes": [{"text": "SpaceX pre-IPO market", "source_field": "event_name", "supports": "external catalyst"}]},
+        "source_quality": {"source_origin": "Bitcoin World", "source_confidence": 0.75, "timing_quality": "published_before_event", "notes": "Publisher/source false positive."},
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "llm-xrp-ripple-effects",
+      "event_id": "llm-xrp-ripple-effects",
+      "coin_id": "xrp",
+      "symbol": "XRP",
+      "analysis": {
+        "asset_role": "ticker_word_collision",
+        "relationship_type": "word_collision_false_positive",
+        "recommended_alert_action": "store_only",
+        "confidence": 0.90,
+        "reason": "Ripple is used as an ordinary phrase, not as XRP evidence.",
+        "evidence_quotes": [{"text": "ripple effects from the SpaceX listing narrative", "source_field": "description", "supports": "word collision"}],
+        "external_catalyst": {"name": "SpaceX", "catalyst_type": "ipo_proxy", "event_time": "2026-06-21T13:30:00Z", "confidence": 0.80, "evidence_quotes": [{"text": "SpaceX IPO hype", "source_field": "event_name", "supports": "external catalyst"}]},
+        "source_quality": {"source_origin": "example.test", "source_confidence": 0.70, "timing_quality": "published_before_event", "notes": "No XRP proxy relationship."},
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "llm-hype-word-collision",
+      "event_id": "llm-hype-word-collision",
+      "coin_id": "hyperliquid",
+      "symbol": "HYPE",
+      "analysis": {
+        "asset_role": "ticker_word_collision",
+        "relationship_type": "word_collision_false_positive",
+        "recommended_alert_action": "store_only",
+        "confidence": 0.88,
+        "reason": "Hype is used as a normal word; Hyperliquid or $HYPE is not the subject.",
+        "evidence_quotes": [{"text": "uses hype as a normal word", "source_field": "description", "supports": "word collision"}],
+        "external_catalyst": {"name": "SpaceX", "catalyst_type": "ipo_proxy", "event_time": "2026-06-22T13:30:00Z", "confidence": 0.80, "evidence_quotes": [{"text": "SpaceX debut", "source_field": "event_name", "supports": "external catalyst"}]},
+        "source_quality": {"source_origin": "example.test", "source_confidence": 0.70, "timing_quality": "published_before_event", "notes": "Ticker word collision."},
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "llm-kcs-kucoin-source",
+      "event_id": "llm-kcs-kucoin-source",
+      "coin_id": "kucoin-shares",
+      "symbol": "KCS",
+      "analysis": {
+        "asset_role": "source_noise",
+        "relationship_type": "publisher_suffix_false_positive",
+        "recommended_alert_action": "store_only",
+        "confidence": 0.86,
+        "reason": "KuCoin is the source/origin context; KCS is not named as the proxy token.",
+        "evidence_quotes": [{"text": "KuCoin source discusses a SpaceX market", "source_field": "description", "supports": "source context"}],
+        "external_catalyst": {"name": "SpaceX", "catalyst_type": "ipo_proxy", "event_time": "2026-06-23T13:30:00Z", "confidence": 0.80, "evidence_quotes": [{"text": "SpaceX prediction market volume", "source_field": "event_name", "supports": "external catalyst"}]},
+        "source_quality": {"source_origin": "KuCoin", "source_confidence": 0.70, "timing_quality": "published_before_event", "notes": "Exchange/source mention only."},
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "llm-chainlink-world-cup",
+      "event_id": "llm-chainlink-world-cup",
+      "coin_id": "chainlink",
+      "symbol": "LINK",
+      "analysis": {
+        "asset_role": "infrastructure",
+        "relationship_type": "infrastructure_provider",
+        "recommended_alert_action": "store_only",
+        "confidence": 0.91,
+        "reason": "Chainlink is described as the oracle provider powering the market, not the proxy instrument.",
+        "evidence_quotes": [{"text": "Chainlink powers the World Cup prediction market as an oracle provider", "source_field": "description", "supports": "infrastructure role"}],
+        "external_catalyst": {"name": "World Cup", "catalyst_type": "sports_event", "event_time": "2026-06-18T18:00:00Z", "confidence": 0.90, "evidence_quotes": [{"text": "World Cup prediction market", "source_field": "description", "supports": "external catalyst"}]},
+        "source_quality": {"source_origin": "example.test", "source_confidence": 0.80, "timing_quality": "published_before_event", "notes": "Infrastructure/control row."},
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "llm-velvet-spacex",
+      "event_id": "llm-velvet-spacex",
+      "coin_id": "velvet",
+      "symbol": "VELVET",
+      "analysis": {
+        "asset_role": "proxy_venue",
+        "relationship_type": "proxy_exposure",
+        "recommended_alert_action": "radar_digest",
+        "confidence": 0.90,
+        "reason": "Velvet is the venue/platform tied to synthetic SpaceX exposure.",
+        "evidence_quotes": [{"text": "Velvet Capital users can trade SpaceX pre-IPO exposure", "source_field": "raw_bodies", "supports": "proxy exposure"}],
+        "external_catalyst": {"name": "SpaceX", "catalyst_type": "ipo_proxy", "event_time": "2026-06-24T13:30:00Z", "confidence": 0.95, "evidence_quotes": [{"text": "SpaceX pre-IPO exposure", "source_field": "description", "supports": "external catalyst"}]},
+        "source_quality": {"source_origin": "example.test", "source_confidence": 0.92, "timing_quality": "published_before_event", "notes": "Venue proxy remains review-only by default."},
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "llm-chz-world-cup",
+      "event_id": "llm-chz-world-cup",
+      "coin_id": "chiliz",
+      "symbol": "CHZ",
+      "analysis": {
+        "asset_role": "proxy_instrument",
+        "relationship_type": "proxy_attention",
+        "recommended_alert_action": "watchlist",
+        "confidence": 0.87,
+        "reason": "CHZ is framed as the fan-token proxy for World Cup attention.",
+        "evidence_quotes": [{"text": "CHZ is framed as a fan-token proxy for World Cup attention", "source_field": "description", "supports": "proxy instrument"}],
+        "external_catalyst": {"name": "World Cup", "catalyst_type": "sports_event", "event_time": "2026-06-19T18:00:00Z", "confidence": 0.90, "evidence_quotes": [{"text": "World Cup kickoff", "source_field": "event_name", "supports": "external catalyst"}]},
+        "source_quality": {"source_origin": "example.test", "source_confidence": 0.85, "timing_quality": "published_before_event", "notes": "Fan-token proxy evidence."},
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "llm-btc-etf",
+      "event_id": "llm-btc-etf",
+      "coin_id": "bitcoin",
+      "symbol": "BTC",
+      "analysis": {
+        "asset_role": "direct_beneficiary",
+        "relationship_type": "direct_protocol_event",
+        "recommended_alert_action": "store_only",
+        "confidence": 0.94,
+        "reason": "BTC is directly affected by the Bitcoin ETF event, so this is not a proxy fade candidate.",
+        "evidence_quotes": [{"text": "directly affects Bitcoin demand", "source_field": "description", "supports": "direct beneficiary"}],
+        "external_catalyst": {"name": "Bitcoin", "catalyst_type": "etf_approval", "event_time": "2026-06-18T13:30:00Z", "confidence": 1.0, "evidence_quotes": [{"text": "spot Bitcoin ETF approval decision", "source_field": "event_name", "supports": "direct event"}]},
+        "source_quality": {"source_origin": "example.test", "source_confidence": 0.90, "timing_quality": "published_before_event", "notes": "Direct-beneficiary control."},
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "llm-invalid-quote",
+      "event_id": "llm-invalid-quote",
+      "coin_id": "velvet",
+      "symbol": "VELVET",
+      "analysis": {
+        "asset_role": "proxy_venue",
+        "relationship_type": "proxy_exposure",
+        "recommended_alert_action": "radar_digest",
+        "confidence": 0.89,
+        "reason": "The model supplied one unsupported quote, so analyzer validation should clamp confidence.",
+        "evidence_quotes": [{"text": "guaranteed short signals after the IPO", "source_field": "raw_bodies", "supports": "unsupported hallucinated quote"}],
+        "external_catalyst": {"name": "SpaceX", "catalyst_type": "ipo_proxy", "event_time": "2026-06-25T13:30:00Z", "confidence": 0.90, "evidence_quotes": [{"text": "SpaceX pre-IPO exposure", "source_field": "description", "supports": "external catalyst"}]},
+        "source_quality": {"source_origin": "example.test", "source_confidence": 0.90, "timing_quality": "published_before_event", "notes": "Quote clamp fixture."},
+        "warnings": []
+      }
+    }
+  ]
+}

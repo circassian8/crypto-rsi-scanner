@@ -40,7 +40,7 @@ EVENT_DISCOVERY_POLYMARKET_LIMIT ?= 100
 EVENT_DISCOVERY_POLYMARKET_UNIVERSE_LIVE ?= 1
 EVENT_DISCOVERY_POLYMARKET_UNIVERSE_FETCH_LIMIT ?= 250
 
-.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -65,6 +65,7 @@ help:
 	@echo "  make event-discovery-refresh-gdelt  Cache no-key GDELT news event evidence"
 	@echo "  make event-discovery-refresh-polymarket  Cache no-key Polymarket dated catalysts"
 	@echo "  make event-discovery-binance-listen  Cache raw live Binance announcement evidence"
+	@echo "  make event-llm-eval  Run offline LLM shadow eval fixtures"
 	@echo "  make event-fade-auto-report  Print grouped event-fade discovery report"
 	@echo "  make event-fade-export-sample  Write validation sample from fixtures"
 	@echo "  make event-fade-export-cache-sample  Write validation sample from cache"
@@ -233,6 +234,16 @@ event-discovery-refresh-polymarket:
 event-discovery-binance-listen:
 	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
 	$(PYTHON) main.py --event-discovery-binance-listen
+
+event-llm-eval:
+	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/llm_golden_cases.json \
+	RSI_EVENT_DISCOVERY_ALIASES_PATH=fixtures/event_discovery/llm_golden_cases.json \
+	RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=720 \
+	RSI_EVENT_DISCOVERY_HORIZON_DAYS=30 \
+	RSI_EVENT_LLM_PROVIDER=fixture \
+	RSI_EVENT_LLM_MIN_PREFILTER_SCORE=0 \
+	RSI_EVENT_LLM_MAX_CANDIDATES_PER_RUN=50 \
+	$(PYTHON) main.py --event-llm-shadow-report
 
 event-fade-auto-report:
 	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \

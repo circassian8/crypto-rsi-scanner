@@ -56,6 +56,8 @@ class ManualJsonEventProvider:
                 raise ValueError(f"invalid manual event fixture {self.path}: {exc}") from exc
             log.warning("Manual event fixture load failed: %s", exc)
             return []
+        if isinstance(raw, Mapping):
+            raw = raw.get("raw_events", raw.get("events", raw))
         if not isinstance(raw, list):
             if self.required:
                 raise ValueError("manual event fixture must be a list")
