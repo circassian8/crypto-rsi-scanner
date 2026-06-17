@@ -619,8 +619,12 @@ SAMPLE TEMPLATE OUT` copies nonblank review fields back into a full validation
 sample artifact and immediately prints the resulting review report and
 next-sample work. Human event-time confirmation is stored separately from the
 machine-extracted `event_time` so later analysis can distinguish what the system
-knew from what the reviewer confirmed. A row only counts as reviewed evidence
-when it has both
+knew from what the reviewer confirmed. When `human_event_time_confidence` meets
+the review threshold, validation metrics may use `human_event_time` for
+review-only decision timing, trigger latency, source-timing checks, and
+event-time baseline outcome filling; it still does not prove the discovery
+pipeline knew that event time automatically. A row only counts as reviewed
+evidence when it has both
 `review_status=reviewed` and a known `human_label`. The apply command uses stable
 event/asset/relationship identity and writes only `OUT`; it does not infer
 labels, alter the source sample, write live storage, route alerts, open paper

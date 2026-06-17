@@ -3776,6 +3776,87 @@ def test_event_fade_validation_outcome_fill_from_local_prices():
     assert second.skipped_existing_rows == 1
 
 
+def test_event_fade_validation_uses_human_event_time_for_review_metrics():
+    from datetime import datetime, timedelta, timezone
+    from crypto_rsi_scanner import event_validation
+
+    event_time = datetime(2026, 6, 20, 0, 0, tzinfo=timezone.utc)
+    trigger_time = event_time + timedelta(hours=6)
+    row = {
+        "schema_version": "event_fade_validation_sample_v1",
+        "event_id": "hype-spacex-human-time",
+        "asset_symbol": "HYPE",
+        "asset_coin_id": "hyperliquid",
+        "event_name": "Hyperliquid SpaceX pre-IPO market",
+        "event_type": "ipo_proxy",
+        "relationship_type": "proxy_exposure",
+        "asset_role": "proxy_instrument",
+        "signal_type": "SHORT_TRIGGERED",
+        "event_time": "",
+        "event_time_source": "",
+        "event_time_confidence": None,
+        "human_event_time": event_time.isoformat(),
+        "human_event_time_source": "https://example.test/hype-spacex",
+        "human_event_time_confidence": 0.95,
+        "is_proxy_narrative": True,
+        "is_direct_beneficiary": False,
+        "trigger_observed_at": trigger_time.isoformat(),
+        "review_status": "reviewed",
+        "human_label": "valid_proxy_fade",
+        "source": "project_blog_rss",
+        "raw_providers": ["project_blog_rss"],
+        "source_urls": ["https://example.test/hype-spacex"],
+        "first_seen_time": (event_time - timedelta(hours=3)).isoformat(),
+        "published_at_min": (event_time - timedelta(hours=3)).isoformat(),
+        "published_at_max": (event_time - timedelta(hours=3)).isoformat(),
+        "fetched_at_min": (event_time - timedelta(hours=2)).isoformat(),
+        "fetched_at_max": (event_time - timedelta(hours=2)).isoformat(),
+        "raw_published_at": [(event_time - timedelta(hours=3)).isoformat()],
+        "raw_fetched_at": [(event_time - timedelta(hours=2)).isoformat()],
+        "btc_risk_on_score": 35,
+    }
+    candles = [
+        event_validation.ValidationOutcomeCandle(event_time, close=10.0, high=10.0, low=10.0, interval="1h", source="fixture"),
+        event_validation.ValidationOutcomeCandle(trigger_time, close=9.0, high=9.0, low=9.0, interval="1h", source="fixture"),
+        event_validation.ValidationOutcomeCandle(event_time + timedelta(hours=24), close=8.0, high=9.2, low=7.5, interval="1h", source="fixture"),
+        event_validation.ValidationOutcomeCandle(trigger_time + timedelta(hours=24), close=7.0, high=7.5, low=6.5, interval="1h", source="fixture"),
+        event_validation.ValidationOutcomeCandle(event_time + timedelta(hours=72), close=7.0, high=7.2, low=6.8, interval="1h", source="fixture"),
+        event_validation.ValidationOutcomeCandle(trigger_time + timedelta(hours=72), close=5.5, high=6.0, low=5.0, interval="1h", source="fixture"),
+        event_validation.ValidationOutcomeCandle(event_time + timedelta(hours=168), close=6.0, high=6.2, low=5.8, interval="1h", source="fixture"),
+        event_validation.ValidationOutcomeCandle(trigger_time + timedelta(hours=168), close=4.5, high=5.0, low=4.0, interval="1h", source="fixture"),
+    ]
+
+    filled = event_validation.fill_validation_outcomes([row], {"hyperliquid": candles})
+    assert filled.filled_rows == 1
+    filled_row = filled.rows[0]
+    assert filled_row["event_time"] == ""
+    assert filled_row["human_event_time"] == event_time.isoformat()
+    assert round(filled_row["event_time_entry_price"], 4) == 10.0
+    assert round(filled_row["event_time_post_event_return_72h"], 4) == -0.3
+    assert round(filled_row["post_event_return_72h"], 4) == -0.3889
+
+    review = event_validation.review_validation_sample(
+        filled.rows,
+        min_proxy_candidates=1,
+        min_negative_controls=0,
+        min_triggered_reviewed=1,
+        min_proxy_event_types=1,
+        min_proxy_source_providers=1,
+        min_trigger_btc_risk_buckets=1,
+    )
+    assert review.low_confidence_trigger_event_time_rows == 0
+    assert review.point_in_time_violation_rows == 0
+    assert review.post_decision_source_rows == 0
+    assert review.missing_source_timing_rows == 0
+    assert review.missing_event_time_baseline_rows == 0
+    assert review.avg_trigger_latency_hours == 6.0
+    assert review.promotion_ready is True
+    time_source_cohorts = {cohort.name: cohort for cohort in review.event_time_source_cohorts}
+    assert time_source_cohorts["human_confirmed"].reviewed_proxy_candidates == 1
+    report = event_validation.format_validation_review(review)
+    assert "human_confirmed" in report
+
+
 def test_event_fade_outcome_price_export_from_klines_fixture():
     import json
     import tempfile

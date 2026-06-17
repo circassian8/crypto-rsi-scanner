@@ -355,7 +355,7 @@ def fill_validation_outcomes(
             missing_history += 1
             output.append(out)
             continue
-        decision_time = _dt(row.get("trigger_observed_at")) or _dt(row.get("event_time"))
+        decision_time = _dt(row.get("trigger_observed_at")) or _review_event_time(row)
         if decision_time is None:
             insufficient_history += 1
             output.append(out)
@@ -379,7 +379,7 @@ def fill_validation_outcomes(
             if overwrite or _num(out.get(field)) is None:
                 out[field] = value
                 changed = True
-        event_time = _dt(row.get("event_time"))
+        event_time = _review_event_time(row)
         if event_time is not None:
             event_time_outcome = _short_outcome(
                 candles,
@@ -733,7 +733,7 @@ def review_validation_sample(
     low_confidence_trigger_event_time_rows = sum(
         1
         for row in triggered_reviewed
-        if (_num(row.get("event_time_confidence")) or 0.0) < min_trigger_event_time_confidence
+        if (_review_event_time_confidence(row) or 0.0) < min_trigger_event_time_confidence
     )
     missing_source_timing_rows = sum(1 for row in reviewed if _missing_source_timing(row))
     pit_violation_rows = sum(1 for row in reviewed if _point_in_time_violation(row))
@@ -1639,7 +1639,7 @@ def _queue_item(
 def _trigger_event_time_needs_confirmation(row: Mapping[str, Any]) -> bool:
     if _signal_type(row) != "SHORT_TRIGGERED":
         return False
-    confidence = _num(row.get("event_time_confidence")) or 0.0
+    confidence = _review_event_time_confidence(row) or 0.0
     return confidence < DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE
 
 
@@ -1873,11 +1873,32 @@ def _missing_source_timing(row: Mapping[str, Any]) -> bool:
     return not _source_known_times(row, include_max=True)
 
 
+def _review_event_time(row: Mapping[str, Any]) -> datetime | None:
+    human = _review_human_event_time(row)
+    if human is not None:
+        return human
+    return _dt(row.get("event_time"))
+
+
+def _review_human_event_time(row: Mapping[str, Any]) -> datetime | None:
+    human = _dt(row.get("human_event_time"))
+    if human is None:
+        return None
+    confidence = _num(row.get("human_event_time_confidence")) or 0.0
+    return human if confidence >= DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE else None
+
+
+def _review_event_time_confidence(row: Mapping[str, Any]) -> float | None:
+    if _review_human_event_time(row) is not None:
+        return _num(row.get("human_event_time_confidence"))
+    return _num(row.get("event_time_confidence"))
+
+
 def _decision_time(row: Mapping[str, Any]) -> datetime | None:
     signal_type = _signal_type(row)
     if signal_type == "SHORT_TRIGGERED":
         return _dt(row.get("trigger_observed_at"))
-    return _dt(row.get("event_time"))
+    return _review_event_time(row)
 
 
 def _source_known_times(row: Mapping[str, Any], *, include_max: bool) -> list[datetime]:
@@ -1920,7 +1941,7 @@ def _trigger_vs_event_time_72h_edges(rows: Iterable[Mapping[str, Any]]) -> list[
 def _trigger_latencies_hours(rows: Iterable[Mapping[str, Any]]) -> list[float]:
     out: list[float] = []
     for row in rows:
-        event_time = _dt(row.get("event_time"))
+        event_time = _review_event_time(row)
         trigger_time = _dt(row.get("trigger_observed_at"))
         if event_time is None or trigger_time is None:
             continue
@@ -2034,6 +2055,8 @@ def _btc_risk_bucket(row: Mapping[str, Any]) -> str:
 
 
 def _event_time_source_bucket(row: Mapping[str, Any]) -> str:
+    if _review_human_event_time(row) is not None:
+        return "human_confirmed"
     source = str(row.get("event_time_source") or "").strip()
     if source:
         return source

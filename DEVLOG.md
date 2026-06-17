@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Use human event times in validation metrics · Codex
+**Why:** Human-confirmed event times were being preserved in review artifacts,
+but validation metrics still ignored them. That would keep confirmed proxy rows
+blocked or mismeasured even after manual review.
+**Changes:**
+- Taught validation outcome filling to use a high-confidence
+  `human_event_time` for event-time baseline outcomes when the machine
+  `event_time` is missing or weaker.
+- Taught review metrics to use high-confidence human event times for
+  review-only decision timing, trigger latency, low-confidence trigger-time
+  checks, point-in-time checks, and event-time-source cohorts.
+- Kept machine-derived `event_time` unchanged so reviewed timing evidence stays
+  separate from what the discovery pipeline knew automatically.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`
+  with the review-only interpretation.
+- Added regression coverage for outcome filling and promotion-review metrics on
+  a triggered proxy row with only `human_event_time`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 253/253
+tests, and `make verify` passes.
+**Notes/risks:** This does not promote event fade, alter discovery eligibility,
+route alerts, write live DB rows, or open paper trades. It only makes manual
+validation artifacts measurable after reviewers confirm catalyst times.
+
 ## 2026-06-17 — Add human event-time review fields · Codex
 **Why:** The expanded no-key RSS cycle produced many proxy-instrument leads, but
 nearly all lacked confirmed catalyst times. Reviewers need a first-class,
