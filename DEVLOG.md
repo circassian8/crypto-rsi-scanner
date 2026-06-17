@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add source providers to event-fade review aids · Codex
+**Why:** The review sidecar already summarized source origins, but reviewers
+also need provider visibility (`project_blog_rss`, `gdelt`,
+`prediction_market_events`, etc.) while labeling for the source-provider
+diversity gate.
+**Changes:**
+- Added `source_providers` as a helper-only review-template column and review
+  packet section; it is excluded from evidence matching/copyback just like
+  `source_search_url` and `source_date_hint`.
+- Updated the review bundle README/guide text, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to document the new reviewer aid.
+- Added regression coverage for packet output, sidecar CSV round-tripping,
+  helper-only apply behavior, and review-bundle artifacts.
+- Regenerated the latest no-key review bundle at
+  `/tmp/event_fade_no_key_review_bundle_20260617_050822_source_providers`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 260/260.
+`make verify` passes with 260/260 tests, alert render smoke, fixture backtest
+smoke, and paper scoreboard. The regenerated balanced sidecar has 75 rows,
+includes `source_providers`, and still orders the 25 proxy rows as 15
+`proxy_instrument` rows followed by 10 `proxy_venue` rows.
+**Notes/risks:** Review-workflow only. This does not change event scoring,
+eligibility gates, alerts, live storage, paper trades, or promotion status.
+
 ## 2026-06-17 — Prioritize proxy instruments in review sidecar · Codex
 **Why:** The latest balanced review sidecar spent too much proxy-review capacity
 on `proxy_venue` rows even though proxy venues are watchlist/review-only by

@@ -124,6 +124,7 @@ REVIEW_TEMPLATE_FIELDS = (
     "primary_raw_title",
     "source_search_url",
     "source_urls",
+    "source_providers",
     "source_origins",
     "raw_published_at",
     "raw_fetched_at",
@@ -162,6 +163,7 @@ REVIEW_TEMPLATE_DERIVED_FIELDS = frozenset({
     "primary_source_origin",
     "primary_raw_title",
     "source_search_url",
+    "source_providers",
     "source_origins",
 })
 REVIEW_TEMPLATE_EVIDENCE_FIELDS = tuple(
@@ -1689,6 +1691,7 @@ def _format_review_packet_row(
     fields.extend(_packet_bullets("Warnings", row.get("warnings")))
     fields.extend(_packet_bullets("Missing data", row.get("missing_data")))
     fields.extend(_packet_bullets("Sources", row.get("source_urls")))
+    fields.extend(_packet_bullets("Source providers", _source_provider_values(row)))
     fields.extend(_packet_bullets("Source origins", source_origin_values(row)))
     source_search = _source_search_url(row)
     if source_search:
@@ -1725,6 +1728,7 @@ def _review_template_row(
         "primary_raw_title": _first_list_text(row.get("raw_titles")),
         "source_search_url": _source_search_url(row),
         "source_urls": list(item.source_urls),
+        "source_providers": list(_source_provider_values(row)),
         "source_origins": list(item.source_origins),
     })
     return out

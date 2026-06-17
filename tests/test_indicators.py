@@ -4252,6 +4252,8 @@ def test_event_fade_validation_review_packet_formats_human_evidence():
     assert "Event-time baseline: entry=`8.00` | 72h=`-20.0%` | trigger edge=`+0.8pp`" in packet
     assert "Classifier evidence:" in packet
     assert "Sources:" in packet
+    assert "Source providers:" in packet
+    assert "manual_json" in packet
     assert "Source origins:" in packet
     assert "example.test" in packet
     assert "Source search:" in packet
@@ -4274,6 +4276,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     assert template_rows[0]["human_event_time"] is None
     assert template_rows[0]["suggested_label"] == "valid_proxy_fade or false_positive"
     assert template_rows[0]["source_origins"] == ["example.test"]
+    assert template_rows[0]["source_providers"] == ["manual_json"]
     assert template_rows[0]["primary_source_url"] == "https://example.test/velvet-spacex-duplicate"
     assert template_rows[0]["primary_source_origin"] == "example.test"
     assert (
@@ -4299,6 +4302,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     template_rows[0]["primary_source_url"] = "https://example.test/helper-column-change"
     template_rows[0]["review_prompt"] = "Helper-only reviewer note changed."
     template_rows[0]["source_search_url"] = "https://example.test/helper-search-change"
+    template_rows[0]["source_providers"] = ["helper_provider"]
     template_rows[0]["post_event_return_72h"] = -0.21
     result = event_validation.apply_review_template(rows, template_rows)
     assert result.matched_rows == 1
@@ -4324,6 +4328,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
         assert "Verify source evidence" in csv_rows[0]["review_prompt"]
         assert "TestVelvet+offers+synthetic+exposure" in csv_rows[0]["source_search_url"]
         assert "source_date_hint" in csv_rows[0]
+        assert csv_rows[0]["source_providers"] == ["manual_json"]
         assert csv_rows[0]["missing_fields"][0] == "human_label"
         assert jsonl_rows[0]["asset_symbol"] == "TESTVELVET"
 
@@ -4345,6 +4350,7 @@ def test_event_fade_validation_balanced_review_template_samples_gates():
     assert any(row["asset_symbol"] == "TESTVELVET" for row in template_rows)
     assert any(row["suggested_label"] == "direct_event" for row in template_rows)
     assert all("primary_source_url" in row for row in template_rows)
+    assert all("source_providers" in row for row in template_rows)
     assert all(row.get("source_search_url") for row in template_rows)
 
     csv_text = event_validation.format_review_template_csv(template_rows)
@@ -4362,6 +4368,7 @@ def test_event_fade_validation_balanced_review_template_samples_gates():
     assert "- Review slice: `triggered`" in packet
     assert "- Review slice: `proxy_candidate`" in packet
     assert "- Review slice: `negative_control`" in packet
+    assert "Source providers:" in packet
     assert "Source search:" in packet
 
 
@@ -5343,6 +5350,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "review_guide.md" in readme
         assert "review_packet_balanced.md" in readme
         assert "review_template_balanced.csv" in readme
+        assert "source_providers" in readme
         assert "manifest.json" in readme
 
         guide = (bundle_dir / "review_guide.md").read_text(encoding="utf-8")
@@ -5357,6 +5365,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "primary_source_url" in guide
         assert "source_search_url" in guide
         assert "source_date_hint" in guide
+        assert "source_providers" in guide
         assert "review_prompt" in guide
         assert "helper columns are not copied back" in guide
         assert "review_template_balanced.csv" in guide
@@ -5396,12 +5405,14 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "primary_raw_title" in template_header
         assert "source_search_url" in template_header
         assert "source_date_hint" in template_header
+        assert "source_providers" in template_header
         assert "event_time_review_hint" in template_header
         balanced_header = (bundle_dir / "review_template_balanced.csv").read_text(encoding="utf-8").splitlines()[0]
         assert "review_slice" in balanced_header
         assert "primary_source_url" in balanced_header
         assert "source_search_url" in balanced_header
         assert "source_date_hint" in balanced_header
+        assert "source_providers" in balanced_header
         assert "Sample summary:" in readme
         assert "Proxy candidates: 6" in readme
         assert "Asset roles: direct_beneficiary=9, proxy_instrument=6, ambiguous=2" in readme
@@ -5420,6 +5431,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "- Review slice: `triggered`" in balanced_packet
         assert "- Review slice: `negative_control`" in balanced_packet
         assert "Source search:" in balanced_packet
+        assert "Source providers:" in balanced_packet
 
         report = (bundle_dir / "review_report.txt").read_text(encoding="utf-8")
         assert "EVENT FADE VALIDATION SAMPLE REVIEW" in report

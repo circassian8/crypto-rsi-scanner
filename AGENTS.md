@@ -386,8 +386,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `review_template.csv`, a diversity-first gate-balanced
   `review_packet_balanced.md` and `review_template_balanced.csv` with proxy
   candidates and negative controls, reviewer helper columns including
-  `source_search_url` for Google News/feed wrappers and `source_date_hint` for
-  date-like source-title cues, a `review_guide.md` with
+  `source_search_url` for Google News/feed wrappers, `source_date_hint` for
+  date-like source-title cues, and `source_providers` for provider diversity
+  review, a `review_guide.md` with
   label taxonomy, review provenance fields, and human event-time rules, and its
   README summarizes the same coverage,
   diversity, timing, and promotion-readiness gates. Empty bundles must warn that

@@ -666,11 +666,13 @@ workspace for a validation sample. The bundle contains:
 
 Review sidecars include helper-only columns such as `primary_source_url`,
 `primary_raw_title`, `review_prompt`, `event_time_review_hint`, and
-`source_search_url` and `source_date_hint`. `source_search_url` is a
-title/publisher search link for finding the canonical article when the source is
-a feed or Google News wrapper. `source_date_hint` surfaces date-like source-title
-phrases such as event years, date ranges, `today`, or `tonight` so reviewers can
-verify explicit catalyst timing faster.
+`source_search_url`, `source_date_hint`, and `source_providers`.
+`source_search_url` is a title/publisher search link for finding the canonical
+article when the source is a feed or Google News wrapper. `source_date_hint`
+surfaces date-like source-title phrases such as event years, date ranges,
+`today`, or `tonight` so reviewers can verify explicit catalyst timing faster.
+`source_providers` shows which discovery providers supplied the row so
+reviewers can cover provider diversity without opening the manifest.
 These columns are reviewer aids only; they are excluded from evidence matching
 and are not copied back into validation samples.
 
