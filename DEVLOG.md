@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Generate fresh no-key event-fade review bundle · Codex
+**Why:** The event-fade pipeline is now blocked on reviewed evidence, not more
+provider code. A fresh no-key run gives the human a concrete bundle to label and
+shows what the current public-source discovery pass can actually produce.
+**Changes:**
+- Ran `make event-fade-no-key-review-cycle` into
+  `/tmp/event_fade_no_key_review_bundle_20260617_032443` with 1h outcome-price
+  export enabled.
+- Confirmed the run produced 121 review rows: 27 proxy candidates, 19
+  proxy-context controls, 8 direct-beneficiary rows, 67 ambiguous rows, 0
+  eligible rows, 0 SHORT_TRIGGERED rows, and 117 rows missing machine event
+  times.
+- Noted that GDELT failed soft with HTTP 429, while RSS/Google News and
+  Polymarket produced cache evidence.
+- Added a ROADMAP checkpoint pointing reviewers at the generated bundle and the
+  exact remaining human-labeling work.
+**Verify:** `make event-discovery-status`; `make event-fade-no-key-review-cycle
+EVENT_DISCOVERY_CACHE_DIR=/tmp/event_fade_no_key_cache_20260617_032443
+EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR=/tmp/event_fade_no_key_review_bundle_20260617_032443
+EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES=1 EVENT_FADE_PRICE_INTERVAL=1h`.
+**Notes/risks:** This is a research artifact checkpoint only. The run wrote temp
+cache/review-bundle files and did not route alerts, write live DB signal/paper
+tables, or promote event fade beyond local review.
+
 ## 2026-06-17 — Gate event-fade promotion on review provenance · Codex
 **Why:** Review provenance fields existed, but a reviewed row missing
 `reviewed_by` or `reviewed_at` could still look mechanically complete in review
