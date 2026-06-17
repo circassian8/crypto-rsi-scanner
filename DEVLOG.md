@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Prioritize proxy instruments in review sidecar · Codex
+**Why:** The latest balanced review sidecar spent too much proxy-review capacity
+on `proxy_venue` rows even though proxy venues are watchlist/review-only by
+default. The validation sample should first cover the actual proxy instruments
+that could eventually test the event-fade thesis.
+**Changes:**
+- Changed balanced proxy review selection to choose `proxy_instrument` rows
+  first, then fill remaining proxy slots with other proxy roles such as
+  `proxy_venue`.
+- Added a regression test proving proxy instruments take priority over proxy
+  venues while still using venues as fill when the proxy-instrument pool is too
+  small.
+- Regenerated the latest review bundle into
+  `/tmp/event_fade_no_key_review_bundle_20260617_050822_instrument_first`.
+- Updated `ROADMAP.md` so the human labeling task points at the instrument-first
+  bundle.
+**Verify:** `make verify` passes with 260/260 tests plus alert render smoke,
+fixture backtest smoke, and paper scoreboard. The regenerated balanced sidecar
+has 25 proxy rows: all 15 available `proxy_instrument` rows first, then 10
+`proxy_venue` rows.
+**Notes/risks:** Review-workflow only. This changes local sidecar ordering and
+sample review priority, not event-fade scoring, alerts, storage, paper trades,
+or promotion gates.
+
 ## 2026-06-17 — Refresh no-key event-fade review bundle · Codex
 **Why:** The Pro-model plan calls for running discovery cycles and building a
 reviewed validation sample. The previous bundle was already stale relative to

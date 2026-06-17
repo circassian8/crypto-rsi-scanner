@@ -4403,6 +4403,53 @@ def test_event_fade_validation_balanced_review_template_diversifies_controls():
     assert {row["asset_symbol"] for row in balanced_rows} == {"BTC", "ETH", "SOL"}
 
 
+def test_event_fade_validation_balanced_review_template_prefers_proxy_instruments():
+    from crypto_rsi_scanner import event_validation
+
+    def proxy_row(symbol: str, role: str, idx: int) -> dict:
+        return {
+            "event_id": f"proxy-{symbol.lower()}-{idx}",
+            "asset_coin_id": symbol.lower(),
+            "asset_symbol": symbol,
+            "event_name": f"{symbol} external proxy story {idx}",
+            "event_type": "ipo_proxy",
+            "relationship_type": "proxy_attention",
+            "asset_role": role,
+            "is_proxy_narrative": True,
+            "is_direct_beneficiary": False,
+            "signal_type": "NO_TRADE",
+            "source_urls": [f"https://example.test/{symbol.lower()}-{idx}"],
+            "raw_titles": [f"{symbol} external proxy story {idx}"],
+        }
+
+    rows = [
+        proxy_row("VENUE1", "proxy_venue", 1),
+        proxy_row("VENUE2", "proxy_venue", 2),
+        proxy_row("INST1", "proxy_instrument", 1),
+        proxy_row("VENUE3", "proxy_venue", 3),
+        proxy_row("INST2", "proxy_instrument", 2),
+    ]
+
+    instruments_only = event_validation.build_balanced_review_template_rows(
+        rows,
+        proxy_limit=2,
+        control_limit=0,
+        triggered_limit=0,
+    )
+    assert [row["review_slice"] for row in instruments_only] == ["proxy_candidate"] * 2
+    assert {row["asset_role"] for row in instruments_only} == {"proxy_instrument"}
+    assert {row["asset_symbol"] for row in instruments_only} == {"INST1", "INST2"}
+
+    with_fill = event_validation.build_balanced_review_template_rows(
+        rows,
+        proxy_limit=4,
+        control_limit=0,
+        triggered_limit=0,
+    )
+    assert [row["asset_role"] for row in with_fill[:2]] == ["proxy_instrument", "proxy_instrument"]
+    assert sum(row["asset_role"] == "proxy_venue" for row in with_fill) == 2
+
+
 def test_event_fade_validation_review_template_skips_changed_sidecar_evidence():
     from crypto_rsi_scanner import event_discovery, event_validation
 

@@ -1510,10 +1510,19 @@ def _balanced_review_packet_items(
         or item.category in {"label_triggered_candidate", "confirm_trigger_event_time", "fill_trigger_outcomes"},
         triggered_limit,
     )
+    proxy_selected_before = len(selected)
     add_slice(
         "proxy_candidate",
-        lambda item, row: _is_proxy_candidate(row),
+        lambda item, row: _is_proxy_candidate(row) and _asset_role(row) == "proxy_instrument",
         proxy_limit,
+    )
+    proxy_remainder = None
+    if proxy_limit is not None:
+        proxy_remainder = max(0, proxy_limit - (len(selected) - proxy_selected_before))
+    add_slice(
+        "proxy_candidate",
+        lambda item, row: _is_proxy_candidate(row) and _asset_role(row) != "proxy_instrument",
+        proxy_remainder,
     )
     add_slice(
         "negative_control",
@@ -2425,6 +2434,10 @@ def _list_values(value: object) -> list[Any]:
 
 def _is_proxy_candidate(row: Mapping[str, Any]) -> bool:
     return _bool(row.get("is_proxy_narrative")) and not _bool(row.get("is_direct_beneficiary"))
+
+
+def _asset_role(row: Mapping[str, Any]) -> str:
+    return str(row.get("asset_role") or "").strip().casefold()
 
 
 def _is_direct_or_ambiguous(row: Mapping[str, Any]) -> bool:
