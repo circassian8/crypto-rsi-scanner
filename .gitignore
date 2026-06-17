@@ -14,6 +14,7 @@ universe_hygiene_latest.json
 backups/
 backtest_cache/
 event_fade_cache/
+crypto-rsi-scanner-source.zip
 
 # Python
 __pycache__/

@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Keep clean source export out of git status · Codex
+**Why:** Running `make export-src` correctly creates a tracked-source-only zip
+for external review, but the generated archive was left as an untracked file in
+`git status`.
+**Changes:**
+- Added `crypto-rsi-scanner-source.zip` to `.gitignore` while leaving the
+  existing `.gitattributes` export-ignore rule in place.
+- Ran the event-fade review-template preflight on the latest no-key bundle; it
+  correctly reports the untouched balanced sidecar is not ready to apply because
+  it has no human review fields yet.
+- Ran event-discovery status/runs checks to confirm no always-on configured
+  event sources are currently ready and the latest cache metadata is readable.
+**Verify:** `make export-src` wrote `crypto-rsi-scanner-source.zip`; archive
+inspection found no `.env`, `.venv`, DB, log, backup, pycache, pytest-cache, or
+event-fade-cache paths. `make verify` passed with 262/262 tests, alert render
+smoke, fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Process/docs only. The event-fade validation blocker remains
+human labeling of `/tmp/event_fade_no_key_review_bundle_20260617_external_assets`.
+
 ## 2026-06-17 — Refresh live paper and outcome status · Codex
 **Why:** Several roadmap items were waiting on live paper/outcome evidence. The
 current local DB had more matured paper trades available, so the waiting status
