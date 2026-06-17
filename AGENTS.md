@@ -281,6 +281,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `event_time_source`/`event_time_confidence` provenance in validation exports,
   and fade-candidate confidence is capped by event-time confidence so
   lower-confidence text dates cannot silently satisfy the event-confidence gate.
+  News/proxy providers may infer external assets from a conservative alias list
+  plus explicit IPO/exposure/prediction-market/sports-match phrasing; this only
+  improves radar/review rows and cannot bypass resolver confidence, proxy/direct
+  classification, or event-fade hard gates.
   Validation review reports cohort by event-time source and block promotion if
   reviewed `SHORT_TRIGGERED` rows have event-time confidence below the review
   threshold.

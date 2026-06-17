@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Broaden rule-based external asset extraction · Codex
+**Why:** The Pro-model review flagged that proxy-news discovery still depended
+too heavily on a short hardcoded external-asset list. That left likely future
+IPO/proxy candidates invisible unless the company name was already enumerated.
+**Changes:**
+- Expanded the news external-asset alias list with common private-company proxy
+  targets from the public RSS search set (`Stripe`, `Databricks`, `Anduril`,
+  `Figma`, `xAI`) plus `Kraken`.
+- Added conservative capitalized-entity extraction for explicit
+  IPO/public-debut, synthetic-exposure, tokenized-share, prediction-market, and
+  sports-match phrasing.
+- Reused the same extractor for live Polymarket/Gamma prediction-market rows.
+- Added regression tests for generic company names such as `Mercury` and
+  `Cerebras`, plus a `USA vs Paraguay` sports-match catalyst.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to document the extractor as
+  radar/review-only evidence.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 262/262.
+**Notes/risks:** This does not add providers, alerts, paper trades, or live
+routing. Extracted external assets still have to survive resolver confidence,
+proxy/direct classification, event-time confidence, and the event-fade hard
+gate before they can become anything beyond review evidence.
+
 ## 2026-06-17 — Add source providers to event-fade review aids · Codex
 **Why:** The review sidecar already summarized source origins, but reviewers
 also need provider visibility (`project_blog_rss`, `gdelt`,

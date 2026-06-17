@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 
 from ..event_models import RawDiscoveredEvent
 from ._external_common import fetch_external_events
+from ._news_common import infer_external_asset
 from .manual_json import content_hash, parse_datetime
 
 log = logging.getLogger(__name__)
@@ -226,7 +227,7 @@ def _external_asset_hint(title: str, body: str) -> str | None:
     ):
         if any(alias in text for alias in aliases):
             return name
-    return None
+    return infer_external_asset(f"{title} {body}")
 
 
 def _polymarket_event_url(slug: str) -> str | None:

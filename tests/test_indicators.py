@@ -2371,6 +2371,47 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     ).fetch_events(start, end) == []
 
 
+def test_event_discovery_news_external_asset_inference_handles_generic_ipo_entities():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner.event_providers._news_common import news_events_from_items
+
+    start = datetime(2026, 6, 16, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    rows = [
+        {
+            "id": "mercury-exposure",
+            "title": "TESTMERC offers synthetic exposure to Mercury before IPO on June 20, 2026",
+            "description": "The token is being used as a temporary proxy for Mercury pre-IPO demand.",
+            "url": "https://example.test/mercury-preipo",
+            "published_at": "2026-06-16T12:00:00Z",
+        },
+        {
+            "id": "cerebras-ipo-market",
+            "title": "Will Cerebras IPO before July 31?",
+            "description": "Prediction markets and crypto traders are watching the Cerebras public debut.",
+            "url": "https://example.test/cerebras-ipo",
+            "published_at": "2026-06-16T13:00:00Z",
+        },
+        {
+            "id": "team-match",
+            "title": "USA vs Paraguay match attracts fan token traders",
+            "description": "The match fixture is a dated external sports catalyst.",
+            "url": "https://example.test/usa-paraguay",
+            "published_at": "2026-06-16T14:00:00Z",
+        },
+    ]
+
+    events = news_events_from_items(rows, provider="project_blog_rss", start=start, end=end)
+    by_id = {event.raw_id: event for event in events}
+    assert by_id["project_blog_rss:mercury-exposure"].raw_json["event"]["external_asset"] == "Mercury"
+    assert by_id["project_blog_rss:mercury-exposure"].raw_json["event"]["event_type"] == "ipo_proxy"
+    assert by_id["project_blog_rss:mercury-exposure"].raw_json["event"]["event_time"] == "2026-06-20T00:00:00+00:00"
+    assert by_id["project_blog_rss:cerebras-ipo-market"].raw_json["event"]["external_asset"] == "Cerebras"
+    assert by_id["project_blog_rss:cerebras-ipo-market"].raw_json["event"]["event_type"] == "ipo_proxy"
+    assert by_id["project_blog_rss:team-match"].raw_json["event"]["external_asset"] == "USA vs Paraguay"
+    assert by_id["project_blog_rss:team-match"].raw_json["event"]["event_type"] == "sports_event"
+
+
 def test_event_discovery_proxy_article_with_text_date_becomes_dated_review_candidate():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -2917,6 +2958,52 @@ def test_event_discovery_prediction_market_live_provider_parses_polymarket_offli
         live_enabled=True,
         opener=failing_opener,
     ).fetch_events(start, end) == []
+
+
+def test_event_discovery_prediction_market_external_asset_infers_generic_ipo_entity():
+    import json
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner.event_providers.prediction_market_events import PredictionMarketEventsProvider
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def fake_opener(_request, _timeout):
+        return FakeResponse([{
+            "id": "cerebras-ipo",
+            "slug": "will-cerebras-ipo-before-july",
+            "title": "Will Cerebras IPO before July 31?",
+            "description": "Prediction markets are tracking the Cerebras public debut.",
+            "createdAt": "2026-06-15T08:00:00Z",
+            "endDate": "2026-06-20T23:59:00Z",
+        }])
+
+    events = PredictionMarketEventsProvider(
+        None,
+        live_enabled=True,
+        opener=fake_opener,
+        fetched_at=datetime(2026, 6, 16, 10, 0, tzinfo=timezone.utc),
+    ).fetch_events(
+        datetime(2026, 6, 16, tzinfo=timezone.utc),
+        datetime(2026, 6, 30, tzinfo=timezone.utc),
+    )
+
+    assert len(events) == 1
+    assert events[0].raw_json["event"]["event_type"] == "ipo_proxy"
+    assert events[0].raw_json["event"]["external_asset"] == "Cerebras"
+    assert events[0].source_url == "https://polymarket.com/event/will-cerebras-ipo-before-july"
 
 
 def test_event_discovery_external_catalysts_are_radar_first_and_link_narrowly():

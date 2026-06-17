@@ -204,8 +204,12 @@ When a proxy-style article has strong narrative evidence but no precise
 `event_time`, it may remain in the validation sample as a `proxy_attention` row.
 That is review evidence only: the pure event-fade engine still requires a known
 event time before a candidate can become eligible or leave `NO_TRADE`. The news
-parser infers only a small set of common external assets such as SpaceX, OpenAI,
-Anthropic, Tesla, Nvidia, World Cup, Champions League, Iran, and US election.
+parser infers a conservative set of common external assets such as SpaceX,
+OpenAI, Anthropic, Stripe, Databricks, Anduril, Figma, xAI, Tesla, Nvidia,
+World Cup, Champions League, Iran, and US election. It also extracts simple
+capitalized entities only when they sit next to explicit proxy-catalyst language
+such as synthetic exposure, tokenized shares, prediction markets, IPO/public
+debut wording, or `Team A vs Team B` sports-match phrasing.
 The resolver also rejects common identity words observed in public feeds
 (`cash`, `real`, `just`, `humanity`) so they do not become high-confidence
 asset matches from normal prose.

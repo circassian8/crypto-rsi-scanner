@@ -20,6 +20,12 @@ EXTERNAL_ASSET_ALIASES = (
     ("SpaceX", ("spacex", "spcx")),
     ("OpenAI", ("openai", "open ai", "chatgpt")),
     ("Anthropic", ("anthropic", "claude")),
+    ("Stripe", ("stripe",)),
+    ("Databricks", ("databricks",)),
+    ("Anduril", ("anduril",)),
+    ("Figma", ("figma",)),
+    ("xAI", ("xai", "x.ai")),
+    ("Kraken", ("kraken",)),
     ("Tesla", ("tesla",)),
     ("Nvidia", ("nvidia",)),
     ("World Cup", ("world cup",)),
@@ -27,6 +33,47 @@ EXTERNAL_ASSET_ALIASES = (
     ("Iran", ("iran",)),
     ("US election", ("us election", "u.s. election", "presidential election")),
 )
+
+_ENTITY_TOKEN = r"(?:xAI|XAI|[A-Z][A-Za-z0-9&.'-]*)"
+_ENTITY_PHRASE = rf"{_ENTITY_TOKEN}(?:\s+{_ENTITY_TOKEN}){{0,3}}"
+_EXPOSURE_ENTITY_RE = re.compile(
+    rf"\b(?i:synthetic exposure to|exposure to|pre-ipo access to|pre IPO access to|"
+    rf"tokenized shares? of|tokenized stock of|stock token tied to|market for|"
+    rf"perpetual market for|prediction market for|bet on|bets on)\s+(?P<entity>{_ENTITY_PHRASE})\b",
+)
+_IPO_ENTITY_BEFORE_RE = re.compile(
+    rf"\b(?P<entity>{_ENTITY_PHRASE})\s+(?i:IPO|pre-IPO|pre IPO|public debut|direct listing)\b",
+)
+_IPO_ENTITY_AFTER_RE = re.compile(
+    rf"\b(?i:IPO of|IPO for|pre-IPO shares of|pre IPO shares of|public debut of)\s+"
+    rf"(?P<entity>{_ENTITY_PHRASE})\b",
+)
+_SPORTS_MATCH_RE = re.compile(
+    rf"\b(?P<home>{_ENTITY_PHRASE})\s+(?i:vs\.?|v\.?)\s+(?P<away>{_ENTITY_PHRASE})\b",
+)
+_GENERIC_ENTITY_WORDS = {
+    "A",
+    "An",
+    "And",
+    "Before",
+    "Coin",
+    "Crypto",
+    "ETF",
+    "Event",
+    "Exchange",
+    "Launch",
+    "Market",
+    "Markets",
+    "News",
+    "Prediction",
+    "Protocol",
+    "Shares",
+    "Stock",
+    "Token",
+    "Trade",
+    "Trading",
+    "Will",
+}
 
 _MONTHS = {
     "jan": 1,
@@ -199,9 +246,16 @@ def _raw_event_from_row(row: Mapping[str, Any], provider: str) -> RawDiscoveredE
 
 
 def _infer_event_payload(title: str, body: str, row: Mapping[str, Any]) -> dict[str, Any]:
-    text = clean_text(f"{title} {body}")
+    raw_text = f"{title} {body}"
+    text = clean_text(raw_text)
     event_type = "other"
-    if any(token in text for token in ("pre ipo", "pre-ipo", "tokenized stock", "synthetic exposure")):
+    if any(token in text for token in (
+        "pre ipo",
+        "pre-ipo",
+        "tokenized stock",
+        "synthetic exposure",
+        "public debut",
+    )) or re.search(r"\bipo\b", text):
         event_type = "ipo_proxy"
     elif any(token in text for token in ("prediction market", "election", "inauguration")):
         event_type = "political_event"
@@ -227,7 +281,7 @@ def _infer_event_payload(title: str, body: str, row: Mapping[str, Any]) -> dict[
         )
         event_time = _infer_text_event_time(title, body, reference_time)
         event_time_source = "text_date" if event_time else None
-    external_asset = row.get("external_asset") or row.get("externalAsset") or _infer_external_asset(text)
+    external_asset = row.get("external_asset") or row.get("externalAsset") or infer_external_asset(raw_text)
     return {
         "event_name": str(row.get("event_name") or row.get("eventName") or title),
         "event_type": event_type,
@@ -240,11 +294,52 @@ def _infer_event_payload(title: str, body: str, row: Mapping[str, Any]) -> dict[
     }
 
 
-def _infer_external_asset(text: str) -> str | None:
+def infer_external_asset(text: str) -> str | None:
+    """Infer a likely external catalyst asset from clear proxy-event language."""
+    clean = clean_text(text)
     for name, aliases in EXTERNAL_ASSET_ALIASES:
-        if any(alias in text for alias in aliases):
+        if any(alias in clean for alias in aliases):
             return name
+    for pattern in (_EXPOSURE_ENTITY_RE, _IPO_ENTITY_BEFORE_RE, _IPO_ENTITY_AFTER_RE):
+        match = pattern.search(text)
+        if not match:
+            continue
+        entity = _normalized_external_entity(match.group("entity"))
+        if entity:
+            return entity
+    sports_match = _SPORTS_MATCH_RE.search(text)
+    if sports_match:
+        home = _normalized_external_entity(sports_match.group("home"))
+        away = _normalized_external_entity(sports_match.group("away"))
+        if home and away:
+            return f"{home} vs {away}"
     return None
+
+
+def _infer_external_asset(text: str) -> str | None:
+    return infer_external_asset(text)
+
+
+def _normalized_external_entity(value: object) -> str | None:
+    raw = str(value or "").strip()
+    raw = re.sub(r"^[\"'“”‘’([{]+|[\"'“”‘’)\]},.:;!?]+$", "", raw)
+    raw = re.sub(r"'s\b", "", raw)
+    raw = re.sub(r"\s+", " ", raw).strip()
+    if not raw:
+        return None
+    words = raw.split()
+    while words and words[0] in _GENERIC_ENTITY_WORDS:
+        words.pop(0)
+    while words and words[-1] in _GENERIC_ENTITY_WORDS:
+        words.pop()
+    if not words:
+        return None
+    if all(word in _GENERIC_ENTITY_WORDS for word in words):
+        return None
+    entity = " ".join(words)
+    if len(entity) < 2:
+        return None
+    return "xAI" if entity.casefold() in {"xai", "x.ai"} else entity
 
 
 def _parse_time(value: object) -> datetime | None:
