@@ -190,7 +190,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `--export-priors registry_priors.json` (write reviewable registry calibration) ·
   `--fixture-dir fixtures/backtest_smoke` (offline Binance-path smoke) ·
   `--costs` / `--fee-bps` / `--slippage-bps` / `--max-trades-per-day`
-  (cost-aware research) · `--walk-forward` (chronological setup stability) ·
+  (cost-aware research) · `--walk-forward` (chronological setup and
+  setup×BTC-market stability) ·
   `--min-signals N` (fail if a smoke run produces too few graded observations)
 - **Deploy:** the scan agent (`com.nasrenkaraf.rsiscanner`) auto-loads new code on
   its next run (03:10 MSK). The **listener must be restarted** to pick up code:
@@ -467,8 +468,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   BULL/CHOP/BEAR all covered): the gating map held (mean_reversion CHOP +10
   n=800; breakdown_risk no edge anywhere). Its prior export
   (`research/registry_priors_volpit_2026-06-10.json`) supersedes the bear-only
-  one for review; still NOT live-loaded. `research/PIT_DATA_OPTIONS_2026-06-09.md`
-  is historical context. Residual caveats: delisted pairs absent, single venue,
+  one for review; still NOT live-loaded. `research/VOLUME_PIT_WALK_FORWARD_2026-06-17.md`
+  confirms the CHOP mean_reversion edge was positive in every eligible
+  chronological test fold on the same top-100/1825d volume-PIT configuration
+  (+2, +25, +26 edge). `research/PIT_DATA_OPTIONS_2026-06-09.md` is historical
+  context. Residual caveats: delisted pairs absent, single venue,
   volume-rank ≠ live mcap universe.
 - **Confirmation entry trigger** was A/B'd and **rejected** (no improvement) — do
   not re-add without new evidence.

@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add market-regime walk-forward backtest output · Codex
+**Why:** The remaining non-human research follow-up was to verify whether the
+volume-PIT `mean_reversion`×`CHOP` edge was temporally stable or concentrated in
+one episode. The existing walk-forward table was setup-level only, so it could
+not answer the CHOP-specific question directly.
+**Changes:**
+- Added setup×BTC-market walk-forward reporting to `backtest --walk-forward`,
+  using the same full-period same coin-regime×BTC-market base-rate convention as
+  the existing market-regime edge table.
+- Added unit coverage for the new market-regime walk-forward formatter.
+- Added `research/VOLUME_PIT_WALK_FORWARD_2026-06-17.md` with the comparable
+  top-100/1825d volume-PIT walk-forward result.
+- Updated `AGENTS.md` and `ROADMAP.md` with the result.
+**Verify:** `make verify` passed with 262/262 tests, alert render smoke, fixture
+backtest smoke, and paper scoreboard. `.venv/bin/python -m
+crypto_rsi_scanner.backtest --pit-volume --top-n 100 --days 1825
+--walk-forward` completed with 368 usable coins and 21,334 graded observations;
+`mean_reversion`×`CHOP` test-fold edges were +2, +25, +26.
+**Notes/risks:** Research/reporting only. This does not alter live conviction,
+routing, alerts, paper trading, or registry priors.
+
 ## 2026-06-17 — Surface external assets in event-fade review artifacts · Codex
 **Why:** The latest no-key review bundle had valid machine `external_asset`
 values, but the editable review sidecars and packets did not show them. That

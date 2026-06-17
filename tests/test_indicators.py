@@ -7502,6 +7502,7 @@ def test_backtest_cost_and_walk_forward_reports():
         signals.append({
             "setup": setup,
             "exp": exp,
+            "regime": "UPTREND" if setup == "dip_buy" else "DOWNTREND",
             "h": 7,
             "ret": ret,
             "fav": 1,
@@ -7522,6 +7523,17 @@ def test_backtest_cost_and_walk_forward_reports():
     wf = backtest.format_walk_forward(signals, folds=4)
     assert "Walk-forward setup stability" in wf
     assert "Train = all earlier folds" in wf
+
+    mkt_base = {
+        ("UPTREND", "BULL", 7): [1.0, -1.0] * 10,
+        ("DOWNTREND", "BEAR", 7): [1.0, -1.0] * 10,
+    }
+    mkt_wf = backtest.format_market_walk_forward(signals, mkt_base, folds=4, min_test_n=1)
+    assert "Walk-forward setup × MARKET regime stability" in mkt_wf
+    assert "Base = full-period same coin-regime × BTC-market base" in mkt_wf
+    assert "dip_buy" in mkt_wf
+    assert "BULL" in mkt_wf
+    assert "+50" in mkt_wf
 
 
 def test_backtest_pit_membership():

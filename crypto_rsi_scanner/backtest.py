@@ -834,13 +834,7 @@ def summarize_market(signals: list, mkt_base: dict, horizon: int) -> list[dict]:
     """Per (setup, market regime): confirm% vs a base rate conditioned on the
     SAME (coin-regime, market-regime). This separates bull/bear so a setup that
     only works in one regime can't hide inside a blended average."""
-    bconf: dict = {}
-    for (regime, mkt, h), rets in mkt_base.items():
-        arr = np.asarray(rets, dtype=float)
-        if not len(arr):
-            continue
-        bconf[(regime, mkt, h, "up")] = float((arr > 0).mean())
-        bconf[(regime, mkt, h, "down")] = float((arr < 0).mean())
+    bconf = _market_base_conf(mkt_base)
 
     groups: dict = defaultdict(list)
     for s in signals:
@@ -850,13 +844,28 @@ def summarize_market(signals: list, mkt_base: dict, horizon: int) -> list[dict]:
     rows = []
     for (setup, mkt), sigs in sorted(groups.items()):
         conf = 100.0 * statistics.fmean(s["fav"] for s in sigs)
-        base = 100.0 * statistics.fmean(
-            bconf.get((s["regime"], mkt, horizon, s["exp"]), 0.0) for s in sigs
-        )
+        base = _market_base_for_signals(sigs, bconf, horizon)
         rows.append({"setup": setup, "mkt": mkt, "n": len(sigs), "conf": conf,
                      "base": base, "edge": conf - base,
                      "med": statistics.median(s["ret"] for s in sigs)})
     return rows
+
+
+def _market_base_conf(mkt_base: dict) -> dict:
+    bconf: dict = {}
+    for (regime, mkt, h), rets in mkt_base.items():
+        arr = np.asarray(rets, dtype=float)
+        if not len(arr):
+            continue
+        bconf[(regime, mkt, h, "up")] = float((arr > 0).mean())
+        bconf[(regime, mkt, h, "down")] = float((arr < 0).mean())
+    return bconf
+
+
+def _market_base_for_signals(sigs: list[dict], bconf: dict, horizon: int) -> float:
+    return 100.0 * statistics.fmean(
+        bconf.get((s["regime"], s.get("mkt"), horizon, s["exp"]), 0.0) for s in sigs
+    )
 
 
 def summarize_state_slices(
@@ -1240,6 +1249,34 @@ def _setup_confirm(rows: list[dict], setup: str) -> dict | None:
     }
 
 
+def _setup_market_edge(
+    rows: list[dict],
+    setup: str,
+    mkt: str,
+    bconf: dict,
+    horizon: int,
+) -> dict | None:
+    sub = [
+        s for s in rows
+        if (
+            s["setup"] == setup
+            and s.get("mkt") == mkt
+            and s.get("mkt") not in (None, "", "NA")
+        )
+    ]
+    if not sub:
+        return None
+    conf = 100.0 * statistics.fmean(s["fav"] for s in sub)
+    base = _market_base_for_signals(sub, bconf, horizon)
+    return {
+        "n": len(sub),
+        "conf": conf,
+        "base": base,
+        "edge": conf - base,
+        "med_dir": statistics.median(_dir_ret(s) for s in sub),
+    }
+
+
 def format_walk_forward(signals: list, *, horizon: int = PRIMARY, folds: int = 4) -> str:
     """Simple time-split check: do setup hit-rates persist into the next fold?"""
     split = _time_folds(signals, folds, horizon)
@@ -1262,6 +1299,61 @@ def format_walk_forward(signals: list, *, horizon: int = PRIMARY, folds: int = 4
                 f"  {i:<6}{setup:<19}{tr['n']:>7}{tr['conf']:>7.0f}%"
                 f"{te['n']:>7}{te['conf']:>7.0f}%{te['med_dir']:>+8.1f}%"
             )
+    return "\n".join(out)
+
+
+def format_market_walk_forward(
+    signals: list,
+    mkt_base: dict,
+    *,
+    horizon: int = PRIMARY,
+    folds: int = 4,
+    min_test_n: int = 8,
+) -> str:
+    """Chronological setup x BTC-market stability, with edge vs same-market base."""
+    split = _time_folds(signals, folds, horizon)
+    out = [
+        f"\nWalk-forward setup × MARKET regime stability at {horizon}d "
+        f"({len(split)} time folds):"
+    ]
+    if len(split) < 2:
+        out.append("  Not enough timestamped signals for market-regime walk-forward analysis.")
+        return "\n".join(out)
+    if not mkt_base:
+        out.append("  No market-regime base rates available.")
+        return "\n".join(out)
+    bconf = _market_base_conf(mkt_base)
+    setups = sorted({s["setup"] for s in signals if s["h"] == horizon})
+    mkts = sorted({
+        s.get("mkt")
+        for s in signals
+        if s["h"] == horizon and s.get("mkt") not in (None, "", "NA")
+    })
+    out.append(
+        "  Base = full-period same coin-regime × BTC-market base; "
+        f"rows need testN >= {min_test_n}."
+    )
+    out.append(
+        f"  {'fold':<6}{'setup':<19}{'mkt':<7}{'trainN':>7}{'trainEdge':>11}"
+        f"{'testN':>7}{'testEdge':>10}{'testMed':>9}"
+    )
+    printed = 0
+    for i in range(1, len(split)):
+        train = [s for f in split[:i] for s in f]
+        test = split[i]
+        for setup in setups:
+            for mkt in mkts:
+                tr = _setup_market_edge(train, setup, mkt, bconf, horizon)
+                te = _setup_market_edge(test, setup, mkt, bconf, horizon)
+                if not tr or not te or te["n"] < min_test_n:
+                    continue
+                printed += 1
+                out.append(
+                    f"  {i:<6}{setup:<19}{mkt:<7}{tr['n']:>7}{tr['edge']:>+10.0f}"
+                    f"{te['n']:>7}{te['edge']:>+9.0f}{te['med_dir']:>+8.1f}%"
+                )
+    if not printed:
+        out.append("  No setup × market-regime folds met the minimum test sample size.")
     return "\n".join(out)
 
 
@@ -2030,6 +2122,13 @@ def main(argv=None) -> None:
             horizon=PRIMARY,
             folds=args.walk_forward_folds,
         ))
+        if mkt_base:
+            print(format_market_walk_forward(
+                signals,
+                mkt_base,
+                horizon=PRIMARY,
+                folds=args.walk_forward_folds,
+            ))
 
     if args.export_priors:
         payload = build_registry_prior_export(
