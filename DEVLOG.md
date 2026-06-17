@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add review-bundle Make wrappers · Codex
+**Why:** After a human labels the event-fade sidecar, the next commands should
+be hard to mistype. The existing Make targets required passing three separate
+sample/template/output paths.
+**Changes:**
+- Added `event-fade-check-review-bundle`, `event-fade-apply-review-bundle`, and
+  `event-fade-review-applied-bundle` targets driven by
+  `EVENT_FADE_REVIEW_BUNDLE_DIR`.
+- Updated the event-fade review quickstart to use the new bundle-oriented
+  targets.
+- Added Makefile regression coverage for the new dry-run path expansion.
+**Verify:** `make -n event-fade-check-review-bundle` expands to the expected
+latest-bundle check command. `make verify` passed with 262/262 tests, alert
+render smoke, fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Workflow-only. No labels were inferred or applied; event fade
+remains research-only with no alerts, live DB writes, paper trades, or
+promotion.
+
 ## 2026-06-17 — Add event-fade review quickstart · Codex
 **Why:** The Pro-plan blocker is now human labeling. The latest `/tmp` bundle has
 instructions, but a checked-in quickstart makes the handoff durable and gives

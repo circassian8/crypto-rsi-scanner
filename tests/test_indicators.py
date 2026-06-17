@@ -139,6 +139,12 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD" in makefile
     assert "event-fade-check-review-template:" in makefile
     assert "--event-fade-check-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE)" in makefile
+    assert "event-fade-check-review-bundle:" in makefile
+    assert "--event-fade-check-review-template $(EVENT_FADE_REVIEW_BUNDLE_SAMPLE) $(EVENT_FADE_REVIEW_BUNDLE_TEMPLATE)" in makefile
+    assert "event-fade-apply-review-bundle:" in makefile
+    assert "--event-fade-apply-review-template $(EVENT_FADE_REVIEW_BUNDLE_SAMPLE) $(EVENT_FADE_REVIEW_BUNDLE_TEMPLATE) $(EVENT_FADE_REVIEW_BUNDLE_APPLIED)" in makefile
+    assert "event-fade-review-applied-bundle:" in makefile
+    assert "--event-fade-review-sample $(EVENT_FADE_REVIEW_BUNDLE_APPLIED)" in makefile
     assert "Run 'make bootstrap' or override with 'make verify PYTHON=python3'." in makefile
 
     export_dry = subprocess.run(
@@ -159,6 +165,25 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     )
     assert "python3 tests/test_indicators.py" in verify_dry.stdout
     assert ".venv/bin/python tests/test_indicators.py" not in verify_dry.stdout
+
+    bundle_check_dry = subprocess.run(
+        [
+            "make",
+            "-n",
+            "event-fade-check-review-bundle",
+            "PYTHON=python3",
+            "EVENT_FADE_REVIEW_BUNDLE_DIR=/tmp/review_bundle",
+        ],
+        cwd=root,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    assert (
+        "python3 main.py --event-fade-check-review-template "
+        "/tmp/review_bundle/validation_sample.jsonl "
+        "/tmp/review_bundle/review_template_balanced.csv"
+    ) in bundle_check_dry.stdout
 
 
 def test_state_features_cross_sectional_ranks_monotonic():

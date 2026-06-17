@@ -79,25 +79,22 @@ From the repo root:
 ```bash
 cd /Users/nasrenkaraf/crypto-rsi-scanner
 
-.venv/bin/python main.py --event-fade-check-review-template \
-  /tmp/event_fade_no_key_review_bundle_20260617_continue/validation_sample.jsonl \
-  /tmp/event_fade_no_key_review_bundle_20260617_continue/review_template_balanced.csv
+EVENT_FADE_REVIEW_BUNDLE_DIR=/tmp/event_fade_no_key_review_bundle_20260617_continue \
+  make event-fade-check-review-bundle
 ```
 
 If the check passes, apply the sidecar:
 
 ```bash
-.venv/bin/python main.py --event-fade-apply-review-template \
-  /tmp/event_fade_no_key_review_bundle_20260617_continue/validation_sample.jsonl \
-  /tmp/event_fade_no_key_review_bundle_20260617_continue/review_template_balanced.csv \
-  /tmp/event_fade_no_key_review_bundle_20260617_continue/validation_sample_reviewed.jsonl
+EVENT_FADE_REVIEW_BUNDLE_DIR=/tmp/event_fade_no_key_review_bundle_20260617_continue \
+  make event-fade-apply-review-bundle
 ```
 
 Then review promotion blockers:
 
 ```bash
-.venv/bin/python main.py --event-fade-review-sample \
-  /tmp/event_fade_no_key_review_bundle_20260617_continue/validation_sample_reviewed.jsonl
+EVENT_FADE_REVIEW_BUNDLE_DIR=/tmp/event_fade_no_key_review_bundle_20260617_continue \
+  make event-fade-review-applied-bundle
 ```
 
 If the reviewed sample later has `SHORT_TRIGGERED` rows, fill outcomes from local
@@ -115,4 +112,3 @@ prices before considering promotion:
 Do not promote event fade to Telegram, paper tracking, live DB writes, or any
 execution path until the review report clears the required proxy/control/trigger
 coverage, timing, diversity, and outcome gates.
-
