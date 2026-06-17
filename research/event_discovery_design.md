@@ -646,6 +646,8 @@ workspace for a validation sample. The bundle contains:
   outcomes
 - `review_packet.md`: human-readable evidence packet
 - `review_template.csv`: compact editable sidecar
+- `review_packet_balanced.md`: human-readable evidence packet matching the
+  gate-balanced sidecar
 - `review_template_balanced.csv`: gate-balanced editable sidecar with triggered
   rows, proxy candidates, and direct/ambiguous negative controls
 - `review_report.txt`: current metrics and promotion blockers

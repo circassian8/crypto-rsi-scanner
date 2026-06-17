@@ -533,54 +533,18 @@ def build_balanced_review_template_rows(
     triggered_limit: int | None = None,
 ) -> list[dict[str, Any]]:
     """Build a review sidecar that samples the validation gates, not just priority order."""
-    data = [dict(row) for row in rows]
-    pairs = _review_packet_items(data, limit=None)
-    selected: list[dict[str, Any]] = []
-    used: set[tuple[str, str, str, str]] = set()
-
-    def pair_key(item: ValidationLabelingQueueItem) -> tuple[str, str, str, str]:
-        return (
-            item.event_id,
-            item.asset_coin_id,
-            item.relationship_type,
-            item.category,
+    return [
+        {
+            **_review_template_row(item, row),
+            "review_slice": review_slice,
+        }
+        for review_slice, item, row in _balanced_review_packet_items(
+            rows,
+            proxy_limit=proxy_limit,
+            control_limit=control_limit,
+            triggered_limit=triggered_limit,
         )
-
-    def add_slice(
-        review_slice: str,
-        predicate,
-        limit: int | None,
-    ) -> None:
-        added = 0
-        for item, row in pairs:
-            key = pair_key(item)
-            if key in used or not predicate(item, row):
-                continue
-            out = _review_template_row(item, row)
-            out["review_slice"] = review_slice
-            selected.append(out)
-            used.add(key)
-            added += 1
-            if limit is not None and added >= max(0, limit):
-                break
-
-    add_slice(
-        "triggered",
-        lambda item, row: _signal_type(row) == "SHORT_TRIGGERED"
-        or item.category in {"label_triggered_candidate", "confirm_trigger_event_time", "fill_trigger_outcomes"},
-        triggered_limit,
-    )
-    add_slice(
-        "proxy_candidate",
-        lambda item, row: _is_proxy_candidate(row),
-        proxy_limit,
-    )
-    add_slice(
-        "negative_control",
-        lambda item, row: _is_direct_or_ambiguous(row),
-        control_limit,
-    )
-    return selected
+    ]
 
 
 def format_review_template_jsonl(rows: Iterable[Mapping[str, Any]]) -> str:
@@ -736,6 +700,49 @@ def format_review_packet(
     out.append("")
     for idx, (item, row) in enumerate(pairs, 1):
         out.extend(_format_review_packet_row(idx, item, row))
+        out.append("")
+    return "\n".join(out).rstrip()
+
+
+def format_balanced_review_packet(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    proxy_limit: int | None = DEFAULT_BALANCED_PROXY_REVIEW_ROWS,
+    control_limit: int | None = DEFAULT_BALANCED_CONTROL_REVIEW_ROWS,
+    triggered_limit: int | None = None,
+) -> str:
+    """Format gate-balanced validation rows as a human-labeling Markdown packet."""
+    data = [dict(row) for row in rows]
+    pairs = _balanced_review_packet_items(
+        data,
+        proxy_limit=proxy_limit,
+        control_limit=control_limit,
+        triggered_limit=triggered_limit,
+    )
+    slice_counts: dict[str, int] = {}
+    for review_slice, _item, _row in pairs:
+        slice_counts[review_slice] = slice_counts.get(review_slice, 0) + 1
+    slice_summary = ", ".join(
+        f"{key}={value}" for key, value in sorted(slice_counts.items())
+    ) or "none"
+    out = [
+        "# Event-Fade Balanced Review Packet",
+        "",
+        "Research-only: no alerts, DB writes, paper trades, or orders.",
+        "",
+        (
+            f"Rows shown: {len(pairs)} | proxy_limit={proxy_limit} | "
+            f"control_limit={control_limit} | triggered_limit={triggered_limit or 'all'}"
+        ),
+        f"Slices: {slice_summary}",
+    ]
+    if not pairs:
+        out.extend(["", "No rows need balanced review."])
+        return "\n".join(out)
+
+    out.append("")
+    for idx, (review_slice, item, row) in enumerate(pairs, 1):
+        out.extend(_format_review_packet_row(idx, item, row, review_slice=review_slice))
         out.append("")
     return "\n".join(out).rstrip()
 
@@ -1279,10 +1286,62 @@ def _review_packet_items(
     return pairs[: max(0, limit)] if limit is not None else pairs
 
 
+def _balanced_review_packet_items(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    proxy_limit: int | None = DEFAULT_BALANCED_PROXY_REVIEW_ROWS,
+    control_limit: int | None = DEFAULT_BALANCED_CONTROL_REVIEW_ROWS,
+    triggered_limit: int | None = None,
+) -> list[tuple[str, ValidationLabelingQueueItem, Mapping[str, Any]]]:
+    pairs = _review_packet_items(rows, limit=None)
+    selected: list[tuple[str, ValidationLabelingQueueItem, Mapping[str, Any]]] = []
+    used: set[tuple[str, str, str, str]] = set()
+
+    def pair_key(item: ValidationLabelingQueueItem) -> tuple[str, str, str, str]:
+        return (
+            item.event_id,
+            item.asset_coin_id,
+            item.relationship_type,
+            item.category,
+        )
+
+    def add_slice(review_slice: str, predicate, limit: int | None) -> None:
+        added = 0
+        for item, row in pairs:
+            key = pair_key(item)
+            if key in used or not predicate(item, row):
+                continue
+            selected.append((review_slice, item, row))
+            used.add(key)
+            added += 1
+            if limit is not None and added >= max(0, limit):
+                break
+
+    add_slice(
+        "triggered",
+        lambda item, row: _signal_type(row) == "SHORT_TRIGGERED"
+        or item.category in {"label_triggered_candidate", "confirm_trigger_event_time", "fill_trigger_outcomes"},
+        triggered_limit,
+    )
+    add_slice(
+        "proxy_candidate",
+        lambda item, row: _is_proxy_candidate(row),
+        proxy_limit,
+    )
+    add_slice(
+        "negative_control",
+        lambda item, row: _is_direct_or_ambiguous(row),
+        control_limit,
+    )
+    return selected
+
+
 def _format_review_packet_row(
     idx: int,
     item: ValidationLabelingQueueItem,
     row: Mapping[str, Any],
+    *,
+    review_slice: str | None = None,
 ) -> list[str]:
     symbol = item.asset_symbol or "UNKNOWN"
     coin_id = item.asset_coin_id or "unknown"
@@ -1294,6 +1353,10 @@ def _format_review_packet_row(
         f"## {idx}. {symbol} - {event_name}",
         "",
         f"- Queue category: `{item.category}`",
+    ]
+    if review_slice:
+        fields.append(f"- Review slice: `{review_slice}`")
+    fields.extend([
         f"- Suggested label: `{item.suggested_label}`",
         f"- Missing fields: `{missing}`",
         f"- Current label: `{current_label}`",
@@ -1347,13 +1410,16 @@ def _format_review_packet_row(
             f"trigger edge=`{_fmt_pp(edge_72h[0] if edge_72h else None)}`"
         ),
         f"- Classifier reason: {_packet_text(row.get('classification_reason'))}",
-    ]
+    ])
     fields.extend(_packet_bullets("Classifier evidence", row.get("classification_evidence")))
     fields.extend(_packet_bullets("Reason codes", row.get("reason_codes")))
     fields.extend(_packet_bullets("Warnings", row.get("warnings")))
     fields.extend(_packet_bullets("Missing data", row.get("missing_data")))
     fields.extend(_packet_bullets("Sources", row.get("source_urls")))
     fields.extend(_packet_bullets("Source origins", source_origin_values(row)))
+    source_search = _source_search_url(row)
+    if source_search:
+        fields.append(f"- Source search: {source_search}")
     fields.extend(_packet_bullets("Raw titles", row.get("raw_titles")))
     fields.extend([
         "- Review fields to fill:",

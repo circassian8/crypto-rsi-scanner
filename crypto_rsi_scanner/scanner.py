@@ -1655,6 +1655,7 @@ def _write_event_fade_review_bundle(
 
     queue_path = bundle_dir / "labeling_queue.txt"
     packet_path = bundle_dir / "review_packet.md"
+    balanced_packet_path = bundle_dir / "review_packet_balanced.md"
     template_path = bundle_dir / "review_template.csv"
     balanced_template_path = bundle_dir / "review_template_balanced.csv"
     report_path = bundle_dir / "review_report.txt"
@@ -1664,6 +1665,10 @@ def _write_event_fade_review_bundle(
 
     queue_path.write_text(event_validation.format_labeling_queue(queue) + "\n", encoding="utf-8")
     packet_path.write_text(event_validation.format_review_packet(review_rows, limit=limit) + "\n", encoding="utf-8")
+    balanced_packet_path.write_text(
+        event_validation.format_balanced_review_packet(review_rows) + "\n",
+        encoding="utf-8",
+    )
     template_path.write_text(event_validation.format_review_template_csv(template_rows), encoding="utf-8")
     balanced_template_path.write_text(
         event_validation.format_review_template_csv(balanced_template_rows),
@@ -1680,6 +1685,7 @@ def _write_event_fade_review_bundle(
         outcome_sample=outcome_sample,
         queue_path=queue_path,
         packet_path=packet_path,
+        balanced_packet_path=balanced_packet_path,
         template_path=template_path,
         balanced_template_path=balanced_template_path,
         balanced_template_rows=len(balanced_template_rows),
@@ -1716,6 +1722,7 @@ def _write_event_fade_review_bundle(
             outcome_sample=outcome_sample,
             queue_path=queue_path,
             packet_path=packet_path,
+            balanced_packet_path=balanced_packet_path,
             template_path=template_path,
             balanced_template_path=balanced_template_path,
             report_path=report_path,
@@ -1752,6 +1759,7 @@ def _event_fade_review_bundle_manifest(
     outcome_sample: Path | None,
     queue_path: Path,
     packet_path: Path,
+    balanced_packet_path: Path,
     template_path: Path,
     balanced_template_path: Path,
     balanced_template_rows: int,
@@ -1781,6 +1789,7 @@ def _event_fade_review_bundle_manifest(
         "validation_sample": copied_sample.name,
         "labeling_queue": queue_path.name,
         "review_packet": packet_path.name,
+        "review_packet_balanced": balanced_packet_path.name,
         "review_template": template_path.name,
         "review_template_balanced": balanced_template_path.name,
         "review_report": report_path.name,
@@ -2151,6 +2160,7 @@ def _event_fade_review_bundle_readme(
     outcome_sample: Path | None,
     queue_path: Path,
     packet_path: Path,
+    balanced_packet_path: Path,
     template_path: Path,
     balanced_template_path: Path,
     report_path: Path,
@@ -2213,6 +2223,7 @@ def _event_fade_review_bundle_readme(
         outcome_line,
         f"- `{queue_path.name}`: prioritized queue for missing labels/status/outcomes",
         f"- `{packet_path.name}`: human-readable evidence packet",
+        f"- `{balanced_packet_path.name}`: human-readable evidence packet matching the balanced sidecar",
         f"- `{template_path.name}`: compact editable CSV sidecar",
         f"- `{balanced_template_path.name}`: gate-balanced editable CSV sidecar with proxy candidates and negative controls",
         f"- `{guide_path.name}`: label taxonomy, review provenance, and event-time review rules",
@@ -2221,7 +2232,7 @@ def _event_fade_review_bundle_readme(
         "",
         "Suggested workflow:",
         "1. Read `review_guide.md` for label and timing rules.",
-        "2. Read `review_packet.md` for row evidence.",
+        "2. Read `review_packet_balanced.md` for evidence matching `review_template_balanced.csv`; use `review_packet.md` for strict priority rows.",
         "3. For fastest promotion-gate coverage, edit `review_template_balanced.csv`; for strict priority order, edit `review_template.csv`.",
         "4. Fill `review_status`, `reviewed_by`, `reviewed_at`, `human_label`, `human_notes`, any human event-time confirmation, and any missing outcomes. Use `primary_source_url`, `source_search_url`, `primary_raw_title`, `review_prompt`, and `event_time_review_hint` as reviewer aids only.",
         "5. Apply the edited sidecar with `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`.",

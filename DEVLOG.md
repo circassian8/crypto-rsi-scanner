@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add balanced event-fade review packet · Codex
+**Why:** The balanced review CSV is now the preferred handoff for building the
+proxy/control validation sample, but its matching evidence packet was still the
+strict-priority packet. Reviewers need a Markdown packet with the same rows and
+slice labels as `review_template_balanced.csv`.
+**Changes:**
+- Added `format_balanced_review_packet()` and shared balanced-row selection for
+  the balanced review sidecar and packet.
+- Event-fade review bundles now write `review_packet_balanced.md`, include it in
+  `manifest.json`, and point the README workflow at it.
+- Review packets now include the derived `source_search_url` helper line when
+  available, so Google News/feed wrapper rows can be checked from Markdown too.
+- Updated bundle tests plus `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+- Refreshed the latest no-key review bundle into
+  `/tmp/event_fade_no_key_review_bundle_20260617_032443_balanced_packet`; its
+  balanced sidecar and balanced packet cover 75 gate rows: 25 proxy candidates
+  and 50 controls.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 255/255
+tests. The regenerated bundle manifest includes `review_packet_balanced.md`.
+**Notes/risks:** Review workflow only. No labels are inferred, no live storage
+or alerts are written, no paper trades are opened, and event-fade promotion
+remains blocked on human-reviewed evidence.
+
 ## 2026-06-17 — Add source search links to review sidecars · Codex
 **Why:** The latest balanced review bundle has many Google News/feed wrapper
 links, which slows human review because the canonical article can be harder to
