@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Refresh no-key event-fade review bundle · Codex
+**Why:** The Pro-model plan calls for running discovery cycles and building a
+reviewed validation sample. The previous bundle was already stale relative to
+the current source mix and sidecar preflight workflow.
+**Changes:**
+- Ran `make event-fade-no-key-review-cycle` with a fresh temp cache and
+  1h outcome-price export enabled.
+- Produced `/tmp/event_fade_no_key_review_bundle_20260617_050822_fresh` from
+  public RSS, GDELT, and Polymarket no-key sources.
+- The bundle has 128 validation rows: 26 proxy candidates, 21 proxy-context
+  controls, 8 direct rows, 73 ambiguous rows, 124 missing machine event times,
+  0 eligible rows, and 0 triggers.
+- The balanced sidecar still provides 75 review rows: 25 proxy candidates and
+  50 controls. Its README/guide include the sidecar preflight command before
+  apply.
+- Updated `ROADMAP.md` so the human labeling task points at the fresh bundle.
+**Verify:** Inspected the generated `manifest.json`, `review_report.txt`,
+`labeling_queue.txt`, and `review_template_balanced.csv`. The bundle manifest
+shows 128 sample rows and 75 balanced review rows; the balanced sidecar has 13
+source date hints. `make verify` passes with 259/259 tests plus alert render
+smoke, fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Artifact refresh only. It does not infer labels, promote
+event-fade, route alerts, write live signal/paper tables, or open paper trades.
+The validation plan remains blocked on human labels and confirmed event times.
+
 ## 2026-06-17 — Add review sidecar preflight check · Codex
 **Why:** The remaining event-fade work depends on human-edited sidecars. Before
 those labels are copied into validation samples, reviewers need a dry check that
