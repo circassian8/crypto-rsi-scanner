@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Refresh no-key event-fade review bundle · Codex
+**Why:** The Pro-model plan now depends on building a reviewed event-fade
+validation sample, so the shared roadmap should point at the freshest no-key
+research bundle rather than stale local output.
+**Changes:**
+- Ran `make event-fade-no-key-review-cycle` into a fresh `/tmp` cache/bundle path
+  with outcome-price export enabled.
+- Updated `ROADMAP.md` with the new bundle path, counts, and GDELT rate-limit
+  diagnostic.
+**Verify:** The refresh wrote
+  `/tmp/event_fade_no_key_review_bundle_20260617_continue` with 120 validation
+  rows, 24 proxy candidates, 20 proxy-context controls, 8 direct rows, 68
+  ambiguous rows, 116 missing machine event times, 0 eligible rows, and 0
+  triggers. The balanced sidecar has 74 rows and `--event-fade-check-review-template`
+  correctly reports it is not ready to apply because no human review fields have
+  been filled yet. `make verify` passed with 262/262 tests, alert render smoke,
+  fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Research artifact/status only. No alerts, live DB writes, paper
+trades, routing, or promotion. Human review remains the blocker before outcome
+filling or any event-fade promotion.
+
 ## 2026-06-17 — Keep clean source export out of git status · Codex
 **Why:** Running `make export-src` correctly creates a tracked-source-only zip
 for external review, but the generated archive was left as an untracked file in
