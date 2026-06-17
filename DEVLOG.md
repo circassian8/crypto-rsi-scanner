@@ -17,6 +17,24 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Refresh live paper and outcome status · Codex
+**Why:** Several roadmap items were waiting on live paper/outcome evidence. The
+current local DB had more matured paper trades available, so the waiting status
+needed a fresh evidence check.
+**Changes:**
+- Ran `main.py --refresh-paper`, which fetched 16/16 open histories and closed
+  4 more paper trades.
+- Checked `main.py --score --cohorts`, `main.py --report`, and `main.py --status`.
+- Updated `ROADMAP.md` with the current paper, conviction-bucket, and state-cohort
+  sample sizes while keeping those items waiting.
+**Verify:** `main.py --refresh-paper` completed; paper book is now 11 closed /
+12 open. `main.py --report` shows 102 matured 7d observations, with conviction
+buckets low 8 / med 81 / high 13. `main.py --status` reports health OK.
+`make verify` passed with 262/262 tests, alert render smoke, fixture backtest
+smoke, and paper scoreboard.
+**Notes/risks:** Docs/status only. No signal logic, registry priors, routing, or
+state-conditioned live rules changed; samples remain too small for promotion.
+
 ## 2026-06-17 — Add market-regime walk-forward backtest output · Codex
 **Why:** The remaining non-human research follow-up was to verify whether the
 volume-PIT `mean_reversion`×`CHOP` edge was temporally stable or concentrated in
