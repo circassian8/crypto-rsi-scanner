@@ -560,15 +560,16 @@ Queue priority is:
 1. unknown `human_label` values
 2. rows marked `review_status=reviewed` but missing `human_label`
 3. labeled rows missing `review_status=reviewed`
-4. reviewed rows with point-in-time evidence violations
-5. reviewed rows with any source evidence after the decision time
-6. reviewed rows missing source timing evidence
-7. unlabeled `SHORT_TRIGGERED` rows
-8. reviewed `SHORT_TRIGGERED` rows missing required outcome fields:
+4. reviewed rows missing `reviewed_by` or `reviewed_at`
+5. reviewed rows with point-in-time evidence violations
+6. reviewed rows with any source evidence after the decision time
+7. reviewed rows missing source timing evidence
+8. unlabeled `SHORT_TRIGGERED` rows
+9. reviewed `SHORT_TRIGGERED` rows missing required outcome fields:
    `max_adverse_excursion`, `max_favorable_excursion`, and
    `post_event_return_72h`
-9. unlabeled proxy candidates
-10. unlabeled direct/ambiguous negative controls
+10. unlabeled proxy candidates
+11. unlabeled direct/ambiguous negative controls
 
 The report shows the event, asset, signal type, relationship, event time,
 trigger time, missing fields, suggested label category, and source URLs. It is a
@@ -703,8 +704,8 @@ does not promote event-fade output automatically.
 The reviewer currently checks:
 
 - reviewed rows vs unreviewed/incomplete rows
-- labeled rows missing `review_status=reviewed`, and rows marked reviewed but
-  missing `human_label`
+- labeled rows missing `review_status=reviewed`, rows marked reviewed but
+  missing `human_label`, and reviewed rows missing `reviewed_by`/`reviewed_at`
 - reviewed proxy candidate count against the 25-case minimum target
 - reviewed direct/ambiguous control count against the 50-case minimum target
 - label counts for `valid_proxy_fade`, `false_positive`, `direct_event`, and

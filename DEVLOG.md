@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Gate event-fade promotion on review provenance · Codex
+**Why:** Review provenance fields existed, but a reviewed row missing
+`reviewed_by` or `reviewed_at` could still look mechanically complete in review
+metrics. The validation sample needs auditable labels before any future
+promotion decision.
+**Changes:**
+- Added `missing_review_provenance_rows` to event-fade validation review metrics,
+  formatted reports, bundle manifests, and bundle README gate summaries.
+- Added a promotion blocker and next-sample-work item for reviewed rows missing
+  `reviewed_by`/`reviewed_at`.
+- Added an `add_review_provenance` labeling-queue category before PIT/source
+  checks so incomplete reviewed rows surface in review packets/templates.
+- Updated `AGENTS.md`, `ROADMAP.md`, `research/event_discovery_design.md`, and
+  the bundle guide to treat review provenance as a promotion blocker.
+- Added regression coverage for missing provenance blocking promotion and being
+  prioritized in the queue.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 254/254
+tests, and `make verify` passes.
+**Notes/risks:** This is artifact-only. It does not change event-fade scoring,
+eligibility, live routing, storage, paper trading, or execution.
+
 ## 2026-06-17 — Add event-fade review provenance fields · Codex
 **Why:** The validation workflow can preserve labels and outcomes across fresh
 exports, but those labels were not traceable to a reviewer or review time. That

@@ -36,10 +36,13 @@ REQUIRED_TRIGGER_OUTCOME_FIELDS = (
 REQUIRED_EVENT_TIME_BASELINE_FIELDS = (
     "event_time_post_event_return_72h",
 )
-REVIEW_FIELDS = (
-    "review_status",
+REVIEW_PROVENANCE_FIELDS = (
     "reviewed_by",
     "reviewed_at",
+)
+REVIEW_FIELDS = (
+    "review_status",
+    *REVIEW_PROVENANCE_FIELDS,
     "human_label",
     "human_notes",
     "max_adverse_excursion",
@@ -171,6 +174,7 @@ class EventFadeValidationReview:
     unlabeled_rows: int
     missing_review_status_rows: int
     missing_human_label_rows: int
+    missing_review_provenance_rows: int
     schema_mismatches: int
     unknown_label_rows: int
     label_counts: dict[str, int]
@@ -693,6 +697,9 @@ def review_validation_sample(
         for row in data
         if _is_reviewed_evidence(row)
     ]
+    missing_review_provenance_rows = sum(
+        1 for row in reviewed if _missing_review_provenance_fields(row)
+    )
     label_counts = _label_counts(reviewed)
     schema_mismatches = sum(
         1
@@ -777,6 +784,10 @@ def review_validation_sample(
     if missing_human_label_rows:
         blockers.append(
             f"{missing_human_label_rows} reviewed row(s) are missing human_label"
+        )
+    if missing_review_provenance_rows:
+        blockers.append(
+            f"{missing_review_provenance_rows} reviewed row(s) are missing review provenance"
         )
     if len(reviewed_proxy) < min_proxy_candidates:
         blockers.append(
@@ -884,6 +895,7 @@ def review_validation_sample(
         unlabeled_rows=len(data) - len(reviewed),
         missing_review_status_rows=missing_review_status_rows,
         missing_human_label_rows=missing_human_label_rows,
+        missing_review_provenance_rows=missing_review_provenance_rows,
         schema_mismatches=schema_mismatches,
         unknown_label_rows=unknown_label_rows,
         label_counts=label_counts,
@@ -988,6 +1000,7 @@ def format_validation_review(review: EventFadeValidationReview) -> str:
         f"  direct/non-proxy SHORT_TRIGGERED rows: {review.direct_or_nonproxy_triggered}",
         f"  labeled rows missing review_status=reviewed: {review.missing_review_status_rows}",
         f"  reviewed rows missing human_label: {review.missing_human_label_rows}",
+        f"  reviewed rows missing provenance: {review.missing_review_provenance_rows}",
         f"  point-in-time evidence violations: {review.point_in_time_violation_rows}",
         f"  rows with post-decision source evidence: {review.post_decision_source_rows}",
         f"  reviewed rows missing source timing: {review.missing_source_timing_rows}",
@@ -1062,6 +1075,10 @@ def validation_review_next_steps(review: EventFadeValidationReview) -> tuple[str
     if review.missing_human_label_rows:
         steps.append(
             f"Fill human_label for {review.missing_human_label_rows} row(s) marked reviewed."
+        )
+    if review.missing_review_provenance_rows:
+        steps.append(
+            f"Fill reviewed_by and reviewed_at for {review.missing_review_provenance_rows} reviewed row(s)."
         )
     if review.point_in_time_violation_rows:
         steps.append(
@@ -1535,10 +1552,18 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
             suggested_label=label,
             missing_fields=("review_status",),
         )
-    if label and _point_in_time_violation(row):
+    if _is_reviewed_evidence(row) and (missing_provenance := _missing_review_provenance_fields(row)):
         return _queue_item(
             row,
             priority=3,
+            category="add_review_provenance",
+            suggested_label=label,
+            missing_fields=missing_provenance,
+        )
+    if label and _point_in_time_violation(row):
+        return _queue_item(
+            row,
+            priority=4,
             category="fix_point_in_time_evidence",
             suggested_label=label,
             missing_fields=(),
@@ -1546,7 +1571,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if label and _post_decision_source(row):
         return _queue_item(
             row,
-            priority=4,
+            priority=5,
             category="review_post_decision_source",
             suggested_label=label,
             missing_fields=(),
@@ -1554,7 +1579,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if label and _missing_source_timing(row):
         return _queue_item(
             row,
-            priority=5,
+            priority=6,
             category="add_source_timing",
             suggested_label=label,
             missing_fields=("first_seen_time", "raw_published_at", "raw_fetched_at"),
@@ -1562,7 +1587,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if label and triggered and _trigger_event_time_needs_confirmation(row):
         return _queue_item(
             row,
-            priority=6,
+            priority=7,
             category="confirm_trigger_event_time",
             suggested_label=label,
             missing_fields=("event_time_source", "event_time_confidence"),
@@ -1570,7 +1595,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if triggered and not label:
         return _queue_item(
             row,
-            priority=7,
+            priority=8,
             category="label_triggered_candidate",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label", *missing_required_outcomes),
@@ -1578,7 +1603,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if triggered and missing_required_outcomes:
         return _queue_item(
             row,
-            priority=8,
+            priority=9,
             category="fill_trigger_outcomes",
             suggested_label=label or _suggested_label(row),
             missing_fields=missing_required_outcomes,
@@ -1589,7 +1614,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
             missing = ("human_label", "human_event_time_source", "human_event_time_confidence")
         return _queue_item(
             row,
-            priority=9,
+            priority=10,
             category="confirm_proxy_event_time",
             suggested_label="valid_proxy_fade or false_positive",
             missing_fields=missing,
@@ -1597,7 +1622,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_proxy_candidate(row):
         return _queue_item(
             row,
-            priority=10,
+            priority=11,
             category="label_proxy_candidate",
             suggested_label="valid_proxy_fade or false_positive",
             missing_fields=("human_label",),
@@ -1605,7 +1630,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_direct_or_ambiguous(row):
         return _queue_item(
             row,
-            priority=11,
+            priority=12,
             category="label_negative_control",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label",),
@@ -1753,6 +1778,10 @@ def _sample_key(row: Mapping[str, Any]) -> tuple[str, str, str] | None:
 
 def _has_review_data(row: Mapping[str, Any]) -> bool:
     return any(_has_value(row.get(field)) for field in REVIEW_FIELDS)
+
+
+def _missing_review_provenance_fields(row: Mapping[str, Any]) -> tuple[str, ...]:
+    return tuple(field for field in REVIEW_PROVENANCE_FIELDS if not _has_value(row.get(field)))
 
 
 def _changed_evidence_fields(

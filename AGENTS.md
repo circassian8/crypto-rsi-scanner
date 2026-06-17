@@ -326,7 +326,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   cohorts, diversity gates, and promotion blockers plus concrete next-sample
   work. Reviewed proxy evidence must not be dominated by one event type or one
   source provider. A row only counts as reviewed evidence when it has
-  `review_status=reviewed` and a known `human_label`.
+  `review_status=reviewed` and a known `human_label`, and promotion remains
+  blocked until reviewed rows also carry `reviewed_by` and `reviewed_at`.
   Source-timing checks use `trigger_observed_at` for reviewed `SHORT_TRIGGERED`
   rows and `event_time` for other reviewed dated rows, including direct or
   ambiguous controls. If a reviewer supplies high-confidence `human_event_time`,

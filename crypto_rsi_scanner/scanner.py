@@ -1828,6 +1828,7 @@ def _event_fade_review_bundle_manifest(
             "low_confidence_trigger_event_time_rows": review.low_confidence_trigger_event_time_rows,
             "missing_trigger_outcome_rows": review.missing_trigger_outcome_rows,
             "missing_event_time_baseline_rows": review.missing_event_time_baseline_rows,
+            "missing_review_provenance_rows": review.missing_review_provenance_rows,
             "point_in_time_violation_rows": review.point_in_time_violation_rows,
             "post_decision_source_rows": review.post_decision_source_rows,
             "missing_source_timing_rows": review.missing_source_timing_rows,
@@ -2226,7 +2227,7 @@ def _event_fade_review_guide() -> str:
         "",
         "Set `review_status=reviewed` only after checking the source evidence. Rows with labels but without `review_status=reviewed` do not count as reviewed evidence.",
         "",
-        "Fill `reviewed_by` with the reviewer name or handle and `reviewed_at` with an ISO timestamp. These fields make copied labels auditable across refreshed samples.",
+        "Fill `reviewed_by` with the reviewer name or handle and `reviewed_at` with an ISO timestamp. These fields make copied labels auditable across refreshed samples, and missing provenance blocks promotion.",
         "",
         "## Proxy Criteria",
         "",
@@ -2308,6 +2309,7 @@ def _event_fade_review_gate_lines(review: event_validation.EventFadeValidationRe
             f"point_in_time_violations={review.point_in_time_violation_rows}, "
             f"post_decision_source_rows={review.post_decision_source_rows}"
         ),
+        f"- Review provenance missing: {review.missing_review_provenance_rows}",
         "",
     ]
 

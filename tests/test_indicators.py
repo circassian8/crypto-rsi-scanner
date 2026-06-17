@@ -876,6 +876,12 @@ def _outcome_klines_fixture_dir():
     return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "outcome_klines"
 
 
+def _stamp_review_provenance(row, reviewer="human", reviewed_at="2026-06-17T12:00:00+00:00"):
+    row["reviewed_by"] = reviewer
+    row["reviewed_at"] = reviewed_at
+    return row
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -3300,6 +3306,47 @@ def test_event_fade_validation_review_requires_explicit_review_status_and_label(
     assert "mark_reviewed_status" in categories
 
 
+def test_event_fade_validation_review_requires_provenance_for_promotion():
+    from crypto_rsi_scanner import event_discovery, event_validation
+
+    rows = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
+    triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
+    triggered["review_status"] = "reviewed"
+    triggered["human_label"] = "valid_proxy_fade"
+    triggered["max_favorable_excursion"] = 0.42
+    triggered["max_adverse_excursion"] = 0.08
+    triggered["post_event_return_72h"] = -0.22
+    triggered["event_time_post_event_return_72h"] = -0.12
+
+    review = event_validation.review_validation_sample(
+        rows,
+        min_proxy_candidates=1,
+        min_negative_controls=0,
+        min_triggered_reviewed=1,
+        min_trigger_precision=0.90,
+        min_mfe_mae_ratio=2.0,
+        min_proxy_event_types=1,
+        min_proxy_source_providers=1,
+        min_trigger_btc_risk_buckets=1,
+    )
+    assert review.reviewed_rows == 1
+    assert review.missing_review_provenance_rows == 1
+    assert review.promotion_ready is False
+    assert "1 reviewed row(s) are missing review provenance" in review.promotion_blockers
+    assert (
+        "Fill reviewed_by and reviewed_at for 1 reviewed row(s)."
+        in event_validation.validation_review_next_steps(review)
+    )
+
+    report = event_validation.format_validation_review(review)
+    assert "reviewed rows missing provenance: 1" in report
+
+    queue = event_validation.build_labeling_queue(rows)
+    item = next(item for item in queue.items if item.asset_symbol == "TESTVELVET")
+    assert item.category == "add_review_provenance"
+    assert item.missing_fields == ("reviewed_by", "reviewed_at")
+
+
 def test_event_fade_validation_review_metrics_and_file_loaders():
     import tempfile
     from pathlib import Path
@@ -3320,6 +3367,7 @@ def test_event_fade_validation_review_metrics_and_file_loaders():
         row = pick(symbol, relationship)
         row["human_label"] = label
         row["review_status"] = "reviewed"
+        _stamp_review_provenance(row)
         row["first_seen_time"] = "2026-06-12T00:00:00+00:00"
         row["published_at_min"] = "2026-06-12T00:00:00+00:00"
         row["published_at_max"] = "2026-06-12T00:00:00+00:00"
@@ -3497,6 +3545,7 @@ def test_event_fade_validation_review_blocks_single_source_proxy_sample():
         row = next(row for row in rows if row["asset_symbol"] == symbol)
         row["human_label"] = "valid_proxy_fade" if symbol == "TESTAI" else "false_positive"
         row["review_status"] = "reviewed"
+        _stamp_review_provenance(row)
         row["raw_providers"] = ("manual_json",)
         row["source"] = "manual_json"
         row["first_seen_time"] = "2026-06-12T00:00:00+00:00"
@@ -3541,6 +3590,7 @@ def test_event_fade_validation_reports_google_news_publisher_origins():
         row = next(row for row in rows if row["asset_symbol"] == symbol)
         row["human_label"] = "valid_proxy_fade"
         row["review_status"] = "reviewed"
+        _stamp_review_provenance(row)
         row["raw_providers"] = ["project_blog_rss"]
         row["source"] = "project_blog_rss"
         row["source_urls"] = ["https://news.google.com/rss/articles/example?oc=5"]
@@ -3611,9 +3661,11 @@ def test_event_fade_validation_review_blocks_narrow_event_or_btc_samples():
         if row["asset_symbol"] in {"TESTVELVET", "TESTAI"}:
             row["human_label"] = "valid_proxy_fade"
             row["review_status"] = "reviewed"
+            _stamp_review_provenance(row)
         elif row["asset_symbol"] in {"TESTBTC", "TESTPUMP"}:
             row["human_label"] = "direct_event" if row["asset_symbol"] == "TESTBTC" else "ambiguous"
             row["review_status"] = "reviewed"
+            _stamp_review_provenance(row)
 
     velvet = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
     velvet["max_favorable_excursion"] = 0.42
@@ -3645,6 +3697,7 @@ def test_event_fade_validation_review_blocks_low_confidence_trigger_event_time()
     triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
     triggered["human_label"] = "valid_proxy_fade"
     triggered["review_status"] = "reviewed"
+    _stamp_review_provenance(triggered)
     triggered["event_time_confidence"] = 0.60
     triggered["event_time_source"] = "text_date"
     triggered["max_favorable_excursion"] = 0.42
@@ -3774,6 +3827,7 @@ def test_event_fade_validation_outcome_fill_from_local_prices():
 
     velvet["human_label"] = "valid_proxy_fade"
     velvet["review_status"] = "reviewed"
+    _stamp_review_provenance(velvet)
     queue = event_validation.build_labeling_queue(result.rows)
     assert not any(item.asset_symbol == "TESTVELVET" for item in queue.items)
 
@@ -3808,6 +3862,8 @@ def test_event_fade_validation_uses_human_event_time_for_review_metrics():
         "is_direct_beneficiary": False,
         "trigger_observed_at": trigger_time.isoformat(),
         "review_status": "reviewed",
+        "reviewed_by": "human",
+        "reviewed_at": "2026-06-17T12:00:00+00:00",
         "human_label": "valid_proxy_fade",
         "source": "project_blog_rss",
         "raw_providers": ["project_blog_rss"],
@@ -3942,6 +3998,7 @@ def test_event_fade_validation_labeling_queue_flags_low_confidence_trigger_time(
     triggered = next(row for row in filled.rows if row["asset_symbol"] == "TESTVELVET")
     triggered["human_label"] = "valid_proxy_fade"
     triggered["review_status"] = "reviewed"
+    _stamp_review_provenance(triggered)
     triggered["event_time_source"] = "text_date"
     triggered["event_time_confidence"] = 0.60
 
@@ -4188,6 +4245,7 @@ def test_event_fade_validation_labeling_queue_flags_reviewed_trigger_outcomes():
     triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
     triggered["human_label"] = "valid_proxy_fade"
     triggered["review_status"] = "reviewed"
+    _stamp_review_provenance(triggered)
     queue = event_validation.build_labeling_queue(rows)
     item = next(item for item in queue.items if item.asset_symbol == "TESTVELVET")
     assert item.category == "fill_trigger_outcomes"
@@ -4206,6 +4264,7 @@ def test_event_fade_validation_review_blocks_late_or_weak_trigger_evidence():
     triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
     triggered["human_label"] = "false_positive"
     triggered["review_status"] = "reviewed"
+    _stamp_review_provenance(triggered)
     triggered["first_seen_time"] = "2026-06-14T00:00:00+00:00"
     triggered["fetched_at_min"] = "2026-06-14T00:00:00+00:00"
     triggered["published_at_min"] = "2026-06-14T00:00:00+00:00"
@@ -4246,6 +4305,7 @@ def test_event_fade_validation_review_flags_mixed_late_source_evidence():
     triggered = next(row for row in rows if row["asset_symbol"] == "TESTVELVET")
     triggered["human_label"] = "valid_proxy_fade"
     triggered["review_status"] = "reviewed"
+    _stamp_review_provenance(triggered)
     triggered["max_favorable_excursion"] = 0.42
     triggered["max_adverse_excursion"] = 0.08
     triggered["post_event_return_72h"] = -0.22
@@ -4291,6 +4351,7 @@ def test_event_fade_validation_review_flags_late_control_evidence():
     )
     direct["human_label"] = "direct_event"
     direct["review_status"] = "reviewed"
+    _stamp_review_provenance(direct)
     direct["event_time"] = "2026-06-15T13:30:00+00:00"
     direct["first_seen_time"] = "2026-06-15T14:00:00+00:00"
     direct["published_at_min"] = "2026-06-15T14:00:00+00:00"
@@ -4328,6 +4389,7 @@ def test_event_fade_validation_review_blocks_missing_source_timing():
     )
     direct["human_label"] = "direct_event"
     direct["review_status"] = "reviewed"
+    _stamp_review_provenance(direct)
     direct["first_seen_time"] = ""
     direct["published_at_min"] = ""
     direct["published_at_max"] = ""
@@ -5073,6 +5135,7 @@ def test_event_fade_review_bundle_scanner_merges_prior_reviewed_sample():
     reviewed = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     reviewed_row = next(row for row in reviewed if row["asset_symbol"] == "TESTVELVET")
     reviewed_row["review_status"] = "reviewed"
+    _stamp_review_provenance(reviewed_row)
     reviewed_row["human_label"] = "valid_proxy_fade"
     reviewed_row["human_notes"] = "Reviewed prior bundle evidence."
     with tempfile.TemporaryDirectory() as tmp:
@@ -5100,7 +5163,7 @@ def test_event_fade_review_bundle_scanner_merges_prior_reviewed_sample():
         assert manifest["review_merge"]["enabled"] is True
         assert manifest["review_merge"]["reviewed_path"] == str(reviewed_path)
         assert manifest["review_merge"]["matched_rows"] == 1
-        assert manifest["review_merge"]["copied_fields"] == 3
+        assert manifest["review_merge"]["copied_fields"] == 5
         assert manifest["queue"]["needed_rows"] == 16
 
         readme = (bundle_dir / "README.md").read_text(encoding="utf-8")
@@ -5111,6 +5174,8 @@ def test_event_fade_review_bundle_scanner_merges_prior_reviewed_sample():
             for line in (bundle_dir / "validation_sample.jsonl").read_text(encoding="utf-8").splitlines()
         ]
         copied_velvet = next(row for row in copied_rows if row["asset_symbol"] == "TESTVELVET")
+        assert copied_velvet["reviewed_by"] == "human"
+        assert copied_velvet["reviewed_at"] == "2026-06-17T12:00:00+00:00"
         assert copied_velvet["human_label"] == "valid_proxy_fade"
         assert copied_velvet["human_notes"] == "Reviewed prior bundle evidence."
 
@@ -5355,6 +5420,7 @@ def test_event_fade_merge_sample_scanner_reports_changed_evidence():
     fresh_row["raw_content_hashes"] = ["changed-source-hash"]
     reviewed_row = next(row for row in reviewed if row["asset_symbol"] == "TESTVELVET")
     reviewed_row["review_status"] = "reviewed"
+    _stamp_review_provenance(reviewed_row)
     reviewed_row["human_label"] = "valid_proxy_fade"
     reviewed_row["post_event_return_72h"] = -0.22
     with tempfile.TemporaryDirectory() as tmp:
