@@ -4276,6 +4276,44 @@ def test_event_fade_validation_balanced_review_template_samples_gates():
     assert "Source search:" in packet
 
 
+def test_event_fade_validation_balanced_review_template_diversifies_controls():
+    from crypto_rsi_scanner import event_validation
+
+    def control_row(symbol: str, idx: int, *, origin: str = "example.test") -> dict:
+        return {
+            "event_id": f"control-{symbol.lower()}-{idx}",
+            "asset_coin_id": symbol.lower(),
+            "asset_symbol": symbol,
+            "event_name": f"{symbol} market context story {idx}",
+            "event_type": "other",
+            "relationship_type": "ambiguous",
+            "asset_role": "ambiguous",
+            "is_proxy_narrative": False,
+            "is_direct_beneficiary": False,
+            "signal_type": "NO_TRADE",
+            "source_urls": [f"https://{origin}/{symbol.lower()}-{idx}"],
+            "raw_titles": [f"{symbol} market context story {idx}"],
+        }
+
+    rows = [
+        *(control_row("BTC", idx) for idx in range(1, 6)),
+        control_row("ETH", 1),
+        control_row("SOL", 1),
+    ]
+
+    priority_rows = event_validation.build_review_template_rows(rows, limit=3)
+    assert [row["asset_symbol"] for row in priority_rows] == ["BTC", "BTC", "BTC"]
+
+    balanced_rows = event_validation.build_balanced_review_template_rows(
+        rows,
+        proxy_limit=0,
+        control_limit=3,
+        triggered_limit=0,
+    )
+    assert [row["review_slice"] for row in balanced_rows] == ["negative_control"] * 3
+    assert {row["asset_symbol"] for row in balanced_rows} == {"BTC", "ETH", "SOL"}
+
+
 def test_event_fade_validation_review_template_skips_changed_sidecar_evidence():
     from crypto_rsi_scanner import event_discovery, event_validation
 

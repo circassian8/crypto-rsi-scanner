@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Diversify balanced event-fade review rows · Codex
+**Why:** The balanced event-fade sidecar now covered proxy and control gates,
+but the control slice still clustered heavily around repeated BTC/news rows.
+The validation sample needs broad asset/event/source coverage before any edge
+claim is meaningful.
+**Changes:**
+- Changed the balanced review selector to choose rows diversity-first within
+  each slice, reducing repeats by asset, event type, asset role, relationship,
+  source origin, and event title while leaving the strict priority queue
+  unchanged.
+- Fixed zero limits for balanced slices so `proxy_limit=0` or
+  `triggered_limit=0` really selects no rows for that slice.
+- Added a regression test proving the strict priority template can still pick
+  repeated controls while the balanced template spreads the same sample across
+  different assets.
+- Updated `AGENTS.md`, `ROADMAP.md`, and `research/event_discovery_design.md`.
+- Refreshed the latest no-key review bundle into
+  `/tmp/event_fade_no_key_review_bundle_20260617_032443_diverse_balanced`; its
+  50-control slice now spans 22 assets instead of being BTC-dominated.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 256/256
+tests. The regenerated bundle manifest includes the same 75 balanced rows.
+**Notes/risks:** Review workflow only. This does not infer labels, promote event
+fade, route alerts, write live signal/paper tables, or change event-fade
+scoring.
+
 ## 2026-06-17 — Add balanced event-fade review packet · Codex
 **Why:** The balanced review CSV is now the preferred handoff for building the
 proxy/control validation sample, but its matching evidence packet was still the

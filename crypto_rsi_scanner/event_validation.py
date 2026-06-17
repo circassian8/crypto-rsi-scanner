@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import csv
 import json
+import re
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1306,16 +1308,16 @@ def _balanced_review_packet_items(
         )
 
     def add_slice(review_slice: str, predicate, limit: int | None) -> None:
-        added = 0
-        for item, row in pairs:
+        candidates: list[tuple[int, ValidationLabelingQueueItem, Mapping[str, Any]]] = []
+        for idx, (item, row) in enumerate(pairs):
             key = pair_key(item)
             if key in used or not predicate(item, row):
                 continue
+            candidates.append((idx, item, row))
+        for item, row in _select_diverse_review_pairs(candidates, limit):
+            key = pair_key(item)
             selected.append((review_slice, item, row))
             used.add(key)
-            added += 1
-            if limit is not None and added >= max(0, limit):
-                break
 
     add_slice(
         "triggered",
@@ -1334,6 +1336,80 @@ def _balanced_review_packet_items(
         control_limit,
     )
     return selected
+
+
+def _select_diverse_review_pairs(
+    candidates: list[tuple[int, ValidationLabelingQueueItem, Mapping[str, Any]]],
+    limit: int | None,
+) -> list[tuple[ValidationLabelingQueueItem, Mapping[str, Any]]]:
+    if limit is not None and limit <= 0:
+        return []
+    if limit is None:
+        return [(item, row) for _idx, item, row in candidates]
+
+    remaining = list(candidates)
+    selected: list[tuple[ValidationLabelingQueueItem, Mapping[str, Any]]] = []
+    counts: dict[str, Counter[str]] = {
+        "asset": Counter(),
+        "event_type": Counter(),
+        "asset_role": Counter(),
+        "relationship": Counter(),
+        "origin": Counter(),
+        "event": Counter(),
+    }
+    while remaining and len(selected) < limit:
+        best_idx = min(
+            range(len(remaining)),
+            key=lambda idx: _review_diversity_score(remaining[idx], counts),
+        )
+        _original_idx, item, row = remaining.pop(best_idx)
+        selected.append((item, row))
+        dimensions = _review_diversity_dimensions(item, row)
+        for key, value in dimensions.items():
+            counts[key][value] += 1
+    return selected
+
+
+def _review_diversity_score(
+    candidate: tuple[int, ValidationLabelingQueueItem, Mapping[str, Any]],
+    counts: Mapping[str, Counter[str]],
+) -> tuple[int, int, int, int, int, int, int]:
+    original_idx, item, row = candidate
+    dimensions = _review_diversity_dimensions(item, row)
+    return (
+        counts["asset"][dimensions["asset"]],
+        counts["event_type"][dimensions["event_type"]],
+        counts["asset_role"][dimensions["asset_role"]],
+        counts["relationship"][dimensions["relationship"]],
+        counts["origin"][dimensions["origin"]],
+        counts["event"][dimensions["event"]],
+        original_idx,
+    )
+
+
+def _review_diversity_dimensions(
+    item: ValidationLabelingQueueItem,
+    row: Mapping[str, Any],
+) -> dict[str, str]:
+    origin = _first_list_text(source_origin_values(row)) or "unknown_source_origin"
+    return {
+        "asset": _review_diversity_value(item.asset_coin_id or item.asset_symbol),
+        "event_type": _review_diversity_value(row.get("event_type") or "unknown_event_type"),
+        "asset_role": _review_diversity_value(row.get("asset_role") or "unknown_asset_role"),
+        "relationship": _review_diversity_value(item.relationship_type or "unknown_relationship"),
+        "origin": _review_diversity_value(origin),
+        "event": _review_text_slug(item.event_name or row.get("event_name")),
+    }
+
+
+def _review_diversity_value(value: object) -> str:
+    return str(value or "unknown").strip().casefold() or "unknown"
+
+
+def _review_text_slug(value: object) -> str:
+    text = str(value or "unknown").strip().casefold()
+    slug = re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+    return slug or "unknown"
 
 
 def _format_review_packet_row(
