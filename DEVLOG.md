@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Surface external assets in event-fade review artifacts · Codex
+**Why:** The latest no-key review bundle had valid machine `external_asset`
+values, but the editable review sidecars and packets did not show them. That
+made proxy rows look like they lacked a concrete external catalyst and made
+manual review more error-prone.
+**Changes:**
+- Added `external_asset` to event-fade review-template CSV/JSONL rows and to the
+  human-readable review packet event line.
+- Updated the review-bundle README/guide text so reviewers know to verify the
+  machine-extracted external catalyst before assigning `valid_proxy_fade`.
+- Added regression coverage for sidecar, packet, CSV, and bundle headers.
+- Rebuilt `/tmp/event_fade_no_key_review_bundle_20260617_external_assets` from
+  the existing research cache so `review_template_balanced.csv` now surfaces
+  catalyst identities such as `SpaceX` and `World Cup`.
+**Verify:** `make verify` passed with 262/262 tests, alert render smoke, fixture
+backtest smoke, and paper scoreboard.
+**Notes/risks:** Review-artifact only. This does not change event discovery,
+classification, event-fade scoring, alerts, storage, paper trades, or promotion
+status.
+
 ## 2026-06-17 — Guard external-asset extraction and refresh no-key bundle · Codex
 **Why:** A live no-key refresh showed the new generic extractor could over-capture
 headline action phrases, turning "Ventuals winds down on-chain pre-IPO markets"

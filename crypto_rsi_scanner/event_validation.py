@@ -101,6 +101,7 @@ REVIEW_TEMPLATE_FIELDS = (
     "asset_symbol",
     "asset_role",
     "relationship_type",
+    "external_asset",
     "event_name",
     "event_type",
     "event_time",
@@ -1634,6 +1635,7 @@ def _format_review_packet_row(
         f"- Current label: `{current_label}`",
         (
             f"- Event: `{_packet_text(row.get('event_type'))}` at `{_packet_text(item.event_time or 'unknown')}` | "
+            f"external=`{_packet_text(row.get('external_asset') or 'unknown')}` | "
             f"time_source=`{_packet_text(row.get('event_time_source') or 'unknown')}` | "
             f"time_confidence=`{_fmt_num(_num(row.get('event_time_confidence')))}`"
         ),

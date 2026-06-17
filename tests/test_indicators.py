@@ -4194,6 +4194,7 @@ def test_event_fade_validation_review_template_roundtrips_human_event_time():
         "event_id": "event-missing-time",
         "asset_symbol": "HYPE",
         "asset_coin_id": "hyperliquid",
+        "external_asset": "SpaceX",
         "event_name": "Hyperliquid SpaceX pre-IPO market",
         "relationship_type": "proxy_exposure",
         "signal_type": "NO_TRADE",
@@ -4211,6 +4212,7 @@ def test_event_fade_validation_review_template_roundtrips_human_event_time():
 
     template_rows = event_validation.build_review_template_rows(rows, limit=1)
     assert template_rows[0]["queue_category"] == "confirm_proxy_event_time"
+    assert template_rows[0]["external_asset"] == "SpaceX"
     assert template_rows[0]["human_event_time"] is None
     assert template_rows[0]["primary_source_url"] == "https://example.test/hype-spacex"
     assert template_rows[0]["primary_raw_title"] == "Hyperliquid launches SpaceX pre-IPO market"
@@ -4369,6 +4371,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     assert template_rows[0]["queue_category"] == "label_triggered_candidate"
     assert template_rows[0]["event_time_confidence"] == 1.0
     assert template_rows[0]["event_time_source"] == "explicit"
+    assert template_rows[0]["external_asset"] == "SpaceX"
     assert template_rows[0]["human_event_time"] is None
     assert template_rows[0]["suggested_label"] == "valid_proxy_fade or false_positive"
     assert template_rows[0]["source_origins"] == ["example.test"]
@@ -4420,6 +4423,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
         csv_rows = event_validation.load_validation_sample(csv_path)
         jsonl_rows = event_validation.load_validation_sample(jsonl_path)
         assert csv_rows[0]["asset_symbol"] == "TESTVELVET"
+        assert csv_rows[0]["external_asset"] == "SpaceX"
         assert csv_rows[0]["primary_source_url"] == "https://example.test/velvet-spacex-duplicate"
         assert "Verify source evidence" in csv_rows[0]["review_prompt"]
         assert "TestVelvet+offers+synthetic+exposure" in csv_rows[0]["source_search_url"]
@@ -4446,6 +4450,7 @@ def test_event_fade_validation_balanced_review_template_samples_gates():
     assert any(row["asset_symbol"] == "TESTVELVET" for row in template_rows)
     assert any(row["suggested_label"] == "direct_event" for row in template_rows)
     assert all("primary_source_url" in row for row in template_rows)
+    assert all("external_asset" in row for row in template_rows)
     assert all("source_providers" in row for row in template_rows)
     assert all(row.get("source_search_url") for row in template_rows)
 
@@ -4464,6 +4469,7 @@ def test_event_fade_validation_balanced_review_template_samples_gates():
     assert "- Review slice: `triggered`" in packet
     assert "- Review slice: `proxy_candidate`" in packet
     assert "- Review slice: `negative_control`" in packet
+    assert "external=`SpaceX`" in packet
     assert "Source providers:" in packet
     assert "Source search:" in packet
 
@@ -5458,6 +5464,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "reviewed_by" in guide
         assert "reviewed_at" in guide
         assert "human_event_time" in guide
+        assert "external_asset" in guide
         assert "primary_source_url" in guide
         assert "source_search_url" in guide
         assert "source_date_hint" in guide
@@ -5497,6 +5504,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert manifest["sample_summary"]["source_origins"]["example.test"] == 13
         assert manifest["sample_summary"]["source_origin_summary"]["example.test"]["short_triggered_rows"] == 1
         template_header = (bundle_dir / "review_template.csv").read_text(encoding="utf-8").splitlines()[0]
+        assert "external_asset" in template_header
         assert "primary_source_url" in template_header
         assert "primary_raw_title" in template_header
         assert "source_search_url" in template_header
@@ -5505,6 +5513,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "event_time_review_hint" in template_header
         balanced_header = (bundle_dir / "review_template_balanced.csv").read_text(encoding="utf-8").splitlines()[0]
         assert "review_slice" in balanced_header
+        assert "external_asset" in balanced_header
         assert "primary_source_url" in balanced_header
         assert "source_search_url" in balanced_header
         assert "source_date_hint" in balanced_header
