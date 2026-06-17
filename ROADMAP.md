@@ -30,7 +30,7 @@ Status labels:
 | status | item | owner | notes |
 |---|---|---|---|
 | waiting | Monitor next full-scan universe audit | system | `make refresh-universe-audit` confirmed current hygiene output after the filter tighten: 53 excluded, no obvious USD/stable kept by audit regex. The audit now stores all kept rows for leak detection; re-check after the next scheduled full scan. |
-| todo | Use LLM shadow analyzer for event-review QA | human/open | `main.py --event-llm-shadow-report` and `make event-llm-eval` now compare rule classifications with fixture/OpenAI relationship analysis, but outputs are advisory only. Use it to inspect false-positive classes and evidence quotes while building the reviewed event-fade sample; do not promote it into alert tiering or trading logic without a new decision and validation evidence. |
+| todo | Use LLM shadow analyzer for event-review QA | human/open | `main.py --event-llm-shadow-report` and `make event-llm-eval` now compare rule classifications with fixture/OpenAI relationship analysis; the eval target fails on golden role/action drift and quote-validation regressions. Outputs are advisory only. Use it to inspect false-positive classes and evidence quotes while building the reviewed event-fade sample; do not promote it into alert tiering or trading logic without a new decision and validation evidence. |
 
 ## Later
 

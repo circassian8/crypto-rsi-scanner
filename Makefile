@@ -236,14 +236,7 @@ event-discovery-binance-listen:
 	$(PYTHON) main.py --event-discovery-binance-listen
 
 event-llm-eval:
-	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/llm_golden_cases.json \
-	RSI_EVENT_DISCOVERY_ALIASES_PATH=fixtures/event_discovery/llm_golden_cases.json \
-	RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=720 \
-	RSI_EVENT_DISCOVERY_HORIZON_DAYS=30 \
-	RSI_EVENT_LLM_PROVIDER=fixture \
-	RSI_EVENT_LLM_MIN_PREFILTER_SCORE=0 \
-	RSI_EVENT_LLM_MAX_CANDIDATES_PER_RUN=50 \
-	$(PYTHON) main.py --event-llm-shadow-report
+	$(PYTHON) -m crypto_rsi_scanner.event_llm_eval fixtures/event_discovery/llm_golden_cases.json
 
 event-fade-auto-report:
 	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \

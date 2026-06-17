@@ -101,7 +101,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   (research-only shadow relationship analysis for event candidates; fixture by
   default, optional OpenAI only when explicitly enabled; no sends, no normal RSI
   routing, no paper trades, no live DB writes) · `make event-llm-eval`
-  (offline fixture eval for the LLM analyzer) · `main.py --event-discovery-refresh` (fetch
+  (offline golden eval for the LLM analyzer; fails on expected role/action
+  drift or quote-validation regressions) · `main.py --event-discovery-refresh` (fetch
   configured event-discovery sources and append research-only JSONL cache
   artifacts under `RSI_EVENT_DISCOVERY_CACHE_DIR`; no live DB writes; use
   `make event-discovery-refresh-configured` when you want the Makefile to avoid

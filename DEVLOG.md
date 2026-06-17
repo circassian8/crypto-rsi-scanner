@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Make LLM golden eval fail on drift · Codex
+**Why:** `make event-llm-eval` printed the shadow report, but it did not fail if
+golden LLM relationship roles/actions drifted. The eval should be a real
+offline regression gate before the analyzer is used for review QA.
+**Changes:**
+- Added `crypto_rsi_scanner/event_llm_eval.py` to run the fixture discovery
+  pipeline, fixture LLM provider, quote-validating analyzer, and expected
+  role/relationship/action comparisons.
+- Changed `make event-llm-eval` to call the evaluator directly and exit nonzero
+  on mismatches.
+- Added an explicit `max_confidence` expectation for the invalid-quote fixture
+  so quote-validation/clamping regressions fail the eval.
+- Updated `AGENTS.md`, `ROADMAP.md`, and tests for the stricter eval behavior.
+**Verify:** Targeted eval tests passed. `make event-llm-eval PYTHON=python3`
+passed 9/9 golden cases with the expected invalid-quote clamp warning. `python3
+tests/test_indicators.py` passed 278/278. `python3 -m compileall -q
+crypto_rsi_scanner tests` passed. `make verify PYTHON=python3` passed 278/278
+tests, alert render smoke, fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** This still does not let LLM output affect event-alert tiers,
+event-fade eligibility, paper trades, live DB rows, or notification routing.
+
 ## 2026-06-17 — Add LLM shadow relationship analyzer · Codex
 **Why:** Event-discovery alerts need a research-only way to compare deterministic
 proxy/direct rules against structured LLM relationship analysis without letting

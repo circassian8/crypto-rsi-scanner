@@ -3307,8 +3307,33 @@ def test_makefile_has_event_llm_eval_target():
 
     text = Path("Makefile").read_text(encoding="utf-8")
     assert "event-llm-eval:" in text
-    assert "RSI_EVENT_LLM_PROVIDER=fixture" in text
-    assert "main.py --event-llm-shadow-report" in text
+    assert "python -m crypto_rsi_scanner.event_llm_eval" in text or "$(PYTHON) -m crypto_rsi_scanner.event_llm_eval" in text
+
+
+def test_event_llm_golden_eval_passes_and_detects_mismatch():
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_llm_eval
+
+    result = event_llm_eval.run_fixture_eval(_llm_golden_fixture_path())
+    assert result.success
+    assert result.passed_cases == result.total_cases == 9
+    assert any("llm-invalid-quote" in warning for warning in result.warnings)
+    assert "PASS: all golden cases matched" in event_llm_eval.format_eval_result(result)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        source = json.loads(_llm_golden_fixture_path().read_text(encoding="utf-8"))
+        source["llm_outputs"][0]["expected"] = {
+            "asset_role": "proxy_instrument",
+            "relationship_type": source["llm_outputs"][0]["analysis"]["relationship_type"],
+            "recommended_alert_action": source["llm_outputs"][0]["analysis"]["recommended_alert_action"],
+        }
+        path = Path(tmp) / "bad_llm_eval.json"
+        path.write_text(json.dumps(source), encoding="utf-8")
+        failed = event_llm_eval.run_fixture_eval(path)
+        assert not failed.success
+        assert any("asset_role expected" in mismatch for mismatch in failed.mismatches)
 
 
 def test_event_discovery_asset_role_demotes_proxy_context_noise():

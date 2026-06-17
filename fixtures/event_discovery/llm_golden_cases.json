@@ -403,6 +403,12 @@
       "event_id": "llm-invalid-quote",
       "coin_id": "velvet",
       "symbol": "VELVET",
+      "expected": {
+        "asset_role": "proxy_venue",
+        "relationship_type": "proxy_exposure",
+        "recommended_alert_action": "radar_digest",
+        "max_confidence": 0.5
+      },
       "analysis": {
         "asset_role": "proxy_venue",
         "relationship_type": "proxy_exposure",
