@@ -4113,6 +4113,7 @@ def test_event_fade_validation_review_template_roundtrips_human_event_time():
     assert template_rows[0]["human_event_time"] is None
     assert template_rows[0]["primary_source_url"] == "https://example.test/hype-spacex"
     assert template_rows[0]["primary_raw_title"] == "Hyperliquid launches SpaceX pre-IPO market"
+    assert "Hyperliquid+launches+SpaceX" in template_rows[0]["source_search_url"]
     assert "fill human_event_time" in template_rows[0]["review_prompt"]
     assert "No machine event time" in template_rows[0]["event_time_review_hint"]
     assert template_rows[0]["missing_fields"] == [
@@ -4189,6 +4190,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
         template_rows[0]["primary_raw_title"]
         == "TestVelvet offers synthetic exposure to SpaceX pre-IPO trading before launch"
     )
+    assert "TestVelvet+offers+synthetic+exposure" in template_rows[0]["source_search_url"]
     assert "Verify source evidence" in template_rows[0]["review_prompt"]
     assert "explicit/high confidence" in template_rows[0]["event_time_review_hint"]
     assert template_rows[0]["missing_fields"] == [
@@ -4206,6 +4208,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     template_rows[0]["human_notes"] = "Reviewed source evidence."
     template_rows[0]["primary_source_url"] = "https://example.test/helper-column-change"
     template_rows[0]["review_prompt"] = "Helper-only reviewer note changed."
+    template_rows[0]["source_search_url"] = "https://example.test/helper-search-change"
     template_rows[0]["post_event_return_72h"] = -0.21
     result = event_validation.apply_review_template(rows, template_rows)
     assert result.matched_rows == 1
@@ -4229,6 +4232,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
         assert csv_rows[0]["asset_symbol"] == "TESTVELVET"
         assert csv_rows[0]["primary_source_url"] == "https://example.test/velvet-spacex-duplicate"
         assert "Verify source evidence" in csv_rows[0]["review_prompt"]
+        assert "TestVelvet+offers+synthetic+exposure" in csv_rows[0]["source_search_url"]
         assert csv_rows[0]["missing_fields"][0] == "human_label"
         assert jsonl_rows[0]["asset_symbol"] == "TESTVELVET"
 
@@ -4250,6 +4254,7 @@ def test_event_fade_validation_balanced_review_template_samples_gates():
     assert any(row["asset_symbol"] == "TESTVELVET" for row in template_rows)
     assert any(row["suggested_label"] == "direct_event" for row in template_rows)
     assert all("primary_source_url" in row for row in template_rows)
+    assert all(row.get("source_search_url") for row in template_rows)
 
     csv_text = event_validation.format_review_template_csv(template_rows)
     assert "review_slice" in csv_text.splitlines()[0]
@@ -5108,6 +5113,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "reviewed_at" in guide
         assert "human_event_time" in guide
         assert "primary_source_url" in guide
+        assert "source_search_url" in guide
         assert "review_prompt" in guide
         assert "helper columns are not copied back" in guide
         assert "review_template_balanced.csv" in guide
@@ -5144,10 +5150,12 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         template_header = (bundle_dir / "review_template.csv").read_text(encoding="utf-8").splitlines()[0]
         assert "primary_source_url" in template_header
         assert "primary_raw_title" in template_header
+        assert "source_search_url" in template_header
         assert "event_time_review_hint" in template_header
         balanced_header = (bundle_dir / "review_template_balanced.csv").read_text(encoding="utf-8").splitlines()[0]
         assert "review_slice" in balanced_header
         assert "primary_source_url" in balanced_header
+        assert "source_search_url" in balanced_header
         assert "Sample summary:" in readme
         assert "Proxy candidates: 6" in readme
         assert "Asset roles: direct_beneficiary=9, proxy_instrument=6, ambiguous=2" in readme

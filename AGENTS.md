@@ -379,7 +379,8 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   writes a `manifest.json` for bundle provenance/counts/review-gate metrics/
   price-export/merge status, a priority `review_template.csv`, a
   gate-balanced `review_template_balanced.csv` with proxy candidates and
-  negative controls, a `review_guide.md` with label taxonomy, review
+  negative controls, reviewer helper columns including `source_search_url` for
+  Google News/feed wrappers, a `review_guide.md` with label taxonomy, review
   provenance fields, and human event-time rules, and its README summarizes the
   same coverage,
   diversity, timing, and promotion-readiness gates. Empty bundles must warn that

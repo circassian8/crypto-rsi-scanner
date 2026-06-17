@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
-from urllib.parse import urlparse
+from urllib.parse import quote_plus, urlparse
 
 from .event_discovery import VALIDATION_SAMPLE_FIELDS, VALIDATION_SAMPLE_SCHEMA_VERSION
 
@@ -101,6 +101,7 @@ REVIEW_TEMPLATE_FIELDS = (
     "primary_source_url",
     "primary_source_origin",
     "primary_raw_title",
+    "source_search_url",
     "source_urls",
     "source_origins",
     "raw_published_at",
@@ -138,6 +139,7 @@ REVIEW_TEMPLATE_DERIVED_FIELDS = frozenset({
     "primary_source_url",
     "primary_source_origin",
     "primary_raw_title",
+    "source_search_url",
     "source_origins",
 })
 REVIEW_TEMPLATE_EVIDENCE_FIELDS = tuple(
@@ -1381,6 +1383,7 @@ def _review_template_row(
         "primary_source_url": _first_list_text(row.get("source_urls")),
         "primary_source_origin": _first_list_text(source_origin_values(row)),
         "primary_raw_title": _first_list_text(row.get("raw_titles")),
+        "source_search_url": _source_search_url(row),
         "source_urls": list(item.source_urls),
         "source_origins": list(item.source_origins),
     })
@@ -1431,6 +1434,17 @@ def _first_list_text(value: object) -> str | None:
         if text and text != "n/a":
             return text
     return None
+
+
+def _source_search_url(row: Mapping[str, Any]) -> str | None:
+    title = _first_list_text(row.get("raw_titles")) or _string_or_none(row.get("event_name"))
+    if not title:
+        return None
+    origin = _first_list_text(source_origin_values(row))
+    query = f'"{title}"'
+    if origin and origin != "unknown_source_origin":
+        query = f"{query} {origin}"
+    return "https://www.google.com/search?q=" + quote_plus(query)
 
 
 def _packet_bullets(label: str, value: object, *, max_items: int = 5) -> list[str]:

@@ -657,6 +657,13 @@ workspace for a validation sample. The bundle contains:
   fields, and promotion reminder
 - `README.md`: suggested manual workflow
 
+Review sidecars include helper-only columns such as `primary_source_url`,
+`primary_raw_title`, `review_prompt`, `event_time_review_hint`, and
+`source_search_url`. `source_search_url` is a title/publisher search link for
+finding the canonical article when the source is a feed or Google News wrapper.
+These columns are reviewer aids only; they are excluded from evidence matching
+and are not copied back into validation samples.
+
 The bundle is a convenience wrapper around existing artifact-only commands. It
 does not infer labels, alter the source sample, write live storage, route
 alerts, open paper trades, or imply promotion. If a local price fixture is

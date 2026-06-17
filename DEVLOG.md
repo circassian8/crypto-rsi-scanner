@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add source search links to review sidecars · Codex
+**Why:** The latest balanced review bundle has many Google News/feed wrapper
+links, which slows human review because the canonical article can be harder to
+open directly. Reviewers need a fast fallback link without introducing network
+resolution, scraping, or auto-labeling.
+**Changes:**
+- Added `source_search_url` to event-fade review templates and balanced review
+  templates.
+- The search URL is generated from the raw title plus source origin/publisher so
+  reviewers can find the canonical article when `primary_source_url` is a feed
+  or Google News wrapper.
+- Kept `source_search_url` as a derived helper column excluded from evidence
+  matching and review-field copying.
+- Updated generated bundle README/guide text plus `AGENTS.md`, `ROADMAP.md`,
+  and `research/event_discovery_design.md`.
+- Refreshed the latest no-key review bundle into
+  `/tmp/event_fade_no_key_review_bundle_20260617_032443_searchlinks`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 255/255
+tests.
+**Notes/risks:** This is review-workflow only. It performs no network
+resolution, does not infer labels, and does not change event-fade scoring,
+routing, storage, paper trading, or promotion gates.
+
 ## 2026-06-17 — Add balanced event-fade review sidecar · Codex
 **Why:** The priority review template focused entirely on proxy event-time rows
 in the current no-key bundle, but the validation gate also needs 50 direct or
