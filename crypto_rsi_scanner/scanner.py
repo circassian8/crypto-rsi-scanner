@@ -45,7 +45,7 @@ from .state_features import (
     volume_price_state,
     volume_z_score,
 )
-from .notifications import notify_all
+from .notifications import notify_all, send_telegram
 from .storage import Storage
 from .universe import (
     candidate_count,
@@ -62,6 +62,7 @@ from . import paper
 from . import event_fade
 from . import event_cache
 from . import event_discovery
+from . import event_alerts
 from . import event_provider_status
 from . import event_price_history
 from . import event_validation
@@ -1151,6 +1152,20 @@ def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResul
     )
 
 
+def _event_alert_config_from_runtime() -> event_alerts.EventAlertConfig:
+    return event_alerts.EventAlertConfig(
+        enabled=config.EVENT_ALERTS_ENABLED,
+        mode=config.EVENT_ALERT_MODE,
+        min_digest_score=config.EVENT_ALERT_MIN_DIGEST_SCORE,
+        min_watchlist_score=config.EVENT_ALERT_MIN_WATCHLIST_SCORE,
+        min_high_priority_score=config.EVENT_ALERT_MIN_HIGH_PRIORITY_SCORE,
+        max_digest_items=config.EVENT_ALERT_MAX_DIGEST_ITEMS,
+        max_instant_per_day=config.EVENT_ALERT_MAX_INSTANT_PER_DAY,
+        cooldown_hours=config.EVENT_ALERT_COOLDOWN_HOURS,
+        allow_proxy_venue=config.EVENT_ALERT_ALLOW_PROXY_VENUE,
+    )
+
+
 def _setup_event_discovery_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -1171,6 +1186,95 @@ def event_discovery_report(verbose: bool = False) -> None:
         return
     result = _event_discovery_result_from_config()
     print(event_discovery.format_discovery_report(result))
+
+
+def event_alert_report(verbose: bool = False, send: bool = False) -> None:
+    """Print or explicitly send research-only event-discovery alert candidates."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_discovery_paths_configured():
+        print(
+            "No event-discovery sources ready. Set RSI_EVENT_DISCOVERY_EVENTS_PATH, "
+            "another event-discovery fixture path, or opt into a live research provider. "
+            "Run --event-discovery-status for a redacted readiness report."
+        )
+        return
+    cfg = _event_alert_config_from_runtime()
+    result = _event_discovery_result_from_config()
+    alerts = event_alerts.build_event_alert_candidates(result, cfg=cfg)
+    print(event_alerts.format_event_alert_report(alerts))
+    if send:
+        _send_event_alert_digest(alerts, cfg)
+
+
+def _send_event_alert_digest(
+    alerts: list[event_alerts.EventAlertCandidate],
+    cfg: event_alerts.EventAlertConfig,
+) -> None:
+    if not cfg.enabled:
+        print("Event research alert sending disabled. Set RSI_EVENT_ALERTS_ENABLED=1 to opt in.")
+        return
+    if cfg.mode != "research_only":
+        print("Event research alert sending blocked: RSI_EVENT_ALERT_MODE must remain research_only.")
+        return
+    digest = event_alerts.digest_candidates(alerts, cfg=cfg)
+    if not digest:
+        print("Event research alert sending skipped: no candidates above digest threshold.")
+        return
+    storage = Storage(config.DB_PATH)
+    try:
+        now = datetime.now(timezone.utc)
+        due, reason = _event_alert_digest_due(storage, cfg, now)
+        if not due:
+            print(f"Event research alert sending held: {reason}.")
+            return
+        recipients = storage.active_subscribers() or config.TELEGRAM_CHAT_IDS
+        sent = send_telegram(
+            event_alerts.format_event_alert_telegram_digest(digest),
+            parse_mode="HTML",
+            chat_ids=recipients,
+        )
+        if sent:
+            _mark_event_alert_digest_sent(storage, len(digest), now)
+            print(f"Event research Telegram digest sent with {len(digest)} item(s).")
+        else:
+            print("Event research Telegram digest not sent: no channel delivered.")
+    finally:
+        storage.close()
+
+
+def _event_alert_digest_due(
+    storage: Storage,
+    cfg: event_alerts.EventAlertConfig,
+    now: datetime,
+) -> tuple[bool, str]:
+    last_raw = storage.get_meta("event_alert_last_digest_at")
+    if last_raw:
+        try:
+            last = datetime.fromisoformat(last_raw)
+            last = last if last.tzinfo else last.replace(tzinfo=timezone.utc)
+        except ValueError:
+            last = None
+        if last and (now - last.astimezone(timezone.utc)).total_seconds() / 3600.0 < cfg.cooldown_hours:
+            return False, f"cooldown active for {cfg.cooldown_hours:g}h"
+    day_key = f"event_alert_sent_count_{now.date().isoformat()}"
+    try:
+        sent_today = int(storage.get_meta(day_key) or "0")
+    except ValueError:
+        sent_today = 0
+    if sent_today >= cfg.max_instant_per_day:
+        return False, f"daily send cap reached ({cfg.max_instant_per_day})"
+    return True, "due"
+
+
+def _mark_event_alert_digest_sent(storage: Storage, item_count: int, now: datetime) -> None:
+    storage.set_meta("event_alert_last_digest_at", now.isoformat())
+    day_key = f"event_alert_sent_count_{now.date().isoformat()}"
+    try:
+        sent_today = int(storage.get_meta(day_key) or "0")
+    except ValueError:
+        sent_today = 0
+    storage.set_meta(day_key, str(sent_today + 1))
+    storage.set_meta("event_alert_last_digest_items", str(item_count))
 
 
 def event_discovery_status(json_output: bool = False) -> None:
@@ -2592,6 +2696,19 @@ def cli() -> None:
         help="Print research-only event radar from local discovery fixtures.",
     )
     parser.add_argument(
+        "--event-alert-report",
+        action="store_true",
+        help="Print ranked research-only event-alert candidates from discovery fixtures.",
+    )
+    parser.add_argument(
+        "--event-alert-send",
+        action="store_true",
+        help=(
+            "With --event-alert-report, send an opt-in Telegram research digest. "
+            "Requires RSI_EVENT_ALERTS_ENABLED=1."
+        ),
+    )
+    parser.add_argument(
         "--event-discovery-refresh",
         action="store_true",
         help="Fetch configured event-discovery sources and append research-only JSONL cache artifacts.",
@@ -2835,6 +2952,9 @@ def cli() -> None:
         return
     if args.event_discovery_report:
         event_discovery_report(verbose=args.verbose)
+        return
+    if args.event_alert_report:
+        event_alert_report(verbose=args.verbose, send=args.event_alert_send)
         return
     if args.event_discovery_refresh:
         event_discovery_refresh(verbose=args.verbose)

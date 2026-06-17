@@ -18,10 +18,78 @@ GENERIC_ASSET_TERMS = {
     "humanity",
 }
 
+COMMON_ENTITY_TERMS = {
+    "open",
+    "time",
+    "magic",
+    "mode",
+    "base",
+    "line",
+    "world",
+    "hype",
+    "beat",
+    "prime",
+    "usa",
+    "rain",
+    "near",
+    "ripple",
+}
+
+SOURCE_PUBLISHER_NAMES = {
+    "bitcoin news",
+    "bitcoin world",
+    "coindesk",
+    "coin desk",
+    "crypto briefing",
+    "the block",
+    "cointelegraph",
+    "coin telegraph",
+    "decrypt",
+    "beincrypto",
+    "blockworks",
+    "cryptoslate",
+    "kucoin",
+    "binance",
+    "bybit",
+    "okx",
+}
+
+MARKET_RECAP_PATTERNS = (
+    "market recap",
+    "weekly recap",
+    "daily recap",
+    "top stories",
+    "market update",
+    "performance update",
+    "coin desk 20",
+    "coindesk 20",
+    "price analysis",
+    "markets today",
+)
+
 
 def clean_text(value: object) -> str:
     text = unicodedata.normalize("NFKC", str(value or ""))
     return re.sub(r"\s+", " ", text.casefold()).strip()
+
+
+def strip_publisher_suffix(value: object) -> str:
+    """Remove common news-site suffixes so publisher names cannot resolve assets."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    parts = re.split(r"\s+(?:[-–—|:]{1,2})\s+", text)
+    if len(parts) < 2:
+        return text
+    tail = clean_text(parts[-1])
+    if tail in SOURCE_PUBLISHER_NAMES:
+        return " - ".join(parts[:-1]).strip()
+    return text
+
+
+def is_market_recap_event(event: NormalizedEvent) -> bool:
+    text = clean_text(f"{strip_publisher_suffix(event.event_name)} {event.description or ''}")
+    return any(pattern in text for pattern in MARKET_RECAP_PATTERNS)
 
 
 def load_asset_aliases(path: str | Path | None) -> list[DiscoveredAsset]:
@@ -59,8 +127,9 @@ def resolve_event_assets(
     *,
     min_confidence: float = 0.80,
 ) -> list[EventAssetLink]:
+    title = strip_publisher_suffix(event.event_name)
     text = clean_text(" ".join([
-        event.event_name,
+        title,
         event.description or "",
         event.external_asset or "",
     ]))
@@ -99,9 +168,9 @@ def _score_asset_match(
     evidence: list[str] = []
     payload_text = text
     coin_id = clean_text(asset.coin_id)
-    if coin_id and not _is_generic_asset_term(coin_id) and _phrase_in_text(coin_id, payload_text):
+    if coin_id and _direct_name_match_allowed(coin_id, payload_text) and _phrase_in_text(coin_id, payload_text):
         evidence.append(asset.coin_id)
-        return 1.00, "coin_id", evidence
+        return _recap_adjusted(event, 1.00, "coin_id"), "coin_id", evidence
 
     for chain, address in asset.contract_addresses.items():
         if address and clean_text(address) in payload_text:
@@ -112,25 +181,28 @@ def _score_asset_match(
         alias for alias in asset.aliases
         if (
             len(clean_text(alias)) >= 4
-            and not _is_generic_asset_term(alias)
+            and _direct_name_match_allowed(alias, payload_text)
             and _phrase_in_text(alias, payload_text)
         )
     ]
     if alias_hits:
-        return 0.95, "known_alias", alias_hits[:3]
+        return _recap_adjusted(event, 0.95, "known_alias"), "known_alias", alias_hits[:3]
 
     name = clean_text(asset.name)
     symbol = asset.symbol.upper()
-    symbol_hit = _symbol_in_text(symbol, event.event_name) or _symbol_in_text(symbol, event.description or "")
-    if name and len(name) >= 4 and not _is_generic_asset_term(name) and _phrase_in_text(name, payload_text):
+    symbol_hit = _symbol_in_text(symbol, strip_publisher_suffix(event.event_name)) or _symbol_in_text(
+        symbol,
+        event.description or "",
+    )
+    if name and len(name) >= 4 and _direct_name_match_allowed(name, payload_text) and _phrase_in_text(name, payload_text):
         evidence.append(asset.name)
         if symbol_hit:
             evidence.append(symbol)
-            return 0.90, "name_and_symbol", evidence
-        return 0.85, "name", evidence
+            return _recap_adjusted(event, 0.90, "name_and_symbol"), "name_and_symbol", evidence
+        return _recap_adjusted(event, 0.85, "name"), "name", evidence
 
     if symbol_hit and symbol_counts.get(symbol, 0) == 1 and _strong_symbol_context(symbol, event):
-        return 0.70, "ticker_only_unique", [symbol]
+        return _recap_adjusted(event, 0.80, "ticker_explicit_context"), "ticker_explicit_context", [symbol]
 
     return 0.0, "no_match", []
 
@@ -143,7 +215,16 @@ def _phrase_in_text(phrase: str, text: str) -> bool:
 
 
 def _is_generic_asset_term(value: object) -> bool:
-    return clean_text(value) in GENERIC_ASSET_TERMS
+    return clean_text(value) in GENERIC_ASSET_TERMS or clean_text(value) in COMMON_ENTITY_TERMS
+
+
+def _direct_name_match_allowed(value: object, text: str) -> bool:
+    cleaned = clean_text(value)
+    if not cleaned:
+        return False
+    if cleaned not in SOURCE_PUBLISHER_NAMES and not _is_generic_asset_term(cleaned):
+        return True
+    return _tight_asset_context(cleaned, text)
 
 
 def _symbol_in_text(symbol: str, text: str) -> bool:
@@ -153,6 +234,41 @@ def _symbol_in_text(symbol: str, text: str) -> bool:
 
 
 def _strong_symbol_context(symbol: str, event: NormalizedEvent) -> bool:
-    haystack = clean_text(f"{event.event_name} {event.description or ''}")
-    context_words = ("token", "coin", "crypto", "listing", "unlock", "airdrop", "perp", "futures")
+    raw_title = strip_publisher_suffix(event.event_name)
+    raw_text = f"{raw_title} {event.description or ''}"
+    haystack = clean_text(raw_text)
+    if _explicit_symbol_reference(symbol, raw_text):
+        return True
+    symbol_text = clean_text(symbol)
+    if symbol_text in COMMON_ENTITY_TERMS or len(symbol_text) <= 4:
+        return _tight_asset_context(symbol_text, haystack)
+    context_words = ("token", "coin", "crypto", "listing", "unlock", "airdrop", "perp", "perpetual", "futures")
     return _phrase_in_text(symbol, haystack) and any(word in haystack for word in context_words)
+
+
+def _explicit_symbol_reference(symbol: str, text: str) -> bool:
+    sym = re.escape(symbol.upper())
+    raw = str(text or "")
+    return (
+        re.search(rf"(?<![A-Za-z0-9])\${sym}(?![A-Za-z0-9])", raw, re.IGNORECASE) is not None
+        or re.search(rf"(?<![A-Za-z0-9]){sym}\s*[/_-]\s*(?:USDT|USD|USDC|BTC|ETH)(?![A-Za-z0-9])", raw, re.IGNORECASE) is not None
+        or re.search(rf"(?<![A-Za-z0-9]){sym}(?:USDT|USD|USDC|BTC|ETH)(?![A-Za-z0-9])", raw, re.IGNORECASE) is not None
+    )
+
+
+def _tight_asset_context(term: str, text: str) -> bool:
+    cleaned = clean_text(term)
+    if not cleaned:
+        return False
+    return re.search(
+        rf"(?<![a-z0-9]){re.escape(cleaned)}\s+(?:token|coin|perp|perpetual|futures?|listing)(?![a-z0-9])",
+        text,
+    ) is not None
+
+
+def _recap_adjusted(event: NormalizedEvent, confidence: float, reason: str) -> float:
+    if not is_market_recap_event(event):
+        return confidence
+    if reason == "contract_address":
+        return confidence
+    return min(confidence, 0.75)

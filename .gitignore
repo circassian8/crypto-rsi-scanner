@@ -15,6 +15,7 @@ backups/
 backtest_cache/
 event_fade_cache/
 crypto-rsi-scanner-source.zip
+crypto-rsi-scanner-source/
 
 # Python
 __pycache__/

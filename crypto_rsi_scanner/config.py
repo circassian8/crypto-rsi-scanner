@@ -333,6 +333,18 @@ EVENT_DISCOVERY_MIN_LINK_CONFIDENCE = float(os.getenv("RSI_EVENT_DISCOVERY_MIN_L
 EVENT_DISCOVERY_MIN_CLASSIFIER_CONFIDENCE = float(os.getenv("RSI_EVENT_DISCOVERY_MIN_CLASSIFIER_CONFIDENCE", "0.80"))
 EVENT_DISCOVERY_MIN_EVENT_TIME_CONFIDENCE = float(os.getenv("RSI_EVENT_DISCOVERY_MIN_EVENT_TIME_CONFIDENCE", "0.80"))
 
+# Event-discovery research alerts. Disabled by default and separate from normal
+# RSI routing, event-fade validation labels, paper trades, and execution.
+EVENT_ALERTS_ENABLED = _env_bool("RSI_EVENT_ALERTS_ENABLED", False)
+EVENT_ALERT_MODE = os.getenv("RSI_EVENT_ALERT_MODE", "research_only")
+EVENT_ALERT_MIN_DIGEST_SCORE = int(os.getenv("RSI_EVENT_ALERT_MIN_DIGEST_SCORE", "55"))
+EVENT_ALERT_MIN_WATCHLIST_SCORE = int(os.getenv("RSI_EVENT_ALERT_MIN_WATCHLIST_SCORE", "70"))
+EVENT_ALERT_MIN_HIGH_PRIORITY_SCORE = int(os.getenv("RSI_EVENT_ALERT_MIN_HIGH_PRIORITY_SCORE", "80"))
+EVENT_ALERT_MAX_DIGEST_ITEMS = int(os.getenv("RSI_EVENT_ALERT_MAX_DIGEST_ITEMS", "10"))
+EVENT_ALERT_MAX_INSTANT_PER_DAY = int(os.getenv("RSI_EVENT_ALERT_MAX_INSTANT_PER_DAY", "3"))
+EVENT_ALERT_COOLDOWN_HOURS = float(os.getenv("RSI_EVENT_ALERT_COOLDOWN_HOURS", "12"))
+EVENT_ALERT_ALLOW_PROXY_VENUE = _env_bool("RSI_EVENT_ALERT_ALLOW_PROXY_VENUE", False)
+
 # Macro context header in the digest (Fear & Greed + BTC trend + breadth).
 MACRO_ENABLED = (os.getenv("RSI_MACRO", "1").lower() not in ("0", "false", "no"))
 

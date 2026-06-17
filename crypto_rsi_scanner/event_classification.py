@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from .event_models import DiscoveredAsset, EventAssetLink, EventClassification, NormalizedEvent
-from .event_resolver import clean_text
+from .event_resolver import clean_text, is_market_recap_event
 
 
 CLASSIFIER_VERSION = "rules_v3"
@@ -148,7 +148,7 @@ def classify_event_asset(
             is_proxy_narrative=False,
             is_direct_beneficiary=True,
             relationship_type=_direct_relationship(event.event_type, text),
-            confidence=min(1.0, max(0.80, event.confidence, link.link_confidence)),
+            confidence=_confidence_for_event(event, min(1.0, max(0.80, event.confidence, link.link_confidence))),
             classifier_version=CLASSIFIER_VERSION,
             reason="Event directly affects the linked token/listing/supply/protocol.",
             evidence=tuple(evidence + list(link.evidence)),
@@ -171,7 +171,7 @@ def classify_event_asset(
                 is_proxy_narrative=False,
                 is_direct_beneficiary=False,
                 relationship_type="proxy_context",
-                confidence=min(0.60, event.confidence, link.link_confidence),
+                confidence=_confidence_for_event(event, min(0.60, event.confidence, link.link_confidence)),
                 classifier_version=CLASSIFIER_VERSION,
                 reason=f"Proxy narrative is present, but the linked asset role is not the proxy instrument: {role_reason}",
                 evidence=tuple(proxy_hits[:3] + list(link.evidence) + list(role_evidence)),
@@ -187,9 +187,9 @@ def classify_event_asset(
             is_direct_beneficiary=False,
             relationship_type="proxy_exposure" if has_event_time else "proxy_attention",
             confidence=(
-                min(1.0, max(0.80, event.confidence, link.link_confidence))
+                _confidence_for_event(event, min(1.0, max(0.80, event.confidence, link.link_confidence)))
                 if has_event_time
-                else min(0.85, max(0.70, event.confidence, link.link_confidence))
+                else _confidence_for_event(event, min(0.85, max(0.70, event.confidence, link.link_confidence)))
             ),
             classifier_version=CLASSIFIER_VERSION,
             reason=(
@@ -214,7 +214,7 @@ def classify_event_asset(
                     is_proxy_narrative=False,
                     is_direct_beneficiary=False,
                     relationship_type="proxy_context",
-                    confidence=min(0.60, event.confidence, link.link_confidence),
+                    confidence=_confidence_for_event(event, min(0.60, event.confidence, link.link_confidence)),
                     classifier_version=CLASSIFIER_VERSION,
                     reason=(
                         "Proxy event type is present, but the linked asset role is not the proxy instrument: "
@@ -232,7 +232,7 @@ def classify_event_asset(
                 is_proxy_narrative=True,
                 is_direct_beneficiary=False,
                 relationship_type="proxy_attention",
-                confidence=min(0.90, max(0.75, event.confidence, link.link_confidence)),
+                confidence=_confidence_for_event(event, min(0.90, max(0.75, event.confidence, link.link_confidence))),
                 classifier_version=CLASSIFIER_VERSION,
                 reason="Event type and external asset indicate proxy attention, but keyword evidence is limited.",
                 evidence=tuple(list(link.evidence) + [event.event_type]),
@@ -257,6 +257,12 @@ def classify_event_asset(
         asset_role_reason="No clear direct, proxy-instrument, venue, infrastructure, or mention role was identified.",
         asset_role_evidence=tuple(link.evidence),
     )
+
+
+def _confidence_for_event(event: NormalizedEvent, confidence: float) -> float:
+    if is_market_recap_event(event):
+        return min(confidence, 0.70)
+    return confidence
 
 
 def _direct_relationship(event_type: str, text: str) -> str:

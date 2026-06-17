@@ -93,7 +93,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   Coinalyze-style derivatives with opt-in live Coinalyze enrichment,
   supply/on-chain enrichment, and clean CoinGecko
   universe fixtures or opt-in live CoinGecko universe resolver enrichment,
-  research-only/no writes) · `main.py --event-discovery-refresh` (fetch
+  research-only/no writes) · `main.py --event-alert-report` (rank discovery-fed
+  research alert candidates as store-only/radar/watchlist/high-priority/
+  triggered-fade; not trade signals, no paper trades, no normal RSI routing;
+  optional Telegram digest requires explicit `--event-alert-send` plus
+  `RSI_EVENT_ALERTS_ENABLED=1`) · `main.py --event-discovery-refresh` (fetch
   configured event-discovery sources and append research-only JSONL cache
   artifacts under `RSI_EVENT_DISCOVERY_CACHE_DIR`; no live DB writes; use
   `make event-discovery-refresh-configured` when you want the Makefile to avoid
@@ -218,6 +222,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_fade.py` | pure alert-only sell-the-news event-fade research sleeve; no storage, alerts, paper trades, or execution |
 | `event_models.py` | immutable event-discovery dataclasses for raw events, normalized events, links, classifications, and candidates |
 | `event_discovery.py` | research-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring, grouped auto reports, and validation sample exports |
+| `event_alerts.py` | pure research-alert ranking/tiering for discovery candidates; no labels, paper trades, normal RSI routing, or execution |
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
@@ -532,7 +537,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, can attach local
   Tokenomist/Etherscan/Arkham/Dune-style supply and on-chain snapshots from the
   `RSI_EVENT_DISCOVERY_*_SUPPLY_PATH` env vars, and feeds structured candidates
-  through `event_fade.py` for flat radar and grouped auto reports. The grouped
+  through `event_fade.py` for flat radar, research-alert ranking, and grouped auto reports.
+  `main.py --event-alert-report` ranks discovery candidates into store-only,
+  radar digest, watchlist, high-priority watch, or triggered-fade tiers without
+  requiring human labels or review status; optional Telegram research digests are
+  disabled by default, separate from normal RSI alerts, and explicitly labeled
+  "not a trade signal." The grouped
   report is `main.py --event-fade-auto-report` and prints event radar, proxy
   watchlist, blowoff risk, event-passed, armed, triggered, rejected/no-trade,
   and ambiguous sections with evidence/warnings. The validation-sample export is

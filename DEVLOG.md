@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add event research alert ranking · Codex
+**Why:** The event-discovery pipeline had validation/export tooling, but no
+separate way to surface manageable research candidates without treating them as
+trade signals. The Pro review also flagged publisher/source and common-word
+resolver false positives that could create noisy candidates.
+**Changes:**
+- Added `crypto_rsi_scanner/event_alerts.py` with pure opportunity scoring,
+  store/radar/watchlist/high-priority/triggered-fade tiers, report formatting,
+  and research-only Telegram digest text.
+- Added `main.py --event-alert-report` plus explicit opt-in
+  `--event-alert-send`, gated by `RSI_EVENT_ALERTS_ENABLED=1` and separate
+  event-alert cooldown/count metadata.
+- Hardened `event_resolver.py` and `event_classification.py` against publisher
+  suffixes, source-origin-only matches, common-word/ticker collisions, and
+  market recap confidence inflation.
+- Added disabled-by-default event-alert config knobs in `config.py`.
+- Updated `AGENTS.md`, `ROADMAP.md`, `main.py` usage text, and `.gitignore`
+  for the new research-alert surface and local source-copy artifact.
+- Added offline tests for BTC/Bitcoin World, KuCoin source-origin, USA/ripple/
+  HYPE/BEAT/PRIME false positives, market recap penalties, watchlist/radar/
+  proxy-venue/triggered-fade alert tiers, and scanner report wiring.
+**Verify:** `python3 tests/test_indicators.py` passed 269/269. `make verify
+PYTHON=python3` passed 269/269 tests, alert render smoke, backtest fixture
+smoke, and paper scoreboard. Manual fixture command
+`RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json
+RSI_EVENT_DISCOVERY_ALIASES_PATH=fixtures/event_discovery/asset_aliases.json
+RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=120 RSI_EVENT_DISCOVERY_HORIZON_DAYS=2
+python3 main.py --event-alert-report` printed the research-only ranked report.
+**Notes/risks:** Event alerts are investigation prompts only. They do not
+depend on human labels, do not route as normal RSI alerts, do not open paper
+trades, do not write live signal rows, and do not promote event fade beyond
+research.
+
 ## 2026-06-17 — Recheck live paper maturity · Codex
 **Why:** The Pro-plan live evidence blockers depend on paper trades and outcome
 cohorts maturing. A fresh refresh could have closed more open paper trades since

@@ -931,6 +931,38 @@ def _stamp_review_provenance(row, reviewer="human", reviewed_at="2026-06-17T12:0
     return row
 
 
+def _test_normalized_event(
+    title,
+    body="",
+    *,
+    event_id="test-event",
+    event_type="ipo_proxy",
+    external_asset="SpaceX",
+    event_time=None,
+    event_time_confidence=0.0,
+    confidence=0.75,
+    source="test",
+):
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner.event_models import NormalizedEvent
+
+    return NormalizedEvent(
+        event_id=event_id,
+        raw_ids=(event_id,),
+        event_name=title,
+        event_type=event_type,
+        event_time=event_time,
+        event_time_confidence=event_time_confidence,
+        first_seen_time=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+        source=source,
+        source_urls=(f"https://example.test/{event_id}",),
+        external_asset=external_asset,
+        description=body or None,
+        confidence=confidence,
+        event_time_source="explicit" if event_time else None,
+    )
+
+
 def _event_discovery_fixture_result():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -1597,6 +1629,128 @@ def test_event_resolver_rejects_generic_live_universe_identity_terms():
     )
 
     assert resolve_event_assets(legislature_event, noisy_assets) == []
+
+
+def test_event_resolver_strips_publisher_suffixes_and_source_origin_noise():
+    from crypto_rsi_scanner.event_models import DiscoveredAsset
+    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+
+    btc = DiscoveredAsset(
+        coin_id="bitcoin",
+        symbol="BTC",
+        name="Bitcoin",
+        aliases=("bitcoin", "btc"),
+    )
+    kcs = DiscoveredAsset(
+        coin_id="kucoin-token",
+        symbol="KCS",
+        name="KuCoin Token",
+        aliases=("kucoin", "kcs"),
+    )
+
+    msx = _test_normalized_event(
+        "MSX Lists SpaceX Stock Token Ahead of IPO - Bitcoin World",
+        "MSX offers tokenized stock exposure to SpaceX before its public debut.",
+        event_id="msx-spacex-bitcoin-world",
+    )
+    rain = _test_normalized_event(
+        "Rain Commits New Liquidity to Tokenized Pre-IPO Markets - Bitcoin News",
+        "Rain is expanding synthetic exposure products for private companies.",
+        event_id="rain-bitcoin-news",
+    )
+    source_origin = _test_normalized_event(
+        "SpaceX pre-IPO market opens for prediction traders",
+        "The source_origin is KuCoin, but no exchange token is named.",
+        event_id="kucoin-source-origin-only",
+        source="KuCoin",
+    )
+    explicit_token = _test_normalized_event(
+        "KuCoin token liquidity jumps as SpaceX pre-IPO market opens",
+        "KCS token traders discuss the exchange venue narrative.",
+        event_id="kucoin-token-explicit",
+        source="KuCoin",
+    )
+
+    assert resolve_event_assets(msx, [btc]) == []
+    assert resolve_event_assets(rain, [btc]) == []
+    assert resolve_event_assets(source_origin, [kcs]) == []
+    links = resolve_event_assets(explicit_token, [kcs])
+    assert links and links[0].coin_id == "kucoin-token"
+
+
+def test_event_resolver_rejects_common_word_and_ticker_collisions():
+    from crypto_rsi_scanner.event_models import DiscoveredAsset
+    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+
+    assets = [
+        DiscoveredAsset("usat", "USAT", "USA Token", aliases=("usa", "usat", "usa token")),
+        DiscoveredAsset("xrp", "XRP", "XRP", aliases=("ripple", "xrp")),
+        DiscoveredAsset("hyperliquid", "HYPE", "Hyperliquid", aliases=("hype", "hyperliquid")),
+        DiscoveredAsset("beat-token", "BEAT", "Beat Token", aliases=("beat", "beat token")),
+        DiscoveredAsset("prime", "PRIME", "Prime", aliases=("prime",)),
+    ]
+    cases = [
+        _test_normalized_event(
+            "USA vs Paraguay match attracts fan token traders",
+            "The World Cup fixture is a dated external sports catalyst.",
+            event_id="usa-paraguay",
+            event_type="sports_event",
+            external_asset="USA vs Paraguay",
+        ),
+        _test_normalized_event(
+            "Ripple effects from ETF optimism lift market sentiment",
+            "The article uses a common phrase about broader market effects.",
+            event_id="ripple-effects",
+            external_asset=None,
+        ),
+        _test_normalized_event(
+            "OpenAI IPO hype grows as prediction markets expand",
+            "Prediction traders are watching private-market demand.",
+            event_id="openai-hype",
+            external_asset="OpenAI",
+        ),
+        _test_normalized_event(
+            "Chainlink beat Polymarket in oracle market share this week",
+            "The article uses beat as a verb in an oracle comparison.",
+            event_id="chainlink-beat",
+            external_asset=None,
+        ),
+        _test_normalized_event(
+            "Prime Minister comments on crypto market structure",
+            "The title refers to a government official.",
+            event_id="prime-minister",
+            external_asset=None,
+        ),
+    ]
+
+    for event in cases:
+        assert resolve_event_assets(event, assets) == []
+
+    explicit_hype = _test_normalized_event(
+        "OpenAI IPO hype grows as $HYPE traders watch pre-IPO perpetuals",
+        "Hyperliquid users discuss synthetic exposure to OpenAI.",
+        event_id="explicit-hype",
+        external_asset="OpenAI",
+    )
+    links = resolve_event_assets(explicit_hype, assets)
+    assert [link.coin_id for link in links] == ["hyperliquid"]
+
+
+def test_event_resolver_penalizes_market_recap_resolution_confidence():
+    from crypto_rsi_scanner.event_models import DiscoveredAsset
+    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+
+    event = _test_normalized_event(
+        "Weekly market recap: HYPE token and SpaceX pre-IPO markets lead top stories",
+        "Hyperliquid appears in a broad market recap rather than a focused catalyst article.",
+        event_id="market-recap-hype",
+        external_asset="SpaceX",
+    )
+    asset = DiscoveredAsset("hyperliquid", "HYPE", "Hyperliquid", aliases=("hyperliquid", "hype"))
+
+    assert resolve_event_assets(event, [asset]) == []
+    low_conf = resolve_event_assets(event, [asset], min_confidence=0.0)
+    assert low_conf[0].link_confidence == 0.75
 
 
 def test_event_discovery_resolves_real_assets_from_clean_universe_fixture():
@@ -2704,6 +2858,207 @@ def test_event_discovery_proxy_article_without_event_time_stays_reviewable_no_tr
     assert "not an eligible proxy event-fade candidate" in candidate.fade_signal.warnings
 
 
+def test_event_alerts_rank_proxy_candidates_without_human_review_fields():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts, event_discovery
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_providers.manual_json import content_hash
+
+    def raw_proxy(raw_id, title, body, symbol, coin_id, external_asset, event_type="ipo_proxy"):
+        payload = {
+            "raw_id": raw_id,
+            "title": title,
+            "body": body,
+            "event": {
+                "event_id": raw_id,
+                "event_name": title,
+                "event_type": event_type,
+                "event_time": None,
+                "event_time_confidence": 0.0,
+                "external_asset": external_asset,
+                "confidence": 0.78,
+                "description": body,
+            },
+            "market": {
+                "symbol": symbol,
+                "coin_id": coin_id,
+                "timestamp": "2026-06-16T16:00:00Z",
+                "price": 10.0,
+                "market_cap": 100_000_000,
+                "volume_24h": 120_000_000,
+                "return_24h": 1.1,
+                "return_72h": 2.2,
+                "return_7d": 4.0,
+                "volume_zscore_24h": 5.5,
+            },
+        }
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="test_news",
+            fetched_at=datetime(2026, 6, 16, 13, 0, tzinfo=timezone.utc),
+            published_at=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body,
+            raw_json=payload,
+            source_confidence=0.78,
+            content_hash=content_hash(payload),
+        )
+
+    assets = [
+        DiscoveredAsset("hyperliquid", "HYPE", "Hyperliquid", aliases=("hyperliquid", "hype")),
+        DiscoveredAsset("aster", "ASTER", "Aster", aliases=("aster", "aster token")),
+        DiscoveredAsset("chiliz", "CHZ", "Chiliz", aliases=("chiliz", "chz")),
+    ]
+    raw = [
+        raw_proxy(
+            "hype-spacex-preipo",
+            "Hyperliquid $HYPE token rallies as SpaceX pre-IPO perpetual market opens",
+            "$HYPE token traders chase synthetic exposure to SpaceX before a dated catalyst is confirmed.",
+            "HYPE",
+            "hyperliquid",
+            "SpaceX",
+        ),
+        raw_proxy(
+            "aster-openai-preipo",
+            "ASTER token jumps as OpenAI pre-IPO perpetual launches",
+            "ASTER token is discussed as a synthetic exposure instrument for OpenAI private-market demand.",
+            "ASTER",
+            "aster",
+            "OpenAI",
+        ),
+        raw_proxy(
+            "chz-world-cup-fan-token",
+            "$CHZ fan token volume jumps before World Cup kickoff",
+            "Chiliz fan token traders chase World Cup attention before a confirmed match catalyst.",
+            "CHZ",
+            "chiliz",
+            "World Cup",
+            event_type="sports_event",
+        ),
+    ]
+
+    result = event_discovery.run_discovery(raw, assets, now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc))
+    alerts = event_alerts.build_event_alert_candidates(
+        result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc),
+    )
+    by_symbol = {alert.symbol: alert for alert in alerts}
+
+    assert by_symbol["HYPE"].tier == event_alerts.EventAlertTier.WATCHLIST
+    assert by_symbol["ASTER"].tier == event_alerts.EventAlertTier.WATCHLIST
+    assert by_symbol["CHZ"].tier in {
+        event_alerts.EventAlertTier.RADAR_DIGEST,
+        event_alerts.EventAlertTier.WATCHLIST,
+    }
+    assert all("review_status" not in alert.score_components for alert in alerts)
+    report = event_alerts.format_event_alert_report(alerts)
+    assert "EVENT RESEARCH ALERT REPORT" in report
+    assert "not trade signals" in report
+    assert "what user should verify:" in report
+
+
+def test_event_alerts_proxy_venue_digest_only_unless_enabled():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts, event_discovery
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.event_providers.manual_json import content_hash
+
+    payload = {
+        "raw_id": "hyperliquid-venue-spacex",
+        "title": "Hyperliquid lists SpaceX pre-IPO perpetual market",
+        "body": "The platform lists SpaceX pre-IPO contracts and prices the market for private-company exposure.",
+        "event": {
+            "event_id": "hyperliquid-venue-spacex",
+            "event_name": "Hyperliquid lists SpaceX pre-IPO perpetual market",
+            "event_type": "ipo_proxy",
+            "event_time": "2026-06-20T00:00:00+00:00",
+            "event_time_confidence": 1.0,
+            "external_asset": "SpaceX",
+            "confidence": 0.88,
+            "description": "The platform lists SpaceX pre-IPO contracts and prices the market for private-company exposure.",
+        },
+        "market": {
+            "symbol": "HYPE",
+            "coin_id": "hyperliquid",
+            "timestamp": "2026-06-16T16:00:00Z",
+            "price": 35.0,
+            "market_cap": 1_000_000_000,
+            "volume_24h": 900_000_000,
+            "return_24h": 1.2,
+            "return_72h": 2.5,
+            "return_7d": 4.5,
+            "volume_zscore_24h": 6.0,
+        },
+        "derivatives": {
+            "symbol": "HYPE",
+            "timestamp": "2026-06-16T16:00:00Z",
+            "perp_available": True,
+            "open_interest_24h_change_pct": 0.80,
+            "funding_rate_8h": 0.0012,
+            "perp_spot_volume_ratio": 25.0,
+        },
+    }
+    raw = RawDiscoveredEvent(
+        raw_id="hyperliquid-venue-spacex",
+        provider="test_news",
+        fetched_at=datetime(2026, 6, 16, 13, 0, tzinfo=timezone.utc),
+        published_at=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+        source_url="https://example.test/hyperliquid-venue-spacex",
+        title=payload["title"],
+        body=payload["body"],
+        raw_json=payload,
+        source_confidence=0.88,
+        content_hash=content_hash(payload),
+    )
+    assets = [
+        DiscoveredAsset(
+            "hyperliquid",
+            "HYPE",
+            "Hyperliquid",
+            aliases=("hyperliquid", "hype"),
+            market_cap=1_000_000_000,
+            volume_24h=900_000_000,
+            price=35.0,
+        )
+    ]
+    result = event_discovery.run_discovery(raw_events=[raw], assets=assets, now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc))
+    assert result.candidates[0].classification.asset_role == "proxy_venue"
+
+    default_alert = event_alerts.build_event_alert_candidates(
+        result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc),
+    )[0]
+    assert default_alert.tier == event_alerts.EventAlertTier.RADAR_DIGEST
+
+    strict_alert = event_alerts.build_event_alert_candidates(
+        result,
+        cfg=event_alerts.EventAlertConfig(allow_proxy_venue=True),
+        now=datetime(2026, 6, 16, 16, 0, tzinfo=timezone.utc),
+    )[0]
+    assert strict_alert.tier in {
+        event_alerts.EventAlertTier.WATCHLIST,
+        event_alerts.EventAlertTier.HIGH_PRIORITY_WATCH,
+    }
+
+
+def test_event_alerts_short_triggered_candidate_gets_triggered_fade_tier():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts
+
+    result = _event_discovery_fixture_result()
+    alerts = event_alerts.build_event_alert_candidates(
+        result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+    by_symbol = {alert.symbol: alert for alert in alerts}
+    assert by_symbol["TESTVELVET"].tier == event_alerts.EventAlertTier.TRIGGERED_FADE
+    assert "SHORT_TRIGGERED" in by_symbol["TESTVELVET"].reason
+
+
 def test_event_discovery_asset_role_demotes_proxy_context_noise():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery
@@ -2815,10 +3170,7 @@ def test_event_discovery_asset_role_demotes_proxy_context_noise():
     assert venue.fade_signal.signal_type == FadeSignalType.NO_TRADE
     assert "proxy venue candidates are watchlist-only by default" in venue.fade_signal.warnings
 
-    ticker_word = by_event_asset[("spacex-hype-common-word", "hyperliquid")]
-    assert ticker_word.classification.relationship_type == "proxy_context"
-    assert ticker_word.classification.asset_role == "ticker_word_collision"
-    assert ticker_word.classification.is_proxy_narrative is False
+    assert ("spacex-hype-common-word", "hyperliquid") not in by_event_asset
 
     sol = by_event_asset[("spacex-on-solana", "solana")]
     assert sol.classification.relationship_type == "proxy_context"
@@ -4877,6 +5229,63 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
         config.EVENT_DISCOVERY_UNIVERSE_PATH = orig_universe
         config.EVENT_DISCOVERY_LOOKBACK_HOURS = orig_lookback
         config.EVENT_DISCOVERY_HORIZON_DAYS = orig_horizon
+
+
+def test_event_alert_scanner_report_uses_local_fixtures_without_sending():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    events_path, aliases_path = _event_discovery_fixture_paths()
+    original = {
+        "EVENT_DISCOVERY_EVENTS_PATH": config.EVENT_DISCOVERY_EVENTS_PATH,
+        "EVENT_DISCOVERY_ALIASES_PATH": config.EVENT_DISCOVERY_ALIASES_PATH,
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH": config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH": config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
+        "EVENT_DISCOVERY_COINMARKETCAL_PATH": config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
+        "EVENT_DISCOVERY_TOKENOMIST_PATH": config.EVENT_DISCOVERY_TOKENOMIST_PATH,
+        "EVENT_DISCOVERY_CRYPTOPANIC_PATH": config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+        "EVENT_DISCOVERY_GDELT_PATH": config.EVENT_DISCOVERY_GDELT_PATH,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH": config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
+        "EVENT_DISCOVERY_EXTERNAL_IPO_PATH": config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH,
+        "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH": config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH": config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
+        "EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH": config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
+        "EVENT_DISCOVERY_UNIVERSE_PATH": config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        "EVENT_DISCOVERY_LOOKBACK_HOURS": config.EVENT_DISCOVERY_LOOKBACK_HOURS,
+        "EVENT_DISCOVERY_HORIZON_DAYS": config.EVENT_DISCOVERY_HORIZON_DAYS,
+        "EVENT_ALERTS_ENABLED": config.EVENT_ALERTS_ENABLED,
+    }
+    config.EVENT_DISCOVERY_EVENTS_PATH = events_path
+    config.EVENT_DISCOVERY_ALIASES_PATH = aliases_path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+    config.EVENT_DISCOVERY_GDELT_PATH = None
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = None
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = None
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    config.EVENT_DISCOVERY_LOOKBACK_HOURS = 120
+    config.EVENT_DISCOVERY_HORIZON_DAYS = 2
+    config.EVENT_ALERTS_ENABLED = False
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_alert_report(send=False)
+        text = out.getvalue()
+        assert "EVENT RESEARCH ALERT REPORT" in text
+        assert "research-only; not trade signals" in text
+        assert "TESTVELVET/testvelvet" in text
+        assert "TRIGGERED_FADE" in text
+        assert "what user should verify:" in text
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
 
 
 def test_event_discovery_refresh_scanner_writes_cache_fixture():
