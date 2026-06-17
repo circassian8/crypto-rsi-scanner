@@ -17,6 +17,19 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add event-fade review quickstart · Codex
+**Why:** The Pro-plan blocker is now human labeling. The latest `/tmp` bundle has
+instructions, but a checked-in quickstart makes the handoff durable and gives
+future agents exact commands for applying reviewed labels.
+**Changes:**
+- Added `research/EVENT_FADE_REVIEW_QUICKSTART_2026-06-17.md` with the latest
+  bundle path, fields to fill, label rules, post-edit commands, and promotion
+  guardrail.
+**Verify:** `make verify` passed with 262/262 tests, alert render smoke, fixture
+backtest smoke, and paper scoreboard.
+**Notes/risks:** No labels were inferred or applied. Event fade remains
+research-only with no alerts, live DB writes, paper trades, or promotion.
+
 ## 2026-06-17 — Add Pro-plan completion audit · Codex
 **Why:** The remaining event-fade work kept converging on the same human-review
 blocker. A checked-in requirement audit makes clear which parts of the Pro plan
