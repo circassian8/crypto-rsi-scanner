@@ -137,6 +137,8 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "python3 -m venv .venv" in makefile
     assert "export-src:" in makefile
     assert "git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD" in makefile
+    assert "event-fade-check-review-template:" in makefile
+    assert "--event-fade-check-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE)" in makefile
     assert "Run 'make bootstrap' or override with 'make verify PYTHON=python3'." in makefile
 
     export_dry = subprocess.run(
@@ -4104,6 +4106,9 @@ def test_event_fade_validation_review_template_roundtrips_human_event_time():
         "event_time_confidence": None,
         "is_proxy_narrative": True,
         "is_direct_beneficiary": False,
+        "first_seen_time": "2026-06-17T10:00:00+00:00",
+        "raw_published_at": ["2026-06-17T09:00:00+00:00"],
+        "raw_fetched_at": ["2026-06-17T10:00:00+00:00"],
         "source_urls": ["https://example.test/hype-spacex"],
         "raw_titles": ["Hyperliquid launches SpaceX pre-IPO market"],
     }]
@@ -4143,6 +4148,56 @@ def test_event_fade_validation_review_template_roundtrips_human_event_time():
     assert out["human_event_time_source"] == "https://example.test/hype-spacex"
     assert out["human_event_time_confidence"] == 0.95
     assert out["human_event_time_notes"] == "Source states the market opens at 13:30 UTC."
+
+
+def test_event_fade_validation_review_template_check_requires_valid_proxy_event_time():
+    from crypto_rsi_scanner import event_validation
+
+    rows = [{
+        "event_id": "event-missing-time",
+        "asset_symbol": "HYPE",
+        "asset_coin_id": "hyperliquid",
+        "event_name": "Hyperliquid SpaceX pre-IPO market",
+        "relationship_type": "proxy_exposure",
+        "signal_type": "NO_TRADE",
+        "event_time": "",
+        "event_time_source": "",
+        "event_time_confidence": None,
+        "is_proxy_narrative": True,
+        "is_direct_beneficiary": False,
+        "first_seen_time": "2026-06-17T10:00:00+00:00",
+        "raw_published_at": ["2026-06-17T09:00:00+00:00"],
+        "raw_fetched_at": ["2026-06-17T10:00:00+00:00"],
+        "source_urls": ["https://example.test/hype-spacex"],
+        "raw_titles": ["Hyperliquid launches SpaceX pre-IPO market"],
+    }]
+
+    template_rows = event_validation.build_review_template_rows(rows, limit=1)
+    template_rows[0]["review_status"] = "reviewed"
+    template_rows[0]["reviewed_by"] = "human"
+    template_rows[0]["reviewed_at"] = "2026-06-17T11:00:00+00:00"
+    template_rows[0]["human_label"] = "valid_proxy_fade"
+
+    check = event_validation.check_review_template(rows, template_rows)
+    assert not check.ready_to_apply
+    assert check.edited_rows == 1
+    assert check.issues[0].category == "confirm_valid_proxy_event_time"
+    assert check.issues[0].missing_fields == (
+        "human_event_time",
+        "human_event_time_source",
+        "human_event_time_confidence",
+    )
+    formatted = event_validation.format_review_template_check(check)
+    assert "Status: not ready to apply." in formatted
+    assert "confirm_valid_proxy_event_time" in formatted
+
+    template_rows[0]["human_event_time"] = "2026-06-20T13:30:00+00:00"
+    template_rows[0]["human_event_time_source"] = "https://example.test/hype-spacex"
+    template_rows[0]["human_event_time_confidence"] = 0.95
+    check = event_validation.check_review_template(rows, template_rows)
+    assert check.ready_to_apply
+    assert check.issue_rows == 0
+    assert "Status: ready to apply." in event_validation.format_review_template_check(check)
 
 
 def test_event_fade_validation_review_template_surfaces_source_date_hints():
@@ -4367,6 +4422,12 @@ def test_event_fade_validation_review_template_skips_changed_sidecar_evidence():
     velvet = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
     assert velvet["review_status"] == ""
     assert velvet["human_label"] == ""
+
+    check = event_validation.check_review_template(rows, template_rows)
+    assert not check.ready_to_apply
+    assert check.issues[0].category == "evidence_changed"
+    assert check.issues[0].changed_fields == ("source_urls",)
+    assert "Evidence fields changed" in event_validation.format_review_template_check(check)
 
 
 def test_event_fade_validation_labeling_queue_flags_reviewed_trigger_outcomes():
@@ -5139,6 +5200,51 @@ def test_event_fade_review_template_scanner_exports_and_applies_sidecar():
         assert velvet["reviewed_at"] == "2026-06-17T11:30:00+00:00"
         assert velvet["human_label"] == "valid_proxy_fade"
         assert velvet["human_notes"] == "Reviewed compact sidecar."
+
+
+def test_event_fade_check_review_template_scanner_dry_checks_sidecar():
+    import contextlib
+    import io
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, event_validation, scanner
+
+    rows = [{
+        "event_id": "event-control",
+        "asset_symbol": "CTRL",
+        "asset_coin_id": "control-token",
+        "event_name": "Control narrative mention",
+        "relationship_type": "ambiguous",
+        "signal_type": "NO_TRADE",
+        "is_proxy_narrative": False,
+        "is_direct_beneficiary": False,
+        "first_seen_time": "2026-06-17T10:00:00+00:00",
+        "source_urls": [],
+        "raw_published_at": ["2026-06-17T09:00:00+00:00"],
+        "raw_fetched_at": ["2026-06-17T10:00:00+00:00"],
+    }]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        sample_path = Path(tmp) / "sample.jsonl"
+        template_path = Path(tmp) / "review_template.csv"
+        event_discovery.write_validation_sample(rows, sample_path)
+        template_rows = event_validation.build_review_template_rows(rows, limit=1)
+        template_rows[0]["review_status"] = "reviewed"
+        template_rows[0]["reviewed_by"] = "Codex"
+        template_rows[0]["reviewed_at"] = "2026-06-17T11:30:00+00:00"
+        template_rows[0]["human_label"] = "ambiguous"
+        template_path.write_text(
+            event_validation.format_review_template_csv(template_rows),
+            encoding="utf-8",
+        )
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_fade_check_review_template(str(sample_path), str(template_path))
+        text = out.getvalue()
+        assert "EVENT FADE REVIEW TEMPLATE CHECK" in text
+        assert "Status: ready to apply." in text
+        assert "edited rows: 1" in text
 
 
 def test_event_fade_review_bundle_scanner_writes_workspace():

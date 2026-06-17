@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add review sidecar preflight check · Codex
+**Why:** The remaining event-fade work depends on human-edited sidecars. Before
+those labels are copied into validation samples, reviewers need a dry check that
+catches stale evidence, missing provenance, incomplete trigger outcomes, and
+valid proxy labels without explicit catalyst timing.
+**Changes:**
+- Added `check_review_template()` and `format_review_template_check()` to dry-run
+  edited sidecars against a validation sample without writing output.
+- Added `main.py --event-fade-check-review-template SAMPLE TEMPLATE` and
+  `make event-fade-check-review-template`.
+- Tightened the labeling queue so `valid_proxy_fade` proxy rows with missing or
+  weak machine event times remain queued until `human_event_time_source` and
+  high-confidence human event-time confirmation are supplied.
+- Updated review-bundle README/guide text plus `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to place the check before sidecar apply.
+- Added regression coverage for ready sidecars, changed-evidence sidecars, and
+  valid proxy labels missing explicit catalyst timing.
+- Refreshed the latest no-key review bundle into
+  `/tmp/event_fade_no_key_review_bundle_20260617_032443_template_check`; its
+  README/guide now include the dry-check step, with the same 121 sample rows, 75
+  balanced review rows, and 13 source date hints.
+**Verify:** `make -n event-fade-check-review-template
+EVENT_FADE_SAMPLE_IN=/tmp/sample.jsonl EVENT_FADE_REVIEW_TEMPLATE=/tmp/review.csv`
+prints the expected CLI command. `make verify` passes with 259/259 tests plus
+alert render smoke, fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Review workflow only. The check writes nothing and does not
+infer labels, change event-fade scoring, route alerts, write live signal/paper
+tables, or open paper trades.
+
 ## 2026-06-17 — Add source date hints to event-fade review aids · Codex
 **Why:** The no-key event-fade bundle still has many rows with missing machine
 event times. Reviewers need fast, local cues from source titles/event names to

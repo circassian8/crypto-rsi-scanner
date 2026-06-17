@@ -615,7 +615,11 @@ sidecar keeps stable identity/context fields plus editable review fields:
 - trigger-time and event-time-baseline outcome fields when they need manual
   override or preservation
 
-After a human edits the sidecar, `main.py --event-fade-apply-review-template
+After a human edits the sidecar, run `main.py --event-fade-check-review-template
+SAMPLE TEMPLATE` before applying it. The check is a dry run: it writes nothing
+and catches changed evidence, unmatched rows, missing provenance, unknown
+labels, missing trigger outcomes, and `valid_proxy_fade` rows that still lack
+explicit human catalyst timing. Then `main.py --event-fade-apply-review-template
 SAMPLE TEMPLATE OUT` copies nonblank review fields back into a full validation
 sample artifact and immediately prints the resulting review report and
 next-sample work. Human event-time confirmation is stored separately from the
@@ -1190,6 +1194,11 @@ EVENT_FADE_SAMPLE_IN=/path/to/sample.jsonl \
 EVENT_FADE_REVIEW_TEMPLATE_OUT=/tmp/event_fade_review_template.csv \
 EVENT_FADE_QUEUE_LIMIT=50 \
   make event-fade-export-review-template
+
+make event-fade-check-review-template
+EVENT_FADE_SAMPLE_IN=/path/to/sample.jsonl \
+EVENT_FADE_REVIEW_TEMPLATE=/tmp/event_fade_review_template.csv \
+  make event-fade-check-review-template
 
 make event-fade-apply-review-template
 EVENT_FADE_SAMPLE_IN=/path/to/sample.jsonl \

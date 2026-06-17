@@ -306,6 +306,38 @@ class ValidationSampleMergeResult:
 
 
 @dataclass(frozen=True)
+class ValidationReviewTemplateIssue:
+    row_index: int
+    category: str
+    event_id: str
+    asset_symbol: str
+    asset_coin_id: str
+    relationship_type: str
+    message: str
+    missing_fields: tuple[str, ...] = ()
+    changed_fields: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ValidationReviewTemplateCheck:
+    template_rows: int
+    edited_rows: int
+    matched_rows: int
+    evidence_changed_rows: int
+    unmatched_reviewed_rows: int
+    copied_fields: int
+    issues: tuple[ValidationReviewTemplateIssue, ...]
+
+    @property
+    def issue_rows(self) -> int:
+        return len(self.issues)
+
+    @property
+    def ready_to_apply(self) -> bool:
+        return self.edited_rows > 0 and not self.issues
+
+
+@dataclass(frozen=True)
 class ValidationLabelingQueueItem:
     priority: int
     category: str
@@ -619,6 +651,139 @@ def apply_review_template(
         reviewed_template_rows,
         evidence_fields=REVIEW_TEMPLATE_EVIDENCE_FIELDS,
     )
+
+
+def check_review_template(
+    sample_rows: Iterable[Mapping[str, Any]],
+    reviewed_template_rows: Iterable[Mapping[str, Any]],
+) -> ValidationReviewTemplateCheck:
+    """Dry-check an edited review sidecar before applying it to a sample."""
+    fresh = [dict(row) for row in sample_rows]
+    template = [dict(row) for row in reviewed_template_rows]
+    result = apply_review_template(fresh, template)
+
+    fresh_by_key = {
+        key: row
+        for row in fresh
+        if (key := _sample_key(row)) is not None
+    }
+    merged_by_key = {
+        key: row
+        for row in result.rows
+        if (key := _sample_key(row)) is not None
+    }
+
+    issues: list[ValidationReviewTemplateIssue] = []
+    edited_rows = 0
+    for idx, row in enumerate(template, 1):
+        if not _has_review_data(row):
+            continue
+        edited_rows += 1
+        key = _sample_key(row)
+        if key is None:
+            issues.append(_review_template_issue(
+                row,
+                idx,
+                category="missing_identity",
+                message="Template row has review data but lacks event/asset/relationship identity.",
+            ))
+            continue
+        fresh_row = fresh_by_key.get(key)
+        if fresh_row is None:
+            issues.append(_review_template_issue(
+                row,
+                idx,
+                category="unmatched_row",
+                message="Template row has review data but does not match any sample row.",
+            ))
+            continue
+        changed = _changed_evidence_fields(fresh_row, row, REVIEW_TEMPLATE_EVIDENCE_FIELDS)
+        if changed:
+            issues.append(_review_template_issue(
+                row,
+                idx,
+                category="evidence_changed",
+                message="Evidence fields changed; review fields will not be copied.",
+                changed_fields=changed,
+            ))
+            continue
+        merged_row = merged_by_key.get(key, fresh_row)
+        queue_item = _labeling_queue_item(merged_row)
+        if queue_item is not None:
+            issues.append(_review_template_issue(
+                merged_row,
+                idx,
+                category=queue_item.category,
+                message="Edited row still needs required review fields before it is complete.",
+                missing_fields=queue_item.missing_fields,
+            ))
+
+    if edited_rows == 0:
+        issues.append(ValidationReviewTemplateIssue(
+            row_index=0,
+            category="no_review_data",
+            event_id="",
+            asset_symbol="",
+            asset_coin_id="",
+            relationship_type="",
+            message="No sidecar row contains nonblank review fields.",
+        ))
+
+    return ValidationReviewTemplateCheck(
+        template_rows=len(template),
+        edited_rows=edited_rows,
+        matched_rows=result.matched_rows,
+        evidence_changed_rows=result.evidence_changed_rows,
+        unmatched_reviewed_rows=result.unmatched_reviewed_rows,
+        copied_fields=result.copied_fields,
+        issues=tuple(issues),
+    )
+
+
+def format_review_template_check(
+    check: ValidationReviewTemplateCheck,
+    *,
+    limit: int = 20,
+) -> str:
+    rows = [
+        "=" * 78,
+        "EVENT FADE REVIEW TEMPLATE CHECK (research-only; no writes, alerts, paper trades, or orders)",
+        "=" * 78,
+        (
+            f"Template rows: {check.template_rows} · edited rows: {check.edited_rows} · "
+            f"matched edited rows: {check.matched_rows} · copied fields if applied: {check.copied_fields}"
+        ),
+        (
+            f"Evidence-changed rows: {check.evidence_changed_rows} · "
+            f"unmatched edited rows: {check.unmatched_reviewed_rows} · issues: {check.issue_rows}"
+        ),
+        "",
+        "Status: ready to apply." if check.ready_to_apply else "Status: not ready to apply.",
+    ]
+    if not check.issues:
+        return "\n".join(rows)
+
+    rows.extend(["", "Issues:"])
+    shown = check.issues[: max(0, limit)]
+    for issue in shown:
+        label = issue.asset_symbol or issue.asset_coin_id or "unknown-asset"
+        event = issue.event_id or "unknown-event"
+        rows.append(
+            f"- row {issue.row_index}: {issue.category} · {label} · "
+            f"{event} · rel={issue.relationship_type or 'unknown'}"
+        )
+        rows.append(f"  {issue.message}")
+        if issue.missing_fields:
+            rows.append("  missing: " + ", ".join(issue.missing_fields))
+        if issue.changed_fields:
+            fields = ", ".join(issue.changed_fields[:8])
+            if len(issue.changed_fields) > 8:
+                fields += f", +{len(issue.changed_fields) - 8} more"
+            rows.append("  changed evidence: " + fields)
+    remaining = len(check.issues) - len(shown)
+    if remaining > 0:
+        rows.append(f"- ... {remaining} more issue(s)")
+    return "\n".join(rows)
 
 
 def format_merge_evidence_changes(
@@ -1916,10 +2081,18 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
             suggested_label=label,
             missing_fields=("event_time_source", "event_time_confidence"),
         )
-    if triggered and not label:
+    if label == POSITIVE_LABEL and _is_proxy_candidate(row) and _proxy_event_time_needs_human_confirmation(row):
         return _queue_item(
             row,
             priority=8,
+            category="confirm_valid_proxy_event_time",
+            suggested_label=label,
+            missing_fields=_missing_proxy_event_time_review_fields(row, include_label=False),
+        )
+    if triggered and not label:
+        return _queue_item(
+            row,
+            priority=9,
             category="label_triggered_candidate",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label", *missing_required_outcomes),
@@ -1927,26 +2100,23 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if triggered and missing_required_outcomes:
         return _queue_item(
             row,
-            priority=9,
+            priority=10,
             category="fill_trigger_outcomes",
             suggested_label=label or _suggested_label(row),
             missing_fields=missing_required_outcomes,
         )
     if not label and _is_proxy_candidate(row) and _proxy_event_time_needs_human_confirmation(row):
-        missing = ("human_label", "human_event_time", "human_event_time_source", "human_event_time_confidence")
-        if _string_or_none(row.get("event_time")) and _num(row.get("event_time_confidence")) is not None:
-            missing = ("human_label", "human_event_time_source", "human_event_time_confidence")
         return _queue_item(
             row,
-            priority=10,
+            priority=11,
             category="confirm_proxy_event_time",
             suggested_label="valid_proxy_fade or false_positive",
-            missing_fields=missing,
+            missing_fields=_missing_proxy_event_time_review_fields(row, include_label=True),
         )
     if not label and _is_proxy_candidate(row):
         return _queue_item(
             row,
-            priority=11,
+            priority=12,
             category="label_proxy_candidate",
             suggested_label="valid_proxy_fade or false_positive",
             missing_fields=("human_label",),
@@ -1954,7 +2124,7 @@ def _labeling_queue_item(row: Mapping[str, Any]) -> ValidationLabelingQueueItem 
     if not label and _is_direct_or_ambiguous(row):
         return _queue_item(
             row,
-            priority=12,
+            priority=13,
             category="label_negative_control",
             suggested_label=_suggested_label(row),
             missing_fields=("human_label",),
@@ -1991,6 +2161,23 @@ def _queue_item(
     )
 
 
+def _missing_proxy_event_time_review_fields(
+    row: Mapping[str, Any],
+    *,
+    include_label: bool,
+) -> tuple[str, ...]:
+    missing: list[str] = []
+    if include_label and not _label(row):
+        missing.append("human_label")
+    if not _string_or_none(row.get("event_time")) and not _string_or_none(row.get("human_event_time")):
+        missing.append("human_event_time")
+    if not _string_or_none(row.get("human_event_time_source")):
+        missing.append("human_event_time_source")
+    if (_num(row.get("human_event_time_confidence")) or 0.0) < DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE:
+        missing.append("human_event_time_confidence")
+    return tuple(missing)
+
+
 def _trigger_event_time_needs_confirmation(row: Mapping[str, Any]) -> bool:
     if _signal_type(row) != "SHORT_TRIGGERED":
         return False
@@ -2001,7 +2188,8 @@ def _trigger_event_time_needs_confirmation(row: Mapping[str, Any]) -> bool:
 def _proxy_event_time_needs_human_confirmation(row: Mapping[str, Any]) -> bool:
     if _string_or_none(row.get("human_event_time")):
         confidence = _num(row.get("human_event_time_confidence")) or 0.0
-        if confidence >= DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE:
+        source = _string_or_none(row.get("human_event_time_source"))
+        if source and confidence >= DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE:
             return False
     event_time = _string_or_none(row.get("event_time"))
     confidence = _num(row.get("event_time_confidence")) or 0.0
@@ -2098,6 +2286,28 @@ def _sample_key(row: Mapping[str, Any]) -> tuple[str, str, str] | None:
     if event_name and symbol and relationship:
         return (event_name, symbol, relationship)
     return None
+
+
+def _review_template_issue(
+    row: Mapping[str, Any],
+    row_index: int,
+    *,
+    category: str,
+    message: str,
+    missing_fields: tuple[str, ...] = (),
+    changed_fields: tuple[str, ...] = (),
+) -> ValidationReviewTemplateIssue:
+    return ValidationReviewTemplateIssue(
+        row_index=row_index,
+        category=category,
+        event_id=str(row.get("event_id") or ""),
+        asset_symbol=str(row.get("asset_symbol") or ""),
+        asset_coin_id=str(row.get("asset_coin_id") or ""),
+        relationship_type=str(row.get("relationship_type") or ""),
+        message=message,
+        missing_fields=missing_fields,
+        changed_fields=changed_fields,
+    )
 
 
 def _has_review_data(row: Mapping[str, Any]) -> bool:

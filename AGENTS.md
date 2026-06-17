@@ -140,6 +140,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   fields, and human review fields; writes only `OUT`) ·
   `main.py --event-fade-export-review-template SAMPLE OUT` (write compact
   editable review sidecar rows; writes only `OUT`) ·
+  `main.py --event-fade-check-review-template SAMPLE TEMPLATE` (dry-check an
+  edited sidecar for changed evidence, missing labels/provenance/outcomes, and
+  weak valid-proxy event-time evidence; no writes) ·
   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` (copy
   sidecar human review status/labels/outcomes back into a validation sample and
   print the resulting review report/next work; writes only `OUT`) ·
@@ -354,7 +357,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   storage, route alerts, open paper trades, or imply promotion.
 - Event-fade validation review templates are artifact-only. `main.py
   --event-fade-export-review-template SAMPLE OUT` may write compact editable
-  sidecar rows with derived source origins, and `main.py
+  sidecar rows with derived source origins, `main.py
+  --event-fade-check-review-template SAMPLE TEMPLATE` may dry-check an edited
+  sidecar before apply without writing anything, and `main.py
   --event-fade-apply-review-template SAMPLE TEMPLATE OUT` may copy nonblank
   human labels/notes/outcomes and human event-time confirmations from that
   sidecar into a validation-sample artifact only when the sidecar evidence
@@ -538,7 +543,9 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   Markdown packet for the same prioritized rows with source URLs, raw titles,
   classifier evidence, signal/risk fields, trigger/event-time outcomes, and the
   human fields to fill. `main.py --event-fade-export-review-template SAMPLE OUT`
-  writes a compact editable sidecar for those rows, and
+  writes a compact editable sidecar for those rows,
+  `main.py --event-fade-check-review-template SAMPLE TEMPLATE` dry-checks the
+  edited sidecar, and
   `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT` applies
   nonblank sidecar review status/labels/outcomes back into a requested sample
   artifact, then prints the resulting review report and next-sample work.
@@ -613,7 +620,8 @@ Use `ROADMAP.md` as the live task list. The current high-leverage items are:
    `main.py --event-fade-labeling-queue PATH` to prioritize missing
    review status/labels/outcomes, optionally write a review packet with
    `main.py --event-fade-review-packet SAMPLE OUT`, fill a compact sidecar from
-   `main.py --event-fade-export-review-template SAMPLE OUT`, apply it with
+   `main.py --event-fade-export-review-template SAMPLE OUT`, dry-check it with
+   `main.py --event-fade-check-review-template SAMPLE TEMPLATE`, apply it with
    `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`, optionally
    build a review workspace with `main.py --event-fade-review-bundle SAMPLE
    OUT_DIR`, then use

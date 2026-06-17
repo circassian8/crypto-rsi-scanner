@@ -35,7 +35,7 @@ EVENT_DISCOVERY_POLYMARKET_LIMIT ?= 100
 EVENT_DISCOVERY_POLYMARKET_UNIVERSE_LIVE ?= 1
 EVENT_DISCOVERY_POLYMARKET_UNIVERSE_FETCH_LIMIT ?= 250
 
-.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -68,6 +68,7 @@ help:
 	@echo "  make event-fade-review-packet  Write Markdown packet for manual validation review"
 	@echo "  make event-fade-export-review-template  Write compact editable review sidecar"
 	@echo "  make event-fade-apply-review-template  Apply edited review sidecar to sample"
+	@echo "  make event-fade-check-review-template  Dry-check edited sidecar before applying"
 	@echo "  make event-fade-review-bundle  Write manual review workspace"
 	@echo "  make event-fade-cache-review-bundle  Write manual review workspace from cache"
 	@echo "  make event-fade-review-cycle  Refresh research cache and write review workspace"
@@ -288,6 +289,9 @@ event-fade-export-review-template:
 
 event-fade-apply-review-template:
 	$(PYTHON) main.py --event-fade-apply-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE) $(EVENT_FADE_SAMPLE_REVIEW_APPLIED)
+
+event-fade-check-review-template:
+	$(PYTHON) main.py --event-fade-check-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE)
 
 event-fade-review-bundle:
 	$(PYTHON) main.py --event-fade-review-bundle $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),) $(if $(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES),--event-fade-review-bundle-export-prices --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) --event-fade-price-interval $(EVENT_FADE_PRICE_INTERVAL) $(EVENT_FADE_PRICE_FIXTURE_ARG),)

@@ -1438,6 +1438,22 @@ def event_fade_apply_review_template(
     print(event_validation.format_validation_review(review))
 
 
+def event_fade_check_review_template(
+    sample_path: str,
+    template_path: str,
+    *,
+    verbose: bool = False,
+) -> None:
+    """Dry-check an edited compact review sidecar before applying it."""
+    _setup_event_discovery_logging(verbose)
+    sample_rows = event_validation.load_validation_sample(sample_path)
+    template_rows = event_validation.load_validation_sample(template_path)
+    check = event_validation.check_review_template(sample_rows, template_rows)
+    print(event_validation.format_review_template_check(check))
+    if not check.ready_to_apply:
+        raise SystemExit(1)
+
+
 def event_fade_review_bundle(
     sample_path: str,
     out_dir: str,
@@ -2235,8 +2251,9 @@ def _event_fade_review_bundle_readme(
         "2. Read `review_packet_balanced.md` for evidence matching `review_template_balanced.csv`; use `review_packet.md` for strict priority rows.",
         "3. For fastest promotion-gate coverage, edit `review_template_balanced.csv`; for strict priority order, edit `review_template.csv`.",
         "4. Fill `review_status`, `reviewed_by`, `reviewed_at`, `human_label`, `human_notes`, any human event-time confirmation, and any missing outcomes. Use `primary_source_url`, `source_search_url`, `source_date_hint`, `primary_raw_title`, `review_prompt`, and `event_time_review_hint` as reviewer aids only.",
-        "5. Apply the edited sidecar with `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`.",
-        "6. Run `main.py --event-fade-review-sample OUT` to inspect coverage and blockers.",
+        "5. Dry-check the edited sidecar with `main.py --event-fade-check-review-template SAMPLE TEMPLATE`.",
+        "6. Apply the checked sidecar with `main.py --event-fade-apply-review-template SAMPLE TEMPLATE OUT`.",
+        "7. Run `main.py --event-fade-review-sample OUT` to inspect coverage and blockers.",
         "",
     ])
 
@@ -2297,6 +2314,7 @@ def _event_fade_review_guide() -> str:
         "These helper columns are not copied back into validation samples and do not affect evidence matching. The fields that count are still `review_status`, `reviewed_by`, `reviewed_at`, `human_label`, `human_notes`, `human_event_time*`, and required outcome fields.",
         "",
         "`review_template.csv` follows strict labeling-queue priority. `review_template_balanced.csv` is better for building the validation sample because it includes triggered rows, proxy candidates, and direct/ambiguous negative controls in one sidecar.",
+        "Run `main.py --event-fade-check-review-template SAMPLE TEMPLATE` before applying an edited sidecar; it catches changed evidence, unmatched rows, missing provenance, unknown labels, missing outcomes, and valid proxy labels without explicit catalyst timing.",
         "",
         "## Outcome Fields",
         "",
@@ -2641,6 +2659,12 @@ def cli() -> None:
         help="Apply edited compact review sidecar rows to SAMPLE and write OUT.",
     )
     parser.add_argument(
+        "--event-fade-check-review-template",
+        nargs=2,
+        metavar=("SAMPLE", "TEMPLATE"),
+        help="Dry-check edited compact review sidecar rows before applying them.",
+    )
+    parser.add_argument(
         "--event-fade-review-bundle",
         nargs=2,
         metavar=("SAMPLE", "OUT_DIR"),
@@ -2865,6 +2889,14 @@ def cli() -> None:
             sample_path,
             template_path,
             out_path,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_fade_check_review_template:
+        sample_path, template_path = args.event_fade_check_review_template
+        event_fade_check_review_template(
+            sample_path,
+            template_path,
             verbose=args.verbose,
         )
         return
