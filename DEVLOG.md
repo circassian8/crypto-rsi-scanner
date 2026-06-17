@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add review-template helper columns · Codex
+**Why:** The event-fade validation sample is blocked on human review, and the
+CSV sidecar was too machine-oriented for fast spreadsheet labeling. Reviewers
+needed a primary source link, source title, and compact prompt without weakening
+the strict reviewed-evidence rules.
+**Changes:**
+- Added reviewer-only `review_prompt`, `event_time_review_hint`,
+  `primary_source_url`, `primary_source_origin`, and `primary_raw_title` columns
+  to event-fade review templates.
+- Kept those helper columns out of review-field copying and evidence matching so
+  changing them cannot create or invalidate reviewed evidence.
+- Updated generated review bundle README/guide text to explain that helper
+  columns are aids only; counted review fields remain `review_status`,
+  `reviewed_by`, `reviewed_at`, `human_label`, `human_notes`,
+  `human_event_time*`, and required outcome fields.
+- Refreshed the latest no-key review bundle into
+  `/tmp/event_fade_no_key_review_bundle_20260617_032443_with_helpers`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 254/254
+tests.
+**Notes/risks:** This is review-workflow only. It does not infer labels, alter
+event-fade scoring, route alerts, write live DB signal/paper tables, or promote
+event fade beyond local reports.
+
 ## 2026-06-17 — Generate fresh no-key event-fade review bundle · Codex
 **Why:** The event-fade pipeline is now blocked on reviewed evidence, not more
 provider code. A fresh no-key run gives the human a concrete bundle to label and

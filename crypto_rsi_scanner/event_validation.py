@@ -93,6 +93,11 @@ REVIEW_TEMPLATE_FIELDS = (
     "queue_category",
     "suggested_label",
     "missing_fields",
+    "review_prompt",
+    "event_time_review_hint",
+    "primary_source_url",
+    "primary_source_origin",
+    "primary_raw_title",
     "source_urls",
     "source_origins",
     "raw_published_at",
@@ -124,6 +129,11 @@ REVIEW_TEMPLATE_DERIVED_FIELDS = frozenset({
     "queue_category",
     "suggested_label",
     "missing_fields",
+    "review_prompt",
+    "event_time_review_hint",
+    "primary_source_url",
+    "primary_source_origin",
+    "primary_raw_title",
     "source_origins",
 })
 REVIEW_TEMPLATE_EVIDENCE_FIELDS = tuple(
@@ -1304,10 +1314,61 @@ def _review_template_row(
         "queue_category": item.category,
         "suggested_label": item.suggested_label,
         "missing_fields": list(item.missing_fields),
+        "review_prompt": _review_template_prompt(item, row),
+        "event_time_review_hint": _event_time_review_hint(row),
+        "primary_source_url": _first_list_text(row.get("source_urls")),
+        "primary_source_origin": _first_list_text(source_origin_values(row)),
+        "primary_raw_title": _first_list_text(row.get("raw_titles")),
         "source_urls": list(item.source_urls),
         "source_origins": list(item.source_origins),
     })
     return out
+
+
+def _review_template_prompt(
+    item: ValidationLabelingQueueItem,
+    row: Mapping[str, Any],
+) -> str:
+    if item.category == "confirm_proxy_event_time":
+        return (
+            "Open primary_source_url, verify the proxy/direct relationship, and fill "
+            "human_event_time* only if explicit catalyst timing is sourced."
+        )
+    if item.category == "label_triggered_candidate":
+        return (
+            "Verify source evidence, label the row, and fill any required trigger/event-time "
+            "outcomes from local price evidence."
+        )
+    if item.category == "confirm_trigger_event_time":
+        return "Confirm the trigger's event time from source evidence before counting outcomes."
+    if item.category == "add_review_provenance":
+        return "Add reviewed_by and reviewed_at so the existing label is auditable."
+    if item.category == "confirm_source_timing":
+        return "Check that source evidence was published/fetched before the decision time."
+    if item.category == "confirm_point_in_time":
+        return "Check point-in-time evidence timing before keeping this row as reviewed."
+    if "human_label" in item.missing_fields:
+        return "Open primary_source_url and assign one accepted human_label with evidence notes."
+    return "Review the missing fields listed for this row."
+
+
+def _event_time_review_hint(row: Mapping[str, Any]) -> str:
+    source = _string_or_none(row.get("event_time_source")) or "missing"
+    confidence = _float_or_none(row.get("event_time_confidence")) or 0.0
+    event_time = _string_or_none(row.get("event_time"))
+    if not event_time:
+        return "No machine event time; fill human_event_time* only from explicit dated catalyst evidence."
+    if source == "text_date" or confidence < DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE:
+        return "Machine event time is inferred or low confidence; confirm with an explicit source before counting it."
+    return "Machine event time is explicit/high confidence; confirm only if source evidence contradicts it."
+
+
+def _first_list_text(value: object) -> str | None:
+    for item in _list_values(value):
+        text = _packet_text(item)
+        if text and text != "n/a":
+            return text
+    return None
 
 
 def _packet_bullets(label: str, value: object, *, max_items: int = 5) -> list[str]:
@@ -1859,6 +1920,15 @@ def _string_or_none(value: object) -> str | None:
     if value in (None, ""):
         return None
     return str(value)
+
+
+def _float_or_none(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _list_values(value: object) -> list[Any]:
