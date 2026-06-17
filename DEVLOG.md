@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add source date hints to event-fade review aids · Codex
+**Why:** The no-key event-fade bundle still has many rows with missing machine
+event times. Reviewers need fast, local cues from source titles/event names to
+spot likely catalyst dates without letting the machine infer or promote weak
+event times.
+**Changes:**
+- Added a derived `source_date_hint` helper column to event-fade review
+  templates and balanced templates.
+- Added matching `Source date hint` lines to review packets and documented the
+  helper in bundle README/guide text.
+- Kept the field review-only: it is excluded from sidecar evidence matching and
+  is not copied back into validation samples.
+- Updated `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md`.
+- Refreshed the latest no-key review bundle into
+  `/tmp/event_fade_no_key_review_bundle_20260617_032443_date_hints`; its
+  balanced sidecar still covers 75 gate rows and now includes 13 rows with date
+  hints.
+**Verify:** `.venv/bin/python -m compileall -q crypto_rsi_scanner tests` passed.
+`make verify` passes with 257/257 tests plus alert render smoke, fixture
+backtest smoke, and paper scoreboard. The regenerated bundle manifest still
+reports 121 total rows and 75 balanced review rows.
+**Notes/risks:** Review workflow only. This does not infer labels, change
+event-fade scoring, promote event-fade, route alerts, write live signal/paper
+tables, or open paper trades.
+
 ## 2026-06-17 — Diversify balanced event-fade review rows · Codex
 **Why:** The balanced event-fade sidecar now covered proxy and control gates,
 but the control slice still clustered heavily around repeated BTC/news rows.

@@ -4145,6 +4145,39 @@ def test_event_fade_validation_review_template_roundtrips_human_event_time():
     assert out["human_event_time_notes"] == "Source states the market opens at 13:30 UTC."
 
 
+def test_event_fade_validation_review_template_surfaces_source_date_hints():
+    from crypto_rsi_scanner import event_validation
+
+    rows = [{
+        "event_id": "event-world-cup-tonight",
+        "asset_symbol": "USAT",
+        "asset_coin_id": "usa-fan-token",
+        "event_name": "USA vs Paraguay kicks off World Cup 2026 tonight",
+        "relationship_type": "proxy_attention",
+        "asset_role": "proxy_instrument",
+        "event_type": "sports_event",
+        "signal_type": "NO_TRADE",
+        "event_time": "",
+        "event_time_source": "",
+        "event_time_confidence": None,
+        "is_proxy_narrative": True,
+        "is_direct_beneficiary": False,
+        "source_urls": ["https://example.test/usat-world-cup-tonight"],
+        "raw_titles": ["USA vs Paraguay kicks off World Cup 2026 tonight, and crypto is already on the pitch"],
+    }]
+
+    template_rows = event_validation.build_review_template_rows(rows, limit=1)
+    assert template_rows[0]["queue_category"] == "confirm_proxy_event_time"
+    assert template_rows[0]["source_date_hint"] == "World Cup 2026; tonight"
+
+    csv_text = event_validation.format_review_template_csv(template_rows)
+    assert "source_date_hint" in csv_text.splitlines()[0]
+    assert "World Cup 2026; tonight" in csv_text
+
+    packet = event_validation.format_review_packet(rows, limit=1)
+    assert "Source date hint: World Cup 2026; tonight" in packet
+
+
 def test_event_fade_validation_review_packet_formats_human_evidence():
     from crypto_rsi_scanner import event_discovery, event_validation
 
@@ -4235,6 +4268,7 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
         assert csv_rows[0]["primary_source_url"] == "https://example.test/velvet-spacex-duplicate"
         assert "Verify source evidence" in csv_rows[0]["review_prompt"]
         assert "TestVelvet+offers+synthetic+exposure" in csv_rows[0]["source_search_url"]
+        assert "source_date_hint" in csv_rows[0]
         assert csv_rows[0]["missing_fields"][0] == "human_label"
         assert jsonl_rows[0]["asset_symbol"] == "TESTVELVET"
 
@@ -5169,6 +5203,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "human_event_time" in guide
         assert "primary_source_url" in guide
         assert "source_search_url" in guide
+        assert "source_date_hint" in guide
         assert "review_prompt" in guide
         assert "helper columns are not copied back" in guide
         assert "review_template_balanced.csv" in guide
@@ -5207,11 +5242,13 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "primary_source_url" in template_header
         assert "primary_raw_title" in template_header
         assert "source_search_url" in template_header
+        assert "source_date_hint" in template_header
         assert "event_time_review_hint" in template_header
         balanced_header = (bundle_dir / "review_template_balanced.csv").read_text(encoding="utf-8").splitlines()[0]
         assert "review_slice" in balanced_header
         assert "primary_source_url" in balanced_header
         assert "source_search_url" in balanced_header
+        assert "source_date_hint" in balanced_header
         assert "Sample summary:" in readme
         assert "Proxy candidates: 6" in readme
         assert "Asset roles: direct_beneficiary=9, proxy_instrument=6, ambiguous=2" in readme

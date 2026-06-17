@@ -25,6 +25,24 @@ POSITIVE_LABEL = "valid_proxy_fade"
 DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE = 0.80
 DEFAULT_BALANCED_PROXY_REVIEW_ROWS = 25
 DEFAULT_BALANCED_CONTROL_REVIEW_ROWS = 50
+DATE_HINT_MONTH_PATTERN = (
+    "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    "jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?"
+)
+DATE_HINT_PATTERNS = (
+    re.compile(r"\b20\d{2}-\d{1,2}-\d{1,2}\b", re.IGNORECASE),
+    re.compile(
+        rf"\b(?:{DATE_HINT_MONTH_PATTERN})\.?\s+\d{{1,2}}(?:st|nd|rd|th)?\s*[–-]\s*"
+        rf"\d{{1,2}}(?:st|nd|rd|th)?[,]?\s+20\d{{2}}\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        rf"\b(?:{DATE_HINT_MONTH_PATTERN})\.?\s+\d{{1,2}}(?:st|nd|rd|th)?[,]?\s+20\d{{2}}\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(?:world cup|ipo|election|inauguration|fixture|match|listing|launch)[^.;:|()]{0,80}\b20\d{2}\b", re.IGNORECASE),
+    re.compile(r"\b(?:today|tonight|tomorrow|same day|first day)\b", re.IGNORECASE),
+)
 KNOWN_LABELS = frozenset({
     POSITIVE_LABEL,
     "false_positive",
@@ -100,6 +118,7 @@ REVIEW_TEMPLATE_FIELDS = (
     "missing_fields",
     "review_prompt",
     "event_time_review_hint",
+    "source_date_hint",
     "primary_source_url",
     "primary_source_origin",
     "primary_raw_title",
@@ -138,6 +157,7 @@ REVIEW_TEMPLATE_DERIVED_FIELDS = frozenset({
     "missing_fields",
     "review_prompt",
     "event_time_review_hint",
+    "source_date_hint",
     "primary_source_url",
     "primary_source_origin",
     "primary_raw_title",
@@ -1487,6 +1507,9 @@ def _format_review_packet_row(
         ),
         f"- Classifier reason: {_packet_text(row.get('classification_reason'))}",
     ])
+    date_hint = _source_date_hint(row)
+    if date_hint:
+        fields.append(f"- Source date hint: {date_hint}")
     fields.extend(_packet_bullets("Classifier evidence", row.get("classification_evidence")))
     fields.extend(_packet_bullets("Reason codes", row.get("reason_codes")))
     fields.extend(_packet_bullets("Warnings", row.get("warnings")))
@@ -1522,6 +1545,7 @@ def _review_template_row(
         "missing_fields": list(item.missing_fields),
         "review_prompt": _review_template_prompt(item, row),
         "event_time_review_hint": _event_time_review_hint(row),
+        "source_date_hint": _source_date_hint(row),
         "primary_source_url": _first_list_text(row.get("source_urls")),
         "primary_source_origin": _first_list_text(source_origin_values(row)),
         "primary_raw_title": _first_list_text(row.get("raw_titles")),
@@ -1568,6 +1592,27 @@ def _event_time_review_hint(row: Mapping[str, Any]) -> str:
     if source == "text_date" or confidence < DEFAULT_MIN_TRIGGER_EVENT_TIME_CONFIDENCE:
         return "Machine event time is inferred or low confidence; confirm with an explicit source before counting it."
     return "Machine event time is explicit/high confidence; confirm only if source evidence contradicts it."
+
+
+def _source_date_hint(row: Mapping[str, Any]) -> str | None:
+    values: list[str] = []
+    for value in (row.get("event_name"), row.get("description"), *list(_list_values(row.get("raw_titles")))):
+        text = str(value or "").strip()
+        if text:
+            values.append(text)
+    found: list[str] = []
+    seen: set[str] = set()
+    for text in values:
+        for pattern in DATE_HINT_PATTERNS:
+            for match in pattern.finditer(text):
+                hint = re.sub(r"\s+", " ", match.group(0)).strip(" -–")
+                key = hint.casefold()
+                if hint and key not in seen:
+                    found.append(hint)
+                    seen.add(key)
+                if len(found) >= 5:
+                    return "; ".join(found)
+    return "; ".join(found) if found else None
 
 
 def _first_list_text(value: object) -> str | None:
