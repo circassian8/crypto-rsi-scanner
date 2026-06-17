@@ -17,6 +17,21 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Recheck live paper maturity · Codex
+**Why:** The Pro-plan live evidence blockers depend on paper trades and outcome
+cohorts maturing. A fresh refresh could have closed more open paper trades since
+the previous status pass.
+**Changes:**
+- Ran `main.py --status`, `main.py --score --cohorts`, `main.py --report`, and
+  `main.py --refresh-paper`.
+- Updated `ROADMAP.md` to record that the follow-up paper refresh fetched all
+  12 open histories and closed 0 trades.
+**Verify:** `main.py --refresh-paper` completed: fetched 12/12 histories, closed
+0 trades, paper book remains 11 closed / 12 open. `make verify` passed with
+262/262 tests, alert render smoke, fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Status/docs only. No live logic, registry priors, state rules,
+event-fade labels, alerts, DB schema, or paper-trading rules changed.
+
 ## 2026-06-17 — Document review-bundle wrappers in agent rules · Codex
 **Why:** The new bundle-oriented review Make targets should be the shared
 default for Claude and Codex after a human labels the event-fade sidecar.
