@@ -3088,6 +3088,8 @@ def test_event_fade_validation_sample_rows_and_serializers():
     assert velvet["invalidation_level"] == 8.65
     assert velvet["human_label"] == ""
     assert velvet["human_notes"] == ""
+    assert velvet["reviewed_by"] == ""
+    assert velvet["reviewed_at"] == ""
     assert velvet["max_adverse_excursion"] is None
     assert velvet["post_event_return_7d"] is None
     assert velvet["event_time_entry_price"] is None
@@ -3683,6 +3685,8 @@ def test_event_fade_validation_merge_preserves_review_fields():
     reviewed = event_discovery.event_fade_validation_sample_rows(_full_event_discovery_fixture_result())
     source = next(row for row in reviewed if row["asset_symbol"] == "TESTVELVET")
     source["review_status"] = "reviewed"
+    source["reviewed_by"] = "Codex"
+    source["reviewed_at"] = "2026-06-17T10:15:00+00:00"
     source["human_label"] = "valid_proxy_fade"
     source["human_notes"] = "Reviewed SpaceX proxy event."
     source["max_favorable_excursion"] = 0.42
@@ -3700,9 +3704,11 @@ def test_event_fade_validation_merge_preserves_review_fields():
     assert result.matched_rows == 1
     assert result.evidence_changed_rows == 0
     assert result.unmatched_reviewed_rows == 1
-    assert result.copied_fields == 8
+    assert result.copied_fields == 10
 
     merged = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
+    assert merged["reviewed_by"] == "Codex"
+    assert merged["reviewed_at"] == "2026-06-17T10:15:00+00:00"
     assert merged["human_label"] == "valid_proxy_fade"
     assert merged["human_notes"] == "Reviewed SpaceX proxy event."
     assert merged["max_favorable_excursion"] == 0.42
@@ -4056,6 +4062,8 @@ def test_event_fade_validation_review_template_roundtrips_human_event_time():
     ]
 
     template_rows[0]["review_status"] = "reviewed"
+    template_rows[0]["reviewed_by"] = "human"
+    template_rows[0]["reviewed_at"] = "2026-06-17T11:00:00+00:00"
     template_rows[0]["human_label"] = "valid_proxy_fade"
     template_rows[0]["human_event_time"] = "2026-06-20T13:30:00+00:00"
     template_rows[0]["human_event_time_source"] = "https://example.test/hype-spacex"
@@ -4064,9 +4072,11 @@ def test_event_fade_validation_review_template_roundtrips_human_event_time():
     result = event_validation.apply_review_template(rows, template_rows)
     assert result.matched_rows == 1
     assert result.evidence_changed_rows == 0
-    assert result.copied_fields == 6
+    assert result.copied_fields == 8
     out = result.rows[0]
     assert out["event_time"] == ""
+    assert out["reviewed_by"] == "human"
+    assert out["reviewed_at"] == "2026-06-17T11:00:00+00:00"
     assert out["human_event_time"] == "2026-06-20T13:30:00+00:00"
     assert out["human_event_time_source"] == "https://example.test/hype-spacex"
     assert out["human_event_time_confidence"] == 0.95
@@ -4121,15 +4131,19 @@ def test_event_fade_validation_review_template_roundtrips_sidecar_labels():
     ]
 
     template_rows[0]["review_status"] = "reviewed"
+    template_rows[0]["reviewed_by"] = "human"
+    template_rows[0]["reviewed_at"] = "2026-06-17T11:00:00+00:00"
     template_rows[0]["human_label"] = "valid_proxy_fade"
     template_rows[0]["human_notes"] = "Reviewed source evidence."
     template_rows[0]["post_event_return_72h"] = -0.21
     result = event_validation.apply_review_template(rows, template_rows)
     assert result.matched_rows == 1
     assert result.evidence_changed_rows == 0
-    assert result.copied_fields == 4
+    assert result.copied_fields == 6
     velvet = next(row for row in result.rows if row["asset_symbol"] == "TESTVELVET")
     assert velvet["review_status"] == "reviewed"
+    assert velvet["reviewed_by"] == "human"
+    assert velvet["reviewed_at"] == "2026-06-17T11:00:00+00:00"
     assert velvet["human_label"] == "valid_proxy_fade"
     assert velvet["human_notes"] == "Reviewed source evidence."
     assert velvet["post_event_return_72h"] == -0.21
@@ -4898,6 +4912,8 @@ def test_event_fade_review_template_scanner_exports_and_applies_sidecar():
 
         template_rows = event_validation.load_validation_sample(template_path)
         template_rows[0]["review_status"] = "reviewed"
+        template_rows[0]["reviewed_by"] = "Codex"
+        template_rows[0]["reviewed_at"] = "2026-06-17T11:30:00+00:00"
         template_rows[0]["human_label"] = "valid_proxy_fade"
         template_rows[0]["human_notes"] = "Reviewed compact sidecar."
         template_path.write_text(
@@ -4926,6 +4942,8 @@ def test_event_fade_review_template_scanner_exports_and_applies_sidecar():
             for line in reviewed_path.read_text(encoding="utf-8").splitlines()
         ]
         velvet = next(row for row in written if row["asset_symbol"] == "TESTVELVET")
+        assert velvet["reviewed_by"] == "Codex"
+        assert velvet["reviewed_at"] == "2026-06-17T11:30:00+00:00"
         assert velvet["human_label"] == "valid_proxy_fade"
         assert velvet["human_notes"] == "Reviewed compact sidecar."
 
@@ -4983,6 +5001,8 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
         assert "`false_positive`" in guide
         assert "`direct_event`" in guide
         assert "`ambiguous`" in guide
+        assert "reviewed_by" in guide
+        assert "reviewed_at" in guide
         assert "human_event_time" in guide
 
         manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))

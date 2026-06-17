@@ -38,6 +38,8 @@ REQUIRED_EVENT_TIME_BASELINE_FIELDS = (
 )
 REVIEW_FIELDS = (
     "review_status",
+    "reviewed_by",
+    "reviewed_at",
     "human_label",
     "human_notes",
     "max_adverse_excursion",
@@ -97,6 +99,8 @@ REVIEW_TEMPLATE_FIELDS = (
     "fetched_at_min",
     "fetched_at_max",
     "review_status",
+    "reviewed_by",
+    "reviewed_at",
     "human_label",
     "human_notes",
     "max_adverse_excursion",
@@ -1263,6 +1267,8 @@ def _format_review_packet_row(
     fields.extend([
         "- Review fields to fill:",
         "  - `review_status`: `reviewed`",
+        "  - `reviewed_by`: reviewer name or handle",
+        "  - `reviewed_at`: ISO timestamp when the row was reviewed",
         "  - `human_label`: `valid_proxy_fade` | `false_positive` | `direct_event` | `ambiguous`",
         "  - `human_notes`: evidence-backed note",
         "  - `human_event_time`: explicit catalyst time if the system missed or weakly inferred it",

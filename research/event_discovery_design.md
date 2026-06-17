@@ -649,8 +649,8 @@ workspace for a validation sample. The bundle contains:
 - `manifest.json`: machine-readable bundle provenance, file map, review counts,
   diversity/timing gate metrics, blockers, next-sample work, and optional
   outcome-fill stats
-- `review_guide.md`: label taxonomy, proxy/direct criteria, human event-time
-  confirmation rules, outcome fields, and promotion reminder
+- `review_guide.md`: label taxonomy, proxy/direct criteria, review provenance,
+  human event-time confirmation rules, outcome fields, and promotion reminder
 - `README.md`: suggested manual workflow
 
 The bundle is a convenience wrapper around existing artifact-only commands. It
@@ -1061,8 +1061,8 @@ is the fastest way to sanity-check a fresh RSS/GDELT/Polymarket bundle before
 filling the sidecar labels.
 The bundle-level `review_guide.md` makes the manual review artifact
 self-contained: it defines the four accepted labels, proxy/direct criteria,
-human event-time confirmation fields, required trigger outcomes, and the
-promotion reminder.
+review provenance fields (`reviewed_by` and `reviewed_at`), human event-time
+confirmation fields, required trigger outcomes, and the promotion reminder.
 
 Inspect configured provider readiness without printing secrets:
 

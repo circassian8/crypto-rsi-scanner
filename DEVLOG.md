@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Add event-fade review provenance fields · Codex
+**Why:** The validation workflow can preserve labels and outcomes across fresh
+exports, but those labels were not traceable to a reviewer or review time. That
+weakens the reviewed sample as evidence once rows are copied forward.
+**Changes:**
+- Added `reviewed_by` and `reviewed_at` to event-fade validation sample exports.
+- Added both fields to review sidecar templates, sidecar apply, and
+  evidence-safe reviewed-sample merges.
+- Updated review packets, bundle guides, `AGENTS.md`, `ROADMAP.md`, and
+  `research/event_discovery_design.md` to describe the provenance fields.
+- Extended regression tests for sample export defaults, sidecar round-trip,
+  reviewed-sample merge, scanner sidecar apply, and bundle guide content.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passes with 253/253
+tests, and `make verify` passes.
+**Notes/risks:** This is artifact-only. It does not alter event-fade scoring,
+eligibility, routing, paper trades, live DB writes, or promotion gates.
+
 ## 2026-06-17 — Add event-fade review guide bundles · Codex
 **Why:** The review bundle had the evidence packet and editable sidecar, but it
 still assumed reviewers already knew the accepted label taxonomy, proxy/direct

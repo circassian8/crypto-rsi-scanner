@@ -165,6 +165,8 @@ VALIDATION_SAMPLE_FIELDS = (
     "human_event_time_confidence",
     "human_event_time_notes",
     "review_status",
+    "reviewed_by",
+    "reviewed_at",
     "human_label",
     "human_notes",
 )
@@ -1375,6 +1377,8 @@ def _validation_sample_row(
         "outcome_price_interval": None,
         "outcome_price_source": None,
         "review_status": "",
+        "reviewed_by": "",
+        "reviewed_at": "",
         "human_label": "",
         "human_notes": "",
     }
