@@ -74,6 +74,24 @@ _GENERIC_ENTITY_WORDS = {
     "Trading",
     "Will",
 }
+_ENTITY_ACTION_WORDS = {
+    "Adds",
+    "Announces",
+    "Closes",
+    "Debuts",
+    "Down",
+    "Falls",
+    "Launches",
+    "Lists",
+    "Offers",
+    "Opens",
+    "Rallies",
+    "Reveals",
+    "Shuts",
+    "Surges",
+    "Unveils",
+    "Winds",
+}
 
 _MONTHS = {
     "jan": 1,
@@ -333,6 +351,8 @@ def _normalized_external_entity(value: object) -> str | None:
     while words and words[-1] in _GENERIC_ENTITY_WORDS:
         words.pop()
     if not words:
+        return None
+    if any(word in _ENTITY_ACTION_WORDS for word in words):
         return None
     if all(word in _GENERIC_ENTITY_WORDS for word in words):
         return None

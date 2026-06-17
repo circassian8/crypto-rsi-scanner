@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-17 — Guard external-asset extraction and refresh no-key bundle · Codex
+**Why:** A live no-key refresh showed the new generic extractor could over-capture
+headline action phrases, turning "Ventuals winds down on-chain pre-IPO markets"
+into a fake external asset. This is exactly the false-positive pressure the
+event-fade stabilization pass is meant to catch before human review.
+**Changes:**
+- Added an action-word guard to the rule-based external-asset normalizer so
+  phrases like "winds down pre-IPO markets" are rejected instead of becoming
+  proxy catalysts.
+- Added regression coverage proving generic IPO entities still extract
+  (`Mercury`, `Cerebras`) while the pre-IPO-market shutdown headline leaves
+  `external_asset` blank.
+- Regenerated the no-key review bundle at
+  `/tmp/event_fade_no_key_review_bundle_20260617_external_assets` using a fresh
+  `/tmp/event_fade_no_key_cache_20260617_external_assets` cache.
+- Updated `ROADMAP.md` and `research/event_discovery_design.md` with the cleaned
+  bundle counts and extractor guardrail.
+**Verify:** Targeted extractor tests passed. The refreshed bundle has 121 rows:
+26 proxy candidates, 19 proxy-context controls, 8 direct rows, 68 ambiguous rows,
+117 missing machine event times, 0 triggers, and the bad external asset is gone.
+GDELT timed out during the refresh and wrote a zero-row diagnostic; RSS and
+Polymarket produced the review bundle.
+**Notes/risks:** Research/review workflow only. The bundle still has no reviewed
+labels or trigger outcomes, so promotion remains blocked on human labeling.
+
 ## 2026-06-17 — Broaden rule-based external asset extraction · Codex
 **Why:** The Pro-model review flagged that proxy-news discovery still depended
 too heavily on a short hardcoded external-asset list. That left likely future

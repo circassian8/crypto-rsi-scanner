@@ -209,7 +209,9 @@ OpenAI, Anthropic, Stripe, Databricks, Anduril, Figma, xAI, Tesla, Nvidia,
 World Cup, Champions League, Iran, and US election. It also extracts simple
 capitalized entities only when they sit next to explicit proxy-catalyst language
 such as synthetic exposure, tokenized shares, prediction markets, IPO/public
-debut wording, or `Team A vs Team B` sports-match phrasing.
+debut wording, or `Team A vs Team B` sports-match phrasing. The extractor
+rejects action-phrase captures such as "winds down pre-IPO markets" so venue
+shutdown headlines do not become fake external assets.
 The resolver also rejects common identity words observed in public feeds
 (`cash`, `real`, `just`, `humanity`) so they do not become high-confidence
 asset matches from normal prose.

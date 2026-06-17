@@ -2399,6 +2399,13 @@ def test_event_discovery_news_external_asset_inference_handles_generic_ipo_entit
             "url": "https://example.test/usa-paraguay",
             "published_at": "2026-06-16T14:00:00Z",
         },
+        {
+            "id": "preipo-market-shutdown",
+            "title": "Hyperliquid-Based Ventuals Winds Down On-Chain Pre-IPO Markets",
+            "description": "The article is about a venue shutting down generic pre-IPO markets, not a named external IPO catalyst.",
+            "url": "https://example.test/ventuals-shutdown",
+            "published_at": "2026-06-16T15:00:00Z",
+        },
     ]
 
     events = news_events_from_items(rows, provider="project_blog_rss", start=start, end=end)
@@ -2410,6 +2417,8 @@ def test_event_discovery_news_external_asset_inference_handles_generic_ipo_entit
     assert by_id["project_blog_rss:cerebras-ipo-market"].raw_json["event"]["event_type"] == "ipo_proxy"
     assert by_id["project_blog_rss:team-match"].raw_json["event"]["external_asset"] == "USA vs Paraguay"
     assert by_id["project_blog_rss:team-match"].raw_json["event"]["event_type"] == "sports_event"
+    assert by_id["project_blog_rss:preipo-market-shutdown"].raw_json["event"]["external_asset"] is None
+    assert by_id["project_blog_rss:preipo-market-shutdown"].raw_json["event"]["event_type"] == "ipo_proxy"
 
 
 def test_event_discovery_proxy_article_with_text_date_becomes_dated_review_candidate():
