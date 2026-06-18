@@ -38,8 +38,10 @@ class CoinGeckoUniverseProvider:
         self.live_enabled = live_enabled
         self.live_fetch_limit = live_fetch_limit
         self.client_factory = client_factory or CoinGeckoClient
+        self.last_warnings: tuple[str, ...] = ()
 
     def fetch_assets(self) -> list[DiscoveredAsset]:
+        self.last_warnings = ()
         if self.path is None and self.live_enabled:
             return self._fetch_live_assets()
         if self.path is None:
@@ -47,9 +49,11 @@ class CoinGeckoUniverseProvider:
         try:
             markets = load_market_rows(self.path)
         except Exception as exc:  # noqa: BLE001
+            warning = f"CoinGecko universe fixture load failed: {exc}"
+            self.last_warnings = (warning,)
             if self.required:
                 raise
-            log.warning("CoinGecko universe fixture load failed: %s", exc)
+            log.warning(warning)
             return []
         return assets_from_markets(markets, limit=self.limit)
 
@@ -57,10 +61,13 @@ class CoinGeckoUniverseProvider:
         try:
             markets = _run_async(self._fetch_live_markets())
         except Exception as exc:  # noqa: BLE001
+            warning = f"CoinGecko live universe fetch failed: {exc}"
+            self.last_warnings = (warning,)
             if self.required:
                 raise
-            log.warning("CoinGecko live universe fetch failed: %s", exc)
+            log.warning(warning)
             return []
+        self.last_warnings = ()
         return assets_from_markets(markets, limit=self.limit)
 
     async def _fetch_live_markets(self) -> list[dict[str, Any]]:

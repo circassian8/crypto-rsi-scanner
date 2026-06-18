@@ -46,8 +46,10 @@ class ProjectBlogRssProvider:
         self.timeout = timeout
         self.opener = opener or _urlopen_with_timeout
         self.fetched_at = fetched_at
+        self.last_warnings: tuple[str, ...] = ()
 
     def fetch_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
+        self.last_warnings = ()
         if self.path is None and self.live_enabled:
             return self._fetch_live_events(start, end)
         return fetch_news_events(
@@ -61,6 +63,7 @@ class ProjectBlogRssProvider:
     def _fetch_live_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
         fetched_at = self.fetched_at or datetime.now(timezone.utc)
         events: list[RawDiscoveredEvent] = []
+        warnings: list[str] = []
         for feed_url in self.feed_urls:
             try:
                 request = Request(
@@ -74,9 +77,11 @@ class ProjectBlogRssProvider:
                     body = response.read()
                 rows = _feed_rows(body, feed_url=feed_url, fetched_at=fetched_at)
             except Exception as exc:  # noqa: BLE001
+                warning = f"Project blog/RSS live feed fetch failed for {feed_url}: {exc}"
+                warnings.append(warning)
                 if self.required:
                     raise
-                log.warning("Project blog/RSS live feed fetch failed for %s: %s", feed_url, exc)
+                log.warning(warning)
                 continue
             events.extend(news_events_from_items(
                 rows,
@@ -85,6 +90,7 @@ class ProjectBlogRssProvider:
                 end=end,
                 fetched_at=fetched_at,
             ))
+        self.last_warnings = tuple(warnings)
         return events
 
 

@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-19 - Keep Event Alpha replay, priors shadow, and provider health advisory-only
+**Status:** accepted
+**Decision:** Event Alpha may wrap live event-source, catalyst-search,
+CoinGecko-universe, and derivatives-enrichment providers with local
+health/backoff state; run targeted CoinGecko watchlist market refresh for
+active research rows; compare calibration priors in shadow; and replay raw
+event evidence through local discovery/alert/watchlist/router stages. These
+paths are operations and comparison tools only. Provider backoff must fail soft,
+targeted market refresh must be evidence only, priors shadow must not write
+snapshots, and replay must not call live providers, send Telegram, write live
+DB rows, open paper trades, or execute. `TRIGGERED_FADE` remains reserved for
+deterministic `event_fade.py` output on `proxy_fade` rows.
+**Why:** Daily operation needs policy-comparable diagnostics and safer provider
+behavior, but replay/prior/health tooling would be dangerous if it silently
+became alert or trading authority.
+**Revisit when:** A reviewed Event Alpha sample and explicit human approval
+justify promoting a specific replay/prior/provider signal into a separate
+research-digest or paper-tracking workflow.
+
 ## 2026-06-19 - Keep Event Alpha daily-ops automation bounded and local
 **Status:** accepted
 **Decision:** Event Alpha may run targeted active-watchlist market refresh,

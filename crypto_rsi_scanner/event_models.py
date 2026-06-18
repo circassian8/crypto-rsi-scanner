@@ -105,3 +105,4 @@ class EventDiscoveryResult:
     links: tuple[EventAssetLink, ...]
     classifications: tuple[EventClassification, ...]
     candidates: tuple[DiscoveredEventFadeCandidate, ...]
+    warnings: tuple[str, ...] = ()

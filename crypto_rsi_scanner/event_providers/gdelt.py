@@ -56,8 +56,10 @@ class GdeltProvider:
         self.timeout = timeout
         self.opener = opener or _urlopen_with_timeout
         self.fetched_at = fetched_at
+        self.last_warnings: tuple[str, ...] = ()
 
     def fetch_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
+        self.last_warnings = ()
         if self.path is None and self.live_enabled:
             return self._fetch_live_events(start, end)
         return fetch_news_events(
@@ -79,13 +81,16 @@ class GdeltProvider:
                 raw = json.loads(response.read().decode("utf-8"))
             rows = _news_items(raw, allow_empty=True)
         except Exception as exc:  # noqa: BLE001
+            warning = f"GDELT live news fetch failed: {exc}"
+            self.last_warnings = (warning,)
             if self.required:
                 raise
-            log.warning("GDELT live news fetch failed: %s", exc)
+            log.warning(warning)
             return []
 
         # Live rows reuse the fixture parser/filter path so they inherit the same
         # event-type inference, point-in-time timestamps, and no-trade safety.
+        self.last_warnings = ()
         return news_events_from_items(
             rows,
             provider=self.name,

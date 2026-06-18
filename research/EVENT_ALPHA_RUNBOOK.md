@@ -29,6 +29,13 @@ watchlist monitoring, missed opportunities, and calibration. The brief writes a
 Markdown summary under `RSI_EVENT_ALPHA_DAILY_BRIEF_PATH`, linking any selected
 research cards.
 
+For a compact daily burn-in loop that does status, cycle, brief, and last-run
+explain without enabling sends:
+
+```bash
+make event-alpha-burn-in-no-key
+```
+
 ## Full LLM No-Send Review
 
 Use the full LLM profile only when `OPENAI_API_KEY` is configured and you want
@@ -41,6 +48,12 @@ make event-alpha-daily-llm-report PROFILE=full_llm_live
 LLM calls are capped by the profile budget defaults and the local budget ledger.
 Cache hits are reused. If rows are skipped, the run ledger and explain report
 show `llm_skipped_due_budget`.
+
+For an LLM burn-in loop that keeps sends off and adds source reliability:
+
+```bash
+make event-alpha-burn-in-llm
+```
 
 ## Guarded Research Send
 
@@ -97,6 +110,18 @@ Applied priors write `score_before_priors`, `score_after_priors`, prior file,
 version, and multipliers into alert snapshots. They cannot create
 `TRIGGERED_FADE` or bypass hard source-noise/identity gates.
 
+To compare priors without applying or writing snapshots:
+
+```bash
+make event-alpha-priors-shadow-report
+```
+
+Weekly review stitches the local review loop together:
+
+```bash
+make event-alpha-weekly-review
+```
+
 ## Research Cards
 
 Print one card:
@@ -113,7 +138,8 @@ make event-research-cards-write
 
 Cards are Markdown artifacts under `RSI_EVENT_RESEARCH_CARDS_DIR` and include
 playbook, source evidence, LLM interpretation, market confirmation, warnings,
-verification steps, invalidation, and outcome fields.
+verification steps, a playbook-specific trade-readiness checklist,
+invalidation, and outcome fields.
 
 ## When No Alerts Arrive
 
@@ -137,8 +163,9 @@ Common causes:
 ## Provider Health and Replay
 
 Provider health is stored locally under `RSI_EVENT_PROVIDER_HEALTH_PATH`.
-Non-fixture catalyst-search providers may be skipped temporarily after repeated
-failures or DNS-like errors. Inspect it with:
+Non-fixture event-source, enrichment, and catalyst-search providers may be
+skipped temporarily after repeated failures or DNS-like errors. Inspect grouped
+event-source/enrichment/catalyst-search rows with:
 
 ```bash
 make event-alpha-status PROFILE=no_key_live
@@ -152,6 +179,18 @@ make event-alpha-replay
 
 Replay is useful when comparing priors/advisory settings without live providers,
 Telegram sends, or watchlist mutations.
+
+Raw-event replay can reconstruct discovery/alerts/watchlist/router decisions
+from a local cache/export plus optional local market rows:
+
+```bash
+python3 main.py --event-alpha-replay \
+  --event-alpha-replay-raw-events event_fade_cache/raw_events.jsonl \
+  --event-alpha-replay-market-rows fixtures/coingecko_smoke/top_markets.json \
+  --event-alpha-replay-priors
+```
+
+This writes no live artifacts and uses a temporary watchlist path.
 
 ## Retention
 

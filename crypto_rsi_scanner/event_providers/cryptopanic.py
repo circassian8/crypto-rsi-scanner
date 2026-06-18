@@ -61,8 +61,10 @@ class CryptoPanicProvider:
         self.timeout = timeout
         self.opener = opener or _urlopen_with_timeout
         self.fetched_at = fetched_at
+        self.last_warnings: tuple[str, ...] = ()
 
     def fetch_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
+        self.last_warnings = ()
         if self.path is None and self.live_enabled:
             return self._fetch_live_events(start, end)
         return fetch_news_events(
@@ -76,9 +78,11 @@ class CryptoPanicProvider:
     def _fetch_live_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
         token = self.api_token.strip()
         if not token:
+            warning = "CryptoPanic live news fetch skipped: missing API token"
+            self.last_warnings = (warning,)
             if self.required:
                 raise ValueError("CryptoPanic live fetch requires RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN")
-            log.warning("CryptoPanic live news fetch skipped: missing API token")
+            log.warning(warning)
             return []
         url = self._request_url(token)
         try:
@@ -90,11 +94,14 @@ class CryptoPanicProvider:
                 raw = json.loads(response.read().decode("utf-8"))
             rows = _news_items(raw, allow_empty=True)
         except Exception as exc:  # noqa: BLE001
+            warning = f"CryptoPanic live news fetch failed: {exc}"
+            self.last_warnings = (warning,)
             if self.required:
                 raise
-            log.warning("CryptoPanic live news fetch failed: %s", exc)
+            log.warning(warning)
             return []
 
+        self.last_warnings = ()
         return news_events_from_items(
             rows,
             provider=self.name,

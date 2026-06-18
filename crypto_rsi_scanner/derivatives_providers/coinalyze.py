@@ -59,8 +59,10 @@ class CoinalyzeDerivativesProvider:
         self.convert_to_usd = convert_to_usd
         self.opener = opener or _urlopen_with_timeout
         self.clock = clock or time.time
+        self.last_warnings: tuple[str, ...] = ()
 
     def fetch_snapshots(self) -> dict[str, dict[str, Any]]:
+        self.last_warnings = ()
         if self.path is None and self.live_enabled:
             return self._fetch_live_snapshots()
         if self.path is None:
@@ -68,9 +70,11 @@ class CoinalyzeDerivativesProvider:
         try:
             rows = _load_rows(self.path)
         except Exception as exc:  # noqa: BLE001
+            warning = f"Coinalyze derivatives fixture load failed: {exc}"
+            self.last_warnings = (warning,)
             if self.required:
                 raise
-            log.warning("Coinalyze derivatives fixture load failed: %s", exc)
+            log.warning(warning)
             return {}
 
         out: dict[str, dict[str, Any]] = {}
@@ -84,23 +88,31 @@ class CoinalyzeDerivativesProvider:
 
     def _fetch_live_snapshots(self) -> dict[str, dict[str, Any]]:
         if not self.api_key:
+            warning = "Coinalyze live derivatives fetch skipped: missing API key"
+            self.last_warnings = (warning,)
             if self.required:
                 raise ValueError("Coinalyze live derivatives fetch requires API key")
-            log.warning("Coinalyze live derivatives fetch skipped: missing API key")
-            return {}
-        symbols = self._live_symbols()
-        if not symbols:
-            if self.required:
-                raise ValueError("Coinalyze live derivatives fetch requires at least one symbol")
-            log.warning("Coinalyze live derivatives fetch skipped: no symbols configured")
+            log.warning(warning)
             return {}
         try:
+            symbols = self._live_symbols()
+            if not symbols:
+                warning = "Coinalyze live derivatives fetch skipped: no symbols configured"
+                self.last_warnings = (warning,)
+                if self.required:
+                    raise ValueError("Coinalyze live derivatives fetch requires at least one symbol")
+                log.warning(warning)
+                return {}
             rows = self._fetch_live_rows(symbols)
         except Exception as exc:  # noqa: BLE001
+            safe_error = _safe_error(exc, self.api_key)
+            warning = f"Coinalyze live derivatives fetch failed: {safe_error}"
+            self.last_warnings = (warning,)
             if self.required:
                 raise
-            log.warning("Coinalyze live derivatives fetch failed: %s", _safe_error(exc, self.api_key))
+            log.warning(warning)
             return {}
+        self.last_warnings = ()
         out: dict[str, dict[str, Any]] = {}
         for row in rows:
             snapshot = _snapshot(row)

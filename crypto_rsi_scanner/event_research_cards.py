@@ -113,6 +113,11 @@ def render_research_card(
     lines.extend(_verify_lines(alert, playbook))
     lines.extend([
         "",
+        "## Trade-Readiness Checklist",
+    ])
+    lines.extend(_trade_readiness_lines(entry, alert, playbook, state))
+    lines.extend([
+        "",
         "## Invalidation / Why Wrong",
         f"- {_value(None, alert, '', 'playbook_invalidation') or _default_invalidation(playbook)}",
         "",
@@ -542,3 +547,53 @@ def _default_invalidation(playbook: str) -> str:
     if playbook == "proxy_fade":
         return "Price reclaims event VWAP/invalidation level or proxy narrative persists."
     return "Source evidence fails identity/catalyst review."
+
+
+def _trade_readiness_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+    playbook: str,
+    state: str,
+) -> list[str]:
+    components = alert.get("score_components") if alert is not None and isinstance(alert.get("score_components"), Mapping) else {}
+    timing = _value(entry, alert, "event_time", "event_time") or "unknown"
+    direction = _value(None, alert, "", "expected_direction") or _playbook_direction(playbook)
+    horizon = _value(None, alert, "", "primary_horizon") or "manual"
+    invalidation = _value(None, alert, "", "playbook_invalidation") or _default_invalidation(playbook)
+    lines = [
+        f"- Catalyst clarity: {_check_value(components, 'external_catalyst')}",
+        f"- Event timing quality: {timing} / {_check_value(components, 'event_time_quality')}",
+        f"- Market confirmation: {_check_value(components, 'market_move_volume')}",
+        f"- Derivatives crowding: {_score(entry, alert, 'derivatives_crowding')}",
+        f"- Liquidity/supply risk: supply={_score(entry, alert, 'supply_pressure')} liquidity=manual review",
+        f"- Current lifecycle state: {state}",
+        f"- Primary playbook: {playbook}",
+        f"- Expected direction / horizon: {direction} / {horizon}",
+        f"- Invalidation / why wrong: {invalidation}",
+    ]
+    if playbook == "proxy_fade":
+        lines.append("- Manual verification: confirm post-event failure, failed reclaim, and invalidation level before treating as research-actionable.")
+    elif "listing" in playbook:
+        lines.append("- Manual verification: confirm venue, listing mechanics, opening liquidity, spread, and whether the event is already priced.")
+    elif "unlock" in playbook:
+        lines.append("- Manual verification: confirm unlock size, circulating-supply impact, recipient wallets, and available liquidity.")
+    elif "market_anomaly" in playbook:
+        lines.append("- Manual verification: catalyst unvalidated; find source evidence and confirm asset identity before escalation.")
+    else:
+        lines.append("- Manual verification: confirm source evidence, asset identity, playbook fit, and why the thesis could be wrong.")
+    return lines
+
+
+def _check_value(components: Mapping[str, Any], key: str) -> str:
+    value = components.get(key)
+    return "n/a" if value is None else str(value)
+
+
+def _playbook_direction(playbook: str) -> str:
+    if playbook in {"proxy_fade", "unlock_supply_pressure"}:
+        return "down"
+    if "listing" in playbook:
+        return "volatility"
+    if "market_anomaly" in playbook:
+        return "unknown"
+    return "manual"

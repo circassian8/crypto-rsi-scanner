@@ -1203,6 +1203,7 @@ def _event_discovery_result_from_config(
         fade_cfg=event_fade.runtime_config(config),
         now=now,
         raw_event_transform=raw_event_transform,
+        provider_health_cfg=_event_provider_health_config_from_runtime(),
     )
 
 
@@ -1302,6 +1303,16 @@ def _event_watchlist_monitor_market_rows_from_runtime() -> list[dict[str, Any]]:
         return []
     market_path = config.EVENT_WATCHLIST_MONITOR_MARKET_PATH or config.EVENT_DISCOVERY_UNIVERSE_PATH
     return event_watchlist_market.load_market_rows(market_path)
+
+
+def _event_watchlist_market_provider_from_runtime() -> event_watchlist_market.EventWatchlistMarketProvider | None:
+    source = str(config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE or "").strip().lower()
+    if source != "coingecko":
+        return None
+    return event_watchlist_market.CoinGeckoWatchlistMarketProvider(
+        live_enabled=bool(config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP and config.EVENT_DISCOVERY_UNIVERSE_LIVE),
+        cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
+    )
 
 
 def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRouterConfig:
@@ -1585,6 +1596,7 @@ def event_alpha_cycle(
         watchlist_monitor_enabled=config.EVENT_WATCHLIST_MONITOR_ENABLED,
         watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
         watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
+        watchlist_monitor_market_provider=_event_watchlist_market_provider_from_runtime(),
         watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
         watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
         watchlist_monitor_market_cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
@@ -1799,6 +1811,7 @@ def event_watchlist_monitor_report(verbose: bool = False, event_now: str | datet
         fixture_rows=fixture_rows,
         cycle_rows=fixture_rows,
         targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
+        targeted_provider=_event_watchlist_market_provider_from_runtime(),
         max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
         cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
         now=_event_research_now(event_now),
@@ -2003,6 +2016,23 @@ def event_alpha_calibration_export_priors(out_path: str | None = None, verbose: 
     print(event_alpha_calibration.format_priors_export(path, payload))
 
 
+def event_alpha_priors_shadow_report(verbose: bool = False) -> None:
+    """Print in-memory priors before/after comparison for current Event Alpha alerts."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_alpha_inputs_configured():
+        print(
+            "No event-alpha inputs ready for priors shadow report. Configure event sources or enable "
+            "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
+        )
+        return
+    alert_cfg = _event_alert_config_from_runtime()
+    result = _event_discovery_result_from_config(now=_event_research_now())
+    alerts = event_alerts.build_event_alert_candidates(result, cfg=alert_cfg, now=_event_research_now())
+    priors_cfg = _event_alpha_priors_config_from_runtime()
+    result_shadow = event_alpha_priors.compare_priors_shadow(alerts, cfg=priors_cfg, alert_cfg=alert_cfg)
+    print(event_alpha_priors.format_priors_shadow_report(result_shadow))
+
+
 def event_alpha_export_eval_cases_from_feedback(out_dir: str | None = None, verbose: bool = False) -> None:
     """Export proposed eval cases from feedback artifacts."""
     _setup_event_discovery_logging(verbose)
@@ -2110,6 +2140,7 @@ def event_alpha_daily_brief_report(verbose: bool = False) -> None:
         missed_rows=missed_rows,
         watchlist_entries=watchlist.entries,
         router_result=router_result,
+        provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
         card_paths=card_write.card_paths,
     )
     result = event_alpha_daily_brief.write_daily_brief(
@@ -2124,10 +2155,42 @@ def event_alpha_replay_report(
     *,
     priors: bool = False,
     llm_advisory: bool = False,
+    raw_events_path: str | None = None,
+    market_rows_path: str | None = None,
     verbose: bool = False,
 ) -> None:
     """Replay Event Alpha local artifacts without provider calls or sends."""
     _setup_event_discovery_logging(verbose)
+    if raw_events_path:
+        raw_events = event_alpha_replay.load_raw_events_jsonl(raw_events_path)
+        market_rows = event_alpha_replay.load_market_rows(market_rows_path or config.EVENT_DISCOVERY_UNIVERSE_PATH)
+        assets = [
+            *event_discovery.load_discovery_assets(config.EVENT_DISCOVERY_ALIASES_PATH),
+            *event_alpha_replay.assets_from_market_rows(market_rows),
+        ]
+        llm_cfg = _event_llm_config_from_runtime() if llm_advisory else None
+        llm_provider = _event_llm_provider(llm_cfg) if llm_cfg and llm_cfg.provider != "openai" else None
+        priors_cfg = _event_alpha_priors_config_from_runtime()
+        if priors:
+            priors_cfg = event_alpha_priors.EventAlphaPriorsConfig(
+                enabled=True,
+                path=priors_cfg.path,
+                min_multiplier=priors_cfg.min_multiplier,
+                max_multiplier=priors_cfg.max_multiplier,
+            )
+        result = event_alpha_replay.replay_from_raw_events(
+            raw_events=raw_events,
+            assets=assets,
+            market_rows=market_rows,
+            alert_cfg=_event_alert_config_from_runtime(),
+            priors_cfg=priors_cfg,
+            llm_provider=llm_provider,
+            llm_cfg=llm_cfg,
+            router_cfg=_event_alpha_router_config_from_runtime(),
+            now=_event_research_now(),
+        )
+        print(event_alpha_replay.format_replay_report(result))
+        return
     alerts = event_alpha_replay.load_jsonl_rows(config.EVENT_ALPHA_ALERT_STORE_PATH)
     watchlist_rows = event_alpha_replay.load_jsonl_rows(config.EVENT_WATCHLIST_STATE_PATH)
     result = event_alpha_replay.replay_from_artifacts(
@@ -4000,6 +4063,16 @@ def cli() -> None:
         help="Replay Event Alpha local artifacts without provider calls or sends.",
     )
     parser.add_argument(
+        "--event-alpha-replay-raw-events",
+        default=None,
+        help="Optional raw event JSONL/cache path for true local Event Alpha replay.",
+    )
+    parser.add_argument(
+        "--event-alpha-replay-market-rows",
+        default=None,
+        help="Optional CoinGecko-style market rows path for --event-alpha-replay-raw-events.",
+    )
+    parser.add_argument(
         "--event-alpha-replay-priors",
         action="store_true",
         help="With --event-alpha-replay, show priors before/after score fields when present.",
@@ -4013,6 +4086,11 @@ def cli() -> None:
         "--event-alpha-prune-artifacts",
         action="store_true",
         help="Dry-run retention pruning for old Event Alpha research artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-priors-shadow-report",
+        action="store_true",
+        help="Compare current Event Alpha alert tiers/scores before and after priors without writing artifacts.",
     )
     parser.add_argument(
         "--event-research-card",
@@ -4446,6 +4524,9 @@ def cli() -> None:
             verbose=args.verbose,
         )
         return
+    if args.event_alpha_priors_shadow_report:
+        event_alpha_priors_shadow_report(verbose=args.verbose)
+        return
     if args.event_alpha_export_eval_cases_from_feedback is not None:
         event_alpha_export_eval_cases_from_feedback(
             args.event_alpha_export_eval_cases_from_feedback or None,
@@ -4468,6 +4549,8 @@ def cli() -> None:
         event_alpha_replay_report(
             priors=args.event_alpha_replay_priors,
             llm_advisory=args.event_alpha_replay_llm_advisory,
+            raw_events_path=args.event_alpha_replay_raw_events,
+            market_rows_path=args.event_alpha_replay_market_rows,
             verbose=args.verbose,
         )
         return

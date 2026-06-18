@@ -27,6 +27,27 @@ class EventAlphaPriors:
     payload: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class EventAlphaPriorsShadowRow:
+    alert_key: str
+    symbol: str
+    coin_id: str
+    playbook: str
+    tier_before: str
+    tier_after: str
+    score_before: int
+    score_after: int
+    multipliers_applied: dict[str, float]
+    hard_gate: str | None = None
+
+
+@dataclass(frozen=True)
+class EventAlphaPriorsShadowResult:
+    rows: tuple[EventAlphaPriorsShadowRow, ...]
+    prior_file: str | None
+    warnings: tuple[str, ...] = ()
+
+
 def load_priors(cfg: EventAlphaPriorsConfig) -> EventAlphaPriors | None:
     if not cfg.enabled or cfg.path is None:
         return None
@@ -65,6 +86,84 @@ def apply_priors_to_alerts(
     return sorted(adjusted, key=lambda item: (-_tier_rank(item.tier), -item.opportunity_score, item.symbol))
 
 
+def compare_priors_shadow(
+    alerts: Iterable[event_alerts.EventAlertCandidate],
+    *,
+    cfg: EventAlphaPriorsConfig,
+    alert_cfg: event_alerts.EventAlertConfig | None = None,
+) -> EventAlphaPriorsShadowResult:
+    """Compare Event Alpha priors in memory without writing artifacts."""
+    data = list(alerts)
+    enabled_cfg = EventAlphaPriorsConfig(
+        enabled=True,
+        path=cfg.path,
+        min_multiplier=cfg.min_multiplier,
+        max_multiplier=cfg.max_multiplier,
+    )
+    priors = load_priors(enabled_cfg)
+    if priors is None:
+        return EventAlphaPriorsShadowResult(
+            rows=(),
+            prior_file=str(cfg.path) if cfg.path else None,
+            warnings=(f"priors file not found or invalid: {cfg.path}" if cfg.path else "priors path is not configured",),
+        )
+    adjusted = apply_priors_to_alerts(data, cfg=enabled_cfg, alert_cfg=alert_cfg)
+    adjusted_by_key = {_alert_key(alert): alert for alert in adjusted}
+    rows: list[EventAlphaPriorsShadowRow] = []
+    for alert in data:
+        key = _alert_key(alert)
+        after = adjusted_by_key.get(key, alert)
+        rows.append(EventAlphaPriorsShadowRow(
+            alert_key=key,
+            symbol=alert.symbol,
+            coin_id=alert.coin_id,
+            playbook=alert.effective_playbook_type or alert.playbook_type or "unknown",
+            tier_before=alert.tier.value,
+            tier_after=after.tier.value,
+            score_before=alert.opportunity_score,
+            score_after=after.opportunity_score,
+            multipliers_applied=dict(after.prior_multipliers_applied),
+            hard_gate=_hard_gate_reason(alert, after),
+        ))
+    return EventAlphaPriorsShadowResult(
+        rows=tuple(rows),
+        prior_file=str(priors.path),
+        warnings=(),
+    )
+
+
+def format_priors_shadow_report(result: EventAlphaPriorsShadowResult) -> str:
+    lines = [
+        "=" * 76,
+        "EVENT ALPHA PRIORS SHADOW REPORT (research-only; no stored changes)",
+        "=" * 76,
+        f"prior_file: {result.prior_file or 'none'}",
+        f"rows: {len(result.rows)}",
+    ]
+    if result.warnings:
+        lines.append("warnings: " + "; ".join(result.warnings))
+    if not result.rows:
+        lines.append("No priors comparison rows.")
+        lines.append("No sends, paper trades, live DB rows, or execution were used.")
+        return "\n".join(lines)
+    lines.append("")
+    for row in result.rows[:50]:
+        multipliers = (
+            ", ".join(f"{key}={value:.3f}" for key, value in sorted(row.multipliers_applied.items()))
+            if row.multipliers_applied
+            else "none"
+        )
+        lines.append(
+            f"{row.alert_key or row.symbol}: {row.symbol}/{row.coin_id} playbook={row.playbook} "
+            f"tier={row.tier_before}->{row.tier_after} score={row.score_before}->{row.score_after}"
+        )
+        lines.append(f"  multipliers: {multipliers}")
+        if row.hard_gate:
+            lines.append(f"  hard_gate: {row.hard_gate}")
+    lines.append("No sends, paper trades, live DB rows, or execution were used.")
+    return "\n".join(lines).rstrip()
+
+
 def _apply_to_alert(
     alert: event_alerts.EventAlertCandidate,
     priors: EventAlphaPriors,
@@ -91,6 +190,28 @@ def _apply_to_alert(
         prior_generated_at=priors.generated_at,
         prior_multipliers_applied=multipliers,
     )
+
+
+def _alert_key(alert: event_alerts.EventAlertCandidate) -> str:
+    event = alert.discovery_candidate.event
+    return "|".join((
+        str(event.event_id or ""),
+        str(alert.coin_id or ""),
+        str(alert.effective_playbook_type or alert.playbook_type or ""),
+    ))
+
+
+def _hard_gate_reason(
+    before: event_alerts.EventAlertCandidate,
+    after: event_alerts.EventAlertCandidate,
+) -> str | None:
+    if before.tier == event_alerts.EventAlertTier.TRIGGERED_FADE and after.tier == before.tier:
+        return "triggered_fade_authoritative"
+    if before.tier == event_alerts.EventAlertTier.STORE_ONLY and after.tier == before.tier:
+        return before.rejected_reason or "store_only_hard_gate"
+    if before.effective_playbook_type == "source_noise_control" and after.tier == event_alerts.EventAlertTier.STORE_ONLY:
+        return "source_noise_control_store_only"
+    return None
 
 
 def _tier_after_priors(

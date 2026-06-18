@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Protocol
 
 from . import event_watchlist
+from .client import CoinGeckoClient
 from .event_models import EventDiscoveryResult
+from .event_providers.coingecko_universe import _run_async
 
 
 @dataclass(frozen=True)
@@ -69,8 +71,22 @@ class CoinGeckoWatchlistMarketProvider:
 
     name = "coingecko"
 
-    def __init__(self, fetcher: Callable[[tuple[str, ...]], Iterable[Mapping[str, Any]]] | None = None) -> None:
+    def __init__(
+        self,
+        fetcher: Callable[[tuple[str, ...]], Iterable[Mapping[str, Any]]] | None = None,
+        *,
+        live_enabled: bool = False,
+        cache_ttl_seconds: int = 900,
+        client_factory: Callable[[], Any] | None = None,
+        now_fn: Callable[[], datetime] | None = None,
+    ) -> None:
         self._fetcher = fetcher
+        self.live_enabled = live_enabled
+        self.cache_ttl_seconds = max(0, int(cache_ttl_seconds or 0))
+        self.client_factory = client_factory or CoinGeckoClient
+        self.now_fn = now_fn or (lambda: datetime.now(timezone.utc))
+        self._cache: dict[tuple[str, ...], tuple[datetime, list[dict[str, Any]]]] = {}
+        self.last_cache_status: str = "miss"
 
     def fetch_market_rows(
         self,
@@ -82,13 +98,53 @@ class CoinGeckoWatchlistMarketProvider:
         ids = ids[: max(1, int(max_assets or 1))]
         if not ids:
             return [], ()
-        if self._fetcher is None:
-            return [], ("CoinGecko targeted watchlist lookup is not configured; using fallback rows",)
+        cache_key = tuple(sorted(ids))
+        cached = self._cache.get(cache_key)
+        observed = self._as_utc(self.now_fn())
+        if cached is not None and self.cache_ttl_seconds > 0:
+            cached_at, rows = cached
+            if cached_at + timedelta(seconds=self.cache_ttl_seconds) >= observed:
+                self.last_cache_status = "hit"
+                return [dict(row) for row in rows], ()
         try:
-            rows = [dict(row) for row in self._fetcher(ids) if isinstance(row, Mapping)]
+            if self._fetcher is not None:
+                rows = [dict(row) for row in self._fetcher(ids) if isinstance(row, Mapping)]
+            elif self.live_enabled:
+                rows = self._fetch_live_rows(ids)
+            else:
+                self.last_cache_status = "disabled"
+                return [], ("CoinGecko targeted watchlist lookup is not configured; using fallback rows",)
         except Exception as exc:  # pragma: no cover - defensive fail-soft guard
+            self.last_cache_status = "error"
             return [], (f"CoinGecko targeted watchlist lookup failed: {type(exc).__name__}: {exc}",)
+        self._cache[cache_key] = (observed, [dict(row) for row in rows])
+        self.last_cache_status = "miss"
         return rows, ()
+
+    def _fetch_live_rows(self, ids: tuple[str, ...]) -> list[dict[str, Any]]:
+        return _run_async(self._fetch_live_rows_async(ids))
+
+    async def _fetch_live_rows_async(self, ids: tuple[str, ...]) -> list[dict[str, Any]]:
+        async with self.client_factory() as client:
+            rows = await client._get(  # noqa: SLF001 - no public targeted markets helper yet
+                "/coins/markets",
+                {
+                    "vs_currency": "usd",
+                    "ids": ",".join(ids),
+                    "order": "market_cap_desc",
+                    "per_page": min(250, max(1, len(ids))),
+                    "page": 1,
+                    "sparkline": "false",
+                    "price_change_percentage": "1h,24h,7d",
+                },
+            )
+        if not isinstance(rows, list):
+            return []
+        return [dict(row) for row in rows if isinstance(row, Mapping)]
+
+    @staticmethod
+    def _as_utc(value: datetime) -> datetime:
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
 def market_rows_for_watchlist(
@@ -147,8 +203,12 @@ def market_rows_for_watchlist(
                     row.setdefault("watchlist_market_source", getattr(provider, "name", clean_source))
                     row.setdefault("watchlist_market_observed_at", observed.isoformat())
                 candidate_rows.extend(targeted_rows)
+            provider_cache_status = getattr(provider, "last_cache_status", None)
         else:
             warnings.append(f"targeted watchlist market lookup is not available for source {clean_source!r}")
+            provider_cache_status = None
+    else:
+        provider_cache_status = None
     if clean_source == "fixture":
         candidate_rows.extend(dict(row) for row in fixture_rows if isinstance(row, Mapping))
     elif clean_source in {"cycle", "coingecko"}:
@@ -166,7 +226,7 @@ def market_rows_for_watchlist(
         assets_requested=len(active),
         rows_selected=len(selected),
         warnings=tuple(dict.fromkeys(warnings)),
-        cache_status=f"ttl={int(cache_ttl_seconds or 0)}s",
+        cache_status=provider_cache_status or f"ttl={int(cache_ttl_seconds or 0)}s",
     )
 
 

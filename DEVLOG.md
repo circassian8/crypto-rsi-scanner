@@ -17,6 +17,53 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Polish Event Alpha policy-comparable daily radar · Codex
+**Why:** The Event Alpha Radar needed one more daily-operations pass so live
+research sources, active watchlist monitoring, prior comparisons, replay, daily
+briefs, and research cards behave like one auditable operating system rather
+than separate reports.
+**Changes:**
+- Expanded `event_provider_health.py` with wrappers for catalyst search,
+  event-source, universe, and derivatives providers; wired health/backoff into
+  live GDELT/RSS/Polymarket/CryptoPanic discovery sources plus live CoinGecko
+  universe and Coinalyze derivatives enrichment.
+- Added provider warnings to `EventDiscoveryResult` so skipped/backoff provider
+  rows flow into Event Alpha pipeline warnings and run-ledger rows.
+- Extended `event_watchlist_market.py` with opt-in targeted CoinGecko
+  watchlist lookup by active `coin_id`, max-asset limits, TTL cache hits, and
+  fail-soft fallback to cycle/fixture rows.
+- Expanded `event_alpha_replay.py` from artifact counting into a local replay
+  harness that can reconstruct discovery alerts, optional fixture/cache LLM
+  advisory, bounded priors, temporary watchlist refresh, router decisions, and
+  before/after tier/score comparisons without live providers or sends.
+- Added `--event-alpha-priors-shadow-report` and the matching Make target for
+  in-memory prior comparison without writing snapshots.
+- Upgraded daily brief sections with provider health, LLM budget, new-vs-last
+  run, hotter watchlist rows, alertable decisions, cards, missed opportunities,
+  calibration recommendations, suppression reasons, and why alerts were or were
+  not sent.
+- Added a trade-readiness checklist section to research cards, using
+  playbook-specific review language for proxy fades, listings, unlocks, and
+  market anomalies.
+- Added burn-in/review Make workflows:
+  `event-alpha-burn-in-no-key`, `event-alpha-burn-in-llm`, and
+  `event-alpha-weekly-review`.
+- Added offline regression tests for universal provider health wrappers,
+  targeted watchlist market cache/fallback, raw replay, priors shadow, daily
+  brief/card sections, and burn-in Make targets.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 355/355. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. `make verify PYTHON=python3`
+passed.
+**Notes/risks:** The new live-provider protection and targeted watchlist market
+refresh are still research-only and opt-in. Replay writes only temporary
+watchlist state unless an explicit report path is added later. Priors shadow
+does not apply priors or write artifacts. None of these paths can create
+`TRIGGERED_FADE`, send normal RSI alerts, paper trade, write live signal rows,
+or execute.
+
 ## 2026-06-19 — Polish Event Alpha daily-use operations · Codex
 **Why:** Event Alpha had strong research reports, but daily use still needed
 targeted active-watchlist market refresh, provider backoff state, opt-in

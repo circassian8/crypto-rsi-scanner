@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
-from . import event_anomaly_scanner, event_fade, event_market_enrichment
+from . import event_anomaly_scanner, event_fade, event_market_enrichment, event_provider_health
 from .derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
 from .event_classification import classify_event_asset
 from .event_models import (
@@ -360,6 +360,7 @@ def run_discovery(
     market_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
     derivatives_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
     supply_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
+    warnings: Iterable[str] = (),
 ) -> EventDiscoveryResult:
     cfg = cfg or EventDiscoveryConfig()
     fade_cfg = fade_cfg or event_fade.EventFadeConfig()
@@ -431,6 +432,7 @@ def run_discovery(
         links=tuple(links),
         classifications=tuple(classifications),
         candidates=tuple(candidates),
+        warnings=tuple(dict.fromkeys(str(warning) for warning in warnings if str(warning))),
     )
 
 
@@ -565,11 +567,13 @@ def run_manual_discovery(
     fade_cfg: event_fade.EventFadeConfig | None = None,
     now: datetime | None = None,
     raw_event_transform: Callable[[tuple[RawDiscoveredEvent]], Iterable[RawDiscoveredEvent]] | None = None,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None = None,
 ) -> EventDiscoveryResult:
     cfg = cfg or EventDiscoveryConfig()
     now = _as_utc(now or datetime.now(timezone.utc))
     start = now - timedelta(hours=cfg.lookback_hours)
     end = now + timedelta(days=cfg.horizon_days)
+    provider_warnings: list[str] = []
     raw_events = load_discovery_events(
         event_path,
         start,
@@ -620,6 +624,8 @@ def run_manual_discovery(
         prediction_market_events_base_url=prediction_market_events_base_url,
         prediction_market_events_limit=prediction_market_events_limit,
         prediction_market_events_timeout=prediction_market_events_timeout,
+        provider_health_cfg=provider_health_cfg,
+        provider_warnings=provider_warnings,
     )
     market_rows = event_market_enrichment.load_market_enrichment_rows(
         market_enrichment_path if market_enrichment_path is not None else universe_path,
@@ -652,6 +658,8 @@ def run_manual_discovery(
         universe_limit=universe_limit,
         universe_live=universe_live,
         universe_fetch_limit=universe_fetch_limit,
+        provider_health_cfg=provider_health_cfg,
+        provider_warnings=provider_warnings,
     )
     derivatives = load_derivatives_snapshots(
         coinalyze_derivatives_path,
@@ -665,6 +673,8 @@ def run_manual_discovery(
         coinalyze_history_interval=coinalyze_history_interval,
         coinalyze_lookback_hours=coinalyze_lookback_hours,
         coinalyze_convert_to_usd=coinalyze_convert_to_usd,
+        provider_health_cfg=provider_health_cfg,
+        provider_warnings=provider_warnings,
     )
     supply = load_supply_snapshots(
         tokenomist_supply_path=tokenomist_supply_path,
@@ -686,6 +696,7 @@ def run_manual_discovery(
         market_by_asset=market,
         derivatives_by_asset=derivatives,
         supply_by_asset=supply,
+        warnings=provider_warnings,
     )
 
 
@@ -740,6 +751,8 @@ def load_discovery_events(
     prediction_market_events_base_url: str = "https://gamma-api.polymarket.com/events",
     prediction_market_events_limit: int = 100,
     prediction_market_events_timeout: float = 10.0,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None = None,
+    provider_warnings: list[str] | None = None,
 ) -> list[RawDiscoveredEvent]:
     """Load local event fixtures from every configured research source."""
     events: list[RawDiscoveredEvent] = []
@@ -772,7 +785,7 @@ def load_discovery_events(
     if tokenomist_path:
         events.extend(TokenomistProvider(tokenomist_path).fetch_events(start, end))
     if cryptopanic_path or cryptopanic_live:
-        events.extend(CryptoPanicProvider(
+        provider = CryptoPanicProvider(
             cryptopanic_path,
             live_enabled=cryptopanic_live,
             api_token=cryptopanic_api_token,
@@ -784,35 +797,67 @@ def load_discovery_events(
             kind=cryptopanic_kind,
             search=cryptopanic_search,
             timeout=cryptopanic_timeout,
-        ).fetch_events(start, end))
+        )
+        events.extend(_fetch_provider_events(
+            provider,
+            start,
+            end,
+            live=cryptopanic_live,
+            health_cfg=provider_health_cfg,
+            warnings=provider_warnings,
+        ))
     if gdelt_path or gdelt_live:
-        events.extend(GdeltProvider(
+        provider = GdeltProvider(
             gdelt_path,
             live_enabled=gdelt_live,
             base_url=gdelt_base_url,
             query=gdelt_query or DEFAULT_GDELT_QUERY,
             max_records=gdelt_max_records,
             timeout=gdelt_timeout,
-        ).fetch_events(start, end))
+        )
+        events.extend(_fetch_provider_events(
+            provider,
+            start,
+            end,
+            live=gdelt_live,
+            health_cfg=provider_health_cfg,
+            warnings=provider_warnings,
+        ))
     if project_blog_rss_path or project_blog_rss_live:
-        events.extend(ProjectBlogRssProvider(
+        provider = ProjectBlogRssProvider(
             project_blog_rss_path,
             live_enabled=project_blog_rss_live,
             feed_urls=project_blog_rss_urls,
             timeout=project_blog_rss_timeout,
-        ).fetch_events(start, end))
+        )
+        events.extend(_fetch_provider_events(
+            provider,
+            start,
+            end,
+            live=project_blog_rss_live,
+            health_cfg=provider_health_cfg,
+            warnings=provider_warnings,
+        ))
     if external_ipo_path:
         events.extend(ExternalIpoProvider(external_ipo_path).fetch_events(start, end))
     if sports_fixtures_path:
         events.extend(SportsFixturesProvider(sports_fixtures_path).fetch_events(start, end))
     if prediction_market_events_path or prediction_market_events_live:
-        events.extend(PredictionMarketEventsProvider(
+        provider = PredictionMarketEventsProvider(
             prediction_market_events_path,
             live_enabled=prediction_market_events_live,
             base_url=prediction_market_events_base_url,
             limit=prediction_market_events_limit,
             timeout=prediction_market_events_timeout,
-        ).fetch_events(start, end))
+        )
+        events.extend(_fetch_provider_events(
+            provider,
+            start,
+            end,
+            live=prediction_market_events_live,
+            health_cfg=provider_health_cfg,
+            warnings=provider_warnings,
+        ))
     return events
 
 
@@ -823,6 +868,8 @@ def load_discovery_assets(
     universe_limit: int | None = None,
     universe_live: bool = False,
     universe_fetch_limit: int | None = None,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None = None,
+    provider_warnings: list[str] | None = None,
 ) -> list[DiscoveredAsset]:
     """Load manual aliases plus an optional cleaned CoinGecko-style universe."""
     assets: list[DiscoveredAsset] = []
@@ -830,12 +877,21 @@ def load_discovery_assets(
     if universe_path:
         assets.extend(CoinGeckoUniverseProvider(universe_path, limit=universe_limit).fetch_assets())
     if universe_live:
-        assets.extend(CoinGeckoUniverseProvider(
+        provider = CoinGeckoUniverseProvider(
             None,
             limit=universe_limit,
             live_enabled=True,
             live_fetch_limit=universe_fetch_limit,
-        ).fetch_assets())
+        )
+        if provider_health_cfg is not None:
+            provider = event_provider_health.HealthCheckedUniverseProvider(
+                provider,
+                cfg=provider_health_cfg,
+                provider_kind="enrichment",
+            )
+        fetched = provider.fetch_assets()
+        assets.extend(fetched)
+        _extend_warnings(provider_warnings, getattr(provider, "last_warnings", ()))
     return merge_discovered_assets(assets)
 
 
@@ -879,13 +935,15 @@ def load_derivatives_snapshots(
     coinalyze_history_interval: str = "1hour",
     coinalyze_lookback_hours: int = 24,
     coinalyze_convert_to_usd: bool = True,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None = None,
+    provider_warnings: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Load optional local and/or live derivatives snapshots for event-candidate enrichment."""
     snapshots: dict[str, dict[str, Any]] = {}
     if coinalyze_derivatives_path:
         snapshots.update(CoinalyzeDerivativesProvider(coinalyze_derivatives_path).fetch_snapshots())
     if coinalyze_live:
-        snapshots.update(CoinalyzeDerivativesProvider(
+        provider = CoinalyzeDerivativesProvider(
             None,
             live_enabled=True,
             api_key=coinalyze_api_key,
@@ -897,8 +955,46 @@ def load_derivatives_snapshots(
             history_interval=coinalyze_history_interval,
             lookback_hours=coinalyze_lookback_hours,
             convert_to_usd=coinalyze_convert_to_usd,
-        ).fetch_snapshots())
+        )
+        if provider_health_cfg is not None:
+            provider = event_provider_health.HealthCheckedDerivativesProvider(
+                provider,
+                cfg=provider_health_cfg,
+                provider_kind="enrichment",
+            )
+        snapshots.update(provider.fetch_snapshots())
+        _extend_warnings(provider_warnings, getattr(provider, "last_warnings", ()))
     return snapshots
+
+
+def _fetch_provider_events(
+    provider: Any,
+    start: datetime,
+    end: datetime,
+    *,
+    live: bool,
+    health_cfg: event_provider_health.EventProviderHealthConfig | None,
+    warnings: list[str] | None,
+) -> list[RawDiscoveredEvent]:
+    wrapped = provider
+    if live and health_cfg is not None:
+        wrapped = event_provider_health.HealthCheckedEventProvider(
+            provider,
+            cfg=health_cfg,
+            provider_kind="event_source",
+        )
+    rows = list(wrapped.fetch_events(start, end))
+    _extend_warnings(warnings, getattr(wrapped, "last_warnings", ()))
+    return rows
+
+
+def _extend_warnings(target: list[str] | None, warnings: Iterable[str]) -> None:
+    if target is None:
+        return
+    for warning in warnings:
+        text = str(warning or "").strip()
+        if text:
+            target.append(text)
 
 
 def load_supply_snapshots(

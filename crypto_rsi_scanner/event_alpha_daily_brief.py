@@ -32,6 +32,7 @@ def build_daily_brief(
     missed_rows: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
+    provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     card_paths: Iterable[Path] = (),
     generated_at: datetime | None = None,
 ) -> str:
@@ -60,14 +61,22 @@ def build_daily_brief(
             f"- Success: {str(bool(latest.get('success'))).lower()}",
             f"- Raw/events/candidates/alerts: {int(latest.get('raw_events') or 0)} / {int(latest.get('candidates') or 0)} / {int(latest.get('alerts') or 0)}",
             f"- Routed/alertable/sent: {int(latest.get('routed') or 0)} / {int(latest.get('alertable') or 0)} / {str(bool(latest.get('sent'))).lower()}",
-            f"- LLM calls/skipped budget: {int(latest.get('llm_calls_attempted') or 0)} / {int(latest.get('llm_skipped_due_budget') or 0)}",
+            f"- Sent/delivered/block: {int(latest.get('send_items_delivered') or 0)}/{int(latest.get('send_items_attempted') or 0)} / {latest.get('send_block_reason') or 'none'}",
         ])
         warnings = [str(w) for w in latest.get("warnings") or [] if str(w)]
         if warnings:
             lines.append("- Warnings: " + "; ".join(warnings[:6]))
     else:
         lines.append("- No run ledger rows found.")
-    lines.extend(["", "## Alertable Route Decisions"])
+    lines.extend(["", "## Provider Health"])
+    lines.extend(_provider_health_lines(provider_health_rows or {}))
+    lines.extend(["", "## LLM Budget"])
+    lines.extend(_llm_budget_lines(latest))
+    lines.extend(["", "## New Since Last Run"])
+    lines.extend(_new_since_last_run_lines(runs))
+    lines.extend(["", "## Watchlist Got Hotter"])
+    lines.extend(_watchlist_hotter_lines(entries))
+    lines.extend(["", "## Alertable Decisions"])
     if alertable:
         for decision in alertable[:10]:
             entry = decision.entry
@@ -86,7 +95,7 @@ def build_daily_brief(
         }
     ]
     if active:
-        for entry in sorted(active, key=lambda item: item.latest_score, reverse=True)[:10]:
+        for entry in sorted(active, key=lambda item: item.latest_score, reverse=True)[:5]:
             lines.append(f"- {entry.state}: {entry.symbol}/{entry.coin_id} score={entry.latest_score} playbook={entry.latest_playbook_type or 'unknown'}")
     else:
         lines.append("- No active watchlist entries.")
@@ -99,7 +108,7 @@ def build_daily_brief(
         lines.append("- No cards written for this brief.")
     lines.extend(["", "## Missed Opportunities"])
     if missed:
-        for row in missed[:10]:
+        for row in sorted(missed, key=lambda item: abs(_float(item.get("return_pct"))), reverse=True)[:5]:
             lines.append(f"- {row.get('symbol') or row.get('coin_id')}: {row.get('move_window')} {row.get('return_pct')} stage={row.get('failure_stage')}")
     else:
         lines.append("- No missed-opportunity rows found.")
@@ -110,15 +119,21 @@ def build_daily_brief(
         missed_rows=missed,
         run_rows=runs[:10],
     )))
-    lines.extend(["", "## Calibration"])
+    lines.extend(["", "## Calibration Recommendations"])
     lines.append(_compact(event_alpha_calibration.format_calibration_report(
         alerts,
         feedback_rows=feedback,
         missed_rows=missed,
     )))
+    lines.extend(["", "## Top Suppression Reasons"])
+    lines.extend(_suppression_lines(decisions, entries))
     if not alertable:
         lines.extend(["", "## Why No Alerts"])
         lines.append(_compact(event_alpha_explain.format_last_run_explanation(runs[:1], alert_rows=alerts)))
+    else:
+        lines.extend(["", "## Why Alerts Were Sent"])
+        for decision in alertable[:8]:
+            lines.append(f"- {decision.entry.symbol}/{decision.entry.coin_id}: {decision.reason}")
     return _strip_sensitive("\n".join(lines).rstrip() + "\n")
 
 
@@ -149,6 +164,91 @@ def format_daily_brief_result(result: EventAlphaDailyBriefResult) -> str:
 def _compact(report: str) -> str:
     lines = [line for line in str(report or "").splitlines() if line and not line.startswith("=")]
     return "\n".join(f"> {line}" for line in lines[:20])
+
+
+def _provider_health_lines(rows: Mapping[str, Mapping[str, Any]]) -> list[str]:
+    if not rows:
+        return ["- No provider health rows found."]
+    grouped: dict[str, list[tuple[str, Mapping[str, Any]]]] = {}
+    for provider, row in rows.items():
+        grouped.setdefault(str(row.get("provider_kind") or "unclassified"), []).append((str(provider), row))
+    lines: list[str] = []
+    for group in ("event_source", "enrichment", "catalyst_search", "llm", "unclassified"):
+        items = grouped.get(group)
+        if not items:
+            continue
+        lines.append(f"- {group}:")
+        for provider, row in sorted(items)[:8]:
+            disabled = row.get("disabled_until") or "none"
+            lines.append(
+                f"  - {provider}: failures={int(row.get('consecutive_failures') or 0)} "
+                f"disabled_until={disabled} last_success={row.get('last_success_at') or 'never'}"
+            )
+    return lines or ["- No provider health rows found."]
+
+
+def _llm_budget_lines(latest: Mapping[str, Any]) -> list[str]:
+    if not latest:
+        return ["- No latest run row; budget usage unknown."]
+    return [
+        f"- Cache hits/misses: {int(latest.get('llm_cache_hits') or 0)} / {int(latest.get('llm_cache_misses') or 0)}",
+        f"- Calls attempted: {int(latest.get('llm_calls_attempted') or 0)}",
+        f"- Skipped due budget: {int(latest.get('llm_skipped_due_budget') or 0)}",
+    ]
+
+
+def _new_since_last_run_lines(runs: list[dict[str, Any]]) -> list[str]:
+    if not runs:
+        return ["- No run history."]
+    latest = runs[0]
+    previous = runs[1] if len(runs) > 1 else {}
+    fields = ("raw_events", "candidates", "alerts", "watchlist_entries", "alertable")
+    lines = []
+    for field in fields:
+        delta = int(latest.get(field) or 0) - int(previous.get(field) or 0)
+        lines.append(f"- {field}: {int(latest.get(field) or 0)} ({delta:+d} vs previous)")
+    return lines
+
+
+def _watchlist_hotter_lines(entries: list[event_watchlist.EventWatchlistEntry]) -> list[str]:
+    hot = [
+        entry for entry in entries
+        if entry.score_jump > 0
+        or entry.derivatives_crowding_upgraded
+        or entry.cluster_confidence_upgraded
+        or entry.event_time_upgraded
+    ]
+    if not hot:
+        return ["- No hotter watchlist rows found."]
+    lines = []
+    for entry in sorted(hot, key=lambda item: (item.score_jump, item.latest_score), reverse=True)[:5]:
+        reasons = ", ".join(entry.material_change_reasons) if entry.material_change_reasons else "material update"
+        lines.append(f"- {entry.symbol}/{entry.coin_id}: score={entry.latest_score} jump={entry.score_jump} reasons={reasons}")
+    return lines
+
+
+def _suppression_lines(
+    decisions: list[event_alpha_router.EventAlphaRouteDecision],
+    entries: list[event_watchlist.EventWatchlistEntry],
+) -> list[str]:
+    counts: dict[str, int] = {}
+    for decision in decisions:
+        if decision.alertable:
+            continue
+        counts[decision.reason] = counts.get(decision.reason, 0) + 1
+    for entry in entries:
+        if entry.suppressed_reason:
+            counts[entry.suppressed_reason] = counts.get(entry.suppressed_reason, 0) + 1
+    if not counts:
+        return ["- None."]
+    return [f"- {reason}: {count}" for reason, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:5]]
+
+
+def _float(value: object) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _strip_sensitive(text: str) -> str:

@@ -367,6 +367,7 @@ def run_event_alpha_operating_cycle(
         raw_event_transform = _combined_raw_event_transform
 
     discovery_result = load_discovery_result(observed, raw_event_transform)
+    warnings.extend(str(warning) for warning in getattr(discovery_result, "warnings", ()) or () if str(warning))
     result = run_event_alpha_pipeline(
         discovery_result,
         alert_cfg=alert_cfg,

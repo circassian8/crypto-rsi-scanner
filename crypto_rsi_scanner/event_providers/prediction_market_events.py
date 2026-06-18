@@ -53,8 +53,10 @@ class PredictionMarketEventsProvider:
         self.timeout = timeout
         self.opener = opener or _urlopen_with_timeout
         self.fetched_at = fetched_at
+        self.last_warnings: tuple[str, ...] = ()
 
     def fetch_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
+        self.last_warnings = ()
         if self.path is None and self.live_enabled:
             return self._fetch_live_events(start, end)
         return fetch_external_events(
@@ -78,11 +80,14 @@ class PredictionMarketEventsProvider:
                     raise RuntimeError(f"HTTP {status}")
                 payload = json.loads(response.read().decode("utf-8"))
         except Exception as exc:  # noqa: BLE001
+            warning = f"Prediction-market live event fetch failed: {exc}"
+            self.last_warnings = (warning,)
             if self.required:
                 raise
-            log.warning("Prediction-market live event fetch failed: %s", exc)
+            log.warning(warning)
             return []
 
+        self.last_warnings = ()
         fetched_at = _as_utc(self.fetched_at or datetime.now(timezone.utc))
         rows = _polymarket_event_rows(payload)
         events: list[RawDiscoveredEvent] = []
