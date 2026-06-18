@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Centralize Event Alpha cycle orchestration in pipeline module · Codex
+**Why:** A completion audit against the Pro-model plan showed the CLI was doing
+the unified cycle ordering while `event_alpha_pipeline.py` only handled the
+post-discovery half. The plan explicitly asked the pipeline module to own the
+research operating cycle.
+**Changes:**
+- Added `event_alpha_pipeline.run_event_alpha_operating_cycle`, which performs
+  optional raw-event LLM extraction, enrichment, deterministic discovery loading,
+  event-alert/playbook ranking, optional relationship advisory, watchlist
+  refresh, router decisions, and optional research send callback ordering.
+- Simplified `scanner.event_alpha_cycle` so it delegates the operating-cycle
+  sequence into `event_alpha_pipeline.py`.
+- Added the explicit `event_research_now_from_config()` helper named in the
+  plan.
+- Added regression tests proving the pipeline module applies raw extraction
+  before deterministic discovery and that the named research-clock helper works.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 312/312. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. `make verify PYTHON=python3`
+passed 312/312 tests, alert render smoke, fixture backtest smoke, and paper
+scoreboard.
+**Notes/risks:** This keeps sends opt-in and research-only. LLM extraction still
+only enriches resolver evidence; it cannot create `TRIGGERED_FADE`.
+
 ## 2026-06-18 — Finish Event Alpha Radar graph, playbook, and alert-store phases · Codex
 **Why:** The Pro-model polish plan still had unfinished later phases: catalyst
 graph identity, broader deterministic playbooks, and alert snapshot/outcome

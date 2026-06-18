@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from . import (
     event_alerts,
@@ -15,7 +16,11 @@ from . import (
     event_llm_extractor,
     event_watchlist,
 )
-from .event_models import EventDiscoveryResult
+from .event_models import EventDiscoveryResult, RawDiscoveredEvent
+
+RawEventTransform = Callable[[tuple[RawDiscoveredEvent, ...]], Iterable[RawDiscoveredEvent]]
+DiscoveryLoader = Callable[[datetime, RawEventTransform | None], EventDiscoveryResult]
+ResearchAlertSender = Callable[[list[event_alerts.EventAlertCandidate]], Any]
 
 
 @dataclass(frozen=True)
@@ -27,6 +32,7 @@ class EventAlphaPipelineResult:
     watchlist_result: event_watchlist.EventWatchlistRefreshResult | None
     router_result: event_alpha_router.EventAlphaRouterResult | None
     warnings: tuple[str, ...] = ()
+    send_attempted: bool = False
 
     @property
     def raw_events(self) -> int:
@@ -80,11 +86,12 @@ def run_event_alpha_pipeline(
     router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
     refresh_watchlist: bool = False,
     route: bool = False,
+    extra_warnings: Iterable[str] = (),
 ) -> EventAlphaPipelineResult:
     """Run the research-only Event Alpha pipeline over a discovery result."""
     observed = _as_utc(now or datetime.now(timezone.utc))
     alert_cfg = alert_cfg or event_alerts.EventAlertConfig()
-    warnings: list[str] = []
+    warnings: list[str] = list(extra_warnings)
     alerts = event_alerts.build_event_alert_candidates(discovery_result, cfg=alert_cfg, now=observed)
     relationship_rows: list[event_llm_analyzer.EventLLMReportRow] = []
     if relationship_provider is not None and relationship_cfg is not None:
@@ -129,6 +136,125 @@ def run_event_alpha_pipeline(
         router_result=router_result,
         warnings=tuple(dict.fromkeys(warnings)),
     )
+
+
+def run_event_alpha_operating_cycle(
+    *,
+    load_discovery_result: DiscoveryLoader,
+    alert_cfg: event_alerts.EventAlertConfig | None = None,
+    now: datetime | None = None,
+    with_llm: bool = False,
+    extraction_provider: object | None = None,
+    extraction_cfg: event_llm_extractor.EventLLMExtractorConfig | None = None,
+    relationship_provider: object | None = None,
+    relationship_cfg: event_llm_analyzer.EventLLMConfig | None = None,
+    watchlist_cfg: event_watchlist.EventWatchlistConfig | None = None,
+    router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
+    refresh_watchlist: bool = True,
+    route: bool = True,
+    send: bool = False,
+    send_callback: ResearchAlertSender | None = None,
+) -> EventAlphaPipelineResult:
+    """Run the coherent Event Alpha research cycle from source loading onward.
+
+    The caller supplies the source/discovery loader so config-specific provider
+    wiring can stay in ``scanner.py``. This function owns the cycle ordering:
+    optional raw-event extraction, deterministic discovery, alert/playbook
+    ranking, optional relationship advisory, watchlist refresh, router
+    decisions, and optional research digest callback.
+    """
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    warnings: list[str] = []
+    extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow] = []
+    raw_event_transform: RawEventTransform | None = None
+    relationship_provider_to_use = None
+    relationship_cfg_to_use = None
+
+    if with_llm:
+        if extraction_cfg is not None and extraction_provider is not None:
+            if extraction_cfg.mode == "shadow":
+                def _enrich_with_llm_extractions(
+                    raw_events: tuple[RawDiscoveredEvent, ...],
+                ) -> tuple[RawDiscoveredEvent, ...]:
+                    nonlocal extraction_rows
+                    extraction_rows = event_llm_extractor.analyze_raw_events(
+                        raw_events,
+                        extraction_provider,
+                        cfg=extraction_cfg,
+                    )
+                    return event_llm_extractor.enrich_raw_events_with_extractions(raw_events, extraction_rows)
+
+                raw_event_transform = _enrich_with_llm_extractions
+            else:
+                warnings.append(
+                    "Event LLM extractor skipped: RSI_EVENT_LLM_EXTRACTOR_MODE must be shadow for this cycle"
+                )
+        elif extraction_cfg is not None:
+            warnings.append("Event LLM extractor skipped: no extraction provider available")
+
+        if relationship_cfg is not None and relationship_provider is not None:
+            if relationship_cfg.mode in {"shadow", "advisory"}:
+                relationship_provider_to_use = relationship_provider
+                relationship_cfg_to_use = relationship_cfg
+            else:
+                warnings.append(
+                    f"Event LLM mode {relationship_cfg.mode!r} is not supported; use shadow or advisory"
+                )
+        elif relationship_cfg is not None:
+            warnings.append("Event LLM relationship analysis skipped: no relationship provider available")
+
+    discovery_result = load_discovery_result(observed, raw_event_transform)
+    result = run_event_alpha_pipeline(
+        discovery_result,
+        alert_cfg=alert_cfg,
+        now=observed,
+        extraction_rows=extraction_rows,
+        relationship_provider=relationship_provider_to_use,
+        relationship_cfg=relationship_cfg_to_use,
+        watchlist_cfg=watchlist_cfg,
+        router_cfg=router_cfg,
+        refresh_watchlist=refresh_watchlist,
+        route=route,
+        extra_warnings=warnings,
+    )
+    if send:
+        if send_callback is None:
+            warnings = [*result.warnings, "research send skipped: no send callback supplied"]
+            return EventAlphaPipelineResult(
+                discovery_result=result.discovery_result,
+                alerts=result.alerts,
+                extraction_rows=result.extraction_rows,
+                relationship_rows=result.relationship_rows,
+                watchlist_result=result.watchlist_result,
+                router_result=result.router_result,
+                warnings=tuple(dict.fromkeys(warnings)),
+                send_attempted=False,
+            )
+        try:
+            send_callback(result.alerts)
+        except Exception as exc:  # pragma: no cover - defensive fail-soft guard
+            warnings = [*result.warnings, f"research send failed: {exc}"]
+            return EventAlphaPipelineResult(
+                discovery_result=result.discovery_result,
+                alerts=result.alerts,
+                extraction_rows=result.extraction_rows,
+                relationship_rows=result.relationship_rows,
+                watchlist_result=result.watchlist_result,
+                router_result=result.router_result,
+                warnings=tuple(dict.fromkeys(warnings)),
+                send_attempted=True,
+            )
+        return EventAlphaPipelineResult(
+            discovery_result=result.discovery_result,
+            alerts=result.alerts,
+            extraction_rows=result.extraction_rows,
+            relationship_rows=result.relationship_rows,
+            watchlist_result=result.watchlist_result,
+            router_result=result.router_result,
+            warnings=result.warnings,
+            send_attempted=True,
+        )
+    return result
 
 
 def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:

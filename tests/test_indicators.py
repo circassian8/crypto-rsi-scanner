@@ -1062,13 +1062,14 @@ def _full_event_discovery_config_values():
 
 def test_event_clock_parses_research_now_values():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_clock
+    from crypto_rsi_scanner import event_clock, scanner
 
     parsed = event_clock.parse_event_now("2026-06-15T16:00:00Z")
     assert parsed == datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
     assert event_clock.parse_event_now("2026-06-15T16:00:00") == parsed
     assert event_clock.event_research_now("2026-06-15T16:00:00Z") == parsed
     assert event_clock.event_research_now("2026-06-14T16:00:00Z", override=parsed) == parsed
+    assert scanner.event_research_now_from_config(override="2026-06-15T16:00:00Z") == parsed
 
     try:
         event_clock.parse_event_now("not-a-date")
@@ -4467,6 +4468,115 @@ def test_event_alpha_pipeline_runs_watchlist_and_router_cycle():
         assert disabled.router_result is None
         assert "watchlist refresh skipped" in "; ".join(disabled.warnings)
         assert "router skipped" in "; ".join(disabled.warnings)
+
+
+def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery():
+    from datetime import datetime, timezone
+    from pathlib import Path
+    import tempfile
+    from crypto_rsi_scanner import (
+        event_alpha_pipeline,
+        event_alpha_router,
+        event_alerts,
+        event_discovery,
+        event_llm_extractor,
+        event_watchlist,
+    )
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="pipeline-llm-stealth",
+        provider="test",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/pipeline-llm-stealth",
+        title="SpaceX exposure desk opens",
+        body="Stealth proxy venue is live for SpaceX exposure before the event.",
+        raw_json={
+            "event": {
+                "event_id": "pipeline-llm-stealth",
+                "event_name": "SpaceX proxy exposure opens",
+                "event_type": "ipo_proxy",
+                "event_time": "2026-06-16T13:30:00Z",
+                "event_time_confidence": 1.0,
+                "external_asset": "SpaceX",
+                "confidence": 0.90,
+                "description": "A proxy venue opened for SpaceX exposure.",
+            }
+        },
+        source_confidence=0.90,
+        content_hash="pipeline-llm-stealth",
+    )
+    asset = DiscoveredAsset(
+        coin_id="stealth-alpha",
+        symbol="STEALTH",
+        name="Stealth Alpha",
+        aliases=("stealth alpha",),
+    )
+
+    class Provider:
+        name = "fixture"
+
+        def extract_raw_event(self, packet):
+            return LLMProviderResult(raw={
+                "confidence": 0.91,
+                "external_catalysts": [{
+                    "name": "SpaceX",
+                    "catalyst_type": "ipo_proxy",
+                    "event_time": None,
+                    "event_time_confidence": 0.0,
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "SpaceX exposure", "source_field": "body", "supports": "external catalyst"}],
+                }],
+                "crypto_asset_mentions": [{
+                    "name": "Stealth Alpha",
+                    "symbol": "STEALTH",
+                    "coin_id": "stealth-alpha",
+                    "contract_address": None,
+                    "mention_type": "project_or_token",
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "Stealth proxy venue", "source_field": "body", "supports": "asset mention"}],
+                }],
+                "false_positive_terms": [],
+                "event_date_hints": [],
+                "suggested_followup_queries": [],
+                "warnings": [],
+            })
+
+    seen = {"transform_applied": False, "loader_now": None}
+
+    def loader(observed, raw_event_transform):
+        seen["loader_now"] = observed
+        transformed = tuple(raw_event_transform((raw,))) if raw_event_transform else (raw,)
+        seen["transform_applied"] = bool(transformed[0].raw_json and transformed[0].raw_json.get("llm_extraction"))
+        return event_discovery.run_discovery(transformed, [asset], now=observed)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        pipe = event_alpha_pipeline.run_event_alpha_operating_cycle(
+            load_discovery_result=loader,
+            alert_cfg=event_alerts.EventAlertConfig(),
+            now=now,
+            with_llm=True,
+            extraction_provider=Provider(),
+            extraction_cfg=event_llm_extractor.EventLLMExtractorConfig(mode="shadow", provider="fixture"),
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(
+                enabled=True,
+                state_path=Path(tmp) / "watchlist.jsonl",
+            ),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=True,
+            route=True,
+        )
+    assert seen["loader_now"] == now
+    assert seen["transform_applied"] is True
+    assert pipe.extractions == 1
+    assert pipe.extraction_hint_events == 1
+    assert pipe.candidates == 1
+    assert pipe.alerts[0].symbol == "STEALTH"
+    assert pipe.watchlist_entries == 1
+    assert pipe.routed == 1
 
 
 def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
