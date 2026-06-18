@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add deterministic event research clock · Codex
+**Why:** Pro-model review found that fixed June 2026 event fixtures can silently
+drift out of lookback windows as wall-clock time moves forward. Event research
+reports and fixture Make targets need a deterministic clock so tests/review
+artifacts stay reproducible.
+**Changes:**
+- Added `event_clock.py` plus `RSI_EVENT_RESEARCH_NOW` and CLI `--event-now`
+  support for event/research commands.
+- Threaded the injected clock through event discovery, event alerts, event alpha
+  radar, LLM shadow/extraction reports, watchlist refresh, cache refresh,
+  Binance announcement listen, event-fade reports/exports, and review-bundle
+  manifest generation.
+- Pinned fixture-oriented Make targets to `EVENT_RESEARCH_NOW ?=
+  2026-06-15T16:00:00Z` while leaving live/no-key source targets on real time
+  unless explicitly overridden.
+- Added clock parser/regression coverage and updated scanner fixture tests to
+  pass the fixed research clock explicitly.
+- Documented the env knob in `.env.example`, `ROADMAP.md`, and `DECISIONS.md`.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 304/304. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. `make verify PYTHON=python3`
+passed 304/304 tests, alert render smoke, fixture backtest smoke, and paper
+scoreboard. `make event-discovery-report PYTHON=python3` printed the fixture
+radar with the pinned `RSI_EVENT_RESEARCH_NOW=2026-06-15T16:00:00Z`.
+**Notes/risks:** This is research-command determinism only. Normal RSI scans,
+production cooldowns without `--event-now`, paper trading, and live execution
+logic were not changed.
+
 ## 2026-06-18 — Sweep cleanup for warnings and config hygiene · Codex
 **Why:** A codebase sweep found a recurring pandas `FutureWarning` in backtest
 coverage plus a small safety issue where whitespace-padded falsey env values

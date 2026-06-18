@@ -64,6 +64,7 @@ from . import event_cache
 from . import event_discovery
 from . import event_alerts
 from . import event_alpha_router
+from . import event_clock
 from . import event_feedback
 from . import event_llm_analyzer
 from . import event_llm_extractor
@@ -1029,7 +1030,7 @@ def refresh_paper(verbose: bool = False, json_output: bool = False, cohorts: boo
         storage.close()
 
 
-def event_fade_report(verbose: bool = False) -> None:
+def event_fade_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Print local event-fade fixture scores without changing live RSI behavior."""
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -1047,7 +1048,7 @@ def event_fade_report(verbose: bool = False) -> None:
         log.warning("Event fade fixture load failed: %s", exc)
         print(f"Event fade fixture load failed: {exc}")
         return
-    now = datetime.now(timezone.utc)
+    now = _event_research_now(event_now)
     print(event_fade.format_fade_report(candidates, cfg, now))
 
 
@@ -1078,7 +1079,14 @@ def _event_discovery_refresh_diagnostics(
     }
 
 
-def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResult:
+def _event_research_now(override: str | datetime | None = None) -> datetime:
+    try:
+        return event_clock.event_research_now(config.EVENT_RESEARCH_NOW, override=override)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+
+
+def _event_discovery_result_from_config(now: datetime | None = None) -> event_discovery.EventDiscoveryResult:
     cfg = event_discovery.EventDiscoveryConfig(
         min_link_confidence=config.EVENT_DISCOVERY_MIN_LINK_CONFIDENCE,
         min_classifier_confidence=config.EVENT_DISCOVERY_MIN_CLASSIFIER_CONFIDENCE,
@@ -1165,6 +1173,7 @@ def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResul
         universe_fetch_limit=config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT or None,
         cfg=cfg,
         fade_cfg=event_fade.runtime_config(config),
+        now=now,
     )
 
 
@@ -1246,10 +1255,14 @@ def _event_alpha_inputs_configured() -> bool:
     )
 
 
-def _event_alerts_from_config(with_llm: bool = False) -> list[event_alerts.EventAlertCandidate]:
+def _event_alerts_from_config(
+    with_llm: bool = False,
+    *,
+    now: datetime | None = None,
+) -> list[event_alerts.EventAlertCandidate]:
     cfg = _event_alert_config_from_runtime()
-    result = _event_discovery_result_from_config()
-    alerts = event_alerts.build_event_alert_candidates(result, cfg=cfg)
+    result = _event_discovery_result_from_config(now=now)
+    alerts = event_alerts.build_event_alert_candidates(result, cfg=cfg, now=now)
     if with_llm:
         llm_cfg = _event_llm_config_from_runtime()
         provider = _event_llm_provider(llm_cfg)
@@ -1259,7 +1272,7 @@ def _event_alerts_from_config(with_llm: bool = False) -> list[event_alerts.Event
     return alerts
 
 
-def event_discovery_report(verbose: bool = False) -> None:
+def event_discovery_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Print research-only event-discovery radar from local fixtures."""
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
@@ -1269,11 +1282,17 @@ def event_discovery_report(verbose: bool = False) -> None:
             "Run --event-discovery-status for a redacted readiness report."
         )
         return
-    result = _event_discovery_result_from_config()
+    now = _event_research_now(event_now)
+    result = _event_discovery_result_from_config(now=now)
     print(event_discovery.format_discovery_report(result))
 
 
-def event_alert_report(verbose: bool = False, send: bool = False, with_llm: bool = False) -> None:
+def event_alert_report(
+    verbose: bool = False,
+    send: bool = False,
+    with_llm: bool = False,
+    event_now: str | datetime | None = None,
+) -> None:
     """Print or explicitly send research-only event-discovery alert candidates."""
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
@@ -1284,8 +1303,9 @@ def event_alert_report(verbose: bool = False, send: bool = False, with_llm: bool
         )
         return
     cfg = _event_alert_config_from_runtime()
-    result = _event_discovery_result_from_config()
-    alerts = event_alerts.build_event_alert_candidates(result, cfg=cfg)
+    now = _event_research_now(event_now)
+    result = _event_discovery_result_from_config(now=now)
+    alerts = event_alerts.build_event_alert_candidates(result, cfg=cfg, now=now)
     if with_llm:
         llm_cfg = _event_llm_config_from_runtime()
         provider = _event_llm_provider(llm_cfg)
@@ -1306,10 +1326,14 @@ def event_alert_report(verbose: bool = False, send: bool = False, with_llm: bool
             print(f"Event LLM mode {llm_cfg.mode!r} is not supported; use shadow or advisory.")
     print(event_alerts.format_event_alert_report(alerts))
     if send:
-        _send_event_alert_digest(alerts, cfg)
+        _send_event_alert_digest(alerts, cfg, now=now)
 
 
-def event_alpha_radar_report(verbose: bool = False, with_llm: bool = False) -> None:
+def event_alpha_radar_report(
+    verbose: bool = False,
+    with_llm: bool = False,
+    event_now: str | datetime | None = None,
+) -> None:
     """Print the opt-in event alpha radar with market enrichment/anomalies."""
     _setup_event_discovery_logging(verbose)
     if not _event_alpha_inputs_configured():
@@ -1318,11 +1342,16 @@ def event_alpha_radar_report(verbose: bool = False, with_llm: bool = False) -> N
             "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
         )
         return
-    alerts = _event_alerts_from_config(with_llm=with_llm)
+    now = _event_research_now(event_now)
+    alerts = _event_alerts_from_config(with_llm=with_llm, now=now)
     print(event_alerts.format_event_alert_report(alerts))
 
 
-def event_watchlist_refresh(verbose: bool = False, with_llm: bool = False) -> None:
+def event_watchlist_refresh(
+    verbose: bool = False,
+    with_llm: bool = False,
+    event_now: str | datetime | None = None,
+) -> None:
     """Append research-only Event Alpha Radar watchlist state."""
     _setup_event_discovery_logging(verbose)
     watch_cfg = _event_watchlist_config_from_runtime()
@@ -1335,8 +1364,9 @@ def event_watchlist_refresh(verbose: bool = False, with_llm: bool = False) -> No
             "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
         )
         return
-    alerts = _event_alerts_from_config(with_llm=with_llm)
-    result = event_watchlist.refresh_watchlist(alerts, cfg=watch_cfg)
+    now = _event_research_now(event_now)
+    alerts = _event_alerts_from_config(with_llm=with_llm, now=now)
+    result = event_watchlist.refresh_watchlist(alerts, cfg=watch_cfg, now=now)
     print(event_watchlist.format_watchlist_refresh_result(result))
 
 
@@ -1398,7 +1428,7 @@ def event_feedback_report(path: str | None = None, verbose: bool = False) -> Non
     print(event_feedback.format_feedback_report(result))
 
 
-def event_llm_shadow_report(verbose: bool = False) -> None:
+def event_llm_shadow_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Print research-only shadow LLM relationship analysis for event candidates."""
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
@@ -1416,8 +1446,9 @@ def event_llm_shadow_report(verbose: bool = False) -> None:
     if provider is None:
         return
     alert_cfg = _event_alert_config_from_runtime()
-    result = _event_discovery_result_from_config()
-    alerts = event_alerts.build_event_alert_candidates(result, cfg=alert_cfg)
+    now = _event_research_now(event_now)
+    result = _event_discovery_result_from_config(now=now)
+    alerts = event_alerts.build_event_alert_candidates(result, cfg=alert_cfg, now=now)
     rows = event_llm_analyzer.analyze_event_candidates(
         result,
         alerts,
@@ -1427,7 +1458,7 @@ def event_llm_shadow_report(verbose: bool = False) -> None:
     print(event_llm_analyzer.format_llm_shadow_report(rows))
 
 
-def event_llm_extract_report(verbose: bool = False) -> None:
+def event_llm_extract_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Print research-only LLM raw-event extraction for discovery evidence."""
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
@@ -1444,7 +1475,8 @@ def event_llm_extract_report(verbose: bool = False) -> None:
     provider = _event_llm_extraction_provider(extractor_cfg)
     if provider is None:
         return
-    result = _event_discovery_result_from_config()
+    now = _event_research_now(event_now)
+    result = _event_discovery_result_from_config(now=now)
     rows = event_llm_extractor.analyze_raw_events(
         result.raw_events,
         provider,
@@ -1493,6 +1525,8 @@ def _event_llm_extraction_provider(extractor_cfg: event_llm_extractor.EventLLMEx
 def _send_event_alert_digest(
     alerts: list[event_alerts.EventAlertCandidate],
     cfg: event_alerts.EventAlertConfig,
+    *,
+    now: datetime | None = None,
 ) -> None:
     if not cfg.enabled:
         print("Event research alert sending disabled. Set RSI_EVENT_ALERTS_ENABLED=1 to opt in.")
@@ -1506,7 +1540,7 @@ def _send_event_alert_digest(
         return
     storage = Storage(config.DB_PATH)
     try:
-        now = datetime.now(timezone.utc)
+        now = now or datetime.now(timezone.utc)
         due, reason = _event_alert_digest_due(storage, cfg, now)
         if not due:
             print(f"Event research alert sending held: {reason}.")
@@ -1617,7 +1651,7 @@ def _format_event_discovery_runs(read: event_cache.EventDiscoveryRunsReadResult)
     return "\n".join(lines)
 
 
-def event_discovery_refresh(verbose: bool = False) -> None:
+def event_discovery_refresh(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Fetch configured event-discovery sources and write observational cache artifacts."""
     _setup_event_discovery_logging(verbose)
     status_report = event_provider_status.build_event_discovery_provider_status(config)
@@ -1628,11 +1662,13 @@ def event_discovery_refresh(verbose: bool = False) -> None:
             "Run --event-discovery-status for a redacted readiness report."
         )
         return
-    result = _event_discovery_result_from_config()
+    now = _event_research_now(event_now)
+    result = _event_discovery_result_from_config(now=now)
     diagnostics = _event_discovery_refresh_diagnostics(result, status_report)
     write = event_cache.write_event_discovery_cache(
         result,
         config.EVENT_DISCOVERY_CACHE_DIR,
+        observed_at=now,
         diagnostics=diagnostics,
     )
     print(
@@ -1648,7 +1684,7 @@ def event_discovery_refresh(verbose: bool = False) -> None:
         print(f"WARNING: {warning}")
 
 
-def event_discovery_binance_listen(verbose: bool = False) -> None:
+def event_discovery_binance_listen(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Listen briefly to Binance announcements and cache raw research evidence."""
     _setup_event_discovery_logging(verbose)
     if not config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE:
@@ -1657,7 +1693,7 @@ def event_discovery_binance_listen(verbose: bool = False) -> None:
             "RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE=1 and API credentials."
         )
         return
-    now = datetime.now(timezone.utc)
+    now = _event_research_now(event_now)
     start = now - timedelta(hours=config.EVENT_DISCOVERY_LOOKBACK_HOURS)
     end = now + timedelta(days=config.EVENT_DISCOVERY_HORIZON_DAYS)
     provider = BinanceAnnouncementProvider(
@@ -1688,7 +1724,7 @@ def event_discovery_binance_listen(verbose: bool = False) -> None:
     )
 
 
-def event_fade_auto_report(verbose: bool = False) -> None:
+def event_fade_auto_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Print grouped research-only event-fade candidates from discovery fixtures."""
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
@@ -1698,11 +1734,12 @@ def event_fade_auto_report(verbose: bool = False) -> None:
             "Run --event-discovery-status for a redacted readiness report."
         )
         return
-    result = _event_discovery_result_from_config()
+    now = _event_research_now(event_now)
+    result = _event_discovery_result_from_config(now=now)
     print(event_discovery.format_event_fade_auto_report(result))
 
 
-def event_fade_export_sample(path: str, verbose: bool = False) -> None:
+def event_fade_export_sample(path: str, verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Export discovery-fed event-fade validation sample rows."""
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
@@ -1712,8 +1749,9 @@ def event_fade_export_sample(path: str, verbose: bool = False) -> None:
             "Run --event-discovery-status for a redacted readiness report."
         )
         return
-    result = _event_discovery_result_from_config()
-    rows = event_discovery.event_fade_validation_sample_rows(result)
+    now = _event_research_now(event_now)
+    result = _event_discovery_result_from_config(now=now)
+    rows = event_discovery.event_fade_validation_sample_rows(result, exported_at=now)
     if path == "-":
         print(event_discovery.format_validation_sample_jsonl(rows))
         return
@@ -1721,9 +1759,14 @@ def event_fade_export_sample(path: str, verbose: bool = False) -> None:
     print(f"Event-fade validation sample: wrote {len(rows)} row(s) to {out}")
 
 
-def event_fade_export_cache_sample(path: str, verbose: bool = False) -> None:
+def event_fade_export_cache_sample(
+    path: str,
+    verbose: bool = False,
+    event_now: str | datetime | None = None,
+) -> None:
     """Export latest cached event-discovery snapshots as validation sample rows."""
     _setup_event_discovery_logging(verbose)
+    _event_research_now(event_now)
     read = event_cache.load_cached_validation_sample(config.EVENT_DISCOVERY_CACHE_DIR)
     if path == "-":
         print(event_discovery.format_validation_sample_jsonl(read.rows))
@@ -1856,11 +1899,13 @@ def event_fade_review_bundle(
     reviewed_path: str | None = None,
     overwrite_outcomes: bool = False,
     verbose: bool = False,
+    event_now: str | datetime | None = None,
 ) -> None:
     """Write a local event-fade validation review workspace."""
     _setup_event_discovery_logging(verbose)
     source_rows = event_validation.load_validation_sample(sample_path)
     bundle_rows, review_merge = _merge_review_rows_for_bundle(source_rows, reviewed_path)
+    generated_at = _event_research_now(event_now)
     result = _write_event_fade_review_bundle(
         source_rows=bundle_rows,
         sample_path=sample_path,
@@ -1875,6 +1920,7 @@ def event_fade_review_bundle(
         reviewed_path=reviewed_path,
         review_merge=review_merge,
         overwrite_outcomes=overwrite_outcomes,
+        generated_at=generated_at,
     )
     print(
         "Event-fade review bundle: "
@@ -1911,11 +1957,13 @@ def event_fade_cache_review_bundle(
     reviewed_path: str | None = None,
     overwrite_outcomes: bool = False,
     verbose: bool = False,
+    event_now: str | datetime | None = None,
 ) -> None:
     """Write a local review workspace from latest cached event-discovery snapshots."""
     _setup_event_discovery_logging(verbose)
     read = event_cache.load_cached_validation_sample(config.EVENT_DISCOVERY_CACHE_DIR)
     bundle_rows, review_merge = _merge_review_rows_for_bundle(read.rows, reviewed_path)
+    generated_at = _event_research_now(event_now)
     result = _write_event_fade_review_bundle(
         source_rows=bundle_rows,
         sample_path=f"cache:{read.cache_dir}",
@@ -1930,6 +1978,7 @@ def event_fade_cache_review_bundle(
         reviewed_path=reviewed_path,
         review_merge=review_merge,
         overwrite_outcomes=overwrite_outcomes,
+        generated_at=generated_at,
     )
     print(
         "Event-fade cached review bundle: "
@@ -2005,6 +2054,7 @@ def _write_event_fade_review_bundle(
     reviewed_path: str | None,
     review_merge: event_validation.ValidationSampleMergeResult | None,
     overwrite_outcomes: bool,
+    generated_at: datetime | None = None,
 ) -> dict[str, Any]:
     bundle_dir = Path(out_dir).expanduser()
     bundle_dir.mkdir(parents=True, exist_ok=True)
@@ -2113,6 +2163,7 @@ def _write_event_fade_review_bundle(
         reviewed_path=reviewed_path,
         review_merge=review_merge,
         warnings=bundle_warnings,
+        generated_at=generated_at,
     )
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
@@ -2187,6 +2238,7 @@ def _event_fade_review_bundle_manifest(
     reviewed_path: str | None,
     review_merge: event_validation.ValidationSampleMergeResult | None,
     warnings: tuple[str, ...] = (),
+    generated_at: datetime | None = None,
 ) -> dict[str, Any]:
     files = {
         "readme": readme_path.name,
@@ -2221,7 +2273,7 @@ def _event_fade_review_bundle_manifest(
 
     return {
         "bundle_version": 1,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": (generated_at or datetime.now(timezone.utc)).isoformat(),
         "source": {
             "sample_path": sample_path,
             "source_rows": source_rows,
@@ -3064,6 +3116,14 @@ def cli() -> None:
         ),
     )
     parser.add_argument(
+        "--event-now",
+        default=None,
+        help=(
+            "Override the event research clock for deterministic reports "
+            "(ISO-8601, e.g. 2026-06-15T16:00:00Z)."
+        ),
+    )
+    parser.add_argument(
         "--event-discovery-refresh",
         action="store_true",
         help="Fetch configured event-discovery sources and append research-only JSONL cache artifacts.",
@@ -3303,19 +3363,24 @@ def cli() -> None:
         refresh_paper(verbose=args.verbose, json_output=args.json, cohorts=args.cohorts)
         return
     if args.event_fade_report:
-        event_fade_report(verbose=args.verbose)
+        event_fade_report(verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_discovery_report:
-        event_discovery_report(verbose=args.verbose)
+        event_discovery_report(verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_alert_report:
-        event_alert_report(verbose=args.verbose, send=args.event_alert_send, with_llm=args.with_llm)
+        event_alert_report(
+            verbose=args.verbose,
+            send=args.event_alert_send,
+            with_llm=args.with_llm,
+            event_now=args.event_now,
+        )
         return
     if args.event_alpha_radar_report:
-        event_alpha_radar_report(verbose=args.verbose, with_llm=args.with_llm)
+        event_alpha_radar_report(verbose=args.verbose, with_llm=args.with_llm, event_now=args.event_now)
         return
     if args.event_watchlist_refresh:
-        event_watchlist_refresh(verbose=args.verbose, with_llm=args.with_llm)
+        event_watchlist_refresh(verbose=args.verbose, with_llm=args.with_llm, event_now=args.event_now)
         return
     if args.event_watchlist_report:
         event_watchlist_report(verbose=args.verbose)
@@ -3337,13 +3402,13 @@ def cli() -> None:
         event_feedback_report(path=args.event_feedback_path, verbose=args.verbose)
         return
     if args.event_llm_shadow_report:
-        event_llm_shadow_report(verbose=args.verbose)
+        event_llm_shadow_report(verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_llm_extract_report:
-        event_llm_extract_report(verbose=args.verbose)
+        event_llm_extract_report(verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_discovery_refresh:
-        event_discovery_refresh(verbose=args.verbose)
+        event_discovery_refresh(verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_discovery_status:
         event_discovery_status(json_output=args.json)
@@ -3352,16 +3417,20 @@ def cli() -> None:
         event_discovery_runs(limit=args.event_discovery_run_limit, json_output=args.json)
         return
     if args.event_discovery_binance_listen:
-        event_discovery_binance_listen(verbose=args.verbose)
+        event_discovery_binance_listen(verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_fade_auto_report:
-        event_fade_auto_report(verbose=args.verbose)
+        event_fade_auto_report(verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_fade_export_sample:
-        event_fade_export_sample(args.event_fade_export_sample, verbose=args.verbose)
+        event_fade_export_sample(args.event_fade_export_sample, verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_fade_export_cache_sample:
-        event_fade_export_cache_sample(args.event_fade_export_cache_sample, verbose=args.verbose)
+        event_fade_export_cache_sample(
+            args.event_fade_export_cache_sample,
+            verbose=args.verbose,
+            event_now=args.event_now,
+        )
         return
     if args.event_fade_review_sample:
         event_fade_review_sample(args.event_fade_review_sample, verbose=args.verbose)
@@ -3423,6 +3492,7 @@ def cli() -> None:
             reviewed_path=args.event_fade_review_bundle_reviewed,
             overwrite_outcomes=args.event_fade_overwrite_outcomes,
             verbose=args.verbose,
+            event_now=args.event_now,
         )
         return
     if args.event_fade_cache_review_bundle:
@@ -3438,6 +3508,7 @@ def cli() -> None:
             reviewed_path=args.event_fade_review_bundle_reviewed,
             overwrite_outcomes=args.event_fade_overwrite_outcomes,
             verbose=args.verbose,
+            event_now=args.event_now,
         )
         return
     if args.event_fade_merge_sample:

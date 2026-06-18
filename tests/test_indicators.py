@@ -132,6 +132,8 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     root = Path(__file__).resolve().parent.parent
     makefile = (root / "Makefile").read_text(encoding="utf-8")
     assert "PYTHON ?= .venv/bin/python" in makefile
+    assert "EVENT_RESEARCH_NOW ?= 2026-06-15T16:00:00Z" in makefile
+    assert "RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW)" in makefile
     assert "check-python:" in makefile
     assert "bootstrap:" in makefile
     assert "python3 -m venv .venv" in makefile
@@ -1054,7 +1056,26 @@ def _full_event_discovery_config_values():
         "EVENT_DISCOVERY_UNIVERSE_PATH": _coingecko_universe_fixture_path(),
         "EVENT_DISCOVERY_LOOKBACK_HOURS": 120,
         "EVENT_DISCOVERY_HORIZON_DAYS": 2,
+        "EVENT_RESEARCH_NOW": "2026-06-15T16:00:00Z",
     }
+
+
+def test_event_clock_parses_research_now_values():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_clock
+
+    parsed = event_clock.parse_event_now("2026-06-15T16:00:00Z")
+    assert parsed == datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    assert event_clock.parse_event_now("2026-06-15T16:00:00") == parsed
+    assert event_clock.event_research_now("2026-06-15T16:00:00Z") == parsed
+    assert event_clock.event_research_now("2026-06-14T16:00:00Z", override=parsed) == parsed
+
+    try:
+        event_clock.parse_event_now("not-a-date")
+    except ValueError as exc:
+        assert "Invalid event research timestamp" in str(exc)
+    else:
+        raise AssertionError("invalid event research timestamp should fail")
 
 
 def test_event_discovery_manual_provider_fixture_and_missing_path():
@@ -3705,7 +3726,7 @@ def test_event_llm_extract_scanner_report_uses_runtime_config():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_llm_extract_report()
+            scanner.event_llm_extract_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "EVENT LLM RAW EXTRACTION REPORT" in text
         assert "extract-velvet-spacex" in text
@@ -4079,7 +4100,7 @@ def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_alpha_radar_report()
+            scanner.event_alpha_radar_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "EVENT RESEARCH ALERT REPORT" in text
         assert "market anomaly" in text
@@ -4467,7 +4488,7 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
         try:
             refresh_out = io.StringIO()
             with contextlib.redirect_stdout(refresh_out):
-                scanner.event_watchlist_refresh()
+                scanner.event_watchlist_refresh(event_now="2026-06-15T16:00:00Z")
             refresh_text = refresh_out.getvalue()
             assert "EVENT WATCHLIST REFRESH" in refresh_text
             assert "rows_written: 1" in refresh_text
@@ -6702,7 +6723,7 @@ def test_event_discovery_scanner_report_uses_local_fixtures():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_discovery_report()
+            scanner.event_discovery_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "EVENT DISCOVERY REPORT" in text
         assert "TESTVELVET" in text
@@ -6772,7 +6793,7 @@ def test_event_alert_scanner_report_uses_local_fixtures_without_sending():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_alert_report(send=False)
+            scanner.event_alert_report(send=False, event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "EVENT RESEARCH ALERT REPORT" in text
         assert "research-only; not trade signals" in text
@@ -6847,7 +6868,7 @@ def test_event_alert_scanner_report_with_llm_advisory_uses_runtime_config():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_alert_report(send=False, with_llm=True)
+            scanner.event_alert_report(send=False, with_llm=True, event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "EVENT RESEARCH ALERT REPORT" in text
         assert "llm tier adjustment: RADAR_DIGEST -> STORE_ONLY" in text
@@ -6876,7 +6897,7 @@ def test_event_discovery_refresh_scanner_writes_cache_fixture():
         try:
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
-                scanner.event_discovery_refresh()
+                scanner.event_discovery_refresh(event_now="2026-06-15T16:00:00Z")
             text = out.getvalue()
             assert "Event-discovery cache refresh" in text
             assert "candidate_snapshots=17" in text
@@ -6938,7 +6959,7 @@ def test_event_discovery_refresh_scanner_warns_and_caches_zero_output_diagnostic
                     setattr(config, name, False)
                 else:
                     setattr(config, name, None)
-            scanner._event_discovery_result_from_config = lambda: EventDiscoveryResult(
+            scanner._event_discovery_result_from_config = lambda now=None: EventDiscoveryResult(
                 raw_events=(),
                 normalized_events=(),
                 links=(),
@@ -6947,7 +6968,7 @@ def test_event_discovery_refresh_scanner_warns_and_caches_zero_output_diagnostic
             )
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
-                scanner.event_discovery_refresh()
+                scanner.event_discovery_refresh(event_now="2026-06-15T16:00:00Z")
             text = out.getvalue()
             assert "Event-discovery cache refresh" in text
             assert "WARNING: no_raw_events_collected" in text
@@ -7084,7 +7105,7 @@ def test_event_discovery_binance_listen_scanner_writes_raw_cache():
         try:
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
-                scanner.event_discovery_binance_listen()
+                scanner.event_discovery_binance_listen(event_now="2026-06-15T16:00:00Z")
             text = out.getvalue()
             assert "Binance announcement cache listen" in text
             assert "seen=1" in text
@@ -7127,8 +7148,8 @@ def test_event_fade_export_cache_sample_scanner_writes_latest_cached_rows():
         config.EVENT_DISCOVERY_CACHE_DIR = cache_dir
         try:
             with contextlib.redirect_stdout(io.StringIO()):
-                scanner.event_discovery_refresh()
-                scanner.event_discovery_refresh()
+                scanner.event_discovery_refresh(event_now="2026-06-15T16:00:00Z")
+                scanner.event_discovery_refresh(event_now="2026-06-15T16:00:00Z")
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
                 scanner.event_fade_export_cache_sample(str(out_path))
@@ -7209,7 +7230,7 @@ def test_event_fade_auto_scanner_report_uses_local_fixtures():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_fade_auto_report()
+            scanner.event_fade_auto_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "EVENT FADE AUTO REPORT" in text
         assert "TRIGGERED\n  TESTVELVET" in text
@@ -7240,7 +7261,7 @@ def test_event_fade_export_sample_scanner_writes_jsonl_fixture():
             out_path = Path(tmp) / "sample.jsonl"
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
-                scanner.event_fade_export_sample(str(out_path))
+                scanner.event_fade_export_sample(str(out_path), event_now="2026-06-15T16:00:00Z")
             text = out.getvalue()
             assert "wrote" in text
             assert out_path.exists()
@@ -7451,6 +7472,7 @@ def test_event_fade_review_bundle_scanner_writes_workspace():
                 str(bundle_dir),
                 limit=1,
                 prices_path=str(_outcome_prices_fixture_path()),
+                event_now="2026-06-15T16:00:00Z",
             )
         text = out.getvalue()
         assert "Event-fade review bundle" in text
@@ -7611,6 +7633,7 @@ def test_event_fade_review_bundle_scanner_merges_prior_reviewed_sample():
                 limit=1,
                 prices_path=str(_outcome_prices_fixture_path()),
                 reviewed_path=str(reviewed_path),
+                event_now="2026-06-15T16:00:00Z",
             )
         text = out.getvalue()
         assert "Review merge: 1 matched row(s)" in text
@@ -7671,6 +7694,7 @@ def test_event_fade_review_bundle_scanner_auto_exports_price_fixture():
                 auto_export_prices=True,
                 price_days=30,
                 price_fixture_dir=str(_outcome_klines_fixture_dir()),
+                event_now="2026-06-15T16:00:00Z",
             )
         text = out.getvalue()
         assert "Outcome price fixture" in text
@@ -7748,6 +7772,7 @@ def test_event_fade_cache_review_bundle_scanner_writes_workspace():
                     str(bundle_dir),
                     limit=1,
                     prices_path=str(_outcome_prices_fixture_path()),
+                    event_now="2026-06-15T16:00:00Z",
                 )
             text = out.getvalue()
             assert "Event-fade cached review bundle" in text
@@ -7817,7 +7842,11 @@ def test_event_fade_cache_review_bundle_warns_on_empty_cache():
         try:
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
-                scanner.event_fade_cache_review_bundle(str(bundle_dir), limit=5)
+                scanner.event_fade_cache_review_bundle(
+                    str(bundle_dir),
+                    limit=5,
+                    event_now="2026-06-15T16:00:00Z",
+                )
             text = out.getvalue()
             assert "snapshots_read=0" in text
             assert "rows=0" in text
@@ -8065,7 +8094,7 @@ def test_event_discovery_scanner_report_accepts_exchange_only_fixtures():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_discovery_report()
+            scanner.event_discovery_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "TESTLIST" in text
         assert "TESTPERP" in text
@@ -8126,7 +8155,7 @@ def test_event_discovery_scanner_report_accepts_derivatives_fixture():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_discovery_report()
+            scanner.event_discovery_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "TESTLIST" in text
         assert "TESTPERP" in text
@@ -8196,7 +8225,7 @@ def test_event_discovery_scanner_report_accepts_supply_fixtures():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_discovery_report()
+            scanner.event_discovery_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "TESTLIST" in text
         assert "supply=yes" in text
@@ -8260,7 +8289,7 @@ def test_event_discovery_scanner_report_accepts_news_fixtures():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_discovery_report()
+            scanner.event_discovery_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "TESTAI" in text
         assert "TESTFAN" in text
@@ -8323,7 +8352,7 @@ def test_event_discovery_scanner_report_accepts_external_catalyst_fixtures():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_discovery_report()
+            scanner.event_discovery_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "SpaceX IPO calendar placeholder" in text
         assert "TESTFAN" in text
@@ -8384,7 +8413,7 @@ def test_event_discovery_scanner_report_accepts_structured_calendar_fixtures():
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            scanner.event_discovery_report()
+            scanner.event_discovery_report(event_now="2026-06-15T16:00:00Z")
         text = out.getvalue()
         assert "TESTCAL" in text
         assert "TESTUNLOCK" in text

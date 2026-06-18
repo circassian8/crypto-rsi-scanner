@@ -1,4 +1,5 @@
 PYTHON ?= .venv/bin/python
+EVENT_RESEARCH_NOW ?= 2026-06-15T16:00:00Z
 EVENT_FADE_SAMPLE_OUT ?= /tmp/event_fade_validation_sample.jsonl
 EVENT_FADE_SAMPLE_IN ?= $(EVENT_FADE_SAMPLE_OUT)
 EVENT_FADE_SAMPLE_FRESH ?= $(EVENT_FADE_SAMPLE_OUT)
@@ -160,9 +161,11 @@ report:
 	$(PYTHON) main.py --report
 
 event-fade-report:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	$(PYTHON) main.py --event-fade-report
 
 event-discovery-report:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
 	RSI_EVENT_DISCOVERY_ALIASES_PATH=fixtures/event_discovery/asset_aliases.json \
 	RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH=fixtures/event_discovery/binance_announcements.json \
@@ -194,6 +197,7 @@ event-discovery-runs:
 
 event-discovery-refresh:
 	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
 	RSI_EVENT_DISCOVERY_ALIASES_PATH=fixtures/event_discovery/asset_aliases.json \
 	RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH=fixtures/event_discovery/binance_announcements.json \
@@ -261,6 +265,7 @@ event-alpha-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_alpha_eval fixtures/event_discovery/event_alpha_golden_cases.json
 
 event-alpha-no-key-report:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
 	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
 	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
@@ -269,6 +274,7 @@ event-alpha-no-key-report:
 	$(PYTHON) main.py --event-alpha-radar-report
 
 event-watchlist-refresh:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
 	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
 	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
@@ -334,6 +340,7 @@ event-alert-no-key-send:
 	$(PYTHON) main.py --event-alert-report --event-alert-send --with-llm
 
 event-fade-auto-report:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
 	RSI_EVENT_DISCOVERY_ALIASES_PATH=fixtures/event_discovery/asset_aliases.json \
 	RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH=fixtures/event_discovery/binance_announcements.json \
@@ -357,6 +364,7 @@ event-fade-auto-report:
 	$(PYTHON) main.py --event-fade-auto-report
 
 event-fade-export-sample:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \
 	RSI_EVENT_DISCOVERY_ALIASES_PATH=fixtures/event_discovery/asset_aliases.json \
 	RSI_EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH=fixtures/event_discovery/binance_announcements.json \
@@ -414,10 +422,12 @@ event-fade-fill-review-bundle-outcomes:
 	$(PYTHON) main.py --event-fade-fill-outcomes $(EVENT_FADE_REVIEW_BUNDLE_APPLIED) $(EVENT_FADE_REVIEW_BUNDLE_OUTCOME_PRICES) $(EVENT_FADE_REVIEW_BUNDLE_OUTCOMES)
 
 event-fade-review-bundle:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	$(PYTHON) main.py --event-fade-review-bundle $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),) $(if $(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES),--event-fade-review-bundle-export-prices --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) --event-fade-price-interval $(EVENT_FADE_PRICE_INTERVAL) $(EVENT_FADE_PRICE_FIXTURE_ARG),)
 
 event-fade-cache-review-bundle:
 	RSI_EVENT_DISCOVERY_CACHE_DIR=$(EVENT_DISCOVERY_CACHE_DIR) \
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	$(PYTHON) main.py --event-fade-cache-review-bundle $(EVENT_FADE_CACHE_REVIEW_BUNDLE_DIR) --event-fade-queue-limit $(EVENT_FADE_QUEUE_LIMIT) $(if $(EVENT_FADE_REVIEW_BUNDLE_PRICES),--event-fade-review-bundle-prices $(EVENT_FADE_REVIEW_BUNDLE_PRICES),) $(if $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),--event-fade-review-bundle-reviewed $(EVENT_FADE_REVIEW_BUNDLE_REVIEWED),) $(if $(EVENT_FADE_REVIEW_BUNDLE_EXPORT_PRICES),--event-fade-review-bundle-export-prices --event-fade-price-days $(EVENT_FADE_PRICE_DAYS) --event-fade-price-interval $(EVENT_FADE_PRICE_INTERVAL) $(EVENT_FADE_PRICE_FIXTURE_ARG),)
 
 event-fade-review-cycle:

@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Allow deterministic clocks for event research commands
+**Status:** accepted
+**Decision:** Event discovery, event-alert, Event Alpha, LLM event-analysis,
+event-fade fixture/export, cache-refresh, and review-bundle commands may use
+`RSI_EVENT_RESEARCH_NOW` or CLI `--event-now` to run against a deterministic
+UTC research timestamp. Fixture-oriented Make targets should pin that clock so
+checked-in June 2026 event fixtures do not age out of lookback windows. Normal
+RSI scans and production behavior continue to use wall-clock time unless a
+research event command explicitly opts into the override.
+**Why:** Event research fixtures, validation exports, and review bundles must be
+reproducible across calendar dates. Without an injected clock, tests and
+reports can fail or change meaning simply because the real date moved forward.
+**Revisit when:** A unified Event Alpha pipeline centralizes all event/review
+orchestration and can own a single clock injection point.
+
 ## 2026-06-18 - Keep Event Alpha feedback as review metadata
 **Status:** accepted
 **Decision:** Event Alpha feedback labels (`useful`, `junk`, `watch`, `missed`,

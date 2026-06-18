@@ -187,6 +187,7 @@ EVENT_FADE_ALLOW_PROXY_VENUE_TRIGGER = _env_bool("RSI_EVENT_FADE_ALLOW_PROXY_VEN
 # Automatic event-discovery radar. This remains research-only: no live routing,
 # no paper trades, no DB writes, no execution. Providers are fixture-backed by
 # default; live source fetches must be explicitly opted in per provider.
+EVENT_RESEARCH_NOW = os.getenv("RSI_EVENT_RESEARCH_NOW", "").strip() or None
 EVENT_DISCOVERY_ENABLED = _env_bool("RSI_EVENT_DISCOVERY_ENABLED", False)
 EVENT_DISCOVERY_MODE = os.getenv("RSI_EVENT_DISCOVERY_MODE", "research_only")
 _EVENT_DISCOVERY_EVENTS_PATH_RAW = os.getenv("RSI_EVENT_DISCOVERY_EVENTS_PATH", "")

@@ -71,6 +71,10 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - **Clean source export:** `make export-src` writes
   `crypto-rsi-scanner-source.zip` via `git archive` so ignored local artifacts
   such as `.env`, DBs, logs, caches, and `.venv` are not shared.
+- **Deterministic event research clock:** event fixture/review commands may set
+  `RSI_EVENT_RESEARCH_NOW` or pass `--event-now`; fixture-oriented Make targets
+  default to `2026-06-15T16:00:00Z` so checked-in June 2026 event fixtures do
+  not age out of lookback windows.
 - **Standard verification:** `make verify` (runs tests + alert render smoke +
   backtest fixture smoke + paper scoreboard).
 - **Tests (must all pass before you claim done):**
