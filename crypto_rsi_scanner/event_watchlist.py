@@ -76,6 +76,9 @@ class EventWatchlistEntry:
     latest_tier: str = ""
     latest_event_name: str = ""
     latest_source: str = ""
+    latest_playbook_type: str | None = None
+    latest_playbook_score: int | None = None
+    latest_playbook_action: str | None = None
     latest_llm_asset_role: str | None = None
     latest_llm_confidence: float | None = None
     latest_market_snapshot: dict[str, Any] = field(default_factory=dict)
@@ -313,6 +316,9 @@ def _entry_from_alert(
         latest_tier=alert.tier.value,
         latest_event_name=event.event_name,
         latest_source=event.source,
+        latest_playbook_type=alert.playbook_type,
+        latest_playbook_score=alert.playbook_score,
+        latest_playbook_action=alert.playbook_action,
         latest_llm_asset_role=alert.llm_asset_role,
         latest_llm_confidence=alert.llm_confidence,
         latest_market_snapshot=_market_snapshot(alert),
@@ -473,6 +479,9 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             latest_tier=str(row.get("latest_tier") or ""),
             latest_event_name=str(row.get("latest_event_name") or ""),
             latest_source=str(row.get("latest_source") or ""),
+            latest_playbook_type=_optional_str(row.get("latest_playbook_type")),
+            latest_playbook_score=_optional_int(row.get("latest_playbook_score")),
+            latest_playbook_action=_optional_str(row.get("latest_playbook_action")),
             latest_llm_asset_role=_optional_str(row.get("latest_llm_asset_role")),
             latest_llm_confidence=_optional_float(row.get("latest_llm_confidence")),
             latest_market_snapshot=dict(row.get("latest_market_snapshot") or {}),
@@ -511,6 +520,9 @@ def _entry_lines(entry: EventWatchlistEntry) -> list[str]:
         f"  external: {entry.external_asset or 'unknown'} · relationship: {entry.relationship_type}",
         f"  first_seen: {entry.first_seen_at} · last_seen: {entry.last_seen_at}",
         f"  tier: {entry.latest_tier or 'unknown'} · source_count: {entry.source_count} · source: {entry.latest_source}",
+        f"  playbook: {entry.latest_playbook_type or 'unknown'} "
+        f"score={entry.latest_playbook_score if entry.latest_playbook_score is not None else 0} "
+        f"action={entry.latest_playbook_action or 'store_only'}",
         f"  transition: {entry.previous_state or 'new'} -> {entry.state}"
         + (" · alertable escalation" if entry.should_alert else f" · suppressed: {entry.suppressed_reason}"),
     ]
@@ -537,6 +549,15 @@ def _optional_float(value: Any) -> float | None:
         if value in (None, ""):
             return None
         return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_int(value: Any) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        return int(value)
     except (TypeError, ValueError):
         return None
 

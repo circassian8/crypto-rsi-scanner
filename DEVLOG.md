@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add Event Alpha playbook scoring · Codex
+**Why:** Event Alpha candidates needed explicit research intent labels so
+reports/watchlist state can distinguish proxy fades, proxy attention, direct
+events, infrastructure/context, market anomalies, source-noise controls, and
+ambiguous controls without treating all event alerts as the same kind of setup.
+**Changes:**
+- Added `event_playbooks.py` with deterministic playbook scoring, recommended
+  research action, max tier metadata, and a `can_trigger_fade` safety flag.
+- Wired playbook metadata into event-alert candidates, local/Telegram research
+  formatting, and event-watchlist state rows.
+- Added safety capping so a non-`proxy_fade` playbook cannot preserve a
+  `TRIGGERED_FADE` tier even if an inconsistent candidate appears.
+- Added regression tests for proxy fade, proxy attention, direct event,
+  infrastructure/context, source-noise control, and market-anomaly playbooks.
+- Updated `AGENTS.md`, `DECISIONS.md`, and `ROADMAP.md` to record that
+  playbooks are deterministic research labels only.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 299/299. `make
+event-alpha-no-key-report PYTHON=python3` printed the fixture SOL anomaly with
+`playbook: market_anomaly`. `make event-watchlist-refresh` plus
+`make event-watchlist-report` wrote/read one fixture SOL `RAW_EVIDENCE` row with
+`playbook: market_anomaly` and zero alertable escalations. `make
+event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases. `make
+event-llm-eval PYTHON=python3` passed 9/9 golden cases. `make verify
+PYTHON=python3` passed 299/299 tests, alert render smoke, fixture backtest
+smoke, and paper scoreboard.
+**Notes/risks:** Playbooks cannot create `TRIGGERED_FADE`, route Telegram,
+affect normal RSI alerts, write live signal/outcome/paper rows, open paper
+trades, or execute orders. Remaining Event Alpha Radar phases are research
+routing and feedback/evals.
+
 ## 2026-06-18 — Add Event Alpha watchlist state · Codex
 **Why:** The Event Alpha Radar needs memory so repeated articles/anomalies do
 not become repeated prompts, and so only meaningful state escalations are

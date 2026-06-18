@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Iterable
 
-from . import event_fade
+from . import event_fade, event_playbooks
 from .event_classification import (
     ROLE_DIRECT_BENEFICIARY,
     ROLE_INFRASTRUCTURE,
@@ -61,6 +61,11 @@ class EventAlertCandidate:
     llm_confidence: float | None = None
     llm_reason: str | None = None
     llm_adjustment_reason: str | None = None
+    playbook_type: str | None = None
+    playbook_score: int | None = None
+    playbook_action: str | None = None
+    playbook_reason: str | None = None
+    playbook_can_trigger_fade: bool = False
 
     @property
     def symbol(self) -> str:
@@ -177,6 +182,14 @@ def format_event_alert_report(alerts: Iterable[EventAlertCandidate]) -> str:
             f"relationship: {c.classification.relationship_type}"
         )
         rows.append(f"  source: {alert.source} · time: {event_time} · url: {source_url}")
+        if alert.playbook_type:
+            rows.append(
+                f"  playbook: {alert.playbook_type} score={alert.playbook_score if alert.playbook_score is not None else 0} "
+                f"action={alert.playbook_action or 'store_only'} "
+                f"fade_trigger_allowed={str(alert.playbook_can_trigger_fade).lower()}"
+            )
+            if alert.playbook_reason:
+                rows.append(f"  playbook reason: {alert.playbook_reason}")
         rows.append(f"  reason: {alert.reason}")
         if alert.llm_asset_role:
             rows.append(
@@ -222,6 +235,11 @@ def format_event_alert_telegram_digest(alerts: Iterable[EventAlertCandidate]) ->
             f"external={_esc(alert.external_asset or 'unknown')} "
             f"role={_esc(alert.asset_role)} rel={_esc(c.classification.relationship_type)}"
         )
+        if alert.playbook_type:
+            lines.append(
+                f"playbook={_esc(alert.playbook_type)} "
+                f"action={_esc(alert.playbook_action or 'store_only')}"
+            )
         if alert.llm_adjustment_reason:
             lines.append(
                 f"llm={_esc(alert.llm_asset_role or 'unknown')} "
@@ -240,7 +258,11 @@ def _build_alert_candidate(
     components = _score_components(candidate, now)
     score = _weighted_score(components)
     rejected = _rejected_reason(candidate, cfg)
+    playbook = event_playbooks.assess_event_playbook(candidate, components, rejected_reason=rejected)
     tier = _tier(candidate, cfg, score, components, rejected)
+    if tier == EventAlertTier.TRIGGERED_FADE and not playbook.can_trigger_fade:
+        tier = EventAlertTier.STORE_ONLY
+        rejected = "; ".join(filter(None, [rejected, f"playbook {playbook.playbook_type} cannot trigger fade"]))
     reason = _reason(candidate, tier, components)
     verify = _verify_items(candidate, tier)
     return EventAlertCandidate(
@@ -251,6 +273,11 @@ def _build_alert_candidate(
         reason=reason,
         verify=verify,
         rejected_reason=rejected,
+        playbook_type=playbook.playbook_type,
+        playbook_score=playbook.playbook_score,
+        playbook_action=playbook.recommended_action,
+        playbook_reason=playbook.reason,
+        playbook_can_trigger_fade=playbook.can_trigger_fade,
     )
 
 

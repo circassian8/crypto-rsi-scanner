@@ -246,6 +246,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_models.py` | immutable event-discovery dataclasses for raw events, normalized events, links, classifications, and candidates |
 | `event_discovery.py` | research-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring, grouped auto reports, and validation sample exports |
 | `event_alerts.py` | pure research-alert ranking/tiering for discovery candidates; no labels, paper trades, normal RSI routing, or execution |
+| `event_playbooks.py` | deterministic Event Alpha Radar playbook scoring; labels candidates as proxy fade, proxy attention, direct event, infrastructure, market anomaly, source-noise, or ambiguous control without creating trades or triggers |
 | `event_llm_models.py` / `event_llm_analyzer.py` / `llm_providers/` | research-only LLM relationship analysis for discovery candidates; verifies quoted evidence, compares LLM role/action with rule output, and can feed opt-in advisory event-alert tier quality control |
 | `event_llm_extraction_models.py` / `event_llm_extractor.py` | research-only LLM raw-event extraction for catalysts, asset/project mentions, false-positive terms, and date hints; extracted assets must still be validated by deterministic resolver logic |
 | `event_market_enrichment.py` / `event_anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; anomalies without catalyst evidence remain store-only/radar evidence and cannot create event-fade triggers |
@@ -370,9 +371,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   rows under the research cache for `RAW_EVIDENCE`, `RADAR`, `WATCHLIST`,
   `HIGH_PRIORITY`, `EVENT_PASSED`, `ARMED`, `TRIGGERED_FADE`, `INVALIDATED`,
   and `EXPIRED`, and may mark duplicate rows as suppressed unless state
-  escalates. None of these paths can create proxy eligibility, create
-  `TRIGGERED_FADE`, route normal RSI alerts, open paper trades, write live
-  signal/outcome/paper tables, or execute orders.
+  escalates. Playbook scoring may label candidates as `proxy_fade`,
+  `proxy_attention`, `direct_event`, `infrastructure_mention`,
+  `market_anomaly`, `source_noise_control`, or `ambiguous_control`; only
+  `proxy_fade` may preserve an already-emitted `event_fade.py`
+  `SHORT_TRIGGERED` as `TRIGGERED_FADE`. None of these paths can create proxy
+  eligibility, create `TRIGGERED_FADE`, route normal RSI alerts, open paper
+  trades, write live signal/outcome/paper tables, or execute orders.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, explicit
   `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise

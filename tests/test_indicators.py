@@ -3865,8 +3865,185 @@ def test_event_anomaly_scanner_creates_store_only_research_rows():
     assert len(result.candidates) == 1
     alert = event_alerts.build_event_alert_candidates(result, cfg=event_alerts.EventAlertConfig(), now=now)[0]
     assert alert.tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert alert.playbook_type == "market_anomaly"
+    assert alert.playbook_action == "store_only"
+    assert alert.playbook_can_trigger_fade is False
     assert "not a confirmed proxy narrative" in (alert.rejected_reason or "")
     assert "low classifier confidence" in (alert.rejected_reason or "")
+
+
+def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_noise():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts, event_discovery, event_playbooks
+    from crypto_rsi_scanner.event_models import (
+        DiscoveredAsset,
+        DiscoveredEventFadeCandidate,
+        EventAssetLink,
+        EventClassification,
+        NormalizedEvent,
+        RawDiscoveredEvent,
+    )
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def raw_event(raw_id, title, body, event_type="ipo_proxy", event_time="2026-06-20T13:30:00Z"):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="test",
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body,
+            raw_json={
+                "event": {
+                    "event_id": raw_id,
+                    "event_name": title,
+                    "event_type": event_type,
+                    "event_time": event_time,
+                    "event_time_confidence": 0.90 if event_time else 0.0,
+                    "external_asset": "SpaceX",
+                    "confidence": 0.90,
+                    "description": body,
+                }
+            },
+            source_confidence=0.90,
+            content_hash=raw_id,
+        )
+
+    pumpx = DiscoveredAsset(coin_id="pumpx", symbol="PUMPX", name="PumpX", aliases=("pumpx token", "PumpX"))
+    proxy = event_discovery.run_discovery(
+        [raw_event(
+            "playbook-proxy-fade",
+            "PumpX token offers synthetic exposure to SpaceX pre-IPO market",
+            "PumpX token holders can trade synthetic exposure to SpaceX before the IPO.",
+        )],
+        [pumpx],
+        now=now,
+    ).candidates[0]
+    proxy_alert = event_alerts.build_event_alert_candidates(
+        event_discovery.EventDiscoveryResult((), (), (), (), (proxy,)),
+        now=now,
+    )[0]
+    assert proxy_alert.playbook_type == event_playbooks.EventPlaybookType.PROXY_FADE.value
+    assert proxy_alert.playbook_can_trigger_fade is True
+
+    attention = event_discovery.run_discovery(
+        [raw_event(
+            "playbook-proxy-attention",
+            "PumpX token offers synthetic exposure to SpaceX pre-IPO market",
+            "PumpX token holders can trade synthetic exposure to SpaceX before the IPO.",
+            event_time=None,
+        )],
+        [pumpx],
+        now=now,
+    ).candidates[0]
+    attention_alert = event_alerts.build_event_alert_candidates(
+        event_discovery.EventDiscoveryResult((), (), (), (), (attention,)),
+        now=now,
+    )[0]
+    assert attention_alert.playbook_type == event_playbooks.EventPlaybookType.PROXY_ATTENTION.value
+    assert attention_alert.playbook_can_trigger_fade is False
+
+    direct = event_discovery.run_discovery(
+        [raw_event(
+            "playbook-direct",
+            "PumpX Binance listing starts tomorrow",
+            "Binance will list PumpX spot trading pairs.",
+            event_type="exchange_listing",
+        )],
+        [pumpx],
+        now=now,
+    ).candidates[0]
+    direct_alert = event_alerts.build_event_alert_candidates(
+        event_discovery.EventDiscoveryResult((), (), (), (), (direct,)),
+        now=now,
+    )[0]
+    assert direct_alert.playbook_type == event_playbooks.EventPlaybookType.DIRECT_EVENT.value
+    assert direct_alert.playbook_can_trigger_fade is False
+
+    link = EventAssetLink(
+        event_id="noise",
+        coin_id="hype",
+        symbol="HYPE",
+        name="Hype",
+        link_confidence=0.90,
+        match_reason="ticker",
+        evidence=("hype",),
+    )
+    noise = DiscoveredEventFadeCandidate(
+        event=NormalizedEvent(
+            event_id="noise",
+            raw_ids=("noise",),
+            event_name="IPO hype grows",
+            event_type="ipo_proxy",
+            event_time=None,
+            event_time_confidence=0.0,
+            first_seen_time=now,
+            source="test",
+            source_urls=(),
+            external_asset="SpaceX",
+            description="IPO hype grows around SpaceX.",
+            confidence=0.70,
+        ),
+        asset=DiscoveredAsset(coin_id="hype", symbol="HYPE", name="Hype"),
+        link=link,
+        classification=EventClassification(
+            event_id="noise",
+            coin_id="hype",
+            is_proxy_narrative=False,
+            is_direct_beneficiary=False,
+            relationship_type="proxy_context",
+            confidence=0.55,
+            classifier_version="test",
+            reason="ticker word collision",
+            evidence=("hype",),
+            asset_role="ticker_word_collision",
+            asset_role_confidence=0.90,
+            asset_role_reason="ordinary word",
+            asset_role_evidence=("hype",),
+        ),
+        fade_candidate=None,
+        fade_signal=None,
+        data_quality={},
+    )
+    noise_assessment = event_playbooks.assess_event_playbook(
+        noise,
+        {"asset_resolution": 90, "source_quality": 70, "classifier": 55},
+        rejected_reason="ticker_word_collision",
+    )
+    assert noise_assessment.playbook_type == event_playbooks.EventPlaybookType.SOURCE_NOISE_CONTROL.value
+    assert noise_assessment.can_trigger_fade is False
+
+    infra = DiscoveredEventFadeCandidate(
+        event=noise.event,
+        asset=DiscoveredAsset(coin_id="chainlink", symbol="LINK", name="Chainlink"),
+        link=EventAssetLink("infra", "chainlink", "LINK", "Chainlink", 0.95, "alias", ("Chainlink",)),
+        classification=EventClassification(
+            event_id="infra",
+            coin_id="chainlink",
+            is_proxy_narrative=False,
+            is_direct_beneficiary=False,
+            relationship_type="proxy_context",
+            confidence=0.60,
+            classifier_version="test",
+            reason="infrastructure context",
+            evidence=("oracle provider",),
+            asset_role="infrastructure",
+            asset_role_confidence=0.90,
+            asset_role_reason="oracle provider",
+            asset_role_evidence=("oracle provider",),
+        ),
+        fade_candidate=None,
+        fade_signal=None,
+        data_quality={},
+    )
+    infra_assessment = event_playbooks.assess_event_playbook(
+        infra,
+        {"asset_resolution": 95, "source_quality": 80, "classifier": 60},
+    )
+    assert infra_assessment.playbook_type == event_playbooks.EventPlaybookType.INFRASTRUCTURE_MENTION.value
+    assert infra_assessment.max_research_tier == "RADAR_DIGEST"
 
 
 def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
@@ -3906,6 +4083,7 @@ def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
         text = out.getvalue()
         assert "EVENT RESEARCH ALERT REPORT" in text
         assert "market anomaly" in text
+        assert "playbook: market_anomaly" in text
         assert "STORE_ONLY" in text
     finally:
         for name, value in original.items():
@@ -4113,6 +4291,7 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
             assert "EVENT WATCHLIST REPORT" in report_text
             assert "RAW_EVIDENCE" in report_text
             assert "SOL/solana" in report_text
+            assert "playbook: market_anomaly" in report_text
         finally:
             for name, value in original.items():
                 setattr(config, name, value)

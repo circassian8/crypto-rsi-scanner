@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep Event Alpha playbooks deterministic and non-triggering
+**Status:** accepted
+**Decision:** Event Alpha Radar playbooks may label research candidates as
+`proxy_fade`, `proxy_attention`, `direct_event`, `infrastructure_mention`,
+`market_anomaly`, `source_noise_control`, or `ambiguous_control`, and may attach
+playbook score/action metadata to reports and watchlist state. Playbooks must
+not create `TRIGGERED_FADE`; only the `proxy_fade` playbook may preserve a
+`SHORT_TRIGGERED` signal that was already emitted by the pure `event_fade.py`
+engine. Direct, infrastructure, source-noise, ambiguous, and market-anomaly
+playbooks remain review/control evidence only.
+**Why:** Playbooks make the research thesis auditable without giving the
+classification layer authority to trade or bypass event-fade hard gates.
+**Revisit when:** Reviewed Event Alpha samples show a playbook should be
+promoted into a human-approved research digest or paper-tracking workflow.
+
 ## 2026-06-18 - Keep Event Alpha watchlist artifact-only
 **Status:** accepted
 **Decision:** Event Alpha Radar watchlist state may persist local JSONL rows for
