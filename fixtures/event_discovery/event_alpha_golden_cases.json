@@ -1,0 +1,63 @@
+{
+  "watchlist_routes": [
+    {
+      "id": "proxy-fade-trigger",
+      "symbol": "PFADE",
+      "state": "TRIGGERED_FADE",
+      "score": 95,
+      "playbook_type": "proxy_fade",
+      "playbook_action": "triggered_fade_allowed",
+      "should_alert": true,
+      "expected_route": "TRIGGERED_FADE_RESEARCH"
+    },
+    {
+      "id": "proxy-attention-watch",
+      "symbol": "ATTN",
+      "state": "WATCHLIST",
+      "score": 74,
+      "playbook_type": "proxy_attention",
+      "playbook_action": "watchlist",
+      "should_alert": true,
+      "expected_route": "RESEARCH_DIGEST"
+    },
+    {
+      "id": "source-noise-control",
+      "symbol": "NOISE",
+      "state": "RADAR",
+      "score": 61,
+      "playbook_type": "source_noise_control",
+      "playbook_action": "store_only",
+      "should_alert": true,
+      "expected_route": "STORE_ONLY"
+    },
+    {
+      "id": "duplicate-watchlist",
+      "symbol": "DUP",
+      "state": "WATCHLIST",
+      "score": 75,
+      "playbook_type": "proxy_attention",
+      "playbook_action": "watchlist",
+      "should_alert": false,
+      "suppressed_reason": "duplicate state, no escalation",
+      "expected_route": "SUPPRESS_DUPLICATE"
+    },
+    {
+      "id": "bad-trigger-direct",
+      "symbol": "DIRECT",
+      "state": "TRIGGERED_FADE",
+      "score": 90,
+      "playbook_type": "direct_event",
+      "playbook_action": "store_only",
+      "should_alert": true,
+      "expected_route": "LOCAL_REPORT"
+    }
+  ],
+  "feedback_labels": [
+    "useful",
+    "junk",
+    "watch",
+    "missed",
+    "traded_elsewhere",
+    "ignored"
+  ]
+}

@@ -4342,6 +4342,86 @@ def test_event_alpha_router_routes_watchlist_escalations_safely():
     assert "no sends, trades, or paper rows" in text
 
 
+def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_feedback, event_playbooks, event_watchlist
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="feed|solana|proxy_attention|SpaceX|",
+        event_id="feed",
+        coin_id="solana",
+        symbol="SOL",
+        relationship_type="proxy_attention",
+        external_asset="SpaceX",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        previous_state="RADAR",
+        first_seen_at="2026-06-18T12:00:00+00:00",
+        last_seen_at="2026-06-18T13:00:00+00:00",
+        source_count=2,
+        highest_score=74,
+        latest_score=74,
+        latest_tier="WATCHLIST",
+        latest_event_name="SOL proxy attention",
+        latest_source="fixture",
+        latest_playbook_type=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+        latest_playbook_score=74,
+        latest_playbook_action="watchlist",
+        should_alert=True,
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = event_feedback.EventFeedbackConfig(path=Path(tmp) / "feedback.jsonl")
+        marked = event_feedback.mark_feedback(
+            "SOL",
+            "useful",
+            watchlist_entries=[entry],
+            cfg=cfg,
+            marked_by="tester",
+            notes="good lead",
+            now=datetime(2026, 6, 18, 14, 0, tzinfo=timezone.utc),
+        )
+        assert marked.label == event_feedback.EventFeedbackLabel.USEFUL.value
+        assert marked.key == entry.key
+        assert marked.state == event_watchlist.EventWatchlistState.WATCHLIST.value
+        assert "No live signal" in event_feedback.format_feedback_record(marked, path=cfg.path)
+
+        try:
+            event_feedback.mark_feedback("UNKNOWN", "junk", watchlist_entries=[entry], cfg=cfg)
+        except ValueError as exc:
+            assert "label=missed" in str(exc)
+        else:
+            raise AssertionError("expected unmatched non-missed feedback to fail")
+
+        missed = event_feedback.mark_feedback(
+            "missed velvet article",
+            "missed",
+            watchlist_entries=[entry],
+            cfg=cfg,
+            marked_by="tester",
+        )
+        assert missed.key is None
+        assert missed.label == event_feedback.EventFeedbackLabel.MISSED.value
+        loaded = event_feedback.load_feedback(cfg.path)
+        assert loaded.rows_read == 2
+        report = event_feedback.format_feedback_report(loaded)
+        assert "useful=1" in report
+        assert "missed=1" in report
+
+
+def test_event_alpha_eval_fixture_passes():
+    from crypto_rsi_scanner import event_alpha_eval
+
+    path = "fixtures/event_discovery/event_alpha_golden_cases.json"
+    result = event_alpha_eval.run_eval(path)
+    assert result.passed == result.total
+    assert result.failures == ()
+    assert "PASS" in event_alpha_eval.format_eval_result(result, path)
+
+
 def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
     import contextlib
     import io
@@ -4365,6 +4445,7 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
         "EVENT_WATCHLIST_STATE_PATH": config.EVENT_WATCHLIST_STATE_PATH,
         "EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT": config.EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT,
         "EVENT_ALPHA_ROUTER_ENABLED": config.EVENT_ALPHA_ROUTER_ENABLED,
+        "EVENT_ALPHA_FEEDBACK_PATH": config.EVENT_ALPHA_FEEDBACK_PATH,
     }
     with tempfile.TemporaryDirectory() as tmp:
         config.EVENT_DISCOVERY_EVENTS_PATH = None
@@ -4382,6 +4463,7 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
         config.EVENT_WATCHLIST_STATE_PATH = Path(tmp) / "watchlist.jsonl"
         config.EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT = 72
         config.EVENT_ALPHA_ROUTER_ENABLED = True
+        config.EVENT_ALPHA_FEEDBACK_PATH = Path(tmp) / "feedback.jsonl"
         try:
             refresh_out = io.StringIO()
             with contextlib.redirect_stdout(refresh_out):
@@ -4408,6 +4490,26 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
             assert "router_enabled: true" in router_text
             assert "STORE_ONLY" in router_text
             assert "SOL/solana" in router_text
+
+            feedback_out = io.StringIO()
+            with contextlib.redirect_stdout(feedback_out):
+                scanner.event_feedback_mark(
+                    "SOL",
+                    "junk",
+                    notes="no catalyst",
+                    marked_by="tester",
+                )
+            feedback_text = feedback_out.getvalue()
+            assert "EVENT ALPHA FEEDBACK MARKED" in feedback_text
+            assert "label: junk" in feedback_text
+            assert "SOL/solana" in feedback_text
+
+            feedback_report_out = io.StringIO()
+            with contextlib.redirect_stdout(feedback_report_out):
+                scanner.event_feedback_report()
+            feedback_report = feedback_report_out.getvalue()
+            assert "EVENT ALPHA FEEDBACK REPORT" in feedback_report
+            assert "junk=1" in feedback_report
         finally:
             for name, value in original.items():
                 setattr(config, name, value)
@@ -4417,12 +4519,15 @@ def test_makefile_has_event_alpha_no_key_target():
     from pathlib import Path
 
     text = Path("Makefile").read_text(encoding="utf-8")
+    assert "event-alpha-eval:" in text
+    assert "event_alpha_eval" in text
     assert "event-alpha-no-key-report:" in text
     assert "--event-alpha-radar-report" in text
     assert "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1" in text
     assert "event-watchlist-refresh:" in text
     assert "event-watchlist-report:" in text
     assert "event-alpha-router-report:" in text
+    assert "event-feedback-report:" in text
     assert "--event-watchlist-refresh" in text
     assert "--event-alpha-router-report" in text
 

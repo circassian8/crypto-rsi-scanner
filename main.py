@@ -48,6 +48,8 @@ Usage:
   python main.py --event-watchlist-refresh # append research-only event watchlist state
   python main.py --event-watchlist-report # latest research-only event watchlist state
   python main.py --event-alpha-router-report # route watchlist rows for local research output
+  python main.py --event-feedback-mark SOL --event-feedback-label junk # append research feedback
+  python main.py --event-feedback-report # inspect Event Alpha feedback artifact
   python main.py --event-llm-shadow-report # shadow LLM relationship analysis
   python main.py --event-llm-extract-report # shadow LLM raw-event extraction
   python main.py --event-discovery-refresh # write research-only event JSONL cache

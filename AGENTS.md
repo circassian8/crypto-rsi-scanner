@@ -120,7 +120,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   escalations are alertable metadata) · `main.py --event-alpha-router-report` /
   `make event-alpha-router-report` (route latest watchlist state into
   artifact-only local research output; no sends, paper trades, live DB writes,
-  normal RSI routing, or execution) · `make event-alert-no-key-report` /
+  normal RSI routing, or execution) · `main.py --event-feedback-mark` /
+  `main.py --event-feedback-report` (append/read lightweight Event Alpha
+  feedback labels such as useful/junk/watch/missed as research JSONL artifacts
+  only) · `make event-alpha-eval` (offline Event Alpha route/feedback golden
+  eval) · `make event-alert-no-key-report` /
   `make event-alert-no-key-llm-report` / `make event-alert-no-key-send`
   (no-key public RSS/GDELT/Polymarket event-alert research surfaces; send still
   requires explicit alert enablement) · `main.py --event-discovery-refresh` (fetch
@@ -255,6 +259,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_market_enrichment.py` / `event_anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; anomalies without catalyst evidence remain store-only/radar evidence and cannot create event-fade triggers |
 | `event_watchlist.py` | research-only Event Alpha Radar state cache; tracks raw/radar/watchlist/high-priority/event-passed/armed/triggered/terminal transitions and duplicate suppression without routing alerts or writing live storage |
 | `event_alpha_router.py` | artifact-only Event Alpha Radar route decisions from watchlist state; local research output only, no sends/trades/live writes |
+| `event_feedback.py` / `event_alpha_eval.py` | lightweight Event Alpha feedback JSONL artifacts and offline route/feedback golden evals; review metadata only |
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
@@ -382,10 +387,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `SHORT_TRIGGERED` as `TRIGGERED_FADE`. The Event Alpha router may read latest
   watchlist state and produce local route decisions such as store-only,
   duplicate suppression, research digest, high-priority research, or
-  triggered-fade research, but this is report metadata only. None of these paths
-  can create proxy eligibility, create `TRIGGERED_FADE`, send Telegram alerts,
-  route normal RSI alerts, open paper trades, write live signal/outcome/paper
-  tables, or execute orders.
+  triggered-fade research, but this is report metadata only. Feedback labels
+  (`useful`, `junk`, `watch`, `missed`, `traded_elsewhere`, `ignored`) may be
+  appended as JSONL review artifacts and inspected/evaluated offline, but they
+  do not mutate watchlist state or alert tiers. None of these paths can create
+  proxy eligibility, create `TRIGGERED_FADE`, send Telegram alerts, route normal
+  RSI alerts, open paper trades, write live signal/outcome/paper tables, or
+  execute orders.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, explicit
   `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise

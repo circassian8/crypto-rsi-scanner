@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add Event Alpha feedback and eval artifacts · Codex
+**Why:** The Event Alpha Radar needed a lightweight way to capture human
+judgment on research rows (`useful`, `junk`, `watch`, `missed`, etc.) and a
+small offline eval harness for route/feedback behavior, without converting
+review labels into production signal logic.
+**Changes:**
+- Added `event_feedback.py` with append-only JSONL feedback records, allowed
+  label validation, watchlist-row matching by key/event/symbol/coin, `missed`
+  support for uncaptured opportunities, and report formatting.
+- Added `event_alpha_eval.py` plus
+  `fixtures/event_discovery/event_alpha_golden_cases.json` for offline
+  route/feedback golden checks.
+- Added `main.py --event-feedback-mark`, `main.py --event-feedback-report`,
+  `make event-alpha-eval`, and `make event-feedback-report`.
+- Added `RSI_EVENT_ALPHA_FEEDBACK_PATH` config/env support, scanner CLI tests,
+  feedback artifact tests, and eval fixture tests.
+- Updated `AGENTS.md`, `DECISIONS.md`, `ROADMAP.md`, `.env.example`, and
+  `config.py` comments to record that Event Alpha feedback is review metadata
+  only.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`make event-alpha-eval PYTHON=python3` passed 11/11 golden checks. `make
+event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases. `make
+event-llm-eval PYTHON=python3` passed 9/9 golden cases. A temp CLI smoke ran
+`make event-watchlist-refresh`, then `main.py --event-feedback-mark SOL
+--event-feedback-label junk`, then `main.py --event-feedback-report`; it wrote
+and read one `junk` feedback row without touching live storage. `python3
+tests/test_indicators.py` passed 302/302. `make verify PYTHON=python3` passed
+302/302 tests, alert render smoke, fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Feedback labels do not mutate watchlist state, event-alert
+tiers, event-fade eligibility, Telegram routing, live signal/outcome/paper
+tables, paper trades, or execution. The Pro-model Event Alpha Radar design is
+now implemented as a research-only local/eval system; the next work is operating
+it and collecting reviewed evidence.
+
 ## 2026-06-18 — Add Event Alpha research router · Codex
 **Why:** The Event Alpha watchlist now has persistent state and playbook labels,
 but it needed a separate deterministic layer to decide which rows would be

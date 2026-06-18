@@ -369,10 +369,12 @@ EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES = _env_bool("RSI_EVENT_LLM_EXTRACTOR
 _EVENT_LLM_EXTRACTOR_CACHE_PATH_RAW = os.getenv("RSI_EVENT_LLM_EXTRACTOR_CACHE_PATH", "")
 EVENT_LLM_EXTRACTOR_PROMPT_VERSION = os.getenv("RSI_EVENT_LLM_EXTRACTOR_PROMPT_VERSION", "llm_raw_event_extraction_v1")
 _EVENT_WATCHLIST_STATE_PATH_RAW = os.getenv("RSI_EVENT_WATCHLIST_STATE_PATH", "")
+_EVENT_ALPHA_FEEDBACK_PATH_RAW = os.getenv("RSI_EVENT_ALPHA_FEEDBACK_PATH", "")
 
 # Event Alpha Radar research phases. Market enrichment, anomaly scanning,
-# watchlist state, and local router decisions are implemented but disabled by
-# default; they remain artifact/report paths until explicitly promoted.
+# watchlist state, local router decisions, and feedback artifacts are implemented
+# but disabled/explicit by default; they remain artifact/report paths until
+# explicitly promoted.
 EVENT_MARKET_ENRICHMENT_ENABLED = _env_bool("RSI_EVENT_MARKET_ENRICHMENT_ENABLED", False)
 EVENT_ANOMALY_SCANNER_ENABLED = _env_bool("RSI_EVENT_ANOMALY_SCANNER_ENABLED", False)
 EVENT_ANOMALY_MIN_RETURN_24H = float(os.getenv("RSI_EVENT_ANOMALY_MIN_RETURN_24H", "0.30"))
@@ -611,6 +613,13 @@ EVENT_WATCHLIST_STATE_PATH = (
 )
 if not EVENT_WATCHLIST_STATE_PATH.is_absolute():
     EVENT_WATCHLIST_STATE_PATH = DATA_DIR / EVENT_WATCHLIST_STATE_PATH
+EVENT_ALPHA_FEEDBACK_PATH = (
+    Path(_EVENT_ALPHA_FEEDBACK_PATH_RAW).expanduser()
+    if _EVENT_ALPHA_FEEDBACK_PATH_RAW
+    else EVENT_DISCOVERY_CACHE_DIR / "event_alpha_feedback.jsonl"
+)
+if not EVENT_ALPHA_FEEDBACK_PATH.is_absolute():
+    EVENT_ALPHA_FEEDBACK_PATH = DATA_DIR / EVENT_ALPHA_FEEDBACK_PATH
 EVENT_LLM_CACHE_PATH = Path(_EVENT_LLM_CACHE_PATH_RAW).expanduser() if _EVENT_LLM_CACHE_PATH_RAW else None
 if EVENT_LLM_CACHE_PATH is not None and not EVENT_LLM_CACHE_PATH.is_absolute():
     EVENT_LLM_CACHE_PATH = DATA_DIR / EVENT_LLM_CACHE_PATH

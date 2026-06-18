@@ -64,6 +64,7 @@ from . import event_cache
 from . import event_discovery
 from . import event_alerts
 from . import event_alpha_router
+from . import event_feedback
 from . import event_llm_analyzer
 from . import event_llm_extractor
 from . import event_provider_status
@@ -1222,6 +1223,13 @@ def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRo
     )
 
 
+def _event_feedback_config_from_runtime(path: str | None = None) -> event_feedback.EventFeedbackConfig:
+    feedback_path = Path(path).expanduser() if path else config.EVENT_ALPHA_FEEDBACK_PATH
+    if not feedback_path.is_absolute():
+        feedback_path = config.DATA_DIR / feedback_path
+    return event_feedback.EventFeedbackConfig(path=feedback_path)
+
+
 def _setup_event_discovery_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -1348,6 +1356,46 @@ def event_alpha_router_report(verbose: bool = False) -> None:
     read_result = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
     routed = event_alpha_router.route_watchlist(read_result, cfg=router_cfg)
     print(event_alpha_router.format_router_report(routed))
+
+
+def event_feedback_mark(
+    target: str,
+    label: str | None,
+    *,
+    notes: str | None = None,
+    marked_by: str | None = None,
+    path: str | None = None,
+    verbose: bool = False,
+) -> None:
+    """Append one lightweight Event Alpha feedback row."""
+    _setup_event_discovery_logging(verbose)
+    if not label:
+        print(f"Event feedback mark failed: --event-feedback-label is required ({', '.join(event_feedback.valid_labels())})")
+        return
+    watch_cfg = _event_watchlist_config_from_runtime()
+    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    feedback_cfg = _event_feedback_config_from_runtime(path)
+    try:
+        record = event_feedback.mark_feedback(
+            target,
+            label,
+            watchlist_entries=watchlist.entries,
+            cfg=feedback_cfg,
+            marked_by=marked_by or "human",
+            notes=notes,
+        )
+    except ValueError as exc:
+        print(f"Event feedback mark failed: {exc}")
+        return
+    print(event_feedback.format_feedback_record(record, path=feedback_cfg.path))
+
+
+def event_feedback_report(path: str | None = None, verbose: bool = False) -> None:
+    """Print lightweight Event Alpha feedback artifact rows."""
+    _setup_event_discovery_logging(verbose)
+    feedback_cfg = _event_feedback_config_from_runtime(path)
+    result = event_feedback.load_feedback(feedback_cfg.path)
+    print(event_feedback.format_feedback_report(result))
 
 
 def event_llm_shadow_report(verbose: bool = False) -> None:
@@ -2957,6 +3005,39 @@ def cli() -> None:
         help="Print research-only Event Alpha Radar route decisions from watchlist state.",
     )
     parser.add_argument(
+        "--event-feedback-mark",
+        metavar="TARGET",
+        help=(
+            "Append lightweight Event Alpha feedback for a watchlist key, event id, symbol, "
+            "coin id, or missed opportunity target."
+        ),
+    )
+    parser.add_argument(
+        "--event-feedback-label",
+        choices=event_feedback.valid_labels(),
+        help="Feedback label to use with --event-feedback-mark.",
+    )
+    parser.add_argument(
+        "--event-feedback-notes",
+        default=None,
+        help="Optional notes to append with --event-feedback-mark.",
+    )
+    parser.add_argument(
+        "--event-feedback-by",
+        default="human",
+        help="Reviewer name to append with --event-feedback-mark.",
+    )
+    parser.add_argument(
+        "--event-feedback-path",
+        default=None,
+        help="Optional feedback JSONL artifact path for mark/report commands.",
+    )
+    parser.add_argument(
+        "--event-feedback-report",
+        action="store_true",
+        help="Print lightweight Event Alpha feedback artifact rows.",
+    )
+    parser.add_argument(
         "--event-llm-shadow-report",
         action="store_true",
         help="Print research-only shadow LLM relationship analysis for event candidates.",
@@ -3241,6 +3322,19 @@ def cli() -> None:
         return
     if args.event_alpha_router_report:
         event_alpha_router_report(verbose=args.verbose)
+        return
+    if args.event_feedback_mark:
+        event_feedback_mark(
+            args.event_feedback_mark,
+            args.event_feedback_label,
+            notes=args.event_feedback_notes,
+            marked_by=args.event_feedback_by,
+            path=args.event_feedback_path,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_feedback_report:
+        event_feedback_report(path=args.event_feedback_path, verbose=args.verbose)
         return
     if args.event_llm_shadow_report:
         event_llm_shadow_report(verbose=args.verbose)

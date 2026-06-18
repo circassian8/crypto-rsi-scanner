@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep Event Alpha feedback as review metadata
+**Status:** accepted
+**Decision:** Event Alpha feedback labels (`useful`, `junk`, `watch`, `missed`,
+`traded_elsewhere`, `ignored`) may be appended to a local JSONL research
+artifact and covered by offline golden evals. Feedback rows may reference latest
+watchlist state when a row is known, or record a `missed` item when the radar
+failed to capture something. Feedback must not mutate watchlist state, route
+alerts, write live signal/outcome/paper rows, open paper trades, execute orders,
+or affect event-fade eligibility.
+**Why:** Lightweight labels make day-to-day radar quality measurable without
+turning subjective review into hidden production logic.
+**Revisit when:** A reviewed feedback sample is large enough to justify a
+human-approved calibration pass for resolver/classifier/playbook thresholds.
+
 ## 2026-06-18 - Keep Event Alpha router local and artifact-only
 **Status:** accepted
 **Decision:** Event Alpha Radar routing may read latest watchlist JSONL state

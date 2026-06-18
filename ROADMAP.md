@@ -31,13 +31,13 @@ Status labels:
 |---|---|---|---|
 | waiting | Monitor next full-scan universe audit | system | `make refresh-universe-audit` confirmed current hygiene output after the filter tighten: 53 excluded, no obvious USD/stable kept by audit regex. The audit now stores all kept rows for leak detection; re-check after the next scheduled full scan. |
 | todo | Use LLM extraction/advisory analyzer for event-review QA | human/open | `main.py --event-llm-extract-report` and `make event-llm-extract-eval` now run fixture/OpenAI raw-event extraction for catalysts, crypto asset mentions, source-noise terms, and date hints; extracted assets remain resolver hints only. `main.py --event-llm-shadow-report` and `make event-llm-eval` compare rule classifications with fixture/OpenAI relationship analysis, while `main.py --event-alert-report --with-llm` can run opt-in advisory tier quality control when `RSI_EVENT_LLM_MODE=advisory`. Use these to reduce source-noise/ticker-collision junk and find missed proxy asset mentions while building the reviewed event-fade sample. They still cannot create `TRIGGERED_FADE`, affect normal RSI alerts, paper trade, write live signal rows, or change event-fade eligibility. |
-| todo | Build Event Alpha Radar feedback/eval phase | open | Phase 1 raw-event extraction, Phase 2 market enrichment/anomaly discovery, Phase 3 persistent watchlist state, deterministic playbook scoring, and artifact-only router decisions are in place. `main.py --event-alpha-radar-report` / `make event-alpha-no-key-report` show opt-in market anomaly rows with playbook metadata; `main.py --event-watchlist-refresh` / `make event-watchlist-refresh` append artifact-only state and suppress duplicate non-escalations; `main.py --event-watchlist-report` / `make event-watchlist-report` inspect latest state and playbook context; `main.py --event-alpha-router-report` / `make event-alpha-router-report` route latest watchlist rows into local research output only. Next phase is lightweight feedback labels/evals. Keep disabled by default and research-only; do not add Telegram routing changes, paper trades, live signal DB writes, or execution until a reviewed sample supports promotion. |
+| done | Build Event Alpha Radar design phases | — | Phase 1 raw-event extraction, Phase 2 market enrichment/anomaly discovery, Phase 3 persistent watchlist state, deterministic playbook scoring, artifact-only router decisions, and lightweight feedback/evals are now in place. `main.py --event-alpha-radar-report`, `--event-watchlist-refresh`, `--event-watchlist-report`, `--event-alpha-router-report`, `--event-feedback-mark`, and `--event-feedback-report` cover the local research loop; `make event-alpha-eval` covers route/feedback golden checks. Details are in `DEVLOG.md`. Keep the system research-only until reviewed samples justify any separate promotion. |
 
 ## Later
 
 No ready later items. Current remaining work is waiting on live outcomes, the
-event-fade validation sample review status/labels/outcomes, event-alpha
-feedback/eval phase, or the next universe hygiene audit.
+event-fade validation sample review status/labels/outcomes, Event Alpha
+operational review data, or the next universe hygiene audit.
 Tooling now exists for `--score --cohorts`, cost-aware backtests, walk-forward
 checks, audit refreshes, event-fade fixture reports, event-discovery fixture/
 universe plus opt-in live CoinGecko resolver enrichment/exchange/calendar/news
@@ -47,7 +47,8 @@ reports, research-only event-alert ranking reports, event-discovery JSONL cache 
 announcement cache listening, research-only LLM raw-extraction reports/evals,
 research-only LLM shadow/advisory relationship reports/evals,
 research-only event-alpha market-enriched/anomaly reports with playbook
-metadata, watchlist state refresh/report commands, and local router decisions, grouped
+metadata, watchlist state refresh/report commands, local router decisions,
+feedback artifacts, and route/feedback evals, grouped
 event-fade auto reports, event-fade validation-sample exports from fixtures or
 cached snapshots, event-fade validation merge/price-export/outcome-fill/
 labeling-queue/review-packet/review-template/review-bundle/review cohort
