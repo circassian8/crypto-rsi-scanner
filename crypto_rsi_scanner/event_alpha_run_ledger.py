@@ -1,0 +1,254 @@
+"""Research-only Event Alpha cycle run ledger."""
+
+from __future__ import annotations
+
+import json
+import math
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+
+RUN_LEDGER_SCHEMA_VERSION = "event_alpha_run_ledger_v1"
+
+
+@dataclass(frozen=True)
+class EventAlphaRunLedgerConfig:
+    path: Path
+
+
+@dataclass(frozen=True)
+class EventAlphaRunLedgerReadResult:
+    path: Path
+    rows_read: int
+    rows: list[dict[str, Any]]
+
+
+def append_run_record(
+    result: Any,
+    *,
+    cfg: EventAlphaRunLedgerConfig,
+    profile: str | None,
+    started_at: datetime,
+    finished_at: datetime,
+    with_llm: bool,
+    send_requested: bool,
+    success: bool = True,
+    failure: str | None = None,
+) -> dict[str, Any]:
+    """Append one Event Alpha cycle summary row to a local JSONL artifact."""
+    started = _as_utc(started_at)
+    finished = _as_utc(finished_at)
+    row = _run_record(
+        result,
+        profile=profile,
+        started_at=started,
+        finished_at=finished,
+        with_llm=with_llm,
+        send_requested=send_requested,
+        success=success,
+        failure=failure,
+    )
+    path = cfg.path.expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+        fh.write("\n")
+    return row
+
+
+def load_run_records(path: str | Path, *, limit: int | None = None) -> EventAlphaRunLedgerReadResult:
+    """Load recent run ledger rows, tolerating malformed legacy rows."""
+    p = Path(path).expanduser()
+    rows = [
+        row for row in _read_jsonl(p)
+        if row.get("row_type") == "event_alpha_run"
+    ]
+    rows.sort(key=lambda row: str(row.get("started_at") or ""), reverse=True)
+    if limit is not None and limit > 0:
+        rows = rows[:limit]
+    return EventAlphaRunLedgerReadResult(path=p, rows_read=len(rows), rows=rows)
+
+
+def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
+    rows = [
+        "=" * 76,
+        "EVENT ALPHA RUNS REPORT (research artifact only)",
+        "=" * 76,
+        f"path: {result.path}",
+        f"rows_read: {result.rows_read}",
+    ]
+    if not result.rows:
+        rows.append("")
+        rows.append("No Event Alpha cycle run rows found.")
+        return "\n".join(rows)
+
+    success = sum(1 for row in result.rows if bool(row.get("success")))
+    failed = len(result.rows) - success
+    rows.append(f"success={success} · failure={failed}")
+    rows.append("")
+    for row in result.rows:
+        rows.append(
+            f"{row.get('started_at', 'unknown')} profile={row.get('profile') or 'default'} "
+            f"success={str(bool(row.get('success'))).lower()} runtime={float(row.get('runtime_seconds') or 0):.2f}s"
+        )
+        rows.append(
+            "  "
+            f"raw={int(row.get('raw_events') or 0)} anomalies={int(row.get('market_anomalies') or 0)} "
+            f"queries={int(row.get('catalyst_queries') or 0)} accepted={int(row.get('catalyst_results_accepted') or 0)} "
+            f"rejected={int(row.get('catalyst_results_rejected') or 0)} candidates={int(row.get('candidates') or 0)} "
+            f"alerts={int(row.get('alerts') or 0)} routed={int(row.get('routed') or 0)} "
+            f"alertable={int(row.get('alertable') or 0)} sent={str(bool(row.get('sent'))).lower()}"
+        )
+        rows.append(
+            "  "
+            f"provider_fetch={int(row.get('provider_fetch_count') or 0)} "
+            f"provider_cache={int(row.get('provider_cache_hits') or 0)}/{int(row.get('provider_cache_misses') or 0)} "
+            f"llm_cache={int(row.get('llm_cache_hits') or 0)}/{int(row.get('llm_cache_misses') or 0)} "
+            f"llm_calls={int(row.get('llm_calls_attempted') or 0)} skipped_budget={int(row.get('llm_skipped_due_budget') or 0)}"
+        )
+        warnings = [str(item) for item in row.get("warnings") or [] if str(item)]
+        if warnings:
+            rows.append("  warnings: " + "; ".join(warnings[:5]))
+        if row.get("failure"):
+            rows.append(f"  failure: {row.get('failure')}")
+    return "\n".join(rows).rstrip()
+
+
+def _run_record(
+    result: Any,
+    *,
+    profile: str | None,
+    started_at: datetime,
+    finished_at: datetime,
+    with_llm: bool,
+    send_requested: bool,
+    success: bool,
+    failure: str | None,
+) -> dict[str, Any]:
+    catalyst = getattr(result, "catalyst_search_result", None)
+    discovery = getattr(result, "discovery_result", None)
+    watchlist = getattr(result, "watchlist_result", None)
+    router = getattr(result, "router_result", None)
+    extraction_rows = list(getattr(result, "extraction_rows", ()) or ())
+    relationship_rows = list(getattr(result, "relationship_rows", ()) or ())
+    llm_stats = _llm_stats((*extraction_rows, *relationship_rows))
+    warnings = list(getattr(result, "warnings", ()) or ())
+    if failure:
+        warnings.append(failure)
+    run_id = f"{started_at.isoformat()}|{profile or 'default'}"
+    return {
+        "schema_version": RUN_LEDGER_SCHEMA_VERSION,
+        "row_type": "event_alpha_run",
+        "run_id": run_id,
+        "profile": profile or "default",
+        "started_at": started_at.isoformat(),
+        "finished_at": finished_at.isoformat(),
+        "runtime_seconds": round(max(0.0, (finished_at - started_at).total_seconds()), 4),
+        "with_llm": bool(with_llm),
+        "send_requested": bool(send_requested),
+        "raw_events": _int(getattr(result, "raw_events", 0)),
+        "market_anomalies": _market_anomaly_count(discovery),
+        "catalyst_queries": _int(getattr(result, "catalyst_queries", 0)),
+        "catalyst_results_accepted": _int(getattr(catalyst, "attached_result_count", 0)),
+        "catalyst_results_rejected": _int(getattr(catalyst, "rejected_result_count", 0)),
+        "extraction_rows": len(extraction_rows),
+        "extraction_hints_applied": _int(getattr(result, "extraction_hint_events", 0)),
+        "candidates": _int(getattr(result, "candidates", 0)),
+        "clusters": _int(getattr(result, "clusters", 0)),
+        "alerts": len(list(getattr(result, "alerts", ()) or ())),
+        "watchlist_entries": _int(getattr(result, "watchlist_entries", 0)),
+        "watchlist_escalations": _int(getattr(result, "watchlist_escalations", 0)),
+        "routed": _int(getattr(result, "routed", 0)),
+        "alertable": _int(getattr(result, "alertable", 0)),
+        "sent": bool(getattr(result, "send_attempted", False)),
+        "provider_fetch_count": _int(getattr(catalyst, "provider_fetch_count", 0)),
+        "provider_cache_hits": _int(getattr(catalyst, "provider_cache_hits", 0)),
+        "provider_cache_misses": _int(getattr(catalyst, "provider_cache_misses", 0)),
+        "llm_cache_hits": llm_stats["cache_hits"],
+        "llm_cache_misses": llm_stats["cache_misses"],
+        "llm_calls_attempted": llm_stats["calls_attempted"],
+        "llm_skipped_due_budget": llm_stats["skipped_due_budget"],
+        "watchlist_path": str(getattr(watchlist, "state_path", "") or ""),
+        "router_enabled": bool(getattr(router, "enabled", False)),
+        "warnings": tuple(dict.fromkeys(str(warning) for warning in warnings if str(warning))),
+        "success": bool(success),
+        "failure": failure,
+    }
+
+
+def _llm_stats(rows: Iterable[object]) -> dict[str, int]:
+    stats = {
+        "cache_hits": 0,
+        "cache_misses": 0,
+        "calls_attempted": 0,
+        "skipped_due_budget": 0,
+    }
+    for row in rows:
+        status = str(getattr(row, "cache_status", "") or "")
+        if status == "hit":
+            stats["cache_hits"] += 1
+        elif status == "miss":
+            stats["cache_misses"] += 1
+            stats["calls_attempted"] += 1
+        elif status == "skipped_budget":
+            stats["skipped_due_budget"] += 1
+        warnings = tuple(getattr(row, "warnings", ()) or ())
+        if any("budget exhausted" in str(warning) for warning in warnings):
+            stats["skipped_due_budget"] += 1
+    return stats
+
+
+def _market_anomaly_count(discovery: Any) -> int:
+    raw_events = tuple(getattr(discovery, "raw_events", ()) or ())
+    count = 0
+    for raw in raw_events:
+        if str(getattr(raw, "provider", "") or "") == "market_anomaly":
+            count += 1
+            continue
+        payload = getattr(raw, "raw_json", None)
+        if isinstance(payload, Mapping) and isinstance(payload.get("anomaly"), Mapping):
+            count += 1
+    return count
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(row, dict):
+                rows.append(row)
+    return rows
+
+
+def _json_ready(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_ready(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, datetime):
+        return _as_utc(value).isoformat()
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    return value
+
+
+def _int(value: object) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _as_utc(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)

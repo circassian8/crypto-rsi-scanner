@@ -65,8 +65,11 @@ from . import event_cache
 from . import event_discovery
 from . import event_alerts
 from . import event_alpha_alert_store
+from . import event_alpha_calibration
+from . import event_alpha_missed
 from . import event_alpha_pipeline
 from . import event_alpha_profiles
+from . import event_alpha_run_ledger
 from . import event_alpha_router
 from . import event_catalyst_search
 from . import event_clock
@@ -75,8 +78,10 @@ from . import event_llm_analyzer
 from . import event_llm_extractor
 from . import event_provider_status
 from . import event_price_history
+from . import event_research_cards
 from . import event_validation
 from . import event_watchlist
+from . import event_watchlist_monitor
 from .event_models import EventDiscoveryResult, RawDiscoveredEvent
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
 from .llm_providers.fixture import FixtureLLMExtractionProvider, FixtureLLMRelationshipProvider
@@ -1307,6 +1312,13 @@ def _event_alpha_alert_store_config_from_runtime(
     )
 
 
+def _event_alpha_run_ledger_config_from_runtime(path: str | None = None) -> event_alpha_run_ledger.EventAlphaRunLedgerConfig:
+    ledger_path = Path(path).expanduser() if path else config.EVENT_ALPHA_RUN_LEDGER_PATH
+    if not ledger_path.is_absolute():
+        ledger_path = config.DATA_DIR / ledger_path
+    return event_alpha_run_ledger.EventAlphaRunLedgerConfig(path=ledger_path)
+
+
 def _apply_event_alpha_profile(profile_name: str | None) -> event_alpha_profiles.EventAlphaProfile | None:
     if not profile_name:
         return None
@@ -1324,6 +1336,9 @@ def _normalize_profile_paths() -> None:
         "EVENT_CATALYST_SEARCH_FIXTURE_PATH",
         "EVENT_WATCHLIST_STATE_PATH",
         "EVENT_ALPHA_ALERT_STORE_PATH",
+        "EVENT_ALPHA_RUN_LEDGER_PATH",
+        "EVENT_ALPHA_MISSED_PATH",
+        "EVENT_LLM_BUDGET_LEDGER_PATH",
     ):
         value = getattr(config, attr, None)
         if isinstance(value, Path):
@@ -1473,6 +1488,7 @@ def event_alpha_cycle(
         )
         return
     now = _event_research_now(event_now)
+    started_at = datetime.now(timezone.utc)
     extraction_provider = None
     extraction_cfg = None
     relationship_provider = None
@@ -1515,6 +1531,21 @@ def event_alpha_cycle(
     )
     print("")
     print(event_alpha_alert_store.format_alert_store_write_result(store_result))
+    run_row = event_alpha_run_ledger.append_run_record(
+        pipeline_result,
+        cfg=_event_alpha_run_ledger_config_from_runtime(),
+        profile=profile.name if profile else profile_name,
+        started_at=started_at,
+        finished_at=datetime.now(timezone.utc),
+        with_llm=with_llm,
+        send_requested=send,
+        success=True,
+    )
+    print("")
+    print(
+        "Event Alpha run ledger updated: "
+        f"{config.EVENT_ALPHA_RUN_LEDGER_PATH} run_id={run_row.get('run_id')}"
+    )
 
 
 def event_alpha_profile_report(profile_name: str, verbose: bool = False) -> None:
@@ -1526,6 +1557,54 @@ def event_alpha_profile_report(profile_name: str, verbose: bool = False) -> None
         print(str(exc))
         return
     print(event_alpha_profiles.format_profile_report(profile))
+
+
+def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -> None:
+    """Print profile-aware Event Alpha operational status."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        profile = _apply_event_alpha_profile(profile_name)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    provider_report = event_provider_status.build_event_discovery_provider_status(config)
+    lines = [
+        "=" * 76,
+        "EVENT ALPHA STATUS (research-only; profile-aware)",
+        "=" * 76,
+        f"profile: {(profile.name if profile else profile_name) or 'default'}",
+        f"send requested by profile: {str(bool(profile and profile.send)).lower()}",
+        f"send enabled env: {str(bool(config.EVENT_ALERTS_ENABLED)).lower()}",
+        f"LLM relationship: provider={config.EVENT_LLM_PROVIDER} mode={config.EVENT_LLM_MODE} enabled={str(bool(config.EVENT_LLM_ENABLED)).lower()}",
+        (
+            "LLM extractor: "
+            f"provider={config.EVENT_LLM_EXTRACTOR_PROVIDER} mode={config.EVENT_LLM_EXTRACTOR_MODE} "
+            f"enabled={str(bool(config.EVENT_LLM_EXTRACTOR_ENABLED)).lower()}"
+        ),
+        (
+            "LLM budget: "
+            f"max_run={config.EVENT_LLM_MAX_CALLS_PER_RUN} max_day={config.EVENT_LLM_MAX_CALLS_PER_DAY} "
+            f"max_cost_day={config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY:g} "
+            f"cache_ttl_hours={config.EVENT_LLM_CACHE_TTL_HOURS:g} "
+            f"ledger={config.EVENT_LLM_BUDGET_LEDGER_PATH}"
+        ),
+        f"catalyst providers: {', '.join(config.EVENT_CATALYST_SEARCH_PROVIDERS) or 'none'}",
+        f"watchlist_state_path: {config.EVENT_WATCHLIST_STATE_PATH}",
+        f"alert_store_path: {config.EVENT_ALPHA_ALERT_STORE_PATH}",
+        f"run_ledger_path: {config.EVENT_ALPHA_RUN_LEDGER_PATH}",
+        f"missed_path: {config.EVENT_ALPHA_MISSED_PATH}",
+        "",
+        event_provider_status.format_event_discovery_provider_status(provider_report),
+    ]
+    print("\n".join(lines))
+
+
+def event_alpha_runs_report(path: str | None = None, limit: int = 20, verbose: bool = False) -> None:
+    """Print recent Event Alpha cycle run ledger rows."""
+    _setup_event_discovery_logging(verbose)
+    cfg = _event_alpha_run_ledger_config_from_runtime(path)
+    result = event_alpha_run_ledger.load_run_records(cfg.path, limit=limit)
+    print(event_alpha_run_ledger.format_run_ledger_report(result))
 
 
 def event_catalyst_search_report(
@@ -1607,6 +1686,20 @@ def event_watchlist_report(verbose: bool = False) -> None:
     watch_cfg = _event_watchlist_config_from_runtime()
     result = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
     print(event_watchlist.format_watchlist_report(result))
+
+
+def event_watchlist_monitor_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
+    """Refresh active watchlist rows from market state without new source evidence."""
+    _setup_event_discovery_logging(verbose)
+    watch_cfg = _event_watchlist_config_from_runtime()
+    read_result = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    market_rows = event_watchlist_monitor.load_market_rows(config.EVENT_DISCOVERY_UNIVERSE_PATH)
+    result = event_watchlist_monitor.monitor_watchlist(
+        read_result,
+        market_rows=market_rows,
+        now=_event_research_now(event_now),
+    )
+    print(event_watchlist_monitor.format_watchlist_monitor_report(result))
 
 
 def event_alpha_router_report(verbose: bool = False) -> None:
@@ -1692,6 +1785,78 @@ def event_alpha_fill_outcomes(
         source_path=store_cfg.path,
     )
     print(event_alpha_alert_store.format_outcome_fill_result(result))
+
+
+def event_alpha_missed_report(verbose: bool = False) -> None:
+    """Print missed-opportunity diagnostics from local Event Alpha artifacts."""
+    _setup_event_discovery_logging(verbose)
+    market_rows = event_alpha_missed.load_market_rows(config.EVENT_DISCOVERY_UNIVERSE_PATH)
+    store_cfg = _event_alpha_alert_store_config_from_runtime()
+    alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path)
+    watch_cfg = _event_watchlist_config_from_runtime()
+    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    raw_events: tuple[RawDiscoveredEvent, ...] = ()
+    if _event_discovery_paths_configured() or _event_alpha_inputs_configured():
+        try:
+            raw_events = tuple(_event_discovery_result_from_config().raw_events)
+        except Exception as exc:  # noqa: BLE001 - report-only fail-soft guard
+            print(f"Missed-opportunity raw event load warning: {exc}")
+    result = event_alpha_missed.detect_missed_opportunities(
+        market_rows,
+        alert_rows=alerts.rows,
+        watchlist_entries=watchlist.entries,
+        raw_events=raw_events,
+    )
+    if result.rows:
+        event_alpha_missed.write_missed_rows(config.EVENT_ALPHA_MISSED_PATH, result.rows)
+    print(event_alpha_missed.format_missed_report(result))
+    if result.rows:
+        print("")
+        print(f"Missed-opportunity rows appended: {config.EVENT_ALPHA_MISSED_PATH}")
+
+
+def event_alpha_calibration_report(verbose: bool = False) -> None:
+    """Print calibration summaries from alert, feedback, outcome, and missed artifacts."""
+    _setup_event_discovery_logging(verbose)
+    store_cfg = _event_alpha_alert_store_config_from_runtime()
+    alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path)
+    feedback_cfg = _event_feedback_config_from_runtime()
+    feedback = event_feedback.load_feedback(feedback_cfg.path)
+    feedback_rows = [record.__dict__ for record in feedback.records]
+    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
+    print(
+        event_alpha_calibration.format_calibration_report(
+            alerts.rows,
+            feedback_rows=feedback_rows,
+            missed_rows=missed_rows,
+        )
+    )
+
+
+def event_research_card_report(target: str | None, verbose: bool = False) -> None:
+    """Print a Markdown research card for one Event Alpha watchlist/alert key."""
+    _setup_event_discovery_logging(verbose)
+    watch_cfg = _event_watchlist_config_from_runtime()
+    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    store_cfg = _event_alpha_alert_store_config_from_runtime()
+    alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path, latest_only=True)
+    routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    if target:
+        result = event_research_cards.render_research_card(
+            target,
+            watchlist_entries=watchlist.entries,
+            alert_rows=alerts.rows,
+            route_decisions=routed.decisions,
+        )
+        print(result.markdown)
+        return
+    print(
+        event_research_cards.render_selected_cards(
+            watchlist_entries=watchlist.entries,
+            alert_rows=alerts.rows,
+            route_decisions=routed.decisions,
+        )
+    )
 
 
 def event_llm_shadow_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
@@ -3413,6 +3578,27 @@ def cli() -> None:
         help="Run one unified research-only Event Alpha cycle (alerts, watchlist, router summary).",
     )
     parser.add_argument(
+        "--event-alpha-runs-report",
+        action="store_true",
+        help="Print recent research-only Event Alpha cycle run ledger rows.",
+    )
+    parser.add_argument(
+        "--event-alpha-run-ledger-path",
+        default=None,
+        help="Optional Event Alpha run ledger JSONL path for --event-alpha-runs-report.",
+    )
+    parser.add_argument(
+        "--event-alpha-run-limit",
+        type=int,
+        default=20,
+        help="Maximum rows to show for --event-alpha-runs-report.",
+    )
+    parser.add_argument(
+        "--event-alpha-status",
+        action="store_true",
+        help="Print profile-aware Event Alpha source, artifact, send, and LLM budget status.",
+    )
+    parser.add_argument(
         "--event-watchlist-refresh",
         action="store_true",
         help="Refresh research-only event alpha watchlist state from current alert candidates.",
@@ -3423,9 +3609,31 @@ def cli() -> None:
         help="Print latest research-only event alpha watchlist state.",
     )
     parser.add_argument(
+        "--event-watchlist-monitor",
+        action="store_true",
+        help="Monitor active event alpha watchlist rows without requiring new source evidence.",
+    )
+    parser.add_argument(
         "--event-alpha-router-report",
         action="store_true",
         help="Print research-only Event Alpha Radar route decisions from watchlist state.",
+    )
+    parser.add_argument(
+        "--event-alpha-missed-report",
+        action="store_true",
+        help="Print missed-opportunity diagnostics from market rows and Event Alpha artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-calibration-report",
+        action="store_true",
+        help="Print research-only calibration summaries from alert, feedback, outcome, and missed artifacts.",
+    )
+    parser.add_argument(
+        "--event-research-card",
+        nargs="?",
+        const="",
+        metavar="ALERT_KEY",
+        help="Print a Markdown Event Alpha research card for ALERT_KEY, or selected local cards when omitted.",
     )
     parser.add_argument(
         "--event-alpha-alerts-report",
@@ -3793,6 +4001,16 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
         )
         return
+    if args.event_alpha_runs_report:
+        event_alpha_runs_report(
+            path=args.event_alpha_run_ledger_path,
+            limit=args.event_alpha_run_limit,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_alpha_status:
+        event_alpha_status(profile_name=args.event_alpha_profile, verbose=args.verbose)
+        return
     if args.event_alpha_profile_report:
         event_alpha_profile_report(args.event_alpha_profile_report, verbose=args.verbose)
         return
@@ -3805,8 +4023,20 @@ def cli() -> None:
     if args.event_watchlist_report:
         event_watchlist_report(verbose=args.verbose)
         return
+    if args.event_watchlist_monitor:
+        event_watchlist_monitor_report(verbose=args.verbose, event_now=args.event_now)
+        return
     if args.event_alpha_router_report:
         event_alpha_router_report(verbose=args.verbose)
+        return
+    if args.event_alpha_missed_report:
+        event_alpha_missed_report(verbose=args.verbose)
+        return
+    if args.event_alpha_calibration_report:
+        event_alpha_calibration_report(verbose=args.verbose)
+        return
+    if args.event_research_card is not None:
+        event_research_card_report(args.event_research_card, verbose=args.verbose)
         return
     if args.event_alpha_alerts_report:
         event_alpha_alerts_report(

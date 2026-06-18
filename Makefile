@@ -48,11 +48,14 @@ EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP ?= 0.05
 EVENT_CATALYST_SEARCH_FIXTURE_PATH ?=
 EVENT_WATCHLIST_STATE_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_watchlist_state.jsonl
 EVENT_ALPHA_ALERT_STORE_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_alpha_alerts.jsonl
+EVENT_ALPHA_RUN_LEDGER_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_alpha_runs.jsonl
+EVENT_ALPHA_MISSED_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_alpha_missed.jsonl
 EVENT_ALPHA_ALERT_OUTCOMES ?= /tmp/event_alpha_alerts_with_outcomes.jsonl
 EVENT_ALPHA_ALERT_PRICES ?= fixtures/event_discovery/outcome_prices.json
 PROFILE ?= no_key_live
+ALERT_KEY ?=
 
-.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-alpha-router-report event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-runs-report event-alpha-status event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-calibration-report event-research-cards event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -89,11 +92,17 @@ help:
 	@echo "  make event-alpha-cycle-send  Run one Event Alpha cycle with opt-in research digest send flag"
 	@echo "  make event-alpha-cycle-profile PROFILE=no_key_live  Run one Event Alpha cycle using an operational profile"
 	@echo "  make event-alpha-cycle-profile-send PROFILE=research_send  Run a profiled cycle with the explicit send flag"
+	@echo "  make event-alpha-runs-report  Print Event Alpha cycle run ledger rows"
+	@echo "  make event-alpha-status PROFILE=no_key_live  Print profile-aware Event Alpha readiness/status"
 	@echo "  make event-alpha-alerts-report  Print Event Alpha alert snapshot cohorts"
 	@echo "  make event-alpha-fill-outcomes  Fill Event Alpha alert outcomes from local prices"
 	@echo "  make event-watchlist-refresh  Refresh fixture event-alpha watchlist state"
 	@echo "  make event-watchlist-report  Print latest event-alpha watchlist state"
+	@echo "  make event-watchlist-monitor  Monitor active watchlist rows without new source evidence"
 	@echo "  make event-alpha-router-report  Route latest watchlist state with daily/instant/triggered lanes"
+	@echo "  make event-alpha-missed-report  Print missed-opportunity diagnostics"
+	@echo "  make event-alpha-calibration-report  Print calibration recommendations from artifacts"
+	@echo "  make event-research-cards ALERT_KEY=...  Print Markdown research card(s)"
 	@echo "  make event-feedback-report  Print latest event-alpha feedback artifact"
 	@echo "  make event-alert-no-key-report  Print no-key public-source event research alerts"
 	@echo "  make event-alert-no-key-llm-report  Print no-key event alerts with LLM advisory metadata"
@@ -391,6 +400,15 @@ event-alpha-cycle-profile-send:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	$(PYTHON) main.py --event-alpha-cycle --event-alpha-profile $(PROFILE) --event-alert-send
 
+event-alpha-runs-report:
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
+	$(PYTHON) main.py --event-alpha-runs-report
+
+event-alpha-status:
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
+	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
+	$(PYTHON) main.py --event-alpha-status --event-alpha-profile $(PROFILE)
+
 event-alpha-alerts-report:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	$(PYTHON) main.py --event-alpha-alerts-report
@@ -414,10 +432,35 @@ event-watchlist-report:
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	$(PYTHON) main.py --event-watchlist-report
 
+event-watchlist-monitor:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	$(PYTHON) main.py --event-watchlist-monitor
+
 event-alpha-router-report:
 	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	$(PYTHON) main.py --event-alpha-router-report
+
+event-alpha-missed-report:
+	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
+	$(PYTHON) main.py --event-alpha-missed-report
+
+event-alpha-calibration-report:
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
+	$(PYTHON) main.py --event-alpha-calibration-report
+
+event-research-cards:
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
+	$(PYTHON) main.py --event-research-card $(ALERT_KEY)
 
 event-feedback-report:
 	$(PYTHON) main.py --event-feedback-report

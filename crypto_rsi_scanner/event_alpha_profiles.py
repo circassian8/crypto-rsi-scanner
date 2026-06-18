@@ -44,6 +44,18 @@ def format_profile_report(profile: EventAlphaProfile) -> str:
     else:
         for key, value in sorted(profile.config_overrides.items()):
             rows.append(f"- {key}={value}")
+    budget_keys = [
+        "EVENT_LLM_MAX_CALLS_PER_RUN",
+        "EVENT_LLM_MAX_CALLS_PER_DAY",
+        "EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY",
+        "EVENT_LLM_ESTIMATED_COST_PER_CALL_USD",
+        "EVENT_LLM_CACHE_TTL_HOURS",
+    ]
+    budget = {key: profile.config_overrides.get(key) for key in budget_keys if key in profile.config_overrides}
+    if budget:
+        rows.extend(["", "LLM budget defaults:"])
+        for key, value in budget.items():
+            rows.append(f"- {key}={value}")
     return "\n".join(rows)
 
 
@@ -146,6 +158,11 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_ENABLED": True,
             "EVENT_LLM_PROVIDER": "openai",
             "EVENT_LLM_MODE": "advisory",
+            "EVENT_LLM_MAX_CALLS_PER_RUN": 20,
+            "EVENT_LLM_MAX_CALLS_PER_DAY": 80,
+            "EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY": 1.0,
+            "EVENT_LLM_ESTIMATED_COST_PER_CALL_USD": 0.005,
+            "EVENT_LLM_CACHE_TTL_HOURS": 168,
             "EVENT_LLM_EXTRACTOR_ENABLED": True,
             "EVENT_LLM_EXTRACTOR_PROVIDER": "openai",
             "EVENT_LLM_EXTRACTOR_MODE": "advisory",
@@ -171,6 +188,7 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_MODE": "advisory",
             "EVENT_LLM_EXTRACTOR_PROVIDER": "fixture",
             "EVENT_LLM_EXTRACTOR_MODE": "advisory",
+            "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
             "EVENT_WATCHLIST_ENABLED": True,
             "EVENT_ALPHA_ROUTER_ENABLED": True,
         },

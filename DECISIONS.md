@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep Event Alpha operational reports artifact-only
+**Status:** accepted
+**Decision:** Event Alpha may append a local cycle run ledger, print
+profile-aware status, monitor active watchlist rows from market/derivatives
+state, detect missed opportunities, summarize calibration by feedback/outcomes,
+and render Markdown research cards. These outputs are operational research
+artifacts only. They must not write live signal/paper tables, route normal RSI
+alerts, open paper trades, execute orders, or create `TRIGGERED_FADE`.
+Catalyst-search identity evidence must come from title/body/event text,
+contract-address URL paths, or resolver/quote-validated LLM extraction; URL-only
+and publisher/source-origin matches are explicit rejection reason codes.
+**Why:** The radar needs daily operating visibility and a feedback loop, but
+monitoring and calibration data can become dangerous if it silently turns into
+alert authority. Keeping these paths artifact-only preserves auditability while
+the system builds reviewed evidence.
+**Revisit when:** A reviewed Event Alpha sample and human approval justify a
+separate promoted research digest, paper-tracking, or threshold-calibration
+workflow.
+
 ## 2026-06-18 - Require identity proof before catalyst-search attachment
 **Status:** accepted
 **Decision:** Dynamic catalyst-search results may attach to a market anomaly

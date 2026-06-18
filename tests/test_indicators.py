@@ -4952,6 +4952,96 @@ def test_event_catalyst_search_identity_can_come_from_resolver_validated_llm_ext
     assert event_catalyst_search.result_mentions_anomaly_identity(raw, query, None) is True
 
 
+def test_event_catalyst_search_identity_field_safety_rejects_url_and_source_noise():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def raw(raw_id, *, title="", body="", source_url=None, provider="fixture_search_result", raw_json=None):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider=provider,
+            fetched_at=now,
+            published_at=now,
+            source_url=source_url,
+            title=title,
+            body=body,
+            raw_json=raw_json or {},
+            source_confidence=0.85,
+            content_hash=raw_id,
+        )
+
+    pump_query = event_catalyst_search.SearchQuery(
+        anomaly_raw_id="market_anomaly:pump:2026-06-18",
+        query="PUMP Binance listing",
+        symbol="PUMP",
+        rank=1,
+        coin_id="pump-token",
+    )
+    url_only = raw(
+        "url-only",
+        title="Exchange listing roundup",
+        body="A listing roundup mentions other tokens.",
+        source_url="https://example.test/search?q=PUMPUSDT",
+    )
+    assert event_catalyst_search.result_mentions_anomaly_identity(url_only, pump_query, None) is False
+    score = event_catalyst_search.score_search_result(url_only, pump_query, now=now)
+    assert "identity_url_only_rejected" in score.reason_codes
+
+    body_pair = raw(
+        "body-pair",
+        title="Binance lists a new perp",
+        body="Binance confirms PUMPUSDT perpetual trading starts today.",
+        source_url="https://example.test/news/listing",
+    )
+    assert event_catalyst_search.result_mentions_anomaly_identity(body_pair, pump_query, None) is True
+    assert "identity_match_pair" in event_catalyst_search.score_search_result(body_pair, pump_query, now=now).reason_codes
+
+    btc_query = event_catalyst_search.SearchQuery(
+        anomaly_raw_id="market_anomaly:bitcoin:2026-06-18",
+        query="BTC catalyst",
+        symbol="BTC",
+        rank=1,
+        coin_id="bitcoin",
+    )
+    publisher = raw(
+        "publisher",
+        title="SpaceX pre-IPO markets expand",
+        body="The article is about SpaceX exposure.",
+        source_url="https://bitcoinworld.example/news/spacex",
+        raw_json={"source_origin": "Bitcoin World"},
+    )
+    assert event_catalyst_search.result_mentions_anomaly_identity(publisher, btc_query, None) is False
+    assert "identity_source_origin_rejected" in event_catalyst_search.score_search_result(publisher, btc_query, now=now).reason_codes
+
+    address = "0x1234567890abcdef1234567890abcdef12345678"
+    contract_query = event_catalyst_search.SearchQuery(
+        anomaly_raw_id="market_anomaly:contract-token:2026-06-18",
+        query="CONTRACT catalyst",
+        symbol="CONTRACT",
+        rank=1,
+        contract_addresses=(address,),
+    )
+    path_contract = raw(
+        "contract-path",
+        title="Protocol update",
+        body="Contract details published.",
+        source_url=f"https://etherscan.io/token/{address}",
+    )
+    assert event_catalyst_search.result_mentions_anomaly_identity(path_contract, contract_query, None) is True
+
+    query_contract = raw(
+        "contract-query",
+        title="Protocol update",
+        body="Contract details published.",
+        source_url=f"https://example.test/search?contract={address}",
+    )
+    assert event_catalyst_search.result_mentions_anomaly_identity(query_contract, contract_query, None) is False
+    assert "identity_url_only_rejected" in event_catalyst_search.score_search_result(query_contract, contract_query, now=now).reason_codes
+
+
 def test_event_catalyst_search_provider_cache_fetches_broad_sources_once():
     import json
     import tempfile
@@ -6098,6 +6188,7 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
         "EVENT_WATCHLIST_STATE_PATH": config.EVENT_WATCHLIST_STATE_PATH,
         "EVENT_ALPHA_ROUTER_ENABLED": config.EVENT_ALPHA_ROUTER_ENABLED,
         "EVENT_ALPHA_ALERT_STORE_PATH": config.EVENT_ALPHA_ALERT_STORE_PATH,
+        "EVENT_ALPHA_RUN_LEDGER_PATH": config.EVENT_ALPHA_RUN_LEDGER_PATH,
         "EVENT_ALERTS_ENABLED": config.EVENT_ALERTS_ENABLED,
     }
     with tempfile.TemporaryDirectory() as tmp:
@@ -6116,6 +6207,7 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
         config.EVENT_WATCHLIST_STATE_PATH = Path(tmp) / "watchlist.jsonl"
         config.EVENT_ALPHA_ROUTER_ENABLED = True
         config.EVENT_ALPHA_ALERT_STORE_PATH = Path(tmp) / "event_alpha_alerts.jsonl"
+        config.EVENT_ALPHA_RUN_LEDGER_PATH = Path(tmp) / "event_alpha_runs.jsonl"
         config.EVENT_ALERTS_ENABLED = False
         try:
             out = io.StringIO()
@@ -6129,8 +6221,10 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
             assert "routed=1" in text
             assert "routes: STORE_ONLY=1" in text
             assert "market_anomaly_unknown" in text
+            assert "run ledger updated" in text.lower()
             assert config.EVENT_WATCHLIST_STATE_PATH.exists()
             assert config.EVENT_ALPHA_ALERT_STORE_PATH.exists()
+            assert config.EVENT_ALPHA_RUN_LEDGER_PATH.exists()
         finally:
             for name, value in original.items():
                 setattr(config, name, value)
@@ -6765,6 +6859,240 @@ def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
         assert "missed=1" in report
 
 
+def test_event_alpha_status_profile_budget_and_unknown_profile():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, event_alpha_profiles, scanner
+
+    profile_keys = set()
+    for profile_name in event_alpha_profiles.profile_names():
+        profile_keys.update(event_alpha_profiles.get_profile(profile_name).config_overrides)
+    profile_keys.add("EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS")
+    original = {
+        name: getattr(config, name)
+        for name in profile_keys
+        if hasattr(config, name)
+    }
+    try:
+        profile = event_alpha_profiles.get_profile("full_llm_live")
+        assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > 0
+        assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] > 0
+        assert "LLM budget defaults" in event_alpha_profiles.format_profile_report(profile)
+        assert event_alpha_profiles.get_profile("research_send").config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "alertable"
+
+        default_out = io.StringIO()
+        with contextlib.redirect_stdout(default_out):
+            scanner.event_alpha_status()
+        profile_out = io.StringIO()
+        with contextlib.redirect_stdout(profile_out):
+            scanner.event_alpha_status(profile_name="no_key_live")
+        assert "profile: default" in default_out.getvalue()
+        assert "profile: no_key_live" in profile_out.getvalue()
+        assert default_out.getvalue() != profile_out.getvalue()
+        assert "LLM budget:" in profile_out.getvalue()
+
+        bad_out = io.StringIO()
+        with contextlib.redirect_stdout(bad_out):
+            scanner.event_alpha_status(profile_name="missing-profile")
+        assert "unknown Event Alpha profile" in bad_out.getvalue()
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
+
+
+def test_event_watchlist_monitor_detects_material_updates_without_new_source():
+    from pathlib import Path
+    from crypto_rsi_scanner import event_watchlist, event_watchlist_monitor
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="spacex|velvet|proxy_attention",
+        cluster_id="spacex|ipo_proxy|2026-06-20",
+        event_id="velvet-event",
+        coin_id="velvet",
+        symbol="VELVET",
+        relationship_type="proxy_attention",
+        external_asset="SpaceX",
+        event_time="2026-06-18T13:00:00+00:00",
+        state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        previous_state="RADAR",
+        first_seen_at="2026-06-18T10:00:00+00:00",
+        last_seen_at="2026-06-18T11:00:00+00:00",
+        source_count=2,
+        highest_score=72,
+        latest_score=72,
+        latest_tier="WATCHLIST",
+        latest_event_name="VELVET SpaceX proxy",
+        latest_source="fixture",
+        latest_score_components={"derivatives_crowding": 55, "cluster_confidence": 70},
+    )
+    expired = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="old|old|proxy_attention",
+        cluster_id="old",
+        event_id="old-event",
+        coin_id="old",
+        symbol="OLD",
+        relationship_type="proxy_attention",
+        external_asset=None,
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.EXPIRED.value,
+        previous_state="RADAR",
+        first_seen_at="2026-06-10T00:00:00+00:00",
+        last_seen_at="2026-06-18T11:00:00+00:00",
+        latest_event_name="old",
+        latest_source="fixture",
+    )
+    read = event_watchlist.EventWatchlistReadResult(
+        state_path=Path("watchlist.jsonl"),
+        rows_read=2,
+        entries=[entry, expired],
+        latest_only=True,
+    )
+    result = event_watchlist_monitor.monitor_watchlist(
+        read,
+        market_rows=[{
+            "id": "velvet",
+            "symbol": "velvet",
+            "name": "Velvet",
+            "current_price": 1.25,
+            "price_change_percentage_24h_in_currency": 38,
+            "price_change_percentage_7d_in_currency": 120,
+            "total_volume": 6000000,
+            "market_cap": 20000000,
+            "volume_zscore_24h": 4.2,
+        }],
+        now=pd.Timestamp("2026-06-18T14:00:00Z").to_pydatetime(),
+    )
+    assert result.active_entries == 1
+    assert result.skipped_expired == 1
+    row = result.rows[0]
+    assert row.material_update is True
+    assert "EVENT_PASSED" in row.state_transition_hints
+    assert "DERIVATIVES_HEATED" in row.state_transition_hints
+    assert "MARKET_SCORE_JUMP" in row.state_transition_hints
+    assert "TRIGGERED_FADE" not in row.state_transition_hints
+    assert "EVENT WATCHLIST MONITOR" in event_watchlist_monitor.format_watchlist_monitor_report(result)
+
+
+def test_event_alpha_missed_calibration_and_research_card_reports():
+    from crypto_rsi_scanner import (
+        event_alpha_calibration,
+        event_alpha_missed,
+        event_alpha_router,
+        event_playbooks,
+        event_research_cards,
+        event_watchlist,
+    )
+    from pathlib import Path
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="cup|chiliz|fan_sports_event",
+        cluster_id="cup|sports|2026-06-20",
+        event_id="chz-event",
+        coin_id="chiliz",
+        symbol="CHZ",
+        relationship_type="proxy_attention",
+        external_asset="World Cup",
+        event_time="2026-06-20T18:00:00+00:00",
+        state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        previous_state="WATCHLIST",
+        first_seen_at="2026-06-18T10:00:00+00:00",
+        last_seen_at="2026-06-18T12:00:00+00:00",
+        source_count=3,
+        highest_score=86,
+        latest_score=86,
+        latest_tier="HIGH_PRIORITY_WATCH",
+        latest_event_name="CHZ World Cup fan token surge",
+        latest_source="fixture",
+        latest_playbook_type=event_playbooks.EventPlaybookType.FAN_SPORTS_EVENT.value,
+        latest_rule_playbook_type=event_playbooks.EventPlaybookType.FAN_SPORTS_EVENT.value,
+        latest_effective_playbook_type=event_playbooks.EventPlaybookType.FAN_SPORTS_EVENT.value,
+        latest_playbook_score=86,
+        latest_playbook_action="high_priority_watch",
+        latest_llm_asset_role="proxy_instrument",
+        latest_llm_confidence=0.88,
+        latest_score_components={"cluster_confidence": 78, "derivatives_crowding": 20},
+        latest_market_snapshot={"price": 0.21, "return_24h": 0.18},
+        alert_history=[{"observed_at": "2026-06-18T12:00:00+00:00", "state": "HIGH_PRIORITY", "tier": "HIGH_PRIORITY_WATCH", "score": 86}],
+        should_alert=True,
+    )
+    alerts = [{
+        "alert_key": entry.key,
+        "asset_symbol": "CHZ",
+        "asset_coin_id": "chiliz",
+        "event_name": entry.latest_event_name,
+        "tier": "HIGH_PRIORITY_WATCH",
+        "playbook_type": entry.latest_playbook_type,
+        "source": "fixture",
+        "feedback_label": "useful",
+        "primary_horizon_return": 0.12,
+        "mfe_mae_ratio": 1.8,
+        "direction_hit": True,
+        "volatility_hit": True,
+        "llm_asset_role": "proxy_instrument",
+        "score_components": {"cluster_confidence": 78},
+    }]
+    missed = event_alpha_missed.detect_missed_opportunities(
+        [
+            {
+                "id": "new-pump",
+                "symbol": "pump",
+                "name": "New Pump",
+                "current_price": 2.0,
+                "price_change_percentage_24h_in_currency": 150,
+                "total_volume": 10000000,
+                "market_cap": 20000000,
+            },
+            {
+                "id": "chiliz",
+                "symbol": "chz",
+                "name": "Chiliz",
+                "current_price": 0.21,
+                "price_change_percentage_24h_in_currency": 150,
+            },
+        ],
+        alert_rows=alerts,
+        watchlist_entries=[entry],
+    )
+    assert [row.symbol for row in missed.rows] == ["PUMP"]
+    assert missed.rows[0].failure_stage == "no_source_event"
+    assert "PUMP crypto catalyst" in missed.rows[0].suggested_queries
+    missed_report = event_alpha_missed.format_missed_report(missed)
+    assert "missed=1" in missed_report
+
+    calibration = event_alpha_calibration.format_calibration_report(
+        alerts,
+        feedback_rows=[{"key": entry.key, "label": "useful"}],
+        missed_rows=[row.__dict__ for row in missed.rows],
+    )
+    assert "feedback by playbook" in calibration
+    assert "missed opportunities by failure stage" in calibration
+    assert "recommendations:" in calibration
+
+    routed = event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH,
+        alertable=True,
+        reason="watchlist escalation",
+    )
+    card = event_research_cards.render_research_card(
+        "CHZ",
+        watchlist_entries=[entry],
+        alert_rows=alerts,
+        route_decisions=[routed],
+    )
+    assert card.found is True
+    assert "CHZ Event Research Card" in card.markdown
+    assert "Evidence Sources" in card.markdown
+    assert "World Cup" in card.markdown
+    assert ".env" not in card.markdown
+
+
 def test_event_alpha_eval_fixture_passes():
     from crypto_rsi_scanner import event_alpha_eval
 
@@ -6883,6 +7211,8 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event-alpha-cycle-search-llm:" in text
     assert "--event-catalyst-search-report" in text
     assert "event-alpha-cycle-send:" in text
+    assert "event-alpha-runs-report:" in text
+    assert "event-alpha-status:" in text
     assert "event-alpha-alerts-report:" in text
     assert "event-alpha-fill-outcomes:" in text
     assert "--event-alpha-cycle" in text
@@ -6895,10 +7225,16 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "RSI_EVENT_ALPHA_ALERT_STORE_PATH" in text
     assert "event-watchlist-refresh:" in text
     assert "event-watchlist-report:" in text
+    assert "event-watchlist-monitor:" in text
     assert "event-alpha-router-report:" in text
+    assert "event-alpha-missed-report:" in text
+    assert "event-alpha-calibration-report:" in text
+    assert "event-research-cards:" in text
     assert "event-feedback-report:" in text
     assert "--event-watchlist-refresh" in text
     assert "--event-alpha-router-report" in text
+    assert "--event-alpha-runs-report" in text
+    assert "--event-alpha-status" in text
 
 
 def test_event_discovery_asset_role_demotes_proxy_context_noise():

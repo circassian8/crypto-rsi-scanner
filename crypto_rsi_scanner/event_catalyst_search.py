@@ -16,6 +16,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Protocol
+from urllib.parse import urlparse
 
 from .event_models import RawDiscoveredEvent
 from .event_providers.cryptopanic import CryptoPanicProvider
@@ -698,8 +699,14 @@ def score_search_result(
     reasons = [f"source_confidence_{int(round(float(raw_event.source_confidence or 0.0) * 100))}"]
     identity_reason = _identity_match_reason(raw_event, query, anomaly)
     identity_missing = identity_reason is None
+    rejected_identity_reasons = {
+        "common_word_identity_rejected",
+        "identity_url_only_rejected",
+        "identity_source_origin_rejected",
+    }
     common_word_rejected = identity_reason == "common_word_identity_rejected"
-    if identity_reason and identity_reason != "common_word_identity_rejected":
+    rejected_identity = identity_reason in rejected_identity_reasons
+    if identity_reason and not rejected_identity:
         score += {
             "identity_match_strong": 26,
             "identity_match_pair": 24,
@@ -708,6 +715,7 @@ def score_search_result(
             "identity_match_project": 22,
             "identity_match_token_context": 20,
             "identity_match_llm_resolver_validated": 20,
+            "identity_quote_validated": 20,
         }.get(identity_reason, 18)
         reasons.append(identity_reason)
     elif query.symbol in {"BTC", "ETH"} and _looks_generic_major_market_article(text):
@@ -750,6 +758,9 @@ def score_search_result(
     if common_word_rejected:
         score = min(score, 35)
         reasons.append("common_word_identity_rejected")
+    elif identity_reason in {"identity_url_only_rejected", "identity_source_origin_rejected"}:
+        score = min(score, 40)
+        reasons.append(identity_reason)
     elif identity_missing:
         score = min(score, 45)
         reasons.append("identity_missing_cap")
@@ -930,7 +941,12 @@ def result_mentions_anomaly_identity(
     anomaly: RawDiscoveredEvent | None,
 ) -> bool:
     """Return true when a search result names the anomaly asset, not just a catalyst."""
-    return _identity_match_reason(raw_event, query, anomaly) not in {None, "common_word_identity_rejected"}
+    return _identity_match_reason(raw_event, query, anomaly) not in {
+        None,
+        "common_word_identity_rejected",
+        "identity_url_only_rejected",
+        "identity_source_origin_rejected",
+    }
 
 
 def _identity_match_reason(
@@ -939,25 +955,31 @@ def _identity_match_reason(
     anomaly: RawDiscoveredEvent | None = None,
 ) -> str | None:
     identity = _query_identity(query, anomaly)
-    raw_source = " ".join(str(part or "") for part in (
+    payload = raw_event.raw_json if isinstance(raw_event.raw_json, Mapping) else {}
+    event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
+    strong_source = " ".join(str(part or "") for part in (
         raw_event.title,
         raw_event.body,
-        raw_event.source_url,
         _event_name(raw_event),
+        event_payload.get("description"),
     ))
-    raw_lower = raw_source.casefold()
-    text = clean_text(raw_source)
+    strong_lower = strong_source.casefold()
+    text = clean_text(strong_source)
+    source_url = str(raw_event.source_url or "")
+    source_origin = _source_origin_text(raw_event)
     symbol = identity.symbol.upper()
     if not symbol:
         return None
 
     for address in identity.contract_addresses:
-        if address and address.casefold() in raw_lower:
+        if address and address.casefold() in strong_lower:
+            return "identity_match_contract"
+        if _contract_in_url_path(source_url, address):
             return "identity_match_contract"
 
-    if _pair_symbol_in_source(raw_source, symbol):
+    if _pair_symbol_in_source(strong_source, symbol):
         return "identity_match_pair"
-    if _dollar_symbol_in_source(raw_source, symbol):
+    if _dollar_symbol_in_source(strong_source, symbol):
         return "identity_match_strong"
     if _case_sensitive_symbol_in_source(raw_event, symbol):
         if identity.is_common_word_symbol:
@@ -976,10 +998,16 @@ def _identity_match_reason(
             return "identity_match_alias"
 
     if _llm_extraction_mentions_identity(raw_event, identity):
-        return "identity_match_llm_resolver_validated"
+        return "identity_quote_validated"
 
     if identity.is_common_word_symbol and symbol.casefold() in text:
         return "common_word_identity_rejected"
+    url_text = clean_text(source_url)
+    origin_text = clean_text(source_origin)
+    if _identity_in_source_origin(identity, origin_text):
+        return "identity_source_origin_rejected"
+    if _identity_in_url_only(identity, source_url, url_text):
+        return "identity_url_only_rejected"
     return None
 
 
@@ -1120,6 +1148,72 @@ def _token_context_in_text(text: str, symbol: str) -> bool:
     )
 
 
+def _contract_in_url_path(source_url: str, address: str) -> bool:
+    if not source_url or not address or not _looks_contract_address(address):
+        return False
+    try:
+        parsed = urlparse(source_url)
+    except ValueError:
+        return False
+    path = parsed.path or ""
+    query = parsed.query or ""
+    address_l = address.casefold()
+    if address_l in query.casefold():
+        return False
+    return address_l in path.casefold()
+
+
+def _looks_contract_address(address: str) -> bool:
+    text = str(address or "").strip()
+    return bool(re.fullmatch(r"0x[a-fA-F0-9]{40}", text))
+
+
+def _source_origin_text(raw_event: RawDiscoveredEvent) -> str:
+    payload = raw_event.raw_json if isinstance(raw_event.raw_json, Mapping) else {}
+    values = [
+        payload.get("source_origin"),
+        payload.get("publisher"),
+        payload.get("source_name"),
+        payload.get("provider_name"),
+        raw_event.provider,
+    ]
+    if raw_event.source_url:
+        try:
+            values.append(urlparse(raw_event.source_url).netloc)
+        except ValueError:
+            pass
+    return " ".join(str(value or "") for value in values)
+
+
+def _identity_in_source_origin(identity: _AnomalyIdentity, origin_text: str) -> bool:
+    if not origin_text:
+        return False
+    symbol = identity.symbol.casefold()
+    if symbol and re.search(rf"(?<![a-z0-9]){re.escape(symbol)}(?![a-z0-9])", origin_text):
+        return True
+    for term in identity.identity_terms:
+        normalized = clean_text(term)
+        if normalized and normalized in origin_text:
+            return True
+    return False
+
+
+def _identity_in_url_only(identity: _AnomalyIdentity, source_url: str, url_text: str) -> bool:
+    if not source_url or not url_text:
+        return False
+    symbol = identity.symbol.casefold()
+    if symbol and re.search(rf"(?<![a-z0-9]){re.escape(symbol)}(?:usdt)?(?![a-z0-9])", url_text):
+        return True
+    for term in identity.identity_terms:
+        normalized = clean_text(term)
+        if normalized and normalized in url_text:
+            return True
+    for address in identity.contract_addresses:
+        if address and address.casefold() in source_url.casefold() and not _contract_in_url_path(source_url, address):
+            return True
+    return False
+
+
 def _llm_extraction_mentions_identity(raw_event: RawDiscoveredEvent, identity: _AnomalyIdentity) -> bool:
     payload = raw_event.raw_json if isinstance(raw_event.raw_json, Mapping) else {}
     extraction = payload.get("llm_extraction") if isinstance(payload.get("llm_extraction"), Mapping) else {}
@@ -1150,8 +1244,19 @@ def _llm_extraction_mentions_identity(raw_event: RawDiscoveredEvent, identity: _
             or (coin_id and mention_coin == coin_id)
             or (symbol and mention_symbol == symbol)
         )
-        if resolver_validated and ((coin_id and mention_coin == coin_id) or (symbol and mention_symbol == symbol)):
-            return True
+        if not (resolver_validated and ((coin_id and mention_coin == coin_id) or (symbol and mention_symbol == symbol))):
+            continue
+        quotes = mention.get("evidence_quotes")
+        if isinstance(quotes, list) and quotes:
+            source_text = " ".join(str(part or "") for part in (raw_event.title, raw_event.body, _event_name(raw_event)))
+            if not any(
+                isinstance(quote, Mapping)
+                and str(quote.get("text") or "").strip()
+                and str(quote.get("text") or "").strip() in source_text
+                for quote in quotes
+            ):
+                continue
+        return True
     return False
 
 

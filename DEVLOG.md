@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add Event Alpha operational radar reports · Codex
+**Why:** Event Alpha had source discovery, LLM advisory, playbooks, watchlist
+state, routing, and alert snapshots, but daily operation still needed a run
+ledger, profile-aware status, active watchlist monitoring, missed-opportunity
+review, calibration summaries, and rich per-alert cards.
+**Changes:**
+- Added `event_alpha_run_ledger.py` plus `--event-alpha-runs-report` and
+  profile-aware `--event-alpha-status`, with run counts for sources, anomalies,
+  catalyst search, LLM cache/budget use, watchlist/router output, sends, and
+  warnings.
+- Added `event_watchlist_monitor.py` so active RADAR/WATCHLIST/HIGH_PRIORITY/
+  EVENT_PASSED/ARMED rows can be refreshed from market state without a new
+  article/source row.
+- Added `event_alpha_missed.py`, `event_alpha_calibration.py`, and
+  `event_research_cards.py` for missed large-move diagnostics, feedback/outcome
+  calibration recommendations, and Markdown review cards.
+- Hardened catalyst-search identity evidence so URL-only and publisher/source
+  origin matches are rejected with explicit reason codes while title/body/event
+  text, contract-address URL paths, and quote/resolver-validated LLM extraction
+  remain valid evidence.
+- Added safer `full_llm_live` profile budget caps, `research_send` alertable
+  snapshot retention, new Make targets, `.env.example` knobs, and regression
+  tests.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 337/337. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. `make verify PYTHON=python3`
+passed.
+**Notes/risks:** All new paths are local research artifacts/reports. They do
+not write live signal/paper tables, route normal RSI alerts, execute orders, or
+let LLM/search/watchlist monitoring create `TRIGGERED_FADE`.
+
 ## 2026-06-18 — Harden Event Alpha catalyst identity and routing · Codex
 **Why:** The dynamic Event Alpha catalyst-search loop needed to avoid attaching
 generic catalyst articles to hot tickers, reduce repeated provider fetches, make
