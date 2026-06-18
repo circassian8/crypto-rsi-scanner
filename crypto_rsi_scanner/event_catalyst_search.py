@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Protocol
 from urllib.parse import urlparse
 
+from . import event_identity
 from .event_models import RawDiscoveredEvent
 from .event_providers.cryptopanic import CryptoPanicProvider
 from .event_providers.gdelt import GdeltProvider
@@ -957,58 +958,37 @@ def _identity_match_reason(
     identity = _query_identity(query, anomaly)
     payload = raw_event.raw_json if isinstance(raw_event.raw_json, Mapping) else {}
     event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
-    strong_source = " ".join(str(part or "") for part in (
+    strong_fields = (
         raw_event.title,
         raw_event.body,
         _event_name(raw_event),
         event_payload.get("description"),
-    ))
-    strong_lower = strong_source.casefold()
-    text = clean_text(strong_source)
-    source_url = str(raw_event.source_url or "")
-    source_origin = _source_origin_text(raw_event)
-    symbol = identity.symbol.upper()
-    if not symbol:
-        return None
+    )
+    result = event_identity.match_asset_identity(
+        _shared_identity(identity),
+        event_identity.IdentityEvidence(
+            strong_content=tuple(str(field or "") for field in strong_fields),
+            llm_quotes=(
+                event_identity.validated_llm_identity_quotes(payload, strong_fields)
+                or ((identity.symbol,) if _llm_extraction_mentions_identity(raw_event, identity) else ())
+            ),
+            url=str(raw_event.source_url or ""),
+            source_origin=(_source_origin_text(raw_event),),
+        ),
+    )
+    return result.reason
 
-    for address in identity.contract_addresses:
-        if address and address.casefold() in strong_lower:
-            return "identity_match_contract"
-        if _contract_in_url_path(source_url, address):
-            return "identity_match_contract"
 
-    if _pair_symbol_in_source(strong_source, symbol):
-        return "identity_match_pair"
-    if _dollar_symbol_in_source(strong_source, symbol):
-        return "identity_match_strong"
-    if _case_sensitive_symbol_in_source(raw_event, symbol):
-        if identity.is_common_word_symbol:
-            return "identity_match_strong"
-        return "identity_match_strong"
-    if _token_context_in_text(text, symbol):
-        return "identity_match_token_context"
-
-    for term in identity.identity_terms:
-        normalized = clean_text(term)
-        if not normalized or len(normalized) < 3:
-            continue
-        if normalized in text:
-            if identity.project_name and normalized == clean_text(identity.project_name):
-                return "identity_match_project"
-            return "identity_match_alias"
-
-    if _llm_extraction_mentions_identity(raw_event, identity):
-        return "identity_quote_validated"
-
-    if identity.is_common_word_symbol and symbol.casefold() in text:
-        return "common_word_identity_rejected"
-    url_text = clean_text(source_url)
-    origin_text = clean_text(source_origin)
-    if _identity_in_source_origin(identity, origin_text):
-        return "identity_source_origin_rejected"
-    if _identity_in_url_only(identity, source_url, url_text):
-        return "identity_url_only_rejected"
-    return None
+def _shared_identity(identity: _AnomalyIdentity) -> event_identity.AssetIdentity:
+    return event_identity.AssetIdentity(
+        symbol=identity.symbol.upper(),
+        coin_id=identity.coin_id,
+        project_name=identity.project_name,
+        aliases=tuple(identity.aliases),
+        contract_addresses=tuple(identity.contract_addresses),
+        is_common_word_symbol=identity.is_common_word_symbol,
+        identity_terms=tuple(identity.identity_terms),
+    )
 
 
 def _query_identity(query: SearchQuery, anomaly: RawDiscoveredEvent | None = None) -> _AnomalyIdentity:

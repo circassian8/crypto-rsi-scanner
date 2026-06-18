@@ -17,6 +17,7 @@ from . import (
     event_llm_analyzer,
     event_llm_extractor,
     event_watchlist,
+    event_watchlist_market,
     event_watchlist_monitor,
 )
 from .event_models import EventDiscoveryResult, RawDiscoveredEvent
@@ -133,6 +134,9 @@ def run_event_alpha_pipeline(
     route: bool = False,
     watchlist_monitor_enabled: bool = False,
     watchlist_monitor_market_rows: Iterable[dict[str, Any]] = (),
+    watchlist_monitor_market_source: str = "cycle",
+    watchlist_monitor_targeted_lookup: bool = False,
+    watchlist_monitor_max_assets: int = 50,
     watchlist_monitor_route_updates: bool = True,
     extra_warnings: Iterable[str] = (),
 ) -> EventAlphaPipelineResult:
@@ -185,9 +189,19 @@ def run_event_alpha_pipeline(
         else:
             state_path = watchlist_cfg.state_path or Path("event_watchlist_state.jsonl")
             watchlist_read_result = event_watchlist.load_watchlist(state_path)
+            market_source_result = event_watchlist_market.market_rows_for_watchlist(
+                watchlist_read_result,
+                source=watchlist_monitor_market_source,
+                fixture_rows=watchlist_monitor_market_rows,
+                cycle_rows=watchlist_monitor_market_rows,
+                discovery_result=discovery_result,
+                targeted_lookup=watchlist_monitor_targeted_lookup,
+                max_assets=watchlist_monitor_max_assets,
+            )
+            warnings.extend(f"watchlist market: {warning}" for warning in market_source_result.warnings)
             watchlist_monitor_result = event_watchlist_monitor.monitor_watchlist(
                 watchlist_read_result,
-                market_rows=watchlist_monitor_market_rows,
+                market_rows=market_source_result.rows,
                 now=observed,
             )
             watchlist_read_result = event_watchlist_monitor.apply_monitor_updates_to_watchlist(
@@ -241,6 +255,9 @@ def run_event_alpha_operating_cycle(
     route: bool = True,
     watchlist_monitor_enabled: bool = False,
     watchlist_monitor_market_rows: Iterable[dict[str, Any]] = (),
+    watchlist_monitor_market_source: str = "cycle",
+    watchlist_monitor_targeted_lookup: bool = False,
+    watchlist_monitor_max_assets: int = 50,
     watchlist_monitor_route_updates: bool = True,
     send: bool = False,
     send_callback: ResearchAlertSender | None = None,
@@ -353,6 +370,9 @@ def run_event_alpha_operating_cycle(
         route=route,
         watchlist_monitor_enabled=watchlist_monitor_enabled,
         watchlist_monitor_market_rows=watchlist_monitor_market_rows,
+        watchlist_monitor_market_source=watchlist_monitor_market_source,
+        watchlist_monitor_targeted_lookup=watchlist_monitor_targeted_lookup,
+        watchlist_monitor_max_assets=watchlist_monitor_max_assets,
         watchlist_monitor_route_updates=watchlist_monitor_route_updates,
         extra_warnings=warnings,
     )

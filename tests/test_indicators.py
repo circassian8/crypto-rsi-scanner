@@ -13648,6 +13648,223 @@ def test_storage_wal_and_busy_timeout():
         st.close()
 
 
+def test_event_identity_shared_matcher_field_safety():
+    from crypto_rsi_scanner import event_identity
+
+    hype = event_identity.AssetIdentity(symbol="HYPE", coin_id="hyperliquid")
+    result = event_identity.match_asset_identity(
+        hype,
+        event_identity.IdentityEvidence(strong_content=("IPO hype keeps building",)),
+    )
+    assert result.reason == "common_word_identity_rejected"
+
+    pump = event_identity.AssetIdentity(symbol="PUMP", coin_id="pump-token")
+    url_only = event_identity.match_asset_identity(
+        pump,
+        event_identity.IdentityEvidence(url="https://search.example/?q=PUMPUSDT"),
+    )
+    assert url_only.reason == "identity_url_only_rejected"
+    body_match = event_identity.match_asset_identity(
+        pump,
+        event_identity.IdentityEvidence(strong_content=("PUMPUSDT volume surged after listing rumors",)),
+    )
+    assert body_match.matched and body_match.reason == "identity_match_pair"
+
+    btc = event_identity.AssetIdentity(symbol="BTC", coin_id="bitcoin", project_name="Bitcoin")
+    publisher = event_identity.match_asset_identity(
+        btc,
+        event_identity.IdentityEvidence(source_origin=("Bitcoin World",)),
+    )
+    assert publisher.reason == "identity_source_origin_rejected"
+
+    address = "0x1111111111111111111111111111111111111111"
+    contract = event_identity.AssetIdentity(symbol="AAA", contract_addresses=(address,))
+    path_match = event_identity.match_asset_identity(
+        contract,
+        event_identity.IdentityEvidence(url=f"https://etherscan.io/token/{address}"),
+    )
+    assert path_match.matched and path_match.evidence_field == "url_path_contract"
+    query_match = event_identity.match_asset_identity(
+        contract,
+        event_identity.IdentityEvidence(url=f"https://search.example/?contract={address}"),
+    )
+    assert query_match.reason == "identity_url_only_rejected"
+
+
+def test_event_alpha_missed_uses_shared_identity_for_common_words():
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner import event_alpha_missed
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    raw = RawDiscoveredEvent(
+        raw_id="raw-hype",
+        provider="news",
+        fetched_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        published_at=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        source_url="https://example.com/ipo-hype",
+        title="IPO hype keeps building before the event",
+        body="No token mention appears here.",
+        raw_json={},
+        source_confidence=0.7,
+        content_hash="h",
+    )
+    market = [{"id": "hyperliquid", "symbol": "hype", "name": "Hyperliquid", "price_change_percentage_24h_in_currency": 180}]
+    result = event_alpha_missed.detect_missed_opportunities(market, raw_events=[raw])
+    assert result.rows
+    assert result.rows[0].failure_stage == "no_source_event"
+
+
+def test_event_watchlist_market_sources_select_active_rows():
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import event_watchlist, event_watchlist_market
+
+    entry = _test_watchlist_entry(state="WATCHLIST", symbol="VELVET", coin_id="velvet")
+    read = event_watchlist.EventWatchlistReadResult(Path("state.jsonl"), 1, [entry], True)
+    rows = [{"id": "velvet", "symbol": "velvet", "current_price": 1.23, "price_change_percentage_24h": 30}]
+    selected = event_watchlist_market.market_rows_for_watchlist(read, source="cycle", cycle_rows=rows)
+    assert selected.rows_selected == 1
+    assert selected.rows[0]["id"] == "velvet"
+
+    tmp = Path(tempfile.mkdtemp()) / "markets.json"
+    tmp.write_text('[{"id":"velvet","symbol":"velvet","current_price":2.0}]')
+    loaded = event_watchlist_market.load_market_rows(tmp)
+    fixture = event_watchlist_market.market_rows_for_watchlist(read, source="fixture", fixture_rows=loaded)
+    assert fixture.rows_selected == 1
+
+    empty = event_watchlist_market.market_rows_for_watchlist(read, source="cycle", cycle_rows=[])
+    assert empty.rows_selected == 0
+    assert empty.warnings
+
+
+def test_event_source_reliability_report_recommendations():
+    from crypto_rsi_scanner import event_source_reliability
+
+    alerts = [
+        {"alert_key": "a", "source_provider": "rss", "primary_horizon_return": 0.12, "mfe_mae_ratio": 1.5},
+        {"alert_key": "b", "source_provider": "rss", "primary_horizon_return": 0.05, "mfe_mae_ratio": 1.2},
+        {"alert_key": "c", "source_provider": "bad", "primary_horizon_return": -0.02, "mfe_mae_ratio": 0.6},
+        {"alert_key": "d", "source_provider": "bad", "primary_horizon_return": -0.03, "mfe_mae_ratio": 0.5},
+    ]
+    feedback = [
+        {"key": "a", "label": "useful"},
+        {"key": "b", "label": "useful"},
+        {"key": "c", "label": "junk"},
+        {"key": "d", "label": "junk"},
+    ]
+    missed = [{"failure_stage": "no_source_event"}, {"failure_stage": "no_source_event"}]
+    report = event_source_reliability.format_source_reliability_report(alerts, feedback_rows=feedback, missed_rows=missed)
+    assert "positive prior for rss" in report
+    assert "tighten or demote bad" in report
+    assert "coverage warning" in report
+
+
+def test_event_alpha_calibration_priors_export():
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import event_alpha_calibration
+
+    alerts = [
+        {"alert_key": "a", "playbook_type": "proxy_attention", "source": "rss", "tier": "WATCHLIST", "primary_horizon_return": 0.1},
+        {"alert_key": "b", "playbook_type": "proxy_attention", "source": "rss", "tier": "WATCHLIST", "primary_horizon_return": 0.2},
+    ]
+    feedback = [{"key": "a", "label": "useful"}, {"key": "b", "label": "useful"}]
+    out = Path(tempfile.mkdtemp()) / "priors.json"
+    payload = event_alpha_calibration.write_calibration_priors(out, alerts, feedback_rows=feedback, min_sample=3)
+    assert out.exists()
+    assert payload["playbook_priors"]["proxy_attention"]["score_adjustment"] == 3
+    assert payload["playbook_priors"]["proxy_attention"]["min_sample_warning"] is True
+
+
+def test_event_alpha_eval_export_from_feedback_and_missed():
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import event_alpha_eval_export
+
+    out_dir = Path(tempfile.mkdtemp())
+    feedback_result = event_alpha_eval_export.export_cases_from_feedback(
+        [{"alert_key": "k1", "event_name": "Bitcoin World article", "asset_symbol": "BTC", "asset_coin_id": "bitcoin"}],
+        [{"key": "k1", "label": "junk", "notes": "publisher noise"}],
+        out_dir,
+    )
+    assert feedback_result.proposed_cases == 1
+    llm_cases = json.loads((out_dir / "proposed_llm_golden_cases.json").read_text())
+    assert llm_cases["cases"][0]["expected_asset_role"] == "source_noise"
+
+    missed_result = event_alpha_eval_export.export_cases_from_missed(
+        [{"symbol": "XYZ", "coin_id": "xyz", "name": "XYZ", "move_window": "24h", "return_pct": 1.5, "failure_stage": "resolver_missed_asset", "suggested_queries": ["XYZ catalyst"]}],
+        out_dir,
+    )
+    assert missed_result.proposed_cases == 2
+    extraction = json.loads((out_dir / "proposed_llm_extraction_golden_cases.json").read_text())
+    assert extraction["cases"][0]["expected_crypto_asset_mentions"][0]["symbol"] == "XYZ"
+
+
+def test_event_research_cards_write_files_and_index():
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import event_research_cards
+
+    entry = _test_watchlist_entry(state="HIGH_PRIORITY", symbol="VELVET", coin_id="velvet")
+    out_dir = Path(tempfile.mkdtemp())
+    result = event_research_cards.write_research_cards(out_dir, watchlist_entries=[entry], alert_rows=[], route_decisions=[])
+    assert result.cards_written == 1
+    assert result.index_path.exists()
+    assert "VELVET" in result.card_paths[0].read_text()
+    assert result.card_paths[0].name in result.index_path.read_text()
+
+
+def test_event_alpha_explain_last_run_paths():
+    from crypto_rsi_scanner import event_alpha_explain
+
+    quiet = event_alpha_explain.format_last_run_explanation([
+        {"run_id": "r1", "success": True, "raw_events": 0, "market_anomalies": 0, "candidates": 0, "alerts": 0, "routed": 0, "alertable": 0}
+    ])
+    assert "no source events or market anomalies" in quiet
+    routed = event_alpha_explain.format_last_run_explanation([
+        {"run_id": "r2", "success": True, "raw_events": 3, "market_anomalies": 1, "candidates": 2, "alerts": 2, "routed": 2, "alertable": 0, "llm_skipped_due_budget": 1}
+    ], alert_rows=[{"tier": "STORE_ONLY", "rejected_reason": "source_noise"}])
+    assert "router produced no alertable decisions" in routed
+    assert "skipped_budget=1" in routed
+
+
+def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):
+    from crypto_rsi_scanner import event_watchlist
+
+    return event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key=f"cluster|{coin_id}|proxy_attention",
+        cluster_id="cluster",
+        event_id="event",
+        coin_id=coin_id,
+        symbol=symbol,
+        relationship_type="proxy_exposure",
+        external_asset="SpaceX",
+        event_time="2026-06-16T00:00:00+00:00",
+        state=state,
+        previous_state=None,
+        first_seen_at="2026-06-15T00:00:00+00:00",
+        last_seen_at="2026-06-15T00:00:00+00:00",
+        source_count=1,
+        highest_score=80,
+        latest_score=80,
+        latest_tier="HIGH_PRIORITY_WATCH" if state == "HIGH_PRIORITY" else "WATCHLIST",
+        latest_event_name="SpaceX pre-IPO exposure",
+        latest_source="fixture",
+        latest_playbook_type="proxy_attention",
+        latest_effective_playbook_type="proxy_attention",
+        latest_market_snapshot={},
+        latest_score_components={"cluster_confidence": 70},
+    )
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

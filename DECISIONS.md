@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-19 - Keep Event Alpha self-improvement artifacts review-only
+**Status:** accepted
+**Decision:** Event Alpha may centralize asset-identity matching, refresh active
+watchlist rows from already-available market rows, explain the last run, report
+source reliability, export calibration priors, export proposed eval cases from
+feedback/missed rows, and write Markdown research-card files. These artifacts
+are review and operations tools only. Exported priors and proposed eval cases
+must not be applied automatically, canonical fixtures must not be modified by
+export commands, and watchlist market refreshes must route only through the
+existing research router. None of these paths may create `TRIGGERED_FADE`,
+normal RSI alerts, paper trades, live signal rows, or execution.
+**Why:** The radar needs an operator feedback loop and better diagnostics, but
+self-calibration and generated eval proposals are unsafe if they silently become
+alert authority.
+**Revisit when:** Reviewed Event Alpha artifacts show a source/playbook/prior
+change is durable enough for a separate human-approved implementation.
+
 ## 2026-06-18 - Route Event Alpha monitor updates through the router only
 **Status:** accepted
 **Decision:** Active watchlist monitoring may be integrated into

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import math
+from datetime import datetime, timezone
+from pathlib import Path
 from statistics import median
 from typing import Any, Iterable, Mapping
 
@@ -63,6 +66,72 @@ def format_calibration_report(
     lines.extend(f"- {item}" for item in _recommendations(merged, missed))
     lines.append("No thresholds, alert tiers, paper trades, live DB rows, or execution were changed.")
     return "\n".join(lines).rstrip()
+
+
+def build_calibration_priors(
+    alert_rows: Iterable[Mapping[str, Any]],
+    *,
+    feedback_rows: Iterable[Mapping[str, Any]] = (),
+    generated_at: datetime | None = None,
+    min_sample: int = 5,
+) -> dict[str, Any]:
+    """Build reviewable priors from artifacts without applying them."""
+    alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
+    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    merged = _merge_feedback(alerts, feedback)
+    generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
+    payload = {
+        "schema_version": "event_alpha_calibration_priors_v1",
+        "generated_at": generated,
+        "min_sample": int(min_sample),
+        "min_sample_warning": len(merged) < int(min_sample),
+        "playbook_priors": _prior_group(merged, "playbook_type", min_sample=min_sample),
+        "provider_priors": _prior_group(merged, "source_provider", fallback_field="source", min_sample=min_sample),
+        "llm_role_priors": _prior_group(merged, "llm_asset_role", min_sample=min_sample),
+        "tier_priors": _prior_group(merged, "tier", min_sample=min_sample),
+        "research_only": True,
+    }
+    return payload
+
+
+def write_calibration_priors(
+    path: str | Path,
+    alert_rows: Iterable[Mapping[str, Any]],
+    *,
+    feedback_rows: Iterable[Mapping[str, Any]] = (),
+    generated_at: datetime | None = None,
+    min_sample: int = 5,
+) -> dict[str, Any]:
+    payload = build_calibration_priors(
+        alert_rows,
+        feedback_rows=feedback_rows,
+        generated_at=generated_at,
+        min_sample=min_sample,
+    )
+    p = Path(path).expanduser()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return payload
+
+
+def format_priors_export(path: str | Path, payload: Mapping[str, Any]) -> str:
+    groups = [
+        f"playbooks={len(payload.get('playbook_priors') or {})}",
+        f"providers={len(payload.get('provider_priors') or {})}",
+        f"llm_roles={len(payload.get('llm_role_priors') or {})}",
+        f"tiers={len(payload.get('tier_priors') or {})}",
+    ]
+    warning = "yes" if payload.get("min_sample_warning") else "no"
+    return "\n".join([
+        "=" * 76,
+        "EVENT ALPHA CALIBRATION PRIORS EXPORTED (research-only; not applied)",
+        "=" * 76,
+        f"path: {Path(path).expanduser()}",
+        f"generated_at: {payload.get('generated_at')}",
+        "groups: " + ", ".join(groups),
+        f"min_sample_warning: {warning}",
+        "No thresholds, alert tiers, paper trades, live DB rows, or execution were changed.",
+    ])
 
 
 def _merge_feedback(
@@ -160,6 +229,41 @@ def _recommendations(rows: list[Mapping[str, Any]], missed: list[Mapping[str, An
     return tuple(dict.fromkeys(recs))
 
 
+def _prior_group(
+    rows: list[Mapping[str, Any]],
+    field: str,
+    *,
+    fallback_field: str | None = None,
+    min_sample: int,
+) -> dict[str, Any]:
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        key = str(row.get(field) or (row.get(fallback_field) if fallback_field else "") or "unknown")
+        grouped.setdefault(key, []).append(row)
+    out: dict[str, Any] = {}
+    for key, items in sorted(grouped.items()):
+        useful = sum(1 for row in items if row.get("feedback_label") == "useful")
+        junk = sum(1 for row in items if row.get("feedback_label") == "junk")
+        watch = sum(1 for row in items if row.get("feedback_label") == "watch")
+        primary = [_float(row.get("primary_horizon_return")) for row in items]
+        primary = [value for value in primary if value is not None]
+        score_adjustment = 0
+        if useful > junk and useful >= 2:
+            score_adjustment = 3
+        elif junk > useful and junk >= 2:
+            score_adjustment = -5
+        out[key] = {
+            "samples": len(items),
+            "useful": useful,
+            "junk": junk,
+            "watch": watch,
+            "median_primary_horizon_return": median(primary) if primary else None,
+            "score_adjustment": score_adjustment,
+            "min_sample_warning": len(items) < min_sample,
+        }
+    return out
+
+
 def _group(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, list[Mapping[str, Any]]]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     for row in rows:
@@ -188,3 +292,13 @@ def _float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def _json_ready(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_ready(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    return value

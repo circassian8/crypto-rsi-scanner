@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_market_enrichment, event_watchlist
+from . import event_identity, event_market_enrichment, event_watchlist
 from .event_models import RawDiscoveredEvent
 
 
@@ -246,25 +246,35 @@ def _queries(symbol: str, name: str) -> tuple[str, ...]:
 def _raw_identity_hint(raw: RawDiscoveredEvent, symbol: str, coin_id: str) -> str | None:
     payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
     event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
-    strong_fields = [
+    strong_fields = (
         raw.title,
         raw.body,
         event_payload.get("event_name"),
         event_payload.get("description"),
-    ]
-    if any(_contains_identity(field, symbol, coin_id) for field in strong_fields):
+    )
+    result = event_identity.match_asset_identity(
+        event_identity.AssetIdentity(
+            symbol=str(symbol or "").upper(),
+            coin_id=coin_id,
+            is_common_word_symbol=str(symbol or "").upper() in event_identity.COMMON_WORD_SYMBOLS,
+        ),
+        event_identity.IdentityEvidence(
+            strong_content=tuple(str(field or "") for field in strong_fields),
+            llm_quotes=event_identity.validated_llm_identity_quotes(payload, strong_fields),
+            url=str(raw.source_url or ""),
+            source_origin=tuple(str(value or "") for value in (
+                raw.provider,
+                payload.get("source_origin"),
+                payload.get("publisher"),
+                payload.get("source_provider"),
+            )),
+        ),
+    )
+    if result.matched and result.strength == event_identity.STRENGTH_STRONG:
         return "strong_identity"
-    if _validated_llm_quote_mentions_identity(payload, strong_fields, symbol, coin_id):
-        return "strong_identity"
-    metadata_fields = [
-        raw.provider,
-        payload.get("source_origin"),
-        payload.get("publisher"),
-        payload.get("source_provider"),
-    ]
-    if any(_contains_identity(field, symbol, coin_id) for field in metadata_fields):
+    if result.reason == "identity_source_origin_rejected":
         return "metadata_only_identity_hint"
-    if _contains_identity(raw.source_url, symbol, coin_id):
+    if result.reason == "identity_url_only_rejected":
         return "weak_url_only_identity_hint"
     return None
 

@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Add Event Alpha self-improvement operations loop · Codex
+**Why:** Event Alpha could run daily, but the operator loop still needed shared
+identity semantics, better active-watchlist market refresh selection,
+source/provider reliability reporting, reviewable calibration-prior exports,
+proposed eval-case generation, card-file output, and a clear runbook.
+**Changes:**
+- Added `event_identity.py` and routed catalyst-search plus missed-opportunity
+  identity checks through it, preserving URL/source-origin/common-word symbol
+  rejection and resolver-validated LLM identity behavior.
+- Added `event_watchlist_market.py` plus monitor market-source config so active
+  watchlist monitoring can select fixture, cycle, or CoinGecko-style rows
+  fail-soft without creating trigger authority.
+- Added source reliability, calibration-prior export, proposed eval-case export,
+  last-run explain, and research-card write/index artifact paths with CLI and
+  Make targets.
+- Updated Event Alpha profiles/status, `.env.example`, `ROADMAP.md`,
+  `DECISIONS.md`, and added `research/EVENT_ALPHA_RUNBOOK.md`.
+- Added regression tests for identity field safety, missed diagnostics,
+  watchlist market source selection, reliability recommendations, priors export,
+  proposed eval exports, research card writes, and last-run explanations.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 347/347. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. `make verify PYTHON=python3`
+passed. Smoke-ran `python3 main.py --event-alpha-explain-last-run` and
+`python3 main.py --event-source-reliability-report`.
+**Notes/risks:** All new outputs are research artifacts. Priors are exported
+but not applied, proposed eval cases do not mutate canonical fixtures, and none
+of these paths can create `TRIGGERED_FADE`, normal RSI alerts, paper trades,
+live signal rows, or execution.
+
 ## 2026-06-18 — Polish Event Alpha daily operations · Codex
 **Why:** Event Alpha had strong operational reports, but daily cycles still
 needed profile RSS readiness fixes, active-watchlist monitor routing inside the

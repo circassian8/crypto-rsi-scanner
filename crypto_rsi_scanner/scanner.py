@@ -66,11 +66,14 @@ from . import event_discovery
 from . import event_alerts
 from . import event_alpha_alert_store
 from . import event_alpha_calibration
+from . import event_alpha_eval_export
+from . import event_alpha_explain
 from . import event_alpha_missed
 from . import event_alpha_pipeline
 from . import event_alpha_profiles
 from . import event_alpha_run_ledger
 from . import event_alpha_router
+from . import event_source_reliability
 from . import event_catalyst_search
 from . import event_clock
 from . import event_feedback
@@ -81,6 +84,7 @@ from . import event_price_history
 from . import event_research_cards
 from . import event_validation
 from . import event_watchlist
+from . import event_watchlist_market
 from . import event_watchlist_monitor
 from .event_models import EventDiscoveryResult, RawDiscoveredEvent
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
@@ -1259,8 +1263,10 @@ def _event_watchlist_config_from_runtime() -> event_watchlist.EventWatchlistConf
 
 
 def _event_watchlist_monitor_market_rows_from_runtime() -> list[dict[str, Any]]:
+    if str(config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE or "").lower() in {"cycle", "none", "off"}:
+        return []
     market_path = config.EVENT_WATCHLIST_MONITOR_MARKET_PATH or config.EVENT_DISCOVERY_UNIVERSE_PATH
-    return event_watchlist_monitor.load_market_rows(market_path)
+    return event_watchlist_market.load_market_rows(market_path)
 
 
 def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRouterConfig:
@@ -1344,6 +1350,9 @@ def _normalize_profile_paths() -> None:
         "EVENT_ALPHA_ALERT_STORE_PATH",
         "EVENT_ALPHA_RUN_LEDGER_PATH",
         "EVENT_ALPHA_MISSED_PATH",
+        "EVENT_ALPHA_PRIORS_PATH",
+        "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
+        "EVENT_RESEARCH_CARDS_DIR",
         "EVENT_LLM_BUDGET_LEDGER_PATH",
     ):
         value = getattr(config, attr, None)
@@ -1527,6 +1536,9 @@ def event_alpha_cycle(
         route=True,
         watchlist_monitor_enabled=config.EVENT_WATCHLIST_MONITOR_ENABLED,
         watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
+        watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
+        watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
+        watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
         watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
         send=send,
         send_callback=lambda decisions: _send_event_alpha_routed_digest(decisions, alert_cfg, now=now),
@@ -1603,7 +1615,10 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
             "watchlist_monitor: "
             f"enabled={str(bool(config.EVENT_WATCHLIST_MONITOR_ENABLED)).lower()} "
             f"route_updates={str(bool(config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES)).lower()} "
-            f"market_path={config.EVENT_WATCHLIST_MONITOR_MARKET_PATH or config.EVENT_DISCOVERY_UNIVERSE_PATH or 'none'}"
+            f"market_source={config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE} "
+            f"targeted={str(bool(config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP)).lower()} "
+            f"max_assets={config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS} "
+            f"market_path={config.EVENT_WATCHLIST_MONITOR_MARKET_PATH or config.EVENT_DISCOVERY_UNIVERSE_PATH or 'cycle'}"
         ),
         f"alert_store_path: {config.EVENT_ALPHA_ALERT_STORE_PATH}",
         f"run_ledger_path: {config.EVENT_ALPHA_RUN_LEDGER_PATH}",
@@ -1708,12 +1723,22 @@ def event_watchlist_monitor_report(verbose: bool = False, event_now: str | datet
     _setup_event_discovery_logging(verbose)
     watch_cfg = _event_watchlist_config_from_runtime()
     read_result = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
-    market_rows = _event_watchlist_monitor_market_rows_from_runtime()
+    fixture_rows = _event_watchlist_monitor_market_rows_from_runtime()
+    market_source = event_watchlist_market.market_rows_for_watchlist(
+        read_result,
+        source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
+        fixture_rows=fixture_rows,
+        cycle_rows=fixture_rows,
+        targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
+        max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
+    )
     result = event_watchlist_monitor.monitor_watchlist(
         read_result,
-        market_rows=market_rows,
+        market_rows=market_source.rows,
         now=_event_research_now(event_now),
     )
+    if market_source.warnings:
+        print("watchlist market warnings: " + "; ".join(market_source.warnings))
     print(event_watchlist_monitor.format_watchlist_monitor_report(result))
 
 
@@ -1848,6 +1873,69 @@ def event_alpha_calibration_report(verbose: bool = False) -> None:
     )
 
 
+def event_source_reliability_report(verbose: bool = False) -> None:
+    """Print source/provider reliability summaries from local artifacts."""
+    _setup_event_discovery_logging(verbose)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        _event_alpha_alert_store_config_from_runtime().path,
+        latest_only=False,
+    )
+    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
+    feedback_rows = [record.__dict__ for record in feedback.records]
+    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
+    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=50)
+    print(
+        event_source_reliability.format_source_reliability_report(
+            alerts.rows,
+            feedback_rows=feedback_rows,
+            missed_rows=missed_rows,
+            run_rows=runs.rows,
+        )
+    )
+
+
+def event_alpha_calibration_export_priors(out_path: str | None = None, verbose: bool = False) -> None:
+    """Write reviewable calibration priors without applying them."""
+    _setup_event_discovery_logging(verbose)
+    alerts = event_alpha_alert_store.load_alert_snapshots(_event_alpha_alert_store_config_from_runtime().path)
+    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
+    feedback_rows = [record.__dict__ for record in feedback.records]
+    path = Path(out_path).expanduser() if out_path else config.EVENT_ALPHA_PRIORS_PATH
+    if not path.is_absolute():
+        path = config.DATA_DIR / path
+    payload = event_alpha_calibration.write_calibration_priors(
+        path,
+        alerts.rows,
+        feedback_rows=feedback_rows,
+        generated_at=datetime.now(timezone.utc),
+    )
+    print(event_alpha_calibration.format_priors_export(path, payload))
+
+
+def event_alpha_export_eval_cases_from_feedback(out_dir: str | None = None, verbose: bool = False) -> None:
+    """Export proposed eval cases from feedback artifacts."""
+    _setup_event_discovery_logging(verbose)
+    alerts = event_alpha_alert_store.load_alert_snapshots(_event_alpha_alert_store_config_from_runtime().path)
+    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
+    result = event_alpha_eval_export.export_cases_from_feedback(
+        alerts.rows,
+        [record.__dict__ for record in feedback.records],
+        out_dir or config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR,
+    )
+    print(event_alpha_eval_export.format_eval_export_result(result))
+
+
+def event_alpha_export_eval_cases_from_missed(out_dir: str | None = None, verbose: bool = False) -> None:
+    """Export proposed eval cases from missed-opportunity artifacts."""
+    _setup_event_discovery_logging(verbose)
+    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
+    result = event_alpha_eval_export.export_cases_from_missed(
+        missed_rows,
+        out_dir or config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR,
+    )
+    print(event_alpha_eval_export.format_eval_export_result(result))
+
+
 def event_research_card_report(target: str | None, verbose: bool = False) -> None:
     """Print a Markdown research card for one Event Alpha watchlist/alert key."""
     _setup_event_discovery_logging(verbose)
@@ -1872,6 +1960,37 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
             route_decisions=routed.decisions,
         )
     )
+
+
+def event_research_cards_write(verbose: bool = False) -> None:
+    """Write selected Event Alpha research cards and index markdown files."""
+    _setup_event_discovery_logging(verbose)
+    watch_cfg = _event_watchlist_config_from_runtime()
+    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        _event_alpha_alert_store_config_from_runtime().path,
+        latest_only=True,
+    )
+    routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    result = event_research_cards.write_research_cards(
+        config.EVENT_RESEARCH_CARDS_DIR,
+        watchlist_entries=watchlist.entries,
+        alert_rows=alerts.rows,
+        route_decisions=routed.decisions,
+        now=datetime.now(timezone.utc),
+    )
+    print(event_research_cards.format_card_write_result(result))
+
+
+def event_alpha_explain_last_run(verbose: bool = False) -> None:
+    """Explain why the latest Event Alpha cycle did or did not alert."""
+    _setup_event_discovery_logging(verbose)
+    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=1)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        _event_alpha_alert_store_config_from_runtime().path,
+        latest_only=True,
+    )
+    print(event_alpha_explain.format_last_run_explanation(runs.rows, alert_rows=alerts.rows))
 
 
 def event_llm_shadow_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
@@ -3676,11 +3795,47 @@ def cli() -> None:
         help="Print research-only calibration summaries from alert, feedback, outcome, and missed artifacts.",
     )
     parser.add_argument(
+        "--event-source-reliability-report",
+        action="store_true",
+        help="Print source/provider reliability summaries from Event Alpha artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-calibration-export-priors",
+        nargs="?",
+        const="",
+        metavar="OUT",
+        help="Export reviewable Event Alpha calibration priors JSON; defaults to RSI_EVENT_ALPHA_PRIORS_PATH.",
+    )
+    parser.add_argument(
+        "--event-alpha-export-eval-cases-from-feedback",
+        nargs="?",
+        const="",
+        metavar="OUT_DIR",
+        help="Export proposed eval cases from feedback artifacts without modifying canonical fixtures.",
+    )
+    parser.add_argument(
+        "--event-alpha-export-eval-cases-from-missed",
+        nargs="?",
+        const="",
+        metavar="OUT_DIR",
+        help="Export proposed eval cases from missed-opportunity artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-explain-last-run",
+        action="store_true",
+        help="Explain why the latest Event Alpha cycle did or did not alert.",
+    )
+    parser.add_argument(
         "--event-research-card",
         nargs="?",
         const="",
         metavar="ALERT_KEY",
         help="Print a Markdown Event Alpha research card for ALERT_KEY, or selected local cards when omitted.",
+    )
+    parser.add_argument(
+        "--event-research-cards-write",
+        action="store_true",
+        help="Write selected Event Alpha research cards plus index.md under RSI_EVENT_RESEARCH_CARDS_DIR.",
     )
     parser.add_argument(
         "--event-alpha-alerts-report",
@@ -4082,8 +4237,35 @@ def cli() -> None:
     if args.event_alpha_calibration_report:
         event_alpha_calibration_report(verbose=args.verbose)
         return
+    if args.event_source_reliability_report:
+        event_source_reliability_report(verbose=args.verbose)
+        return
+    if args.event_alpha_calibration_export_priors is not None:
+        event_alpha_calibration_export_priors(
+            args.event_alpha_calibration_export_priors or None,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_alpha_export_eval_cases_from_feedback is not None:
+        event_alpha_export_eval_cases_from_feedback(
+            args.event_alpha_export_eval_cases_from_feedback or None,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_alpha_export_eval_cases_from_missed is not None:
+        event_alpha_export_eval_cases_from_missed(
+            args.event_alpha_export_eval_cases_from_missed or None,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_alpha_explain_last_run:
+        event_alpha_explain_last_run(verbose=args.verbose)
+        return
     if args.event_research_card is not None:
         event_research_card_report(args.event_research_card, verbose=args.verbose)
+        return
+    if args.event_research_cards_write:
+        event_research_cards_write(verbose=args.verbose)
         return
     if args.event_alpha_alerts_report:
         event_alpha_alerts_report(

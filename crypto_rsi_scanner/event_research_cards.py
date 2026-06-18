@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+import re
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
@@ -14,6 +17,14 @@ class EventResearchCardResult:
     key: str
     markdown: str
     found: bool
+
+
+@dataclass(frozen=True)
+class EventResearchCardWriteResult:
+    out_dir: Path
+    cards_written: int
+    index_path: Path
+    card_paths: tuple[Path, ...]
 
 
 def render_research_card(
@@ -156,6 +167,60 @@ def render_selected_cards(
     return "\n---\n\n".join(cards)
 
 
+def write_research_cards(
+    out_dir: str | Path,
+    *,
+    watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry],
+    alert_rows: Iterable[Mapping[str, Any]] = (),
+    route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
+    clusters: Iterable[event_graph.EventCluster] = (),
+    include_all_alertable: bool = True,
+    limit: int = 25,
+    now: datetime | None = None,
+) -> EventResearchCardWriteResult:
+    """Write selected Markdown cards and an index under a local artifact dir."""
+    target = Path(out_dir).expanduser()
+    target.mkdir(parents=True, exist_ok=True)
+    observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    entries = _selected_entries(list(watchlist_entries), list(route_decisions), include_all_alertable=include_all_alertable)
+    card_paths: list[Path] = []
+    for entry in entries[: max(1, limit)]:
+        card = render_research_card(
+            entry.key,
+            watchlist_entries=entries,
+            alert_rows=alert_rows,
+            route_decisions=route_decisions,
+            clusters=clusters,
+        )
+        if not card.found:
+            continue
+        path = target / _card_filename(entry)
+        path.write_text(_strip_sensitive(card.markdown), encoding="utf-8")
+        card_paths.append(path)
+    index = _render_index(card_paths, observed)
+    index_path = target / "index.md"
+    index_path.write_text(index, encoding="utf-8")
+    return EventResearchCardWriteResult(
+        out_dir=target,
+        cards_written=len(card_paths),
+        index_path=index_path,
+        card_paths=tuple(card_paths),
+    )
+
+
+def format_card_write_result(result: EventResearchCardWriteResult) -> str:
+    return "\n".join([
+        "=" * 76,
+        "EVENT RESEARCH CARDS WRITTEN (research artifact only)",
+        "=" * 76,
+        f"out_dir: {result.out_dir}",
+        f"cards_written: {result.cards_written}",
+        f"index: {result.index_path}",
+        *(f"- {path}" for path in result.card_paths[:20]),
+        "No live RSI alerts, paper trades, live DB rows, or execution were changed.",
+    ])
+
+
 def _find_entry(key: str, entries: list[event_watchlist.EventWatchlistEntry]) -> event_watchlist.EventWatchlistEntry | None:
     key_l = key.lower()
     matches = [
@@ -164,6 +229,70 @@ def _find_entry(key: str, entries: list[event_watchlist.EventWatchlistEntry]) ->
         or key_l in {entry.symbol.lower(), entry.coin_id.lower()}
     ]
     return matches[0] if matches else None
+
+
+def _selected_entries(
+    entries: list[event_watchlist.EventWatchlistEntry],
+    decisions: list[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    include_all_alertable: bool,
+) -> list[event_watchlist.EventWatchlistEntry]:
+    selected_by_key: dict[str, event_watchlist.EventWatchlistEntry] = {}
+    states = {
+        event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+        event_watchlist.EventWatchlistState.WATCHLIST.value,
+    }
+    for entry in entries:
+        if entry.state in states:
+            selected_by_key[entry.key] = entry
+    if include_all_alertable:
+        for decision in decisions:
+            if decision.alertable:
+                selected_by_key[decision.entry.key] = decision.entry
+    return sorted(
+        selected_by_key.values(),
+        key=lambda entry: (entry.last_seen_at, entry.latest_score, entry.symbol),
+        reverse=True,
+    )
+
+
+def _card_filename(entry: event_watchlist.EventWatchlistEntry) -> str:
+    base = "_".join(
+        part for part in (
+            entry.symbol.upper(),
+            entry.state.lower(),
+            (entry.latest_effective_playbook_type or entry.latest_playbook_type or "playbook"),
+            entry.key,
+        )
+        if part
+    )
+    return _slug(base)[:180] + ".md"
+
+
+def _slug(value: str) -> str:
+    return re.sub(r"_+", "_", re.sub(r"[^A-Za-z0-9._-]+", "_", value)).strip("._") or "event_card"
+
+
+def _render_index(paths: list[Path], observed: datetime) -> str:
+    lines = [
+        "# Event Research Cards",
+        "",
+        f"Generated at: {observed.isoformat()}",
+        "",
+    ]
+    if not paths:
+        lines.append("No cards selected.")
+    else:
+        for path in paths:
+            lines.append(f"- [{path.name}]({path.name})")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _strip_sensitive(markdown: str) -> str:
+    out = markdown.replace("OPENAI_API_KEY", "[redacted]").replace("TELEGRAM_BOT_TOKEN", "[redacted]")
+    out = out.replace(".env", "[env-file]")
+    return out
 
 
 def _find_alert(key: str, rows: list[Mapping[str, Any]]) -> Mapping[str, Any] | None:
