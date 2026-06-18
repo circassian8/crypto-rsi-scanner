@@ -4237,6 +4237,111 @@ def test_event_watchlist_expiration_and_backward_compatible_reads():
         assert loaded.entries[0].highest_score == 61
 
 
+def test_event_alpha_router_routes_watchlist_escalations_safely():
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_router, event_playbooks, event_watchlist
+
+    def row(
+        symbol,
+        state,
+        playbook,
+        *,
+        should_alert=True,
+        score=75,
+        suppressed_reason=None,
+    ):
+        return event_watchlist.EventWatchlistEntry(
+            schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+            row_type="event_watchlist_state",
+            key=f"{symbol}|coin|rel|asset|time",
+            event_id=f"{symbol}-event",
+            coin_id=symbol.lower(),
+            symbol=symbol,
+            relationship_type="proxy_exposure",
+            external_asset="SpaceX",
+            event_time="2026-06-20T13:30:00+00:00",
+            state=state,
+            previous_state="RADAR",
+            first_seen_at="2026-06-18T12:00:00+00:00",
+            last_seen_at="2026-06-18T13:00:00+00:00",
+            source_count=1,
+            highest_score=score,
+            latest_score=score,
+            latest_tier=state,
+            latest_event_name=f"{symbol} SpaceX event",
+            latest_source="test",
+            latest_playbook_type=playbook,
+            latest_playbook_score=score,
+            latest_playbook_action="watchlist",
+            should_alert=should_alert,
+            suppressed_reason=suppressed_reason,
+        )
+
+    read = event_watchlist.EventWatchlistReadResult(
+        state_path=Path("watchlist.jsonl"),
+        rows_read=6,
+        latest_only=True,
+        entries=[
+            row(
+                "PFADE",
+                event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+                event_playbooks.EventPlaybookType.PROXY_FADE.value,
+                score=95,
+            ),
+            row(
+                "BADTRIG",
+                event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+                event_playbooks.EventPlaybookType.DIRECT_EVENT.value,
+                score=90,
+            ),
+            row(
+                "ATTN",
+                event_watchlist.EventWatchlistState.WATCHLIST.value,
+                event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+                score=74,
+            ),
+            row(
+                "DUP",
+                event_watchlist.EventWatchlistState.WATCHLIST.value,
+                event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+                should_alert=False,
+                suppressed_reason="duplicate state, no escalation",
+            ),
+            row(
+                "ANOM",
+                event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+                event_playbooks.EventPlaybookType.MARKET_ANOMALY.value,
+                should_alert=False,
+            ),
+            row(
+                "NOISE",
+                event_watchlist.EventWatchlistState.RADAR.value,
+                event_playbooks.EventPlaybookType.SOURCE_NOISE_CONTROL.value,
+            ),
+        ],
+    )
+    result = event_alpha_router.route_watchlist(
+        read,
+        cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+    )
+    by_symbol = {decision.entry.symbol: decision for decision in result.decisions}
+    assert by_symbol["PFADE"].route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
+    assert by_symbol["PFADE"].alertable is True
+    assert by_symbol["BADTRIG"].route == event_alpha_router.EventAlphaRoute.LOCAL_REPORT
+    assert by_symbol["BADTRIG"].alertable is False
+    assert "non-proxy playbook cannot route triggered fade" in by_symbol["BADTRIG"].warnings
+    assert by_symbol["ATTN"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+    assert by_symbol["DUP"].route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE
+    assert by_symbol["ANOM"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
+    assert by_symbol["NOISE"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
+
+    text = event_alpha_router.format_router_report(result)
+    assert "EVENT ALPHA ROUTER REPORT" in text
+    assert "TRIGGERED_FADE_RESEARCH" in text
+    assert "SUPPRESS_DUPLICATE" in text
+    assert "no sends, trades, or paper rows" in text
+
+
 def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
     import contextlib
     import io
@@ -4259,6 +4364,7 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
         "EVENT_WATCHLIST_ENABLED": config.EVENT_WATCHLIST_ENABLED,
         "EVENT_WATCHLIST_STATE_PATH": config.EVENT_WATCHLIST_STATE_PATH,
         "EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT": config.EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT,
+        "EVENT_ALPHA_ROUTER_ENABLED": config.EVENT_ALPHA_ROUTER_ENABLED,
     }
     with tempfile.TemporaryDirectory() as tmp:
         config.EVENT_DISCOVERY_EVENTS_PATH = None
@@ -4275,6 +4381,7 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
         config.EVENT_WATCHLIST_ENABLED = True
         config.EVENT_WATCHLIST_STATE_PATH = Path(tmp) / "watchlist.jsonl"
         config.EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT = 72
+        config.EVENT_ALPHA_ROUTER_ENABLED = True
         try:
             refresh_out = io.StringIO()
             with contextlib.redirect_stdout(refresh_out):
@@ -4292,6 +4399,15 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
             assert "RAW_EVIDENCE" in report_text
             assert "SOL/solana" in report_text
             assert "playbook: market_anomaly" in report_text
+
+            router_out = io.StringIO()
+            with contextlib.redirect_stdout(router_out):
+                scanner.event_alpha_router_report()
+            router_text = router_out.getvalue()
+            assert "EVENT ALPHA ROUTER REPORT" in router_text
+            assert "router_enabled: true" in router_text
+            assert "STORE_ONLY" in router_text
+            assert "SOL/solana" in router_text
         finally:
             for name, value in original.items():
                 setattr(config, name, value)
@@ -4306,7 +4422,9 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1" in text
     assert "event-watchlist-refresh:" in text
     assert "event-watchlist-report:" in text
+    assert "event-alpha-router-report:" in text
     assert "--event-watchlist-refresh" in text
+    assert "--event-alpha-router-report" in text
 
 
 def test_event_discovery_asset_role_demotes_proxy_context_noise():

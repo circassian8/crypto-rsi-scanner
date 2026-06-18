@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep Event Alpha router local and artifact-only
+**Status:** accepted
+**Decision:** Event Alpha Radar routing may read latest watchlist JSONL state
+and classify rows as store-only, duplicate-suppressed, local-report,
+research-digest, high-priority-research, or triggered-fade-research decisions.
+Those decisions are local/report metadata only. The router must not send
+Telegram alerts, route normal RSI alerts, write live signal/outcome/paper rows,
+open paper trades, execute orders, or allow any non-`proxy_fade` playbook to
+route a triggered-fade research decision.
+**Why:** The watchlist needs a deterministic way to decide what would be
+surfaced if promoted, while avoiding a silent promotion from research state into
+notifications or trading. Actual event-fade triggers remain owned by
+`event_fade.py` and the reviewed-sample promotion gate.
+**Revisit when:** A reviewed Event Alpha sample proves route decisions are
+useful enough for a human-approved research digest or paper-tracking workflow.
+
 ## 2026-06-18 - Keep Event Alpha playbooks deterministic and non-triggering
 **Status:** accepted
 **Decision:** Event Alpha Radar playbooks may label research candidates as

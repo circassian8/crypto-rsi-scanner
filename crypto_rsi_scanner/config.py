@@ -370,9 +370,9 @@ _EVENT_LLM_EXTRACTOR_CACHE_PATH_RAW = os.getenv("RSI_EVENT_LLM_EXTRACTOR_CACHE_P
 EVENT_LLM_EXTRACTOR_PROMPT_VERSION = os.getenv("RSI_EVENT_LLM_EXTRACTOR_PROMPT_VERSION", "llm_raw_event_extraction_v1")
 _EVENT_WATCHLIST_STATE_PATH_RAW = os.getenv("RSI_EVENT_WATCHLIST_STATE_PATH", "")
 
-# Event Alpha Radar research phases. Market enrichment, anomaly scanning, and
-# watchlist state are implemented but disabled by default; routing remains a
-# future opt-in until explicitly promoted.
+# Event Alpha Radar research phases. Market enrichment, anomaly scanning,
+# watchlist state, and local router decisions are implemented but disabled by
+# default; they remain artifact/report paths until explicitly promoted.
 EVENT_MARKET_ENRICHMENT_ENABLED = _env_bool("RSI_EVENT_MARKET_ENRICHMENT_ENABLED", False)
 EVENT_ANOMALY_SCANNER_ENABLED = _env_bool("RSI_EVENT_ANOMALY_SCANNER_ENABLED", False)
 EVENT_ANOMALY_MIN_RETURN_24H = float(os.getenv("RSI_EVENT_ANOMALY_MIN_RETURN_24H", "0.30"))

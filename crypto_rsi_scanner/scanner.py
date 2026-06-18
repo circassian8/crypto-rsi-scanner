@@ -63,6 +63,7 @@ from . import event_fade
 from . import event_cache
 from . import event_discovery
 from . import event_alerts
+from . import event_alpha_router
 from . import event_llm_analyzer
 from . import event_llm_extractor
 from . import event_provider_status
@@ -1215,6 +1216,12 @@ def _event_watchlist_config_from_runtime() -> event_watchlist.EventWatchlistConf
     )
 
 
+def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRouterConfig:
+    return event_alpha_router.EventAlphaRouterConfig(
+        enabled=config.EVENT_ALPHA_ROUTER_ENABLED,
+    )
+
+
 def _setup_event_discovery_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -1331,6 +1338,16 @@ def event_watchlist_report(verbose: bool = False) -> None:
     watch_cfg = _event_watchlist_config_from_runtime()
     result = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
     print(event_watchlist.format_watchlist_report(result))
+
+
+def event_alpha_router_report(verbose: bool = False) -> None:
+    """Print artifact-only Event Alpha Radar route decisions from watchlist state."""
+    _setup_event_discovery_logging(verbose)
+    watch_cfg = _event_watchlist_config_from_runtime()
+    router_cfg = _event_alpha_router_config_from_runtime()
+    read_result = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    routed = event_alpha_router.route_watchlist(read_result, cfg=router_cfg)
+    print(event_alpha_router.format_router_report(routed))
 
 
 def event_llm_shadow_report(verbose: bool = False) -> None:
@@ -2935,6 +2952,11 @@ def cli() -> None:
         help="Print latest research-only event alpha watchlist state.",
     )
     parser.add_argument(
+        "--event-alpha-router-report",
+        action="store_true",
+        help="Print research-only Event Alpha Radar route decisions from watchlist state.",
+    )
+    parser.add_argument(
         "--event-llm-shadow-report",
         action="store_true",
         help="Print research-only shadow LLM relationship analysis for event candidates.",
@@ -3216,6 +3238,9 @@ def cli() -> None:
         return
     if args.event_watchlist_report:
         event_watchlist_report(verbose=args.verbose)
+        return
+    if args.event_alpha_router_report:
+        event_alpha_router_report(verbose=args.verbose)
         return
     if args.event_llm_shadow_report:
         event_llm_shadow_report(verbose=args.verbose)

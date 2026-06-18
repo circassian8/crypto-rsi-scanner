@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add Event Alpha research router · Codex
+**Why:** The Event Alpha watchlist now has persistent state and playbook labels,
+but it needed a separate deterministic layer to decide which rows would be
+stored, suppressed as duplicates, shown locally, or surfaced as research output
+without promoting anything into Telegram, paper trading, live storage, or
+execution.
+**Changes:**
+- Added `event_alpha_router.py` with artifact-only route decisions:
+  `STORE_ONLY`, `SUPPRESS_DUPLICATE`, `LOCAL_REPORT`, `RESEARCH_DIGEST`,
+  `HIGH_PRIORITY_RESEARCH`, and `TRIGGERED_FADE_RESEARCH`.
+- Wired `main.py --event-alpha-router-report` and `make
+  event-alpha-router-report` to route latest watchlist JSONL state only when
+  `RSI_EVENT_ALPHA_ROUTER_ENABLED=1`.
+- Added router safety tests for duplicate suppression, market-anomaly/source
+  noise store-only behavior, proxy research routing, and the guard that a
+  non-`proxy_fade` playbook cannot route a triggered-fade research decision.
+- Updated `AGENTS.md`, `DECISIONS.md`, `ROADMAP.md`, `.env.example`, and
+  `config.py` comments to record that router decisions remain local
+  research/report metadata.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`make event-watchlist-refresh EVENT_WATCHLIST_STATE_PATH=/tmp/.../watchlist.jsonl
+PYTHON=python3` plus `make event-alpha-router-report` routed the fixture SOL
+market-anomaly row to `STORE_ONLY`. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-llm-eval PYTHON=python3`
+passed 9/9 golden cases. `python3 tests/test_indicators.py` passed 300/300.
+`make verify PYTHON=python3` passed 300/300 tests, alert render smoke, fixture
+backtest smoke, and paper scoreboard.
+**Notes/risks:** The router is not a send path. It cannot create
+`TRIGGERED_FADE`, route normal RSI alerts, send Telegram, write live
+signal/outcome/paper rows, open paper trades, or execute orders. Remaining
+Event Alpha Radar work is lightweight feedback labels/evals.
+
 ## 2026-06-18 — Add Event Alpha playbook scoring · Codex
 **Why:** Event Alpha candidates needed explicit research intent labels so
 reports/watchlist state can distinguish proxy fades, proxy attention, direct
