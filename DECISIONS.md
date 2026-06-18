@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Treat catalyst-search live providers as scored evidence only
+**Status:** accepted
+**Decision:** Event Alpha catalyst search may use fixture, GDELT, project RSS,
+CryptoPanic, and Polymarket providers, including comma-list composition and
+profile presets. Provider rows must be scored and may be rejected before being
+attached to anomalies. Accepted rows remain raw research evidence and still
+must pass deterministic discovery, resolver, classifier, playbook, watchlist,
+and router logic. Search providers and LLM outputs must not create alerts,
+paper trades, live signal rows, orders, or `TRIGGERED_FADE`.
+**Why:** Hot market anomalies need a practical “find the catalyst” loop, but
+search hits are noisy and source/publisher/ticker false positives are common.
+Scoring and lifecycle reporting make the loop operational while preserving the
+existing safety boundary.
+**Revisit when:** Reviewed Event Alpha alert snapshots show a provider/source
+or result-score threshold should be promoted, calibrated, or routed differently
+through a separate human-approved decision.
+
 ## 2026-06-18 - Keep dynamic catalyst search as evidence collection
 **Status:** accepted
 **Decision:** Event Alpha may run a research-only market-anomaly catalyst-search

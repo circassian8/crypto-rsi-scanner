@@ -3463,6 +3463,67 @@ def test_event_llm_cache_keys_include_provider_model_and_metadata():
             assert isinstance(entry["raw"], dict)
 
 
+def test_event_llm_budget_skips_lower_priority_rows_and_cache_hits_are_free():
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    result, alerts, _ = _llm_golden_alerts_and_rows(min_prefilter_score=0)
+
+    class CountingProvider(FixtureLLMRelationshipProvider):
+        def __init__(self, path):
+            super().__init__(path, required=True)
+            self.calls = 0
+
+        def analyze_relationship(self, packet):
+            self.calls += 1
+            return super().analyze_relationship(packet)
+
+    provider = CountingProvider(_llm_golden_fixture_path())
+    rows = event_llm_analyzer.analyze_event_candidates(
+        result,
+        alerts,
+        provider,
+        cfg=event_llm_analyzer.EventLLMConfig(
+            min_prefilter_score=0,
+            max_candidates_per_run=3,
+            max_calls_per_run=1,
+        ),
+    )
+    assert provider.calls == 1
+    assert len([row for row in rows if row.cache_status == "skipped_budget"]) == 2
+    assert any("budget exhausted" in "; ".join(row.warnings) for row in rows)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        cache_path = Path(tmp) / "llm_cache.json"
+        warm = CountingProvider(_llm_golden_fixture_path())
+        event_llm_analyzer.analyze_event_candidates(
+            result,
+            alerts[:1],
+            warm,
+            cfg=event_llm_analyzer.EventLLMConfig(
+                min_prefilter_score=0,
+                max_candidates_per_run=1,
+                cache_path=cache_path,
+            ),
+        )
+        cached_provider = CountingProvider(_llm_golden_fixture_path())
+        cached_rows = event_llm_analyzer.analyze_event_candidates(
+            result,
+            alerts[:2],
+            cached_provider,
+            cfg=event_llm_analyzer.EventLLMConfig(
+                min_prefilter_score=0,
+                max_candidates_per_run=2,
+                max_calls_per_run=1,
+                cache_path=cache_path,
+            ),
+        )
+        assert [row.cache_status for row in cached_rows] == ["hit", "miss"]
+        assert cached_provider.calls == 1
+
+
 def test_makefile_has_event_llm_eval_target():
     from pathlib import Path
 
@@ -3470,6 +3531,30 @@ def test_makefile_has_event_llm_eval_target():
     assert "event-llm-eval:" in text
     assert "python -m crypto_rsi_scanner.event_llm_eval" in text or "$(PYTHON) -m crypto_rsi_scanner.event_llm_eval" in text
     assert "event-alert-no-key-llm-report:" in text
+
+
+def test_event_alpha_profiles_and_make_targets_are_available():
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_profiles
+
+    fixture = event_alpha_profiles.get_profile("fixture")
+    assert fixture.config_overrides["EVENT_CATALYST_SEARCH_PROVIDER"] == "fixture"
+    no_key = event_alpha_profiles.get_profile("no_key_live")
+    assert no_key.config_overrides["EVENT_CATALYST_SEARCH_PROVIDERS"] == ("gdelt", "rss", "polymarket")
+    send = event_alpha_profiles.get_profile("research_send")
+    assert send.send is True
+    report = event_alpha_profiles.format_profile_report(send)
+    assert "still requires --event-alert-send" in report
+    try:
+        event_alpha_profiles.get_profile("unknown")
+    except ValueError as exc:
+        assert "choose one of" in str(exc)
+    else:
+        raise AssertionError("unknown Event Alpha profile should fail")
+
+    text = Path("Makefile").read_text(encoding="utf-8")
+    assert "event-alpha-cycle-profile:" in text
+    assert "--event-alpha-profile $(PROFILE)" in text
 
 
 def test_event_llm_golden_eval_passes_and_detects_mismatch():
@@ -4516,6 +4601,215 @@ def test_event_catalyst_search_proxy_evidence_still_requires_deterministic_valid
         event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
     }
     assert proxy_alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE
+
+
+def test_event_catalyst_search_live_provider_adapters_are_evidence_only():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_catalyst_search
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    query = event_catalyst_search.SearchQuery(
+        anomaly_raw_id="market_anomaly:pump:2026-06-18",
+        query="PUMP Binance listing",
+        symbol="PUMP",
+        rank=1,
+        score=90,
+    )
+    news_row = {
+        "id": "pump-listing",
+        "title": "Binance will list Pump Protocol (PUMP)",
+        "body": "Binance will list Pump Protocol spot trading pairs today.",
+        "published_at": now.isoformat(),
+        "fetched_at": now.isoformat(),
+        "url": "https://example.test/pump",
+        "source_confidence": 0.90,
+    }
+    poly_row = {
+        "id": "pump-spacex-market",
+        "title": "Will Pump Protocol offer SpaceX pre-IPO exposure?",
+        "description": "Prediction market for PUMP and SpaceX pre-IPO exposure.",
+        "createdAt": now.isoformat(),
+        "endDate": "2026-06-20T12:00:00Z",
+        "url": "https://polymarket.test/event/pump-spacex",
+        "source_confidence": 0.80,
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        news_path = Path(tmp) / "news.json"
+        news_path.write_text(json.dumps({"articles": [news_row]}), encoding="utf-8")
+        poly_path = Path(tmp) / "polymarket.json"
+        poly_path.write_text(json.dumps({"events": [poly_row]}), encoding="utf-8")
+        providers = [
+            event_catalyst_search.GdeltCatalystSearchProvider(path=news_path),
+            event_catalyst_search.ProjectRssCatalystSearchProvider(path=news_path),
+            event_catalyst_search.PolymarketCatalystSearchProvider(path=poly_path),
+        ]
+        for provider in providers:
+            result = provider.search([query], max_results_per_query=2, now=now)
+            assert result.result_events
+            raw = result.result_events[0].raw_event
+            assert raw.raw_json["market_anomaly_catalyst_search_source"]["research_only"] is True
+            assert raw.raw_json["market_anomaly_catalyst_search_source"]["query"] == query.query
+
+    missing_key = event_catalyst_search.CryptoPanicCatalystSearchProvider(live_enabled=True, api_token="")
+    result = missing_key.search([query], max_results_per_query=2, now=now)
+    assert result.result_events == ()
+
+
+def test_event_catalyst_search_scores_filter_low_quality_results():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    anomaly = RawDiscoveredEvent(
+        raw_id="market_anomaly:pump:2026-06-18",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="PUMP market anomaly: 24h return 80%",
+        body="No dated external catalyst has been validated.",
+        raw_json={"market": {"symbol": "PUMP", "coin_id": "pump"}, "anomaly": {"score": 90}},
+        source_confidence=0.55,
+        content_hash="anomaly-pump",
+    )
+    good = RawDiscoveredEvent(
+        raw_id="pump-binance",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/pump",
+        title="Binance will list Pump Protocol (PUMP)",
+        body="Binance will list PUMP spot trading today.",
+        raw_json={
+            "event": {
+                "event_id": "pump-binance",
+                "event_name": "Binance will list Pump Protocol (PUMP)",
+                "event_type": "exchange_listing",
+                "event_time": "2026-06-18T20:00:00Z",
+                "event_time_confidence": 0.95,
+                "confidence": 0.90,
+            }
+        },
+        source_confidence=0.90,
+        content_hash="pump-binance",
+    )
+    recap = RawDiscoveredEvent(
+        raw_id="pump-recap",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/recap",
+        title="Daily market recap: crypto prices today",
+        body="A generic market recap mentions PUMP with no catalyst.",
+        raw_json={},
+        source_confidence=0.60,
+        content_hash="pump-recap",
+    )
+    provider = event_catalyst_search.FixtureCatalystSearchProvider({
+        "PUMP Binance listing": (good, recap),
+    })
+    cfg = event_catalyst_search.EventCatalystSearchConfig(
+        enabled=True,
+        max_anomalies=1,
+        max_queries_per_anomaly=2,
+        max_results_per_query=5,
+        min_anomaly_score=60,
+        min_result_confidence=0.60,
+    )
+    result = event_catalyst_search.run_catalyst_search([anomaly], provider, cfg=cfg, now=now)
+    assert [row.raw_event.raw_id for row in result.result_events] == ["pump-binance"]
+    assert [row.raw_event.raw_id for row in result.rejected_result_events] == ["pump-recap"]
+    assert result.result_events[0].result_score > result.rejected_result_events[0].result_score
+    report = event_catalyst_search.format_catalyst_search_report(result)
+    assert "accepted_results=1" in report
+    assert "rejected_results=1" in report
+
+
+def test_event_anomaly_lifecycle_tracks_found_validated_and_expired_states():
+    from datetime import datetime, timedelta, timezone
+    from crypto_rsi_scanner import (
+        event_alerts,
+        event_anomaly_state,
+        event_catalyst_search,
+        event_discovery,
+    )
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    anomaly = RawDiscoveredEvent(
+        raw_id="market_anomaly:pump:2026-06-18",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="PUMP market anomaly",
+        body="No dated external catalyst has been validated.",
+        raw_json={"market": {"symbol": "PUMP", "coin_id": "pump"}, "anomaly": {"score": 90}},
+        source_confidence=0.55,
+        content_hash="anomaly-pump",
+    )
+    listing = RawDiscoveredEvent(
+        raw_id="pump-listing-lifecycle",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/pump",
+        title="Binance will list Pump Protocol (PUMP)",
+        body="Binance will list Pump Protocol spot trading today.",
+        raw_json={
+            "event": {
+                "event_id": "pump-listing-lifecycle",
+                "event_name": "Binance will list Pump Protocol (PUMP)",
+                "event_type": "exchange_listing",
+                "event_time": "2026-06-18T20:00:00Z",
+                "event_time_confidence": 0.95,
+                "confidence": 0.90,
+            }
+        },
+        source_confidence=0.90,
+        content_hash="pump-listing-lifecycle",
+    )
+    provider = event_catalyst_search.FixtureCatalystSearchProvider({"PUMP Binance listing": (listing,)})
+    cfg = event_catalyst_search.EventCatalystSearchConfig(
+        enabled=True,
+        max_anomalies=1,
+        max_queries_per_anomaly=2,
+        max_results_per_query=1,
+        min_anomaly_score=60,
+    )
+    search_result = event_catalyst_search.run_catalyst_search([anomaly], provider, cfg=cfg, now=now)
+    rows = event_catalyst_search.attach_search_results_to_anomaly(anomaly, (listing,))
+    discovery = event_discovery.run_discovery(
+        rows,
+        [DiscoveredAsset(coin_id="pump", symbol="PUMP", name="Pump Protocol", aliases=("pump protocol", "pump"))],
+        now=now,
+    )
+    alerts = event_alerts.build_event_alert_candidates(discovery, now=now)
+    lifecycle = event_anomaly_state.build_anomaly_lifecycle([anomaly], search_result, alerts, now=now)
+    assert lifecycle.entries[0].state in {
+        event_anomaly_state.EventAnomalyLifecycleState.PLAYBOOK_ASSIGNED.value,
+        event_anomaly_state.EventAnomalyLifecycleState.ESCALATED.value,
+    }
+    assert lifecycle.entries[0].validated_catalyst_count == 1
+
+    empty_search = event_catalyst_search.run_catalyst_search(
+        [anomaly],
+        event_catalyst_search.FixtureCatalystSearchProvider({"PUMP Binance listing": ()}),
+        cfg=cfg,
+        now=now,
+    )
+    expired = event_anomaly_state.build_anomaly_lifecycle(
+        [anomaly],
+        empty_search,
+        [],
+        now=now + timedelta(hours=25),
+        expire_hours_no_catalyst=24,
+    )
+    assert expired.entries[0].state == event_anomaly_state.EventAnomalyLifecycleState.EXPIRED_NO_CATALYST.value
 
 
 def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_noise():

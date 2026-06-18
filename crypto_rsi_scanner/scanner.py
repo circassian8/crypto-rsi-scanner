@@ -66,6 +66,7 @@ from . import event_discovery
 from . import event_alerts
 from . import event_alpha_alert_store
 from . import event_alpha_pipeline
+from . import event_alpha_profiles
 from . import event_alpha_router
 from . import event_catalyst_search
 from . import event_clock
@@ -1216,6 +1217,10 @@ def _event_llm_config_from_runtime() -> event_llm_analyzer.EventLLMConfig:
         require_evidence_quotes=config.EVENT_LLM_REQUIRE_EVIDENCE_QUOTES,
         cache_path=config.EVENT_LLM_CACHE_PATH,
         prompt_version=config.EVENT_LLM_PROMPT_VERSION,
+        max_calls_per_run=config.EVENT_LLM_MAX_CALLS_PER_RUN,
+        max_calls_per_day=config.EVENT_LLM_MAX_CALLS_PER_DAY,
+        max_estimated_cost_usd_per_day=config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY,
+        cache_ttl_hours=config.EVENT_LLM_CACHE_TTL_HOURS,
     )
 
 
@@ -1229,6 +1234,10 @@ def _event_llm_extractor_config_from_runtime() -> event_llm_extractor.EventLLMEx
         require_evidence_quotes=config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES,
         cache_path=config.EVENT_LLM_EXTRACTOR_CACHE_PATH,
         prompt_version=config.EVENT_LLM_EXTRACTOR_PROMPT_VERSION,
+        max_calls_per_run=config.EVENT_LLM_MAX_CALLS_PER_RUN,
+        max_calls_per_day=config.EVENT_LLM_MAX_CALLS_PER_DAY,
+        max_estimated_cost_usd_per_day=config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY,
+        cache_ttl_hours=config.EVENT_LLM_CACHE_TTL_HOURS,
     )
 
 
@@ -1253,10 +1262,13 @@ def _event_catalyst_search_config_from_runtime(
     return event_catalyst_search.EventCatalystSearchConfig(
         enabled=config.EVENT_CATALYST_SEARCH_ENABLED if enabled_override is None else enabled_override,
         provider=config.EVENT_CATALYST_SEARCH_PROVIDER,
+        providers=tuple(config.EVENT_CATALYST_SEARCH_PROVIDERS),
         max_anomalies=config.EVENT_CATALYST_SEARCH_MAX_ANOMALIES,
         max_queries_per_anomaly=config.EVENT_CATALYST_SEARCH_MAX_QUERIES_PER_ANOMALY,
         max_results_per_query=config.EVENT_CATALYST_SEARCH_MAX_RESULTS_PER_QUERY,
         min_anomaly_score=config.EVENT_CATALYST_SEARCH_MIN_ANOMALY_SCORE,
+        require_live_source=config.EVENT_CATALYST_SEARCH_REQUIRE_LIVE_SOURCE,
+        min_result_confidence=config.EVENT_CATALYST_SEARCH_MIN_RESULT_CONFIDENCE,
     )
 
 
@@ -1278,6 +1290,43 @@ def _event_alpha_alert_store_config_from_runtime(
         snapshot_policy=config.EVENT_ALPHA_SNAPSHOT_POLICY,
         sampled_controls_limit=config.EVENT_ALPHA_SNAPSHOT_SAMPLED_CONTROLS,
     )
+
+
+def _apply_event_alpha_profile(profile_name: str | None) -> event_alpha_profiles.EventAlphaProfile | None:
+    if not profile_name:
+        return None
+    profile = event_alpha_profiles.get_profile(profile_name)
+    for attr, value in profile.config_overrides.items():
+        setattr(config, attr, value)
+    _normalize_profile_paths()
+    return profile
+
+
+def _normalize_profile_paths() -> None:
+    for attr in (
+        "EVENT_DISCOVERY_UNIVERSE_PATH",
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH",
+        "EVENT_CATALYST_SEARCH_FIXTURE_PATH",
+        "EVENT_WATCHLIST_STATE_PATH",
+        "EVENT_ALPHA_ALERT_STORE_PATH",
+    ):
+        value = getattr(config, attr, None)
+        if isinstance(value, Path):
+            resolved = value.expanduser()
+            if not resolved.is_absolute():
+                resolved = config.DATA_DIR / resolved
+            setattr(config, attr, resolved)
+    rss_path = getattr(config, "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH", None)
+    if rss_path and not getattr(config, "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS", ()):
+        try:
+            urls = [
+                line.strip()
+                for line in Path(rss_path).read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.strip().startswith("#")
+            ]
+            config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = tuple(dict.fromkeys(urls))
+        except OSError:
+            config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = ()
 
 
 def _setup_event_discovery_logging(verbose: bool) -> None:
@@ -1394,9 +1443,14 @@ def event_alpha_cycle(
     with_llm: bool = False,
     send: bool = False,
     event_now: str | datetime | None = None,
+    profile_name: str | None = None,
 ) -> None:
     """Run one unified research-only Event Alpha cycle."""
     _setup_event_discovery_logging(verbose)
+    profile = _apply_event_alpha_profile(profile_name)
+    if profile is not None:
+        with_llm = with_llm or profile.with_llm
+        send = send or profile.send
     if not _event_alpha_inputs_configured():
         print(
             "No event-alpha cycle inputs ready. Configure event sources or enable "
@@ -1446,6 +1500,17 @@ def event_alpha_cycle(
     )
     print("")
     print(event_alpha_alert_store.format_alert_store_write_result(store_result))
+
+
+def event_alpha_profile_report(profile_name: str, verbose: bool = False) -> None:
+    """Print one Event Alpha operational profile."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        profile = event_alpha_profiles.get_profile(profile_name)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    print(event_alpha_profiles.format_profile_report(profile))
 
 
 def event_catalyst_search_report(
@@ -1711,13 +1776,63 @@ def _event_llm_extraction_provider(extractor_cfg: event_llm_extractor.EventLLMEx
 def _event_catalyst_search_provider(
     search_cfg: event_catalyst_search.EventCatalystSearchConfig,
 ):
-    provider_name = search_cfg.provider.strip().lower()
-    if provider_name == "fixture":
-        return event_catalyst_search.FixtureCatalystSearchProvider(
-            path=config.EVENT_CATALYST_SEARCH_FIXTURE_PATH,
-        )
-    print(f"Unknown event catalyst-search provider: {search_cfg.provider}. Use fixture.")
-    return None
+    provider_names = tuple(
+        name.strip().lower()
+        for name in (search_cfg.providers or (search_cfg.provider,))
+        if name and name.strip()
+    )
+    providers = []
+    warnings: list[str] = []
+    for provider_name in provider_names or ("fixture",):
+        if provider_name == "fixture":
+            providers.append(event_catalyst_search.FixtureCatalystSearchProvider(
+                path=config.EVENT_CATALYST_SEARCH_FIXTURE_PATH,
+            ))
+        elif provider_name == "gdelt":
+            providers.append(event_catalyst_search.GdeltCatalystSearchProvider(
+                path=config.EVENT_DISCOVERY_GDELT_PATH,
+                live_enabled=config.EVENT_DISCOVERY_GDELT_LIVE,
+                base_url=config.EVENT_DISCOVERY_GDELT_BASE_URL,
+                max_records=config.EVENT_DISCOVERY_GDELT_MAX_RECORDS,
+                timeout=config.EVENT_DISCOVERY_GDELT_TIMEOUT,
+            ))
+        elif provider_name in {"rss", "project_rss", "project_blog_rss"}:
+            providers.append(event_catalyst_search.ProjectRssCatalystSearchProvider(
+                path=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
+                live_enabled=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE,
+                feed_urls=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS,
+                timeout=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT,
+            ))
+        elif provider_name == "cryptopanic":
+            providers.append(event_catalyst_search.CryptoPanicCatalystSearchProvider(
+                path=config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+                live_enabled=config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
+                api_token=config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN,
+                base_url=config.EVENT_DISCOVERY_CRYPTOPANIC_BASE_URL,
+                public=config.EVENT_DISCOVERY_CRYPTOPANIC_PUBLIC,
+                filter_name=config.EVENT_DISCOVERY_CRYPTOPANIC_FILTER,
+                currencies=config.EVENT_DISCOVERY_CRYPTOPANIC_CURRENCIES,
+                regions=config.EVENT_DISCOVERY_CRYPTOPANIC_REGIONS,
+                kind=config.EVENT_DISCOVERY_CRYPTOPANIC_KIND,
+                timeout=config.EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT,
+            ))
+        elif provider_name == "polymarket":
+            providers.append(event_catalyst_search.PolymarketCatalystSearchProvider(
+                path=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
+                live_enabled=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE,
+                base_url=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_BASE_URL,
+                limit=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT,
+                timeout=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_TIMEOUT,
+            ))
+        else:
+            warnings.append(provider_name)
+    if warnings:
+        print(f"Unknown event catalyst-search provider(s): {', '.join(warnings)}. Known: fixture, gdelt, rss, cryptopanic, polymarket.")
+    if not providers:
+        return None
+    if len(providers) == 1:
+        return providers[0]
+    return event_catalyst_search.CompositeCatalystSearchProvider(providers)
 
 
 def _send_event_alert_digest(
@@ -3362,6 +3477,19 @@ def cli() -> None:
         help="Print research-only market-anomaly catalyst-search diagnostics.",
     )
     parser.add_argument(
+        "--event-alpha-profile",
+        default=None,
+        help=(
+            "Apply an Event Alpha operational research profile "
+            f"({', '.join(event_alpha_profiles.profile_names())})."
+        ),
+    )
+    parser.add_argument(
+        "--event-alpha-profile-report",
+        metavar="PROFILE",
+        help="Print an Event Alpha operational profile without running the cycle.",
+    )
+    parser.add_argument(
         "--event-alert-send",
         action="store_true",
         help=(
@@ -3647,7 +3775,11 @@ def cli() -> None:
             with_llm=args.with_llm,
             send=args.event_alert_send,
             event_now=args.event_now,
+            profile_name=args.event_alpha_profile,
         )
+        return
+    if args.event_alpha_profile_report:
+        event_alpha_profile_report(args.event_alpha_profile_report, verbose=args.verbose)
         return
     if args.event_catalyst_search_report:
         event_catalyst_search_report(verbose=args.verbose, with_llm=args.with_llm, event_now=args.event_now)

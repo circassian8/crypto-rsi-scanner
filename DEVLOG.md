@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Operationalize Event Alpha catalyst search profiles · Codex
+**Why:** The Event Alpha catalyst-search loop needed to move beyond fixture
+attachment into live-source evidence adapters, explicit search quality gates,
+anomaly lifecycle reporting, reusable operating profiles, and LLM call-budget
+guardrails while remaining research-only.
+**Changes:**
+- Added dynamic catalyst-search adapters for GDELT, project RSS, CryptoPanic,
+  and Polymarket on top of the existing provider parsers, plus comma-list
+  provider composition through `RSI_EVENT_CATALYST_SEARCH_PROVIDERS`.
+- Added query/result scoring, result rejection, live-source requirement support,
+  and richer catalyst-search reports with accepted/rejected evidence and reason
+  codes.
+- Added `event_anomaly_state.py` and wired Event Alpha pipeline reports to show
+  anomaly lifecycle states from detected → searched → found → validated →
+  playbook assigned/escalated/expired.
+- Added Event Alpha operational profiles (`fixture`, `no_key_live`,
+  `no_key_llm`, `api_live`, `full_llm_live`, `research_send`) plus CLI/Make
+  profile entry points.
+- Added LLM per-run/day/cache-TTL budget fields; cache hits do not consume
+  budget and exhausted budgets skip lower-priority rows fail-soft.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, and regression tests.
+**Verify:** `python3 tests/test_indicators.py` passed 325/325.
+`make event-llm-eval PYTHON=python3` passed 9/9 golden cases. `make
+event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases. `make
+event-alpha-eval PYTHON=python3` passed 11/11 golden checks. `make verify
+PYTHON=python3` passed. `python3 -m compileall -q crypto_rsi_scanner tests`
+passed.
+**Notes/risks:** Profiles and live-source adapters still only collect research
+evidence and route through deterministic discovery/playbooks. They do not alter
+normal RSI alerts, paper trades, live signal rows, or event-fade eligibility;
+`TRIGGERED_FADE` still only comes from `event_fade.py`.
+
 ## 2026-06-18 — Add dynamic Event Alpha catalyst-search loop · Codex
 **Why:** Event Alpha had offline anomaly and catalyst-search scaffolding, but
 the operating cycle still needed a real anomaly → catalyst-search → discovery

@@ -92,6 +92,10 @@ class EventLLMExtractorConfig:
     require_evidence_quotes: bool = True
     cache_path: Path | None = None
     prompt_version: str = "llm_raw_event_extraction_v1"
+    max_calls_per_run: int = 0
+    max_calls_per_day: int = 0
+    max_estimated_cost_usd_per_day: float = 0.0
+    cache_ttl_hours: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -101,6 +105,7 @@ class EventLLMExtractionReportRow:
     warnings: tuple[str, ...] = ()
     extraction_priority_score: int = 0
     extraction_priority_reasons: tuple[str, ...] = ()
+    cache_status: str = "none"
 
 
 @dataclass(frozen=True)
@@ -123,30 +128,49 @@ def analyze_raw_events(
     selected = _select_raw_events_for_extraction(raw_events, cfg.max_events_per_run)
     provider_name = str(getattr(provider, "name", cfg.provider))
     provider_model = getattr(provider, "model", cfg.model)
+    calls_attempted = 0
     for raw_event, priority in selected:
         packet = build_raw_event_packet(raw_event, prompt_version=cfg.prompt_version)
         warnings: list[str] = []
         cache_key = _cache_key(packet, cfg, provider_name, provider_model)
         cached = cache.get(cache_key)
-        if isinstance(cached, Mapping) and isinstance(cached.get("raw"), Mapping):
+        cache_status = "miss"
+        if isinstance(cached, Mapping) and isinstance(cached.get("raw"), Mapping) and _cache_entry_fresh(cached, cfg):
             raw = dict(cached["raw"])
+            cache_status = "hit"
         elif isinstance(cached, Mapping):
-            warnings.append("LLM extraction cache entry ignored: old cache format")
-            provider_result = provider.extract_raw_event(packet)
-            raw = provider_result.raw
-            if provider_result.warning:
-                warnings.append(provider_result.warning)
-            if raw is not None and cfg.cache_path is not None:
-                cache[cache_key] = _cache_entry(raw, packet, provider_name, provider_model, cfg)
-                cache_changed = True
+            warnings.append(
+                "LLM extraction cache entry ignored: old cache format"
+                if not isinstance(cached.get("raw"), Mapping)
+                else "LLM extraction cache entry expired"
+            )
+            if _budget_exhausted(calls_attempted, cfg):
+                raw = None
+                cache_status = "skipped_budget"
+                warnings.append("LLM extraction skipped: call budget exhausted")
+            else:
+                calls_attempted += 1
+                provider_result = provider.extract_raw_event(packet)
+                raw = provider_result.raw
+                if provider_result.warning:
+                    warnings.append(provider_result.warning)
+                if raw is not None and cfg.cache_path is not None:
+                    cache[cache_key] = _cache_entry(raw, packet, provider_name, provider_model, cfg)
+                    cache_changed = True
         else:
-            provider_result = provider.extract_raw_event(packet)
-            raw = provider_result.raw
-            if provider_result.warning:
-                warnings.append(provider_result.warning)
-            if raw is not None and cfg.cache_path is not None:
-                cache[cache_key] = _cache_entry(raw, packet, provider_name, provider_model, cfg)
-                cache_changed = True
+            if _budget_exhausted(calls_attempted, cfg):
+                raw = None
+                cache_status = "skipped_budget"
+                warnings.append("LLM extraction skipped: call budget exhausted")
+            else:
+                calls_attempted += 1
+                provider_result = provider.extract_raw_event(packet)
+                raw = provider_result.raw
+                if provider_result.warning:
+                    warnings.append(provider_result.warning)
+                if raw is not None and cfg.cache_path is not None:
+                    cache[cache_key] = _cache_entry(raw, packet, provider_name, provider_model, cfg)
+                    cache_changed = True
         extraction: EventLLMRawEventExtraction | None = None
         if raw is not None:
             try:
@@ -167,6 +191,7 @@ def analyze_raw_events(
             warnings=tuple(dict.fromkeys(warnings)),
             extraction_priority_score=priority.score,
             extraction_priority_reasons=priority.reason_codes,
+            cache_status=cache_status,
         ))
     if cache_changed:
         _write_cache(cfg.cache_path, cache)
@@ -504,6 +529,8 @@ def format_llm_extract_report(rows: Iterable[EventLLMExtractionReportRow]) -> st
                 out.append("  follow-up: " + "; ".join(extraction.suggested_followup_queries[:3]))
         for warning in row.warnings:
             out.append(f"  warning: {warning}")
+        if row.cache_status != "none":
+            out.append(f"  cache: {row.cache_status}")
         out.append("")
     return "\n".join(out).rstrip()
 
@@ -757,6 +784,30 @@ def _load_cache(path: Path | None) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         log.warning("LLM extraction cache could not be read: %s", exc)
         return {}
+
+
+def _budget_exhausted(calls_attempted: int, cfg: EventLLMExtractorConfig) -> bool:
+    caps = [cap for cap in (cfg.max_calls_per_run, cfg.max_calls_per_day) if cap and cap > 0]
+    if not caps:
+        return False
+    return calls_attempted >= min(caps)
+
+
+def _cache_entry_fresh(cached: Mapping[str, Any], cfg: EventLLMExtractorConfig) -> bool:
+    ttl = float(cfg.cache_ttl_hours or 0.0)
+    if ttl <= 0:
+        return True
+    analyzed_at = cached.get("analyzed_at")
+    if not analyzed_at:
+        return False
+    try:
+        parsed = datetime.fromisoformat(str(analyzed_at).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    age_hours = (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds() / 3600.0
+    return age_hours <= ttl
 
 
 def _write_cache(path: Path | None, cache: Mapping[str, Any]) -> None:
