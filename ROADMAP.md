@@ -35,6 +35,7 @@ Status labels:
 | done | Add deterministic Event Alpha research clock | — | `RSI_EVENT_RESEARCH_NOW` and `--event-now` now pin event discovery/alert/LLM/watchlist/fade fixture and review-artifact paths, and fixture Make targets default to `2026-06-15T16:00:00Z`. This completes the Pro-model Phase 0 time-determinism pass; normal RSI scans still use wall-clock time. |
 | done | Add unified Event Alpha cycle | — | `main.py --event-alpha-cycle` plus `make event-alpha-cycle`, `make event-alpha-cycle-llm`, and `make event-alpha-cycle-send` now compose discovery/anomaly inputs, optional LLM metadata, alert ranking, watchlist refresh, and local router summaries into one research-only operating loop. The send path now uses only router-approved alertable decisions; broad event-alert digest sends remain limited to `--event-alert-report --event-alert-send`. |
 | done | Polish Event Alpha operational semantics | — | Extractor `shadow` mode is analysis-only, `advisory` mode is the only extraction mode that can enrich raw evidence before deterministic discovery, effective playbooks now drive watchlist/router/snapshot grouping while rule playbooks are preserved for audit, route-approved Telegram copy has a dedicated renderer, alert copy uses playbook-specific hypothesis/timing/invalidation/verification, and alert snapshots/outcomes carry expected direction, primary horizon, success metric, primary-horizon return, direction-hit, and MFE/MAE cohorts. |
+| done | Make Event Alpha tiering playbook-first | — | `event_alerts.resolve_playbook_alert_tier` now makes deterministic playbook assessment the primary research-tier input while preserving hard rejections and the invariant that only `proxy_fade` plus an `event_fade.py` `SHORT_TRIGGERED` signal can become `TRIGGERED_FADE`. Cluster confidence now informs scoring for accepted assets only, snapshot retention is configurable with `RSI_EVENT_ALPHA_SNAPSHOT_POLICY`, and `event_catalyst_search.py` provides offline query/evidence attachment scaffolding for market anomalies. |
 | done | Build Event Alpha Radar design phases | — | Phase 1 raw-event extraction including upstream resolver hints, Phase 2 market enrichment/anomaly discovery, Phase 3 event-graph catalyst clustering plus persistent watchlist state, Phase 4 expanded deterministic playbooks, Phase 5 alert snapshot/outcome artifacts, artifact-only router decisions, lightweight feedback/evals, and the unified cycle command are now in place. `main.py --event-alpha-radar-report`, `--event-alpha-cycle`, `--event-watchlist-refresh`, `--event-watchlist-report`, `--event-alpha-router-report`, `--event-alpha-alerts-report`, `--event-alpha-fill-outcomes`, `--event-feedback-mark`, and `--event-feedback-report` cover the local research loop; `make event-alpha-eval`, `make event-alpha-alerts-report`, and `make event-alpha-fill-outcomes` cover the fixture/artifact paths. Details are in `DEVLOG.md`. Keep the system research-only until reviewed samples justify any separate promotion. |
 
 ## Later
@@ -50,9 +51,10 @@ auto-symbol/external-catalyst/derivatives/supply radar
 reports, research-only event-alert ranking reports, event-discovery JSONL cache refreshes, raw Binance
 announcement cache listening, research-only LLM raw-extraction reports/evals,
 research-only LLM shadow/advisory relationship reports/evals,
-research-only event-alpha market-enriched/anomaly reports with playbook
-metadata, watchlist state refresh/report commands, local router decisions,
-alert snapshot/outcome artifacts, feedback artifacts, and route/feedback evals, grouped
+research-only event-alpha market-enriched/anomaly reports with playbook-first
+tiering, catalyst-cluster confidence, offline anomaly catalyst-search
+scaffolding, watchlist state refresh/report commands, local router decisions,
+alert snapshot/outcome artifacts with configurable retention policies, feedback artifacts, and route/feedback evals, grouped
 event-fade auto reports, event-fade validation-sample exports from fixtures or
 cached snapshots, event-fade validation merge/price-export/outcome-fill/
 labeling-queue/review-packet/review-template/review-bundle/review cohort

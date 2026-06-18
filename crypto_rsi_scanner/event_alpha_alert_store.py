@@ -17,6 +17,8 @@ ALERT_STORE_SCHEMA_VERSION = "event_alpha_alert_snapshot_v1"
 @dataclass(frozen=True)
 class EventAlphaAlertStoreConfig:
     path: Path
+    snapshot_policy: str = "all"
+    sampled_controls_limit: int = 25
 
 
 @dataclass(frozen=True)
@@ -51,10 +53,19 @@ def write_alert_snapshots(
     *,
     cfg: EventAlphaAlertStoreConfig,
     now: datetime | None = None,
+    router_result: Any | None = None,
 ) -> EventAlphaAlertStoreWriteResult:
     """Append research-only alert snapshots to JSONL."""
     observed = _as_utc(now or datetime.now(timezone.utc))
     rows = [_snapshot_from_alert(alert, observed) for alert in alerts]
+    route_context = _route_context_by_key(router_result)
+    rows = [_with_route_context(row, route_context) for row in rows]
+    rows = _filter_snapshot_rows(
+        rows,
+        policy=cfg.snapshot_policy,
+        sampled_controls_limit=cfg.sampled_controls_limit,
+        route_context=route_context,
+    )
     cfg.path.expanduser().parent.mkdir(parents=True, exist_ok=True)
     with cfg.path.expanduser().open("a", encoding="utf-8") as fh:
         for row in rows:
@@ -285,6 +296,70 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "verify": list(alert.verify),
         "rejected_reason": alert.rejected_reason,
     }
+
+
+def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]]:
+    if router_result is None:
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for decision in getattr(router_result, "decisions", ()) or ():
+        entry = getattr(decision, "entry", None)
+        key = str(getattr(entry, "key", "") or "")
+        if not key:
+            continue
+        route = getattr(decision, "route", "")
+        out[key] = {
+            "route": getattr(route, "value", str(route)),
+            "route_alertable": bool(getattr(decision, "alertable", False)),
+            "route_reason": str(getattr(decision, "reason", "") or ""),
+        }
+    return out
+
+
+def _with_route_context(row: dict[str, Any], route_context: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    context = route_context.get(str(row.get("alert_key") or ""))
+    if not context:
+        return row
+    out = dict(row)
+    out.update(context)
+    return out
+
+
+def _filter_snapshot_rows(
+    rows: list[dict[str, Any]],
+    *,
+    policy: str,
+    sampled_controls_limit: int,
+    route_context: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    mode = (policy or "all").strip().lower()
+    if mode == "all":
+        return rows
+    if mode == "non_store":
+        return [row for row in rows if row.get("tier") != event_alerts.EventAlertTier.STORE_ONLY.value]
+    if mode == "routed":
+        if not route_context:
+            return rows
+        return [row for row in rows if str(row.get("alert_key") or "") in route_context]
+    if mode == "alertable":
+        if not route_context:
+            return []
+        return [
+            row for row in rows
+            if bool(route_context.get(str(row.get("alert_key") or ""), {}).get("route_alertable"))
+        ]
+    if mode == "sampled_controls":
+        limit = max(0, int(sampled_controls_limit))
+        kept: list[dict[str, Any]] = []
+        controls = 0
+        for row in rows:
+            if row.get("tier") != event_alerts.EventAlertTier.STORE_ONLY.value:
+                kept.append(row)
+            elif controls < limit:
+                kept.append(row)
+                controls += 1
+        return kept
+    return rows
 
 
 def _outcome_for_row(row: Mapping[str, Any], price_rows: tuple[dict[str, Any], ...]) -> dict[str, Any] | None:

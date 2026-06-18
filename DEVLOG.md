@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Make Event Alpha tiering playbook-first · Codex
+**Why:** Event Alpha had expanded into multiple research playbooks, but alert
+tiering still leaned too heavily on the old generic proxy-opportunity score.
+The radar needed playbook-specific tier decisions, safer cluster confidence,
+configurable snapshot retention, and offline catalyst-search scaffolding for
+market anomalies without promoting anything to trading.
+**Changes:**
+- Added `event_alerts.resolve_playbook_alert_tier` so deterministic playbook
+  assessment drives research tiers while hard rejections still win and
+  `TRIGGERED_FADE` remains restricted to `proxy_fade` rows with a
+  `SHORT_TRIGGERED` signal from `event_fade.py`.
+- Tightened playbook scoring/selection so direct listings, perp listings,
+  unlocks, and undated proxy-attention rows route through their own evidence
+  rules instead of generic proxy scoring; low classifier confidence remains a
+  store-only guard.
+- Expanded `event_graph.EventCluster` with source diversity, event-time
+  consensus, accepted/rejected asset counts, cluster confidence, and warnings;
+  cluster confirmation can help accepted assets but not source-noise rows.
+- Added `RSI_EVENT_ALPHA_SNAPSHOT_POLICY` and sampled-control support to
+  research-only alert snapshot writes, with optional router context fields.
+- Added `event_catalyst_search.py` for offline market-anomaly search-query
+  generation and supplied-evidence attachment; attached evidence still has to
+  pass normal discovery, resolver, classifier, and playbook tiering.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, and regression tests.
+**Verify:** `python3 tests/test_indicators.py` passed 316/316.
+`make event-llm-eval PYTHON=python3` passed 9/9 golden cases.
+`make event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases.
+`make event-alpha-eval PYTHON=python3` passed 11/11 golden checks.
+`python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`make verify PYTHON=python3` passed 316/316 tests, alert render smoke,
+fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Event Alpha remains research-only. Snapshot policies only
+filter local JSONL artifacts; catalyst-search scaffolding does not fetch live
+data or create alertable candidates without validated source evidence.
+
 ## 2026-06-18 — Polish Event Alpha operational alert semantics · Codex
 **Why:** The Event Alpha Radar had the core modules, but its operating loop
 still behaved too much like disconnected reports: LLM extractor `shadow` mode

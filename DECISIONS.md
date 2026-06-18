@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Make Event Alpha tiering playbook-first
+**Status:** accepted
+**Decision:** Event Alpha research-alert tiers should be resolved from the
+deterministic playbook assessment first, with generic opportunity score used
+only as a supporting cap/boost. Hard rejection gates still win for source noise,
+ticker collisions, low asset-resolution confidence, low classifier confidence,
+publisher/source-only evidence, and market recaps. `TRIGGERED_FADE` remains
+reserved for `proxy_fade` rows that already have a `SHORT_TRIGGERED` signal
+from `event_fade.py`; direct/listing/unlock/perp/security/anomaly playbooks can
+produce research alert tiers but cannot trigger event-fade. Catalyst-cluster
+confidence may help accepted asset rows, but it must not boost rejected/source
+noise rows. Market-anomaly catalyst search remains offline scaffolding that
+generates review queries and attaches supplied evidence only; attached evidence
+must still pass normal discovery, resolver, classifier, and playbook logic.
+Snapshot retention may be tuned with `RSI_EVENT_ALPHA_SNAPSHOT_POLICY` while
+remaining artifact-only.
+**Why:** The Event Alpha system is now a multi-playbook radar, not a generic
+proxy-fade score table. Direct listings, unlocks, and perp listings need their
+own evidence thresholds, while false positives and source-noise controls must
+stay suppressed and all trigger authority must remain deterministic.
+**Revisit when:** Reviewed Event Alpha alert snapshots show a playbook-specific
+tier policy should be calibrated from measured outcomes or promoted through a
+separate human-approved research digest/paper workflow.
+
 ## 2026-06-18 - Route Event Alpha sends through effective playbooks only
 **Status:** accepted
 **Decision:** `RSI_EVENT_LLM_EXTRACTOR_MODE=shadow` is analysis/report-only and

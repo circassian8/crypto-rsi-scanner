@@ -4000,6 +4000,208 @@ def test_event_anomaly_scanner_creates_store_only_research_rows():
     assert "low classifier confidence" in (alert.rejected_reason or "")
 
 
+def test_event_alerts_resolve_playbook_first_tiers_and_trigger_guards():
+    from dataclasses import replace
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts, event_fade, event_playbooks
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    alerts = event_alerts.build_event_alert_candidates(_full_event_discovery_fixture_result(), now=now)
+    by_symbol = {alert.symbol: alert for alert in alerts}
+
+    listing = by_symbol["TESTTOKEN"]
+    assert listing.playbook_type == event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value
+    assert listing.playbook_action == event_playbooks.EventPlaybookAction.WATCHLIST.value
+    assert listing.tier == event_alerts.EventAlertTier.WATCHLIST
+    assert listing.playbook_can_trigger_fade is False
+
+    strong_listing = by_symbol["TESTLIST"]
+    assert strong_listing.playbook_type == event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value
+    assert strong_listing.score_components["derivatives_crowding"] == 100
+    assert strong_listing.tier == event_alerts.EventAlertTier.HIGH_PRIORITY_WATCH
+
+    fake_trigger = event_fade.FadeSignal(
+        symbol=listing.symbol,
+        timestamp=now,
+        signal_type=event_fade.FadeSignalType.SHORT_TRIGGERED,
+        state=event_fade.FadeState.TRIGGERED_SHORT,
+        fade_score=99,
+        confidence=1.0,
+        reason_codes=["fixture_bad_direct_trigger"],
+        warnings=[],
+    )
+    bad_direct = replace(listing.discovery_candidate, fade_signal=fake_trigger)
+    bad_playbook = event_playbooks.assess_event_playbook(
+        bad_direct,
+        listing.score_components,
+        rejected_reason=listing.rejected_reason,
+    )
+    assert event_alerts.resolve_playbook_alert_tier(
+        bad_direct,
+        listing.opportunity_score,
+        listing.score_components,
+        bad_playbook,
+        listing.rejected_reason,
+        event_alerts.EventAlertConfig(),
+    ) == event_alerts.EventAlertTier.STORE_ONLY
+
+    low_quality_direct = by_symbol["TESTCAL"]
+    assert low_quality_direct.playbook_type == event_playbooks.EventPlaybookType.DIRECT_EVENT.value
+    assert low_quality_direct.tier == event_alerts.EventAlertTier.STORE_ONLY
+
+    unlock = by_symbol["TESTUNLOCK"]
+    unlock_components = {
+        **unlock.score_components,
+        "market_move_volume": 60,
+        "supply_pressure": 85,
+        "source_quality": 95,
+    }
+    unlock_playbook = event_playbooks.assess_event_playbook(
+        unlock.discovery_candidate,
+        unlock_components,
+        rejected_reason=unlock.rejected_reason,
+    )
+    assert unlock_playbook.playbook_type == event_playbooks.EventPlaybookType.UNLOCK_SUPPLY_PRESSURE.value
+    assert event_alerts.resolve_playbook_alert_tier(
+        unlock.discovery_candidate,
+        generic_score=72,
+        components=unlock_components,
+        playbook_assessment=unlock_playbook,
+        rejected_reason=unlock.rejected_reason,
+        cfg=event_alerts.EventAlertConfig(),
+    ) == event_alerts.EventAlertTier.HIGH_PRIORITY_WATCH
+
+    perp = by_symbol["TESTPERP"]
+    perp_components = {
+        **perp.score_components,
+        "market_move_volume": 55,
+        "derivatives_crowding": 85,
+        "source_quality": 95,
+    }
+    perp_playbook = event_playbooks.assess_event_playbook(
+        perp.discovery_candidate,
+        perp_components,
+        rejected_reason=perp.rejected_reason,
+    )
+    assert perp_playbook.playbook_type == event_playbooks.EventPlaybookType.PERP_LISTING_SQUEEZE.value
+    assert event_alerts.resolve_playbook_alert_tier(
+        perp.discovery_candidate,
+        generic_score=72,
+        components=perp_components,
+        playbook_assessment=perp_playbook,
+        rejected_reason=perp.rejected_reason,
+        cfg=event_alerts.EventAlertConfig(),
+    ) == event_alerts.EventAlertTier.HIGH_PRIORITY_WATCH
+
+    anomaly = by_symbol["TESTPUMP"]
+    assert anomaly.playbook_type == event_playbooks.EventPlaybookType.SOURCE_NOISE_CONTROL.value
+    assert anomaly.tier == event_alerts.EventAlertTier.STORE_ONLY
+
+
+def test_event_catalyst_search_scaffold_attaches_evidence_without_bypassing_discovery():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alerts,
+        event_anomaly_scanner,
+        event_catalyst_search,
+        event_discovery,
+        event_market_enrichment,
+        event_playbooks,
+    )
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    rows = [{
+        "id": "pump-protocol",
+        "symbol": "pump",
+        "name": "Pump Protocol",
+        "current_price": 1.4,
+        "market_cap": 100000000.0,
+        "total_volume": 60000000.0,
+        "price_change_percentage_24h_in_currency": 45.0,
+        "price_change_percentage_7d_in_currency": 120.0,
+        "volume_zscore_24h": 4.5,
+    }]
+    anomaly = event_anomaly_scanner.discover_market_anomalies(
+        rows,
+        cfg=event_anomaly_scanner.EventAnomalyScannerConfig(
+            enabled=True,
+            min_return_24h=0.30,
+            min_volume_mcap=0.25,
+            min_volume_zscore=3.0,
+        ),
+        now=now,
+    )[0]
+    queries = event_catalyst_search.generate_search_queries_for_anomaly(anomaly)
+    assert "PUMP crypto why up" in queries
+    assert "PUMP Binance listing" in queries
+    assert "PUMP SpaceX exposure" in queries
+
+    asset = DiscoveredAsset(
+        coin_id="pump-protocol",
+        symbol="PUMP",
+        name="Pump Protocol",
+        aliases=("pump protocol", "pump"),
+    )
+    market_by_asset = event_market_enrichment.market_snapshots_from_rows(rows, now=now)
+    no_evidence_rows = event_catalyst_search.attach_search_results_to_anomaly(anomaly, ())
+    no_evidence_result = event_discovery.run_discovery(
+        no_evidence_rows,
+        [asset],
+        now=now,
+        market_by_asset=market_by_asset,
+    )
+    no_evidence_alert = event_alerts.build_event_alert_candidates(no_evidence_result, now=now)[0]
+    assert no_evidence_alert.playbook_type == event_playbooks.EventPlaybookType.MARKET_ANOMALY_UNKNOWN.value
+    assert no_evidence_alert.tier in {
+        event_alerts.EventAlertTier.STORE_ONLY,
+        event_alerts.EventAlertTier.RADAR_DIGEST,
+    }
+    assert no_evidence_alert.tier != event_alerts.EventAlertTier.WATCHLIST
+
+    listing_raw = RawDiscoveredEvent(
+        raw_id="pump-binance-listing",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/pump-binance-listing",
+        title="Binance will list Pump Protocol (PUMP)",
+        body="Binance will list Pump Protocol spot trading pairs today.",
+        raw_json={
+            "event": {
+                "event_id": "pump-binance-listing",
+                "event_name": "Binance will list Pump Protocol (PUMP)",
+                "event_type": "exchange_listing",
+                "event_time": "2026-06-18T20:00:00Z",
+                "event_time_confidence": 0.95,
+                "external_asset": None,
+                "confidence": 0.90,
+                "description": "Binance will list Pump Protocol spot trading pairs today.",
+            }
+        },
+        source_confidence=0.90,
+        content_hash="pump-binance-listing",
+    )
+    attached_rows = event_catalyst_search.attach_search_results_to_anomaly(anomaly, (listing_raw,))
+    assert attached_rows[1].raw_json["market_anomaly_catalyst_search"]["role"] == "attached_source_evidence"
+    with_evidence_result = event_discovery.run_discovery(
+        attached_rows,
+        [asset],
+        now=now,
+        market_by_asset=market_by_asset,
+    )
+    listing_alert = next(
+        alert for alert in event_alerts.build_event_alert_candidates(with_evidence_result, now=now)
+        if alert.discovery_candidate.event.event_id == "pump-binance-listing"
+    )
+    assert listing_alert.playbook_type == event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value
+    assert listing_alert.tier in {
+        event_alerts.EventAlertTier.WATCHLIST,
+        event_alerts.EventAlertTier.HIGH_PRIORITY_WATCH,
+    }
+    assert listing_alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE
+
+
 def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_noise():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alerts, event_discovery, event_playbooks
@@ -4285,7 +4487,7 @@ def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_nois
 
 def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_graph
+    from crypto_rsi_scanner import event_alerts, event_graph
     from crypto_rsi_scanner.event_models import (
         DiscoveredAsset,
         DiscoveredEventFadeCandidate,
@@ -4298,7 +4500,7 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
     event_time = datetime(2026, 6, 20, 13, 30, tzinfo=timezone.utc)
 
-    def event(event_id, title):
+    def event(event_id, title, *, domain="example.test"):
         return NormalizedEvent(
             event_id=event_id,
             raw_ids=(f"raw-{event_id}",),
@@ -4308,16 +4510,16 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
             event_time_confidence=0.90,
             first_seen_time=now,
             source="test",
-            source_urls=(f"https://example.test/{event_id}",),
+            source_urls=(f"https://{domain}/{event_id}",),
             external_asset="SpaceX",
             description=title,
             confidence=0.90,
         )
 
     events = (
-        event("spacex-1", "SpaceX IPO trading starts Friday"),
-        event("spacex-2", "SpaceX pre-IPO market opens on June 20"),
-        event("spacex-3", "Bitcoin World covers SpaceX prediction market volume"),
+        event("spacex-1", "SpaceX IPO trading starts Friday", domain="alpha.test"),
+        event("spacex-2", "SpaceX pre-IPO market opens on June 20", domain="beta.test"),
+        event("spacex-3", "Bitcoin World covers SpaceX prediction market volume", domain="bitcoinworld.test"),
     )
 
     def candidate(norm_event, coin_id, symbol, *, role="proxy_instrument", proxy=True, direct=False):
@@ -4372,6 +4574,13 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
     cluster = clusters[0]
     assert cluster.cluster_id == "spacex|ipo-proxy|2026-06-20"
     assert set(cluster.event_ids) == {"spacex-1", "spacex-2", "spacex-3"}
+    assert cluster.source_count == 3
+    assert cluster.independent_source_count == 3
+    assert cluster.source_quality_score > 0
+    assert cluster.event_time_consensus == 100
+    assert cluster.accepted_asset_count == 2
+    assert cluster.rejected_asset_count == 1
+    assert cluster.cluster_confidence > 70
     links = {link.symbol: link for link in cluster.asset_links}
     assert links["VELVET"].accepted is True
     assert links["ASTER"].accepted is True
@@ -4380,8 +4589,17 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
     assert "mentioned_asset" in (links["BTC"].rejected_reason or "")
     report = event_graph.format_event_cluster_report(clusters)
     assert "EVENT CLUSTER REPORT" in report
+    assert "cluster_conf=" in report
+    assert "sources: total=3 independent=3" in report
     assert "VELVET/velvet accepted" in report
+    assert "ASTER/aster accepted" in report
     assert "BTC/bitcoin rejected" in report
+
+    alerts = event_alerts.build_event_alert_candidates(result, now=now)
+    by_symbol = {alert.symbol: alert for alert in alerts}
+    assert by_symbol["VELVET"].score_components["cluster_confirmation"] == cluster.cluster_confidence
+    assert by_symbol["ASTER"].score_components["cluster_confirmation"] == cluster.cluster_confidence
+    assert by_symbol["BTC"].score_components["cluster_confirmation"] == 0
 
 
 def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
@@ -4694,6 +4912,60 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
         )
         assert "outcomes:" in outcome_report
         assert "MFE/MAE by playbook:" in outcome_report
+
+
+def test_event_alpha_alert_store_snapshot_policy_filters_rows():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_alert_store, event_alerts
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    alerts = event_alerts.build_event_alert_candidates(_full_event_discovery_fixture_result(), now=now)
+    store_only_count = sum(1 for alert in alerts if alert.tier == event_alerts.EventAlertTier.STORE_ONLY)
+    non_store_count = len(alerts) - store_only_count
+    assert store_only_count > 2
+    assert non_store_count > 0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        all_path = root / "all.jsonl"
+        all_result = event_alpha_alert_store.write_alert_snapshots(
+            alerts,
+            cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(path=all_path, snapshot_policy="all"),
+            now=now,
+        )
+        assert all_result.rows_written == len(alerts)
+
+        non_store_path = root / "non-store.jsonl"
+        non_store_result = event_alpha_alert_store.write_alert_snapshots(
+            alerts,
+            cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(path=non_store_path, snapshot_policy="non_store"),
+            now=now,
+        )
+        assert non_store_result.rows_written == non_store_count
+        assert all(
+            json.loads(line)["tier"] != event_alerts.EventAlertTier.STORE_ONLY.value
+            for line in non_store_path.read_text(encoding="utf-8").splitlines()
+        )
+
+        sampled_path = root / "sampled.jsonl"
+        sampled_result = event_alpha_alert_store.write_alert_snapshots(
+            alerts,
+            cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(
+                path=sampled_path,
+                snapshot_policy="sampled_controls",
+                sampled_controls_limit=2,
+            ),
+            now=now,
+        )
+        assert sampled_result.rows_written == non_store_count + 2
+        sampled_rows = [
+            json.loads(line)
+            for line in sampled_path.read_text(encoding="utf-8").splitlines()
+        ]
+        assert sum(1 for row in sampled_rows if row["tier"] == event_alerts.EventAlertTier.STORE_ONLY.value) == 2
 
 
 def test_event_alpha_alert_store_scanner_report_and_outcome_fill_commands():

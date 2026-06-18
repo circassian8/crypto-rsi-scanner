@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Iterable
 
-from . import event_fade, event_playbooks
+from . import event_fade, event_graph, event_playbooks
 from .event_classification import (
     ROLE_DIRECT_BENEFICIARY,
     ROLE_INFRASTRUCTURE,
@@ -111,7 +111,15 @@ def build_event_alert_candidates(
 ) -> list[EventAlertCandidate]:
     cfg = cfg or EventAlertConfig()
     now = _as_utc(now or datetime.now(timezone.utc))
-    alerts = [_build_alert_candidate(candidate, cfg, now) for candidate in result.candidates]
+    cluster_by_event = {
+        event_id: cluster
+        for cluster in event_graph.build_event_clusters(result)
+        for event_id in cluster.event_ids
+    }
+    alerts = [
+        _build_alert_candidate(candidate, cfg, now, cluster_by_event.get(candidate.event.event_id))
+        for candidate in result.candidates
+    ]
     return sorted(alerts, key=_alert_sort_key)
 
 
@@ -316,14 +324,18 @@ def _build_alert_candidate(
     candidate: DiscoveredEventFadeCandidate,
     cfg: EventAlertConfig,
     now: datetime,
+    cluster: event_graph.EventCluster | None = None,
 ) -> EventAlertCandidate:
-    components = _score_components(candidate, now)
+    components = _score_components(candidate, now, cluster)
     score = _weighted_score(components)
     rejected = _rejected_reason(candidate, cfg)
     playbook = event_playbooks.assess_event_playbook(candidate, components, rejected_reason=rejected)
-    tier = _tier(candidate, cfg, score, components, rejected)
-    if tier == EventAlertTier.TRIGGERED_FADE and not playbook.can_trigger_fade:
-        tier = EventAlertTier.STORE_ONLY
+    tier = resolve_playbook_alert_tier(candidate, score, components, playbook, rejected, cfg)
+    if (
+        candidate.fade_signal
+        and candidate.fade_signal.signal_type == event_fade.FadeSignalType.SHORT_TRIGGERED
+        and tier != EventAlertTier.TRIGGERED_FADE
+    ):
         rejected = "; ".join(filter(None, [rejected, f"playbook {playbook.playbook_type} cannot trigger fade"]))
     reason = _reason(candidate, tier, components, playbook)
     verify = _verify_items(candidate, tier, playbook)
@@ -352,7 +364,11 @@ def _build_alert_candidate(
     )
 
 
-def _score_components(candidate: DiscoveredEventFadeCandidate, now: datetime) -> dict[str, int]:
+def _score_components(
+    candidate: DiscoveredEventFadeCandidate,
+    now: datetime,
+    cluster: event_graph.EventCluster | None = None,
+) -> dict[str, int]:
     cls = candidate.classification
     event = candidate.event
     fade_candidate = candidate.fade_candidate
@@ -361,6 +377,7 @@ def _score_components(candidate: DiscoveredEventFadeCandidate, now: datetime) ->
     source_quality += min(10, max(0, len(event.raw_ids) - 1) * 5)
     if is_market_recap_event(event):
         source_quality -= 25
+    fade_components = fade_candidate.component_scores if fade_candidate is not None else {}
     return {
         "asset_resolution": _clamp(candidate.link.link_confidence * 100),
         "proxy_relationship": _proxy_quality(candidate),
@@ -368,10 +385,12 @@ def _score_components(candidate: DiscoveredEventFadeCandidate, now: datetime) ->
         "market_move_volume": _market_move_quality(fade_candidate),
         "source_quality": _clamp(source_quality),
         "derivatives_crowding": _derivatives_quality(fade_candidate),
+        "supply_pressure": _clamp(fade_components.get("supply_pressure", 0)),
         "event_time_quality": _clamp((event.event_time_confidence if event.event_time else 0.0) * 100),
         "novelty_freshness": _novelty_quality(event.first_seen_time, now, len(event.raw_ids)),
         "fade_score": _clamp(signal.fade_score if signal else 0),
         "classifier": _clamp(cls.confidence * 100),
+        "cluster_confirmation": _cluster_confirmation_quality(candidate, cluster),
     }
 
 
@@ -385,36 +404,112 @@ def _weighted_score(components: dict[str, int]) -> int:
         + components["derivatives_crowding"] * 0.10
         + components["event_time_quality"] * 0.05
         + components["novelty_freshness"] * 0.05
+        + min(8, components.get("cluster_confirmation", 0) * 0.08)
     )
 
 
-def _tier(
+def resolve_playbook_alert_tier(
     candidate: DiscoveredEventFadeCandidate,
-    cfg: EventAlertConfig,
-    score: int,
+    generic_score: int,
     components: dict[str, int],
-    rejected: str | None,
+    playbook_assessment: event_playbooks.EventPlaybookAssessment,
+    rejected_reason: str | None,
+    cfg: EventAlertConfig,
 ) -> EventAlertTier:
+    """Resolve a research alert tier with playbook evidence as the primary input."""
     signal_type = candidate.fade_signal.signal_type if candidate.fade_signal else event_fade.FadeSignalType.NO_TRADE
-    if rejected:
-        return EventAlertTier.STORE_ONLY
-    if signal_type == event_fade.FadeSignalType.SHORT_TRIGGERED:
-        return EventAlertTier.TRIGGERED_FADE
-    if score < cfg.min_digest_score:
-        return EventAlertTier.STORE_ONLY
-    if candidate.classification.asset_role == ROLE_PROXY_VENUE and not cfg.allow_proxy_venue:
-        return EventAlertTier.RADAR_DIGEST
+    playbook_type = playbook_assessment.playbook_type
     if (
-        score >= cfg.min_high_priority_score
-        and (
-            components["event_time_quality"] >= 80
-            or components["derivatives_crowding"] >= 70
+        signal_type == event_fade.FadeSignalType.SHORT_TRIGGERED
+        and playbook_type == event_playbooks.EventPlaybookType.PROXY_FADE.value
+        and playbook_assessment.can_trigger_fade
+    ):
+        return EventAlertTier.TRIGGERED_FADE
+    if signal_type == event_fade.FadeSignalType.SHORT_TRIGGERED:
+        return EventAlertTier.STORE_ONLY
+    if _hard_rejection_wins(candidate, rejected_reason):
+        return EventAlertTier.STORE_ONLY
+    if playbook_type in {
+        event_playbooks.EventPlaybookType.SOURCE_NOISE_CONTROL.value,
+        event_playbooks.EventPlaybookType.AMBIGUOUS_CONTROL.value,
+    }:
+        return EventAlertTier.STORE_ONLY
+    if playbook_type == event_playbooks.EventPlaybookType.MARKET_ANOMALY_UNKNOWN.value:
+        if playbook_assessment.playbook_score >= 65 and generic_score >= cfg.min_digest_score:
+            return EventAlertTier.RADAR_DIGEST
+        return EventAlertTier.STORE_ONLY
+
+    tier = _tier_from_playbook_action(playbook_assessment.recommended_action)
+    if tier == EventAlertTier.TRIGGERED_FADE:
+        tier = EventAlertTier.HIGH_PRIORITY_WATCH
+    if tier == EventAlertTier.STORE_ONLY and playbook_assessment.playbook_score >= 45 and generic_score >= cfg.min_digest_score:
+        tier = EventAlertTier.RADAR_DIGEST
+    if generic_score < max(0, cfg.min_digest_score - 15):
+        tier = _cap_tier(tier, EventAlertTier.RADAR_DIGEST)
+        if playbook_assessment.playbook_score < 65:
+            tier = EventAlertTier.STORE_ONLY
+    elif (
+        generic_score < cfg.min_digest_score
+        and not (
+            playbook_assessment.playbook_score >= 65
+            and _playbook_can_override_generic_cap(playbook_type)
         )
     ):
-        return EventAlertTier.HIGH_PRIORITY_WATCH
-    if score >= cfg.min_watchlist_score and components["market_move_volume"] >= 40:
-        return EventAlertTier.WATCHLIST
-    return EventAlertTier.RADAR_DIGEST
+        tier = _cap_tier(tier, EventAlertTier.RADAR_DIGEST)
+
+    if (
+        playbook_type == event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value
+        and tier == EventAlertTier.HIGH_PRIORITY_WATCH
+        and components.get("market_move_volume", 0) < 50
+        and components.get("derivatives_crowding", 0) < 50
+    ):
+        tier = EventAlertTier.WATCHLIST
+    if playbook_type == event_playbooks.EventPlaybookType.PERP_LISTING_SQUEEZE.value:
+        if playbook_assessment.playbook_score >= 80 and components.get("derivatives_crowding", 0) >= 50:
+            tier = EventAlertTier.HIGH_PRIORITY_WATCH
+    if playbook_type == event_playbooks.EventPlaybookType.UNLOCK_SUPPLY_PRESSURE.value:
+        if (
+            playbook_assessment.playbook_score >= 80
+            and components.get("event_time_quality", 0) >= 80
+            and (
+                components.get("supply_pressure", 0) >= 60
+                or components.get("market_move_volume", 0) >= 50
+            )
+        ):
+            tier = EventAlertTier.HIGH_PRIORITY_WATCH
+    if (
+        tier == EventAlertTier.RADAR_DIGEST
+        and playbook_assessment.playbook_score >= 80
+        and generic_score >= cfg.min_watchlist_score
+    ):
+        tier = EventAlertTier.WATCHLIST
+    if (
+        tier == EventAlertTier.WATCHLIST
+        and playbook_assessment.playbook_score >= 85
+        and generic_score >= cfg.min_high_priority_score
+        and (
+            components.get("event_time_quality", 0) >= 80
+            or components.get("derivatives_crowding", 0) >= 70
+            or components.get("supply_pressure", 0) >= 70
+        )
+    ):
+        tier = EventAlertTier.HIGH_PRIORITY_WATCH
+
+    if (
+        playbook_type in {
+            event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+            event_playbooks.EventPlaybookType.RWA_PREIPO_PROXY.value,
+            event_playbooks.EventPlaybookType.AI_IPO_PROXY.value,
+            event_playbooks.EventPlaybookType.FAN_SPORTS_EVENT.value,
+            event_playbooks.EventPlaybookType.POLITICAL_MEME_EVENT.value,
+        }
+        and components.get("event_time_quality", 0) < 50
+        and components.get("derivatives_crowding", 0) < 70
+    ):
+        tier = _cap_tier(tier, EventAlertTier.WATCHLIST)
+    if candidate.classification.asset_role == ROLE_PROXY_VENUE and not cfg.allow_proxy_venue:
+        tier = _cap_tier(tier, EventAlertTier.RADAR_DIGEST)
+    return _cap_tier(tier, _tier_from_max_research_tier(playbook_assessment.max_research_tier))
 
 
 def _rejected_reason(candidate: DiscoveredEventFadeCandidate, cfg: EventAlertConfig) -> str | None:
@@ -667,6 +762,78 @@ def _action_for_tier(tier: EventAlertTier) -> str:
     if tier == EventAlertTier.RADAR_DIGEST:
         return event_playbooks.EventPlaybookAction.RADAR_DIGEST.value
     return event_playbooks.EventPlaybookAction.STORE_ONLY.value
+
+
+def _cluster_confirmation_quality(
+    candidate: DiscoveredEventFadeCandidate,
+    cluster: event_graph.EventCluster | None,
+) -> int:
+    if cluster is None:
+        return 0
+    if _publisher_only_evidence(candidate) or is_market_recap_event(candidate.event):
+        return 0
+    if candidate.classification.asset_role in {ROLE_TICKER_WORD_COLLISION, ROLE_MENTIONED_ASSET}:
+        return 0
+    if candidate.link.link_confidence < 0.80:
+        return 0
+    if cluster.independent_source_count < 2:
+        return 0
+    return _clamp(cluster.cluster_confidence)
+
+
+def _hard_rejection_wins(candidate: DiscoveredEventFadeCandidate, rejected_reason: str | None) -> bool:
+    if candidate.link.link_confidence < 0.80:
+        return True
+    if _publisher_only_evidence(candidate) or is_market_recap_event(candidate.event):
+        return True
+    if candidate.classification.asset_role in {ROLE_TICKER_WORD_COLLISION, ROLE_MENTIONED_ASSET}:
+        return True
+    reason = rejected_reason or ""
+    hard_tokens = (
+        "ticker_word_collision",
+        "mentioned_asset",
+        "ambiguous identity",
+        "low asset-resolution confidence",
+        "low classifier confidence",
+        "publisher/source-only asset evidence",
+        "market recap evidence only",
+    )
+    return any(token in reason for token in hard_tokens)
+
+
+def _tier_from_playbook_action(action: str | event_playbooks.EventPlaybookAction) -> EventAlertTier:
+    value = action.value if isinstance(action, event_playbooks.EventPlaybookAction) else str(action)
+    mapping = {
+        event_playbooks.EventPlaybookAction.STORE_ONLY.value: EventAlertTier.STORE_ONLY,
+        event_playbooks.EventPlaybookAction.RADAR_DIGEST.value: EventAlertTier.RADAR_DIGEST,
+        event_playbooks.EventPlaybookAction.WATCHLIST.value: EventAlertTier.WATCHLIST,
+        event_playbooks.EventPlaybookAction.HIGH_PRIORITY_WATCH.value: EventAlertTier.HIGH_PRIORITY_WATCH,
+        event_playbooks.EventPlaybookAction.TRIGGERED_FADE_ALLOWED.value: EventAlertTier.TRIGGERED_FADE,
+    }
+    return mapping.get(value, EventAlertTier.STORE_ONLY)
+
+
+def _tier_from_max_research_tier(value: str | EventAlertTier | None) -> EventAlertTier:
+    if isinstance(value, EventAlertTier):
+        return value
+    try:
+        return EventAlertTier(str(value))
+    except (TypeError, ValueError):
+        return EventAlertTier.STORE_ONLY
+
+
+def _playbook_can_override_generic_cap(playbook_type: str) -> bool:
+    return playbook_type in {
+        event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value,
+        event_playbooks.EventPlaybookType.PERP_LISTING_SQUEEZE.value,
+        event_playbooks.EventPlaybookType.UNLOCK_SUPPLY_PRESSURE.value,
+        event_playbooks.EventPlaybookType.AIRDROP_TGE_SELL_PRESSURE.value,
+        event_playbooks.EventPlaybookType.FAN_SPORTS_EVENT.value,
+        event_playbooks.EventPlaybookType.POLITICAL_MEME_EVENT.value,
+        event_playbooks.EventPlaybookType.RWA_PREIPO_PROXY.value,
+        event_playbooks.EventPlaybookType.AI_IPO_PROXY.value,
+        event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK.value,
+    }
 
 
 def _cap_tier(tier: EventAlertTier, max_tier: EventAlertTier) -> EventAlertTier:

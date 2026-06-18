@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Iterable
+from urllib.parse import urlparse
 
 from .event_models import DiscoveredEventFadeCandidate, EventDiscoveryResult, NormalizedEvent
 from .event_resolver import clean_text
@@ -58,6 +59,13 @@ class EventCluster:
     event_ids: tuple[str, ...]
     raw_ids: tuple[str, ...]
     source_urls: tuple[str, ...]
+    source_count: int = 0
+    independent_source_count: int = 0
+    source_quality_score: int = 0
+    event_time_consensus: int = 0
+    accepted_asset_count: int = 0
+    rejected_asset_count: int = 0
+    cluster_confidence: int = 0
     evidence: tuple[ClusterEvidence, ...] = ()
     asset_links: tuple[EventClusterAssetLink, ...] = ()
     warnings: tuple[str, ...] = field(default_factory=tuple)
@@ -111,14 +119,29 @@ def format_event_cluster_report(clusters: Iterable[EventCluster]) -> str:
         return "\n".join(rows)
     rows.append("")
     for cluster in clusters:
+        accepted = [link for link in cluster.asset_links if link.accepted]
+        rejected = [link for link in cluster.asset_links if not link.accepted]
         rows.append(
-            f"{cluster.cluster_id} · events={len(cluster.event_ids)} · assets={len(cluster.asset_links)}"
+            f"{cluster.cluster_id} · events={len(cluster.event_ids)} · assets={len(cluster.asset_links)} "
+            f"· cluster_conf={cluster.cluster_confidence}"
         )
         rows.append(
             f"  external={cluster.external_asset or 'unknown'} · type={cluster.event_type} · "
             f"bucket={cluster.event_date_bucket}"
         )
-        for link in cluster.asset_links:
+        rows.append(
+            f"  sources: total={cluster.source_count} independent={cluster.independent_source_count} "
+            f"quality={cluster.source_quality_score} · event_time_consensus={cluster.event_time_consensus}"
+        )
+        rows.append(f"  accepted assets: {len(accepted)} · rejected/noise assets: {len(rejected)}")
+        if cluster.warnings:
+            rows.append("  warnings: " + "; ".join(cluster.warnings))
+        for link in accepted:
+            rows.append(
+                f"  - {link.symbol}/{link.coin_id} accepted "
+                f"playbook={link.playbook_type} role={link.asset_role} rel={link.relationship_type}"
+            )
+        for link in rejected:
             status = "accepted" if link.accepted else "rejected"
             rows.append(
                 f"  - {link.symbol}/{link.coin_id} {status} "
@@ -151,6 +174,25 @@ def _cluster_from_events(
         for event in ordered
     )
     best_time = next((event.event_time for event in ordered if event.event_time is not None), None)
+    links = tuple(sorted(asset_links, key=lambda link: (link.symbol, link.coin_id)))
+    accepted_count = sum(1 for link in links if link.accepted)
+    rejected_count = sum(1 for link in links if not link.accepted)
+    source_count = len(raw_ids)
+    independent_sources = _independent_sources(ordered)
+    source_quality = _source_quality_score(ordered, len(independent_sources))
+    time_consensus = _event_time_consensus(ordered)
+    confidence = _cluster_confidence(
+        source_quality=source_quality,
+        independent_source_count=len(independent_sources),
+        event_time_consensus=time_consensus,
+        accepted_asset_count=accepted_count,
+        rejected_asset_count=rejected_count,
+    )
+    warnings = _cluster_warnings(
+        independent_source_count=len(independent_sources),
+        event_time_consensus=time_consensus,
+        accepted_asset_count=accepted_count,
+    )
     return EventCluster(
         schema_version=EVENT_GRAPH_SCHEMA_VERSION,
         cluster_id=cluster_id,
@@ -162,8 +204,16 @@ def _cluster_from_events(
         event_ids=tuple(event.event_id for event in ordered),
         raw_ids=raw_ids,
         source_urls=urls,
+        source_count=source_count,
+        independent_source_count=len(independent_sources),
+        source_quality_score=source_quality,
+        event_time_consensus=time_consensus,
+        accepted_asset_count=accepted_count,
+        rejected_asset_count=rejected_count,
+        cluster_confidence=confidence,
         evidence=evidence,
-        asset_links=tuple(sorted(asset_links, key=lambda link: (link.symbol, link.coin_id))),
+        asset_links=links,
+        warnings=warnings,
     )
 
 
@@ -223,6 +273,85 @@ def _rejected_reason(candidate: DiscoveredEventFadeCandidate) -> str:
 
 def _cluster_sort_key(cluster: EventCluster) -> tuple[str, str, str]:
     return (cluster.event_date_bucket, cluster.external_asset_slug, cluster.event_type)
+
+
+def _independent_sources(events: Iterable[NormalizedEvent]) -> set[str]:
+    sources: set[str] = set()
+    for event in events:
+        origins = {_source_origin(url) for url in event.source_urls if url}
+        origins = {origin for origin in origins if origin}
+        if origins:
+            sources.update(origins)
+        else:
+            sources.add(clean_text(event.source) or "unknown")
+    return sources
+
+
+def _source_origin(url: str) -> str:
+    parsed = urlparse(url)
+    return (parsed.netloc or parsed.path or "").lower().removeprefix("www.")
+
+
+def _source_quality_score(events: Iterable[NormalizedEvent], independent_source_count: int) -> int:
+    values = [max(0.0, min(1.0, float(event.confidence))) for event in events]
+    average = (sum(values) / len(values)) * 100 if values else 0.0
+    diversity_bonus = min(15, max(0, independent_source_count - 1) * 5)
+    return _clamp(average + diversity_bonus)
+
+
+def _event_time_consensus(events: Iterable[NormalizedEvent]) -> int:
+    times = [event.event_time for event in events if event.event_time is not None]
+    if not times:
+        return 0
+    iso_times = {_as_utc(ts).replace(microsecond=0).isoformat() for ts in times}
+    if len(iso_times) == 1:
+        return 100
+    dates = {_as_utc(ts).date().isoformat() for ts in times}
+    return 75 if len(dates) == 1 else 35
+
+
+def _cluster_confidence(
+    *,
+    source_quality: int,
+    independent_source_count: int,
+    event_time_consensus: int,
+    accepted_asset_count: int,
+    rejected_asset_count: int,
+) -> int:
+    diversity = min(100, 45 + max(0, independent_source_count - 1) * 25)
+    accepted = 70 if accepted_asset_count else 25
+    noise_penalty = min(20, max(0, rejected_asset_count - accepted_asset_count) * 5)
+    return _clamp(
+        source_quality * 0.35
+        + diversity * 0.20
+        + event_time_consensus * 0.25
+        + accepted * 0.20
+        - noise_penalty
+    )
+
+
+def _cluster_warnings(
+    *,
+    independent_source_count: int,
+    event_time_consensus: int,
+    accepted_asset_count: int,
+) -> tuple[str, ...]:
+    warnings: list[str] = []
+    if independent_source_count < 2:
+        warnings.append("single independent source")
+    if event_time_consensus < 75:
+        warnings.append("weak event-time consensus")
+    if accepted_asset_count == 0:
+        warnings.append("no accepted asset links")
+    return tuple(warnings)
+
+
+def _as_utc(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+
+
+def _clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> int:
+    return int(round(max(lo, min(hi, float(value)))))
 
 
 def _slug(value: object) -> str:

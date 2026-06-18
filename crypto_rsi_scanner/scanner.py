@@ -1258,7 +1258,11 @@ def _event_alpha_alert_store_config_from_runtime(
     alert_path = Path(path).expanduser() if path else config.EVENT_ALPHA_ALERT_STORE_PATH
     if not alert_path.is_absolute():
         alert_path = config.DATA_DIR / alert_path
-    return event_alpha_alert_store.EventAlphaAlertStoreConfig(path=alert_path)
+    return event_alpha_alert_store.EventAlphaAlertStoreConfig(
+        path=alert_path,
+        snapshot_policy=config.EVENT_ALPHA_SNAPSHOT_POLICY,
+        sampled_controls_limit=config.EVENT_ALPHA_SNAPSHOT_SAMPLED_CONTROLS,
+    )
 
 
 def _setup_event_discovery_logging(verbose: bool) -> None:
@@ -1418,6 +1422,7 @@ def event_alpha_cycle(
         pipeline_result.alerts,
         cfg=_event_alpha_alert_store_config_from_runtime(),
         now=now,
+        router_result=pipeline_result.router_result,
     )
     print("")
     print(event_alpha_alert_store.format_alert_store_write_result(store_result))

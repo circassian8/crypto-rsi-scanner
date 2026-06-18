@@ -372,6 +372,8 @@ EVENT_LLM_EXTRACTOR_PROMPT_VERSION = os.getenv("RSI_EVENT_LLM_EXTRACTOR_PROMPT_V
 _EVENT_WATCHLIST_STATE_PATH_RAW = os.getenv("RSI_EVENT_WATCHLIST_STATE_PATH", "")
 _EVENT_ALPHA_FEEDBACK_PATH_RAW = os.getenv("RSI_EVENT_ALPHA_FEEDBACK_PATH", "")
 _EVENT_ALPHA_ALERT_STORE_PATH_RAW = os.getenv("RSI_EVENT_ALPHA_ALERT_STORE_PATH", "")
+EVENT_ALPHA_SNAPSHOT_POLICY = os.getenv("RSI_EVENT_ALPHA_SNAPSHOT_POLICY", "all")
+EVENT_ALPHA_SNAPSHOT_SAMPLED_CONTROLS = int(os.getenv("RSI_EVENT_ALPHA_SNAPSHOT_SAMPLED_CONTROLS", "25"))
 
 # Event Alpha Radar research phases. Market enrichment, anomaly scanning,
 # watchlist state, local router decisions, and feedback artifacts are implemented

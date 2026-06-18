@@ -226,7 +226,8 @@ def _specific_playbook(
     event = candidate.event
     text = clean_text(f"{event.event_name} {event.description or ''} {event.event_type}")
     external = clean_text(event.external_asset)
-    if event.event_type == "perp_listing" or "perp" in text or "futures" in text:
+    proxy_event_type = event.event_type in {"ipo_proxy", "external_proxy_event", "sports_event", "political_event"}
+    if event.event_type == "perp_listing" or (not proxy_event_type and ("perp" in text or "futures" in text)):
         return (
             EventPlaybookType.PERP_LISTING_SQUEEZE,
             "Perp/futures listing can create early leverage and squeeze risk; not a proxy-fade trigger.",
@@ -315,13 +316,32 @@ def _specific_playbook_score(playbook_type: EventPlaybookType, components: Mappi
         return _proxy_attention_score(components)
     if playbook_type in {EventPlaybookType.FAN_SPORTS_EVENT, EventPlaybookType.POLITICAL_MEME_EVENT}:
         return _proxy_attention_score(components)
+    if playbook_type == EventPlaybookType.LISTING_VOLATILITY:
+        return _clamp(
+            components.get("asset_resolution", 0) * 0.20
+            + components.get("source_quality", 0) * 0.15
+            + components.get("event_time_quality", 0) * 0.20
+            + components.get("classifier", 0) * 0.20
+            + components.get("market_move_volume", 0) * 0.15
+            + components.get("derivatives_crowding", 0) * 0.10
+        )
+    if playbook_type == EventPlaybookType.PERP_LISTING_SQUEEZE:
+        return _clamp(
+            components.get("asset_resolution", 0) * 0.15
+            + components.get("source_quality", 0) * 0.15
+            + components.get("event_time_quality", 0) * 0.15
+            + components.get("classifier", 0) * 0.15
+            + components.get("market_move_volume", 0) * 0.10
+            + components.get("derivatives_crowding", 0) * 0.30
+        )
     if playbook_type in {EventPlaybookType.UNLOCK_SUPPLY_PRESSURE, EventPlaybookType.AIRDROP_TGE_SELL_PRESSURE}:
         return _clamp(
-            components.get("asset_resolution", 0) * 0.25
+            components.get("asset_resolution", 0) * 0.20
             + components.get("event_time_quality", 0) * 0.20
-            + components.get("market_move_volume", 0) * 0.25
+            + components.get("market_move_volume", 0) * 0.20
             + components.get("source_quality", 0) * 0.15
             + components.get("classifier", 0) * 0.15
+            + components.get("supply_pressure", 0) * 0.10
         )
     return _clamp(
         components.get("asset_resolution", 0) * 0.25
