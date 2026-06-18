@@ -45,6 +45,7 @@ Usage:
   python main.py --event-discovery-report # research-only event radar from fixtures
   python main.py --event-alert-report # ranked research alerts from discovery candidates
   python main.py --event-llm-shadow-report # shadow LLM relationship analysis
+  python main.py --event-llm-extract-report # shadow LLM raw-event extraction
   python main.py --event-discovery-refresh # write research-only event JSONL cache
   python main.py --event-discovery-binance-listen # cache raw live Binance announcements
   python main.py --event-fade-auto-report # grouped event-fade report from discovery fixtures

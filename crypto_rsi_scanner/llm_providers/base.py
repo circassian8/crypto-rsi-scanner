@@ -17,3 +17,10 @@ class LLMRelationshipProvider(Protocol):
 
     def analyze_relationship(self, packet: Mapping[str, Any]) -> LLMProviderResult:
         """Return one structured relationship analysis for an evidence packet."""
+
+
+class LLMExtractionProvider(Protocol):
+    name: str
+
+    def extract_raw_event(self, packet: Mapping[str, Any]) -> LLMProviderResult:
+        """Return one structured extraction for a raw event evidence packet."""

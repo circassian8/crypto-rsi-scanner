@@ -102,9 +102,14 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-llm-shadow-report`
   (research-only shadow relationship analysis for event candidates; fixture by
   default, optional OpenAI only when explicitly enabled; no sends, no normal RSI
-  routing, no paper trades, no live DB writes) · `make event-llm-eval`
+  routing, no paper trades, no live DB writes) · `main.py
+  --event-llm-extract-report` (research-only shadow raw-event extraction for
+  catalysts, asset mentions, source-noise terms, and date hints; extracted
+  assets are proposals until resolver validation) · `make event-llm-eval`
   (offline golden eval for the LLM analyzer; fails on expected role/action
-  drift or quote-validation regressions) · `make event-alert-no-key-report` /
+  drift or quote-validation regressions) · `make event-llm-extract-eval`
+  (offline golden eval for the LLM raw-event extractor; fails on catalyst/asset/
+  source-noise drift or quote-validation regressions) · `make event-alert-no-key-report` /
   `make event-alert-no-key-llm-report` / `make event-alert-no-key-send`
   (no-key public RSS/GDELT/Polymarket event-alert research surfaces; send still
   requires explicit alert enablement) · `main.py --event-discovery-refresh` (fetch
@@ -234,6 +239,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_discovery.py` | research-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring, grouped auto reports, and validation sample exports |
 | `event_alerts.py` | pure research-alert ranking/tiering for discovery candidates; no labels, paper trades, normal RSI routing, or execution |
 | `event_llm_models.py` / `event_llm_analyzer.py` / `llm_providers/` | research-only LLM relationship analysis for discovery candidates; verifies quoted evidence, compares LLM role/action with rule output, and can feed opt-in advisory event-alert tier quality control |
+| `event_llm_extraction_models.py` / `event_llm_extractor.py` | research-only LLM raw-event extraction for catalysts, asset/project mentions, false-positive terms, and date hints; extracted assets must still be validated by deterministic resolver logic |
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
@@ -336,6 +342,14 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   control only. It must not change rule classifications, create
   `TRIGGERED_FADE`, alter `event_fade.py` eligibility, route normal RSI alerts,
   open paper trades, write live signal/outcome/paper tables, or imply execution.
+- Event LLM raw-event extraction is research-only. In `shadow` mode it may
+  extract external catalysts, crypto asset/project mentions, source-noise terms,
+  and event date hints from raw provider evidence, validate structured output,
+  verify source quotes, print local reports, and optionally write a local JSON
+  cache artifact. Extracted assets are resolver hints only; they do not create
+  candidates, alerts, paper trades, live DB rows, or event-fade eligibility
+  unless deterministic resolver/classifier gates validate the asset and event
+  through the normal discovery path.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, explicit
   `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise

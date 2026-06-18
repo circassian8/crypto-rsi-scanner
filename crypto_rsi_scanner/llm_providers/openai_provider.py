@@ -13,6 +13,10 @@ from ..event_llm_models import (
     RECOMMENDED_ALERT_ACTION_VALUES,
     RELATIONSHIP_TYPE_VALUES,
 )
+from ..event_llm_extraction_models import (
+    ASSET_MENTION_TYPE_VALUES,
+    CATALYST_TYPE_VALUES,
+)
 from .base import LLMProviderResult
 
 log = logging.getLogger(__name__)
@@ -98,6 +102,86 @@ class OpenAILLMRelationshipProvider:
         }
 
 
+class OpenAILLMExtractionProvider:
+    name = "openai"
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str | None = None,
+        prompt_version: str = "llm_raw_event_extraction_v1",
+        timeout: float = 30.0,
+        base_url: str = "https://api.openai.com/v1/responses",
+        opener=urlopen,
+    ) -> None:
+        self.api_key = api_key
+        self.model = model or "gpt-4.1-mini"
+        self.prompt_version = prompt_version
+        self.timeout = timeout
+        self.base_url = base_url
+        self.opener = opener
+
+    def extract_raw_event(self, packet: Mapping[str, Any]) -> LLMProviderResult:
+        if not self.api_key:
+            return LLMProviderResult(warning="OpenAI LLM extraction provider skipped: missing OPENAI_API_KEY")
+        try:
+            payload = json.dumps(self._request_payload(packet), sort_keys=True).encode("utf-8")
+            request = Request(
+                self.base_url,
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                method="POST",
+            )
+            with self.opener(request, timeout=self.timeout) as response:
+                status = int(getattr(response, "status", getattr(response, "code", 200)))
+                if status >= 400:
+                    raise RuntimeError(f"HTTP {status}")
+                body = json.loads(response.read().decode("utf-8"))
+            text = _extract_response_text(body)
+            if not text:
+                return LLMProviderResult(warning="OpenAI LLM extraction provider returned no output text")
+            return LLMProviderResult(raw=json.loads(text))
+        except HTTPError as exc:
+            return LLMProviderResult(warning=f"OpenAI LLM extraction provider failed: HTTP {exc.code}")
+        except (URLError, TimeoutError, json.JSONDecodeError, OSError, RuntimeError) as exc:
+            log.warning("OpenAI LLM extraction provider failed: %s", exc)
+            return LLMProviderResult(warning=f"OpenAI LLM extraction provider failed: {type(exc).__name__}")
+
+    def _request_payload(self, packet: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "input": [
+                {
+                    "role": "system",
+                    "content": [{
+                        "type": "input_text",
+                        "text": _extraction_system_prompt(self.prompt_version),
+                    }],
+                },
+                {
+                    "role": "user",
+                    "content": [{
+                        "type": "input_text",
+                        "text": json.dumps(packet, sort_keys=True, default=str),
+                    }],
+                },
+            ],
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "event_raw_extraction",
+                    "strict": True,
+                    "schema": _extraction_schema(),
+                }
+            },
+        }
+
+
 def _system_prompt(prompt_version: str) -> str:
     return (
         f"Prompt version: {prompt_version}.\n"
@@ -106,6 +190,17 @@ def _system_prompt(prompt_version: str) -> str:
         "the relationship between the source evidence, external catalyst, and crypto asset. "
         "Use evidence quotes copied exactly from the packet text. If source evidence is weak, "
         "choose store_only and explain the ambiguity."
+    )
+
+
+def _extraction_system_prompt(prompt_version: str) -> str:
+    return (
+        f"Prompt version: {prompt_version}.\n"
+        "Extract raw crypto event-discovery evidence. You do not recommend trades, "
+        "position sizes, alerts, paper trades, or execution. Identify external catalysts, "
+        "crypto assets/projects actually mentioned, false-positive terms such as publisher "
+        "names or ordinary words, and event date hints. Use exact quotes copied from the "
+        "packet text. If evidence is weak, lower confidence and explain the ambiguity."
     )
 
 
@@ -167,6 +262,90 @@ def _analysis_schema() -> dict[str, Any]:
             "evidence_quotes",
             "external_catalyst",
             "source_quality",
+            "warnings",
+        ],
+    }
+
+
+def _extraction_schema() -> dict[str, Any]:
+    quote_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "text": {"type": "string"},
+            "source_field": {"type": "string"},
+            "supports": {"type": "string"},
+        },
+        "required": ["text", "source_field", "supports"],
+    }
+    catalyst_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "name": {"type": ["string", "null"]},
+            "catalyst_type": {"type": "string", "enum": sorted(CATALYST_TYPE_VALUES)},
+            "event_time": {"type": ["string", "null"]},
+            "event_time_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "evidence_quotes": {"type": "array", "items": quote_schema},
+        },
+        "required": ["name", "catalyst_type", "event_time", "event_time_confidence", "confidence", "evidence_quotes"],
+    }
+    asset_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "name": {"type": ["string", "null"]},
+            "symbol": {"type": ["string", "null"]},
+            "coin_id": {"type": ["string", "null"]},
+            "contract_address": {"type": ["string", "null"]},
+            "mention_type": {"type": "string", "enum": sorted(ASSET_MENTION_TYPE_VALUES)},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "evidence_quotes": {"type": "array", "items": quote_schema},
+        },
+        "required": ["name", "symbol", "coin_id", "contract_address", "mention_type", "confidence", "evidence_quotes"],
+    }
+    false_positive_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "text": {"type": "string"},
+            "reason": {"type": "string"},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "evidence_quotes": {"type": "array", "items": quote_schema},
+        },
+        "required": ["text", "reason", "confidence", "evidence_quotes"],
+    }
+    date_hint_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "text": {"type": "string"},
+            "parsed_event_time": {"type": ["string", "null"]},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "evidence_quotes": {"type": "array", "items": quote_schema},
+        },
+        "required": ["text", "parsed_event_time", "confidence", "evidence_quotes"],
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "external_catalysts": {"type": "array", "items": catalyst_schema},
+            "crypto_asset_mentions": {"type": "array", "items": asset_schema},
+            "false_positive_terms": {"type": "array", "items": false_positive_schema},
+            "event_date_hints": {"type": "array", "items": date_hint_schema},
+            "suggested_followup_queries": {"type": "array", "items": {"type": "string"}},
+            "warnings": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": [
+            "confidence",
+            "external_catalysts",
+            "crypto_asset_mentions",
+            "false_positive_terms",
+            "event_date_hints",
+            "suggested_followup_queries",
             "warnings",
         ],
     }

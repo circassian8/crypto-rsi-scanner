@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add LLM raw-event extraction phase · Codex
+**Why:** The downstream LLM advisory analyzer can reject bad event/asset links,
+but it cannot recover asset mentions the deterministic resolver never surfaces.
+This adds the first Event Alpha Radar phase: quote-validated raw-event
+extraction that proposes catalysts, asset mentions, source-noise terms, and
+date hints while keeping deterministic resolver/classifier gates authoritative.
+**Changes:**
+- Added frozen raw-extraction models, a quote-validating extractor, fixture and
+  optional OpenAI extraction providers, cache-key metadata, and a research-only
+  raw-event enrichment helper whose output still requires resolver validation.
+- Added `main.py --event-llm-extract-report` and
+  `make event-llm-extract-eval` with a golden fixture covering proxy assets,
+  source noise, word collisions, infrastructure mentions, fan-token context,
+  and invalid quote confidence clamping.
+- Added disabled-by-default extractor config plus placeholder disabled flags for
+  later Event Alpha Radar phases: market enrichment, anomaly scanner,
+  watchlist, and router.
+- Updated `.env.example`, `AGENTS.md`, `DECISIONS.md`, `ROADMAP.md`, and tests
+  for the extractor boundary.
+**Verify:** `make event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases
+with the expected invalid-quote clamp warning. `make event-llm-eval
+PYTHON=python3` passed 9/9 relationship cases. `python3 -m compileall -q
+crypto_rsi_scanner tests` passed. `python3 tests/test_indicators.py` passed
+290/290. `make verify PYTHON=python3` passed 290/290 tests, alert render smoke,
+fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** Extraction is shadow/research-only. It cannot create
+`TRIGGERED_FADE`, event-alert tiers, normal RSI alerts, live DB rows, paper
+trades, or orders; extracted assets are only resolver hints until deterministic
+validation succeeds. Market enrichment, anomaly scanning, persistent watchlist
+state, playbooks, and feedback remain later phases.
+
 ## 2026-06-18 — Add LLM advisory mode for event research alerts · Codex
 **Why:** The LLM relationship analyzer could diagnose source-noise and
 ticker-collision false positives, but event research alerts still used only the

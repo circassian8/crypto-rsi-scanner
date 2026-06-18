@@ -931,6 +931,12 @@ def _llm_golden_fixture_path():
     return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "llm_golden_cases.json"
 
 
+def _llm_extraction_golden_fixture_path():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parent.parent / "fixtures" / "event_discovery" / "llm_extraction_golden_cases.json"
+
+
 def _stamp_review_provenance(row, reviewer="human", reviewed_at="2026-06-17T12:00:00+00:00"):
     row["reviewed_by"] = reviewer
     row["reviewed_at"] = reviewed_at
@@ -3462,6 +3468,251 @@ def test_event_llm_golden_eval_passes_and_detects_mismatch():
         failed = event_llm_eval.run_fixture_eval(path)
         assert not failed.success
         assert any("asset_role expected" in mismatch for mismatch in failed.mismatches)
+
+
+def _llm_extraction_rows():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_llm_extractor
+    from crypto_rsi_scanner.event_providers.manual_json import ManualJsonEventProvider
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMExtractionProvider
+
+    path = _llm_extraction_golden_fixture_path()
+    raw_events = ManualJsonEventProvider(path, required=True).fetch_events(
+        datetime(2026, 6, 15, tzinfo=timezone.utc),
+        datetime(2026, 6, 21, tzinfo=timezone.utc),
+    )
+    rows = event_llm_extractor.analyze_raw_events(
+        raw_events,
+        FixtureLLMExtractionProvider(path, required=True),
+        cfg=event_llm_extractor.EventLLMExtractorConfig(max_events_per_run=50),
+    )
+    return raw_events, rows
+
+
+def test_event_llm_extractor_models_fixture_outputs_and_quote_validation():
+    from crypto_rsi_scanner import event_llm_extractor
+    from crypto_rsi_scanner.event_llm_extraction_models import (
+        ASSET_MENTION_TYPE_VALUES,
+        CATALYST_TYPE_VALUES,
+    )
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMExtractionProvider
+
+    assert "project_or_token" in ASSET_MENTION_TYPE_VALUES
+    assert "ipo_proxy" in CATALYST_TYPE_VALUES
+    raw_events, rows = _llm_extraction_rows()
+    by_raw = {row.raw_event.raw_id: row for row in rows}
+    velvet = by_raw["extract-velvet-spacex"].extraction
+    assert velvet is not None
+    assert velvet.external_catalysts[0].name == "SpaceX"
+    assert velvet.crypto_asset_mentions[0].symbol == "VELVET"
+    assert all(quote.found_in_source for quote in velvet.crypto_asset_mentions[0].evidence_quotes)
+
+    invalid = by_raw["extract-invalid-quote"].extraction
+    assert invalid is not None
+    assert invalid.confidence == 0.50
+    assert any("not found in source text" in warning for warning in invalid.warnings)
+
+    provider = FixtureLLMExtractionProvider(_llm_extraction_golden_fixture_path(), required=True)
+    raw = provider.extract_raw_event({"case_id": "extract-velvet-spacex"}).raw
+    assert raw is not None
+    bad = dict(raw)
+    bad["crypto_asset_mentions"] = [dict(raw["crypto_asset_mentions"][0], mention_type="trade_signal")]
+    packet = event_llm_extractor.build_raw_event_packet(raw_events[0])
+    try:
+        event_llm_extractor.validate_llm_extraction(
+            bad,
+            packet,
+            provider_name="fixture",
+            model=None,
+            prompt_version="llm_raw_event_extraction_v1",
+        )
+    except event_llm_extractor.EventLLMExtractionValidationError as exc:
+        assert "invalid LLM extraction mention_type" in str(exc)
+    else:
+        raise AssertionError("invalid extraction enum should be rejected")
+
+
+def test_event_llm_extractor_identifies_source_noise_and_word_collisions():
+    _, rows = _llm_extraction_rows()
+    by_raw = {row.raw_event.raw_id: row for row in rows}
+    bitcoin_world = by_raw["extract-bitcoin-world-source-noise"].extraction
+    ripple = by_raw["extract-ripple-effects"].extraction
+    hype = by_raw["extract-hype-word-collision"].extraction
+    assert bitcoin_world is not None and bitcoin_world.false_positive_terms[0].text == "Bitcoin World"
+    assert bitcoin_world.crypto_asset_mentions[0].mention_type == "publisher_or_source"
+    assert ripple is not None and ripple.false_positive_terms[0].text == "ripple effects"
+    assert ripple.crypto_asset_mentions[0].mention_type == "ordinary_word"
+    assert hype is not None and hype.false_positive_terms[0].text == "hype"
+    assert hype.crypto_asset_mentions[0].mention_type == "ordinary_word"
+
+
+def test_event_llm_extractor_openai_missing_key_fails_soft():
+    from crypto_rsi_scanner.llm_providers.openai_provider import OpenAILLMExtractionProvider
+
+    result = OpenAILLMExtractionProvider(api_key="", model="test-model").extract_raw_event({})
+    assert result.raw is None
+    assert result.warning and "missing OPENAI_API_KEY" in result.warning
+
+
+def test_event_llm_extractor_enrichment_still_requires_resolver_validation():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery, event_llm_extractor
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    class Provider:
+        name = "fixture"
+
+        def extract_raw_event(self, packet):
+            return LLMProviderResult(raw={
+                "confidence": 0.91,
+                "external_catalysts": [{
+                    "name": "SpaceX",
+                    "catalyst_type": "ipo_proxy",
+                    "event_time": None,
+                    "event_time_confidence": 0.0,
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "SpaceX exposure", "source_field": "body", "supports": "external catalyst"}],
+                }],
+                "crypto_asset_mentions": [{
+                    "name": "Missed Proxy",
+                    "symbol": "MISS",
+                    "coin_id": None,
+                    "contract_address": None,
+                    "mention_type": "project_or_token",
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "MISS is the ticker", "source_field": "body", "supports": "asset mention"}],
+                }],
+                "false_positive_terms": [],
+                "event_date_hints": [],
+                "suggested_followup_queries": [],
+                "warnings": [],
+            })
+
+    raw = RawDiscoveredEvent(
+        raw_id="extract-missed-proxy",
+        provider="test",
+        fetched_at=datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
+        published_at=datetime(2026, 6, 16, 11, tzinfo=timezone.utc),
+        source_url="https://example.test/missed-proxy",
+        title="SpaceX exposure market opens",
+        body="A source says MISS is the ticker for a new SpaceX exposure proxy.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="abc",
+    )
+    rows = event_llm_extractor.analyze_raw_events([raw], Provider())
+    enriched = event_llm_extractor.enrich_raw_events_with_extractions([raw], rows)
+    assert "LLM extracted research hints" in (enriched[0].body or "")
+    assert event_discovery.run_discovery(enriched, [], now=datetime(2026, 6, 16, 12, tzinfo=timezone.utc)).candidates == ()
+
+    assets = [DiscoveredAsset(
+        coin_id="missed-proxy",
+        symbol="MISS",
+        name="Missed Proxy",
+        aliases=("missed proxy", "miss"),
+    )]
+    result = event_discovery.run_discovery(
+        enriched,
+        assets,
+        now=datetime(2026, 6, 16, 12, tzinfo=timezone.utc),
+    )
+    assert len(result.candidates) == 1
+    assert result.candidates[0].asset.coin_id == "missed-proxy"
+
+
+def test_event_llm_extract_report_and_eval_pass():
+    from crypto_rsi_scanner import event_llm_extract_eval, event_llm_extractor
+
+    _, rows = _llm_extraction_rows()
+    report = event_llm_extractor.format_llm_extract_report(rows)
+    assert "EVENT LLM RAW EXTRACTION REPORT" in report
+    assert "Velvet Capital/VELVET" in report
+    assert "false-positive terms: Bitcoin World" in report
+    assert "warning: one or more evidence quotes were not found in source text" in report
+
+    result = event_llm_extract_eval.run_fixture_eval(_llm_extraction_golden_fixture_path())
+    assert result.success
+    assert result.passed_cases == result.total_cases == 7
+    assert any("extract-invalid-quote" in warning for warning in result.warnings)
+    assert "PASS: all golden cases matched" in event_llm_extract_eval.format_eval_result(result)
+
+
+def test_makefile_has_event_llm_extract_eval_target():
+    from pathlib import Path
+
+    text = Path("Makefile").read_text(encoding="utf-8")
+    assert "event-llm-extract-eval:" in text
+    assert "crypto_rsi_scanner.event_llm_extract_eval" in text
+
+
+def test_event_llm_extract_scanner_report_uses_runtime_config():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    path = _llm_extraction_golden_fixture_path()
+    original = {
+        "EVENT_DISCOVERY_EVENTS_PATH": config.EVENT_DISCOVERY_EVENTS_PATH,
+        "EVENT_DISCOVERY_ALIASES_PATH": config.EVENT_DISCOVERY_ALIASES_PATH,
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH": config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH": config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
+        "EVENT_DISCOVERY_COINMARKETCAL_PATH": config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
+        "EVENT_DISCOVERY_TOKENOMIST_PATH": config.EVENT_DISCOVERY_TOKENOMIST_PATH,
+        "EVENT_DISCOVERY_CRYPTOPANIC_PATH": config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+        "EVENT_DISCOVERY_GDELT_PATH": config.EVENT_DISCOVERY_GDELT_PATH,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH": config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
+        "EVENT_DISCOVERY_EXTERNAL_IPO_PATH": config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH,
+        "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH": config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH": config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
+        "EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH": config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
+        "EVENT_DISCOVERY_UNIVERSE_PATH": config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        "EVENT_DISCOVERY_LOOKBACK_HOURS": config.EVENT_DISCOVERY_LOOKBACK_HOURS,
+        "EVENT_DISCOVERY_HORIZON_DAYS": config.EVENT_DISCOVERY_HORIZON_DAYS,
+        "EVENT_LLM_EXTRACTOR_ENABLED": config.EVENT_LLM_EXTRACTOR_ENABLED,
+        "EVENT_LLM_EXTRACTOR_MODE": config.EVENT_LLM_EXTRACTOR_MODE,
+        "EVENT_LLM_EXTRACTOR_PROVIDER": config.EVENT_LLM_EXTRACTOR_PROVIDER,
+        "EVENT_LLM_EXTRACTOR_MODEL": config.EVENT_LLM_EXTRACTOR_MODEL,
+        "EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN": config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN,
+        "EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES": config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES,
+        "EVENT_LLM_EXTRACTOR_CACHE_PATH": config.EVENT_LLM_EXTRACTOR_CACHE_PATH,
+        "EVENT_LLM_EXTRACTOR_PROMPT_VERSION": config.EVENT_LLM_EXTRACTOR_PROMPT_VERSION,
+    }
+    config.EVENT_DISCOVERY_EVENTS_PATH = path
+    config.EVENT_DISCOVERY_ALIASES_PATH = _llm_golden_fixture_path()
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+    config.EVENT_DISCOVERY_GDELT_PATH = None
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = None
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = None
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    config.EVENT_DISCOVERY_LOOKBACK_HOURS = 120
+    config.EVENT_DISCOVERY_HORIZON_DAYS = 14
+    config.EVENT_LLM_EXTRACTOR_ENABLED = False
+    config.EVENT_LLM_EXTRACTOR_MODE = "shadow"
+    config.EVENT_LLM_EXTRACTOR_PROVIDER = "fixture"
+    config.EVENT_LLM_EXTRACTOR_MODEL = None
+    config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN = 50
+    config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES = True
+    config.EVENT_LLM_EXTRACTOR_CACHE_PATH = None
+    config.EVENT_LLM_EXTRACTOR_PROMPT_VERSION = "llm_raw_event_extraction_v1"
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_llm_extract_report()
+        text = out.getvalue()
+        assert "EVENT LLM RAW EXTRACTION REPORT" in text
+        assert "extract-velvet-spacex" in text
+        assert "Velvet Capital/VELVET" in text
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
 
 
 def test_event_discovery_asset_role_demotes_proxy_context_noise():

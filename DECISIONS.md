@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep LLM raw-event extraction as resolver input only
+**Status:** accepted
+**Decision:** Event LLM raw-event extraction may run in `shadow` mode to propose
+external catalysts, crypto asset/project mentions, source-noise terms, and date
+hints from raw event evidence. Extracted assets are resolver hints only: they
+must not create candidates, research-alert tiers, `TRIGGERED_FADE`, live signal
+rows, paper trades, or execution unless deterministic resolver/classifier/event
+fade gates validate the asset and event through the existing research path.
+**Why:** Upstream extraction helps find missed proxy assets and diagnose source
+noise, but LLM output still needs deterministic identity validation and quote
+checks before it can influence research artifacts.
+**Revisit when:** The extractor has a reviewed sample showing useful recall
+improvement without unacceptable false-positive asset links, and the human
+approves promotion into the event-alpha radar/watchlist pipeline.
+
 ## 2026-06-18 - Keep LLM advisory limited to research-alert tier quality
 **Status:** accepted
 **Decision:** Event LLM analysis may run in `shadow` mode for diagnosis or

@@ -357,6 +357,25 @@ EVENT_LLM_REQUIRE_EVIDENCE_QUOTES = _env_bool("RSI_EVENT_LLM_REQUIRE_EVIDENCE_QU
 _EVENT_LLM_CACHE_PATH_RAW = os.getenv("RSI_EVENT_LLM_CACHE_PATH", "")
 EVENT_LLM_PROMPT_VERSION = os.getenv("RSI_EVENT_LLM_PROMPT_VERSION", "llm_proxy_context_v1")
 
+# Event-discovery LLM raw-event extraction. Disabled by default and
+# research-only; extracted assets are proposals until deterministic resolver
+# validation matches a known asset universe/alias.
+EVENT_LLM_EXTRACTOR_ENABLED = _env_bool("RSI_EVENT_LLM_EXTRACTOR_ENABLED", False)
+EVENT_LLM_EXTRACTOR_MODE = os.getenv("RSI_EVENT_LLM_EXTRACTOR_MODE", "shadow")
+EVENT_LLM_EXTRACTOR_PROVIDER = os.getenv("RSI_EVENT_LLM_EXTRACTOR_PROVIDER", EVENT_LLM_PROVIDER)
+EVENT_LLM_EXTRACTOR_MODEL = os.getenv("RSI_EVENT_LLM_EXTRACTOR_MODEL", "") or EVENT_LLM_MODEL
+EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN = int(os.getenv("RSI_EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN", "50"))
+EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES = _env_bool("RSI_EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES", True)
+_EVENT_LLM_EXTRACTOR_CACHE_PATH_RAW = os.getenv("RSI_EVENT_LLM_EXTRACTOR_CACHE_PATH", "")
+EVENT_LLM_EXTRACTOR_PROMPT_VERSION = os.getenv("RSI_EVENT_LLM_EXTRACTOR_PROMPT_VERSION", "llm_raw_event_extraction_v1")
+
+# Later Event Alpha Radar phases. These stay disabled until market enrichment,
+# anomaly scanning, persistent watchlist state, and routing are implemented.
+EVENT_MARKET_ENRICHMENT_ENABLED = _env_bool("RSI_EVENT_MARKET_ENRICHMENT_ENABLED", False)
+EVENT_ANOMALY_SCANNER_ENABLED = _env_bool("RSI_EVENT_ANOMALY_SCANNER_ENABLED", False)
+EVENT_WATCHLIST_ENABLED = _env_bool("RSI_EVENT_WATCHLIST_ENABLED", False)
+EVENT_ALPHA_ROUTER_ENABLED = _env_bool("RSI_EVENT_ALPHA_ROUTER_ENABLED", False)
+
 # Macro context header in the digest (Fear & Greed + BTC trend + breadth).
 MACRO_ENABLED = (os.getenv("RSI_MACRO", "1").lower() not in ("0", "false", "no"))
 
@@ -581,6 +600,11 @@ if not EVENT_DISCOVERY_CACHE_DIR.is_absolute():
 EVENT_LLM_CACHE_PATH = Path(_EVENT_LLM_CACHE_PATH_RAW).expanduser() if _EVENT_LLM_CACHE_PATH_RAW else None
 if EVENT_LLM_CACHE_PATH is not None and not EVENT_LLM_CACHE_PATH.is_absolute():
     EVENT_LLM_CACHE_PATH = DATA_DIR / EVENT_LLM_CACHE_PATH
+EVENT_LLM_EXTRACTOR_CACHE_PATH = (
+    Path(_EVENT_LLM_EXTRACTOR_CACHE_PATH_RAW).expanduser() if _EVENT_LLM_EXTRACTOR_CACHE_PATH_RAW else None
+)
+if EVENT_LLM_EXTRACTOR_CACHE_PATH is not None and not EVENT_LLM_EXTRACTOR_CACHE_PATH.is_absolute():
+    EVENT_LLM_EXTRACTOR_CACHE_PATH = DATA_DIR / EVENT_LLM_EXTRACTOR_CACHE_PATH
 
 _BACKUP_DIR_RAW = os.getenv("RSI_BACKUP_DIR", "backups")
 BACKUP_DIR = Path(_BACKUP_DIR_RAW).expanduser()

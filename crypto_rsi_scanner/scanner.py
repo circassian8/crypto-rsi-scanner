@@ -64,13 +64,14 @@ from . import event_cache
 from . import event_discovery
 from . import event_alerts
 from . import event_llm_analyzer
+from . import event_llm_extractor
 from . import event_provider_status
 from . import event_price_history
 from . import event_validation
 from .event_models import EventDiscoveryResult
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
-from .llm_providers.fixture import FixtureLLMRelationshipProvider
-from .llm_providers.openai_provider import OpenAILLMRelationshipProvider
+from .llm_providers.fixture import FixtureLLMExtractionProvider, FixtureLLMRelationshipProvider
+from .llm_providers.openai_provider import OpenAILLMExtractionProvider, OpenAILLMRelationshipProvider
 
 log = logging.getLogger(__name__)
 
@@ -1183,6 +1184,19 @@ def _event_llm_config_from_runtime() -> event_llm_analyzer.EventLLMConfig:
     )
 
 
+def _event_llm_extractor_config_from_runtime() -> event_llm_extractor.EventLLMExtractorConfig:
+    return event_llm_extractor.EventLLMExtractorConfig(
+        enabled=config.EVENT_LLM_EXTRACTOR_ENABLED,
+        mode=config.EVENT_LLM_EXTRACTOR_MODE,
+        provider=config.EVENT_LLM_EXTRACTOR_PROVIDER,
+        model=config.EVENT_LLM_EXTRACTOR_MODEL,
+        max_events_per_run=config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN,
+        require_evidence_quotes=config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES,
+        cache_path=config.EVENT_LLM_EXTRACTOR_CACHE_PATH,
+        prompt_version=config.EVENT_LLM_EXTRACTOR_PROMPT_VERSION,
+    )
+
+
 def _setup_event_discovery_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -1270,6 +1284,32 @@ def event_llm_shadow_report(verbose: bool = False) -> None:
     print(event_llm_analyzer.format_llm_shadow_report(rows))
 
 
+def event_llm_extract_report(verbose: bool = False) -> None:
+    """Print research-only LLM raw-event extraction for discovery evidence."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_discovery_paths_configured():
+        print(
+            "No event-discovery sources ready. Set RSI_EVENT_DISCOVERY_EVENTS_PATH, "
+            "another event-discovery fixture path, or opt into a live research provider. "
+            "Run --event-discovery-status for a redacted readiness report."
+        )
+        return
+    extractor_cfg = _event_llm_extractor_config_from_runtime()
+    if extractor_cfg.mode != "shadow":
+        print("Event LLM extractor blocked: RSI_EVENT_LLM_EXTRACTOR_MODE must be shadow for Phase 1.")
+        return
+    provider = _event_llm_extraction_provider(extractor_cfg)
+    if provider is None:
+        return
+    result = _event_discovery_result_from_config()
+    rows = event_llm_extractor.analyze_raw_events(
+        result.raw_events,
+        provider,
+        cfg=extractor_cfg,
+    )
+    print(event_llm_extractor.format_llm_extract_report(rows))
+
+
 def _event_llm_provider(llm_cfg: event_llm_analyzer.EventLLMConfig):
     provider_name = llm_cfg.provider.strip().lower()
     if provider_name == "fixture":
@@ -1284,6 +1324,26 @@ def _event_llm_provider(llm_cfg: event_llm_analyzer.EventLLMConfig):
             prompt_version=llm_cfg.prompt_version,
         )
     print(f"Unknown event LLM provider: {llm_cfg.provider}. Use fixture or openai.")
+    return None
+
+
+def _event_llm_extraction_provider(extractor_cfg: event_llm_extractor.EventLLMExtractorConfig):
+    provider_name = extractor_cfg.provider.strip().lower()
+    if provider_name == "fixture":
+        return FixtureLLMExtractionProvider()
+    if provider_name == "openai":
+        if not extractor_cfg.enabled:
+            print(
+                "Event LLM OpenAI extractor disabled. "
+                "Set RSI_EVENT_LLM_EXTRACTOR_ENABLED=1 to opt into live LLM calls."
+            )
+            return None
+        return OpenAILLMExtractionProvider(
+            api_key=config.OPENAI_API_KEY,
+            model=extractor_cfg.model,
+            prompt_version=extractor_cfg.prompt_version,
+        )
+    print(f"Unknown event LLM extractor provider: {extractor_cfg.provider}. Use fixture or openai.")
     return None
 
 
@@ -2787,6 +2847,11 @@ def cli() -> None:
         help="Print research-only shadow LLM relationship analysis for event candidates.",
     )
     parser.add_argument(
+        "--event-llm-extract-report",
+        action="store_true",
+        help="Print research-only shadow LLM raw-event extraction for discovery evidence.",
+    )
+    parser.add_argument(
         "--event-alert-send",
         action="store_true",
         help=(
@@ -3052,6 +3117,9 @@ def cli() -> None:
         return
     if args.event_llm_shadow_report:
         event_llm_shadow_report(verbose=args.verbose)
+        return
+    if args.event_llm_extract_report:
+        event_llm_extract_report(verbose=args.verbose)
         return
     if args.event_discovery_refresh:
         event_discovery_refresh(verbose=args.verbose)

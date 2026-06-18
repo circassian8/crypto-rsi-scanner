@@ -30,19 +30,22 @@ Status labels:
 | status | item | owner | notes |
 |---|---|---|---|
 | waiting | Monitor next full-scan universe audit | system | `make refresh-universe-audit` confirmed current hygiene output after the filter tighten: 53 excluded, no obvious USD/stable kept by audit regex. The audit now stores all kept rows for leak detection; re-check after the next scheduled full scan. |
-| todo | Use LLM advisory analyzer for event-review QA | human/open | `main.py --event-llm-shadow-report` and `make event-llm-eval` compare rule classifications with fixture/OpenAI relationship analysis; the eval target fails on golden role/action drift and quote-validation regressions. `main.py --event-alert-report --with-llm` can now run opt-in advisory tier quality control when `RSI_EVENT_LLM_MODE=advisory`, and the no-key helper is `make event-alert-no-key-llm-report`. Use it to reduce source-noise/ticker-collision research-alert junk while building the reviewed event-fade sample. It still cannot create `TRIGGERED_FADE`, affect normal RSI alerts, paper trade, write live signal rows, or change event-fade eligibility. |
+| todo | Use LLM extraction/advisory analyzer for event-review QA | human/open | `main.py --event-llm-extract-report` and `make event-llm-extract-eval` now run fixture/OpenAI raw-event extraction for catalysts, crypto asset mentions, source-noise terms, and date hints; extracted assets remain resolver hints only. `main.py --event-llm-shadow-report` and `make event-llm-eval` compare rule classifications with fixture/OpenAI relationship analysis, while `main.py --event-alert-report --with-llm` can run opt-in advisory tier quality control when `RSI_EVENT_LLM_MODE=advisory`. Use these to reduce source-noise/ticker-collision junk and find missed proxy asset mentions while building the reviewed event-fade sample. They still cannot create `TRIGGERED_FADE`, affect normal RSI alerts, paper trade, write live signal rows, or change event-fade eligibility. |
+| todo | Build Event Alpha Radar market/watchlist phases | open | Phase 1 raw-event extraction is in place. Next implementation phases are market enrichment/anomaly discovery, persistent watchlist state, playbook scoring, research alert routing, and lightweight feedback/evals. Keep each disabled by default and research-only; do not add Telegram routing changes, paper trades, live signal DB writes, or execution until a reviewed sample supports promotion. |
 
 ## Later
 
 No ready later items. Current remaining work is waiting on live outcomes, the
-event-fade validation sample review status/labels/outcomes, or the next universe hygiene audit.
+event-fade validation sample review status/labels/outcomes, event-alpha market/
+watchlist implementation phases, or the next universe hygiene audit.
 Tooling now exists for `--score --cohorts`, cost-aware backtests, walk-forward
 checks, audit refreshes, event-fade fixture reports, event-discovery fixture/
 universe plus opt-in live CoinGecko resolver enrichment/exchange/calendar/news
 plus opt-in live Binance, Bybit, CryptoPanic, GDELT, RSS/RSS URL files, and Coinalyze
 auto-symbol/external-catalyst/derivatives/supply radar
 reports, research-only event-alert ranking reports, event-discovery JSONL cache refreshes, raw Binance
-announcement cache listening, research-only LLM shadow/advisory relationship reports/evals, grouped
+announcement cache listening, research-only LLM raw-extraction reports/evals,
+research-only LLM shadow/advisory relationship reports/evals, grouped
 event-fade auto reports, event-fade validation-sample exports from fixtures or
 cached snapshots, event-fade validation merge/price-export/outcome-fill/
 labeling-queue/review-packet/review-template/review-bundle/review cohort
