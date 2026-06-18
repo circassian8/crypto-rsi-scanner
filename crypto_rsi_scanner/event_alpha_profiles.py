@@ -128,6 +128,7 @@ _PROFILES: dict[str, EventAlphaProfile] = {
         description="API-backed live event sources where configured, with no LLM calls by default.",
         config_overrides={
             "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": True,
+            "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH": _DEFAULT_RSS_URLS,
             "EVENT_DISCOVERY_GDELT_LIVE": True,
             "EVENT_DISCOVERY_CRYPTOPANIC_LIVE": True,
             "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": True,
@@ -146,6 +147,7 @@ _PROFILES: dict[str, EventAlphaProfile] = {
         description="Live public/API sources with opt-in OpenAI extraction and relationship advisory.",
         config_overrides={
             "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": True,
+            "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH": _DEFAULT_RSS_URLS,
             "EVENT_DISCOVERY_GDELT_LIVE": True,
             "EVENT_DISCOVERY_CRYPTOPANIC_LIVE": True,
             "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": True,
@@ -176,6 +178,7 @@ _PROFILES: dict[str, EventAlphaProfile] = {
         description="Research-send profile; still requires --event-alert-send and RSI_EVENT_ALERTS_ENABLED=1.",
         config_overrides={
             "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": True,
+            "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH": _DEFAULT_RSS_URLS,
             "EVENT_DISCOVERY_GDELT_LIVE": True,
             "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": True,
             "EVENT_DISCOVERY_UNIVERSE_LIVE": True,

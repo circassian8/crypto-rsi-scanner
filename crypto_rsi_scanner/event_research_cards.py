@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
+from urllib.parse import urlparse
 
-from . import event_alpha_router, event_watchlist
+from . import event_alpha_router, event_graph, event_watchlist
 
 
 @dataclass(frozen=True)
@@ -21,12 +22,14 @@ def render_research_card(
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     alert_rows: Iterable[Mapping[str, Any]] = (),
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
+    clusters: Iterable[event_graph.EventCluster] = (),
 ) -> EventResearchCardResult:
     """Render one Markdown card from local research artifacts."""
     clean_key = str(key or "").strip()
     entry = _find_entry(clean_key, list(watchlist_entries))
     alert = _find_alert(clean_key, list(alert_rows))
     decision = _find_decision(clean_key, list(route_decisions))
+    cluster = _find_cluster(clean_key, list(clusters), entry, alert)
     if entry is None and alert is None:
         return EventResearchCardResult(
             key=clean_key,
@@ -52,6 +55,11 @@ def render_research_card(
     ]
     if decision is not None:
         lines.append(f"- Route: {decision.route.value} ({decision.reason})")
+    lines.extend([
+        "",
+        "## Cluster Context",
+    ])
+    lines.extend(_cluster_lines(cluster))
     lines.extend([
         "",
         "## Playbook",
@@ -121,8 +129,10 @@ def render_selected_cards(
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry],
     alert_rows: Iterable[Mapping[str, Any]] = (),
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
+    clusters: Iterable[event_graph.EventCluster] = (),
     limit: int = 10,
 ) -> str:
+    cluster_rows = list(clusters)
     entries = [
         entry for entry in watchlist_entries
         if entry.state in {
@@ -139,6 +149,7 @@ def render_selected_cards(
             watchlist_entries=watchlist_entries,
             alert_rows=alert_rows,
             route_decisions=route_decisions,
+            clusters=cluster_rows,
         ).markdown
         for entry in entries
     ]
@@ -181,6 +192,33 @@ def _find_decision(
     return None
 
 
+def _find_cluster(
+    key: str,
+    clusters: list[event_graph.EventCluster],
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> event_graph.EventCluster | None:
+    key_l = key.lower()
+    identifiers = {
+        key,
+        key_l,
+        str(getattr(entry, "cluster_id", "") or ""),
+        str(getattr(entry, "event_id", "") or ""),
+        str(alert.get("cluster_id") or "") if alert else "",
+        str(alert.get("event_id") or "") if alert else "",
+    }
+    identifiers_l = {item.lower() for item in identifiers if item}
+    for cluster in clusters:
+        if cluster.cluster_id in identifiers or cluster.cluster_id.lower() in identifiers_l:
+            return cluster
+        if any(str(event_id).lower() in identifiers_l for event_id in cluster.event_ids):
+            return cluster
+        for link in cluster.asset_links:
+            if key_l in {link.symbol.lower(), link.coin_id.lower()}:
+                return cluster
+    return None
+
+
 def _value(entry: Any | None, alert: Mapping[str, Any] | None, entry_field: str, alert_field: str) -> Any:
     if entry is not None and entry_field:
         value = getattr(entry, entry_field, None)
@@ -191,6 +229,61 @@ def _value(entry: Any | None, alert: Mapping[str, Any] | None, entry_field: str,
         if value not in (None, ""):
             return value
     return None
+
+
+def _cluster_lines(cluster: event_graph.EventCluster | None) -> list[str]:
+    if cluster is None:
+        return ["- No cluster graph data found in local artifacts."]
+    accepted = [link for link in cluster.asset_links if link.accepted]
+    rejected = [link for link in cluster.asset_links if not link.accepted]
+    providers = sorted({evidence.source for evidence in cluster.evidence if evidence.source})
+    origins = sorted({
+        _origin(url)
+        for evidence in cluster.evidence
+        for url in evidence.source_urls
+        if url
+    })
+    lines = [
+        f"- Cluster ID: {cluster.cluster_id}",
+        f"- Cluster confidence: {cluster.cluster_confidence}",
+        f"- Independent sources: {cluster.independent_source_count}",
+        f"- Event-time consensus: {cluster.event_time_consensus}",
+        f"- Source providers: {', '.join(providers) if providers else 'unknown'}",
+        f"- Source origins: {', '.join(origins) if origins else 'unknown'}",
+    ]
+    accepted_by_kind: dict[str, list[str]] = {}
+    for link in accepted:
+        accepted_by_kind.setdefault(link.accepted_kind, []).append(f"{link.symbol}/{link.coin_id}")
+    if accepted_by_kind:
+        lines.append(
+            "- Accepted links by kind: "
+            + "; ".join(
+                f"{kind}={', '.join(values)}"
+                for kind, values in sorted(accepted_by_kind.items())
+            )
+        )
+    else:
+        lines.append("- Accepted links by kind: none")
+    if rejected:
+        lines.append(
+            "- Rejected/noise links: "
+            + "; ".join(
+                f"{link.symbol}/{link.coin_id}:{link.rejected_reason or 'rejected'}"
+                for link in rejected[:8]
+            )
+        )
+    else:
+        lines.append("- Rejected/noise links: none")
+    if cluster.source_urls:
+        lines.append("- Top evidence URLs: " + "; ".join(cluster.source_urls[:5]))
+    if cluster.warnings:
+        lines.append("- Cluster warnings: " + "; ".join(cluster.warnings))
+    return lines
+
+
+def _origin(url: str) -> str:
+    parsed = urlparse(str(url))
+    return parsed.netloc or parsed.path or "unknown"
 
 
 def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:

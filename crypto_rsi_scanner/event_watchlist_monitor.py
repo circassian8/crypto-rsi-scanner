@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -18,6 +18,14 @@ ACTIVE_STATES = {
     event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
     event_watchlist.EventWatchlistState.EVENT_PASSED.value,
     event_watchlist.EventWatchlistState.ARMED.value,
+}
+
+MONITOR_HINT_TO_ROUTER_REASON = {
+    "EVENT_TIME_APPROACHING": "event_time_upgrade",
+    "EVENT_PASSED": "event_time_upgrade",
+    "POST_EVENT_MONITORING": "event_time_upgrade",
+    "DERIVATIVES_HEATED": "derivatives_crowding_upgrade",
+    "MARKET_SCORE_JUMP": "score_jump",
 }
 
 
@@ -82,6 +90,84 @@ def monitor_watchlist(
         active_entries=len(rows),
         skipped_expired=skipped,
         rows=rows,
+    )
+
+
+def apply_monitor_updates_to_watchlist(
+    read_result: event_watchlist.EventWatchlistReadResult,
+    monitor_result: EventWatchlistMonitorResult,
+    *,
+    route_updates: bool = True,
+    score_jump_threshold: int = 10,
+) -> event_watchlist.EventWatchlistReadResult:
+    """Return a read result with material monitor updates expressed for router policy.
+
+    The monitor is observation-only. This adapter deliberately reuses the
+    router's existing material-change fields and never promotes a row to
+    TRIGGERED_FADE.
+    """
+    if not route_updates:
+        return read_result
+    row_by_key = {
+        row.key: row
+        for row in monitor_result.rows
+        if row.material_update
+    }
+    if not row_by_key:
+        return read_result
+    updated: list[event_watchlist.EventWatchlistEntry] = []
+    for entry in read_result.entries:
+        row = row_by_key.get(entry.key)
+        if row is None:
+            updated.append(entry)
+            continue
+        reasons = tuple(dict.fromkeys(
+            MONITOR_HINT_TO_ROUTER_REASON[hint]
+            for hint in row.state_transition_hints
+            if hint in MONITOR_HINT_TO_ROUTER_REASON
+        ))
+        if not reasons:
+            updated.append(entry)
+            continue
+        next_state = entry.state
+        if (
+            "EVENT_PASSED" in row.state_transition_hints
+            and entry.state not in {
+                event_watchlist.EventWatchlistState.ARMED.value,
+                event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+                event_watchlist.EventWatchlistState.INVALIDATED.value,
+                event_watchlist.EventWatchlistState.EXPIRED.value,
+            }
+        ):
+            next_state = event_watchlist.EventWatchlistState.EVENT_PASSED.value
+        if next_state == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value:
+            next_state = entry.state
+        updated.append(replace(
+            entry,
+            state=next_state,
+            previous_state=entry.state if next_state != entry.state else entry.previous_state,
+            last_seen_at=monitor_result.observed_at,
+            score_jump=max(
+                entry.score_jump,
+                score_jump_threshold if "score_jump" in reasons else 0,
+            ),
+            event_time_upgraded=entry.event_time_upgraded or "event_time_upgrade" in reasons,
+            derivatives_crowding_upgraded=(
+                entry.derivatives_crowding_upgraded or "derivatives_crowding_upgrade" in reasons
+            ),
+            material_change_reasons=tuple(dict.fromkeys((*entry.material_change_reasons, *reasons))),
+            should_alert=True,
+            suppressed_reason=None,
+            warnings=tuple(dict.fromkeys((
+                *entry.warnings,
+                "watchlist_monitor:" + ",".join(row.state_transition_hints),
+            ))),
+        ))
+    return event_watchlist.EventWatchlistReadResult(
+        state_path=read_result.state_path,
+        rows_read=read_result.rows_read,
+        entries=updated,
+        latest_only=read_result.latest_only,
     )
 
 

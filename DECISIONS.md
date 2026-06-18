@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Route Event Alpha monitor updates through the router only
+**Status:** accepted
+**Decision:** Active watchlist monitoring may be integrated into
+`--event-alpha-cycle` only as an opt-in research update source. Monitor hints
+such as `EVENT_TIME_APPROACHING`, `EVENT_PASSED`, `DERIVATIVES_HEATED`,
+`MARKET_SCORE_JUMP`, and `POST_EVENT_MONITORING` must be translated into the
+existing watchlist/router material-change fields and routed through the same
+daily/instant/triggered lanes and send guards as source-derived watchlist rows.
+Monitor updates must not create normal event-alert candidates, bypass router
+policy, write live signal/paper tables, or create `TRIGGERED_FADE`. Event Alpha
+cycle send accounting should distinguish requested, attempted, successful,
+delivered, and blocked sends in the run ledger.
+**Why:** Daily operation needs to keep watching already-discovered candidates
+even when no new article arrives, but repeated market updates are only safe if
+they stay inside the existing research router and audit trail.
+**Revisit when:** A reviewed Event Alpha sample justifies persisting monitor
+state transitions or promoting routed research digests through a separate
+human-approved decision.
+
 ## 2026-06-18 - Keep Event Alpha operational reports artifact-only
 **Status:** accepted
 **Decision:** Event Alpha may append a local cycle run ledger, print

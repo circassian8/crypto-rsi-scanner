@@ -214,8 +214,17 @@ def _failure_stage(
     alert_rows: Iterable[Mapping[str, Any]],
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry],
 ) -> tuple[str, str]:
-    if any(_raw_mentions(raw, symbol, coin_id) for raw in raw_events):
+    identity_hints = [_raw_identity_hint(raw, symbol, coin_id) for raw in raw_events]
+    if any(hint == "strong_identity" for hint in identity_hints):
         return "resolver_missed_asset", "Source evidence mentions the asset, but no prior alert/watchlist row exists."
+    weak_hints = [hint for hint in identity_hints if hint in {"weak_url_only_identity_hint", "metadata_only_identity_hint"}]
+    if weak_hints:
+        return (
+            "no_source_event",
+            "Only weak identity hints were found; "
+            + ", ".join(dict.fromkeys(weak_hints))
+            + " is not enough to diagnose a resolver miss.",
+        )
     if any(_row_matches(row, symbol, coin_id) and str(row.get("tier") or "") == "STORE_ONLY" for row in alert_rows):
         return "low_score_suppressed", "The asset exists in alert snapshots but was suppressed below radar tier."
     if any(_entry_matches(entry, symbol, coin_id) for entry in watchlist_entries):
@@ -234,8 +243,77 @@ def _queries(symbol: str, name: str) -> tuple[str, ...]:
     )))[:4]
 
 
-def _raw_mentions(raw: RawDiscoveredEvent, symbol: str, coin_id: str) -> bool:
-    text = " ".join(str(part or "") for part in (raw.title, raw.body, raw.source_url)).casefold()
+def _raw_identity_hint(raw: RawDiscoveredEvent, symbol: str, coin_id: str) -> str | None:
+    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
+    strong_fields = [
+        raw.title,
+        raw.body,
+        event_payload.get("event_name"),
+        event_payload.get("description"),
+    ]
+    if any(_contains_identity(field, symbol, coin_id) for field in strong_fields):
+        return "strong_identity"
+    if _validated_llm_quote_mentions_identity(payload, strong_fields, symbol, coin_id):
+        return "strong_identity"
+    metadata_fields = [
+        raw.provider,
+        payload.get("source_origin"),
+        payload.get("publisher"),
+        payload.get("source_provider"),
+    ]
+    if any(_contains_identity(field, symbol, coin_id) for field in metadata_fields):
+        return "metadata_only_identity_hint"
+    if _contains_identity(raw.source_url, symbol, coin_id):
+        return "weak_url_only_identity_hint"
+    return None
+
+
+def _validated_llm_quote_mentions_identity(
+    payload: Mapping[str, Any],
+    strong_fields: Iterable[object],
+    symbol: str,
+    coin_id: str,
+) -> bool:
+    extraction = payload.get("llm_extraction")
+    if not isinstance(extraction, Mapping):
+        return False
+    source_text = " ".join(str(field or "") for field in strong_fields).casefold()
+    for quote in _llm_quote_texts(extraction):
+        if not quote:
+            continue
+        quote_l = quote.casefold()
+        if quote_l not in source_text:
+            continue
+        if _contains_identity(quote, symbol, coin_id):
+            return True
+    return False
+
+
+def _llm_quote_texts(extraction: Mapping[str, Any]) -> Iterable[str]:
+    for key in ("crypto_asset_mentions", "external_catalysts", "false_positive_terms"):
+        rows = extraction.get(key)
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            quotes = row.get("evidence_quotes")
+            if not isinstance(quotes, list):
+                continue
+            for quote in quotes:
+                if isinstance(quote, Mapping):
+                    text = str(quote.get("text") or "").strip()
+                else:
+                    text = str(quote or "").strip()
+                if text:
+                    yield text
+
+
+def _contains_identity(value: object, symbol: str, coin_id: str) -> bool:
+    text = str(value or "").casefold()
+    if not text:
+        return False
     return bool((symbol and symbol.casefold() in text) or (coin_id and coin_id.casefold() in text))
 
 

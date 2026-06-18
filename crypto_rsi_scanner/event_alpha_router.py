@@ -421,7 +421,7 @@ def _cooldown_active(
     entry: event_watchlist.EventWatchlistEntry,
     cfg: EventAlphaRouterConfig,
 ) -> bool:
-    if entry.escalation or entry.material_change_reasons:
+    if entry.escalation:
         return False
     if cfg.per_key_cooldown_hours <= 0 or not entry.alert_history:
         return False

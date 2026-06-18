@@ -1258,6 +1258,11 @@ def _event_watchlist_config_from_runtime() -> event_watchlist.EventWatchlistConf
     )
 
 
+def _event_watchlist_monitor_market_rows_from_runtime() -> list[dict[str, Any]]:
+    market_path = config.EVENT_WATCHLIST_MONITOR_MARKET_PATH or config.EVENT_DISCOVERY_UNIVERSE_PATH
+    return event_watchlist_monitor.load_market_rows(market_path)
+
+
 def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRouterConfig:
     return event_alpha_router.EventAlphaRouterConfig(
         enabled=config.EVENT_ALPHA_ROUTER_ENABLED,
@@ -1335,6 +1340,7 @@ def _normalize_profile_paths() -> None:
         "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH",
         "EVENT_CATALYST_SEARCH_FIXTURE_PATH",
         "EVENT_WATCHLIST_STATE_PATH",
+        "EVENT_WATCHLIST_MONITOR_MARKET_PATH",
         "EVENT_ALPHA_ALERT_STORE_PATH",
         "EVENT_ALPHA_RUN_LEDGER_PATH",
         "EVENT_ALPHA_MISSED_PATH",
@@ -1519,6 +1525,9 @@ def event_alpha_cycle(
         router_cfg=_event_alpha_router_config_from_runtime(),
         refresh_watchlist=True,
         route=True,
+        watchlist_monitor_enabled=config.EVENT_WATCHLIST_MONITOR_ENABLED,
+        watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
+        watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
         send=send,
         send_callback=lambda decisions: _send_event_alpha_routed_digest(decisions, alert_cfg, now=now),
     )
@@ -1590,6 +1599,12 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
         ),
         f"catalyst providers: {', '.join(config.EVENT_CATALYST_SEARCH_PROVIDERS) or 'none'}",
         f"watchlist_state_path: {config.EVENT_WATCHLIST_STATE_PATH}",
+        (
+            "watchlist_monitor: "
+            f"enabled={str(bool(config.EVENT_WATCHLIST_MONITOR_ENABLED)).lower()} "
+            f"route_updates={str(bool(config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES)).lower()} "
+            f"market_path={config.EVENT_WATCHLIST_MONITOR_MARKET_PATH or config.EVENT_DISCOVERY_UNIVERSE_PATH or 'none'}"
+        ),
         f"alert_store_path: {config.EVENT_ALPHA_ALERT_STORE_PATH}",
         f"run_ledger_path: {config.EVENT_ALPHA_RUN_LEDGER_PATH}",
         f"missed_path: {config.EVENT_ALPHA_MISSED_PATH}",
@@ -1693,7 +1708,7 @@ def event_watchlist_monitor_report(verbose: bool = False, event_now: str | datet
     _setup_event_discovery_logging(verbose)
     watch_cfg = _event_watchlist_config_from_runtime()
     read_result = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
-    market_rows = event_watchlist_monitor.load_market_rows(config.EVENT_DISCOVERY_UNIVERSE_PATH)
+    market_rows = _event_watchlist_monitor_market_rows_from_runtime()
     result = event_watchlist_monitor.monitor_watchlist(
         read_result,
         market_rows=market_rows,
@@ -2058,24 +2073,41 @@ def _send_event_alpha_routed_digest(
     cfg: event_alerts.EventAlertConfig,
     *,
     now: datetime | None = None,
-) -> None:
+) -> event_alpha_pipeline.EventAlphaSendResult:
     if not cfg.enabled:
         print("Event Alpha routed alert sending disabled. Set RSI_EVENT_ALERTS_ENABLED=1 to opt in.")
-        return
+        return event_alpha_pipeline.EventAlphaSendResult(
+            requested=True,
+            attempted=False,
+            block_reason="event alerts disabled",
+        )
     if cfg.mode != "research_only":
         print("Event Alpha routed alert sending blocked: RSI_EVENT_ALERT_MODE must remain research_only.")
-        return
+        return event_alpha_pipeline.EventAlphaSendResult(
+            requested=True,
+            attempted=False,
+            block_reason="event alert mode is not research_only",
+        )
     alertable = [decision for decision in decisions if decision.alertable]
     if not alertable:
         print("Event Alpha routed alert sending skipped: no router-approved escalations.")
-        return
+        return event_alpha_pipeline.EventAlphaSendResult(
+            requested=True,
+            attempted=False,
+            block_reason="no router-approved escalations",
+        )
     storage = Storage(config.DB_PATH)
     try:
         now = now or datetime.now(timezone.utc)
         due, reason = _event_alert_digest_due(storage, cfg, now)
         if not due:
             print(f"Event Alpha routed alert sending held: {reason}.")
-            return
+            return event_alpha_pipeline.EventAlphaSendResult(
+                requested=True,
+                attempted=False,
+                items_attempted=len(alertable),
+                block_reason=reason,
+            )
         recipients = storage.active_subscribers() or config.TELEGRAM_CHAT_IDS
         sent = send_telegram(
             event_alpha_router.format_routed_telegram_digest(alertable),
@@ -2085,8 +2117,23 @@ def _send_event_alpha_routed_digest(
         if sent:
             _mark_event_alert_digest_sent(storage, len(alertable), now)
             print(f"Event Alpha routed Telegram digest sent with {len(alertable)} item(s).")
+            return event_alpha_pipeline.EventAlphaSendResult(
+                requested=True,
+                attempted=True,
+                success=True,
+                items_attempted=len(alertable),
+                items_delivered=len(alertable),
+            )
         else:
             print("Event Alpha routed Telegram digest not sent: no channel delivered.")
+            return event_alpha_pipeline.EventAlphaSendResult(
+                requested=True,
+                attempted=True,
+                success=False,
+                items_attempted=len(alertable),
+                items_delivered=0,
+                block_reason="no channel delivered",
+            )
     finally:
         storage.close()
 

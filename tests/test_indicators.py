@@ -6617,7 +6617,7 @@ def test_event_alpha_router_routes_material_changes_with_lanes():
     from pathlib import Path
     from crypto_rsi_scanner import event_alpha_router, event_playbooks, event_watchlist
 
-    def row(symbol, *, reasons=(), score_jump=0, state=None, playbook=None, should_alert=True):
+    def row(symbol, *, reasons=(), score_jump=0, state=None, playbook=None, should_alert=True, history=None):
         return event_watchlist.EventWatchlistEntry(
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
             row_type="event_watchlist_state",
@@ -6645,7 +6645,7 @@ def test_event_alpha_router_routes_material_changes_with_lanes():
             should_alert=should_alert,
             score_jump=score_jump,
             material_change_reasons=tuple(reasons),
-            alert_history=[
+            alert_history=history or [
                 {"observed_at": "2026-06-18T12:00:00+00:00", "should_alert": False},
                 {"observed_at": "2026-06-18T14:00:00+00:00", "should_alert": should_alert},
             ],
@@ -6660,6 +6660,15 @@ def test_event_alpha_router_routes_material_changes_with_lanes():
             row("JUMP", reasons=("score_jump",), score_jump=15),
             row("SRC", reasons=("new_independent_source",)),
             row("TIME", reasons=("event_time_upgrade",)),
+            row(
+                "COOL",
+                reasons=("score_jump",),
+                score_jump=15,
+                history=[
+                    {"observed_at": "2026-06-18T13:00:00+00:00", "should_alert": True},
+                    {"observed_at": "2026-06-18T14:00:00+00:00", "should_alert": True},
+                ],
+            ),
             row("DUP", should_alert=False),
             row(
                 "TRIG",
@@ -6675,6 +6684,8 @@ def test_event_alpha_router_routes_material_changes_with_lanes():
     assert by_symbol["JUMP"].lane == event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST
     assert by_symbol["SRC"].alertable is True
     assert by_symbol["TIME"].alertable is True
+    assert by_symbol["COOL"].route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE
+    assert "cooldown" in by_symbol["COOL"].reason.lower()
     assert by_symbol["DUP"].route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE
     assert by_symbol["TRIG"].route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
     assert by_symbol["TRIG"].lane == event_alpha_router.EventAlphaRouteLane.TRIGGERED_FADE
@@ -6756,7 +6767,11 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
     config.TELEGRAM_CHAT_IDS = ["fallback"]
     try:
         cfg = event_alerts.EventAlertConfig(enabled=True)
-        scanner._send_event_alpha_routed_digest([], cfg)
+        result = scanner._send_event_alpha_routed_digest([], cfg)
+        assert result.requested is True
+        assert result.attempted is False
+        assert result.success is False
+        assert result.block_reason == "no router-approved escalations"
         assert sent == []
 
         suppressed = event_alpha_router.EventAlphaRouteDecision(
@@ -6765,7 +6780,9 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
             alertable=False,
             reason="duplicate",
         )
-        scanner._send_event_alpha_routed_digest([suppressed], cfg)
+        result = scanner._send_event_alpha_routed_digest([suppressed], cfg)
+        assert result.attempted is False
+        assert result.block_reason == "no router-approved escalations"
         assert sent == []
 
         high = event_alpha_router.EventAlphaRouteDecision(
@@ -6774,7 +6791,11 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
             alertable=True,
             reason="watchlist escalation",
         )
-        scanner._send_event_alpha_routed_digest([suppressed, high], cfg)
+        result = scanner._send_event_alpha_routed_digest([suppressed, high], cfg)
+        assert result.attempted is True
+        assert result.success is True
+        assert result.items_attempted == 1
+        assert result.items_delivered == 1
         assert len(sent) == 1
         assert sent[0][1] == "HTML"
         assert sent[0][2] == ("chat",)
@@ -6782,10 +6803,94 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
         assert "HIGH" in sent[0][0]
         assert "DUP" not in sent[0][0]
         assert FakeStorage.meta.get("event_alert_last_digest_items") == "1"
+
+        FakeStorage.meta = {}
+        scanner.send_telegram = lambda message, *, parse_mode=None, chat_ids=None: False
+        failed = scanner._send_event_alpha_routed_digest([high], cfg)
+        assert failed.attempted is True
+        assert failed.success is False
+        assert failed.items_attempted == 1
+        assert failed.items_delivered == 0
+        assert failed.block_reason == "no channel delivered"
+        disabled = scanner._send_event_alpha_routed_digest([high], event_alerts.EventAlertConfig(enabled=False))
+        assert disabled.requested is True
+        assert disabled.attempted is False
+        assert disabled.block_reason == "event alerts disabled"
     finally:
         scanner.Storage = original_storage
         scanner.send_telegram = original_send
         config.TELEGRAM_CHAT_IDS = original_ids
+
+
+def test_event_alpha_run_ledger_records_send_accounting():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_pipeline,
+        event_alpha_run_ledger,
+        event_alpha_router,
+        event_watchlist,
+    )
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult
+
+    now = datetime(2026, 6, 18, 13, 0, tzinfo=timezone.utc)
+
+    def empty_loader(observed, raw_event_transform):
+        return EventDiscoveryResult((), (), (), (), ())
+
+    with tempfile.TemporaryDirectory() as tmp:
+        watch_path = Path(tmp) / "watchlist.jsonl"
+        no_decisions = event_alpha_pipeline.run_event_alpha_operating_cycle(
+            load_discovery_result=empty_loader,
+            now=now,
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(enabled=True, state_path=watch_path),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=False,
+            route=True,
+            send=True,
+            send_callback=lambda decisions: event_alpha_pipeline.EventAlphaSendResult(
+                requested=True,
+                attempted=True,
+                success=True,
+                items_attempted=len(decisions),
+                items_delivered=len(decisions),
+            ),
+        )
+        assert no_decisions.send_requested is True
+        assert no_decisions.send_attempted is False
+        assert no_decisions.send_block_reason == "no alertable route decisions"
+        cfg = event_alpha_run_ledger.EventAlphaRunLedgerConfig(path=Path(tmp) / "runs.jsonl")
+        row = event_alpha_run_ledger.append_run_record(
+            no_decisions,
+            cfg=cfg,
+            profile="fixture",
+            started_at=now,
+            finished_at=now,
+            with_llm=False,
+            send_requested=True,
+        )
+        assert row["send_requested"] is True
+        assert row["send_attempted"] is False
+        assert row["send_success"] is False
+        assert row["send_block_reason"] == "no alertable route decisions"
+
+        delivered = event_alpha_pipeline._normalize_send_result(True, [])
+        delivered_result = event_alpha_pipeline._with_send_result(no_decisions, delivered)
+        row2 = event_alpha_run_ledger.append_run_record(
+            delivered_result,
+            cfg=cfg,
+            profile="fixture",
+            started_at=now,
+            finished_at=now,
+            with_llm=False,
+            send_requested=True,
+        )
+        assert row2["send_attempted"] is True
+        assert row2["send_success"] is True
+        assert "send=0/0" in event_alpha_run_ledger.format_run_ledger_report(
+            event_alpha_run_ledger.load_run_records(cfg.path)
+        )
 
 
 def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
@@ -6879,6 +6984,10 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] > 0
         assert "LLM budget defaults" in event_alpha_profiles.format_profile_report(profile)
         assert event_alpha_profiles.get_profile("research_send").config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "alertable"
+        assert profile.config_overrides["EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH"].name == "public_rss_feeds.txt"
+        assert event_alpha_profiles.get_profile("research_send").config_overrides[
+            "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH"
+        ].name == "public_rss_feeds.txt"
 
         default_out = io.StringIO()
         with contextlib.redirect_stdout(default_out):
@@ -6886,10 +6995,19 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         profile_out = io.StringIO()
         with contextlib.redirect_stdout(profile_out):
             scanner.event_alpha_status(profile_name="no_key_live")
+        full_llm_out = io.StringIO()
+        with contextlib.redirect_stdout(full_llm_out):
+            scanner.event_alpha_status(profile_name="full_llm_live")
+        send_out = io.StringIO()
+        with contextlib.redirect_stdout(send_out):
+            scanner.event_alpha_status(profile_name="research_send")
         assert "profile: default" in default_out.getvalue()
         assert "profile: no_key_live" in profile_out.getvalue()
         assert default_out.getvalue() != profile_out.getvalue()
         assert "LLM budget:" in profile_out.getvalue()
+        assert "watchlist_monitor:" in profile_out.getvalue()
+        assert "- READY project_blog_rss" in full_llm_out.getvalue()
+        assert "- READY project_blog_rss" in send_out.getvalue()
 
         bad_out = io.StringIO()
         with contextlib.redirect_stdout(bad_out):
@@ -6977,15 +7095,104 @@ def test_event_watchlist_monitor_detects_material_updates_without_new_source():
     assert "EVENT WATCHLIST MONITOR" in event_watchlist_monitor.format_watchlist_monitor_report(result)
 
 
+def test_event_alpha_pipeline_routes_monitor_updates_without_new_source():
+    import json
+    import tempfile
+    from dataclasses import asdict
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_pipeline,
+        event_alpha_router,
+        event_playbooks,
+        event_watchlist,
+    )
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult
+
+    def entry(symbol, *, event_time, state=None):
+        return event_watchlist.EventWatchlistEntry(
+            schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+            row_type="event_watchlist_state",
+            key=f"{symbol.lower()}|coin|proxy_attention",
+            cluster_id=f"{symbol.lower()}|proxy|2026-06-18",
+            event_id=f"{symbol.lower()}-event",
+            coin_id=symbol.lower(),
+            symbol=symbol,
+            relationship_type="proxy_attention",
+            external_asset="SpaceX",
+            event_time=event_time,
+            state=state or event_watchlist.EventWatchlistState.WATCHLIST.value,
+            previous_state=event_watchlist.EventWatchlistState.RADAR.value,
+            first_seen_at="2026-06-18T10:00:00+00:00",
+            last_seen_at="2026-06-18T11:00:00+00:00",
+            source_count=2,
+            highest_score=72,
+            latest_score=72,
+            latest_tier="WATCHLIST",
+            latest_event_name=f"{symbol} SpaceX proxy",
+            latest_source="fixture",
+            latest_playbook_type=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+            latest_playbook_score=72,
+            latest_playbook_action="watchlist",
+            latest_score_components={"derivatives_crowding": 55, "cluster_confidence": 70},
+            should_alert=False,
+            suppressed_reason="duplicate state, no escalation",
+        )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "watchlist.jsonl"
+        rows = [
+            entry("APPROACH", event_time="2026-06-18T17:00:00+00:00"),
+            entry("PASSED", event_time="2026-06-18T12:30:00+00:00"),
+            entry("ARMED", event_time="2026-06-18T12:30:00+00:00", state=event_watchlist.EventWatchlistState.ARMED.value),
+        ]
+        path.write_text(
+            "\n".join(json.dumps(asdict(row), sort_keys=True) for row in rows) + "\n",
+            encoding="utf-8",
+        )
+        result = event_alpha_pipeline.run_event_alpha_pipeline(
+            EventDiscoveryResult((), (), (), (), ()),
+            now=datetime(2026, 6, 18, 13, 0, tzinfo=timezone.utc),
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(enabled=True, state_path=path),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=False,
+            route=True,
+            watchlist_monitor_enabled=True,
+            watchlist_monitor_market_rows=[{
+                "id": "passed",
+                "symbol": "passed",
+                "price_change_percentage_24h_in_currency": 45,
+                "total_volume": 6000000,
+                "market_cap": 20000000,
+                "volume_zscore_24h": 4.0,
+            }],
+            watchlist_monitor_route_updates=True,
+        )
+    assert result.watchlist_monitor_active_entries == 3
+    assert result.watchlist_monitor_material_updates == 3
+    assert result.router_result is not None
+    by_symbol = {decision.entry.symbol: decision for decision in result.router_result.decisions}
+    assert by_symbol["APPROACH"].alertable is True
+    assert by_symbol["APPROACH"].lane == event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST
+    assert by_symbol["PASSED"].alertable is True
+    assert by_symbol["PASSED"].entry.state == event_watchlist.EventWatchlistState.EVENT_PASSED.value
+    assert by_symbol["ARMED"].alertable is True
+    assert by_symbol["ARMED"].entry.state == event_watchlist.EventWatchlistState.ARMED.value
+    assert all(decision.entry.state != event_watchlist.EventWatchlistState.TRIGGERED_FADE.value for decision in by_symbol.values())
+    assert "watchlist_monitor_material=3" in event_alpha_pipeline.format_event_alpha_pipeline_report(result)
+
+
 def test_event_alpha_missed_calibration_and_research_card_reports():
     from crypto_rsi_scanner import (
         event_alpha_calibration,
         event_alpha_missed,
         event_alpha_router,
+        event_graph,
         event_playbooks,
         event_research_cards,
         event_watchlist,
     )
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
     from pathlib import Path
 
     entry = event_watchlist.EventWatchlistEntry(
@@ -7065,6 +7272,77 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
     missed_report = event_alpha_missed.format_missed_report(missed)
     assert "missed=1" in missed_report
 
+    url_only_raw = RawDiscoveredEvent(
+        raw_id="url-only",
+        provider="gdelt",
+        fetched_at=pd.Timestamp("2026-06-18T12:00:00Z").to_pydatetime(),
+        published_at=pd.Timestamp("2026-06-18T12:00:00Z").to_pydatetime(),
+        source_url="https://search.example.test/?q=PUMPUSDT",
+        title="Market update",
+        body="No asset identity in the source text.",
+        raw_json={},
+        source_confidence=0.60,
+        content_hash="url-only",
+    )
+    url_only = event_alpha_missed.detect_missed_opportunities(
+        [{
+            "id": "new-pump",
+            "symbol": "pump",
+            "name": "New Pump",
+            "price_change_percentage_24h_in_currency": 150,
+        }],
+        raw_events=[url_only_raw],
+    )
+    assert url_only.rows[0].failure_stage == "no_source_event"
+    assert "weak_url_only_identity_hint" in url_only.rows[0].reason
+
+    body_raw = RawDiscoveredEvent(
+        raw_id="body-identity",
+        provider="gdelt",
+        fetched_at=pd.Timestamp("2026-06-18T12:00:00Z").to_pydatetime(),
+        published_at=pd.Timestamp("2026-06-18T12:00:00Z").to_pydatetime(),
+        source_url="https://example.test/article",
+        title="PUMPUSDT doubles before listing rumors",
+        body="PUMPUSDT volume spiked after a catalyst rumor.",
+        raw_json={},
+        source_confidence=0.80,
+        content_hash="body-identity",
+    )
+    body_identity = event_alpha_missed.detect_missed_opportunities(
+        [{
+            "id": "new-pump",
+            "symbol": "pump",
+            "name": "New Pump",
+            "price_change_percentage_24h_in_currency": 150,
+        }],
+        raw_events=[body_raw],
+    )
+    assert body_identity.rows[0].failure_stage == "resolver_missed_asset"
+
+    metadata_raw = RawDiscoveredEvent(
+        raw_id="metadata-bitcoin",
+        provider="Bitcoin World",
+        fetched_at=pd.Timestamp("2026-06-18T12:00:00Z").to_pydatetime(),
+        published_at=pd.Timestamp("2026-06-18T12:00:00Z").to_pydatetime(),
+        source_url="https://example.test/market",
+        title="SpaceX market opens",
+        body="The article is about an external catalyst, not the asset.",
+        raw_json={"publisher": "Bitcoin World"},
+        source_confidence=0.70,
+        content_hash="metadata-bitcoin",
+    )
+    metadata_only = event_alpha_missed.detect_missed_opportunities(
+        [{
+            "id": "bitcoin",
+            "symbol": "btc",
+            "name": "Bitcoin",
+            "price_change_percentage_24h_in_currency": 150,
+        }],
+        raw_events=[metadata_raw],
+    )
+    assert metadata_only.rows[0].failure_stage == "no_source_event"
+    assert "metadata_only_identity_hint" in metadata_only.rows[0].reason
+
     calibration = event_alpha_calibration.format_calibration_report(
         alerts,
         feedback_rows=[{"key": entry.key, "label": "useful"}],
@@ -7080,15 +7358,79 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
         alertable=True,
         reason="watchlist escalation",
     )
+    cluster = event_graph.EventCluster(
+        schema_version=event_graph.EVENT_GRAPH_SCHEMA_VERSION,
+        cluster_id=entry.cluster_id,
+        external_asset_slug="world-cup",
+        event_type="sports_event",
+        event_date_bucket="2026-06-20",
+        external_asset="World Cup",
+        event_time=pd.Timestamp("2026-06-20T18:00:00Z").to_pydatetime(),
+        event_ids=("chz-event", "btc-noise"),
+        raw_ids=("raw-chz", "raw-btc"),
+        source_urls=("https://sports.example.test/chz", "https://bitcoinworld.example.test/noise"),
+        source_count=2,
+        independent_source_count=2,
+        source_quality_score=80,
+        event_time_consensus=90,
+        accepted_asset_count=1,
+        rejected_asset_count=1,
+        cluster_confidence=78,
+        evidence=(
+            event_graph.ClusterEvidence(
+                event_id="chz-event",
+                raw_ids=("raw-chz",),
+                source_urls=("https://sports.example.test/chz",),
+                event_name="CHZ World Cup fan token surge",
+                source="sports_fixture",
+                first_seen_time=pd.Timestamp("2026-06-18T12:00:00Z").to_pydatetime(),
+                confidence=0.90,
+            ),
+        ),
+        asset_links=(
+            event_graph.EventClusterAssetLink(
+                cluster_id=entry.cluster_id,
+                event_id="chz-event",
+                coin_id="chiliz",
+                symbol="CHZ",
+                playbook_type=event_playbooks.EventPlaybookType.FAN_SPORTS_EVENT.value,
+                relationship_type="proxy_attention",
+                asset_role="proxy_instrument",
+                accepted=True,
+                link_confidence=0.90,
+                classifier_confidence=0.90,
+                accepted_kind="proxy",
+                accepted_for_playbook=event_playbooks.EventPlaybookType.FAN_SPORTS_EVENT.value,
+            ),
+            event_graph.EventClusterAssetLink(
+                cluster_id=entry.cluster_id,
+                event_id="btc-noise",
+                coin_id="bitcoin",
+                symbol="BTC",
+                playbook_type=event_playbooks.EventPlaybookType.SOURCE_NOISE_CONTROL.value,
+                relationship_type="publisher_suffix_false_positive",
+                asset_role="source_noise",
+                accepted=False,
+                link_confidence=0.20,
+                classifier_confidence=0.90,
+                rejected_reason="publisher/source noise",
+            ),
+        ),
+        warnings=("single source should be reviewed",),
+    )
     card = event_research_cards.render_research_card(
         "CHZ",
         watchlist_entries=[entry],
         alert_rows=alerts,
         route_decisions=[routed],
+        clusters=[cluster],
     )
     assert card.found is True
     assert "CHZ Event Research Card" in card.markdown
     assert "Evidence Sources" in card.markdown
+    assert "Cluster Context" in card.markdown
+    assert "Accepted links by kind: proxy=CHZ/chiliz" in card.markdown
+    assert "Rejected/noise links: BTC/bitcoin:publisher/source noise" in card.markdown
     assert "World Cup" in card.markdown
     assert ".env" not in card.markdown
 
@@ -7213,6 +7555,16 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event-alpha-cycle-send:" in text
     assert "event-alpha-runs-report:" in text
     assert "event-alpha-status:" in text
+    assert "event-alpha-daily-report:" in text
+    assert "event-alpha-daily-llm-report:" in text
+    assert "event-alpha-daily-send:" in text
+    assert "event-alpha-health:" in text
+    assert "event-alpha-open-items:" in text
+    assert "--event-alpha-profile no_key_live" in text
+    assert "--event-alpha-profile full_llm_live" in text
+    assert "--event-alpha-profile research_send --event-alert-send" in text
+    assert "RSI_EVENT_ALERTS_ENABLED=1" in text
+    assert "RSI_EVENT_WATCHLIST_MONITOR_ENABLED=1" in text
     assert "event-alpha-alerts-report:" in text
     assert "event-alpha-fill-outcomes:" in text
     assert "--event-alpha-cycle" in text

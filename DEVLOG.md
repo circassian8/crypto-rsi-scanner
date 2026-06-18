@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Polish Event Alpha daily operations · Codex
+**Why:** Event Alpha had strong operational reports, but daily cycles still
+needed profile RSS readiness fixes, active-watchlist monitor routing inside the
+cycle, precise send accounting, safer missed-opportunity identity diagnostics,
+cluster-aware research cards, and runbook Make targets.
+**Changes:**
+- Fixed live Event Alpha profiles that enable project-blog/RSS sources so they
+  also load the default checked-in RSS URL list and show `project_blog_rss`
+  ready in profile-aware status.
+- Added opt-in watchlist monitor cycle integration with
+  `RSI_EVENT_WATCHLIST_MONITOR_ENABLED`,
+  `RSI_EVENT_WATCHLIST_MONITOR_MARKET_PATH`, and
+  `RSI_EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES`; material monitor hints now flow
+  through the existing router/cooldown lanes instead of creating separate
+  alerts.
+- Added structured Event Alpha send accounting for requested/attempted/success,
+  attempted/delivered item counts, and block reasons, and persisted those fields
+  in the run ledger.
+- Hardened missed-opportunity diagnostics so URL-only and publisher/source
+  metadata matches do not become `resolver_missed_asset`; title/body/event text
+  or validated LLM quotes remain the strong evidence path.
+- Made research cards cluster-aware when `event_graph` data is supplied, showing
+  cluster confidence, source diversity, accepted links by kind, rejected/noise
+  links, source origins, URLs, and warnings.
+- Added operational Make targets: `event-alpha-daily-report`,
+  `event-alpha-daily-llm-report`, `event-alpha-daily-send`,
+  `event-alpha-health`, and `event-alpha-open-items`.
+**Verify:** `python3 tests/test_indicators.py` passed 339/339. `make
+event-llm-eval PYTHON=python3` passed 9/9 golden cases. `make
+event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases. `make
+event-alpha-eval PYTHON=python3` passed 11/11 golden checks. `make verify
+PYTHON=python3` passed.
+**Notes/risks:** Still research-only. Monitor updates cannot create
+`TRIGGERED_FADE`; the send path uses router-approved decisions only and remains
+guarded by `RSI_EVENT_ALERTS_ENABLED=1` plus `research_only` mode.
+
 ## 2026-06-18 — Add Event Alpha operational radar reports · Codex
 **Why:** Event Alpha had source discovery, LLM advisory, playbooks, watchlist
 state, routing, and alert snapshots, but daily operation still needed a run

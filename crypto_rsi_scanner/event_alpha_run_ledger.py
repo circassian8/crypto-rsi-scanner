@@ -99,8 +99,11 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"queries={int(row.get('catalyst_queries') or 0)} accepted={int(row.get('catalyst_results_accepted') or 0)} "
             f"rejected={int(row.get('catalyst_results_rejected') or 0)} candidates={int(row.get('candidates') or 0)} "
             f"alerts={int(row.get('alerts') or 0)} routed={int(row.get('routed') or 0)} "
-            f"alertable={int(row.get('alertable') or 0)} sent={str(bool(row.get('sent'))).lower()}"
+            f"alertable={int(row.get('alertable') or 0)} sent={str(bool(row.get('sent'))).lower()} "
+            f"send={int(row.get('send_items_delivered') or 0)}/{int(row.get('send_items_attempted') or 0)}"
         )
+        if row.get("send_block_reason"):
+            rows.append(f"  send_block: {row.get('send_block_reason')}")
         rows.append(
             "  "
             f"provider_fetch={int(row.get('provider_fetch_count') or 0)} "
@@ -147,7 +150,6 @@ def _run_record(
         "finished_at": finished_at.isoformat(),
         "runtime_seconds": round(max(0.0, (finished_at - started_at).total_seconds()), 4),
         "with_llm": bool(with_llm),
-        "send_requested": bool(send_requested),
         "raw_events": _int(getattr(result, "raw_events", 0)),
         "market_anomalies": _market_anomaly_count(discovery),
         "catalyst_queries": _int(getattr(result, "catalyst_queries", 0)),
@@ -160,9 +162,17 @@ def _run_record(
         "alerts": len(list(getattr(result, "alerts", ()) or ())),
         "watchlist_entries": _int(getattr(result, "watchlist_entries", 0)),
         "watchlist_escalations": _int(getattr(result, "watchlist_escalations", 0)),
+        "watchlist_monitor_active_entries": _int(getattr(result, "watchlist_monitor_active_entries", 0)),
+        "watchlist_monitor_material_updates": _int(getattr(result, "watchlist_monitor_material_updates", 0)),
         "routed": _int(getattr(result, "routed", 0)),
         "alertable": _int(getattr(result, "alertable", 0)),
-        "sent": bool(getattr(result, "send_attempted", False)),
+        "send_requested": bool(getattr(result, "send_requested", send_requested)),
+        "send_attempted": bool(getattr(result, "send_attempted", False)),
+        "send_success": bool(getattr(result, "send_success", False)),
+        "send_items_attempted": _int(getattr(result, "send_items_attempted", 0)),
+        "send_items_delivered": _int(getattr(result, "send_items_delivered", 0)),
+        "send_block_reason": getattr(result, "send_block_reason", None),
+        "sent": bool(getattr(result, "send_success", False)),
         "provider_fetch_count": _int(getattr(catalyst, "provider_fetch_count", 0)),
         "provider_cache_hits": _int(getattr(catalyst, "provider_cache_hits", 0)),
         "provider_cache_misses": _int(getattr(catalyst, "provider_cache_misses", 0)),

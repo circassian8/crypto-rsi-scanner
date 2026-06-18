@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -17,12 +17,23 @@ from . import (
     event_llm_analyzer,
     event_llm_extractor,
     event_watchlist,
+    event_watchlist_monitor,
 )
 from .event_models import EventDiscoveryResult, RawDiscoveredEvent
 
 RawEventTransform = Callable[[tuple[RawDiscoveredEvent, ...]], Iterable[RawDiscoveredEvent]]
 DiscoveryLoader = Callable[[datetime, RawEventTransform | None], EventDiscoveryResult]
 ResearchAlertSender = Callable[[list[event_alpha_router.EventAlphaRouteDecision]], Any]
+
+
+@dataclass(frozen=True)
+class EventAlphaSendResult:
+    requested: bool = False
+    attempted: bool = False
+    success: bool = False
+    items_attempted: int = 0
+    items_delivered: int = 0
+    block_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -34,9 +45,15 @@ class EventAlphaPipelineResult:
     extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow]
     relationship_rows: list[event_llm_analyzer.EventLLMReportRow]
     watchlist_result: event_watchlist.EventWatchlistRefreshResult | None
+    watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None
     router_result: event_alpha_router.EventAlphaRouterResult | None
     warnings: tuple[str, ...] = ()
+    send_requested: bool = False
     send_attempted: bool = False
+    send_success: bool = False
+    send_items_attempted: int = 0
+    send_items_delivered: int = 0
+    send_block_reason: str | None = None
 
     @property
     def raw_events(self) -> int:
@@ -82,6 +99,16 @@ class EventAlphaPipelineResult:
         return len(self.watchlist_result.alert_entries) if self.watchlist_result else 0
 
     @property
+    def watchlist_monitor_material_updates(self) -> int:
+        if self.watchlist_monitor_result is None:
+            return 0
+        return len([row for row in self.watchlist_monitor_result.rows if row.material_update])
+
+    @property
+    def watchlist_monitor_active_entries(self) -> int:
+        return self.watchlist_monitor_result.active_entries if self.watchlist_monitor_result else 0
+
+    @property
     def routed(self) -> int:
         return len(self.router_result.decisions) if self.router_result else 0
 
@@ -104,6 +131,9 @@ def run_event_alpha_pipeline(
     router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
     refresh_watchlist: bool = False,
     route: bool = False,
+    watchlist_monitor_enabled: bool = False,
+    watchlist_monitor_market_rows: Iterable[dict[str, Any]] = (),
+    watchlist_monitor_route_updates: bool = True,
     extra_warnings: Iterable[str] = (),
 ) -> EventAlphaPipelineResult:
     """Run the research-only Event Alpha pipeline over a discovery result."""
@@ -141,11 +171,31 @@ def run_event_alpha_pipeline(
     )
 
     watchlist_result: event_watchlist.EventWatchlistRefreshResult | None = None
+    watchlist_read_result: event_watchlist.EventWatchlistReadResult | None = None
     if refresh_watchlist:
         if watchlist_cfg is None or not watchlist_cfg.enabled:
             warnings.append("watchlist refresh skipped: RSI_EVENT_WATCHLIST_ENABLED is not enabled")
         else:
             watchlist_result = event_watchlist.refresh_watchlist(alerts, cfg=watchlist_cfg, now=observed)
+
+    watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None = None
+    if watchlist_monitor_enabled:
+        if watchlist_cfg is None or not watchlist_cfg.enabled:
+            warnings.append("watchlist monitor skipped: RSI_EVENT_WATCHLIST_ENABLED is not enabled")
+        else:
+            state_path = watchlist_cfg.state_path or Path("event_watchlist_state.jsonl")
+            watchlist_read_result = event_watchlist.load_watchlist(state_path)
+            watchlist_monitor_result = event_watchlist_monitor.monitor_watchlist(
+                watchlist_read_result,
+                market_rows=watchlist_monitor_market_rows,
+                now=observed,
+            )
+            watchlist_read_result = event_watchlist_monitor.apply_monitor_updates_to_watchlist(
+                watchlist_read_result,
+                watchlist_monitor_result,
+                route_updates=watchlist_monitor_route_updates,
+                score_jump_threshold=(router_cfg.score_jump_threshold if router_cfg else 10),
+            )
 
     router_result: event_alpha_router.EventAlphaRouterResult | None = None
     if route:
@@ -154,7 +204,7 @@ def run_event_alpha_pipeline(
         elif not watchlist_cfg.enabled:
             warnings.append("router skipped: RSI_EVENT_WATCHLIST_ENABLED is not enabled")
         else:
-            read_result = event_watchlist.load_watchlist(
+            read_result = watchlist_read_result or event_watchlist.load_watchlist(
                 watchlist_cfg.state_path or Path("event_watchlist_state.jsonl")
             )
             router_result = event_alpha_router.route_watchlist(read_result, cfg=router_cfg)
@@ -167,6 +217,7 @@ def run_event_alpha_pipeline(
         extraction_rows=extraction_rows_list,
         relationship_rows=relationship_rows,
         watchlist_result=watchlist_result,
+        watchlist_monitor_result=watchlist_monitor_result,
         router_result=router_result,
         warnings=tuple(dict.fromkeys(warnings)),
     )
@@ -188,6 +239,9 @@ def run_event_alpha_operating_cycle(
     router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
     refresh_watchlist: bool = True,
     route: bool = True,
+    watchlist_monitor_enabled: bool = False,
+    watchlist_monitor_market_rows: Iterable[dict[str, Any]] = (),
+    watchlist_monitor_route_updates: bool = True,
     send: bool = False,
     send_callback: ResearchAlertSender | None = None,
 ) -> EventAlphaPipelineResult:
@@ -297,81 +351,95 @@ def run_event_alpha_operating_cycle(
         router_cfg=router_cfg,
         refresh_watchlist=refresh_watchlist,
         route=route,
+        watchlist_monitor_enabled=watchlist_monitor_enabled,
+        watchlist_monitor_market_rows=watchlist_monitor_market_rows,
+        watchlist_monitor_route_updates=watchlist_monitor_route_updates,
         extra_warnings=warnings,
     )
     if send:
         if send_callback is None:
             warnings = [*result.warnings, "research send skipped: no send callback supplied"]
-            return EventAlphaPipelineResult(
-                discovery_result=result.discovery_result,
-                alerts=result.alerts,
-                catalyst_search_result=result.catalyst_search_result,
-                anomaly_lifecycle_result=result.anomaly_lifecycle_result,
-                extraction_rows=result.extraction_rows,
-                relationship_rows=result.relationship_rows,
-                watchlist_result=result.watchlist_result,
-                router_result=result.router_result,
-                warnings=tuple(dict.fromkeys(warnings)),
-                send_attempted=False,
+            return _with_send_result(
+                result,
+                EventAlphaSendResult(requested=True, block_reason="no send callback supplied"),
+                warnings=warnings,
             )
         if result.router_result is None:
             warnings = [*result.warnings, "research send skipped: no router decisions available"]
-            return EventAlphaPipelineResult(
-                discovery_result=result.discovery_result,
-                alerts=result.alerts,
-                catalyst_search_result=result.catalyst_search_result,
-                anomaly_lifecycle_result=result.anomaly_lifecycle_result,
-                extraction_rows=result.extraction_rows,
-                relationship_rows=result.relationship_rows,
-                watchlist_result=result.watchlist_result,
-                router_result=result.router_result,
-                warnings=tuple(dict.fromkeys(warnings)),
-                send_attempted=False,
+            return _with_send_result(
+                result,
+                EventAlphaSendResult(requested=True, block_reason="no router decisions available"),
+                warnings=warnings,
             )
         decisions = result.router_result.alertable_decisions
         if not decisions:
             warnings = [*result.warnings, "research send skipped: no alertable route decisions"]
-            return EventAlphaPipelineResult(
-                discovery_result=result.discovery_result,
-                alerts=result.alerts,
-                catalyst_search_result=result.catalyst_search_result,
-                anomaly_lifecycle_result=result.anomaly_lifecycle_result,
-                extraction_rows=result.extraction_rows,
-                relationship_rows=result.relationship_rows,
-                watchlist_result=result.watchlist_result,
-                router_result=result.router_result,
-                warnings=tuple(dict.fromkeys(warnings)),
-                send_attempted=False,
+            return _with_send_result(
+                result,
+                EventAlphaSendResult(requested=True, block_reason="no alertable route decisions"),
+                warnings=warnings,
             )
         try:
-            send_callback(decisions)
+            raw_send_result = send_callback(decisions)
+            send_result = _normalize_send_result(raw_send_result, decisions)
         except Exception as exc:  # pragma: no cover - defensive fail-soft guard
             warnings = [*result.warnings, f"research send failed: {exc}"]
-            return EventAlphaPipelineResult(
-                discovery_result=result.discovery_result,
-                alerts=result.alerts,
-                catalyst_search_result=result.catalyst_search_result,
-                anomaly_lifecycle_result=result.anomaly_lifecycle_result,
-                extraction_rows=result.extraction_rows,
-                relationship_rows=result.relationship_rows,
-                watchlist_result=result.watchlist_result,
-                router_result=result.router_result,
-                warnings=tuple(dict.fromkeys(warnings)),
-                send_attempted=True,
+            return _with_send_result(
+                result,
+                EventAlphaSendResult(
+                    requested=True,
+                    attempted=True,
+                    success=False,
+                    items_attempted=len(decisions),
+                    items_delivered=0,
+                    block_reason=str(exc),
+                ),
+                warnings=warnings,
             )
-        return EventAlphaPipelineResult(
-            discovery_result=result.discovery_result,
-            alerts=result.alerts,
-            catalyst_search_result=result.catalyst_search_result,
-            anomaly_lifecycle_result=result.anomaly_lifecycle_result,
-            extraction_rows=result.extraction_rows,
-            relationship_rows=result.relationship_rows,
-            watchlist_result=result.watchlist_result,
-            router_result=result.router_result,
-            warnings=result.warnings,
-            send_attempted=True,
+        return _with_send_result(result, send_result)
+    return _with_send_result(result, EventAlphaSendResult(requested=False))
+
+
+def _with_send_result(
+    result: EventAlphaPipelineResult,
+    send_result: EventAlphaSendResult,
+    *,
+    warnings: Iterable[str] | None = None,
+) -> EventAlphaPipelineResult:
+    return replace(
+        result,
+        warnings=tuple(dict.fromkeys(warnings if warnings is not None else result.warnings)),
+        send_requested=send_result.requested,
+        send_attempted=send_result.attempted,
+        send_success=send_result.success,
+        send_items_attempted=send_result.items_attempted,
+        send_items_delivered=send_result.items_delivered,
+        send_block_reason=send_result.block_reason,
+    )
+
+
+def _normalize_send_result(
+    raw_result: Any,
+    decisions: list[event_alpha_router.EventAlphaRouteDecision],
+) -> EventAlphaSendResult:
+    if isinstance(raw_result, EventAlphaSendResult):
+        return raw_result
+    if isinstance(raw_result, bool):
+        return EventAlphaSendResult(
+            requested=True,
+            attempted=True,
+            success=raw_result,
+            items_attempted=len(decisions),
+            items_delivered=len(decisions) if raw_result else 0,
+            block_reason=None if raw_result else "send callback returned false",
         )
-    return result
+    return EventAlphaSendResult(
+        requested=True,
+        attempted=True,
+        success=True,
+        items_attempted=len(decisions),
+        items_delivered=len(decisions),
+    )
 
 
 def _merge_catalyst_search_events(
@@ -414,7 +482,16 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
         (
             f"watchlist_entries={result.watchlist_entries} · "
             f"watchlist_escalations={result.watchlist_escalations} · "
+            f"watchlist_monitor_active={result.watchlist_monitor_active_entries} · "
+            f"watchlist_monitor_material={result.watchlist_monitor_material_updates} · "
             f"routed={result.routed} · alertable={result.alertable}"
+        ),
+        (
+            f"send_requested={str(result.send_requested).lower()} · "
+            f"send_attempted={str(result.send_attempted).lower()} · "
+            f"send_success={str(result.send_success).lower()} · "
+            f"send_items={result.send_items_delivered}/{result.send_items_attempted}"
+            + (f" · send_block={result.send_block_reason}" if result.send_block_reason else "")
         ),
     ]
     if result.warnings:
@@ -425,6 +502,9 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
     if result.anomaly_lifecycle_result is not None:
         lines.append("")
         lines.append(event_anomaly_state.format_anomaly_lifecycle_report(result.anomaly_lifecycle_result))
+    if result.watchlist_monitor_result is not None:
+        lines.append("")
+        lines.append(event_watchlist_monitor.format_watchlist_monitor_report(result.watchlist_monitor_result))
     lines.append("")
     lines.append(_tier_summary(result.alerts))
     if result.router_result is not None:
