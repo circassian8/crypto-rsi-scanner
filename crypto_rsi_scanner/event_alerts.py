@@ -18,6 +18,7 @@ from .event_classification import (
     ROLE_DIRECT_BENEFICIARY,
     ROLE_INFRASTRUCTURE,
     ROLE_MENTIONED_ASSET,
+    ROLE_PROXY_INSTRUMENT,
     ROLE_PROXY_VENUE,
     ROLE_TICKER_WORD_COLLISION,
 )
@@ -61,6 +62,9 @@ class EventAlertCandidate:
     llm_confidence: float | None = None
     llm_reason: str | None = None
     llm_adjustment_reason: str | None = None
+    rule_playbook_type: str | None = None
+    effective_playbook_type: str | None = None
+    llm_adjusted_playbook_type: str | None = None
     playbook_type: str | None = None
     playbook_score: int | None = None
     playbook_action: str | None = None
@@ -70,6 +74,9 @@ class EventAlertCandidate:
     playbook_what_to_verify: tuple[str, ...] = ()
     playbook_timing_window: str | None = None
     playbook_invalidation: str | None = None
+    expected_direction: str | None = None
+    primary_horizon: str | None = None
+    success_metric: str | None = None
 
     @property
     def symbol(self) -> str:
@@ -145,8 +152,23 @@ def apply_llm_advisory(
         reason = _analysis_reason(analysis)
         new_tier = alert.tier
         adjustment: str | None = None
+        effective_playbook = alert.effective_playbook_type or alert.playbook_type
+        playbook_adjustment: str | None = None
         if enabled:
             new_tier, adjustment = _advisory_tier(alert, cfg, role, confidence)
+            effective_playbook = _advisory_playbook_type(alert, role, confidence)
+            if effective_playbook != (alert.effective_playbook_type or alert.playbook_type):
+                playbook_adjustment = (
+                    f"LLM adjusted effective playbook to {effective_playbook}."
+                    if effective_playbook else None
+                )
+        action = _action_for_tier(new_tier)
+        expected_direction, primary_horizon, success_metric = event_playbooks.outcome_profile_for_playbook(
+            effective_playbook
+        )
+        combined_adjustment = "; ".join(
+            item for item in (adjustment, playbook_adjustment) if item
+        ) or None
         adjusted.append(replace(
             alert,
             tier=new_tier,
@@ -155,7 +177,20 @@ def apply_llm_advisory(
             llm_relationship_type=relationship or None,
             llm_confidence=confidence,
             llm_reason=reason,
-            llm_adjustment_reason=adjustment,
+            llm_adjustment_reason=combined_adjustment,
+            playbook_type=effective_playbook,
+            effective_playbook_type=effective_playbook,
+            llm_adjusted_playbook_type=effective_playbook
+            if effective_playbook != (alert.rule_playbook_type or alert.playbook_type)
+            else alert.llm_adjusted_playbook_type,
+            playbook_action=action,
+            playbook_can_trigger_fade=bool(
+                alert.playbook_can_trigger_fade
+                and effective_playbook == event_playbooks.EventPlaybookType.PROXY_FADE.value
+            ),
+            expected_direction=expected_direction,
+            primary_horizon=primary_horizon,
+            success_metric=success_metric,
         ))
     return sorted(adjusted, key=_alert_sort_key)
 
@@ -186,12 +221,17 @@ def format_event_alert_report(alerts: Iterable[EventAlertCandidate]) -> str:
             f"relationship: {c.classification.relationship_type}"
         )
         rows.append(f"  source: {alert.source} · time: {event_time} · url: {source_url}")
-        if alert.playbook_type:
+        effective_playbook = alert.effective_playbook_type or alert.playbook_type
+        if effective_playbook:
             rows.append(
-                f"  playbook: {alert.playbook_type} score={alert.playbook_score if alert.playbook_score is not None else 0} "
+                f"  playbook: {effective_playbook} score={alert.playbook_score if alert.playbook_score is not None else 0} "
                 f"action={alert.playbook_action or 'store_only'} "
                 f"fade_trigger_allowed={str(alert.playbook_can_trigger_fade).lower()}"
             )
+            if alert.rule_playbook_type and alert.rule_playbook_type != effective_playbook:
+                rows.append(f"  rule playbook: {alert.rule_playbook_type}")
+            if alert.llm_adjusted_playbook_type:
+                rows.append(f"  llm adjusted playbook: {alert.llm_adjusted_playbook_type}")
             if alert.playbook_reason:
                 rows.append(f"  playbook reason: {alert.playbook_reason}")
             if alert.playbook_hypothesis:
@@ -200,6 +240,11 @@ def format_event_alert_report(alerts: Iterable[EventAlertCandidate]) -> str:
                 rows.append(f"  timing window: {alert.playbook_timing_window}")
             if alert.playbook_invalidation:
                 rows.append(f"  invalidation: {alert.playbook_invalidation}")
+            if alert.expected_direction or alert.primary_horizon or alert.success_metric:
+                rows.append(
+                    f"  outcome profile: direction={alert.expected_direction or 'unknown'} "
+                    f"horizon={alert.primary_horizon or 'unknown'} metric={alert.success_metric or 'manual'}"
+                )
         rows.append(f"  reason: {alert.reason}")
         if alert.llm_asset_role:
             rows.append(
@@ -247,9 +292,10 @@ def format_event_alert_telegram_digest(alerts: Iterable[EventAlertCandidate]) ->
             f"external={_esc(alert.external_asset or 'unknown')} "
             f"role={_esc(alert.asset_role)} rel={_esc(c.classification.relationship_type)}"
         )
-        if alert.playbook_type:
+        effective_playbook = alert.effective_playbook_type or alert.playbook_type
+        if effective_playbook:
             lines.append(
-                f"playbook={_esc(alert.playbook_type)} "
+                f"playbook={_esc(effective_playbook)} "
                 f"action={_esc(alert.playbook_action or 'store_only')}"
             )
             if alert.playbook_hypothesis:
@@ -279,8 +325,8 @@ def _build_alert_candidate(
     if tier == EventAlertTier.TRIGGERED_FADE and not playbook.can_trigger_fade:
         tier = EventAlertTier.STORE_ONLY
         rejected = "; ".join(filter(None, [rejected, f"playbook {playbook.playbook_type} cannot trigger fade"]))
-    reason = _reason(candidate, tier, components)
-    verify = _verify_items(candidate, tier)
+    reason = _reason(candidate, tier, components, playbook)
+    verify = _verify_items(candidate, tier, playbook)
     return EventAlertCandidate(
         discovery_candidate=candidate,
         tier=tier,
@@ -289,6 +335,8 @@ def _build_alert_candidate(
         reason=reason,
         verify=verify,
         rejected_reason=rejected,
+        rule_playbook_type=playbook.playbook_type,
+        effective_playbook_type=playbook.playbook_type,
         playbook_type=playbook.playbook_type,
         playbook_score=playbook.playbook_score,
         playbook_action=playbook.recommended_action,
@@ -298,6 +346,9 @@ def _build_alert_candidate(
         playbook_what_to_verify=playbook.what_to_verify,
         playbook_timing_window=playbook.timing_window,
         playbook_invalidation=playbook.invalidation,
+        expected_direction=playbook.expected_direction,
+        primary_horizon=playbook.primary_horizon,
+        success_metric=playbook.success_metric,
     )
 
 
@@ -469,11 +520,35 @@ def _novelty_quality(first_seen: datetime | None, now: datetime, source_count: i
     return _clamp(freshness + min(10, max(0, source_count - 1) * 5))
 
 
-def _reason(candidate: DiscoveredEventFadeCandidate, tier: EventAlertTier, components: dict[str, int]) -> str:
+def _reason(
+    candidate: DiscoveredEventFadeCandidate,
+    tier: EventAlertTier,
+    components: dict[str, int],
+    playbook: event_playbooks.EventPlaybookAssessment,
+) -> str:
     if tier == EventAlertTier.TRIGGERED_FADE:
-        return "Existing event-fade engine emitted SHORT_TRIGGERED; still research-only."
+        parts = ["Existing event-fade engine emitted SHORT_TRIGGERED; still research-only."]
+        if playbook.hypothesis:
+            parts.append(playbook.hypothesis)
+        if playbook.invalidation:
+            parts.append(f"Invalidation: {playbook.invalidation}")
+        return " ".join(parts)
     if tier == EventAlertTier.STORE_ONLY:
+        if playbook.reason or playbook.hypothesis:
+            detail = " ".join(item for item in (playbook.reason, playbook.hypothesis) if item)
+            return f"Stored for research evidence. {detail}"
         return "Stored for research evidence, but quality or relationship gates are not strong enough for a research alert."
+    parts = []
+    if playbook.hypothesis:
+        parts.append(playbook.hypothesis)
+    elif playbook.reason:
+        parts.append(playbook.reason)
+    if playbook.timing_window:
+        parts.append(f"Timing: {playbook.timing_window}.")
+    if playbook.invalidation:
+        parts.append(f"Invalidation: {playbook.invalidation}")
+    if parts:
+        return " ".join(parts)
     parts = [
         f"proxy={components['proxy_relationship']}",
         f"asset={components['asset_resolution']}",
@@ -486,11 +561,12 @@ def _reason(candidate: DiscoveredEventFadeCandidate, tier: EventAlertTier, compo
     return "Plausible proxy-event candidate: " + ", ".join(parts) + "."
 
 
-def _verify_items(candidate: DiscoveredEventFadeCandidate, tier: EventAlertTier) -> tuple[str, ...]:
-    items = [
-        "confirm the crypto asset is the proxy instrument, not merely venue/infrastructure",
-        "confirm the external catalyst and source timestamp",
-    ]
+def _verify_items(
+    candidate: DiscoveredEventFadeCandidate,
+    tier: EventAlertTier,
+    playbook: event_playbooks.EventPlaybookAssessment,
+) -> tuple[str, ...]:
+    items = list(playbook.what_to_verify)
     if candidate.event.event_time is None:
         items.append("find or reject a dated catalyst before treating it as event-fade eligible")
     elif candidate.event.event_time_confidence < 0.80:
@@ -499,7 +575,9 @@ def _verify_items(candidate: DiscoveredEventFadeCandidate, tier: EventAlertTier)
         items.append("venue-token thesis is review-only by default")
     if tier == EventAlertTier.TRIGGERED_FADE:
         items.append("check post-event technical failure and invalidation level manually")
-    return tuple(items)
+    if not items:
+        items.append("review source evidence and asset identity")
+    return tuple(dict.fromkeys(items))
 
 
 def _advisory_tier(
@@ -560,6 +638,35 @@ def _advisory_tier(
             "LLM confirmed proxy_instrument; advisory tier follows score thresholds.",
         ) if target != original else (original, None)
     return original, None
+
+
+def _advisory_playbook_type(alert: EventAlertCandidate, role: str, confidence: float) -> str | None:
+    current = alert.effective_playbook_type or alert.playbook_type
+    if alert.tier == EventAlertTier.TRIGGERED_FADE and current == event_playbooks.EventPlaybookType.PROXY_FADE.value:
+        return current
+    if role in {"source_noise", "ticker_word_collision"} and confidence >= 0.75:
+        return event_playbooks.EventPlaybookType.SOURCE_NOISE_CONTROL.value
+    if role == ROLE_INFRASTRUCTURE and confidence >= 0.75:
+        return event_playbooks.EventPlaybookType.INFRASTRUCTURE_MENTION.value
+    if role == ROLE_DIRECT_BENEFICIARY and confidence >= 0.75:
+        return event_playbooks.EventPlaybookType.DIRECT_EVENT.value
+    if role in {ROLE_PROXY_INSTRUMENT, ROLE_PROXY_VENUE} and confidence >= 0.80:
+        if alert.rule_playbook_type == event_playbooks.EventPlaybookType.PROXY_FADE.value:
+            return event_playbooks.EventPlaybookType.PROXY_FADE.value
+        return event_playbooks.EventPlaybookType.PROXY_ATTENTION.value
+    return current
+
+
+def _action_for_tier(tier: EventAlertTier) -> str:
+    if tier == EventAlertTier.TRIGGERED_FADE:
+        return event_playbooks.EventPlaybookAction.TRIGGERED_FADE_ALLOWED.value
+    if tier == EventAlertTier.HIGH_PRIORITY_WATCH:
+        return event_playbooks.EventPlaybookAction.HIGH_PRIORITY_WATCH.value
+    if tier == EventAlertTier.WATCHLIST:
+        return event_playbooks.EventPlaybookAction.WATCHLIST.value
+    if tier == EventAlertTier.RADAR_DIGEST:
+        return event_playbooks.EventPlaybookAction.RADAR_DIGEST.value
+    return event_playbooks.EventPlaybookAction.STORE_ONLY.value
 
 
 def _cap_tier(tier: EventAlertTier, max_tier: EventAlertTier) -> EventAlertTier:

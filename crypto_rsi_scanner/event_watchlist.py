@@ -78,6 +78,9 @@ class EventWatchlistEntry:
     latest_event_name: str = ""
     latest_source: str = ""
     latest_playbook_type: str | None = None
+    latest_rule_playbook_type: str | None = None
+    latest_effective_playbook_type: str | None = None
+    latest_llm_adjusted_playbook_type: str | None = None
     latest_playbook_score: int | None = None
     latest_playbook_action: str | None = None
     latest_llm_asset_role: str | None = None
@@ -167,7 +170,7 @@ def load_watchlist(
 def watchlist_key(alert: event_alerts.EventAlertCandidate) -> str:
     candidate = alert.discovery_candidate
     cluster_id = event_graph.cluster_id_for_event(candidate.event)
-    playbook = alert.playbook_type or candidate.classification.relationship_type
+    playbook = alert.effective_playbook_type or alert.playbook_type or candidate.classification.relationship_type
     parts = (
         cluster_id,
         candidate.asset.coin_id,
@@ -244,6 +247,8 @@ def _entry_from_alert(
         "state": state.value,
         "tier": alert.tier.value,
         "score": alert.opportunity_score,
+        "rule_playbook_type": alert.rule_playbook_type,
+        "effective_playbook_type": alert.effective_playbook_type or alert.playbook_type,
         "should_alert": should_alert,
     })
     history = history[-max(1, cfg.max_alert_history):]
@@ -316,7 +321,10 @@ def _entry_from_alert(
         latest_tier=alert.tier.value,
         latest_event_name=event.event_name,
         latest_source=event.source,
-        latest_playbook_type=alert.playbook_type,
+        latest_playbook_type=alert.effective_playbook_type or alert.playbook_type,
+        latest_rule_playbook_type=alert.rule_playbook_type,
+        latest_effective_playbook_type=alert.effective_playbook_type or alert.playbook_type,
+        latest_llm_adjusted_playbook_type=alert.llm_adjusted_playbook_type,
         latest_playbook_score=alert.playbook_score,
         latest_playbook_action=alert.playbook_action,
         latest_llm_asset_role=alert.llm_asset_role,
@@ -481,6 +489,10 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             latest_event_name=str(row.get("latest_event_name") or ""),
             latest_source=str(row.get("latest_source") or ""),
             latest_playbook_type=_optional_str(row.get("latest_playbook_type")),
+            latest_rule_playbook_type=_optional_str(row.get("latest_rule_playbook_type")),
+            latest_effective_playbook_type=_optional_str(row.get("latest_effective_playbook_type"))
+            or _optional_str(row.get("latest_playbook_type")),
+            latest_llm_adjusted_playbook_type=_optional_str(row.get("latest_llm_adjusted_playbook_type")),
             latest_playbook_score=_optional_int(row.get("latest_playbook_score")),
             latest_playbook_action=_optional_str(row.get("latest_playbook_action")),
             latest_llm_asset_role=_optional_str(row.get("latest_llm_asset_role")),
@@ -514,6 +526,15 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def _entry_lines(entry: EventWatchlistEntry) -> list[str]:
+    effective = entry.latest_effective_playbook_type or entry.latest_playbook_type or "unknown"
+    rule = entry.latest_rule_playbook_type
+    playbook_line = (
+        f"  playbook: {effective} "
+        f"score={entry.latest_playbook_score if entry.latest_playbook_score is not None else 0} "
+        f"action={entry.latest_playbook_action or 'store_only'}"
+    )
+    if rule and rule != effective:
+        playbook_line += f" · rule={rule}"
     return [
         f"{entry.state:<16} score={entry.latest_score:>3} high={entry.highest_score:>3} "
         f"{entry.symbol}/{entry.coin_id}",
@@ -522,9 +543,7 @@ def _entry_lines(entry: EventWatchlistEntry) -> list[str]:
         f"  external: {entry.external_asset or 'unknown'} · relationship: {entry.relationship_type}",
         f"  first_seen: {entry.first_seen_at} · last_seen: {entry.last_seen_at}",
         f"  tier: {entry.latest_tier or 'unknown'} · source_count: {entry.source_count} · source: {entry.latest_source}",
-        f"  playbook: {entry.latest_playbook_type or 'unknown'} "
-        f"score={entry.latest_playbook_score if entry.latest_playbook_score is not None else 0} "
-        f"action={entry.latest_playbook_action or 'store_only'}",
+        playbook_line,
         f"  transition: {entry.previous_state or 'new'} -> {entry.state}"
         + (" · alertable escalation" if entry.should_alert else f" · suppressed: {entry.suppressed_reason}"),
     ]

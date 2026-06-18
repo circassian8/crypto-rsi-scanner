@@ -1411,7 +1411,7 @@ def event_alpha_cycle(
         refresh_watchlist=True,
         route=True,
         send=send,
-        send_callback=lambda alerts: _send_event_alert_digest(alerts, alert_cfg, now=now),
+        send_callback=lambda decisions: _send_event_alpha_routed_digest(decisions, alert_cfg, now=now),
     )
     print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
     store_result = event_alpha_alert_store.write_alert_snapshots(
@@ -1667,6 +1667,44 @@ def _send_event_alert_digest(
             print(f"Event research Telegram digest sent with {len(digest)} item(s).")
         else:
             print("Event research Telegram digest not sent: no channel delivered.")
+    finally:
+        storage.close()
+
+
+def _send_event_alpha_routed_digest(
+    decisions: list[event_alpha_router.EventAlphaRouteDecision],
+    cfg: event_alerts.EventAlertConfig,
+    *,
+    now: datetime | None = None,
+) -> None:
+    if not cfg.enabled:
+        print("Event Alpha routed alert sending disabled. Set RSI_EVENT_ALERTS_ENABLED=1 to opt in.")
+        return
+    if cfg.mode != "research_only":
+        print("Event Alpha routed alert sending blocked: RSI_EVENT_ALERT_MODE must remain research_only.")
+        return
+    alertable = [decision for decision in decisions if decision.alertable]
+    if not alertable:
+        print("Event Alpha routed alert sending skipped: no router-approved escalations.")
+        return
+    storage = Storage(config.DB_PATH)
+    try:
+        now = now or datetime.now(timezone.utc)
+        due, reason = _event_alert_digest_due(storage, cfg, now)
+        if not due:
+            print(f"Event Alpha routed alert sending held: {reason}.")
+            return
+        recipients = storage.active_subscribers() or config.TELEGRAM_CHAT_IDS
+        sent = send_telegram(
+            event_alpha_router.format_routed_telegram_digest(alertable),
+            parse_mode="HTML",
+            chat_ids=recipients,
+        )
+        if sent:
+            _mark_event_alert_digest_sent(storage, len(alertable), now)
+            print(f"Event Alpha routed Telegram digest sent with {len(alertable)} item(s).")
+        else:
+            print("Event Alpha routed Telegram digest not sent: no channel delivered.")
     finally:
         storage.close()
 

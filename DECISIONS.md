@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Route Event Alpha sends through effective playbooks only
+**Status:** accepted
+**Decision:** `RSI_EVENT_LLM_EXTRACTOR_MODE=shadow` is analysis/report-only and
+must not mutate raw event evidence. Only `advisory` mode may append
+quote-validated extraction hints before deterministic discovery, and those
+hints still require deterministic resolver validation. Event Alpha cycle sends
+must use router-approved `alertable_decisions`, not raw event-alert digest
+candidates. Alert reports, watchlist state, router decisions, snapshots, and
+outcome analytics should use `effective_playbook_type` for operational
+grouping while retaining `rule_playbook_type` for audit.
+**Why:** The Event Alpha Radar is now an operational research-alert loop, so its
+mode semantics, send boundary, and playbook identity need to be unambiguous.
+This prevents shadow LLM analysis from changing inputs, prevents broad digest
+rows from bypassing the router, and keeps LLM-advisory false-positive handling
+auditable.
+**Revisit when:** A reviewed Event Alpha sample justifies a human-approved
+promotion beyond local/report or opt-in research digest behavior.
+
 ## 2026-06-18 - Keep Event Alpha alert snapshots artifact-only
 **Status:** accepted
 **Decision:** Event Alpha cycles may append research-only alert snapshots to

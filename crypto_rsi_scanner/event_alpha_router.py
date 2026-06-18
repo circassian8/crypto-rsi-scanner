@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -112,6 +113,40 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
             rows.append(f"  watchlist suppressed: {entry.suppressed_reason}")
         rows.append("")
     return "\n".join(rows).rstrip()
+
+
+def format_routed_telegram_digest(decisions: Iterable[EventAlphaRouteDecision]) -> str:
+    """Render router-approved Event Alpha escalations for Telegram."""
+    keep = [decision for decision in decisions if decision.alertable]
+    lines = [
+        "<b>Event Alpha routed research alerts</b>",
+        "<i>Research alert only. Not a trade signal, paper trade, or execution.</i>",
+    ]
+    if not keep:
+        lines.append("No router-approved escalations.")
+        return "\n".join(lines)
+    for decision in keep:
+        entry = decision.entry
+        lines.append("")
+        lines.append(
+            f"<b>{_esc(decision.route.value)}</b> score={entry.latest_score} "
+            f"<b>{_esc(entry.symbol)}</b>"
+        )
+        lines.append(_esc(entry.latest_event_name or "unknown event"))
+        lines.append(
+            f"state={_esc(entry.state)} playbook={_esc(entry.latest_playbook_type or 'unknown')} "
+            f"external={_esc(entry.external_asset or 'unknown')}"
+        )
+        if entry.latest_rule_playbook_type and entry.latest_rule_playbook_type != entry.latest_playbook_type:
+            lines.append(f"rule_playbook={_esc(entry.latest_rule_playbook_type)}")
+        if entry.latest_llm_asset_role:
+            conf = entry.latest_llm_confidence if entry.latest_llm_confidence is not None else 0.0
+            lines.append(f"llm={_esc(entry.latest_llm_asset_role)} conf={conf:.2f}")
+        lines.append(f"route_reason={_esc(decision.reason)}")
+        warnings = tuple(dict.fromkeys((*entry.warnings, *decision.warnings)))
+        if warnings:
+            lines.append("warnings=" + _esc("; ".join(warnings[:3])))
+    return "\n".join(lines)
 
 
 def _route_entry(
@@ -284,3 +319,7 @@ _NON_FADE_RESEARCH_PLAYBOOKS = {
     event_playbooks.EventPlaybookType.AI_IPO_PROXY.value,
     event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK.value,
 }
+
+
+def _esc(value: object) -> str:
+    return html.escape(str(value), quote=False)

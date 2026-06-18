@@ -3370,12 +3370,18 @@ def test_event_llm_advisory_adjusts_research_alert_tiers_only():
 
     assert rule[("llm-btc-bitcoin-world", "bitcoin")].tier == event_alerts.EventAlertTier.RADAR_DIGEST
     assert by_key[("llm-btc-bitcoin-world", "bitcoin")].tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert by_key[("llm-btc-bitcoin-world", "bitcoin")].effective_playbook_type == "source_noise_control"
+    assert by_key[("llm-btc-bitcoin-world", "bitcoin")].rule_playbook_type != "source_noise_control"
     assert by_key[("llm-xrp-ripple-effects", "xrp")].tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert by_key[("llm-xrp-ripple-effects", "xrp")].effective_playbook_type == "source_noise_control"
     assert by_key[("llm-kcs-kucoin-source", "kucoin-shares")].tier == event_alerts.EventAlertTier.STORE_ONLY
     assert by_key[("llm-chainlink-world-cup", "chainlink")].tier.value in {"STORE_ONLY", "RADAR_DIGEST"}
+    assert by_key[("llm-chainlink-world-cup", "chainlink")].effective_playbook_type == "infrastructure_mention"
     assert by_key[("llm-chz-world-cup", "chiliz")].tier == event_alerts.EventAlertTier.WATCHLIST
+    assert by_key[("llm-chz-world-cup", "chiliz")].effective_playbook_type != "ambiguous_control"
     assert by_key[("llm-velvet-spacex", "velvet")].tier == event_alerts.EventAlertTier.RADAR_DIGEST
     assert by_key[("llm-velvet-spacex", "velvet")].original_tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert by_key[("llm-velvet-spacex", "velvet")].effective_playbook_type == "proxy_attention"
     assert "proxy_venue" in (by_key[("llm-velvet-spacex", "velvet")].llm_adjustment_reason or "")
 
     invalid = rule[("llm-invalid-quote", "velvet")]
@@ -3983,9 +3989,13 @@ def test_event_anomaly_scanner_creates_store_only_research_rows():
     assert len(result.candidates) == 1
     alert = event_alerts.build_event_alert_candidates(result, cfg=event_alerts.EventAlertConfig(), now=now)[0]
     assert alert.tier == event_alerts.EventAlertTier.STORE_ONLY
-    assert alert.playbook_type == "market_anomaly"
+    assert alert.playbook_type == "market_anomaly_unknown"
     assert alert.playbook_action == "store_only"
     assert alert.playbook_can_trigger_fade is False
+    assert alert.expected_direction == "unknown"
+    assert "catalyst is unknown" in alert.reason
+    assert "find dated source evidence" in alert.verify
+    assert "proxy instrument" not in "; ".join(alert.verify)
     assert "not a confirmed proxy narrative" in (alert.rejected_reason or "")
     assert "low classifier confidence" in (alert.rejected_reason or "")
 
@@ -4045,6 +4055,8 @@ def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_nois
     )[0]
     assert proxy_alert.playbook_type == event_playbooks.EventPlaybookType.PROXY_FADE.value
     assert proxy_alert.playbook_can_trigger_fade is True
+    assert proxy_alert.expected_direction == "down"
+    assert proxy_alert.primary_horizon == "72h"
 
     attention = event_discovery.run_discovery(
         [raw_event(
@@ -4079,8 +4091,12 @@ def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_nois
         now=now,
     )[0]
     assert direct_alert.playbook_type == event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value
+    assert direct_alert.expected_direction == "volatility"
     assert direct_alert.playbook_can_trigger_fade is False
     assert direct_alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE
+    assert "Fresh venue access" in direct_alert.reason
+    assert "confirm spot listing details" in direct_alert.verify
+    assert "proxy instrument" not in "; ".join(direct_alert.verify)
 
     link = EventAssetLink(
         event_id="noise",
@@ -4260,6 +4276,11 @@ def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_nois
         assert assessment.what_to_verify
         assert assessment.timing_window
         assert assessment.invalidation
+        if expected == event_playbooks.EventPlaybookType.UNLOCK_SUPPLY_PRESSURE:
+            assert assessment.expected_direction == "down"
+            assert any("unlock size" in item for item in assessment.what_to_verify)
+        if expected == event_playbooks.EventPlaybookType.LISTING_VOLATILITY:
+            assert assessment.expected_direction == "volatility"
 
 
 def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
@@ -4400,7 +4421,7 @@ def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
         text = out.getvalue()
         assert "EVENT RESEARCH ALERT REPORT" in text
         assert "market anomaly" in text
-        assert "playbook: market_anomaly" in text
+        assert "playbook: market_anomaly_unknown" in text
         assert "STORE_ONLY" in text
     finally:
         for name, value in original.items():
@@ -4545,16 +4566,27 @@ def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery()
                 "warnings": [],
             })
 
-    seen = {"transform_applied": False, "loader_now": None}
+    seen = {
+        "transform_calls": 0,
+        "shadow_transform_applied": None,
+        "advisory_transform_applied": None,
+        "loader_now": None,
+    }
 
     def loader(observed, raw_event_transform):
         seen["loader_now"] = observed
         transformed = tuple(raw_event_transform((raw,))) if raw_event_transform else (raw,)
-        seen["transform_applied"] = bool(transformed[0].raw_json and transformed[0].raw_json.get("llm_extraction"))
+        applied = bool(transformed[0].raw_json and transformed[0].raw_json.get("llm_extraction"))
+        if raw_event_transform:
+            seen["transform_calls"] += 1
+            if seen["transform_calls"] == 1:
+                seen["shadow_transform_applied"] = applied
+            else:
+                seen["advisory_transform_applied"] = applied
         return event_discovery.run_discovery(transformed, [asset], now=observed)
 
     with tempfile.TemporaryDirectory() as tmp:
-        pipe = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        shadow_pipe = event_alpha_pipeline.run_event_alpha_operating_cycle(
             load_discovery_result=loader,
             alert_cfg=event_alerts.EventAlertConfig(),
             now=now,
@@ -4569,14 +4601,33 @@ def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery()
             refresh_watchlist=True,
             route=True,
         )
+        advisory_pipe = event_alpha_pipeline.run_event_alpha_operating_cycle(
+            load_discovery_result=loader,
+            alert_cfg=event_alerts.EventAlertConfig(),
+            now=now,
+            with_llm=True,
+            extraction_provider=Provider(),
+            extraction_cfg=event_llm_extractor.EventLLMExtractorConfig(mode="advisory", provider="fixture"),
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(
+                enabled=True,
+                state_path=Path(tmp) / "watchlist-advisory.jsonl",
+            ),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=True,
+            route=True,
+        )
     assert seen["loader_now"] == now
-    assert seen["transform_applied"] is True
-    assert pipe.extractions == 1
-    assert pipe.extraction_hint_events == 1
-    assert pipe.candidates == 1
-    assert pipe.alerts[0].symbol == "STEALTH"
-    assert pipe.watchlist_entries == 1
-    assert pipe.routed == 1
+    assert seen["shadow_transform_applied"] is False
+    assert seen["advisory_transform_applied"] is True
+    assert shadow_pipe.extractions == 1
+    assert shadow_pipe.extraction_hint_events == 0
+    assert shadow_pipe.candidates == 0
+    assert advisory_pipe.extractions == 1
+    assert advisory_pipe.extraction_hint_events == 1
+    assert advisory_pipe.candidates == 1
+    assert advisory_pipe.alerts[0].symbol == "STEALTH"
+    assert advisory_pipe.watchlist_entries == 1
+    assert advisory_pipe.routed == 1
 
 
 def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
@@ -4603,6 +4654,7 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
         report = event_alpha_alert_store.format_alert_snapshot_report(loaded)
         assert "EVENT ALPHA ALERT SNAPSHOT REPORT" in report
         assert "by playbook:" in report
+        assert "by expected direction:" in report
         assert "by tier:" in report
 
         prices_path = Path(tmp) / "prices.json"
@@ -4633,12 +4685,15 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
         assert velvet["return_24h"] is not None
         assert velvet["return_72h"] is not None
         assert velvet["return_7d"] is not None
+        assert velvet["primary_horizon_return"] is not None
+        assert velvet["direction_hit"] is True
         assert velvet["max_favorable_excursion"] is not None
         assert velvet["max_adverse_excursion"] is not None
         outcome_report = event_alpha_alert_store.format_alert_snapshot_report(
             event_alpha_alert_store.load_alert_snapshots(out_path)
         )
         assert "outcomes:" in outcome_report
+        assert "MFE/MAE by playbook:" in outcome_report
 
 
 def test_event_alpha_alert_store_scanner_report_and_outcome_fill_commands():
@@ -4750,7 +4805,7 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
             assert "watchlist_entries=1" in text
             assert "routed=1" in text
             assert "routes: STORE_ONLY=1" in text
-            assert "market_anomaly" in text
+            assert "market_anomaly_unknown" in text
             assert config.EVENT_WATCHLIST_STATE_PATH.exists()
             assert config.EVENT_ALPHA_ALERT_STORE_PATH.exists()
         finally:
@@ -4858,7 +4913,7 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         config.EVENT_ALPHA_ROUTER_ENABLED = True
         config.EVENT_ALPHA_ALERT_STORE_PATH = Path(tmp) / "event_alpha_alerts.jsonl"
         config.EVENT_ALERTS_ENABLED = False
-        config.EVENT_LLM_EXTRACTOR_MODE = "shadow"
+        config.EVENT_LLM_EXTRACTOR_MODE = "advisory"
         config.EVENT_LLM_EXTRACTOR_PROVIDER = "fixture"
         config.EVENT_LLM_MODE = "shadow"
         config.EVENT_LLM_PROVIDER = "fixture"
@@ -5134,6 +5189,119 @@ def test_event_alpha_router_routes_watchlist_escalations_safely():
     assert "TRIGGERED_FADE_RESEARCH" in text
     assert "SUPPRESS_DUPLICATE" in text
     assert "no sends, trades, or paper rows" in text
+    routed_digest = event_alpha_router.format_routed_telegram_digest(result.alertable_decisions)
+    assert "Event Alpha routed research alerts" in routed_digest
+    assert "PFADE" in routed_digest
+    assert "ATTN" in routed_digest
+    assert "BADTRIG" not in routed_digest
+
+
+def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        config,
+        event_alpha_router,
+        event_alerts,
+        event_playbooks,
+        event_watchlist,
+        scanner,
+    )
+
+    class FakeStorage:
+        meta = {}
+
+        def __init__(self, path):
+            self.path = path
+            self.closed = False
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+        def active_subscribers(self):
+            return ["chat"]
+
+        def close(self):
+            self.closed = True
+
+    def entry(symbol, *, alertable=True, playbook=None, state=None):
+        state = state or event_watchlist.EventWatchlistState.HIGH_PRIORITY.value
+        playbook = playbook or event_playbooks.EventPlaybookType.PROXY_ATTENTION.value
+        return event_watchlist.EventWatchlistEntry(
+            schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+            row_type="event_watchlist_state",
+            key=f"{symbol}|coin|{playbook}",
+            cluster_id="spacex|ipo_proxy|2026-06-20",
+            event_id=f"{symbol}-event",
+            coin_id=symbol.lower(),
+            symbol=symbol,
+            relationship_type="proxy_attention",
+            external_asset="SpaceX",
+            event_time="2026-06-20T13:30:00+00:00",
+            state=state,
+            previous_state="WATCHLIST",
+            first_seen_at="2026-06-18T12:00:00+00:00",
+            last_seen_at="2026-06-18T13:00:00+00:00",
+            source_count=1,
+            highest_score=82,
+            latest_score=82,
+            latest_tier="HIGH_PRIORITY_WATCH",
+            latest_event_name=f"{symbol} route event",
+            latest_source="test",
+            latest_playbook_type=playbook,
+            latest_playbook_score=82,
+            latest_playbook_action="high_priority_watch",
+            should_alert=alertable,
+            suppressed_reason=None if alertable else "duplicate state, no escalation",
+        )
+
+    sent = []
+
+    def fake_send(message, *, parse_mode=None, chat_ids=None):
+        sent.append((message, parse_mode, tuple(chat_ids or ())))
+        return True
+
+    original_storage = scanner.Storage
+    original_send = scanner.send_telegram
+    original_ids = config.TELEGRAM_CHAT_IDS
+    FakeStorage.meta = {}
+    scanner.Storage = FakeStorage
+    scanner.send_telegram = fake_send
+    config.TELEGRAM_CHAT_IDS = ["fallback"]
+    try:
+        cfg = event_alerts.EventAlertConfig(enabled=True)
+        scanner._send_event_alpha_routed_digest([], cfg)
+        assert sent == []
+
+        suppressed = event_alpha_router.EventAlphaRouteDecision(
+            entry=entry("DUP", alertable=False),
+            route=event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE,
+            alertable=False,
+            reason="duplicate",
+        )
+        scanner._send_event_alpha_routed_digest([suppressed], cfg)
+        assert sent == []
+
+        high = event_alpha_router.EventAlphaRouteDecision(
+            entry=entry("HIGH"),
+            route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH,
+            alertable=True,
+            reason="watchlist escalation",
+        )
+        scanner._send_event_alpha_routed_digest([suppressed, high], cfg)
+        assert len(sent) == 1
+        assert sent[0][1] == "HTML"
+        assert sent[0][2] == ("chat",)
+        assert "HIGH_PRIORITY_RESEARCH" in sent[0][0]
+        assert "HIGH" in sent[0][0]
+        assert "DUP" not in sent[0][0]
+        assert FakeStorage.meta.get("event_alert_last_digest_items") == "1"
+    finally:
+        scanner.Storage = original_storage
+        scanner.send_telegram = original_send
+        config.TELEGRAM_CHAT_IDS = original_ids
 
 
 def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
@@ -5275,7 +5443,7 @@ def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
             assert "EVENT WATCHLIST REPORT" in report_text
             assert "RAW_EVIDENCE" in report_text
             assert "SOL/solana" in report_text
-            assert "playbook: market_anomaly" in report_text
+            assert "playbook: market_anomaly_unknown" in report_text
 
             router_out = io.StringIO()
             with contextlib.redirect_stdout(router_out):

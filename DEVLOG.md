@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Polish Event Alpha operational alert semantics · Codex
+**Why:** The Event Alpha Radar had the core modules, but its operating loop
+still behaved too much like disconnected reports: LLM extractor `shadow` mode
+could mutate raw evidence, Event Alpha cycle sends used broad alert candidates
+instead of router-approved escalations, and alert/watchlist analytics did not
+separate deterministic rule playbooks from LLM-adjusted effective playbooks.
+**Changes:**
+- Changed `event_alpha_pipeline.run_event_alpha_operating_cycle` so extractor
+  `shadow` mode analyzes only, `advisory` mode is the only mode that applies
+  quote-validated extraction hints, and unsupported/off modes skip fail-soft.
+- Changed `event-alpha-cycle --event-alert-send` to send only
+  `router_result.alertable_decisions`; broad digest sends remain on
+  `--event-alert-report --event-alert-send`.
+- Added routed Telegram digest formatting for Event Alpha router decisions.
+- Added rule/effective/LLM-adjusted playbook fields on event alerts and
+  persisted effective playbook identity through watchlist, router, snapshots,
+  and reports while preserving rule playbooks for audit.
+- Added playbook-specific alert reason/verification text and outcome profiles
+  (`expected_direction`, `primary_horizon`, `success_metric`) with alert-store
+  primary-horizon return, direction-hit, and MFE/MAE cohorts.
+- Updated `.env.example`, `ROADMAP.md`, and `DECISIONS.md`; updated regression
+  tests for extractor mode semantics, route-based sends, effective playbooks,
+  playbook copy, and outcome cohorts.
+**Verify:** `python3 tests/test_indicators.py` passed 313/313.
+`make event-llm-eval PYTHON=python3` passed 9/9 golden cases.
+`make event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases.
+`make event-alpha-eval PYTHON=python3` passed 11/11 golden checks.
+`make verify PYTHON=python3` passed 313/313 tests, alert render smoke,
+fixture backtest smoke, and paper scoreboard. `python3 -m compileall -q
+crypto_rsi_scanner tests` passed.
+**Notes/risks:** Event Alpha remains research-only. LLM output can adjust
+research alert tiers/playbook grouping only; it cannot create `TRIGGERED_FADE`,
+paper trades, live signal writes, normal RSI routing, or execution.
+
 ## 2026-06-18 — Centralize Event Alpha cycle orchestration in pipeline module · Codex
 **Why:** A completion audit against the Pro-model plan showed the CLI was doing
 the unified cycle ordering while `event_alpha_pipeline.py` only handled the

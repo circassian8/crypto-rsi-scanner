@@ -62,6 +62,18 @@ class EventPlaybookAssessment:
     what_to_verify: tuple[str, ...] = ()
     timing_window: str = ""
     invalidation: str = ""
+    expected_direction: str = "unknown"
+    primary_horizon: str = "24h"
+    success_metric: str = "manual"
+
+
+def outcome_profile_for_playbook(playbook_type: str | EventPlaybookType | None) -> tuple[str, str, str]:
+    """Return expected direction, primary horizon, and success metric for a playbook."""
+    try:
+        resolved = playbook_type if isinstance(playbook_type, EventPlaybookType) else EventPlaybookType(str(playbook_type))
+    except (TypeError, ValueError):
+        return "unknown", "24h", "manual"
+    return _outcome_profile(resolved)
 
 
 def assess_event_playbook(
@@ -79,7 +91,7 @@ def assess_event_playbook(
 
     if event.event_type == "market_anomaly" or event.source == "market_anomaly":
         return _assessment(
-            EventPlaybookType.MARKET_ANOMALY,
+            EventPlaybookType.MARKET_ANOMALY_UNKNOWN,
             _market_anomaly_score(components),
             EventPlaybookAction.STORE_ONLY,
             False,
@@ -425,6 +437,7 @@ def _assessment(
     timing_window: str = "",
     invalidation: str = "",
 ) -> EventPlaybookAssessment:
+    expected_direction, primary_horizon, success_metric = _outcome_profile(playbook_type)
     return EventPlaybookAssessment(
         playbook_type=playbook_type.value,
         playbook_score=_clamp(score),
@@ -438,7 +451,36 @@ def _assessment(
         what_to_verify=tuple(dict.fromkeys(str(item) for item in what_to_verify if item)),
         timing_window=timing_window,
         invalidation=invalidation,
+        expected_direction=expected_direction,
+        primary_horizon=primary_horizon,
+        success_metric=success_metric,
     )
+
+
+def _outcome_profile(playbook_type: EventPlaybookType) -> tuple[str, str, str]:
+    if playbook_type == EventPlaybookType.PROXY_FADE:
+        return "down", "72h", "mfe_mae"
+    if playbook_type in {
+        EventPlaybookType.UNLOCK_SUPPLY_PRESSURE,
+        EventPlaybookType.AIRDROP_TGE_SELL_PRESSURE,
+        EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK,
+    }:
+        return "down", "72h", "direction_hit"
+    if playbook_type in {
+        EventPlaybookType.LISTING_VOLATILITY,
+        EventPlaybookType.PERP_LISTING_SQUEEZE,
+        EventPlaybookType.DIRECT_EVENT,
+    }:
+        return "volatility", "24h", "volatility"
+    if playbook_type in {
+        EventPlaybookType.PROXY_ATTENTION,
+        EventPlaybookType.FAN_SPORTS_EVENT,
+        EventPlaybookType.POLITICAL_MEME_EVENT,
+        EventPlaybookType.RWA_PREIPO_PROXY,
+        EventPlaybookType.AI_IPO_PROXY,
+    }:
+        return "up_then_fade", "72h", "mfe_mae"
+    return "unknown", "24h", "manual"
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> int:

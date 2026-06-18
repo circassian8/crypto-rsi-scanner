@@ -169,6 +169,7 @@ def format_alert_snapshot_report(
         return "\n".join(out)
     for label, field in (
         ("by playbook", "playbook_type"),
+        ("by expected direction", "expected_direction"),
         ("by tier", "tier"),
         ("by LLM role", "llm_asset_role"),
         ("by source", "source"),
@@ -177,6 +178,9 @@ def format_alert_snapshot_report(
         ("by feedback label", "feedback_label"),
     ):
         out.append(_cohort_line(label, rows, field))
+    mfe_mae = _mfe_mae_by_playbook(rows)
+    if mfe_mae:
+        out.append(mfe_mae)
     out.append("")
     for row in sorted(rows, key=lambda item: str(item.get("observed_at") or ""), reverse=True)[:20]:
         out.append(
@@ -188,6 +192,8 @@ def format_alert_snapshot_report(
         if row.get("return_24h") is not None:
             out.append(
                 "  outcomes: "
+                f"primary={_fmt_pct(row.get('primary_horizon_return'))} "
+                f"hit={_fmt_bool(row.get('direction_hit'))} "
                 f"1h={_fmt_pct(row.get('return_1h'))} "
                 f"4h={_fmt_pct(row.get('return_4h'))} "
                 f"24h={_fmt_pct(row.get('return_24h'))} "
@@ -224,7 +230,8 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
     if entry is None and market is not None:
         entry = market.price
     cluster_id = event_graph.cluster_id_for_event(candidate.event)
-    alert_key = f"{cluster_id}|{candidate.asset.coin_id}|{alert.playbook_type or candidate.classification.relationship_type}"
+    effective_playbook = alert.effective_playbook_type or alert.playbook_type or candidate.classification.relationship_type
+    alert_key = f"{cluster_id}|{candidate.asset.coin_id}|{effective_playbook}"
     observed_iso = observed.isoformat()
     return {
         "schema_version": ALERT_STORE_SCHEMA_VERSION,
@@ -248,7 +255,10 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "tier": alert.tier.value,
         "opportunity_score": alert.opportunity_score,
         "score_components": dict(alert.score_components),
-        "playbook_type": alert.playbook_type,
+        "playbook_type": effective_playbook,
+        "rule_playbook_type": alert.rule_playbook_type,
+        "effective_playbook_type": effective_playbook,
+        "llm_adjusted_playbook_type": alert.llm_adjusted_playbook_type,
         "playbook_score": alert.playbook_score,
         "playbook_action": alert.playbook_action,
         "playbook_hypothesis": alert.playbook_hypothesis,
@@ -258,6 +268,9 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "llm_asset_role": alert.llm_asset_role,
         "llm_relationship_type": alert.llm_relationship_type,
         "llm_confidence": alert.llm_confidence,
+        "expected_direction": alert.expected_direction,
+        "primary_horizon": alert.primary_horizon,
+        "success_metric": alert.success_metric,
         "entry_reference_price": entry,
         "market_price": market.price if market else None,
         "return_24h_at_alert": market.return_24h if market else None,
@@ -300,7 +313,8 @@ def _outcome_for_row(row: Mapping[str, Any], price_rows: tuple[dict[str, Any], .
         item for item in sorted_rows
         if (dt := _dt(item.get("timestamp"))) is not None and observed <= dt <= observed + timedelta(days=7)
     ]
-    short_like = str(row.get("playbook_type") or "") == event_playbooks.EventPlaybookType.PROXY_FADE.value
+    expected_direction = str(row.get("expected_direction") or "")
+    short_like = expected_direction == "down" or str(row.get("playbook_type") or "") == event_playbooks.EventPlaybookType.PROXY_FADE.value
     highs = [_num(item.get("high")) or _num(item.get("close")) for item in window]
     lows = [_num(item.get("low")) or _num(item.get("close")) for item in window]
     highs = [value for value in highs if value is not None]
@@ -312,6 +326,22 @@ def _outcome_for_row(row: Mapping[str, Any], price_rows: tuple[dict[str, Any], .
         else:
             out["max_favorable_excursion"] = (max(highs) - entry) / entry
             out["max_adverse_excursion"] = (entry - min(lows)) / entry
+    primary = str(row.get("primary_horizon") or "").strip().lower()
+    primary_field = {
+        "1h": "return_1h",
+        "4h": "return_4h",
+        "24h": "return_24h",
+        "72h": "return_72h",
+        "7d": "return_7d",
+    }.get(primary)
+    primary_return = out.get(primary_field) if primary_field else None
+    out["primary_horizon_return"] = primary_return
+    if expected_direction == "up" and primary_return is not None:
+        out["direction_hit"] = primary_return > 0
+    elif expected_direction == "down" and primary_return is not None:
+        out["direction_hit"] = primary_return < 0
+    else:
+        out["direction_hit"] = None
     return out
 
 
@@ -352,6 +382,24 @@ def _cohort_line(label: str, rows: Iterable[Mapping[str, Any]], field: str) -> s
         key = str(row.get(field) or "unknown")
         counts[key] = counts.get(key, 0) + 1
     return f"{label}: " + ", ".join(f"{key}={count}" for key, count in sorted(counts.items()))
+
+
+def _mfe_mae_by_playbook(rows: Iterable[Mapping[str, Any]]) -> str:
+    grouped: dict[str, list[tuple[float, float]]] = {}
+    for row in rows:
+        mfe = _num(row.get("max_favorable_excursion"))
+        mae = _num(row.get("max_adverse_excursion"))
+        if mfe is None or mae is None:
+            continue
+        grouped.setdefault(str(row.get("playbook_type") or "unknown"), []).append((mfe, mae))
+    if not grouped:
+        return ""
+    parts = []
+    for playbook, values in sorted(grouped.items()):
+        avg_mfe = sum(item[0] for item in values) / len(values)
+        avg_mae = sum(item[1] for item in values) / len(values)
+        parts.append(f"{playbook}: MFE={avg_mfe * 100:+.1f}% MAE={avg_mae * 100:+.1f}% n={len(values)}")
+    return "MFE/MAE by playbook: " + "; ".join(parts)
 
 
 def _feedback_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
@@ -442,6 +490,14 @@ def _num(value: object) -> float | None:
 def _fmt_pct(value: object) -> str:
     num = _num(value)
     return "n/a" if num is None else f"{num * 100:+.1f}%"
+
+
+def _fmt_bool(value: object) -> str:
+    if value is True:
+        return "yes"
+    if value is False:
+        return "no"
+    return "n/a"
 
 
 def _json_ready(value: Any) -> Any:

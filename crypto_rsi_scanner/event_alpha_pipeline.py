@@ -20,7 +20,7 @@ from .event_models import EventDiscoveryResult, RawDiscoveredEvent
 
 RawEventTransform = Callable[[tuple[RawDiscoveredEvent, ...]], Iterable[RawDiscoveredEvent]]
 DiscoveryLoader = Callable[[datetime, RawEventTransform | None], EventDiscoveryResult]
-ResearchAlertSender = Callable[[list[event_alerts.EventAlertCandidate]], Any]
+ResearchAlertSender = Callable[[list[event_alpha_router.EventAlphaRouteDecision]], Any]
 
 
 @dataclass(frozen=True)
@@ -172,7 +172,21 @@ def run_event_alpha_operating_cycle(
 
     if with_llm:
         if extraction_cfg is not None and extraction_provider is not None:
-            if extraction_cfg.mode == "shadow":
+            mode = extraction_cfg.mode.strip().lower()
+            if mode == "shadow":
+                def _shadow_llm_extractions(
+                    raw_events: tuple[RawDiscoveredEvent, ...],
+                ) -> tuple[RawDiscoveredEvent, ...]:
+                    nonlocal extraction_rows
+                    extraction_rows = event_llm_extractor.analyze_raw_events(
+                        raw_events,
+                        extraction_provider,
+                        cfg=extraction_cfg,
+                    )
+                    return tuple(raw_events)
+
+                raw_event_transform = _shadow_llm_extractions
+            elif mode == "advisory":
                 def _enrich_with_llm_extractions(
                     raw_events: tuple[RawDiscoveredEvent, ...],
                 ) -> tuple[RawDiscoveredEvent, ...]:
@@ -185,9 +199,11 @@ def run_event_alpha_operating_cycle(
                     return event_llm_extractor.enrich_raw_events_with_extractions(raw_events, extraction_rows)
 
                 raw_event_transform = _enrich_with_llm_extractions
+            elif mode in {"off", "disabled", "none"}:
+                warnings.append("Event LLM extractor skipped: mode is off")
             else:
                 warnings.append(
-                    "Event LLM extractor skipped: RSI_EVENT_LLM_EXTRACTOR_MODE must be shadow for this cycle"
+                    f"Event LLM extractor skipped: unsupported mode {extraction_cfg.mode!r}; use shadow or advisory"
                 )
         elif extraction_cfg is not None:
             warnings.append("Event LLM extractor skipped: no extraction provider available")
@@ -230,8 +246,33 @@ def run_event_alpha_operating_cycle(
                 warnings=tuple(dict.fromkeys(warnings)),
                 send_attempted=False,
             )
+        if result.router_result is None:
+            warnings = [*result.warnings, "research send skipped: no router decisions available"]
+            return EventAlphaPipelineResult(
+                discovery_result=result.discovery_result,
+                alerts=result.alerts,
+                extraction_rows=result.extraction_rows,
+                relationship_rows=result.relationship_rows,
+                watchlist_result=result.watchlist_result,
+                router_result=result.router_result,
+                warnings=tuple(dict.fromkeys(warnings)),
+                send_attempted=False,
+            )
+        decisions = result.router_result.alertable_decisions
+        if not decisions:
+            warnings = [*result.warnings, "research send skipped: no alertable route decisions"]
+            return EventAlphaPipelineResult(
+                discovery_result=result.discovery_result,
+                alerts=result.alerts,
+                extraction_rows=result.extraction_rows,
+                relationship_rows=result.relationship_rows,
+                watchlist_result=result.watchlist_result,
+                router_result=result.router_result,
+                warnings=tuple(dict.fromkeys(warnings)),
+                send_attempted=False,
+            )
         try:
-            send_callback(result.alerts)
+            send_callback(decisions)
         except Exception as exc:  # pragma: no cover - defensive fail-soft guard
             warnings = [*result.warnings, f"research send failed: {exc}"]
             return EventAlphaPipelineResult(
