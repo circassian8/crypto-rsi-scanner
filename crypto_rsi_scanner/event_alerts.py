@@ -77,6 +77,12 @@ class EventAlertCandidate:
     expected_direction: str | None = None
     primary_horizon: str | None = None
     success_metric: str | None = None
+    score_before_priors: int | None = None
+    score_after_priors: int | None = None
+    prior_file: str | None = None
+    prior_version: str | None = None
+    prior_generated_at: str | None = None
+    prior_multipliers_applied: dict[str, float] = field(default_factory=dict)
 
     @property
     def symbol(self) -> str:
@@ -266,6 +272,19 @@ def format_event_alert_report(alerts: Iterable[EventAlertCandidate]) -> str:
             rows.append(f"  llm tier adjustment: {alert.original_tier.value} -> {alert.tier.value}")
         if alert.llm_adjustment_reason:
             rows.append(f"  llm adjustment reason: {alert.llm_adjustment_reason}")
+        if alert.prior_file:
+            rows.append(
+                f"  priors: score {alert.score_before_priors if alert.score_before_priors is not None else alert.opportunity_score}"
+                f" -> {alert.score_after_priors if alert.score_after_priors is not None else alert.opportunity_score} "
+                f"file={alert.prior_file}"
+            )
+            if alert.prior_multipliers_applied:
+                rows.append(
+                    "  prior multipliers: "
+                    + ", ".join(
+                        f"{name}={value:.3f}" for name, value in sorted(alert.prior_multipliers_applied.items())
+                    )
+                )
         rows.append(f"  what user should verify: {'; '.join(alert.verify)}")
         if alert.playbook_what_to_verify:
             rows.append(f"  playbook verify: {'; '.join(alert.playbook_what_to_verify)}")

@@ -11,6 +11,7 @@ from typing import Any, Iterable
 from . import (
     event_alerts,
     event_alpha_router,
+    event_alpha_priors,
     event_anomaly_state,
     event_catalyst_search,
     event_graph,
@@ -130,13 +131,16 @@ def run_event_alpha_pipeline(
     relationship_cfg: event_llm_analyzer.EventLLMConfig | None = None,
     watchlist_cfg: event_watchlist.EventWatchlistConfig | None = None,
     router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
+    priors_cfg: event_alpha_priors.EventAlphaPriorsConfig | None = None,
     refresh_watchlist: bool = False,
     route: bool = False,
     watchlist_monitor_enabled: bool = False,
     watchlist_monitor_market_rows: Iterable[dict[str, Any]] = (),
     watchlist_monitor_market_source: str = "cycle",
+    watchlist_monitor_market_provider: event_watchlist_market.EventWatchlistMarketProvider | None = None,
     watchlist_monitor_targeted_lookup: bool = False,
     watchlist_monitor_max_assets: int = 50,
+    watchlist_monitor_market_cache_ttl_seconds: int = 900,
     watchlist_monitor_route_updates: bool = True,
     extra_warnings: Iterable[str] = (),
 ) -> EventAlphaPipelineResult:
@@ -162,6 +166,8 @@ def run_event_alpha_pipeline(
             enabled=relationship_cfg.mode == "advisory",
         )
         warnings.extend(_llm_budget_warnings(relationship_rows, label="relationship"))
+    if priors_cfg is not None:
+        alerts = event_alpha_priors.apply_priors_to_alerts(alerts, cfg=priors_cfg, alert_cfg=alert_cfg)
 
     anomaly_lifecycle_result = (
         event_anomaly_state.build_anomaly_lifecycle(
@@ -196,7 +202,10 @@ def run_event_alpha_pipeline(
                 cycle_rows=watchlist_monitor_market_rows,
                 discovery_result=discovery_result,
                 targeted_lookup=watchlist_monitor_targeted_lookup,
+                targeted_provider=watchlist_monitor_market_provider,
                 max_assets=watchlist_monitor_max_assets,
+                cache_ttl_seconds=watchlist_monitor_market_cache_ttl_seconds,
+                now=observed,
             )
             warnings.extend(f"watchlist market: {warning}" for warning in market_source_result.warnings)
             watchlist_monitor_result = event_watchlist_monitor.monitor_watchlist(
@@ -251,13 +260,16 @@ def run_event_alpha_operating_cycle(
     relationship_cfg: event_llm_analyzer.EventLLMConfig | None = None,
     watchlist_cfg: event_watchlist.EventWatchlistConfig | None = None,
     router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
+    priors_cfg: event_alpha_priors.EventAlphaPriorsConfig | None = None,
     refresh_watchlist: bool = True,
     route: bool = True,
     watchlist_monitor_enabled: bool = False,
     watchlist_monitor_market_rows: Iterable[dict[str, Any]] = (),
     watchlist_monitor_market_source: str = "cycle",
+    watchlist_monitor_market_provider: event_watchlist_market.EventWatchlistMarketProvider | None = None,
     watchlist_monitor_targeted_lookup: bool = False,
     watchlist_monitor_max_assets: int = 50,
+    watchlist_monitor_market_cache_ttl_seconds: int = 900,
     watchlist_monitor_route_updates: bool = True,
     send: bool = False,
     send_callback: ResearchAlertSender | None = None,
@@ -366,13 +378,16 @@ def run_event_alpha_operating_cycle(
         relationship_cfg=relationship_cfg_to_use,
         watchlist_cfg=watchlist_cfg,
         router_cfg=router_cfg,
+        priors_cfg=priors_cfg,
         refresh_watchlist=refresh_watchlist,
         route=route,
         watchlist_monitor_enabled=watchlist_monitor_enabled,
         watchlist_monitor_market_rows=watchlist_monitor_market_rows,
         watchlist_monitor_market_source=watchlist_monitor_market_source,
+        watchlist_monitor_market_provider=watchlist_monitor_market_provider,
         watchlist_monitor_targeted_lookup=watchlist_monitor_targeted_lookup,
         watchlist_monitor_max_assets=watchlist_monitor_max_assets,
+        watchlist_monitor_market_cache_ttl_seconds=watchlist_monitor_market_cache_ttl_seconds,
         watchlist_monitor_route_updates=watchlist_monitor_route_updates,
         extra_warnings=warnings,
     )

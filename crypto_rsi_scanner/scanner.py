@@ -66,11 +66,15 @@ from . import event_discovery
 from . import event_alerts
 from . import event_alpha_alert_store
 from . import event_alpha_calibration
+from . import event_alpha_daily_brief
 from . import event_alpha_eval_export
 from . import event_alpha_explain
 from . import event_alpha_missed
 from . import event_alpha_pipeline
+from . import event_alpha_priors
 from . import event_alpha_profiles
+from . import event_alpha_replay
+from . import event_alpha_retention
 from . import event_alpha_run_ledger
 from . import event_alpha_router
 from . import event_source_reliability
@@ -79,6 +83,7 @@ from . import event_clock
 from . import event_feedback
 from . import event_llm_analyzer
 from . import event_llm_extractor
+from . import event_provider_health
 from . import event_provider_status
 from . import event_price_history
 from . import event_research_cards
@@ -1215,6 +1220,36 @@ def _event_alert_config_from_runtime() -> event_alerts.EventAlertConfig:
     )
 
 
+def _event_alpha_priors_config_from_runtime() -> event_alpha_priors.EventAlphaPriorsConfig:
+    return event_alpha_priors.EventAlphaPriorsConfig(
+        enabled=config.EVENT_ALPHA_APPLY_PRIORS,
+        path=config.EVENT_ALPHA_PRIORS_PATH,
+        min_multiplier=config.EVENT_ALPHA_PRIORS_MIN_MULTIPLIER,
+        max_multiplier=config.EVENT_ALPHA_PRIORS_MAX_MULTIPLIER,
+    )
+
+
+def _event_provider_health_config_from_runtime() -> event_provider_health.EventProviderHealthConfig:
+    return event_provider_health.EventProviderHealthConfig(
+        path=config.EVENT_PROVIDER_HEALTH_PATH,
+        max_consecutive_failures=config.EVENT_PROVIDER_MAX_CONSECUTIVE_FAILURES,
+        backoff_minutes=config.EVENT_PROVIDER_BACKOFF_MINUTES,
+        fail_fast_on_dns=config.EVENT_PROVIDER_FAIL_FAST_ON_DNS,
+    )
+
+
+def _event_alpha_retention_config_from_runtime() -> event_alpha_retention.EventAlphaRetentionConfig:
+    return event_alpha_retention.EventAlphaRetentionConfig(
+        runs_path=config.EVENT_ALPHA_RUN_LEDGER_PATH,
+        alerts_path=config.EVENT_ALPHA_ALERT_STORE_PATH,
+        cards_dir=config.EVENT_RESEARCH_CARDS_DIR,
+        run_days=config.EVENT_ALPHA_RETENTION_DAYS_RUNS,
+        alert_days=config.EVENT_ALPHA_RETENTION_DAYS_ALERTS,
+        card_days=config.EVENT_ALPHA_RETENTION_DAYS_CARDS,
+        keep_eval_cases=config.EVENT_ALPHA_RETENTION_KEEP_EVAL_CASES,
+    )
+
+
 def _event_llm_config_from_runtime() -> event_llm_analyzer.EventLLMConfig:
     return event_llm_analyzer.EventLLMConfig(
         enabled=config.EVENT_LLM_ENABLED,
@@ -1351,6 +1386,8 @@ def _normalize_profile_paths() -> None:
         "EVENT_ALPHA_RUN_LEDGER_PATH",
         "EVENT_ALPHA_MISSED_PATH",
         "EVENT_ALPHA_PRIORS_PATH",
+        "EVENT_PROVIDER_HEALTH_PATH",
+        "EVENT_ALPHA_DAILY_BRIEF_PATH",
         "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
         "EVENT_RESEARCH_CARDS_DIR",
         "EVENT_LLM_BUDGET_LEDGER_PATH",
@@ -1405,6 +1442,11 @@ def _event_alerts_from_config(
         if provider is not None:
             rows = event_llm_analyzer.analyze_event_candidates(result, alerts, provider, cfg=llm_cfg)
             alerts = event_alerts.apply_llm_advisory(alerts, rows, cfg, enabled=llm_cfg.mode == "advisory")
+    alerts = event_alpha_priors.apply_priors_to_alerts(
+        alerts,
+        cfg=_event_alpha_priors_config_from_runtime(),
+        alert_cfg=cfg,
+    )
     return alerts
 
 
@@ -1460,6 +1502,11 @@ def event_alert_report(
             )
         if llm_cfg.mode not in {"shadow", "advisory"}:
             print(f"Event LLM mode {llm_cfg.mode!r} is not supported; use shadow or advisory.")
+    alerts = event_alpha_priors.apply_priors_to_alerts(
+        alerts,
+        cfg=_event_alpha_priors_config_from_runtime(),
+        alert_cfg=cfg,
+    )
     print(event_alerts.format_event_alert_report(alerts))
     if send:
         _send_event_alert_digest(alerts, cfg, now=now)
@@ -1532,6 +1579,7 @@ def event_alpha_cycle(
         relationship_cfg=relationship_cfg,
         watchlist_cfg=_event_watchlist_config_from_runtime(),
         router_cfg=_event_alpha_router_config_from_runtime(),
+        priors_cfg=_event_alpha_priors_config_from_runtime(),
         refresh_watchlist=True,
         route=True,
         watchlist_monitor_enabled=config.EVENT_WATCHLIST_MONITOR_ENABLED,
@@ -1539,6 +1587,7 @@ def event_alpha_cycle(
         watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
         watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
         watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
+        watchlist_monitor_market_cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
         watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
         send=send,
         send_callback=lambda decisions: _send_event_alpha_routed_digest(decisions, alert_cfg, now=now),
@@ -1618,13 +1667,32 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
             f"market_source={config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE} "
             f"targeted={str(bool(config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP)).lower()} "
             f"max_assets={config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS} "
+            f"cache_ttl={config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS}s "
             f"market_path={config.EVENT_WATCHLIST_MONITOR_MARKET_PATH or config.EVENT_DISCOVERY_UNIVERSE_PATH or 'cycle'}"
         ),
         f"alert_store_path: {config.EVENT_ALPHA_ALERT_STORE_PATH}",
         f"run_ledger_path: {config.EVENT_ALPHA_RUN_LEDGER_PATH}",
         f"missed_path: {config.EVENT_ALPHA_MISSED_PATH}",
+        (
+            "calibration_priors: "
+            f"enabled={str(bool(config.EVENT_ALPHA_APPLY_PRIORS)).lower()} "
+            f"path={config.EVENT_ALPHA_PRIORS_PATH} "
+            f"bounds={config.EVENT_ALPHA_PRIORS_MIN_MULTIPLIER:g}-{config.EVENT_ALPHA_PRIORS_MAX_MULTIPLIER:g}"
+        ),
+        (
+            "provider_health: "
+            f"path={config.EVENT_PROVIDER_HEALTH_PATH} "
+            f"max_failures={config.EVENT_PROVIDER_MAX_CONSECUTIVE_FAILURES} "
+            f"backoff_minutes={config.EVENT_PROVIDER_BACKOFF_MINUTES:g} "
+            f"fail_fast_dns={str(bool(config.EVENT_PROVIDER_FAIL_FAST_ON_DNS)).lower()}"
+        ),
+        f"daily_brief_path: {config.EVENT_ALPHA_DAILY_BRIEF_PATH}",
         "",
         event_provider_status.format_event_discovery_provider_status(provider_report),
+        "",
+        event_provider_health.format_provider_health_report(
+            event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH)
+        ),
     ]
     print("\n".join(lines))
 
@@ -1678,6 +1746,7 @@ def event_catalyst_search_report(
         relationship_cfg=relationship_cfg,
         watchlist_cfg=_event_watchlist_config_from_runtime(),
         router_cfg=_event_alpha_router_config_from_runtime(),
+        priors_cfg=_event_alpha_priors_config_from_runtime(),
         refresh_watchlist=False,
         route=False,
         send=False,
@@ -1731,6 +1800,8 @@ def event_watchlist_monitor_report(verbose: bool = False, event_now: str | datet
         cycle_rows=fixture_rows,
         targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
         max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
+        cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
+        now=_event_research_now(event_now),
     )
     result = event_watchlist_monitor.monitor_watchlist(
         read_result,
@@ -1759,6 +1830,7 @@ def event_feedback_mark(
     notes: str | None = None,
     marked_by: str | None = None,
     path: str | None = None,
+    allow_unmatched: bool = False,
     verbose: bool = False,
 ) -> None:
     """Append one lightweight Event Alpha feedback row."""
@@ -1777,11 +1849,30 @@ def event_feedback_mark(
             cfg=feedback_cfg,
             marked_by=marked_by or "human",
             notes=notes,
+            allow_unmatched=allow_unmatched,
         )
     except ValueError as exc:
         print(f"Event feedback mark failed: {exc}")
         return
     print(event_feedback.format_feedback_record(record, path=feedback_cfg.path))
+
+
+def event_feedback_shortcut(
+    target: str,
+    label: str,
+    *,
+    notes: str | None = None,
+    verbose: bool = False,
+) -> None:
+    """Append quick feedback from a shorthand CLI flag."""
+    event_feedback_mark(
+        target,
+        label,
+        notes=notes,
+        marked_by="human",
+        allow_unmatched=True,
+        verbose=verbose,
+    )
 
 
 def event_feedback_report(path: str | None = None, verbose: bool = False) -> None:
@@ -1993,6 +2084,72 @@ def event_alpha_explain_last_run(verbose: bool = False) -> None:
     print(event_alpha_explain.format_last_run_explanation(runs.rows, alert_rows=alerts.rows))
 
 
+def event_alpha_daily_brief_report(verbose: bool = False) -> None:
+    """Write and print the daily Event Alpha operating brief."""
+    _setup_event_discovery_logging(verbose)
+    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=25)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        _event_alpha_alert_store_config_from_runtime().path,
+        latest_only=True,
+    )
+    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
+    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
+    watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
+    router_result = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    card_write = event_research_cards.write_research_cards(
+        config.EVENT_RESEARCH_CARDS_DIR,
+        watchlist_entries=watchlist.entries,
+        alert_rows=alerts.rows,
+        route_decisions=router_result.decisions,
+        now=datetime.now(timezone.utc),
+    )
+    markdown = event_alpha_daily_brief.build_daily_brief(
+        run_rows=runs.rows,
+        alert_rows=alerts.rows,
+        feedback_rows=[record.__dict__ for record in feedback.records],
+        missed_rows=missed_rows,
+        watchlist_entries=watchlist.entries,
+        router_result=router_result,
+        card_paths=card_write.card_paths,
+    )
+    result = event_alpha_daily_brief.write_daily_brief(
+        config.EVENT_ALPHA_DAILY_BRIEF_PATH,
+        markdown=markdown,
+        card_paths=card_write.card_paths,
+    )
+    print(event_alpha_daily_brief.format_daily_brief_result(result))
+
+
+def event_alpha_replay_report(
+    *,
+    priors: bool = False,
+    llm_advisory: bool = False,
+    verbose: bool = False,
+) -> None:
+    """Replay Event Alpha local artifacts without provider calls or sends."""
+    _setup_event_discovery_logging(verbose)
+    alerts = event_alpha_replay.load_jsonl_rows(config.EVENT_ALPHA_ALERT_STORE_PATH)
+    watchlist_rows = event_alpha_replay.load_jsonl_rows(config.EVENT_WATCHLIST_STATE_PATH)
+    result = event_alpha_replay.replay_from_artifacts(
+        alert_rows=alerts,
+        watchlist_rows=watchlist_rows,
+        priors_enabled=priors,
+        llm_advisory=llm_advisory,
+    )
+    print(event_alpha_replay.format_replay_report(result))
+
+
+def event_alpha_prune_artifacts(confirm: bool = False, verbose: bool = False) -> None:
+    """Dry-run or confirm pruning of old Event Alpha research artifacts."""
+    _setup_event_discovery_logging(verbose)
+    result = event_alpha_retention.prune_event_alpha_artifacts(
+        _event_alpha_retention_config_from_runtime(),
+        confirm=confirm,
+        now=datetime.now(timezone.utc),
+    )
+    print(event_alpha_retention.format_retention_report(result))
+
+
 def event_llm_shadow_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Print research-only shadow LLM relationship analysis for event candidates."""
     _setup_event_discovery_logging(verbose)
@@ -2144,6 +2301,13 @@ def _event_catalyst_search_provider(
         print(f"Unknown event catalyst-search provider(s): {', '.join(warnings)}. Known: fixture, gdelt, rss, cryptopanic, polymarket.")
     if not providers:
         return None
+    health_cfg = _event_provider_health_config_from_runtime()
+    providers = [
+        provider
+        if str(getattr(provider, "name", "")).lower() == "fixture"
+        else event_provider_health.HealthCheckedProvider(provider, cfg=health_cfg)
+        for provider in providers
+    ]
     if len(providers) == 1:
         return providers[0]
     return event_catalyst_search.CompositeCatalystSearchProvider(providers)
@@ -3826,6 +3990,31 @@ def cli() -> None:
         help="Explain why the latest Event Alpha cycle did or did not alert.",
     )
     parser.add_argument(
+        "--event-alpha-daily-brief",
+        action="store_true",
+        help="Write and print a daily Event Alpha research brief from local artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-replay",
+        action="store_true",
+        help="Replay Event Alpha local artifacts without provider calls or sends.",
+    )
+    parser.add_argument(
+        "--event-alpha-replay-priors",
+        action="store_true",
+        help="With --event-alpha-replay, show priors before/after score fields when present.",
+    )
+    parser.add_argument(
+        "--event-alpha-replay-llm-advisory",
+        action="store_true",
+        help="With --event-alpha-replay, annotate the replay as LLM-advisory comparison mode.",
+    )
+    parser.add_argument(
+        "--event-alpha-prune-artifacts",
+        action="store_true",
+        help="Dry-run retention pruning for old Event Alpha research artifacts.",
+    )
+    parser.add_argument(
         "--event-research-card",
         nargs="?",
         const="",
@@ -3886,6 +4075,12 @@ def cli() -> None:
         action="store_true",
         help="Print lightweight Event Alpha feedback artifact rows.",
     )
+    parser.add_argument("--event-feedback-useful", metavar="TARGET", help="Shortcut: mark TARGET as useful.")
+    parser.add_argument("--event-feedback-junk", metavar="TARGET", help="Shortcut: mark TARGET as junk.")
+    parser.add_argument("--event-feedback-watch", metavar="TARGET", help="Shortcut: mark TARGET as watch.")
+    parser.add_argument("--event-feedback-traded", metavar="TARGET", help="Shortcut: mark TARGET as traded elsewhere.")
+    parser.add_argument("--event-feedback-ignore", metavar="TARGET", help="Shortcut: mark TARGET as ignored.")
+    parser.add_argument("--event-feedback-missed", metavar="SYMBOL_OR_COIN_ID", help="Shortcut: record a missed opportunity.")
     parser.add_argument(
         "--event-llm-shadow-report",
         action="store_true",
@@ -4166,6 +4361,11 @@ def cli() -> None:
              "are answered in real time. Runs until stopped.",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Debug logging.")
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Confirm commands that are dry-run by default, such as --event-alpha-prune-artifacts.",
+    )
     args = parser.parse_args()
 
     if args.report:
@@ -4261,6 +4461,19 @@ def cli() -> None:
     if args.event_alpha_explain_last_run:
         event_alpha_explain_last_run(verbose=args.verbose)
         return
+    if args.event_alpha_daily_brief:
+        event_alpha_daily_brief_report(verbose=args.verbose)
+        return
+    if args.event_alpha_replay:
+        event_alpha_replay_report(
+            priors=args.event_alpha_replay_priors,
+            llm_advisory=args.event_alpha_replay_llm_advisory,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_alpha_prune_artifacts:
+        event_alpha_prune_artifacts(confirm=args.confirm, verbose=args.verbose)
+        return
     if args.event_research_card is not None:
         event_research_card_report(args.event_research_card, verbose=args.verbose)
         return
@@ -4292,6 +4505,23 @@ def cli() -> None:
             verbose=args.verbose,
         )
         return
+    feedback_shortcuts = (
+        (args.event_feedback_useful, "useful"),
+        (args.event_feedback_junk, "junk"),
+        (args.event_feedback_watch, "watch"),
+        (args.event_feedback_traded, "traded_elsewhere"),
+        (args.event_feedback_ignore, "ignored"),
+        (args.event_feedback_missed, "missed"),
+    )
+    for target, label in feedback_shortcuts:
+        if target is not None:
+            event_feedback_shortcut(
+                target,
+                label,
+                notes=args.event_feedback_notes,
+                verbose=args.verbose,
+            )
+            return
     if args.event_feedback_report:
         event_feedback_report(path=args.event_feedback_path, verbose=args.verbose)
         return

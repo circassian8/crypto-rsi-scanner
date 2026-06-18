@@ -7560,6 +7560,9 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event-alpha-daily-send:" in text
     assert "event-alpha-health:" in text
     assert "event-alpha-open-items:" in text
+    assert "event-alpha-daily-brief:" in text
+    assert "event-alpha-replay:" in text
+    assert "event-alpha-prune-artifacts:" in text
     assert "--event-alpha-profile no_key_live" in text
     assert "--event-alpha-profile full_llm_live" in text
     assert "--event-alpha-profile research_send --event-alert-send" in text
@@ -7583,6 +7586,9 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event-alpha-calibration-report:" in text
     assert "event-research-cards:" in text
     assert "event-feedback-report:" in text
+    assert "event-feedback-useful:" in text
+    assert "event-feedback-junk:" in text
+    assert "event-feedback-watch:" in text
     assert "--event-watchlist-refresh" in text
     assert "--event-alpha-router-report" in text
     assert "--event-alpha-runs-report" in text
@@ -13832,6 +13838,180 @@ def test_event_alpha_explain_last_run_paths():
     ], alert_rows=[{"tier": "STORE_ONLY", "rejected_reason": "source_noise"}])
     assert "router produced no alertable decisions" in routed
     assert "skipped_budget=1" in routed
+
+
+def test_event_watchlist_market_targeted_provider_and_fallback():
+    from crypto_rsi_scanner import event_watchlist_market
+
+    watchlist = type("Read", (), {
+        "entries": [
+            _test_watchlist_entry(state="WATCHLIST", symbol="VELVET", coin_id="velvet"),
+        ]
+    })()
+    targeted = event_watchlist_market.FixtureWatchlistMarketProvider([
+        {"id": "velvet", "symbol": "velvet", "price_change_percentage_24h": 22.0},
+        {"id": "noise", "symbol": "noise"},
+    ])
+    result = event_watchlist_market.market_rows_for_watchlist(
+        watchlist,
+        source="fixture",
+        fixture_rows=[{"id": "velvet", "symbol": "velvet", "price_change_percentage_24h": 4.0}],
+        targeted_lookup=True,
+        targeted_provider=targeted,
+        cache_ttl_seconds=123,
+    )
+    assert result.assets_requested == 1
+    assert result.rows_selected == 1
+    assert result.rows[0]["price_change_percentage_24h"] == 22.0
+    assert result.rows[0]["watchlist_market_source"] == "fixture"
+    assert result.cache_status == "ttl=123s"
+
+    fallback = event_watchlist_market.market_rows_for_watchlist(
+        watchlist,
+        source="coingecko",
+        cycle_rows=[{"id": "velvet", "symbol": "velvet", "price_change_percentage_24h": 7.0}],
+        targeted_lookup=True,
+        cache_ttl_seconds=30,
+    )
+    assert fallback.rows[0]["price_change_percentage_24h"] == 7.0
+    assert any("not configured" in warning for warning in fallback.warnings)
+
+
+def test_event_provider_health_backoff_and_report():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_provider_health
+
+    now = datetime(2026, 6, 18, 10, 0, tzinfo=timezone.utc)
+    path = Path(tempfile.mkdtemp()) / "provider_health.json"
+    cfg = event_provider_health.EventProviderHealthConfig(
+        path=path,
+        max_consecutive_failures=2,
+        backoff_minutes=15,
+    )
+    assert event_provider_health.provider_allowed("gdelt", cfg=cfg, now=now).allowed
+    event_provider_health.record_provider_failure("gdelt", RuntimeError("timeout"), cfg=cfg, now=now)
+    event_provider_health.record_provider_failure("gdelt", RuntimeError("timeout"), cfg=cfg, now=now)
+    decision = event_provider_health.provider_allowed("gdelt", cfg=cfg, now=now)
+    assert decision.allowed is False
+    assert "backoff" in (decision.reason or "")
+    text = event_provider_health.format_provider_health_report(event_provider_health.load_provider_health(path))
+    assert "gdelt" in text
+    assert "failures=2" in text
+
+
+def test_event_alpha_priors_adjust_research_score_but_not_triggered_fade():
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alerts, event_alpha_priors
+
+    alerts = event_alerts.build_event_alert_candidates(
+        _full_event_discovery_fixture_result(),
+        cfg=event_alerts.EventAlertConfig(),
+    )
+    triggered = next(alert for alert in alerts if alert.tier == event_alerts.EventAlertTier.TRIGGERED_FADE)
+    non_triggered = next(alert for alert in alerts if alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE)
+    path = Path(tempfile.mkdtemp()) / "priors.json"
+    path.write_text(json.dumps({
+        "schema_version": "event_alpha_priors_v1",
+        "generated_at": "2026-06-18T00:00:00+00:00",
+        "playbook_priors": {
+            triggered.effective_playbook_type: {"multiplier": 0.2},
+            non_triggered.effective_playbook_type: {"multiplier": 1.3},
+        },
+    }), encoding="utf-8")
+    adjusted = event_alpha_priors.apply_priors_to_alerts(
+        [triggered, non_triggered],
+        cfg=event_alpha_priors.EventAlphaPriorsConfig(enabled=True, path=path, min_multiplier=0.7, max_multiplier=1.3),
+        alert_cfg=event_alerts.EventAlertConfig(),
+    )
+    adjusted_triggered = next(alert for alert in adjusted if alert.symbol == triggered.symbol)
+    adjusted_other = next(alert for alert in adjusted if alert.symbol == non_triggered.symbol)
+    assert adjusted_triggered.tier == event_alerts.EventAlertTier.TRIGGERED_FADE
+    assert adjusted_triggered.score_after_priors >= int(triggered.opportunity_score * 0.69)
+    assert adjusted_other.score_before_priors == non_triggered.opportunity_score
+    assert adjusted_other.score_after_priors >= adjusted_other.score_before_priors
+    assert adjusted_other.prior_file == str(path)
+
+
+def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_daily_brief,
+        event_alpha_replay,
+        event_alpha_retention,
+        event_feedback,
+    )
+
+    entry = _test_watchlist_entry(state="HIGH_PRIORITY", symbol="VELVET", coin_id="velvet")
+    markdown = event_alpha_daily_brief.build_daily_brief(
+        run_rows=[{
+            "run_id": "run-1",
+            "success": True,
+            "raw_events": 2,
+            "candidates": 1,
+            "alerts": 1,
+            "routed": 1,
+            "alertable": 0,
+            "llm_calls_attempted": 0,
+            "llm_skipped_due_budget": 1,
+        }],
+        alert_rows=[{"alert_key": entry.key, "tier": "HIGH_PRIORITY_WATCH", "asset_symbol": "VELVET", "playbook_type": "proxy_attention"}],
+        watchlist_entries=[entry],
+        card_paths=[Path("/tmp/velvet.md")],
+    )
+    assert "Event Alpha Daily Brief" in markdown
+    assert "Why No Alerts" in markdown
+    assert ".env" not in markdown
+
+    replay = event_alpha_replay.replay_from_artifacts(
+        alert_rows=[{"alert_key": "a1", "tier": "WATCHLIST", "route": "RESEARCH_DIGEST", "opportunity_score": 50}],
+        watchlist_rows=[{"key": entry.key}],
+        priors_enabled=True,
+        llm_advisory=True,
+    )
+    assert replay.alert_rows == 1
+    assert "local artifacts only" in event_alpha_replay.format_replay_report(replay)
+
+    tmp = Path(tempfile.mkdtemp())
+    feedback_cfg = event_feedback.EventFeedbackConfig(path=tmp / "feedback.jsonl")
+    record = event_feedback.mark_feedback(
+        "UNKNOWN",
+        "junk",
+        watchlist_entries=[],
+        cfg=feedback_cfg,
+        allow_unmatched=True,
+        notes="bad key",
+    )
+    assert record.source == "manual_cli_unmatched"
+    assert "warning:" in (record.notes or "")
+
+    runs = tmp / "runs.jsonl"
+    alerts = tmp / "alerts.jsonl"
+    cards = tmp / "cards"
+    cards.mkdir()
+    runs.write_text('{"row_type":"event_alpha_run","started_at":"2025-01-01T00:00:00+00:00"}\n', encoding="utf-8")
+    alerts.write_text('{"row_type":"event_alpha_alert_snapshot","observed_at":"2025-01-01T00:00:00+00:00"}\n', encoding="utf-8")
+    old_card = cards / "old.md"
+    old_card.write_text("# old\n", encoding="utf-8")
+    cfg = event_alpha_retention.EventAlphaRetentionConfig(
+        runs_path=runs,
+        alerts_path=alerts,
+        cards_dir=cards,
+        run_days=1,
+        alert_days=1,
+        card_days=1,
+    )
+    dry = event_alpha_retention.prune_event_alpha_artifacts(cfg, confirm=False, now=__import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").timezone.utc))
+    assert dry.dry_run is True
+    assert dry.runs_pruned == 1
+    assert runs.read_text(encoding="utf-8").strip()
+    confirmed = event_alpha_retention.prune_event_alpha_artifacts(cfg, confirm=True, now=__import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").timezone.utc))
+    assert confirmed.dry_run is False
+    assert runs.read_text(encoding="utf-8") == ""
 
 
 def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):

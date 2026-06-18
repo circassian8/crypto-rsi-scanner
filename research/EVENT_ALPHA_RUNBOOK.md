@@ -21,10 +21,13 @@ run:
 ```bash
 make event-alpha-explain-last-run
 make event-alpha-open-items
+make event-alpha-daily-brief
 ```
 
 The first command explains where the funnel stopped. The second checks active
-watchlist monitoring, missed opportunities, and calibration.
+watchlist monitoring, missed opportunities, and calibration. The brief writes a
+Markdown summary under `RSI_EVENT_ALPHA_DAILY_BRIEF_PATH`, linking any selected
+research cards.
 
 ## Full LLM No-Send Review
 
@@ -59,12 +62,16 @@ Use lightweight labels after reviewing cards or digests:
 ```bash
 python3 main.py --event-feedback-mark ALERT_KEY --event-feedback-label useful
 python3 main.py --event-feedback-mark ALERT_KEY --event-feedback-label junk --event-feedback-notes "publisher noise"
+make event-feedback-useful FEEDBACK_TARGET=ALERT_KEY
+make event-feedback-junk FEEDBACK_TARGET=ALERT_KEY FEEDBACK_NOTES="publisher noise"
+make event-feedback-watch FEEDBACK_TARGET=ALERT_KEY
 python3 main.py --event-feedback-report
 ```
 
 Allowed labels are `useful`, `junk`, `watch`, `missed`, `traded_elsewhere`, and
 `ignored`. Feedback is a research artifact only; it does not mutate watchlist
-state or alert tiers.
+state or alert tiers. Shortcut commands tolerate unmatched keys and record a
+manual warning row so review notes are not lost.
 
 ## Calibration Workflow
 
@@ -78,6 +85,17 @@ make event-alpha-calibration-export-priors
 
 The priors export is reviewable JSON. It is not applied automatically. Treat it
 as a proposal for manual threshold or source-prior changes.
+
+If you explicitly want to test bounded priors in research ranking:
+
+```bash
+RSI_EVENT_ALPHA_APPLY_PRIORS=1 make event-alpha-cycle PROFILE=no_key_live
+make event-alpha-replay
+```
+
+Applied priors write `score_before_priors`, `score_after_priors`, prior file,
+version, and multipliers into alert snapshots. They cannot create
+`TRIGGERED_FADE` or bypass hard source-noise/identity gates.
 
 ## Research Cards
 
@@ -115,6 +133,38 @@ Common causes:
 - watchlist/router had no escalation after cooldown and duplicate suppression
 - send was requested but blocked by missing opt-in or no alertable route
 - LLM budget was exhausted and lower-priority rows were skipped
+
+## Provider Health and Replay
+
+Provider health is stored locally under `RSI_EVENT_PROVIDER_HEALTH_PATH`.
+Non-fixture catalyst-search providers may be skipped temporarily after repeated
+failures or DNS-like errors. Inspect it with:
+
+```bash
+make event-alpha-status PROFILE=no_key_live
+```
+
+Replay reads local artifacts only:
+
+```bash
+make event-alpha-replay
+```
+
+Replay is useful when comparing priors/advisory settings without live providers,
+Telegram sends, or watchlist mutations.
+
+## Retention
+
+Retention pruning is dry-run by default:
+
+```bash
+make event-alpha-prune-artifacts
+CONFIRM=1 make event-alpha-prune-artifacts
+```
+
+It prunes old run-ledger rows, alert snapshots, and research cards according to
+`RSI_EVENT_ALPHA_RETENTION_DAYS_*`. Canonical fixtures and proposed eval cases
+are retained by default.
 
 ## When Alerts Are Noisy
 

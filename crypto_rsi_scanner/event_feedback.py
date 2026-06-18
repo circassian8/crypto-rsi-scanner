@@ -71,6 +71,7 @@ def mark_feedback(
     notes: str | None = None,
     route: str | None = None,
     now: datetime | None = None,
+    allow_unmatched: bool = False,
 ) -> EventFeedbackRecord:
     """Append one manual research feedback row.
 
@@ -82,9 +83,18 @@ def mark_feedback(
         raise ValueError("feedback target is required")
     parsed_label = _label(label)
     entry = _find_watchlist_entry(clean_target, list(watchlist_entries))
-    if entry is None and parsed_label != EventFeedbackLabel.MISSED:
+    if entry is None and parsed_label != EventFeedbackLabel.MISSED and not allow_unmatched:
         raise ValueError(
             f"no unique watchlist row matched {clean_target!r}; use label=missed for uncaptured opportunities"
+        )
+    if entry is None and parsed_label != EventFeedbackLabel.MISSED and allow_unmatched:
+        notes = "; ".join(
+            value
+            for value in (
+                "warning: no watchlist row matched this manual feedback target",
+                notes,
+            )
+            if value
         )
     marked_at = _as_utc(now or datetime.now(timezone.utc)).isoformat()
     record = _record_from_entry(
@@ -96,6 +106,8 @@ def mark_feedback(
         notes=notes,
         route=route,
     )
+    if entry is None and allow_unmatched and parsed_label != EventFeedbackLabel.MISSED:
+        record = EventFeedbackRecord(**{**record.__dict__, "source": "manual_cli_unmatched"})
     _append_record(cfg.path, record)
     return record
 

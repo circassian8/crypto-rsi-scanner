@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Polish Event Alpha daily-use operations · Codex
+**Why:** Event Alpha had strong research reports, but daily use still needed
+targeted active-watchlist market refresh, provider backoff state, opt-in
+calibration-prior application, a daily brief, faster feedback labels, replay,
+and safe artifact retention.
+**Changes:**
+- Extended `event_watchlist_market.py` with targeted fixture/CoinGecko-style
+  market providers, source/cache metadata, and fail-soft fallback to cycle rows.
+- Added `event_provider_health.py`, `event_alpha_priors.py`,
+  `event_alpha_daily_brief.py`, `event_alpha_replay.py`, and
+  `event_alpha_retention.py` for provider circuit breakers, bounded opt-in
+  research priors, daily Markdown briefs, local artifact replay, and dry-run
+  retention pruning.
+- Wired priors/watchlist market TTL/provider health/status into
+  `scanner.py`, `event_alpha_pipeline.py`, config, `.env.example`, and Make
+  targets, including `event-alpha-daily-brief`, `event-alpha-replay`,
+  `event-alpha-prune-artifacts`, and quick feedback targets.
+- Added feedback unmatched-label support for shorthand review notes while
+  preserving strict default `--event-feedback-mark` behavior.
+- Updated `DECISIONS.md`, `ROADMAP.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md` with the daily-use operating boundary.
+- Added offline regression tests for targeted watchlist market lookup, provider
+  backoff, priors audit fields, daily brief/replay/retention, and unmatched
+  feedback artifacts.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner` passed.
+`python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 351/351. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. `make verify PYTHON=python3`
+passed.
+**Notes/risks:** Calibration priors are still off unless
+`RSI_EVENT_ALPHA_APPLY_PRIORS=1`; they are bounded research-ranking adjustments
+only. Replay and pruning use local artifacts only, and pruning is dry-run unless
+`--confirm`/`CONFIRM=1` is supplied. None of these paths can create
+`TRIGGERED_FADE`, trade, paper trade, write normal RSI signal rows, or execute.
+
 ## 2026-06-19 — Add Event Alpha self-improvement operations loop · Codex
 **Why:** Event Alpha could run daily, but the operator loop still needed shared
 identity semantics, better active-watchlist market refresh selection,

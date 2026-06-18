@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-19 - Keep Event Alpha daily-ops automation bounded and local
+**Status:** accepted
+**Decision:** Event Alpha may run targeted active-watchlist market refresh,
+provider health circuit breakers, opt-in calibration-prior application, daily
+brief generation, shorthand feedback labels, local artifact replay, and
+retention pruning. Calibration priors may adjust research alert ranking only
+when `RSI_EVENT_ALPHA_APPLY_PRIORS=1`, with bounded multipliers and audit fields.
+They must not create `TRIGGERED_FADE`, bypass source-noise/identity gates, write
+normal RSI signals, paper trade, or execute. Provider health may skip/back off
+live research providers fail-soft, but fixture/eval paths must stay
+deterministic. Retention pruning is dry-run unless explicitly confirmed.
+**Why:** The radar needs to be usable daily without accumulating stale artifacts
+or repeatedly hammering unhealthy providers, but daily operations must not become
+hidden trading or signal authority.
+**Revisit when:** Reviewed Event Alpha evidence supports a separate
+human-approved promotion from local research operations into an alerting or
+paper-tracking workflow.
+
 ## 2026-06-19 - Keep Event Alpha self-improvement artifacts review-only
 **Status:** accepted
 **Decision:** Event Alpha may centralize asset-identity matching, refresh active
