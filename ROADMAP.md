@@ -30,7 +30,7 @@ Status labels:
 | status | item | owner | notes |
 |---|---|---|---|
 | waiting | Monitor next full-scan universe audit | system | `make refresh-universe-audit` confirmed current hygiene output after the filter tighten: 53 excluded, no obvious USD/stable kept by audit regex. The audit now stores all kept rows for leak detection; re-check after the next scheduled full scan. |
-| todo | Use LLM shadow analyzer for event-review QA | human/open | `main.py --event-llm-shadow-report` and `make event-llm-eval` now compare rule classifications with fixture/OpenAI relationship analysis; the eval target fails on golden role/action drift and quote-validation regressions. Outputs are advisory only. Use it to inspect false-positive classes and evidence quotes while building the reviewed event-fade sample; do not promote it into alert tiering or trading logic without a new decision and validation evidence. |
+| todo | Use LLM advisory analyzer for event-review QA | human/open | `main.py --event-llm-shadow-report` and `make event-llm-eval` compare rule classifications with fixture/OpenAI relationship analysis; the eval target fails on golden role/action drift and quote-validation regressions. `main.py --event-alert-report --with-llm` can now run opt-in advisory tier quality control when `RSI_EVENT_LLM_MODE=advisory`, and the no-key helper is `make event-alert-no-key-llm-report`. Use it to reduce source-noise/ticker-collision research-alert junk while building the reviewed event-fade sample. It still cannot create `TRIGGERED_FADE`, affect normal RSI alerts, paper trade, write live signal rows, or change event-fade eligibility. |
 
 ## Later
 
@@ -42,7 +42,7 @@ universe plus opt-in live CoinGecko resolver enrichment/exchange/calendar/news
 plus opt-in live Binance, Bybit, CryptoPanic, GDELT, RSS/RSS URL files, and Coinalyze
 auto-symbol/external-catalyst/derivatives/supply radar
 reports, research-only event-alert ranking reports, event-discovery JSONL cache refreshes, raw Binance
-announcement cache listening, research-only LLM shadow relationship reports/evals, grouped
+announcement cache listening, research-only LLM shadow/advisory relationship reports/evals, grouped
 event-fade auto reports, event-fade validation-sample exports from fixtures or
 cached snapshots, event-fade validation merge/price-export/outcome-fill/
 labeling-queue/review-packet/review-template/review-bundle/review cohort

@@ -39,8 +39,10 @@ EVENT_DISCOVERY_GDELT_LOOKBACK_HOURS ?= 720
 EVENT_DISCOVERY_POLYMARKET_LIMIT ?= 100
 EVENT_DISCOVERY_POLYMARKET_UNIVERSE_LIVE ?= 1
 EVENT_DISCOVERY_POLYMARKET_UNIVERSE_FETCH_LIMIT ?= 250
+EVENT_ALERT_LLM_MODE ?= advisory
+EVENT_ALERT_LLM_PROVIDER ?= fixture
 
-.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -66,6 +68,9 @@ help:
 	@echo "  make event-discovery-refresh-polymarket  Cache no-key Polymarket dated catalysts"
 	@echo "  make event-discovery-binance-listen  Cache raw live Binance announcement evidence"
 	@echo "  make event-llm-eval  Run offline LLM shadow eval fixtures"
+	@echo "  make event-alert-no-key-report  Print no-key public-source event research alerts"
+	@echo "  make event-alert-no-key-llm-report  Print no-key event alerts with LLM advisory metadata"
+	@echo "  make event-alert-no-key-send  Send opt-in no-key event alert digest with LLM metadata"
 	@echo "  make event-fade-auto-report  Print grouped event-fade discovery report"
 	@echo "  make event-fade-export-sample  Write validation sample from fixtures"
 	@echo "  make event-fade-export-cache-sample  Write validation sample from cache"
@@ -237,6 +242,49 @@ event-discovery-binance-listen:
 
 event-llm-eval:
 	$(PYTHON) -m crypto_rsi_scanner.event_llm_eval fixtures/event_discovery/llm_golden_cases.json
+
+event-alert-no-key-report:
+	RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=$(EVENT_DISCOVERY_RSS_LOOKBACK_HOURS) \
+	RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1 \
+	RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH=$(EVENT_DISCOVERY_RSS_URLS_PATH) \
+	RSI_EVENT_DISCOVERY_GDELT_LIVE=1 \
+	RSI_EVENT_DISCOVERY_GDELT_QUERY='$(EVENT_DISCOVERY_GDELT_QUERY)' \
+	RSI_EVENT_DISCOVERY_GDELT_MAX_RECORDS=$(EVENT_DISCOVERY_GDELT_MAX_RECORDS) \
+	RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1 \
+	RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT=$(EVENT_DISCOVERY_POLYMARKET_LIMIT) \
+	RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 \
+	RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT=$(EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT) \
+	$(PYTHON) main.py --event-alert-report
+
+event-alert-no-key-llm-report:
+	RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=$(EVENT_DISCOVERY_RSS_LOOKBACK_HOURS) \
+	RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1 \
+	RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH=$(EVENT_DISCOVERY_RSS_URLS_PATH) \
+	RSI_EVENT_DISCOVERY_GDELT_LIVE=1 \
+	RSI_EVENT_DISCOVERY_GDELT_QUERY='$(EVENT_DISCOVERY_GDELT_QUERY)' \
+	RSI_EVENT_DISCOVERY_GDELT_MAX_RECORDS=$(EVENT_DISCOVERY_GDELT_MAX_RECORDS) \
+	RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1 \
+	RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT=$(EVENT_DISCOVERY_POLYMARKET_LIMIT) \
+	RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 \
+	RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT=$(EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT) \
+	RSI_EVENT_LLM_MODE=$(EVENT_ALERT_LLM_MODE) \
+	RSI_EVENT_LLM_PROVIDER=$(EVENT_ALERT_LLM_PROVIDER) \
+	$(PYTHON) main.py --event-alert-report --with-llm
+
+event-alert-no-key-send:
+	RSI_EVENT_DISCOVERY_LOOKBACK_HOURS=$(EVENT_DISCOVERY_RSS_LOOKBACK_HOURS) \
+	RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=1 \
+	RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH=$(EVENT_DISCOVERY_RSS_URLS_PATH) \
+	RSI_EVENT_DISCOVERY_GDELT_LIVE=1 \
+	RSI_EVENT_DISCOVERY_GDELT_QUERY='$(EVENT_DISCOVERY_GDELT_QUERY)' \
+	RSI_EVENT_DISCOVERY_GDELT_MAX_RECORDS=$(EVENT_DISCOVERY_GDELT_MAX_RECORDS) \
+	RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=1 \
+	RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT=$(EVENT_DISCOVERY_POLYMARKET_LIMIT) \
+	RSI_EVENT_DISCOVERY_UNIVERSE_LIVE=1 \
+	RSI_EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT=$(EVENT_DISCOVERY_RSS_UNIVERSE_FETCH_LIMIT) \
+	RSI_EVENT_LLM_MODE=$(EVENT_ALERT_LLM_MODE) \
+	RSI_EVENT_LLM_PROVIDER=$(EVENT_ALERT_LLM_PROVIDER) \
+	$(PYTHON) main.py --event-alert-report --event-alert-send --with-llm
 
 event-fade-auto-report:
 	RSI_EVENT_DISCOVERY_EVENTS_PATH=fixtures/event_discovery/raw_events.json \

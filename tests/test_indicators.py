@@ -3166,6 +3166,29 @@ def _llm_packet_for(result, event_id, coin_id):
     )
 
 
+def _llm_golden_alerts_and_rows(min_prefilter_score=0):
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts, event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    result = _llm_golden_result()
+    alerts = event_alerts.build_event_alert_candidates(
+        result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+    rows = event_llm_analyzer.analyze_event_candidates(
+        result,
+        alerts,
+        FixtureLLMRelationshipProvider(_llm_golden_fixture_path(), required=True),
+        cfg=event_llm_analyzer.EventLLMConfig(
+            min_prefilter_score=min_prefilter_score,
+            max_candidates_per_run=50,
+        ),
+    )
+    return result, alerts, rows
+
+
 def test_event_llm_model_enums_and_invalid_output_rejection():
     from crypto_rsi_scanner import event_llm_analyzer
     from crypto_rsi_scanner.event_llm_models import (
@@ -3302,12 +3325,117 @@ def test_event_llm_shadow_report_formats_disagreements_and_warnings():
     assert "one or more evidence quotes were not found in source text" in report
 
 
+def test_event_llm_advisory_adjusts_research_alert_tiers_only():
+    from dataclasses import replace
+    from crypto_rsi_scanner import event_alerts
+
+    _, alerts, rows = _llm_golden_alerts_and_rows()
+    rule = {
+        (alert.discovery_candidate.event.event_id, alert.coin_id): alert
+        for alert in alerts
+    }
+    adjusted = event_alerts.apply_llm_advisory(alerts, rows, event_alerts.EventAlertConfig())
+    by_key = {
+        (alert.discovery_candidate.event.event_id, alert.coin_id): alert
+        for alert in adjusted
+    }
+
+    assert rule[("llm-btc-bitcoin-world", "bitcoin")].tier == event_alerts.EventAlertTier.RADAR_DIGEST
+    assert by_key[("llm-btc-bitcoin-world", "bitcoin")].tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert by_key[("llm-xrp-ripple-effects", "xrp")].tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert by_key[("llm-kcs-kucoin-source", "kucoin-shares")].tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert by_key[("llm-chainlink-world-cup", "chainlink")].tier.value in {"STORE_ONLY", "RADAR_DIGEST"}
+    assert by_key[("llm-chz-world-cup", "chiliz")].tier == event_alerts.EventAlertTier.WATCHLIST
+    assert by_key[("llm-velvet-spacex", "velvet")].tier == event_alerts.EventAlertTier.RADAR_DIGEST
+    assert by_key[("llm-velvet-spacex", "velvet")].original_tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert "proxy_venue" in (by_key[("llm-velvet-spacex", "velvet")].llm_adjustment_reason or "")
+
+    invalid = rule[("llm-invalid-quote", "velvet")]
+    forced_store = [replace(invalid, tier=event_alerts.EventAlertTier.STORE_ONLY)]
+    clamped = event_alerts.apply_llm_advisory(forced_store, rows, event_alerts.EventAlertConfig())[0]
+    assert clamped.tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert clamped.llm_confidence == 0.50
+
+    missing = event_alerts.apply_llm_advisory(alerts, [], event_alerts.EventAlertConfig())
+    assert [alert.tier for alert in missing] == [alert.tier for alert in alerts]
+    assert all(alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE for alert in adjusted)
+
+
+def test_event_llm_advisory_does_not_create_or_remove_triggered_fade():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts
+
+    result = _event_discovery_fixture_result()
+    alerts = event_alerts.build_event_alert_candidates(
+        result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+    adjusted = event_alerts.apply_llm_advisory(alerts, [], event_alerts.EventAlertConfig())
+    by_symbol = {alert.symbol: alert for alert in adjusted}
+    assert by_symbol["TESTVELVET"].tier == event_alerts.EventAlertTier.TRIGGERED_FADE
+
+    _, llm_alerts, rows = _llm_golden_alerts_and_rows()
+    llm_adjusted = event_alerts.apply_llm_advisory(llm_alerts, rows, event_alerts.EventAlertConfig())
+    assert all(alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE for alert in llm_adjusted)
+
+
+def test_event_llm_advisory_report_formats_before_after_and_warnings():
+    from crypto_rsi_scanner import event_alerts
+
+    _, alerts, rows = _llm_golden_alerts_and_rows()
+    adjusted = event_alerts.apply_llm_advisory(alerts, rows, event_alerts.EventAlertConfig())
+    report = event_alerts.format_event_alert_report(adjusted)
+    assert "llm: role=source_noise" in report
+    assert "llm tier adjustment: RADAR_DIGEST -> STORE_ONLY" in report
+    assert "llm adjustment reason:" in report
+    assert "llm: role=proxy_venue" in report
+
+
+def test_event_llm_cache_keys_include_provider_model_and_metadata():
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    _, alerts, _ = _llm_golden_alerts_and_rows()
+    result = _llm_golden_result()
+    with tempfile.TemporaryDirectory() as tmp:
+        cache_path = Path(tmp) / "llm_cache.json"
+        provider = FixtureLLMRelationshipProvider(_llm_golden_fixture_path(), required=True)
+        for model in ("model-a", "model-b"):
+            event_llm_analyzer.analyze_event_candidates(
+                result,
+                alerts,
+                provider,
+                cfg=event_llm_analyzer.EventLLMConfig(
+                    model=model,
+                    min_prefilter_score=0,
+                    max_candidates_per_run=1,
+                    cache_path=cache_path,
+                ),
+            )
+        cache = json.loads(cache_path.read_text(encoding="utf-8"))
+        assert len(cache) == 2
+        models = {entry["model"] for entry in cache.values()}
+        assert models == {"model-a", "model-b"}
+        for entry in cache.values():
+            assert entry["schema_version"] == event_llm_analyzer.LLM_ANALYSIS_SCHEMA_VERSION
+            assert entry["provider"] == "fixture"
+            assert entry["prompt_version"] == "llm_proxy_context_v1"
+            assert entry["packet_hash"]
+            assert entry["analyzed_at"]
+            assert isinstance(entry["raw"], dict)
+
+
 def test_makefile_has_event_llm_eval_target():
     from pathlib import Path
 
     text = Path("Makefile").read_text(encoding="utf-8")
     assert "event-llm-eval:" in text
     assert "python -m crypto_rsi_scanner.event_llm_eval" in text or "$(PYTHON) -m crypto_rsi_scanner.event_llm_eval" in text
+    assert "event-alert-no-key-llm-report:" in text
 
 
 def test_event_llm_golden_eval_passes_and_detects_mismatch():
@@ -5583,6 +5711,80 @@ def test_event_alert_scanner_report_uses_local_fixtures_without_sending():
         assert "TESTVELVET/testvelvet" in text
         assert "TRIGGERED_FADE" in text
         assert "what user should verify:" in text
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
+
+
+def test_event_alert_scanner_report_with_llm_advisory_uses_runtime_config():
+    import contextlib
+    import io
+    from crypto_rsi_scanner import config, scanner
+
+    path = _llm_golden_fixture_path()
+    original = {
+        "EVENT_DISCOVERY_EVENTS_PATH": config.EVENT_DISCOVERY_EVENTS_PATH,
+        "EVENT_DISCOVERY_ALIASES_PATH": config.EVENT_DISCOVERY_ALIASES_PATH,
+        "EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH": config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
+        "EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH": config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
+        "EVENT_DISCOVERY_COINMARKETCAL_PATH": config.EVENT_DISCOVERY_COINMARKETCAL_PATH,
+        "EVENT_DISCOVERY_TOKENOMIST_PATH": config.EVENT_DISCOVERY_TOKENOMIST_PATH,
+        "EVENT_DISCOVERY_CRYPTOPANIC_PATH": config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+        "EVENT_DISCOVERY_GDELT_PATH": config.EVENT_DISCOVERY_GDELT_PATH,
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH": config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
+        "EVENT_DISCOVERY_EXTERNAL_IPO_PATH": config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH,
+        "EVENT_DISCOVERY_SPORTS_FIXTURES_PATH": config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH": config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
+        "EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH": config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH,
+        "EVENT_DISCOVERY_UNIVERSE_PATH": config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        "EVENT_DISCOVERY_LOOKBACK_HOURS": config.EVENT_DISCOVERY_LOOKBACK_HOURS,
+        "EVENT_DISCOVERY_HORIZON_DAYS": config.EVENT_DISCOVERY_HORIZON_DAYS,
+        "EVENT_ALERTS_ENABLED": config.EVENT_ALERTS_ENABLED,
+        "EVENT_LLM_ENABLED": config.EVENT_LLM_ENABLED,
+        "EVENT_LLM_MODE": config.EVENT_LLM_MODE,
+        "EVENT_LLM_PROVIDER": config.EVENT_LLM_PROVIDER,
+        "EVENT_LLM_MODEL": config.EVENT_LLM_MODEL,
+        "EVENT_LLM_MAX_CANDIDATES_PER_RUN": config.EVENT_LLM_MAX_CANDIDATES_PER_RUN,
+        "EVENT_LLM_MIN_PREFILTER_SCORE": config.EVENT_LLM_MIN_PREFILTER_SCORE,
+        "EVENT_LLM_REQUIRE_EVIDENCE_QUOTES": config.EVENT_LLM_REQUIRE_EVIDENCE_QUOTES,
+        "EVENT_LLM_CACHE_PATH": config.EVENT_LLM_CACHE_PATH,
+        "EVENT_LLM_PROMPT_VERSION": config.EVENT_LLM_PROMPT_VERSION,
+    }
+    config.EVENT_DISCOVERY_EVENTS_PATH = path
+    config.EVENT_DISCOVERY_ALIASES_PATH = path
+    config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH = None
+    config.EVENT_DISCOVERY_COINMARKETCAL_PATH = None
+    config.EVENT_DISCOVERY_TOKENOMIST_PATH = None
+    config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+    config.EVENT_DISCOVERY_GDELT_PATH = None
+    config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH = None
+    config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH = None
+    config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH = None
+    config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_COINALYZE_DERIVATIVES_PATH = None
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+    config.EVENT_DISCOVERY_LOOKBACK_HOURS = 120
+    config.EVENT_DISCOVERY_HORIZON_DAYS = 14
+    config.EVENT_ALERTS_ENABLED = False
+    config.EVENT_LLM_ENABLED = False
+    config.EVENT_LLM_MODE = "advisory"
+    config.EVENT_LLM_PROVIDER = "fixture"
+    config.EVENT_LLM_MODEL = None
+    config.EVENT_LLM_MAX_CANDIDATES_PER_RUN = 50
+    config.EVENT_LLM_MIN_PREFILTER_SCORE = 0
+    config.EVENT_LLM_REQUIRE_EVIDENCE_QUOTES = True
+    config.EVENT_LLM_CACHE_PATH = None
+    config.EVENT_LLM_PROMPT_VERSION = "llm_proxy_context_v1"
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_alert_report(send=False, with_llm=True)
+        text = out.getvalue()
+        assert "EVENT RESEARCH ALERT REPORT" in text
+        assert "llm tier adjustment: RADAR_DIGEST -> STORE_ONLY" in text
+        assert "llm: role=source_noise" in text
+        assert "llm adjustment reason:" in text
     finally:
         for name, value in original.items():
             setattr(config, name, value)

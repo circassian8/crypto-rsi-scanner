@@ -1205,7 +1205,7 @@ def event_discovery_report(verbose: bool = False) -> None:
     print(event_discovery.format_discovery_report(result))
 
 
-def event_alert_report(verbose: bool = False, send: bool = False) -> None:
+def event_alert_report(verbose: bool = False, send: bool = False, with_llm: bool = False) -> None:
     """Print or explicitly send research-only event-discovery alert candidates."""
     _setup_event_discovery_logging(verbose)
     if not _event_discovery_paths_configured():
@@ -1218,6 +1218,24 @@ def event_alert_report(verbose: bool = False, send: bool = False) -> None:
     cfg = _event_alert_config_from_runtime()
     result = _event_discovery_result_from_config()
     alerts = event_alerts.build_event_alert_candidates(result, cfg=cfg)
+    if with_llm:
+        llm_cfg = _event_llm_config_from_runtime()
+        provider = _event_llm_provider(llm_cfg)
+        if provider is not None:
+            llm_rows = event_llm_analyzer.analyze_event_candidates(
+                result,
+                alerts,
+                provider,
+                cfg=llm_cfg,
+            )
+            alerts = event_alerts.apply_llm_advisory(
+                alerts,
+                llm_rows,
+                cfg,
+                enabled=llm_cfg.mode == "advisory",
+            )
+        if llm_cfg.mode not in {"shadow", "advisory"}:
+            print(f"Event LLM mode {llm_cfg.mode!r} is not supported; use shadow or advisory.")
     print(event_alerts.format_event_alert_report(alerts))
     if send:
         _send_event_alert_digest(alerts, cfg)
@@ -1234,8 +1252,8 @@ def event_llm_shadow_report(verbose: bool = False) -> None:
         )
         return
     llm_cfg = _event_llm_config_from_runtime()
-    if llm_cfg.mode != "shadow":
-        print("Event LLM analysis blocked: RSI_EVENT_LLM_MODE must remain shadow in Phase 1.")
+    if llm_cfg.mode not in {"shadow", "advisory"}:
+        print("Event LLM analysis blocked: RSI_EVENT_LLM_MODE must be shadow or advisory.")
         return
     provider = _event_llm_provider(llm_cfg)
     if provider is None:
@@ -2777,6 +2795,14 @@ def cli() -> None:
         ),
     )
     parser.add_argument(
+        "--with-llm",
+        action="store_true",
+        help=(
+            "With --event-alert-report, run event LLM analysis. "
+            "Advisory tier changes require RSI_EVENT_LLM_MODE=advisory."
+        ),
+    )
+    parser.add_argument(
         "--event-discovery-refresh",
         action="store_true",
         help="Fetch configured event-discovery sources and append research-only JSONL cache artifacts.",
@@ -3022,7 +3048,7 @@ def cli() -> None:
         event_discovery_report(verbose=args.verbose)
         return
     if args.event_alert_report:
-        event_alert_report(verbose=args.verbose, send=args.event_alert_send)
+        event_alert_report(verbose=args.verbose, send=args.event_alert_send, with_llm=args.with_llm)
         return
     if args.event_llm_shadow_report:
         event_llm_shadow_report(verbose=args.verbose)

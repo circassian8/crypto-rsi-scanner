@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import html
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Iterable
@@ -55,6 +55,12 @@ class EventAlertCandidate:
     reason: str = ""
     verify: tuple[str, ...] = ()
     rejected_reason: str | None = None
+    original_tier: EventAlertTier | None = None
+    llm_asset_role: str | None = None
+    llm_relationship_type: str | None = None
+    llm_confidence: float | None = None
+    llm_reason: str | None = None
+    llm_adjustment_reason: str | None = None
 
     @property
     def symbol(self) -> str:
@@ -103,6 +109,48 @@ def digest_candidates(
     return sorted(keep, key=_alert_sort_key)[: max(0, cfg.max_digest_items)]
 
 
+def apply_llm_advisory(
+    alerts: Iterable[EventAlertCandidate],
+    llm_rows: Iterable[object],
+    cfg: EventAlertConfig | None = None,
+    *,
+    enabled: bool = True,
+) -> list[EventAlertCandidate]:
+    """Apply validated LLM relationship metadata to research-alert tiers.
+
+    This is advisory-only: it never creates TRIGGERED_FADE and it does not
+    change event-fade eligibility, storage, paper trading, or normal RSI alerts.
+    """
+    cfg = cfg or EventAlertConfig()
+    row_by_key = {_row_key(row): row for row in llm_rows if _row_key(row) is not None}
+    adjusted: list[EventAlertCandidate] = []
+    for alert in alerts:
+        row = row_by_key.get(_alert_key(alert))
+        analysis = getattr(row, "analysis", None) if row is not None else None
+        if analysis is None:
+            adjusted.append(alert)
+            continue
+        role = str(getattr(analysis, "asset_role", "") or "")
+        relationship = str(getattr(analysis, "relationship_type", "") or "")
+        confidence = _num(getattr(analysis, "confidence", None), default=0.0)
+        reason = _analysis_reason(analysis)
+        new_tier = alert.tier
+        adjustment: str | None = None
+        if enabled:
+            new_tier, adjustment = _advisory_tier(alert, cfg, role, confidence)
+        adjusted.append(replace(
+            alert,
+            tier=new_tier,
+            original_tier=alert.tier if new_tier != alert.tier else alert.original_tier,
+            llm_asset_role=role or None,
+            llm_relationship_type=relationship or None,
+            llm_confidence=confidence,
+            llm_reason=reason,
+            llm_adjustment_reason=adjustment,
+        ))
+    return sorted(adjusted, key=_alert_sort_key)
+
+
 def format_event_alert_report(alerts: Iterable[EventAlertCandidate]) -> str:
     rows = [
         "=" * 76,
@@ -130,6 +178,18 @@ def format_event_alert_report(alerts: Iterable[EventAlertCandidate]) -> str:
         )
         rows.append(f"  source: {alert.source} · time: {event_time} · url: {source_url}")
         rows.append(f"  reason: {alert.reason}")
+        if alert.llm_asset_role:
+            rows.append(
+                f"  llm: role={alert.llm_asset_role} "
+                f"rel={alert.llm_relationship_type or 'unknown'} "
+                f"conf={alert.llm_confidence if alert.llm_confidence is not None else 0.0:.2f}"
+            )
+            if alert.llm_reason:
+                rows.append(f"  llm reason: {alert.llm_reason}")
+        if alert.original_tier and alert.original_tier != alert.tier:
+            rows.append(f"  llm tier adjustment: {alert.original_tier.value} -> {alert.tier.value}")
+        if alert.llm_adjustment_reason:
+            rows.append(f"  llm adjustment reason: {alert.llm_adjustment_reason}")
         rows.append(f"  what user should verify: {'; '.join(alert.verify)}")
         if alert.rejected_reason:
             rows.append(f"  rejected: {alert.rejected_reason}")
@@ -162,6 +222,12 @@ def format_event_alert_telegram_digest(alerts: Iterable[EventAlertCandidate]) ->
             f"external={_esc(alert.external_asset or 'unknown')} "
             f"role={_esc(alert.asset_role)} rel={_esc(c.classification.relationship_type)}"
         )
+        if alert.llm_adjustment_reason:
+            lines.append(
+                f"llm={_esc(alert.llm_asset_role or 'unknown')} "
+                f"conf={_esc(f'{alert.llm_confidence:.2f}' if alert.llm_confidence is not None else '0.00')} "
+                f"{_esc(alert.llm_adjustment_reason)}"
+            )
         lines.append(f"verify: {_esc('; '.join(alert.verify))}")
     return "\n".join(lines)
 
@@ -368,6 +434,100 @@ def _verify_items(candidate: DiscoveredEventFadeCandidate, tier: EventAlertTier)
     if tier == EventAlertTier.TRIGGERED_FADE:
         items.append("check post-event technical failure and invalidation level manually")
     return tuple(items)
+
+
+def _advisory_tier(
+    alert: EventAlertCandidate,
+    cfg: EventAlertConfig,
+    role: str,
+    confidence: float,
+) -> tuple[EventAlertTier, str | None]:
+    original = alert.tier
+    if original == EventAlertTier.TRIGGERED_FADE:
+        return original, None
+    demote_roles = {"source_noise", "ticker_word_collision", "direct_beneficiary"}
+    if role in demote_roles and confidence >= 0.75:
+        return (
+            EventAlertTier.STORE_ONLY,
+            f"LLM classified this as {role} with confidence {confidence:.2f}.",
+        )
+    if confidence < 0.65:
+        return original, None
+    if role == ROLE_INFRASTRUCTURE and confidence >= 0.75:
+        capped = _cap_tier(original, EventAlertTier.RADAR_DIGEST)
+        return (
+            capped,
+            f"LLM classified this as infrastructure, capped at RADAR_DIGEST.",
+        ) if capped != original else (original, None)
+    if role == ROLE_PROXY_VENUE and confidence >= 0.80:
+        target = EventAlertTier.STORE_ONLY
+        if alert.opportunity_score >= cfg.min_digest_score:
+            target = EventAlertTier.RADAR_DIGEST
+        if (
+            alert.opportunity_score >= cfg.min_watchlist_score
+            and (
+                alert.score_components.get("market_move_volume", 0) >= 40
+                or alert.score_components.get("derivatives_crowding", 0) >= 50
+            )
+        ):
+            target = EventAlertTier.WATCHLIST
+        return (
+            target,
+            f"LLM classified this as proxy_venue; advisory tier limited by market/derivatives confirmation.",
+        ) if target != original else (original, None)
+    if role == "proxy_instrument" and confidence >= 0.80:
+        target = EventAlertTier.STORE_ONLY
+        if alert.opportunity_score >= cfg.min_digest_score:
+            target = EventAlertTier.RADAR_DIGEST
+        if alert.opportunity_score >= cfg.min_watchlist_score:
+            target = EventAlertTier.WATCHLIST
+        if (
+            alert.opportunity_score >= cfg.min_high_priority_score
+            and (
+                alert.score_components.get("event_time_quality", 0) >= 80
+                or alert.score_components.get("derivatives_crowding", 0) >= 70
+            )
+        ):
+            target = EventAlertTier.HIGH_PRIORITY_WATCH
+        return (
+            target,
+            "LLM confirmed proxy_instrument; advisory tier follows score thresholds.",
+        ) if target != original else (original, None)
+    return original, None
+
+
+def _cap_tier(tier: EventAlertTier, max_tier: EventAlertTier) -> EventAlertTier:
+    rank = {
+        EventAlertTier.TRIGGERED_FADE: 0,
+        EventAlertTier.HIGH_PRIORITY_WATCH: 1,
+        EventAlertTier.WATCHLIST: 2,
+        EventAlertTier.RADAR_DIGEST: 3,
+        EventAlertTier.STORE_ONLY: 4,
+    }
+    return max_tier if rank[tier] < rank[max_tier] else tier
+
+
+def _row_key(row: object) -> tuple[str, str] | None:
+    candidate = getattr(row, "candidate", None)
+    if candidate is None:
+        return None
+    return (
+        str(candidate.event.event_id),
+        str(candidate.asset.coin_id),
+    )
+
+
+def _alert_key(alert: EventAlertCandidate) -> tuple[str, str]:
+    return (
+        str(alert.discovery_candidate.event.event_id),
+        str(alert.discovery_candidate.asset.coin_id),
+    )
+
+
+def _analysis_reason(analysis: object) -> str:
+    relationship = getattr(analysis, "asset_relationship", None)
+    reason = getattr(relationship, "reason", None)
+    return str(reason or getattr(analysis, "reason", "") or "")
 
 
 def _publisher_only_evidence(candidate: DiscoveredEventFadeCandidate) -> bool:

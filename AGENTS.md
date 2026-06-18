@@ -97,12 +97,17 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   research alert candidates as store-only/radar/watchlist/high-priority/
   triggered-fade; not trade signals, no paper trades, no normal RSI routing;
   optional Telegram digest requires explicit `--event-alert-send` plus
-  `RSI_EVENT_ALERTS_ENABLED=1`) · `main.py --event-llm-shadow-report`
+  `RSI_EVENT_ALERTS_ENABLED=1`; `--with-llm` runs LLM relationship analysis and
+  only applies tier adjustments when `RSI_EVENT_LLM_MODE=advisory`) ·
+  `main.py --event-llm-shadow-report`
   (research-only shadow relationship analysis for event candidates; fixture by
   default, optional OpenAI only when explicitly enabled; no sends, no normal RSI
   routing, no paper trades, no live DB writes) · `make event-llm-eval`
   (offline golden eval for the LLM analyzer; fails on expected role/action
-  drift or quote-validation regressions) · `main.py --event-discovery-refresh` (fetch
+  drift or quote-validation regressions) · `make event-alert-no-key-report` /
+  `make event-alert-no-key-llm-report` / `make event-alert-no-key-send`
+  (no-key public RSS/GDELT/Polymarket event-alert research surfaces; send still
+  requires explicit alert enablement) · `main.py --event-discovery-refresh` (fetch
   configured event-discovery sources and append research-only JSONL cache
   artifacts under `RSI_EVENT_DISCOVERY_CACHE_DIR`; no live DB writes; use
   `make event-discovery-refresh-configured` when you want the Makefile to avoid
@@ -228,7 +233,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_models.py` | immutable event-discovery dataclasses for raw events, normalized events, links, classifications, and candidates |
 | `event_discovery.py` | research-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring, grouped auto reports, and validation sample exports |
 | `event_alerts.py` | pure research-alert ranking/tiering for discovery candidates; no labels, paper trades, normal RSI routing, or execution |
-| `event_llm_models.py` / `event_llm_analyzer.py` / `llm_providers/` | research-only shadow LLM relationship analysis for discovery candidates; verifies quoted evidence and compares LLM role/action with rule output without affecting tiers |
+| `event_llm_models.py` / `event_llm_analyzer.py` / `llm_providers/` | research-only LLM relationship analysis for discovery candidates; verifies quoted evidence, compares LLM role/action with rule output, and can feed opt-in advisory event-alert tier quality control |
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
@@ -322,12 +327,15 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   (`cash`, `real`, `just`, `humanity`) from becoming high-confidence matches.
   Provider enrichment is evidence, not eligibility; raw reviewed fixture
   evidence takes precedence over provider rows.
-- Event LLM analysis is shadow-only in Phase 1. It may build evidence packets
-  from discovery/event-alert candidates, call a fixture or explicitly enabled
-  OpenAI provider, validate structured output, verify source quotes, print local
-  comparison reports, and optionally write a local JSON cache artifact. It must
-  not change rule classifications, event-alert tiers, Telegram routing, paper
-  trades, live signal/outcome/paper tables, or event-fade eligibility.
+- Event LLM analysis is research-only. In `shadow` mode it may build evidence
+  packets from discovery/event-alert candidates, call a fixture or explicitly
+  enabled OpenAI provider, validate structured output, verify source quotes,
+  print local comparison reports, and optionally write a local JSON cache
+  artifact. In `advisory` mode, when explicitly requested with `--with-llm`, it
+  may adjust discovery-fed research-alert tiers for false-positive quality
+  control only. It must not change rule classifications, create
+  `TRIGGERED_FADE`, alter `event_fade.py` eligibility, route normal RSI alerts,
+  open paper trades, write live signal/outcome/paper tables, or imply execution.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, explicit
   `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise

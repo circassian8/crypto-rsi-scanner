@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add LLM advisory mode for event research alerts · Codex
+**Why:** The LLM relationship analyzer could diagnose source-noise and
+ticker-collision false positives, but event research alerts still used only the
+deterministic rule tier. Advisory mode lets validated LLM output improve
+research-alert quality without touching trade or event-fade eligibility logic.
+**Changes:**
+- Added copy-based LLM advisory tier adjustment for discovery-fed event research
+  alerts, including LLM metadata fields and before/after report formatting.
+- Wired `main.py --event-alert-report --with-llm` and
+  `--event-alert-send --with-llm`; advisory changes apply only when
+  `RSI_EVENT_LLM_MODE=advisory`.
+- Hardened LLM cache keys with provider/model/prompt/schema/packet metadata.
+- Added no-key event-alert Make targets and documented event alert / LLM env
+  vars in `.env.example`.
+- Updated `AGENTS.md`, `ROADMAP.md`, `DECISIONS.md`, and tests for the
+  research-only advisory boundary.
+**Verify:** Targeted advisory tests passed. `python3 tests/test_indicators.py`
+passed 283/283. `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`make event-llm-eval PYTHON=python3` passed 9/9 golden cases with the expected
+invalid-quote clamp warning. `make verify PYTHON=python3` passed 283/283 tests,
+alert render smoke, fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** LLM advisory cannot create `TRIGGERED_FADE`, change
+`event_fade.py` eligibility, route normal RSI alerts, write live
+signal/outcome/paper rows, open paper trades, or imply execution.
+
 ## 2026-06-18 — Make LLM golden eval fail on drift · Codex
 **Why:** `make event-llm-eval` printed the shadow report, but it did not fail if
 golden LLM relationship roles/actions drifted. The eval should be a real

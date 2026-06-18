@@ -96,17 +96,40 @@ def analyze_event_candidates(
         )
         warnings: list[str] = []
         raw: dict[str, Any] | None
-        cache_key = _cache_key(packet, cfg.prompt_version)
+        provider_name = str(getattr(provider, "name", cfg.provider))
+        provider_model = getattr(provider, "model", cfg.model)
+        cache_key = _cache_key(packet, cfg, provider_name, provider_model)
         cached = cache.get(cache_key)
-        if isinstance(cached, Mapping):
-            raw = dict(cached)
+        if isinstance(cached, Mapping) and isinstance(cached.get("raw"), Mapping):
+            raw = dict(cached["raw"])
+        elif isinstance(cached, Mapping):
+            warnings.append("LLM analysis cache entry ignored: old cache format")
+            provider_result = provider.analyze_relationship(packet)
+            raw = provider_result.raw
+            if provider_result.warning:
+                warnings.append(provider_result.warning)
+            if raw is not None and cfg.cache_path is not None:
+                cache[cache_key] = _cache_entry(
+                    raw,
+                    packet,
+                    provider_name=provider_name,
+                    model=provider_model,
+                    prompt_version=cfg.prompt_version,
+                )
+                cache_changed = True
         else:
             provider_result = provider.analyze_relationship(packet)
             raw = provider_result.raw
             if provider_result.warning:
                 warnings.append(provider_result.warning)
             if raw is not None and cfg.cache_path is not None:
-                cache[cache_key] = raw
+                cache[cache_key] = _cache_entry(
+                    raw,
+                    packet,
+                    provider_name=provider_name,
+                    model=provider_model,
+                    prompt_version=cfg.prompt_version,
+                )
                 cache_changed = True
         analysis: EventLLMAnalysis | None = None
         if raw is not None:
@@ -114,8 +137,8 @@ def analyze_event_candidates(
                 analysis = validate_llm_analysis(
                     raw,
                     packet,
-                    provider_name=getattr(provider, "name", cfg.provider),
-                    model=cfg.model,
+                    provider_name=provider_name,
+                    model=provider_model,
                     prompt_version=cfg.prompt_version,
                     require_evidence_quotes=cfg.require_evidence_quotes,
                 )
@@ -529,14 +552,54 @@ def _iso(dt: datetime | None) -> str | None:
     return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).astimezone(timezone.utc).isoformat()
 
 
-def _cache_key(packet: Mapping[str, Any], prompt_version: str) -> str:
+def _packet_hash(packet: Mapping[str, Any]) -> str:
     encoded = json.dumps(
-        {"prompt_version": prompt_version, "packet": packet},
+        packet,
         sort_keys=True,
         default=str,
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _cache_key(
+    packet: Mapping[str, Any],
+    cfg: EventLLMConfig,
+    provider_name: str,
+    model: object,
+) -> str:
+    encoded = json.dumps(
+        {
+            "schema_version": LLM_ANALYSIS_SCHEMA_VERSION,
+            "prompt_version": cfg.prompt_version,
+            "provider": provider_name,
+            "model": str(model or ""),
+            "packet_hash": _packet_hash(packet),
+        },
+        sort_keys=True,
+        default=str,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _cache_entry(
+    raw: Mapping[str, Any],
+    packet: Mapping[str, Any],
+    *,
+    provider_name: str,
+    model: object,
+    prompt_version: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": LLM_ANALYSIS_SCHEMA_VERSION,
+        "prompt_version": prompt_version,
+        "provider": provider_name,
+        "model": str(model or ""),
+        "packet_hash": _packet_hash(packet),
+        "analyzed_at": datetime.now(timezone.utc).isoformat(),
+        "raw": dict(raw),
+    }
 
 
 def _load_cache(path: Path | None) -> dict[str, Any]:

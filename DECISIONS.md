@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep LLM advisory limited to research-alert tier quality
+**Status:** accepted
+**Decision:** Event LLM analysis may run in `shadow` mode for diagnosis or
+`advisory` mode to adjust discovery-fed research-alert tiers only. Advisory mode
+may demote source-noise, ticker-collision, direct-beneficiary, and
+infrastructure false positives, and may preserve/raise high-confidence proxy
+candidates within research-alert tiers, but it must never create
+`TRIGGERED_FADE`, change `event_fade.py` eligibility, route normal RSI alerts,
+write live signal/paper rows, open paper trades, or imply execution.
+**Why:** The LLM catches semantic false positives that deterministic resolver
+rules miss, but event-fade triggers and trading boundaries must remain
+deterministic and validated.
+**Revisit when:** A reviewed event-alert/event-fade sample shows advisory output
+is reliable enough to become part of a promoted notification or paper-tracking
+workflow, with explicit human approval.
+
 ## 2026-06-17 - Keep weak discovery evidence review-only
 **Status:** accepted
 **Decision:** Event discovery may keep low-confidence classifier matches,
