@@ -119,9 +119,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   market-anomaly rows; anomalies without catalyst evidence stay low-authority
   review evidence) · `main.py --event-alpha-cycle` / `make event-alpha-cycle`
   / `make event-alpha-cycle-llm` / `make event-alpha-cycle-send` (one unified
-  research-only Event Alpha cycle: discovery/anomaly inputs, optional LLM
-  metadata, alert ranking, watchlist refresh, and local router summary; send
-  still requires explicit alert enablement and remains a research digest) ·
+  research-only Event Alpha cycle: discovery/anomaly inputs, optional
+  quote-checked LLM extraction hints rerun through deterministic
+  resolver/classifier validation, optional LLM relationship metadata, alert
+  ranking, watchlist refresh, and local router summary; send still requires
+  explicit alert enablement and remains a research digest) ·
   `main.py --event-watchlist-refresh` /
   `main.py --event-watchlist-report` and `make event-watchlist-refresh` /
   `make event-watchlist-report` (append/read research-only Event Alpha Radar
@@ -264,7 +266,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_alerts.py` | pure research-alert ranking/tiering for discovery candidates; no labels, paper trades, normal RSI routing, or execution |
 | `event_playbooks.py` | deterministic Event Alpha Radar playbook scoring; labels candidates as proxy fade, proxy attention, direct event, infrastructure, market anomaly, source-noise, or ambiguous control without creating trades or triggers |
 | `event_llm_models.py` / `event_llm_analyzer.py` / `llm_providers/` | research-only LLM relationship analysis for discovery candidates; verifies quoted evidence, compares LLM role/action with rule output, and can feed opt-in advisory event-alert tier quality control |
-| `event_llm_extraction_models.py` / `event_llm_extractor.py` | research-only LLM raw-event extraction for catalysts, asset/project mentions, false-positive terms, and date hints; extracted assets must still be validated by deterministic resolver logic |
+| `event_llm_extraction_models.py` / `event_llm_extractor.py` | research-only LLM raw-event extraction for catalysts, asset/project mentions, false-positive terms, and date hints; extracted assets may become resolver hints in the unified Event Alpha cycle but must still be validated by deterministic resolver/classifier logic |
 | `event_market_enrichment.py` / `event_anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; anomalies without catalyst evidence remain store-only/radar evidence and cannot create event-fade triggers |
 | `event_watchlist.py` | research-only Event Alpha Radar state cache; tracks raw/radar/watchlist/high-priority/event-passed/armed/triggered/terminal transitions and duplicate suppression without routing alerts or writing live storage |
 | `event_alpha_router.py` | artifact-only Event Alpha Radar route decisions from watchlist state; local research output only, no sends/trades/live writes |
@@ -375,10 +377,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   extract external catalysts, crypto asset/project mentions, source-noise terms,
   and event date hints from raw provider evidence, validate structured output,
   verify source quotes, print local reports, and optionally write a local JSON
-  cache artifact. Extracted assets are resolver hints only; they do not create
-  candidates, alerts, paper trades, live DB rows, or event-fade eligibility
-  unless deterministic resolver/classifier gates validate the asset and event
-  through the normal discovery path.
+  cache artifact. The unified Event Alpha cycle may append high-confidence,
+  quote-validated extraction hints to raw evidence before deterministic
+  normalization/resolution so missed assets can be found. Extracted assets are
+  resolver hints only; they do not create candidates, alerts, paper trades, live
+  DB rows, or event-fade eligibility unless deterministic resolver/classifier
+  gates validate the asset and event through the normal discovery path.
 - Event Alpha Radar market enrichment, anomaly scanning, and watchlist state are
   research-only and disabled by default. Market enrichment may fill candidate
   market snapshots from CoinGecko-style fixture/live rows, but raw reviewed

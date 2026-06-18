@@ -217,6 +217,7 @@ def enrich_raw_events_with_extractions(
         body = raw.body or ""
         if hints:
             body = f"{body}\n\nLLM extracted research hints: {hints}".strip()
+            payload = _append_resolver_hints_to_payload(payload, hints)
         out.append(replace(raw, body=body, raw_json=payload))
     return tuple(out)
 
@@ -446,6 +447,25 @@ def _extraction_payload(extraction: EventLLMRawEventExtraction) -> dict[str, Any
         "suggested_followup_queries": list(extraction.suggested_followup_queries),
         "warnings": list(extraction.warnings),
     }
+
+
+def _append_resolver_hints_to_payload(payload: dict[str, Any], hints: str) -> dict[str, Any]:
+    """Append resolver hints to structured descriptions used by normalization."""
+    out = dict(payload)
+    event_payload = out.get("event")
+    if isinstance(event_payload, Mapping):
+        event_copy = dict(event_payload)
+        event_copy["description"] = _append_hints_text(event_copy.get("description"), hints)
+        out["event"] = event_copy
+    else:
+        out["description"] = _append_hints_text(out.get("description"), hints)
+    return out
+
+
+def _append_hints_text(value: object, hints: str) -> str:
+    base = str(value or "").strip()
+    suffix = f"LLM extracted research hints: {hints}"
+    return f"{base}\n\n{suffix}".strip() if base else suffix
 
 
 def _cache_key(

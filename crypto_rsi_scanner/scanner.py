@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import sys
+from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -73,7 +74,7 @@ from . import event_provider_status
 from . import event_price_history
 from . import event_validation
 from . import event_watchlist
-from .event_models import EventDiscoveryResult
+from .event_models import EventDiscoveryResult, RawDiscoveredEvent
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
 from .llm_providers.fixture import FixtureLLMExtractionProvider, FixtureLLMRelationshipProvider
 from .llm_providers.openai_provider import OpenAILLMExtractionProvider, OpenAILLMRelationshipProvider
@@ -1087,7 +1088,11 @@ def _event_research_now(override: str | datetime | None = None) -> datetime:
         raise SystemExit(str(exc)) from exc
 
 
-def _event_discovery_result_from_config(now: datetime | None = None) -> event_discovery.EventDiscoveryResult:
+def _event_discovery_result_from_config(
+    now: datetime | None = None,
+    *,
+    raw_event_transform: Callable[[tuple[RawDiscoveredEvent]], Iterable[RawDiscoveredEvent]] | None = None,
+) -> event_discovery.EventDiscoveryResult:
     cfg = event_discovery.EventDiscoveryConfig(
         min_link_confidence=config.EVENT_DISCOVERY_MIN_LINK_CONFIDENCE,
         min_classifier_confidence=config.EVENT_DISCOVERY_MIN_CLASSIFIER_CONFIDENCE,
@@ -1175,6 +1180,7 @@ def _event_discovery_result_from_config(now: datetime | None = None) -> event_di
         cfg=cfg,
         fade_cfg=event_fade.runtime_config(config),
         now=now,
+        raw_event_transform=raw_event_transform,
     )
 
 
@@ -1363,20 +1369,27 @@ def event_alpha_cycle(
         )
         return
     now = _event_research_now(event_now)
-    discovery_result = _event_discovery_result_from_config(now=now)
     extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow] = []
     relationship_provider = None
     relationship_cfg = None
+    raw_event_transform = None
     if with_llm:
         extractor_cfg = _event_llm_extractor_config_from_runtime()
         if extractor_cfg.mode == "shadow":
             extractor_provider = _event_llm_extraction_provider(extractor_cfg)
             if extractor_provider is not None:
-                extraction_rows = event_llm_extractor.analyze_raw_events(
-                    discovery_result.raw_events,
-                    extractor_provider,
-                    cfg=extractor_cfg,
-                )
+                def _enrich_with_llm_extractions(
+                    raw_events: tuple[RawDiscoveredEvent],
+                ) -> tuple[RawDiscoveredEvent, ...]:
+                    nonlocal extraction_rows
+                    extraction_rows = event_llm_extractor.analyze_raw_events(
+                        raw_events,
+                        extractor_provider,
+                        cfg=extractor_cfg,
+                    )
+                    return event_llm_extractor.enrich_raw_events_with_extractions(raw_events, extraction_rows)
+
+                raw_event_transform = _enrich_with_llm_extractions
         else:
             print("Event LLM extractor skipped: RSI_EVENT_LLM_EXTRACTOR_MODE must be shadow for this cycle.")
         relationship_cfg = _event_llm_config_from_runtime()
@@ -1384,6 +1397,7 @@ def event_alpha_cycle(
             relationship_provider = _event_llm_provider(relationship_cfg)
         else:
             print(f"Event LLM mode {relationship_cfg.mode!r} is not supported; use shadow or advisory.")
+    discovery_result = _event_discovery_result_from_config(now=now, raw_event_transform=raw_event_transform)
     alert_cfg = _event_alert_config_from_runtime()
     pipeline_result = event_alpha_pipeline.run_event_alpha_pipeline(
         discovery_result,

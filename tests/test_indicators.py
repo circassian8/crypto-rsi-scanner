@@ -3642,6 +3642,102 @@ def test_event_llm_extractor_enrichment_still_requires_resolver_validation():
     assert result.candidates[0].asset.coin_id == "missed-proxy"
 
 
+def test_event_discovery_transform_applies_llm_hints_before_resolver_validation():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_discovery, event_llm_extractor
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    class Provider:
+        name = "fixture"
+
+        def extract_raw_event(self, packet):
+            return LLMProviderResult(raw={
+                "confidence": 0.91,
+                "external_catalysts": [{
+                    "name": "SpaceX",
+                    "catalyst_type": "ipo_proxy",
+                    "event_time": None,
+                    "event_time_confidence": 0.0,
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "SpaceX exposure", "source_field": "body", "supports": "external catalyst"}],
+                }],
+                "crypto_asset_mentions": [{
+                    "name": "Stealth Alpha",
+                    "symbol": "STEALTH",
+                    "coin_id": "stealth-alpha",
+                    "contract_address": None,
+                    "mention_type": "project_or_token",
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "Stealth proxy venue", "source_field": "body", "supports": "asset mention"}],
+                }],
+                "false_positive_terms": [],
+                "event_date_hints": [],
+                "suggested_followup_queries": [],
+                "warnings": [],
+            })
+
+    raw_rows = [{
+        "raw_id": "llm-upstream-stealth",
+        "provider": "manual_json",
+        "fetched_at": "2026-06-16T12:00:00Z",
+        "published_at": "2026-06-16T11:00:00Z",
+        "source_url": "https://example.test/stealth-alpha",
+        "title": "SpaceX exposure desk opens before listing event",
+        "body": "Stealth proxy venue is live for SpaceX exposure before the event.",
+        "source_confidence": 0.90,
+        "event": {
+            "event_id": "stealth-spacex-event",
+            "event_name": "SpaceX proxy exposure opens",
+            "event_type": "ipo_proxy",
+            "event_time": "2026-06-16T13:30:00Z",
+            "event_time_confidence": 1.0,
+            "external_asset": "SpaceX",
+            "confidence": 0.90,
+            "description": "A proxy venue opened for SpaceX exposure.",
+        },
+    }]
+    alias_rows = {"assets": [{
+        "coin_id": "stealth-alpha",
+        "symbol": "STEALTH",
+        "name": "Stealth Alpha",
+        "aliases": ["stealth alpha"],
+    }]}
+    now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
+    with tempfile.TemporaryDirectory() as tmp:
+        event_path = Path(tmp) / "events.json"
+        alias_path = Path(tmp) / "aliases.json"
+        event_path.write_text(json.dumps(raw_rows), encoding="utf-8")
+        alias_path.write_text(json.dumps(alias_rows), encoding="utf-8")
+
+        without_hints = event_discovery.run_manual_discovery(event_path, alias_path, now=now)
+        assert without_hints.candidates == ()
+
+        seen_rows = []
+
+        def transform(raw_events):
+            nonlocal seen_rows
+            seen_rows = event_llm_extractor.analyze_raw_events(raw_events, Provider())
+            return event_llm_extractor.enrich_raw_events_with_extractions(raw_events, seen_rows)
+
+        with_hints = event_discovery.run_manual_discovery(
+            event_path,
+            alias_path,
+            now=now,
+            raw_event_transform=transform,
+        )
+        assert len(seen_rows) == 1
+        assert len(with_hints.candidates) == 1
+        candidate = with_hints.candidates[0]
+        assert candidate.asset.coin_id == "stealth-alpha"
+        assert candidate.link.match_reason in {"coin_id", "known_alias", "name_and_symbol", "name"}
+        assert candidate.event.raw_ids == ("llm-upstream-stealth",)
+        assert candidate.event.description and "LLM extracted research hints" in candidate.event.description
+        assert with_hints.raw_events[0].raw_json["llm_extraction"]["crypto_asset_mentions"][0]["coin_id"] == "stealth-alpha"
+
+
 def test_event_llm_extract_report_and_eval_pass():
     from crypto_rsi_scanner import event_llm_extract_eval, event_llm_extractor
 
@@ -4226,6 +4322,128 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
             assert "market_anomaly" in text
             assert config.EVENT_WATCHLIST_STATE_PATH.exists()
         finally:
+            for name, value in original.items():
+                setattr(config, name, value)
+
+
+def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    class Provider:
+        name = "fixture"
+
+        def extract_raw_event(self, packet):
+            return LLMProviderResult(raw={
+                "confidence": 0.91,
+                "external_catalysts": [{
+                    "name": "SpaceX",
+                    "catalyst_type": "ipo_proxy",
+                    "event_time": None,
+                    "event_time_confidence": 0.0,
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "SpaceX exposure", "source_field": "body", "supports": "external catalyst"}],
+                }],
+                "crypto_asset_mentions": [{
+                    "name": "Stealth Alpha",
+                    "symbol": "STEALTH",
+                    "coin_id": "stealth-alpha",
+                    "contract_address": None,
+                    "mention_type": "project_or_token",
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "Stealth proxy venue", "source_field": "body", "supports": "asset mention"}],
+                }],
+                "false_positive_terms": [],
+                "event_date_hints": [],
+                "suggested_followup_queries": [],
+                "warnings": [],
+            })
+
+    attrs = (
+        "EVENT_DISCOVERY_EVENTS_PATH",
+        "EVENT_DISCOVERY_ALIASES_PATH",
+        "EVENT_DISCOVERY_UNIVERSE_PATH",
+        "EVENT_DISCOVERY_UNIVERSE_LIVE",
+        "EVENT_MARKET_ENRICHMENT_ENABLED",
+        "EVENT_ANOMALY_SCANNER_ENABLED",
+        "EVENT_WATCHLIST_ENABLED",
+        "EVENT_WATCHLIST_STATE_PATH",
+        "EVENT_ALPHA_ROUTER_ENABLED",
+        "EVENT_ALERTS_ENABLED",
+        "EVENT_LLM_EXTRACTOR_MODE",
+        "EVENT_LLM_EXTRACTOR_PROVIDER",
+        "EVENT_LLM_MODE",
+        "EVENT_LLM_PROVIDER",
+    )
+    original = {name: getattr(config, name) for name in attrs}
+    original_extraction_provider = scanner._event_llm_extraction_provider
+    original_relationship_provider = scanner._event_llm_provider
+    raw_rows = [{
+        "raw_id": "llm-cycle-stealth",
+        "provider": "manual_json",
+        "fetched_at": "2026-06-16T12:00:00Z",
+        "published_at": "2026-06-16T11:00:00Z",
+        "source_url": "https://example.test/stealth-alpha-cycle",
+        "title": "SpaceX exposure desk opens before listing event",
+        "body": "Stealth proxy venue is live for SpaceX exposure before the event.",
+        "source_confidence": 0.90,
+        "event": {
+            "event_id": "stealth-cycle-spacex-event",
+            "event_name": "SpaceX proxy exposure opens",
+            "event_type": "ipo_proxy",
+            "event_time": "2026-06-16T13:30:00Z",
+            "event_time_confidence": 1.0,
+            "external_asset": "SpaceX",
+            "confidence": 0.90,
+            "description": "A proxy venue opened for SpaceX exposure.",
+        },
+    }]
+    alias_rows = {"assets": [{
+        "coin_id": "stealth-alpha",
+        "symbol": "STEALTH",
+        "name": "Stealth Alpha",
+        "aliases": ["stealth alpha"],
+    }]}
+    with tempfile.TemporaryDirectory() as tmp:
+        event_path = Path(tmp) / "events.json"
+        alias_path = Path(tmp) / "aliases.json"
+        event_path.write_text(json.dumps(raw_rows), encoding="utf-8")
+        alias_path.write_text(json.dumps(alias_rows), encoding="utf-8")
+        config.EVENT_DISCOVERY_EVENTS_PATH = event_path
+        config.EVENT_DISCOVERY_ALIASES_PATH = alias_path
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = None
+        config.EVENT_DISCOVERY_UNIVERSE_LIVE = False
+        config.EVENT_MARKET_ENRICHMENT_ENABLED = False
+        config.EVENT_ANOMALY_SCANNER_ENABLED = False
+        config.EVENT_WATCHLIST_ENABLED = True
+        config.EVENT_WATCHLIST_STATE_PATH = Path(tmp) / "watchlist.jsonl"
+        config.EVENT_ALPHA_ROUTER_ENABLED = True
+        config.EVENT_ALERTS_ENABLED = False
+        config.EVENT_LLM_EXTRACTOR_MODE = "shadow"
+        config.EVENT_LLM_EXTRACTOR_PROVIDER = "fixture"
+        config.EVENT_LLM_MODE = "shadow"
+        config.EVENT_LLM_PROVIDER = "fixture"
+        scanner._event_llm_extraction_provider = lambda extractor_cfg: Provider()
+        scanner._event_llm_provider = lambda llm_cfg: None
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_cycle(with_llm=True, event_now="2026-06-16T12:00:00Z")
+            text = out.getvalue()
+            assert "EVENT ALPHA PIPELINE REPORT" in text
+            assert "extractions=1/1" in text
+            assert "extraction_hints_applied=1" in text
+            assert "candidates=1" in text
+            assert "STEALTH/stealth-alpha" in text
+            assert config.EVENT_WATCHLIST_STATE_PATH.exists()
+        finally:
+            scanner._event_llm_extraction_provider = original_extraction_provider
+            scanner._event_llm_provider = original_relationship_provider
             for name, value in original.items():
                 setattr(config, name, value)
 

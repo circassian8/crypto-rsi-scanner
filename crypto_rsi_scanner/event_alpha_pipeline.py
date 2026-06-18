@@ -36,6 +36,13 @@ class EventAlphaPipelineResult:
         return len([row for row in self.extraction_rows if row.extraction is not None])
 
     @property
+    def extraction_hint_events(self) -> int:
+        return len([
+            raw for raw in self.discovery_result.raw_events
+            if raw.raw_json and raw.raw_json.get("llm_extraction")
+        ])
+
+    @property
     def candidates(self) -> int:
         return len(self.discovery_result.candidates)
 
@@ -127,6 +134,7 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
         "=" * 76,
         (
             f"raw_events={result.raw_events} · extractions={result.extractions}/{len(result.extraction_rows)} · "
+            f"extraction_hints_applied={result.extraction_hint_events} · "
             f"candidates={result.candidates} · alerts={len(result.alerts)}"
         ),
         (

@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Allow LLM extraction hints upstream of deterministic resolution
+**Status:** accepted
+**Decision:** The unified Event Alpha cycle may run raw-event LLM extraction
+before discovery resolution, append high-confidence quote-validated catalyst and
+asset hints to raw evidence, and then rerun the normal deterministic
+normalization, resolver, classifier, event-alert, watchlist, and local-router
+path. Those hints are not candidates or alerts by themselves: asset links,
+classifications, event-fade eligibility, and any `TRIGGERED_FADE` state must
+still come from deterministic code and the pure `event_fade.py` engine.
+**Why:** Relationship-only LLM analysis could reject false positives but could
+not recover missed proxy assets that the deterministic resolver never saw. This
+keeps the recall improvement while preserving quote checks and deterministic
+identity validation.
+**Revisit when:** A reviewed extraction sample shows the hints either add too
+much resolver noise or are reliable enough to justify more structured resolver
+features beyond appended evidence text.
+
 ## 2026-06-18 - Keep the unified Event Alpha cycle research-only
 **Status:** accepted
 **Decision:** `main.py --event-alpha-cycle` may orchestrate event discovery,

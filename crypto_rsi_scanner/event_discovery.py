@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
 from . import event_anomaly_scanner, event_fade, event_market_enrichment
 from .derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
@@ -564,6 +564,7 @@ def run_manual_discovery(
     cfg: EventDiscoveryConfig | None = None,
     fade_cfg: event_fade.EventFadeConfig | None = None,
     now: datetime | None = None,
+    raw_event_transform: Callable[[tuple[RawDiscoveredEvent]], Iterable[RawDiscoveredEvent]] | None = None,
 ) -> EventDiscoveryResult:
     cfg = cfg or EventDiscoveryConfig()
     now = _as_utc(now or datetime.now(timezone.utc))
@@ -638,6 +639,13 @@ def run_manual_discovery(
             ),
             now=now,
         ))
+    if raw_event_transform is not None:
+        original_raw_events = tuple(raw_events)
+        try:
+            raw_events = list(raw_event_transform(original_raw_events))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Event raw evidence transform failed; continuing without transformed hints: %s", exc)
+            raw_events = list(original_raw_events)
     assets = load_discovery_assets(
         alias_path,
         universe_path=universe_path,

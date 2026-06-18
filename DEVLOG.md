@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Feed LLM extraction hints into Event Alpha resolution · Codex
+**Why:** The Pro-model plan called out that relationship-only LLM analysis can
+reject bad links but cannot find missed proxy assets if the deterministic
+resolver never receives the asset evidence. The unified Event Alpha cycle now
+uses quote-validated extraction output as resolver input while keeping
+deterministic validation in charge.
+**Changes:**
+- Added an optional fail-soft raw-event transform hook to `event_discovery.run_manual_discovery`.
+- Updated `event_alpha_cycle --with-llm` to run raw-event extraction before
+  deterministic discovery resolution and append high-confidence extraction hints
+  to raw evidence.
+- Hardened `event_llm_extractor.enrich_raw_events_with_extractions` so hints are
+  appended to structured event descriptions as well as raw bodies.
+- Added Event Alpha cycle report visibility for `extraction_hints_applied`.
+- Added regression tests proving LLM hints cannot create candidates without a
+  deterministic asset universe match, and can recover a candidate when resolver
+  validation succeeds.
+- Updated `AGENTS.md`, `DECISIONS.md`, and `ROADMAP.md`.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 308/308. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. `make event-alpha-cycle-llm
+PYTHON=python3 EVENT_WATCHLIST_STATE_PATH=/tmp/event_alpha_cycle_llm_upstream_watchlist_test.jsonl`
+printed a research-only cycle report with the new `extraction_hints_applied`
+field. `make verify PYTHON=python3` passed 308/308 tests, alert render smoke,
+fixture backtest smoke, and paper scoreboard.
+**Notes/risks:** This remains research-only. Extraction hints do not create
+alerts, paper trades, live DB rows, event-fade eligibility, or `TRIGGERED_FADE`
+without deterministic resolver/classifier/event-fade validation.
+
 ## 2026-06-18 — Add unified Event Alpha cycle · Codex
 **Why:** The Pro-model plan called for a coherent Event Alpha operating loop
 after the deterministic research clock: discovery/anomaly inputs, optional LLM
