@@ -109,7 +109,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   (offline golden eval for the LLM analyzer; fails on expected role/action
   drift or quote-validation regressions) · `make event-llm-extract-eval`
   (offline golden eval for the LLM raw-event extractor; fails on catalyst/asset/
-  source-noise drift or quote-validation regressions) · `make event-alert-no-key-report` /
+  source-noise drift or quote-validation regressions) ·
+  `main.py --event-alpha-radar-report` / `make event-alpha-no-key-report`
+  (research-only Event Alpha Radar view with opt-in market enrichment and
+  market-anomaly rows; anomalies without catalyst evidence stay low-authority
+  review evidence) · `make event-alert-no-key-report` /
   `make event-alert-no-key-llm-report` / `make event-alert-no-key-send`
   (no-key public RSS/GDELT/Polymarket event-alert research surfaces; send still
   requires explicit alert enablement) · `main.py --event-discovery-refresh` (fetch
@@ -240,6 +244,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_alerts.py` | pure research-alert ranking/tiering for discovery candidates; no labels, paper trades, normal RSI routing, or execution |
 | `event_llm_models.py` / `event_llm_analyzer.py` / `llm_providers/` | research-only LLM relationship analysis for discovery candidates; verifies quoted evidence, compares LLM role/action with rule output, and can feed opt-in advisory event-alert tier quality control |
 | `event_llm_extraction_models.py` / `event_llm_extractor.py` | research-only LLM raw-event extraction for catalysts, asset/project mentions, false-positive terms, and date hints; extracted assets must still be validated by deterministic resolver logic |
+| `event_market_enrichment.py` / `event_anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; anomalies without catalyst evidence remain store-only/radar evidence and cannot create event-fade triggers |
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
@@ -350,6 +355,14 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   candidates, alerts, paper trades, live DB rows, or event-fade eligibility
   unless deterministic resolver/classifier gates validate the asset and event
   through the normal discovery path.
+- Event Alpha Radar market enrichment and anomaly scanning are research-only and
+  disabled by default. Market enrichment may fill candidate market snapshots
+  from CoinGecko-style fixture/live rows, but raw reviewed event payloads win
+  when both exist. The market anomaly scanner may create low-authority raw
+  research events from top movers, volume/mcap spikes, or volume z-scores, but
+  anomalies without dated catalyst/source evidence must stay store-only or local
+  radar evidence; they cannot create proxy eligibility, `TRIGGERED_FADE`, normal
+  RSI alerts, paper trades, live DB writes, or execution.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, explicit
   `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise

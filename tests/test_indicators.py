@@ -3715,6 +3715,212 @@ def test_event_llm_extract_scanner_report_uses_runtime_config():
             setattr(config, name, value)
 
 
+def test_event_market_enrichment_from_coingecko_rows():
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_market_enrichment
+    from crypto_rsi_scanner.event_providers.coingecko_universe import load_market_rows
+
+    rows = load_market_rows(Path("fixtures/coingecko_smoke/top_markets.json"))
+    snapshots = event_market_enrichment.market_snapshots_from_rows(
+        rows,
+        now=datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc),
+    )
+    sol = snapshots["solana"]
+    assert sol["symbol"] == "SOL"
+    assert sol["price"] == 160.0
+    assert sol["volume_24h"] == 4500000000.0
+    assert abs(sol["return_24h"] - 0.034) < 1e-9
+    assert abs(sol["return_7d"] - 0.092) < 1e-9
+    assert abs(event_market_enrichment.volume_to_market_cap(rows[2]) - 0.06) < 1e-9
+
+
+def test_event_market_enrichment_fills_candidates_without_overriding_raw_market():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery, event_market_enrichment
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="market-enriched-proxy",
+        provider="test",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/pumpx",
+        title="PumpX token offers synthetic exposure to SpaceX pre-IPO market",
+        body="PumpX token holders can trade synthetic exposure to SpaceX before the IPO.",
+        raw_json={
+            "event": {
+                "event_id": "market-enriched-proxy",
+                "event_name": "PumpX token offers synthetic exposure to SpaceX pre-IPO market",
+                "event_type": "ipo_proxy",
+                "event_time": "2026-06-19T13:30:00Z",
+                "event_time_confidence": 0.90,
+                "external_asset": "SpaceX",
+                "confidence": 0.90,
+                "description": "PumpX token holders can trade synthetic exposure to SpaceX before the IPO.",
+            }
+        },
+        source_confidence=0.90,
+        content_hash="market-enriched-proxy",
+    )
+    asset = DiscoveredAsset(
+        coin_id="pumpx",
+        symbol="PUMPX",
+        name="PumpX",
+        aliases=("pumpx token", "PumpX"),
+    )
+    market_rows = [{
+        "id": "pumpx",
+        "symbol": "pumpx",
+        "name": "PumpX",
+        "current_price": 2.0,
+        "market_cap": 100000000.0,
+        "total_volume": 70000000.0,
+        "price_change_percentage_24h_in_currency": 85.0,
+        "price_change_percentage_7d_in_currency": 240.0,
+        "volume_zscore_24h": 6.0,
+    }]
+    market = event_market_enrichment.market_snapshots_from_rows(market_rows, now=now)
+    candidate = event_discovery.run_discovery(
+        [raw],
+        [asset],
+        now=now,
+        market_by_asset=market,
+    ).candidates[0]
+    assert candidate.fade_candidate is not None
+    assert candidate.fade_candidate.market.return_24h == 0.85
+    assert candidate.fade_candidate.market.volume_zscore_24h == 6.0
+
+    raw_override = RawDiscoveredEvent(
+        raw_id="market-raw-wins",
+        provider="test",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/pumpx-raw",
+        title="PumpX token offers synthetic exposure to SpaceX pre-IPO market",
+        body="PumpX token holders can trade synthetic exposure to SpaceX before the IPO.",
+        raw_json={
+            "event": raw.raw_json["event"],
+            "market": {"coin_id": "pumpx", "symbol": "PUMPX", "price": 3.0, "return_24h": 0.10},
+        },
+        source_confidence=0.90,
+        content_hash="market-raw-wins",
+    )
+    raw_candidate = event_discovery.run_discovery(
+        [raw_override],
+        [asset],
+        now=now,
+        market_by_asset=market,
+    ).candidates[0]
+    assert raw_candidate.fade_candidate is not None
+    assert raw_candidate.fade_candidate.market.price == 3.0
+    assert raw_candidate.fade_candidate.market.return_24h == 0.10
+
+
+def test_event_anomaly_scanner_creates_store_only_research_rows():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts, event_anomaly_scanner, event_discovery, event_market_enrichment
+    from crypto_rsi_scanner.event_models import DiscoveredAsset
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    rows = [{
+        "id": "pump-protocol",
+        "symbol": "pump",
+        "name": "Pump Protocol",
+        "current_price": 1.4,
+        "market_cap": 100000000.0,
+        "total_volume": 60000000.0,
+        "price_change_percentage_24h_in_currency": 45.0,
+        "price_change_percentage_7d_in_currency": 120.0,
+        "volume_zscore_24h": 4.5,
+    }]
+    anomalies = event_anomaly_scanner.discover_market_anomalies(
+        rows,
+        cfg=event_anomaly_scanner.EventAnomalyScannerConfig(
+            enabled=True,
+            min_return_24h=0.30,
+            min_volume_mcap=0.25,
+            min_volume_zscore=3.0,
+        ),
+        now=now,
+    )
+    assert len(anomalies) == 1
+    assert anomalies[0].provider == "market_anomaly"
+    assert anomalies[0].raw_json["event"]["event_type"] == "market_anomaly"
+    assert anomalies[0].raw_json["market"]["return_24h"] == 0.45
+
+    asset = DiscoveredAsset(
+        coin_id="pump-protocol",
+        symbol="PUMP",
+        name="Pump Protocol",
+        aliases=("pump protocol",),
+    )
+    result = event_discovery.run_discovery(
+        anomalies,
+        [asset],
+        now=now,
+        market_by_asset=event_market_enrichment.market_snapshots_from_rows(rows, now=now),
+    )
+    assert len(result.candidates) == 1
+    alert = event_alerts.build_event_alert_candidates(result, cfg=event_alerts.EventAlertConfig(), now=now)[0]
+    assert alert.tier == event_alerts.EventAlertTier.STORE_ONLY
+    assert "not a confirmed proxy narrative" in (alert.rejected_reason or "")
+    assert "low classifier confidence" in (alert.rejected_reason or "")
+
+
+def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
+    import contextlib
+    import io
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+
+    original = {
+        "EVENT_DISCOVERY_EVENTS_PATH": config.EVENT_DISCOVERY_EVENTS_PATH,
+        "EVENT_DISCOVERY_ALIASES_PATH": config.EVENT_DISCOVERY_ALIASES_PATH,
+        "EVENT_DISCOVERY_UNIVERSE_PATH": config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        "EVENT_DISCOVERY_UNIVERSE_LIVE": config.EVENT_DISCOVERY_UNIVERSE_LIVE,
+        "EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT": config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT,
+        "EVENT_MARKET_ENRICHMENT_ENABLED": config.EVENT_MARKET_ENRICHMENT_ENABLED,
+        "EVENT_ANOMALY_SCANNER_ENABLED": config.EVENT_ANOMALY_SCANNER_ENABLED,
+        "EVENT_ANOMALY_MIN_RETURN_24H": config.EVENT_ANOMALY_MIN_RETURN_24H,
+        "EVENT_ANOMALY_MIN_VOLUME_MCAP": config.EVENT_ANOMALY_MIN_VOLUME_MCAP,
+        "EVENT_ANOMALY_MIN_VOLUME_ZSCORE": config.EVENT_ANOMALY_MIN_VOLUME_ZSCORE,
+        "EVENT_ANOMALY_MAX_ASSETS": config.EVENT_ANOMALY_MAX_ASSETS,
+    }
+    config.EVENT_DISCOVERY_EVENTS_PATH = None
+    config.EVENT_DISCOVERY_ALIASES_PATH = None
+    config.EVENT_DISCOVERY_UNIVERSE_PATH = Path("fixtures/coingecko_smoke/top_markets.json")
+    config.EVENT_DISCOVERY_UNIVERSE_LIVE = False
+    config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT = 0
+    config.EVENT_MARKET_ENRICHMENT_ENABLED = True
+    config.EVENT_ANOMALY_SCANNER_ENABLED = True
+    config.EVENT_ANOMALY_MIN_RETURN_24H = 0.03
+    config.EVENT_ANOMALY_MIN_VOLUME_MCAP = 0.05
+    config.EVENT_ANOMALY_MIN_VOLUME_ZSCORE = 3.0
+    config.EVENT_ANOMALY_MAX_ASSETS = 10
+    try:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_alpha_radar_report()
+        text = out.getvalue()
+        assert "EVENT RESEARCH ALERT REPORT" in text
+        assert "market anomaly" in text
+        assert "STORE_ONLY" in text
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
+
+
+def test_makefile_has_event_alpha_no_key_target():
+    from pathlib import Path
+
+    text = Path("Makefile").read_text(encoding="utf-8")
+    assert "event-alpha-no-key-report:" in text
+    assert "--event-alpha-radar-report" in text
+    assert "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1" in text
+
+
 def test_event_discovery_asset_role_demotes_proxy_context_noise():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery

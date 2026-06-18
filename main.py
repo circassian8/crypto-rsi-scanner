@@ -44,6 +44,7 @@ Usage:
   python main.py --event-fade-report # score local event-fade fixtures
   python main.py --event-discovery-report # research-only event radar from fixtures
   python main.py --event-alert-report # ranked research alerts from discovery candidates
+  python main.py --event-alpha-radar-report # event alerts with opt-in market anomaly inputs
   python main.py --event-llm-shadow-report # shadow LLM relationship analysis
   python main.py --event-llm-extract-report # shadow LLM raw-event extraction
   python main.py --event-discovery-refresh # write research-only event JSONL cache

@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep market anomalies evidence-only until catalyst validation
+**Status:** accepted
+**Decision:** Event Alpha Radar market enrichment may fill research candidate
+market snapshots from CoinGecko-style fixture or explicitly enabled live market
+rows. The market anomaly scanner may create local research raw events for hot
+returns, volume/mcap spikes, or volume z-scores, but anomaly rows without
+validated dated external catalyst/source evidence must stay store-only or local
+radar evidence. They must not create event-fade proxy eligibility,
+`TRIGGERED_FADE`, normal RSI alerts, live signal rows, paper trades, or
+execution.
+**Why:** Market anomalies can point review toward possible catalyst-driven
+moves, but the proxy-fade thesis requires source evidence and deterministic
+asset/catalyst validation. Hot coins alone would recreate the false-positive
+"short every pump" failure mode.
+**Revisit when:** A reviewed Event Alpha Radar sample shows anomaly-first rows
+reliably lead to validated catalyst/proxy candidates and the human explicitly
+approves a promoted watchlist or alert workflow.
+
 ## 2026-06-18 - Keep LLM raw-event extraction as resolver input only
 **Status:** accepted
 **Decision:** Event LLM raw-event extraction may run in `shadow` mode to propose

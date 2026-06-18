@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add market enrichment and anomaly radar phase · Codex
+**Why:** The Event Alpha Radar needs market confirmation and anomaly-first
+discovery without turning hot coins into event-fade candidates. This implements
+the next research-only phase after raw-event extraction: market snapshots can
+enrich candidates, and anomaly rows can point review toward possible catalysts
+while remaining low-authority evidence.
+**Changes:**
+- Added `event_market_enrichment.py` to convert CoinGecko-style market rows into
+  candidate market snapshots with return windows, volume, market cap, FDV,
+  volume z-score, and distance-from-MA fields.
+- Added `event_anomaly_scanner.py` to create research-only raw events from top
+  movers, volume/mcap spikes, or volume z-score spikes; anomalies without
+  catalyst evidence stay store-only and cannot trigger event fade.
+- Wired market enrichment and anomaly discovery through event discovery,
+  `main.py --event-alpha-radar-report`, and `make event-alpha-no-key-report`.
+- Added disabled-by-default anomaly thresholds in config/`.env.example`,
+  updated `AGENTS.md`, `DECISIONS.md`, and `ROADMAP.md`, and added regression
+  coverage for enrichment precedence, anomaly safety, and scanner report output.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 295/295. `make
+event-alpha-no-key-report PYTHON=python3` printed one fixture SOL
+market-anomaly row as `STORE_ONLY` with proxy/classifier rejection reasons.
+`make event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases. `make
+event-llm-eval PYTHON=python3` passed 9/9 golden cases. `make verify
+PYTHON=python3` passed 295/295 tests, alert render smoke, fixture backtest
+smoke, and paper scoreboard.
+**Notes/risks:** Market anomaly discovery is not a trading or event-fade
+eligibility path. The remaining Event Alpha Radar phases are persistent
+watchlist state, playbook scoring, research routing, and feedback/evals.
+
 ## 2026-06-18 — Add LLM raw-event extraction phase · Codex
 **Why:** The downstream LLM advisory analyzer can reject bad event/asset links,
 but it cannot recover asset mentions the deterministic resolver never surfaces.

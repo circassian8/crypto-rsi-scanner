@@ -369,10 +369,15 @@ EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES = _env_bool("RSI_EVENT_LLM_EXTRACTOR
 _EVENT_LLM_EXTRACTOR_CACHE_PATH_RAW = os.getenv("RSI_EVENT_LLM_EXTRACTOR_CACHE_PATH", "")
 EVENT_LLM_EXTRACTOR_PROMPT_VERSION = os.getenv("RSI_EVENT_LLM_EXTRACTOR_PROMPT_VERSION", "llm_raw_event_extraction_v1")
 
-# Later Event Alpha Radar phases. These stay disabled until market enrichment,
-# anomaly scanning, persistent watchlist state, and routing are implemented.
+# Event Alpha Radar research phases. Market enrichment and anomaly scanning are
+# implemented but disabled by default; watchlist state and routing remain future
+# opt-ins until explicitly promoted.
 EVENT_MARKET_ENRICHMENT_ENABLED = _env_bool("RSI_EVENT_MARKET_ENRICHMENT_ENABLED", False)
 EVENT_ANOMALY_SCANNER_ENABLED = _env_bool("RSI_EVENT_ANOMALY_SCANNER_ENABLED", False)
+EVENT_ANOMALY_MIN_RETURN_24H = float(os.getenv("RSI_EVENT_ANOMALY_MIN_RETURN_24H", "0.30"))
+EVENT_ANOMALY_MIN_VOLUME_MCAP = float(os.getenv("RSI_EVENT_ANOMALY_MIN_VOLUME_MCAP", "0.25"))
+EVENT_ANOMALY_MIN_VOLUME_ZSCORE = float(os.getenv("RSI_EVENT_ANOMALY_MIN_VOLUME_ZSCORE", "3.0"))
+EVENT_ANOMALY_MAX_ASSETS = int(os.getenv("RSI_EVENT_ANOMALY_MAX_ASSETS", "50"))
 EVENT_WATCHLIST_ENABLED = _env_bool("RSI_EVENT_WATCHLIST_ENABLED", False)
 EVENT_ALPHA_ROUTER_ENABLED = _env_bool("RSI_EVENT_ALPHA_ROUTER_ENABLED", False)
 

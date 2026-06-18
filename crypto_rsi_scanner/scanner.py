@@ -1143,6 +1143,15 @@ def _event_discovery_result_from_config() -> event_discovery.EventDiscoveryResul
         coinalyze_history_interval=config.EVENT_DISCOVERY_COINALYZE_HISTORY_INTERVAL,
         coinalyze_lookback_hours=config.EVENT_DISCOVERY_COINALYZE_LOOKBACK_HOURS,
         coinalyze_convert_to_usd=config.EVENT_DISCOVERY_COINALYZE_CONVERT_TO_USD,
+        market_enrichment_enabled=config.EVENT_MARKET_ENRICHMENT_ENABLED,
+        market_enrichment_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        market_enrichment_live=config.EVENT_DISCOVERY_UNIVERSE_LIVE,
+        market_enrichment_fetch_limit=config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT,
+        anomaly_scanner_enabled=config.EVENT_ANOMALY_SCANNER_ENABLED,
+        anomaly_min_return_24h=config.EVENT_ANOMALY_MIN_RETURN_24H,
+        anomaly_min_volume_mcap=config.EVENT_ANOMALY_MIN_VOLUME_MCAP,
+        anomaly_min_volume_zscore=config.EVENT_ANOMALY_MIN_VOLUME_ZSCORE,
+        anomaly_max_assets=config.EVENT_ANOMALY_MAX_ASSETS,
         tokenomist_supply_path=config.EVENT_DISCOVERY_TOKENOMIST_SUPPLY_PATH,
         etherscan_supply_path=config.EVENT_DISCOVERY_ETHERSCAN_SUPPLY_PATH,
         arkham_supply_path=config.EVENT_DISCOVERY_ARKHAM_SUPPLY_PATH,
@@ -1253,6 +1262,31 @@ def event_alert_report(verbose: bool = False, send: bool = False, with_llm: bool
     print(event_alerts.format_event_alert_report(alerts))
     if send:
         _send_event_alert_digest(alerts, cfg)
+
+
+def event_alpha_radar_report(verbose: bool = False, with_llm: bool = False) -> None:
+    """Print the opt-in event alpha radar with market enrichment/anomalies."""
+    _setup_event_discovery_logging(verbose)
+    if not (
+        config.EVENT_ANOMALY_SCANNER_ENABLED
+        or config.EVENT_MARKET_ENRICHMENT_ENABLED
+        or _event_discovery_paths_configured()
+    ):
+        print(
+            "No event-alpha radar inputs ready. Configure event sources or enable "
+            "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
+        )
+        return
+    cfg = _event_alert_config_from_runtime()
+    result = _event_discovery_result_from_config()
+    alerts = event_alerts.build_event_alert_candidates(result, cfg=cfg)
+    if with_llm:
+        llm_cfg = _event_llm_config_from_runtime()
+        provider = _event_llm_provider(llm_cfg)
+        if provider is not None:
+            rows = event_llm_analyzer.analyze_event_candidates(result, alerts, provider, cfg=llm_cfg)
+            alerts = event_alerts.apply_llm_advisory(alerts, rows, cfg, enabled=llm_cfg.mode == "advisory")
+    print(event_alerts.format_event_alert_report(alerts))
 
 
 def event_llm_shadow_report(verbose: bool = False) -> None:
@@ -2842,6 +2876,11 @@ def cli() -> None:
         help="Print ranked research-only event-alert candidates from discovery fixtures.",
     )
     parser.add_argument(
+        "--event-alpha-radar-report",
+        action="store_true",
+        help="Print research-only event alpha radar with opt-in market enrichment/anomaly inputs.",
+    )
+    parser.add_argument(
         "--event-llm-shadow-report",
         action="store_true",
         help="Print research-only shadow LLM relationship analysis for event candidates.",
@@ -3114,6 +3153,9 @@ def cli() -> None:
         return
     if args.event_alert_report:
         event_alert_report(verbose=args.verbose, send=args.event_alert_send, with_llm=args.with_llm)
+        return
+    if args.event_alpha_radar_report:
+        event_alpha_radar_report(verbose=args.verbose, with_llm=args.with_llm)
         return
     if args.event_llm_shadow_report:
         event_llm_shadow_report(verbose=args.verbose)

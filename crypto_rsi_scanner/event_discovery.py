@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_fade
+from . import event_anomaly_scanner, event_fade, event_market_enrichment
 from .derivatives_providers.coinalyze import CoinalyzeDerivativesProvider
 from .event_classification import classify_event_asset
 from .event_models import (
@@ -357,6 +357,7 @@ def run_discovery(
     cfg: EventDiscoveryConfig | None = None,
     fade_cfg: event_fade.EventFadeConfig | None = None,
     now: datetime | None = None,
+    market_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
     derivatives_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
     supply_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> EventDiscoveryResult:
@@ -387,6 +388,7 @@ def run_discovery(
                 classification,
                 raw_by_id,
                 now,
+                market_by_asset=market_by_asset,
                 derivatives_by_asset=derivatives_by_asset,
                 supply_by_asset=supply_by_asset,
             )
@@ -542,6 +544,15 @@ def run_manual_discovery(
     coinalyze_history_interval: str = "1hour",
     coinalyze_lookback_hours: int = 24,
     coinalyze_convert_to_usd: bool = True,
+    market_enrichment_enabled: bool = False,
+    market_enrichment_path: str | Path | None = None,
+    market_enrichment_live: bool = False,
+    market_enrichment_fetch_limit: int = 0,
+    anomaly_scanner_enabled: bool = False,
+    anomaly_min_return_24h: float = 0.30,
+    anomaly_min_volume_mcap: float = 0.25,
+    anomaly_min_volume_zscore: float = 3.0,
+    anomaly_max_assets: int = 50,
     tokenomist_supply_path: str | Path | None = None,
     etherscan_supply_path: str | Path | None = None,
     arkham_supply_path: str | Path | None = None,
@@ -609,6 +620,24 @@ def run_manual_discovery(
         prediction_market_events_limit=prediction_market_events_limit,
         prediction_market_events_timeout=prediction_market_events_timeout,
     )
+    market_rows = event_market_enrichment.load_market_enrichment_rows(
+        market_enrichment_path if market_enrichment_path is not None else universe_path,
+        live=market_enrichment_live,
+        fetch_limit=market_enrichment_fetch_limit or universe_fetch_limit or 0,
+        limit=universe_limit,
+    ) if (market_enrichment_enabled or anomaly_scanner_enabled) else []
+    if anomaly_scanner_enabled:
+        raw_events.extend(event_anomaly_scanner.discover_market_anomalies(
+            market_rows,
+            cfg=event_anomaly_scanner.EventAnomalyScannerConfig(
+                enabled=True,
+                min_return_24h=anomaly_min_return_24h,
+                min_volume_mcap=anomaly_min_volume_mcap,
+                min_volume_zscore=anomaly_min_volume_zscore,
+                max_assets=anomaly_max_assets,
+            ),
+            now=now,
+        ))
     assets = load_discovery_assets(
         alias_path,
         universe_path=universe_path,
@@ -635,12 +664,18 @@ def run_manual_discovery(
         arkham_supply_path=arkham_supply_path,
         dune_supply_path=dune_supply_path,
     )
+    market = (
+        event_market_enrichment.market_snapshots_from_rows(market_rows, now=now)
+        if market_enrichment_enabled and market_rows
+        else {}
+    )
     return run_discovery(
         raw_events,
         assets,
         cfg=cfg,
         fade_cfg=fade_cfg,
         now=now,
+        market_by_asset=market,
         derivatives_by_asset=derivatives,
         supply_by_asset=supply,
     )
@@ -898,6 +933,7 @@ def build_fade_candidate(
     raw_by_id: Mapping[str, RawDiscoveredEvent],
     now: datetime,
     *,
+    market_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
     derivatives_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
     supply_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> event_fade.FadeCandidate:
@@ -923,7 +959,7 @@ def build_fade_candidate(
         is_direct_beneficiary=classification.is_direct_beneficiary,
         notes=classification.reason,
     )
-    market = _market_snapshot(asset, payload.get("market"), now)
+    market = _market_snapshot(asset, payload.get("market") or _market_for_asset(market_by_asset, asset), now)
     return event_fade.FadeCandidate(
         symbol=asset.symbol,
         coin_id=asset.coin_id,
@@ -1498,6 +1534,36 @@ def _supply_for_asset(
         if key in snapshots:
             return snapshots[key]
     return None
+
+
+def _market_for_asset(
+    snapshots: Mapping[str, Mapping[str, Any]] | None,
+    asset: DiscoveredAsset,
+) -> Mapping[str, Any] | None:
+    if not snapshots:
+        return None
+    for key in _asset_market_keys(asset):
+        if key in snapshots:
+            return snapshots[key]
+    return None
+
+
+def _asset_market_keys(asset: DiscoveredAsset) -> tuple[str, ...]:
+    raw_values = (
+        asset.coin_id,
+        asset.symbol,
+        asset.name,
+        *asset.aliases,
+        *asset.contract_addresses.values(),
+    )
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in raw_values:
+        for key in (clean_text(value), str(value or "").upper()):
+            if key and key not in seen:
+                seen.add(key)
+                out.append(key)
+    return tuple(out)
 
 
 def _asset_derivatives_keys(asset: DiscoveredAsset) -> tuple[str, ...]:
