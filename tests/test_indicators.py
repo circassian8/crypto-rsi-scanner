@@ -4111,6 +4111,125 @@ def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
             setattr(config, name, value)
 
 
+def test_event_alpha_pipeline_runs_watchlist_and_router_cycle():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_pipeline,
+        event_alpha_router,
+        event_alerts,
+        event_watchlist,
+    )
+
+    result = _full_event_discovery_fixture_result()
+    with tempfile.TemporaryDirectory() as tmp:
+        pipe = event_alpha_pipeline.run_event_alpha_pipeline(
+            result,
+            alert_cfg=event_alerts.EventAlertConfig(),
+            now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(
+                enabled=True,
+                state_path=Path(tmp) / "watchlist.jsonl",
+            ),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=True,
+            route=True,
+        )
+        assert pipe.raw_events == 20
+        assert pipe.candidates == 17
+        assert len(pipe.alerts) == 17
+        assert pipe.watchlist_entries == 17
+        assert pipe.watchlist_escalations >= 1
+        assert pipe.routed == 17
+        assert pipe.alertable >= 1
+        assert any(
+            decision.route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
+            and decision.entry.symbol == "TESTVELVET"
+            for decision in pipe.router_result.decisions
+        )
+        text = event_alpha_pipeline.format_event_alpha_pipeline_report(pipe)
+        assert "EVENT ALPHA PIPELINE REPORT" in text
+        assert "raw_events=20" in text
+        assert "TRIGGERED_FADE_RESEARCH" in text
+        assert "no trades, paper rows, or live RSI routing" in text
+
+        disabled = event_alpha_pipeline.run_event_alpha_pipeline(
+            result,
+            alert_cfg=event_alerts.EventAlertConfig(),
+            now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(
+                enabled=False,
+                state_path=Path(tmp) / "disabled-watchlist.jsonl",
+            ),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=True,
+            route=True,
+        )
+        assert disabled.watchlist_result is None
+        assert disabled.router_result is None
+        assert "watchlist refresh skipped" in "; ".join(disabled.warnings)
+        assert "router skipped" in "; ".join(disabled.warnings)
+
+
+def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies():
+    import contextlib
+    import io
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+
+    original = {
+        "EVENT_DISCOVERY_EVENTS_PATH": config.EVENT_DISCOVERY_EVENTS_PATH,
+        "EVENT_DISCOVERY_ALIASES_PATH": config.EVENT_DISCOVERY_ALIASES_PATH,
+        "EVENT_DISCOVERY_UNIVERSE_PATH": config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        "EVENT_DISCOVERY_UNIVERSE_LIVE": config.EVENT_DISCOVERY_UNIVERSE_LIVE,
+        "EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT": config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT,
+        "EVENT_MARKET_ENRICHMENT_ENABLED": config.EVENT_MARKET_ENRICHMENT_ENABLED,
+        "EVENT_ANOMALY_SCANNER_ENABLED": config.EVENT_ANOMALY_SCANNER_ENABLED,
+        "EVENT_ANOMALY_MIN_RETURN_24H": config.EVENT_ANOMALY_MIN_RETURN_24H,
+        "EVENT_ANOMALY_MIN_VOLUME_MCAP": config.EVENT_ANOMALY_MIN_VOLUME_MCAP,
+        "EVENT_ANOMALY_MIN_VOLUME_ZSCORE": config.EVENT_ANOMALY_MIN_VOLUME_ZSCORE,
+        "EVENT_ANOMALY_MAX_ASSETS": config.EVENT_ANOMALY_MAX_ASSETS,
+        "EVENT_WATCHLIST_ENABLED": config.EVENT_WATCHLIST_ENABLED,
+        "EVENT_WATCHLIST_STATE_PATH": config.EVENT_WATCHLIST_STATE_PATH,
+        "EVENT_ALPHA_ROUTER_ENABLED": config.EVENT_ALPHA_ROUTER_ENABLED,
+        "EVENT_ALERTS_ENABLED": config.EVENT_ALERTS_ENABLED,
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        config.EVENT_DISCOVERY_EVENTS_PATH = None
+        config.EVENT_DISCOVERY_ALIASES_PATH = None
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = Path("fixtures/coingecko_smoke/top_markets.json")
+        config.EVENT_DISCOVERY_UNIVERSE_LIVE = False
+        config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT = 0
+        config.EVENT_MARKET_ENRICHMENT_ENABLED = True
+        config.EVENT_ANOMALY_SCANNER_ENABLED = True
+        config.EVENT_ANOMALY_MIN_RETURN_24H = 0.03
+        config.EVENT_ANOMALY_MIN_VOLUME_MCAP = 0.05
+        config.EVENT_ANOMALY_MIN_VOLUME_ZSCORE = 3.0
+        config.EVENT_ANOMALY_MAX_ASSETS = 10
+        config.EVENT_WATCHLIST_ENABLED = True
+        config.EVENT_WATCHLIST_STATE_PATH = Path(tmp) / "watchlist.jsonl"
+        config.EVENT_ALPHA_ROUTER_ENABLED = True
+        config.EVENT_ALERTS_ENABLED = False
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_cycle(event_now="2026-06-15T16:00:00Z")
+            text = out.getvalue()
+            assert "EVENT ALPHA PIPELINE REPORT" in text
+            assert "raw_events=" in text
+            assert "candidates=1" in text
+            assert "watchlist_entries=1" in text
+            assert "routed=1" in text
+            assert "routes: STORE_ONLY=1" in text
+            assert "market_anomaly" in text
+            assert config.EVENT_WATCHLIST_STATE_PATH.exists()
+        finally:
+            for name, value in original.items():
+                setattr(config, name, value)
+
+
 def test_event_watchlist_refresh_tracks_escalations_and_suppresses_duplicates():
     import tempfile
     from dataclasses import replace
@@ -4544,7 +4663,13 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event_alpha_eval" in text
     assert "event-alpha-no-key-report:" in text
     assert "--event-alpha-radar-report" in text
+    assert "event-alpha-cycle:" in text
+    assert "event-alpha-cycle-llm:" in text
+    assert "event-alpha-cycle-send:" in text
+    assert "--event-alpha-cycle" in text
     assert "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1" in text
+    assert "RSI_EVENT_WATCHLIST_ENABLED=1" in text
+    assert "RSI_EVENT_ALPHA_ROUTER_ENABLED=1" in text
     assert "event-watchlist-refresh:" in text
     assert "event-watchlist-report:" in text
     assert "event-alpha-router-report:" in text

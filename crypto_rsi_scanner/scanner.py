@@ -63,6 +63,7 @@ from . import event_fade
 from . import event_cache
 from . import event_discovery
 from . import event_alerts
+from . import event_alpha_pipeline
 from . import event_alpha_router
 from . import event_clock
 from . import event_feedback
@@ -1345,6 +1346,60 @@ def event_alpha_radar_report(
     now = _event_research_now(event_now)
     alerts = _event_alerts_from_config(with_llm=with_llm, now=now)
     print(event_alerts.format_event_alert_report(alerts))
+
+
+def event_alpha_cycle(
+    verbose: bool = False,
+    with_llm: bool = False,
+    send: bool = False,
+    event_now: str | datetime | None = None,
+) -> None:
+    """Run one unified research-only Event Alpha cycle."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_alpha_inputs_configured():
+        print(
+            "No event-alpha cycle inputs ready. Configure event sources or enable "
+            "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
+        )
+        return
+    now = _event_research_now(event_now)
+    discovery_result = _event_discovery_result_from_config(now=now)
+    extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow] = []
+    relationship_provider = None
+    relationship_cfg = None
+    if with_llm:
+        extractor_cfg = _event_llm_extractor_config_from_runtime()
+        if extractor_cfg.mode == "shadow":
+            extractor_provider = _event_llm_extraction_provider(extractor_cfg)
+            if extractor_provider is not None:
+                extraction_rows = event_llm_extractor.analyze_raw_events(
+                    discovery_result.raw_events,
+                    extractor_provider,
+                    cfg=extractor_cfg,
+                )
+        else:
+            print("Event LLM extractor skipped: RSI_EVENT_LLM_EXTRACTOR_MODE must be shadow for this cycle.")
+        relationship_cfg = _event_llm_config_from_runtime()
+        if relationship_cfg.mode in {"shadow", "advisory"}:
+            relationship_provider = _event_llm_provider(relationship_cfg)
+        else:
+            print(f"Event LLM mode {relationship_cfg.mode!r} is not supported; use shadow or advisory.")
+    alert_cfg = _event_alert_config_from_runtime()
+    pipeline_result = event_alpha_pipeline.run_event_alpha_pipeline(
+        discovery_result,
+        alert_cfg=alert_cfg,
+        now=now,
+        extraction_rows=extraction_rows,
+        relationship_provider=relationship_provider,
+        relationship_cfg=relationship_cfg,
+        watchlist_cfg=_event_watchlist_config_from_runtime(),
+        router_cfg=_event_alpha_router_config_from_runtime(),
+        refresh_watchlist=True,
+        route=True,
+    )
+    print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
+    if send:
+        _send_event_alert_digest(pipeline_result.alerts, alert_cfg, now=now)
 
 
 def event_watchlist_refresh(
@@ -3042,6 +3097,11 @@ def cli() -> None:
         help="Print research-only event alpha radar with opt-in market enrichment/anomaly inputs.",
     )
     parser.add_argument(
+        "--event-alpha-cycle",
+        action="store_true",
+        help="Run one unified research-only Event Alpha cycle (alerts, watchlist, router summary).",
+    )
+    parser.add_argument(
         "--event-watchlist-refresh",
         action="store_true",
         help="Refresh research-only event alpha watchlist state from current alert candidates.",
@@ -3378,6 +3438,14 @@ def cli() -> None:
         return
     if args.event_alpha_radar_report:
         event_alpha_radar_report(verbose=args.verbose, with_llm=args.with_llm, event_now=args.event_now)
+        return
+    if args.event_alpha_cycle:
+        event_alpha_cycle(
+            verbose=args.verbose,
+            with_llm=args.with_llm,
+            send=args.event_alert_send,
+            event_now=args.event_now,
+        )
         return
     if args.event_watchlist_refresh:
         event_watchlist_refresh(verbose=args.verbose, with_llm=args.with_llm, event_now=args.event_now)

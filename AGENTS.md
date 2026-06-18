@@ -117,7 +117,12 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-alpha-radar-report` / `make event-alpha-no-key-report`
   (research-only Event Alpha Radar view with opt-in market enrichment and
   market-anomaly rows; anomalies without catalyst evidence stay low-authority
-  review evidence) · `main.py --event-watchlist-refresh` /
+  review evidence) · `main.py --event-alpha-cycle` / `make event-alpha-cycle`
+  / `make event-alpha-cycle-llm` / `make event-alpha-cycle-send` (one unified
+  research-only Event Alpha cycle: discovery/anomaly inputs, optional LLM
+  metadata, alert ranking, watchlist refresh, and local router summary; send
+  still requires explicit alert enablement and remains a research digest) ·
+  `main.py --event-watchlist-refresh` /
   `main.py --event-watchlist-report` and `make event-watchlist-refresh` /
   `make event-watchlist-report` (append/read research-only Event Alpha Radar
   watchlist state; duplicate rows are persisted but only meaningful state

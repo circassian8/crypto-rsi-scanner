@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep the unified Event Alpha cycle research-only
+**Status:** accepted
+**Decision:** `main.py --event-alpha-cycle` may orchestrate event discovery,
+market anomalies, optional LLM relationship/extraction metadata, event-alert
+ranking, watchlist refresh, and local router decisions in one command. It may
+append research watchlist JSONL rows and, only when `--event-alert-send` plus
+`RSI_EVENT_ALERTS_ENABLED=1` are both set, reuse the existing research digest
+send path. It must not route normal RSI alerts, write live signal/outcome/paper
+rows, open paper trades, execute orders, or let LLM output create
+`TRIGGERED_FADE`.
+**Why:** Operators need one coherent radar cycle for daily review, but the
+system still has not proven Event Alpha edge through reviewed samples. The
+cycle should reduce operational friction without silently promoting research
+metadata into trading behavior.
+**Revisit when:** Reviewed Event Alpha samples justify a human-approved
+notification or paper-tracking promotion.
+
 ## 2026-06-18 - Allow deterministic clocks for event research commands
 **Status:** accepted
 **Decision:** Event discovery, event-alert, Event Alpha, LLM event-analysis,

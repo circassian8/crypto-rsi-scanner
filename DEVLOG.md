@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add unified Event Alpha cycle · Codex
+**Why:** The Pro-model plan called for a coherent Event Alpha operating loop
+after the deterministic research clock: discovery/anomaly inputs, optional LLM
+metadata, alert ranking, watchlist state, and local router decisions should be
+available through one research-only command.
+**Changes:**
+- Added `event_alpha_pipeline.py` with `EventAlphaPipelineResult`,
+  `run_event_alpha_pipeline`, and a concise cycle report formatter.
+- Added `main.py --event-alpha-cycle` with `--with-llm` and optional
+  `--event-alert-send` support through the existing research digest guardrails.
+- Added `make event-alpha-cycle`, `make event-alpha-cycle-llm`, and
+  `make event-alpha-cycle-send` fixture-oriented targets using the deterministic
+  event research clock.
+- Added pipeline/scanner tests proving the cycle builds alerts, writes
+  research-only watchlist state, computes local router decisions, and keeps
+  market-anomaly rows store-only.
+- Updated `AGENTS.md`, `DECISIONS.md`, and `ROADMAP.md`.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed. `make
+event-alpha-cycle-llm PYTHON=python3
+EVENT_WATCHLIST_STATE_PATH=/tmp/event_alpha_cycle_llm_watchlist_test.jsonl`
+printed a research-only cycle with 2 raw anomaly events, 1 candidate, 1
+watchlist row, and 1 store-only route. `python3 tests/test_indicators.py`
+passed 306/306. `make event-llm-eval PYTHON=python3` passed 9/9 golden cases.
+`make event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases. `make
+event-alpha-eval PYTHON=python3` passed 11/11 golden checks. `make verify
+PYTHON=python3` passed 306/306 tests, alert render smoke, fixture backtest
+smoke, and paper scoreboard.
+**Notes/risks:** This is still research-only orchestration. It does not write
+live signal/outcome/paper rows, route normal RSI alerts, open paper trades,
+execute orders, or let LLM output create `TRIGGERED_FADE`. Upstream use of LLM
+raw-extraction hints before resolver validation remains the next Pro-plan phase.
+
 ## 2026-06-18 — Add deterministic event research clock · Codex
 **Why:** Pro-model review found that fixed June 2026 event fixtures can silently
 drift out of lookback windows as wall-clock time moves forward. Event research
