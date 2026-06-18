@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Sweep cleanup for warnings and config hygiene · Codex
+**Why:** A codebase sweep found a recurring pandas `FutureWarning` in backtest
+coverage plus a small safety issue where whitespace-padded falsey env values
+could be interpreted as enabled. This pass keeps changes narrow and
+verification-driven.
+**Changes:**
+- Updated `backtest._pct_true` to compute percentages with explicit float
+  conversion and `mask`, removing the pandas downcast warning path.
+- Made `_env_bool` strip whitespace before parsing, so values like `" 0 "` and
+  `" false "` correctly disable opt-in flags.
+- Added `test_env_bool_strips_whitespace`.
+- Made package fixture/config/audit file I/O and touched test file I/O use
+  explicit UTF-8 encodings.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 -W error::FutureWarning tests/test_indicators.py` passed 303/303,
+confirming the pandas warning is gone. `python3 main.py --help` parsed
+successfully. `make verify PYTHON=python3` passed 303/303 tests, alert render
+smoke, fixture backtest smoke, and paper scoreboard. `pyflakes`/`ruff` were not
+installed in this environment, so I used compile, tests, warning-as-error, CLI
+help, grep, and a small AST sweep for bare `except`/mutable defaults instead.
+**Notes/risks:** No strategy logic, routing, storage schema, or provider
+behavior was changed.
+
 ## 2026-06-18 — Add Event Alpha feedback and eval artifacts · Codex
 **Why:** The Event Alpha Radar needed a lightweight way to capture human
 judgment on research rows (`useful`, `junk`, `watch`, `missed`, etc.) and a

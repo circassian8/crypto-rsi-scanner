@@ -8786,7 +8786,7 @@ def test_dry_run_csv_helper_does_not_write():
         assert not path.exists()
         assert scanner._write_latest_csv(df, dry_run=False) is True
         assert path.exists()
-        assert "sparkline" not in path.read_text()
+        assert "sparkline" not in path.read_text(encoding="utf-8")
     finally:
         config.CSV_OUT = orig
 
@@ -8800,7 +8800,7 @@ def test_dotenv_skips_empty_values():
     from crypto_rsi_scanner.config import _load_dotenv
 
     env_path = Path(tempfile.mkdtemp()) / ".env"
-    env_path.write_text("RSI_TEST_FILLED=hello\nRSI_TEST_EMPTY=\n# comment\n")
+    env_path.write_text("RSI_TEST_FILLED=hello\nRSI_TEST_EMPTY=\n# comment\n", encoding="utf-8")
 
     for k in ("RSI_TEST_FILLED", "RSI_TEST_EMPTY"):
         os.environ.pop(k, None)
@@ -8811,6 +8811,25 @@ def test_dotenv_skips_empty_values():
         assert "RSI_TEST_EMPTY" not in os.environ
     finally:
         os.environ.pop("RSI_TEST_FILLED", None)
+
+
+def test_env_bool_strips_whitespace():
+    from crypto_rsi_scanner.config import _env_bool
+
+    key = "RSI_TEST_BOOL"
+    old = os.environ.get(key)
+    try:
+        os.environ[key] = " 0 "
+        assert _env_bool(key, True) is False
+        os.environ[key] = " false "
+        assert _env_bool(key, True) is False
+        os.environ[key] = " yes "
+        assert _env_bool(key, False) is True
+    finally:
+        if old is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = old
 
 
 # --- universe hygiene --------------------------------------------------------
@@ -10444,21 +10463,21 @@ def test_log_rotation_copytruncate_and_retention():
     first_time = datetime(2026, 6, 8, 1, 0, 0, tzinfo=timezone.utc)
     second_time = datetime(2026, 6, 8, 1, 0, 1, tzinfo=timezone.utc)
 
-    log.write_text("first rotation\n")
+    log.write_text("first rotation\n", encoding="utf-8")
     first = rotate_logs([log], max_bytes=3, keep=1, now=first_time)[0]
     assert first.reason == "rotated"
     assert first.rotated_to is not None
-    assert first.rotated_to.read_text() == "first rotation\n"
-    assert log.read_text() == ""
+    assert first.rotated_to.read_text(encoding="utf-8") == "first rotation\n"
+    assert log.read_text(encoding="utf-8") == ""
 
-    log.write_text("second rotation\n")
+    log.write_text("second rotation\n", encoding="utf-8")
     second = rotate_logs([log], max_bytes=3, keep=1, now=second_time)[0]
     assert second.reason == "rotated"
     assert second.rotated_to is not None
-    assert second.rotated_to.read_text() == "second rotation\n"
+    assert second.rotated_to.read_text(encoding="utf-8") == "second rotation\n"
     assert not first.rotated_to.exists()
     assert len(list(root.glob("bot.log.*"))) == 1
-    assert log.read_text() == ""
+    assert log.read_text(encoding="utf-8") == ""
 
     status = log_file_status([log], max_bytes=3)[0]
     assert status.exists is True

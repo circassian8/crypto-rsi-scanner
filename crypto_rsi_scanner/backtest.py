@@ -444,8 +444,10 @@ def _active_mask(frame: pd.DataFrame, membership: pd.DataFrame | None) -> pd.Dat
 
 def _pct_true(values: pd.DataFrame, active: pd.DataFrame) -> pd.Series:
     valid = active & values.notna()
-    denom = valid.sum(axis=1).replace(0, np.nan)
-    return (values.where(valid).sum(axis=1) / denom).replace([np.inf, -np.inf], np.nan)
+    denom = valid.sum(axis=1).astype("float64").mask(lambda row: row == 0, np.nan)
+    numerator = values.where(valid).astype("float64").sum(axis=1)
+    out = numerator / denom
+    return out.mask(~np.isfinite(out), np.nan)
 
 
 def _cross_sectional_rank_frame(values: pd.DataFrame, active: pd.DataFrame) -> pd.DataFrame:

@@ -11,7 +11,7 @@ def _env_bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None:
         return default
-    return raw.lower() not in ("0", "false", "no", "off")
+    return raw.strip().lower() not in ("0", "false", "no", "off")
 
 
 def _env_csv(name: str, default: str = "") -> tuple[str, ...]:
@@ -60,7 +60,7 @@ def _load_dotenv(path: Path) -> None:
     """Minimal .env loader (no dependency). Existing env vars win."""
     if not path.exists():
         return
-    for raw in path.read_text().splitlines():
+    for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

@@ -59,7 +59,7 @@ class CoinGeckoClient:
         if self._fixture_dir is None:
             raise RuntimeError("fixture mode is not enabled")
         path = self._fixture_dir.joinpath(*parts)
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
 
     async def _get(self, path: str, params: dict) -> dict:
         url = f"{self.base_url}{path}"
@@ -119,7 +119,7 @@ class CoinGeckoClient:
                 raise FileNotFoundError(
                     f"missing CoinGecko chart fixture for {coin_id} ({days}d) in {chart_dir}"
                 )
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 raise RuntimeError(f"fixture chart must contain an object: {path}")
             return data

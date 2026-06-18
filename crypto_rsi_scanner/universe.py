@@ -209,7 +209,7 @@ def suspicious_kept(audit: dict, *, limit: int = 20) -> list[dict]:
 def write_audit(audit: dict, path: Path | None = None) -> Path:
     path = Path(path or config.UNIVERSE_AUDIT_OUT).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n")
+    path.write_text(json.dumps(audit, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
 
