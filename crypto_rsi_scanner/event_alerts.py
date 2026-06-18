@@ -776,6 +776,16 @@ def _cluster_confirmation_quality(
         return 0
     if candidate.link.link_confidence < 0.80:
         return 0
+    matching_link = next(
+        (
+            link for link in cluster.asset_links
+            if link.event_id == candidate.event.event_id
+            and link.coin_id == candidate.asset.coin_id
+        ),
+        None,
+    )
+    if matching_link is None or matching_link.accepted_kind not in {"proxy", "direct", "supply", "derivatives"}:
+        return 0
     if cluster.independent_source_count < 2:
         return 0
     return _clamp(cluster.cluster_confidence)

@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add dynamic Event Alpha catalyst-search loop · Codex
+**Why:** Event Alpha had offline anomaly and catalyst-search scaffolding, but
+the operating cycle still needed a real anomaly → catalyst-search → discovery
+loop, better LLM extraction budgeting, and graph/playbook fixes for non-proxy
+event relationships.
+**Changes:**
+- Added LLM raw-event extraction priority scoring so limited extraction budgets
+  prefer high-severity anomalies, fresh catalyst articles, explicit asset
+  mentions, and external-catalyst keywords over recaps/source noise.
+- Expanded `event_catalyst_search.py` with research-only provider/data models,
+  a fixture provider, bounded anomaly/query/result limits, source-evidence
+  attachment, and a local catalyst-search report formatter.
+- Wired optional catalyst search into `event_alpha_pipeline.run_event_alpha_operating_cycle`
+  before deterministic discovery, then composed it with optional LLM extraction.
+- Added `main.py --event-catalyst-search-report`, `make
+  event-catalyst-search-fixture-report`, `make event-alpha-cycle-search`, and
+  `make event-alpha-cycle-search-llm`.
+- Broadened event graph accepted link kinds to proxy/direct/supply/derivatives
+  while keeping infrastructure from boosting cluster confirmation by default.
+- Fixed playbook precedence so explicit external proxy events beat loose
+  listing keywords, while real exchange/perp/unlock/TGE event types keep their
+  direct playbooks.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, and regression tests.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 320/320. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. `make
+event-catalyst-search-fixture-report PYTHON=python3` ran with fixture provider,
+6 generated queries, 0 fixture results, and no live calls. `make verify
+PYTHON=python3` passed.
+**Notes/risks:** Catalyst search remains research-only and fixture-backed unless
+explicitly configured later. Search results are raw evidence only: they still
+must pass deterministic resolver/classifier/playbook logic, and they cannot
+create `TRIGGERED_FADE`.
+
 ## 2026-06-18 — Make Event Alpha tiering playbook-first · Codex
 **Why:** Event Alpha had expanded into multiple research playbooks, but alert
 tiering still leaned too heavily on the old generic proxy-opportunity score.

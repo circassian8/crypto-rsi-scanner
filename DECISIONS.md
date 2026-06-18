@@ -16,6 +16,41 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep dynamic catalyst search as evidence collection
+**Status:** accepted
+**Decision:** Event Alpha may run a research-only market-anomaly catalyst-search
+loop that generates bounded search queries, collects fixture/provider source
+evidence, attaches those source events to the anomaly, and then reruns normal
+deterministic discovery, resolver, classifier, playbook, watchlist, and router
+logic. Catalyst search results are raw evidence only: they must not create
+alerts, paper trades, live signal rows, orders, or `TRIGGERED_FADE` by
+themselves. LLM raw extraction budgets should be prioritized by anomaly
+severity, source confidence, freshness, catalyst keywords, asset mention
+quality, duplicate penalties, and recap/source-noise penalties rather than by
+first-seen order.
+**Why:** The radar needs to move from passive catalyst feeds toward a loop that
+asks “why is this asset moving?” without allowing search hits or LLM text to
+bypass identity validation or event-fade hard gates.
+**Revisit when:** A live catalyst-search provider is added or reviewed Event
+Alpha snapshots justify changing search from local evidence collection into a
+promoted research digest input.
+
+## 2026-06-18 - Preserve non-proxy accepted link kinds in event graph
+**Status:** accepted
+**Decision:** Event graph links should preserve accepted relationship kinds for
+`proxy`, `direct`, `supply`, `derivatives`, and `infrastructure` rows. Cluster
+confidence may count proxy/direct/supply/derivatives accepted links, but
+infrastructure, source-noise, ticker collisions, ambiguous rows, and publisher
+noise must not boost alert scoring. Explicit external proxy event types should
+take precedence over loose listing keywords; only structured exchange/perp
+listing event types should force listing playbooks.
+**Why:** Event Alpha is a multi-playbook research radar, so the graph needs to
+represent direct/listing/unlock/perp relationships without accidentally turning
+context, infrastructure, or source noise into confidence boosts.
+**Revisit when:** Reviewed alert snapshots show infrastructure or other
+non-boosting link kinds have measurable value that deserves a separate
+human-approved tier policy.
+
 ## 2026-06-18 - Make Event Alpha tiering playbook-first
 **Status:** accepted
 **Decision:** Event Alpha research-alert tiers should be resolved from the

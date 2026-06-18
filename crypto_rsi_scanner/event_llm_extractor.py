@@ -29,6 +29,54 @@ log = logging.getLogger(__name__)
 
 LLM_EXTRACTION_SCHEMA_VERSION = "event_llm_extraction_v1"
 
+_CATALYST_KEYWORDS = (
+    "pre ipo",
+    "pre-ipo",
+    "ipo",
+    "synthetic exposure",
+    "tokenized stock",
+    "stock token",
+    "prediction market",
+    "spacex",
+    "openai",
+    "anthropic",
+    "world cup",
+    "fan token",
+    "election",
+)
+_DIRECT_EVENT_KEYWORDS = (
+    "binance listing",
+    "exchange listing",
+    "listing",
+    "perp listing",
+    "futures listing",
+    "unlock",
+    "vesting",
+    "airdrop",
+    "tge",
+    "exploit",
+    "hack",
+    "lawsuit",
+    "sec ",
+    "regulatory",
+)
+_MARKET_RECAP_PHRASES = (
+    "market recap",
+    "market roundup",
+    "price recap",
+    "weekly recap",
+    "daily recap",
+    "crypto prices today",
+    "prices today",
+)
+_SOURCE_NOISE_PHRASES = (
+    "bitcoin world",
+    "kucoin source",
+    "source highlights",
+    "ripple effects",
+    "ipo hype",
+)
+
 
 class EventLLMExtractionValidationError(ValueError):
     """Raised when provider output is not a valid raw-event extraction."""
@@ -51,6 +99,14 @@ class EventLLMExtractionReportRow:
     raw_event: RawDiscoveredEvent
     extraction: EventLLMRawEventExtraction | None
     warnings: tuple[str, ...] = ()
+    extraction_priority_score: int = 0
+    extraction_priority_reasons: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RawEventExtractionPriority:
+    score: int
+    reason_codes: tuple[str, ...] = ()
 
 
 def analyze_raw_events(
@@ -64,10 +120,10 @@ def analyze_raw_events(
     cache = _load_cache(cfg.cache_path)
     cache_changed = False
     rows: list[EventLLMExtractionReportRow] = []
-    selected = list(raw_events)[: max(0, cfg.max_events_per_run)]
+    selected = _select_raw_events_for_extraction(raw_events, cfg.max_events_per_run)
     provider_name = str(getattr(provider, "name", cfg.provider))
     provider_model = getattr(provider, "model", cfg.model)
-    for raw_event in selected:
+    for raw_event, priority in selected:
         packet = build_raw_event_packet(raw_event, prompt_version=cfg.prompt_version)
         warnings: list[str] = []
         cache_key = _cache_key(packet, cfg, provider_name, provider_model)
@@ -105,7 +161,13 @@ def analyze_raw_events(
                 warnings.extend(extraction.warnings)
             except EventLLMExtractionValidationError as exc:
                 warnings.append(str(exc))
-        rows.append(EventLLMExtractionReportRow(raw_event=raw_event, extraction=extraction, warnings=tuple(dict.fromkeys(warnings))))
+        rows.append(EventLLMExtractionReportRow(
+            raw_event=raw_event,
+            extraction=extraction,
+            warnings=tuple(dict.fromkeys(warnings)),
+            extraction_priority_score=priority.score,
+            extraction_priority_reasons=priority.reason_codes,
+        ))
     if cache_changed:
         _write_cache(cfg.cache_path, cache)
     return rows
@@ -137,6 +199,182 @@ def build_raw_event_packet(raw_event: RawDiscoveredEvent, *, prompt_version: str
             "description": event_payload.get("description") or payload.get("description"),
         },
     }
+
+
+def score_raw_event_for_llm_extraction(
+    raw_event: RawDiscoveredEvent,
+    now: datetime | None = None,
+) -> RawEventExtractionPriority:
+    """Prioritize raw evidence before spending an LLM extraction budget."""
+    observed = _as_utc(now or raw_event.fetched_at or datetime.now(timezone.utc))
+    payload = raw_event.raw_json if isinstance(raw_event.raw_json, Mapping) else {}
+    event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
+    anomaly = payload.get("anomaly") if isinstance(payload.get("anomaly"), Mapping) else {}
+    market = payload.get("market") if isinstance(payload.get("market"), Mapping) else {}
+    text = clean_text(
+        " ".join(str(item or "") for item in (
+            raw_event.title,
+            raw_event.body,
+            event_payload.get("event_name"),
+            event_payload.get("event_type"),
+            event_payload.get("external_asset"),
+            event_payload.get("description"),
+        ))
+    )
+    score = 0.0
+    reasons: list[str] = []
+
+    source_conf = max(0.0, min(1.0, float(raw_event.source_confidence or 0.0)))
+    if source_conf:
+        source_points = source_conf * 25
+        score += source_points
+        reasons.append(f"source_confidence_{int(round(source_conf * 100))}")
+
+    anomaly_score = _float_from_mapping(anomaly, "score")
+    if raw_event.provider == "market_anomaly" or anomaly_score is not None:
+        anomaly_points = min(35.0, max(0.0, float(anomaly_score or 0.0)) * 0.35)
+        if anomaly_points:
+            score += anomaly_points
+            reasons.append(f"market_anomaly_{int(round(float(anomaly_score or 0.0)))}")
+
+    published = raw_event.published_at or raw_event.fetched_at
+    if published is not None:
+        age_hours = max(0.0, (observed - _as_utc(published)).total_seconds() / 3600.0)
+        if age_hours <= 24:
+            score += 15
+            reasons.append("fresh_24h")
+        elif age_hours <= 72:
+            score += 8
+            reasons.append("fresh_72h")
+
+    catalyst_hits = _keyword_hits(text, _CATALYST_KEYWORDS)
+    if catalyst_hits:
+        score += min(25, 8 + 4 * len(catalyst_hits))
+        reasons.append("catalyst_keywords:" + ",".join(catalyst_hits[:4]))
+
+    direct_hits = _keyword_hits(text, _DIRECT_EVENT_KEYWORDS)
+    if direct_hits:
+        score += min(14, 5 + 3 * len(direct_hits))
+        reasons.append("direct_event_keywords:" + ",".join(direct_hits[:3]))
+
+    symbol = _structured_symbol(payload, market)
+    if symbol and (f"${symbol.lower()}" in text or symbol.lower() in text):
+        score += 10
+        reasons.append("structured_asset_mention")
+    elif symbol:
+        score += 5
+        reasons.append("structured_asset_context")
+    if _has_structured_asset_hint(payload):
+        score += 8
+        reasons.append("asset_hint")
+
+    if _looks_like_market_recap(text):
+        score -= 22
+        reasons.append("market_recap_penalty")
+    if _looks_like_source_noise(raw_event, text):
+        score -= 28
+        reasons.append("source_noise_penalty")
+    if "no dated external catalyst" in text:
+        score -= 8
+        reasons.append("no_catalyst_disclaimer")
+
+    return RawEventExtractionPriority(
+        score=max(0, min(100, int(round(score)))),
+        reason_codes=tuple(dict.fromkeys(reasons)),
+    )
+
+
+def _select_raw_events_for_extraction(
+    raw_events: Iterable[RawDiscoveredEvent],
+    limit: int,
+) -> list[tuple[RawDiscoveredEvent, RawEventExtractionPriority]]:
+    events = list(raw_events)
+    if limit <= 0 or not events:
+        return []
+    observed = _selection_clock(events)
+    seen_hashes: set[str] = set()
+    scored: list[tuple[int, int, RawDiscoveredEvent, RawEventExtractionPriority]] = []
+    for idx, raw in enumerate(events):
+        priority = score_raw_event_for_llm_extraction(raw, now=observed)
+        reasons = list(priority.reason_codes)
+        score = priority.score
+        duplicate_key = raw.content_hash or _raw_text_hash(raw)
+        if duplicate_key in seen_hashes:
+            score = max(0, score - 20)
+            reasons.append("duplicate_content_penalty")
+        else:
+            seen_hashes.add(duplicate_key)
+        adjusted = RawEventExtractionPriority(score=score, reason_codes=tuple(dict.fromkeys(reasons)))
+        scored.append((adjusted.score, -idx, raw, adjusted))
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [(raw, priority) for _, _, raw, priority in scored[:limit]]
+
+
+def _selection_clock(raw_events: Iterable[RawDiscoveredEvent]) -> datetime:
+    timestamps = [raw.fetched_at for raw in raw_events if raw.fetched_at is not None]
+    if not timestamps:
+        return datetime.now(timezone.utc)
+    return max(_as_utc(ts) for ts in timestamps)
+
+
+def _keyword_hits(text: str, keywords: tuple[str, ...]) -> tuple[str, ...]:
+    hits = [keyword.strip() for keyword in keywords if keyword.strip() and keyword.strip() in text]
+    return tuple(dict.fromkeys(hits))
+
+
+def _float_from_mapping(payload: Mapping[str, Any], key: str) -> float | None:
+    try:
+        value = payload.get(key)
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _structured_symbol(payload: Mapping[str, Any], market: Mapping[str, Any]) -> str:
+    asset = payload.get("asset") if isinstance(payload.get("asset"), Mapping) else {}
+    candidates = (
+        market.get("symbol"),
+        asset.get("symbol"),
+        payload.get("symbol"),
+    )
+    for value in candidates:
+        symbol = str(value or "").strip().lower()
+        if symbol:
+            return symbol
+    return ""
+
+
+def _has_structured_asset_hint(payload: Mapping[str, Any]) -> bool:
+    asset = payload.get("asset") if isinstance(payload.get("asset"), Mapping) else {}
+    market = payload.get("market") if isinstance(payload.get("market"), Mapping) else {}
+    return bool(
+        asset.get("coin_id")
+        or asset.get("contract_address")
+        or market.get("coin_id")
+        or market.get("symbol")
+        or payload.get("coin_id")
+    )
+
+
+def _looks_like_market_recap(text: str) -> bool:
+    return any(phrase in text for phrase in _MARKET_RECAP_PHRASES)
+
+
+def _looks_like_source_noise(raw_event: RawDiscoveredEvent, text: str) -> bool:
+    clean_title = clean_text(raw_event.title)
+    if any(phrase in clean_title for phrase in _SOURCE_NOISE_PHRASES):
+        return True
+    if "bitcoin world" in text and "bitcoin" not in clean_text(strip_publisher_suffix(raw_event.title)):
+        return True
+    return False
+
+
+def _raw_text_hash(raw_event: RawDiscoveredEvent) -> str:
+    return hashlib.sha256(
+        "\n".join(str(part or "") for part in (raw_event.title, raw_event.body, raw_event.source_url)).encode("utf-8")
+    ).hexdigest()
 
 
 def validate_llm_extraction(
@@ -237,6 +475,10 @@ def format_llm_extract_report(rows: Iterable[EventLLMExtractionReportRow]) -> st
     for row in rows:
         extraction = row.extraction
         out.append(f"{row.raw_event.raw_id} · {row.raw_event.provider}")
+        out.append(
+            f"  priority: {row.extraction_priority_score}/100"
+            + (f" ({', '.join(row.extraction_priority_reasons)})" if row.extraction_priority_reasons else "")
+        )
         out.append(f"  title: {row.raw_event.title}")
         if extraction is None:
             out.append("  extraction: unavailable")
@@ -529,6 +771,10 @@ def _write_cache(path: Path | None, cache: Mapping[str, Any]) -> None:
 
 def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
+
+
+def _as_utc(dt: datetime) -> datetime:
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
 
 
 def _source_origin(url: str | None) -> str | None:

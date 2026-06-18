@@ -11,6 +11,7 @@ from typing import Any, Iterable
 from . import (
     event_alerts,
     event_alpha_router,
+    event_catalyst_search,
     event_graph,
     event_llm_analyzer,
     event_llm_extractor,
@@ -27,6 +28,7 @@ ResearchAlertSender = Callable[[list[event_alpha_router.EventAlphaRouteDecision]
 class EventAlphaPipelineResult:
     discovery_result: EventDiscoveryResult
     alerts: list[event_alerts.EventAlertCandidate]
+    catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None
     extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow]
     relationship_rows: list[event_llm_analyzer.EventLLMReportRow]
     watchlist_result: event_watchlist.EventWatchlistRefreshResult | None
@@ -37,6 +39,14 @@ class EventAlphaPipelineResult:
     @property
     def raw_events(self) -> int:
         return len(self.discovery_result.raw_events)
+
+    @property
+    def catalyst_queries(self) -> int:
+        return len(self.catalyst_search_result.queries) if self.catalyst_search_result else 0
+
+    @property
+    def catalyst_results(self) -> int:
+        return len(self.catalyst_search_result.result_events) if self.catalyst_search_result else 0
 
     @property
     def extractions(self) -> int:
@@ -80,6 +90,7 @@ def run_event_alpha_pipeline(
     alert_cfg: event_alerts.EventAlertConfig | None = None,
     now: datetime | None = None,
     extraction_rows: Iterable[event_llm_extractor.EventLLMExtractionReportRow] = (),
+    catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None = None,
     relationship_provider: object | None = None,
     relationship_cfg: event_llm_analyzer.EventLLMConfig | None = None,
     watchlist_cfg: event_watchlist.EventWatchlistConfig | None = None,
@@ -130,6 +141,7 @@ def run_event_alpha_pipeline(
     return EventAlphaPipelineResult(
         discovery_result=discovery_result,
         alerts=alerts,
+        catalyst_search_result=catalyst_search_result,
         extraction_rows=list(extraction_rows),
         relationship_rows=relationship_rows,
         watchlist_result=watchlist_result,
@@ -146,6 +158,8 @@ def run_event_alpha_operating_cycle(
     with_llm: bool = False,
     extraction_provider: object | None = None,
     extraction_cfg: event_llm_extractor.EventLLMExtractorConfig | None = None,
+    catalyst_search_provider: event_catalyst_search.CatalystSearchProvider | None = None,
+    catalyst_search_cfg: event_catalyst_search.EventCatalystSearchConfig | None = None,
     relationship_provider: object | None = None,
     relationship_cfg: event_llm_analyzer.EventLLMConfig | None = None,
     watchlist_cfg: event_watchlist.EventWatchlistConfig | None = None,
@@ -165,8 +179,9 @@ def run_event_alpha_operating_cycle(
     """
     observed = _as_utc(now or datetime.now(timezone.utc))
     warnings: list[str] = []
+    catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None = None
     extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow] = []
-    raw_event_transform: RawEventTransform | None = None
+    llm_transform: RawEventTransform | None = None
     relationship_provider_to_use = None
     relationship_cfg_to_use = None
 
@@ -185,7 +200,7 @@ def run_event_alpha_operating_cycle(
                     )
                     return tuple(raw_events)
 
-                raw_event_transform = _shadow_llm_extractions
+                llm_transform = _shadow_llm_extractions
             elif mode == "advisory":
                 def _enrich_with_llm_extractions(
                     raw_events: tuple[RawDiscoveredEvent, ...],
@@ -198,7 +213,7 @@ def run_event_alpha_operating_cycle(
                     )
                     return event_llm_extractor.enrich_raw_events_with_extractions(raw_events, extraction_rows)
 
-                raw_event_transform = _enrich_with_llm_extractions
+                llm_transform = _enrich_with_llm_extractions
             elif mode in {"off", "disabled", "none"}:
                 warnings.append("Event LLM extractor skipped: mode is off")
             else:
@@ -219,11 +234,37 @@ def run_event_alpha_operating_cycle(
         elif relationship_cfg is not None:
             warnings.append("Event LLM relationship analysis skipped: no relationship provider available")
 
+    def _combined_raw_event_transform(
+        raw_events: tuple[RawDiscoveredEvent, ...],
+    ) -> tuple[RawDiscoveredEvent, ...]:
+        nonlocal catalyst_search_result
+        transformed = tuple(raw_events)
+        if catalyst_search_cfg is not None and catalyst_search_cfg.enabled:
+            if catalyst_search_provider is None:
+                warnings.append("catalyst search skipped: no provider available")
+            else:
+                catalyst_search_result = event_catalyst_search.run_catalyst_search(
+                    transformed,
+                    catalyst_search_provider,
+                    cfg=catalyst_search_cfg,
+                    now=observed,
+                )
+                warnings.extend(f"catalyst search: {warning}" for warning in catalyst_search_result.warnings)
+                transformed = _merge_catalyst_search_events(transformed, catalyst_search_result)
+        if llm_transform is not None:
+            transformed = tuple(llm_transform(transformed))
+        return transformed
+
+    raw_event_transform: RawEventTransform | None = None
+    if llm_transform is not None or (catalyst_search_cfg is not None and catalyst_search_cfg.enabled):
+        raw_event_transform = _combined_raw_event_transform
+
     discovery_result = load_discovery_result(observed, raw_event_transform)
     result = run_event_alpha_pipeline(
         discovery_result,
         alert_cfg=alert_cfg,
         now=observed,
+        catalyst_search_result=catalyst_search_result,
         extraction_rows=extraction_rows,
         relationship_provider=relationship_provider_to_use,
         relationship_cfg=relationship_cfg_to_use,
@@ -239,6 +280,7 @@ def run_event_alpha_operating_cycle(
             return EventAlphaPipelineResult(
                 discovery_result=result.discovery_result,
                 alerts=result.alerts,
+                catalyst_search_result=result.catalyst_search_result,
                 extraction_rows=result.extraction_rows,
                 relationship_rows=result.relationship_rows,
                 watchlist_result=result.watchlist_result,
@@ -251,6 +293,7 @@ def run_event_alpha_operating_cycle(
             return EventAlphaPipelineResult(
                 discovery_result=result.discovery_result,
                 alerts=result.alerts,
+                catalyst_search_result=result.catalyst_search_result,
                 extraction_rows=result.extraction_rows,
                 relationship_rows=result.relationship_rows,
                 watchlist_result=result.watchlist_result,
@@ -264,6 +307,7 @@ def run_event_alpha_operating_cycle(
             return EventAlphaPipelineResult(
                 discovery_result=result.discovery_result,
                 alerts=result.alerts,
+                catalyst_search_result=result.catalyst_search_result,
                 extraction_rows=result.extraction_rows,
                 relationship_rows=result.relationship_rows,
                 watchlist_result=result.watchlist_result,
@@ -278,6 +322,7 @@ def run_event_alpha_operating_cycle(
             return EventAlphaPipelineResult(
                 discovery_result=result.discovery_result,
                 alerts=result.alerts,
+                catalyst_search_result=result.catalyst_search_result,
                 extraction_rows=result.extraction_rows,
                 relationship_rows=result.relationship_rows,
                 watchlist_result=result.watchlist_result,
@@ -288,6 +333,7 @@ def run_event_alpha_operating_cycle(
         return EventAlphaPipelineResult(
             discovery_result=result.discovery_result,
             alerts=result.alerts,
+            catalyst_search_result=result.catalyst_search_result,
             extraction_rows=result.extraction_rows,
             relationship_rows=result.relationship_rows,
             watchlist_result=result.watchlist_result,
@@ -298,6 +344,29 @@ def run_event_alpha_operating_cycle(
     return result
 
 
+def _merge_catalyst_search_events(
+    raw_events: tuple[RawDiscoveredEvent, ...],
+    search_result: event_catalyst_search.CatalystSearchRunResult | None,
+) -> tuple[RawDiscoveredEvent, ...]:
+    if search_result is None or not search_result.attached_raw_events:
+        return raw_events
+    anomaly_ids = {
+        raw.raw_id
+        for raw in search_result.attached_raw_events
+        if raw.raw_json
+        and isinstance(raw.raw_json.get("market_anomaly_catalyst_search"), dict)
+        and raw.raw_json["market_anomaly_catalyst_search"].get("role") == "parent_anomaly"
+    }
+    kept = [raw for raw in raw_events if raw.raw_id not in anomaly_ids]
+    seen: set[str] = {raw.raw_id for raw in kept}
+    for raw in search_result.attached_raw_events:
+        if raw.raw_id in seen:
+            continue
+        kept.append(raw)
+        seen.add(raw.raw_id)
+    return tuple(kept)
+
+
 def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
     """Format a concise Event Alpha cycle summary."""
     lines = [
@@ -305,7 +374,9 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
         "EVENT ALPHA PIPELINE REPORT (research-only; no trades, paper rows, or live RSI routing)",
         "=" * 76,
         (
-            f"raw_events={result.raw_events} · extractions={result.extractions}/{len(result.extraction_rows)} · "
+            f"raw_events={result.raw_events} · catalyst_queries={result.catalyst_queries} · "
+            f"catalyst_results={result.catalyst_results} · "
+            f"extractions={result.extractions}/{len(result.extraction_rows)} · "
             f"extraction_hints_applied={result.extraction_hint_events} · "
             f"candidates={result.candidates} · clusters={result.clusters} · alerts={len(result.alerts)}"
         ),

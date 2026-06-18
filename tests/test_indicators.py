@@ -3574,6 +3574,83 @@ def test_event_llm_extractor_identifies_source_noise_and_word_collisions():
     assert hype.crypto_asset_mentions[0].mention_type == "ordinary_word"
 
 
+def test_event_llm_extractor_prioritizes_high_value_raw_events_before_budget():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_llm_extractor
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def raw(raw_id, title, *, provider="news", score=None, source_conf=0.75, body=None):
+        payload = {}
+        if score is not None:
+            payload = {
+                "market": {"symbol": raw_id.upper(), "coin_id": raw_id},
+                "anomaly": {"score": score, "reasons": ["24h return 80%"]},
+            }
+            provider = "market_anomaly"
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider=provider,
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body or title,
+            raw_json=payload,
+            source_confidence=source_conf,
+            content_hash=raw_id,
+        )
+
+    market_roundup = raw("roundup", "Daily market roundup: Bitcoin World recap", source_conf=0.85)
+    high_anomaly = raw("pump", "PUMP market anomaly with 80% move", score=92, source_conf=0.55)
+    proxy_article = raw(
+        "proxy",
+        "SpaceX pre-IPO exposure opens through PROXY token",
+        body="PROXY token offers synthetic exposure to SpaceX pre-IPO markets.",
+        source_conf=0.90,
+    )
+    publisher_noise = raw("noise", "Bitcoin World covers SpaceX IPO hype", source_conf=0.90)
+
+    high_priority = event_llm_extractor.score_raw_event_for_llm_extraction(high_anomaly, now=now)
+    recap_priority = event_llm_extractor.score_raw_event_for_llm_extraction(market_roundup, now=now)
+    proxy_priority = event_llm_extractor.score_raw_event_for_llm_extraction(proxy_article, now=now)
+    noise_priority = event_llm_extractor.score_raw_event_for_llm_extraction(publisher_noise, now=now)
+    assert high_priority.score > recap_priority.score
+    assert proxy_priority.score > recap_priority.score
+    assert noise_priority.score < proxy_priority.score
+
+    class Provider:
+        name = "fixture"
+
+        def __init__(self):
+            self.seen = []
+
+        def extract_raw_event(self, packet):
+            self.seen.append(packet["raw_id"])
+            return LLMProviderResult(raw={
+                "confidence": 0.80,
+                "external_catalysts": [],
+                "crypto_asset_mentions": [],
+                "false_positive_terms": [],
+                "event_date_hints": [],
+                "suggested_followup_queries": [],
+                "warnings": [],
+            })
+
+    provider = Provider()
+    rows = event_llm_extractor.analyze_raw_events(
+        [market_roundup, publisher_noise, proxy_article, high_anomaly],
+        provider,
+        cfg=event_llm_extractor.EventLLMExtractorConfig(max_events_per_run=2),
+    )
+    assert provider.seen == ["pump", "proxy"]
+    assert [row.raw_event.raw_id for row in rows] == ["pump", "proxy"]
+    assert all(row.extraction_priority_score > 0 for row in rows)
+    assert any("catalyst_keywords" in ",".join(row.extraction_priority_reasons) for row in rows)
+
+
 def test_event_llm_extractor_openai_missing_key_fails_soft():
     from crypto_rsi_scanner.llm_providers.openai_provider import OpenAILLMExtractionProvider
 
@@ -4202,6 +4279,245 @@ def test_event_catalyst_search_scaffold_attaches_evidence_without_bypassing_disc
     assert listing_alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE
 
 
+def test_event_alpha_cycle_search_loop_uses_fixture_evidence_and_respects_limits():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alerts,
+        event_alpha_pipeline,
+        event_anomaly_scanner,
+        event_catalyst_search,
+        event_discovery,
+        event_market_enrichment,
+        event_playbooks,
+    )
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    rows = [
+        {
+            "id": "pump-protocol",
+            "symbol": "pump",
+            "name": "Pump Protocol",
+            "current_price": 1.4,
+            "market_cap": 100000000.0,
+            "total_volume": 60000000.0,
+            "price_change_percentage_24h_in_currency": 45.0,
+            "price_change_percentage_7d_in_currency": 120.0,
+            "volume_zscore_24h": 4.5,
+        },
+        {
+            "id": "quiet-protocol",
+            "symbol": "quiet",
+            "name": "Quiet Protocol",
+            "current_price": 2.0,
+            "market_cap": 100000000.0,
+            "total_volume": 1000000.0,
+            "price_change_percentage_24h_in_currency": 1.0,
+            "price_change_percentage_7d_in_currency": 10.0,
+            "volume_zscore_24h": 1.0,
+        },
+    ]
+    anomalies = event_anomaly_scanner.discover_market_anomalies(
+        rows,
+        cfg=event_anomaly_scanner.EventAnomalyScannerConfig(
+            enabled=True,
+            min_return_24h=0.03,
+            min_volume_mcap=0.05,
+            min_volume_zscore=3.0,
+            max_assets=5,
+        ),
+        now=now,
+    )
+    assert [raw.raw_id for raw in anomalies] == ["market_anomaly:pump-protocol:2026-06-18"]
+    listing_raw = RawDiscoveredEvent(
+        raw_id="pump-binance-listing-dynamic",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/pump-binance-listing",
+        title="Binance will list Pump Protocol (PUMP)",
+        body="Binance will list Pump Protocol spot trading pairs today.",
+        raw_json={
+            "event": {
+                "event_id": "pump-binance-listing-dynamic",
+                "event_name": "Binance will list Pump Protocol (PUMP)",
+                "event_type": "exchange_listing",
+                "event_time": "2026-06-18T20:00:00Z",
+                "event_time_confidence": 0.95,
+                "external_asset": None,
+                "confidence": 0.90,
+                "description": "Binance will list Pump Protocol spot trading pairs today.",
+            }
+        },
+        source_confidence=0.90,
+        content_hash="pump-binance-listing-dynamic",
+    )
+    provider = event_catalyst_search.FixtureCatalystSearchProvider({
+        "PUMP Binance listing": (listing_raw,),
+        "PUMP crypto why up": (),
+    })
+    cfg = event_catalyst_search.EventCatalystSearchConfig(
+        enabled=True,
+        max_anomalies=1,
+        max_queries_per_anomaly=2,
+        max_results_per_query=1,
+        min_anomaly_score=60,
+    )
+    search_result = event_catalyst_search.run_catalyst_search(anomalies, provider, cfg=cfg, now=now)
+    assert len(search_result.queries) == 2
+    assert len(search_result.result_events) == 1
+    assert len(search_result.attached_raw_events) == 2
+    assert search_result.attached_raw_events[1].raw_id == "pump-binance-listing-dynamic"
+
+    asset = DiscoveredAsset(
+        coin_id="pump-protocol",
+        symbol="PUMP",
+        name="Pump Protocol",
+        aliases=("pump protocol", "pump"),
+    )
+    market_by_asset = event_market_enrichment.market_snapshots_from_rows(rows, now=now)
+
+    def loader(observed, raw_event_transform):
+        raw_events = tuple(anomalies)
+        if raw_event_transform:
+            raw_events = tuple(raw_event_transform(raw_events))
+        return event_discovery.run_discovery(
+            raw_events,
+            [asset],
+            now=observed,
+            market_by_asset=market_by_asset,
+        )
+
+    pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=loader,
+        alert_cfg=event_alerts.EventAlertConfig(),
+        now=now,
+        catalyst_search_provider=provider,
+        catalyst_search_cfg=cfg,
+        refresh_watchlist=False,
+        route=False,
+    )
+    assert pipeline_result.catalyst_queries == 2
+    assert pipeline_result.catalyst_results == 1
+    by_event = {alert.discovery_candidate.event.event_id: alert for alert in pipeline_result.alerts}
+    assert by_event["market_anomaly:pump-protocol:2026-06-18"].playbook_type == (
+        event_playbooks.EventPlaybookType.MARKET_ANOMALY_UNKNOWN.value
+    )
+    assert by_event["pump-binance-listing-dynamic"].playbook_type == (
+        event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value
+    )
+    assert by_event["pump-binance-listing-dynamic"].tier != event_alerts.EventAlertTier.TRIGGERED_FADE
+
+
+def test_event_catalyst_search_proxy_evidence_still_requires_deterministic_validation():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alerts,
+        event_alpha_pipeline,
+        event_catalyst_search,
+        event_discovery,
+        event_playbooks,
+    )
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    anomaly = RawDiscoveredEvent(
+        raw_id="market_anomaly:pumpx:2026-06-18",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="PUMPX market anomaly: 24h return 95%",
+        body="No dated external catalyst has been validated.",
+        raw_json={
+            "event": {
+                "event_id": "market_anomaly:pumpx:2026-06-18",
+                "event_name": "PUMPX market anomaly",
+                "event_type": "market_anomaly",
+                "event_time": None,
+                "event_time_confidence": 0.0,
+                "confidence": 0.60,
+                "description": "No dated external catalyst has been validated.",
+            },
+            "market": {"symbol": "PUMPX", "coin_id": "pumpx", "return_24h": 0.95, "volume_zscore_24h": 5.0},
+            "anomaly": {"score": 95, "reasons": ["24h return 95%"]},
+        },
+        source_confidence=0.55,
+        content_hash="anomaly-pumpx",
+    )
+    proxy_raw = RawDiscoveredEvent(
+        raw_id="pumpx-openai-proxy",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/pumpx-openai",
+        title="PumpX launches OpenAI pre-IPO exposure market",
+        body="PumpX token holders can use the PUMPX venue for OpenAI pre-IPO exposure.",
+        raw_json={
+            "event": {
+                "event_id": "pumpx-openai-proxy",
+                "event_name": "PumpX launches OpenAI pre-IPO exposure market",
+                "event_type": "ipo_proxy",
+                "event_time": "2026-06-20T13:30:00Z",
+                "event_time_confidence": 0.90,
+                "external_asset": "OpenAI",
+                "confidence": 0.90,
+                "description": "PumpX token holders can use the PUMPX venue for OpenAI pre-IPO exposure.",
+            }
+        },
+        source_confidence=0.90,
+        content_hash="pumpx-openai-proxy",
+    )
+    provider = event_catalyst_search.FixtureCatalystSearchProvider({"PUMPX OpenAI exposure": (proxy_raw,)})
+    cfg = event_catalyst_search.EventCatalystSearchConfig(
+        enabled=True,
+        max_anomalies=1,
+        max_queries_per_anomaly=6,
+        max_results_per_query=1,
+        min_anomaly_score=60,
+    )
+
+    def loader_without_asset(observed, raw_event_transform):
+        raw_events = tuple(raw_event_transform((anomaly,))) if raw_event_transform else (anomaly,)
+        return event_discovery.run_discovery(raw_events, [], now=observed)
+
+    no_asset = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=loader_without_asset,
+        now=now,
+        catalyst_search_provider=provider,
+        catalyst_search_cfg=cfg,
+        refresh_watchlist=False,
+        route=False,
+    )
+    assert no_asset.candidates == 0
+
+    asset = DiscoveredAsset(coin_id="pumpx", symbol="PUMPX", name="PumpX", aliases=("pumpx",))
+
+    def loader_with_asset(observed, raw_event_transform):
+        raw_events = tuple(raw_event_transform((anomaly,))) if raw_event_transform else (anomaly,)
+        return event_discovery.run_discovery(raw_events, [asset], now=observed)
+
+    with_asset = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=loader_with_asset,
+        alert_cfg=event_alerts.EventAlertConfig(),
+        now=now,
+        catalyst_search_provider=provider,
+        catalyst_search_cfg=cfg,
+        refresh_watchlist=False,
+        route=False,
+    )
+    proxy_alert = next(
+        alert for alert in with_asset.alerts
+        if alert.discovery_candidate.event.event_id == "pumpx-openai-proxy"
+    )
+    assert proxy_alert.playbook_type in {
+        event_playbooks.EventPlaybookType.PROXY_FADE.value,
+        event_playbooks.EventPlaybookType.AI_IPO_PROXY.value,
+        event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+    }
+    assert proxy_alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE
+
+
 def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_noise():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alerts, event_discovery, event_playbooks
@@ -4455,6 +4771,24 @@ def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_nois
             event_playbooks.EventPlaybookType.AI_IPO_PROXY,
         ),
         (
+            manual_candidate("spacex", "ipo_proxy", "SpaceX stock token listing pre-IPO exposure",
+                             "Tokenized stock listing gives synthetic exposure to SpaceX pre-IPO markets.",
+                             external_asset="SpaceX"),
+            event_playbooks.EventPlaybookType.RWA_PREIPO_PROXY,
+        ),
+        (
+            manual_candidate("openai", "external_proxy_event", "OpenAI pre-IPO proxy market opens",
+                             "Crypto venue offers OpenAI pre-IPO proxy access.",
+                             external_asset="OpenAI"),
+            event_playbooks.EventPlaybookType.AI_IPO_PROXY,
+        ),
+        (
+            manual_candidate("listing", "exchange_listing", "LIST Binance listing",
+                             "Binance listing opens spot trading pairs.", proxy=False,
+                             direct=True, role="direct_beneficiary", relationship="direct_listing"),
+            event_playbooks.EventPlaybookType.LISTING_VOLATILITY,
+        ),
+        (
             manual_candidate("shock", "security_event", "SHOCK exploit disclosed", "Security exploit hits protocol.",
                              proxy=False, direct=True, role="direct_beneficiary", relationship="direct_protocol_event"),
             event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK,
@@ -4583,8 +4917,12 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
     assert cluster.cluster_confidence > 70
     links = {link.symbol: link for link in cluster.asset_links}
     assert links["VELVET"].accepted is True
+    assert links["VELVET"].accepted_kind == "proxy"
+    assert links["VELVET"].accepted_for_playbook == "proxy_fade"
     assert links["ASTER"].accepted is True
+    assert links["ASTER"].accepted_kind == "proxy"
     assert links["BTC"].accepted is False
+    assert links["BTC"].accepted_kind == "none"
     assert links["BTC"].playbook_type == "source_noise_control"
     assert "mentioned_asset" in (links["BTC"].rejected_reason or "")
     report = event_graph.format_event_cluster_report(clusters)
@@ -4592,6 +4930,7 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
     assert "cluster_conf=" in report
     assert "sources: total=3 independent=3" in report
     assert "VELVET/velvet accepted" in report
+    assert "accepted_kinds=proxy:2" in report
     assert "ASTER/aster accepted" in report
     assert "BTC/bitcoin rejected" in report
 
@@ -4600,6 +4939,98 @@ def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
     assert by_symbol["VELVET"].score_components["cluster_confirmation"] == cluster.cluster_confidence
     assert by_symbol["ASTER"].score_components["cluster_confirmation"] == cluster.cluster_confidence
     assert by_symbol["BTC"].score_components["cluster_confirmation"] == 0
+
+
+def test_event_graph_accepts_direct_supply_and_derivatives_without_boosting_infrastructure():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts, event_graph
+    from crypto_rsi_scanner.event_models import (
+        DiscoveredAsset,
+        DiscoveredEventFadeCandidate,
+        EventAssetLink,
+        EventClassification,
+        EventDiscoveryResult,
+        NormalizedEvent,
+    )
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    event_time = datetime(2026, 6, 18, 20, 0, tzinfo=timezone.utc)
+
+    def event(event_id, event_type, title):
+        return NormalizedEvent(
+            event_id=event_id,
+            raw_ids=(f"raw-{event_id}",),
+            event_name=title,
+            event_type=event_type,
+            event_time=event_time,
+            event_time_confidence=0.95,
+            first_seen_time=now,
+            source="test",
+            source_urls=(f"https://alpha.test/{event_id}", f"https://beta.test/{event_id}"),
+            external_asset=None,
+            description=title,
+            confidence=0.90,
+        )
+
+    def candidate(norm_event, symbol, role, relationship, *, direct=True):
+        asset = DiscoveredAsset(coin_id=symbol.lower(), symbol=symbol, name=symbol)
+        return DiscoveredEventFadeCandidate(
+            event=norm_event,
+            asset=asset,
+            link=EventAssetLink(norm_event.event_id, asset.coin_id, symbol, symbol, 0.95, "alias", (symbol,)),
+            classification=EventClassification(
+                event_id=norm_event.event_id,
+                coin_id=asset.coin_id,
+                is_proxy_narrative=False,
+                is_direct_beneficiary=direct,
+                relationship_type=relationship,
+                confidence=0.90,
+                classifier_version="test",
+                reason="fixture",
+                evidence=(norm_event.event_name,),
+                asset_role=role,
+                asset_role_confidence=0.90,
+                asset_role_reason="fixture",
+                asset_role_evidence=(symbol,),
+            ),
+            fade_candidate=None,
+            fade_signal=None,
+            data_quality={},
+        )
+
+    listing = event("listing", "exchange_listing", "Binance lists LIST")
+    unlock = event("unlock", "token_unlock", "UNLOCK vesting unlock")
+    perp = event("perp", "perp_listing", "PERP futures listing")
+    infra = event("infra", "external_proxy_event", "Chainlink powers prediction market")
+    result = EventDiscoveryResult(
+        raw_events=(),
+        normalized_events=(listing, unlock, perp, infra),
+        links=(),
+        classifications=(),
+        candidates=(
+            candidate(listing, "LIST", "direct_beneficiary", "direct_listing"),
+            candidate(unlock, "UNLOCK", "direct_beneficiary", "direct_unlock"),
+            candidate(perp, "PERP", "direct_beneficiary", "direct_listing"),
+            candidate(infra, "LINK", "infrastructure", "infrastructure_provider", direct=False),
+        ),
+    )
+    links = {
+        link.symbol: link
+        for cluster in event_graph.build_event_clusters(result)
+        for link in cluster.asset_links
+    }
+    assert links["LIST"].accepted_kind == "direct"
+    assert links["UNLOCK"].accepted_kind == "supply"
+    assert links["PERP"].accepted_kind == "derivatives"
+    assert links["LINK"].accepted is True
+    assert links["LINK"].accepted_kind == "infrastructure"
+
+    alerts = event_alerts.build_event_alert_candidates(result, now=now)
+    by_symbol = {alert.symbol: alert for alert in alerts}
+    assert by_symbol["LIST"].score_components["cluster_confirmation"] > 0
+    assert by_symbol["UNLOCK"].score_components["cluster_confirmation"] > 0
+    assert by_symbol["PERP"].score_components["cluster_confirmation"] > 0
+    assert by_symbol["LINK"].score_components["cluster_confirmation"] == 0
 
 
 def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
@@ -5760,6 +6191,10 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "--event-alpha-radar-report" in text
     assert "event-alpha-cycle:" in text
     assert "event-alpha-cycle-llm:" in text
+    assert "event-catalyst-search-fixture-report:" in text
+    assert "event-alpha-cycle-search:" in text
+    assert "event-alpha-cycle-search-llm:" in text
+    assert "--event-catalyst-search-report" in text
     assert "event-alpha-cycle-send:" in text
     assert "event-alpha-alerts-report:" in text
     assert "event-alpha-fill-outcomes:" in text
@@ -5767,6 +6202,7 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "--event-alpha-alerts-report" in text
     assert "--event-alpha-fill-outcomes" in text
     assert "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1" in text
+    assert "RSI_EVENT_CATALYST_SEARCH_ENABLED=1" in text
     assert "RSI_EVENT_WATCHLIST_ENABLED=1" in text
     assert "RSI_EVENT_ALPHA_ROUTER_ENABLED=1" in text
     assert "RSI_EVENT_ALPHA_ALERT_STORE_PATH" in text

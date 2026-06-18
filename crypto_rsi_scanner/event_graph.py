@@ -43,6 +43,8 @@ class EventClusterAssetLink:
     accepted: bool
     link_confidence: float
     classifier_confidence: float
+    accepted_kind: str = "none"
+    accepted_for_playbook: str | None = None
     evidence: tuple[str, ...] = ()
     rejected_reason: str | None = None
 
@@ -133,13 +135,18 @@ def format_event_cluster_report(clusters: Iterable[EventCluster]) -> str:
             f"  sources: total={cluster.source_count} independent={cluster.independent_source_count} "
             f"quality={cluster.source_quality_score} · event_time_consensus={cluster.event_time_consensus}"
         )
-        rows.append(f"  accepted assets: {len(accepted)} · rejected/noise assets: {len(rejected)}")
+        accepted_kinds = _accepted_kind_summary(cluster.asset_links)
+        rows.append(
+            f"  accepted assets: {len(accepted)} · rejected/noise assets: {len(rejected)}"
+            + (f" · accepted_kinds={accepted_kinds}" if accepted_kinds else "")
+        )
         if cluster.warnings:
             rows.append("  warnings: " + "; ".join(cluster.warnings))
         for link in accepted:
             rows.append(
                 f"  - {link.symbol}/{link.coin_id} accepted "
-                f"playbook={link.playbook_type} role={link.asset_role} rel={link.relationship_type}"
+                f"kind={link.accepted_kind} playbook={link.playbook_type} "
+                f"role={link.asset_role} rel={link.relationship_type}"
             )
         for link in rejected:
             status = "accepted" if link.accepted else "rejected"
@@ -175,7 +182,7 @@ def _cluster_from_events(
     )
     best_time = next((event.event_time for event in ordered if event.event_time is not None), None)
     links = tuple(sorted(asset_links, key=lambda link: (link.symbol, link.coin_id)))
-    accepted_count = sum(1 for link in links if link.accepted)
+    accepted_count = sum(1 for link in links if _counts_for_cluster_confidence(link))
     rejected_count = sum(1 for link in links if not link.accepted)
     source_count = len(raw_ids)
     independent_sources = _independent_sources(ordered)
@@ -223,11 +230,8 @@ def _asset_link_for_candidate(
 ) -> EventClusterAssetLink:
     classification = candidate.classification
     playbook = _playbook_from_candidate(candidate)
-    accepted = bool(
-        classification.is_proxy_narrative
-        and not classification.is_direct_beneficiary
-        and classification.asset_role in {"proxy_instrument", "proxy_venue"}
-    )
+    accepted_kind, accepted_for_playbook = _accepted_link_kind(candidate, playbook)
+    accepted = accepted_kind != "none"
     rejected = None if accepted else _rejected_reason(candidate)
     return EventClusterAssetLink(
         cluster_id=cluster_id,
@@ -240,9 +244,55 @@ def _asset_link_for_candidate(
         accepted=accepted,
         link_confidence=candidate.link.link_confidence,
         classifier_confidence=classification.confidence,
+        accepted_kind=accepted_kind,
+        accepted_for_playbook=accepted_for_playbook,
         evidence=tuple((*candidate.link.evidence, *classification.evidence)),
         rejected_reason=rejected,
     )
+
+
+def _accepted_link_kind(
+    candidate: DiscoveredEventFadeCandidate,
+    playbook: str,
+) -> tuple[str, str | None]:
+    classification = candidate.classification
+    event_type = candidate.event.event_type
+    relationship = classification.relationship_type
+    role = classification.asset_role
+    if (
+        classification.is_proxy_narrative
+        and not classification.is_direct_beneficiary
+        and role in {"proxy_instrument", "proxy_venue"}
+        and relationship in {"proxy_exposure", "proxy_attention"}
+    ):
+        return "proxy", playbook
+    if event_type == "perp_listing" or "perp" in relationship or "futures" in relationship:
+        if classification.is_direct_beneficiary or relationship.startswith("direct_"):
+            return "derivatives", "perp_listing_squeeze"
+    if event_type in {"token_unlock", "airdrop", "tge"} or relationship in {"direct_unlock", "direct_supply_event"}:
+        return "supply", "unlock_supply_pressure"
+    if (
+        classification.is_direct_beneficiary
+        or relationship in {"direct_listing", "direct_protocol_event"}
+        or event_type in {"exchange_listing", "mainnet_launch", "governance", "protocol_upgrade"}
+    ):
+        return "direct", playbook
+    if role == "infrastructure" or relationship == "infrastructure_provider":
+        return "infrastructure", "infrastructure_mention"
+    return "none", None
+
+
+def _counts_for_cluster_confidence(link: EventClusterAssetLink) -> bool:
+    return link.accepted_kind in {"proxy", "direct", "supply", "derivatives"}
+
+
+def _accepted_kind_summary(links: Iterable[EventClusterAssetLink]) -> str:
+    counts: dict[str, int] = {}
+    for link in links:
+        if link.accepted_kind == "none":
+            continue
+        counts[link.accepted_kind] = counts.get(link.accepted_kind, 0) + 1
+    return ", ".join(f"{kind}:{count}" for kind, count in sorted(counts.items()))
 
 
 def _playbook_from_candidate(candidate: DiscoveredEventFadeCandidate) -> str:

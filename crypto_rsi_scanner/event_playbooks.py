@@ -89,6 +89,21 @@ def assess_event_playbook(
     relationship = cls.relationship_type
     signal_type = candidate.fade_signal.signal_type if candidate.fade_signal else event_fade.FadeSignalType.NO_TRADE
 
+    if _is_source_noise(candidate, rejected_reason):
+        return _assessment(
+            EventPlaybookType.SOURCE_NOISE_CONTROL,
+            _control_score(components),
+            EventPlaybookAction.STORE_ONLY,
+            False,
+            "STORE_ONLY",
+            "Asset evidence appears to be publisher/source noise, a ticker word collision, or recap context.",
+            (*cls.evidence, *(rejected_reason.split("; ") if rejected_reason else ())),
+            hypothesis="This is likely not a tradable event-alpha relationship.",
+            what_to_verify=("confirm the term is not the crypto asset", "keep as a negative-control row"),
+            timing_window="store for QA only",
+            invalidation="A primary source explicitly names the crypto asset as the event vehicle.",
+        )
+
     if event.event_type == "market_anomaly" or event.source == "market_anomaly":
         return _assessment(
             EventPlaybookType.MARKET_ANOMALY_UNKNOWN,
@@ -103,21 +118,6 @@ def assess_event_playbook(
             what_to_verify=("find dated source evidence", "verify the asset identity is not a ticker collision"),
             timing_window="observe until a catalyst source is found or the anomaly fades",
             invalidation="No credible catalyst appears, or liquidity/volume normalizes.",
-        )
-
-    if _is_source_noise(candidate, rejected_reason):
-        return _assessment(
-            EventPlaybookType.SOURCE_NOISE_CONTROL,
-            _control_score(components),
-            EventPlaybookAction.STORE_ONLY,
-            False,
-            "STORE_ONLY",
-            "Asset evidence appears to be publisher/source noise, a ticker word collision, or recap context.",
-            (*cls.evidence, *(rejected_reason.split("; ") if rejected_reason else ())),
-            hypothesis="This is likely not a tradable event-alpha relationship.",
-            what_to_verify=("confirm the term is not the crypto asset", "keep as a negative-control row"),
-            timing_window="store for QA only",
-            invalidation="A primary source explicitly names the crypto asset as the event vehicle.",
         )
 
     if _is_proxy_fade_candidate(candidate, rejected_reason):
@@ -226,8 +226,7 @@ def _specific_playbook(
     event = candidate.event
     text = clean_text(f"{event.event_name} {event.description or ''} {event.event_type}")
     external = clean_text(event.external_asset)
-    proxy_event_type = event.event_type in {"ipo_proxy", "external_proxy_event", "sports_event", "political_event"}
-    if event.event_type == "perp_listing" or (not proxy_event_type and ("perp" in text or "futures" in text)):
+    if event.event_type == "perp_listing":
         return (
             EventPlaybookType.PERP_LISTING_SQUEEZE,
             "Perp/futures listing can create early leverage and squeeze risk; not a proxy-fade trigger.",
@@ -236,7 +235,7 @@ def _specific_playbook(
             "first hours to two days after perp market opens",
             "No OI/funding expansion or spot volume fades quickly.",
         )
-    if event.event_type == "exchange_listing" or "listing" in text:
+    if event.event_type == "exchange_listing":
         return (
             EventPlaybookType.LISTING_VOLATILITY,
             "Exchange listing can create direct event volatility; not a proxy-fade trigger.",
@@ -245,7 +244,7 @@ def _specific_playbook(
             "announcement through first 24-72h of trading",
             "No material volume/price response after listing goes live.",
         )
-    if event.event_type == "token_unlock" or "unlock" in text or "vesting" in text:
+    if event.event_type == "token_unlock":
         return (
             EventPlaybookType.UNLOCK_SUPPLY_PRESSURE,
             "Unlock/vesting event may add supply pressure; not a proxy-fade trigger.",
@@ -254,7 +253,7 @@ def _specific_playbook(
             "pre-unlock through 7d post-unlock",
             "Unlock is small, already hedged, or flows do not reach liquid venues.",
         )
-    if event.event_type in {"airdrop", "tge"} or "airdrop" in text or "tge" in text:
+    if event.event_type in {"airdrop", "tge"}:
         return (
             EventPlaybookType.AIRDROP_TGE_SELL_PRESSURE,
             "Airdrop/TGE event may create recipient sell pressure; not a proxy-fade trigger.",
@@ -263,6 +262,8 @@ def _specific_playbook(
             "claim/TGE window through first 72h",
             "Claim is delayed, illiquid, or recipients cannot sell freely.",
         )
+    if event.event_type in {"ipo_proxy", "external_proxy_event"}:
+        return _ipo_proxy_playbook(text, external)
     if event.event_type == "sports_event" or "world cup" in text or "match" in text or "fan token" in text:
         return (
             EventPlaybookType.FAN_SPORTS_EVENT,
@@ -290,25 +291,68 @@ def _specific_playbook(
             "incident publication through first 24-72h",
             "Incident is false, contained, or unrelated to the linked asset.",
         )
-    if event.event_type in {"ipo_proxy", "external_proxy_event"} or "pre ipo" in text or "pre-ipo" in text:
-        if external in {"openai", "anthropic"} or "openai" in text or "anthropic" in text or " ai " in f" {text} ":
-            return (
-                EventPlaybookType.AI_IPO_PROXY,
-                "AI IPO proxy narrative is a specialized proxy-attention/fade research sleeve.",
-                "AI private-market attention may spill into a crypto proxy before the external catalyst expires.",
-                ("confirm AI company catalyst", "confirm the asset is instrument/venue, not news noise"),
-                "pre-catalyst buildup through post-catalyst failure confirmation",
-                "No dated AI catalyst or no token-specific proxy evidence.",
-            )
+    if "pre ipo" in text or "pre-ipo" in text or "tokenized stock" in text or "stock token" in text:
+        return _ipo_proxy_playbook(text, external)
+    if "perp" in text or "futures" in text:
         return (
-            EventPlaybookType.RWA_PREIPO_PROXY,
-            "Pre-IPO/RWA proxy narrative is a specialized proxy-attention/fade research sleeve.",
-            "Tokenized/pre-IPO exposure narrative may unwind after attention/catalyst expiry.",
-            ("confirm external asset and proxy mechanics", "confirm post-event technical failure before fade"),
-            "pre-catalyst buildup through post-catalyst failure confirmation",
-            "Proxy mechanics are unproven or the external catalyst is not dated.",
+            EventPlaybookType.PERP_LISTING_SQUEEZE,
+            "Perp/futures listing can create early leverage and squeeze risk; not a proxy-fade trigger.",
+            "New derivatives access may amplify volatility around the listing window.",
+            ("confirm listing venue and contract launch time", "check funding/open-interest expansion"),
+            "first hours to two days after perp market opens",
+            "No OI/funding expansion or spot volume fades quickly.",
+        )
+    if "listing" in text:
+        return (
+            EventPlaybookType.LISTING_VOLATILITY,
+            "Exchange listing can create direct event volatility; not a proxy-fade trigger.",
+            "Fresh venue access may create a listing pop/fade or liquidity regime change.",
+            ("confirm spot listing details", "separate listing flow from external proxy narrative"),
+            "announcement through first 24-72h of trading",
+            "No material volume/price response after listing goes live.",
+        )
+    if "unlock" in text or "vesting" in text:
+        return (
+            EventPlaybookType.UNLOCK_SUPPLY_PRESSURE,
+            "Unlock/vesting event may add supply pressure; not a proxy-fade trigger.",
+            "New circulating supply may pressure price if liquidity is thin.",
+            ("confirm unlock size vs circulating supply", "check exchange/team wallet flows"),
+            "pre-unlock through 7d post-unlock",
+            "Unlock is small, already hedged, or flows do not reach liquid venues.",
+        )
+    if "airdrop" in text or "tge" in text:
+        return (
+            EventPlaybookType.AIRDROP_TGE_SELL_PRESSURE,
+            "Airdrop/TGE event may create recipient sell pressure; not a proxy-fade trigger.",
+            "New claimable tokens may be sold into early liquidity.",
+            ("confirm claim/TGE timing", "check float, recipient distribution, and exchange availability"),
+            "claim/TGE window through first 72h",
+            "Claim is delayed, illiquid, or recipients cannot sell freely.",
         )
     return None
+
+
+def _ipo_proxy_playbook(
+    text: str,
+    external: str,
+) -> tuple[EventPlaybookType, str, str, tuple[str, ...], str, str]:
+    if external in {"openai", "anthropic"} or "openai" in text or "anthropic" in text or " ai " in f" {text} ":
+        return (
+            EventPlaybookType.AI_IPO_PROXY,
+            "AI IPO proxy narrative is a specialized proxy-attention/fade research sleeve.",
+            "AI private-market attention may spill into a crypto proxy before the external catalyst expires.",
+            ("confirm AI company catalyst", "confirm the asset is instrument/venue, not news noise"),
+            "pre-catalyst buildup through post-catalyst failure confirmation",
+            "No dated AI catalyst or no token-specific proxy evidence.",
+        )
+    return (
+        EventPlaybookType.RWA_PREIPO_PROXY,
+        "Pre-IPO/RWA proxy narrative is a specialized proxy-attention/fade research sleeve.",
+        "Tokenized/pre-IPO exposure narrative may unwind after attention/catalyst expiry.",
+        ("confirm external asset and proxy mechanics", "confirm post-event technical failure before fade"),
+        "pre-catalyst buildup through post-catalyst failure confirmation",
+        "Proxy mechanics are unproven or the external catalyst is not dated.",
+    )
 
 
 def _specific_playbook_score(playbook_type: EventPlaybookType, components: Mapping[str, int]) -> int:
@@ -378,6 +422,8 @@ def _is_proxy_fade_candidate(candidate: DiscoveredEventFadeCandidate, rejected_r
 
 def _is_source_noise(candidate: DiscoveredEventFadeCandidate, rejected_reason: str | None) -> bool:
     cls = candidate.classification
+    if candidate.event.event_type == "market_anomaly" or candidate.event.source == "market_anomaly":
+        return False
     if cls.asset_role in {ROLE_TICKER_WORD_COLLISION, ROLE_MENTIONED_ASSET, ROLE_AMBIGUOUS}:
         return True
     evidence = {clean_text(item) for item in candidate.link.evidence}

@@ -67,6 +67,7 @@ from . import event_alerts
 from . import event_alpha_alert_store
 from . import event_alpha_pipeline
 from . import event_alpha_router
+from . import event_catalyst_search
 from . import event_clock
 from . import event_feedback
 from . import event_llm_analyzer
@@ -1245,6 +1246,20 @@ def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRo
     )
 
 
+def _event_catalyst_search_config_from_runtime(
+    *,
+    enabled_override: bool | None = None,
+) -> event_catalyst_search.EventCatalystSearchConfig:
+    return event_catalyst_search.EventCatalystSearchConfig(
+        enabled=config.EVENT_CATALYST_SEARCH_ENABLED if enabled_override is None else enabled_override,
+        provider=config.EVENT_CATALYST_SEARCH_PROVIDER,
+        max_anomalies=config.EVENT_CATALYST_SEARCH_MAX_ANOMALIES,
+        max_queries_per_anomaly=config.EVENT_CATALYST_SEARCH_MAX_QUERIES_PER_ANOMALY,
+        max_results_per_query=config.EVENT_CATALYST_SEARCH_MAX_RESULTS_PER_QUERY,
+        min_anomaly_score=config.EVENT_CATALYST_SEARCH_MIN_ANOMALY_SCORE,
+    )
+
+
 def _event_feedback_config_from_runtime(path: str | None = None) -> event_feedback.EventFeedbackConfig:
     feedback_path = Path(path).expanduser() if path else config.EVENT_ALPHA_FEEDBACK_PATH
     if not feedback_path.is_absolute():
@@ -1277,6 +1292,7 @@ def _event_alpha_inputs_configured() -> bool:
     return bool(
         config.EVENT_ANOMALY_SCANNER_ENABLED
         or config.EVENT_MARKET_ENRICHMENT_ENABLED
+        or config.EVENT_CATALYST_SEARCH_ENABLED
         or _event_discovery_paths_configured()
     )
 
@@ -1397,6 +1413,8 @@ def event_alpha_cycle(
         extraction_provider = _event_llm_extraction_provider(extraction_cfg)
         relationship_cfg = _event_llm_config_from_runtime()
         relationship_provider = _event_llm_provider(relationship_cfg)
+    catalyst_search_cfg = _event_catalyst_search_config_from_runtime()
+    catalyst_search_provider = _event_catalyst_search_provider(catalyst_search_cfg)
     alert_cfg = _event_alert_config_from_runtime()
     pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
         load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
@@ -1408,6 +1426,8 @@ def event_alpha_cycle(
         with_llm=with_llm,
         extraction_provider=extraction_provider,
         extraction_cfg=extraction_cfg,
+        catalyst_search_provider=catalyst_search_provider,
+        catalyst_search_cfg=catalyst_search_cfg,
         relationship_provider=relationship_provider,
         relationship_cfg=relationship_cfg,
         watchlist_cfg=_event_watchlist_config_from_runtime(),
@@ -1426,6 +1446,56 @@ def event_alpha_cycle(
     )
     print("")
     print(event_alpha_alert_store.format_alert_store_write_result(store_result))
+
+
+def event_catalyst_search_report(
+    verbose: bool = False,
+    with_llm: bool = False,
+    event_now: str | datetime | None = None,
+) -> None:
+    """Print research-only market-anomaly catalyst-search diagnostics."""
+    _setup_event_discovery_logging(verbose)
+    if not _event_alpha_inputs_configured():
+        print(
+            "No event-catalyst-search inputs ready. Enable RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 "
+            "with a CoinGecko universe fixture/live source."
+        )
+        return
+    now = _event_research_now(event_now)
+    catalyst_search_cfg = _event_catalyst_search_config_from_runtime(enabled_override=True)
+    catalyst_search_provider = _event_catalyst_search_provider(catalyst_search_cfg)
+    extraction_provider = None
+    extraction_cfg = None
+    relationship_provider = None
+    relationship_cfg = None
+    if with_llm:
+        extraction_cfg = _event_llm_extractor_config_from_runtime()
+        extraction_provider = _event_llm_extraction_provider(extraction_cfg)
+        relationship_cfg = _event_llm_config_from_runtime()
+        relationship_provider = _event_llm_provider(relationship_cfg)
+    result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
+            now=observed,
+            raw_event_transform=raw_event_transform,
+        ),
+        alert_cfg=_event_alert_config_from_runtime(),
+        now=now,
+        with_llm=with_llm,
+        extraction_provider=extraction_provider,
+        extraction_cfg=extraction_cfg,
+        catalyst_search_provider=catalyst_search_provider,
+        catalyst_search_cfg=catalyst_search_cfg,
+        relationship_provider=relationship_provider,
+        relationship_cfg=relationship_cfg,
+        watchlist_cfg=_event_watchlist_config_from_runtime(),
+        router_cfg=_event_alpha_router_config_from_runtime(),
+        refresh_watchlist=False,
+        route=False,
+        send=False,
+    )
+    print(event_catalyst_search.format_catalyst_search_report(result.catalyst_search_result))
+    print("")
+    print(event_alpha_pipeline.format_event_alpha_pipeline_report(result))
 
 
 def event_watchlist_refresh(
@@ -1585,8 +1655,8 @@ def event_llm_extract_report(verbose: bool = False, event_now: str | datetime | 
         )
         return
     extractor_cfg = _event_llm_extractor_config_from_runtime()
-    if extractor_cfg.mode != "shadow":
-        print("Event LLM extractor blocked: RSI_EVENT_LLM_EXTRACTOR_MODE must be shadow for Phase 1.")
+    if extractor_cfg.mode not in {"shadow", "advisory"}:
+        print("Event LLM extractor blocked: RSI_EVENT_LLM_EXTRACTOR_MODE must be shadow or advisory.")
         return
     provider = _event_llm_extraction_provider(extractor_cfg)
     if provider is None:
@@ -1635,6 +1705,18 @@ def _event_llm_extraction_provider(extractor_cfg: event_llm_extractor.EventLLMEx
             prompt_version=extractor_cfg.prompt_version,
         )
     print(f"Unknown event LLM extractor provider: {extractor_cfg.provider}. Use fixture or openai.")
+    return None
+
+
+def _event_catalyst_search_provider(
+    search_cfg: event_catalyst_search.EventCatalystSearchConfig,
+):
+    provider_name = search_cfg.provider.strip().lower()
+    if provider_name == "fixture":
+        return event_catalyst_search.FixtureCatalystSearchProvider(
+            path=config.EVENT_CATALYST_SEARCH_FIXTURE_PATH,
+        )
+    print(f"Unknown event catalyst-search provider: {search_cfg.provider}. Use fixture.")
     return None
 
 
@@ -3275,6 +3357,11 @@ def cli() -> None:
         help="Print research-only shadow LLM raw-event extraction for discovery evidence.",
     )
     parser.add_argument(
+        "--event-catalyst-search-report",
+        action="store_true",
+        help="Print research-only market-anomaly catalyst-search diagnostics.",
+    )
+    parser.add_argument(
         "--event-alert-send",
         action="store_true",
         help=(
@@ -3561,6 +3648,9 @@ def cli() -> None:
             send=args.event_alert_send,
             event_now=args.event_now,
         )
+        return
+    if args.event_catalyst_search_report:
+        event_catalyst_search_report(verbose=args.verbose, with_llm=args.with_llm, event_now=args.event_now)
         return
     if args.event_watchlist_refresh:
         event_watchlist_refresh(verbose=args.verbose, with_llm=args.with_llm, event_now=args.event_now)

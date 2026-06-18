@@ -45,12 +45,13 @@ EVENT_ALERT_LLM_PROVIDER ?= fixture
 EVENT_ALPHA_UNIVERSE_PATH ?= fixtures/coingecko_smoke/top_markets.json
 EVENT_ALPHA_ANOMALY_MIN_RETURN_24H ?= 0.03
 EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP ?= 0.05
+EVENT_CATALYST_SEARCH_FIXTURE_PATH ?=
 EVENT_WATCHLIST_STATE_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_watchlist_state.jsonl
 EVENT_ALPHA_ALERT_STORE_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_alpha_alerts.jsonl
 EVENT_ALPHA_ALERT_OUTCOMES ?= /tmp/event_alpha_alerts_with_outcomes.jsonl
 EVENT_ALPHA_ALERT_PRICES ?= fixtures/event_discovery/outcome_prices.json
 
-.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-send event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-alpha-router-report event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-alpha-router-report event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -79,8 +80,11 @@ help:
 	@echo "  make event-llm-extract-eval  Run offline LLM raw-extraction eval fixtures"
 	@echo "  make event-alpha-eval  Run offline Event Alpha route/feedback eval fixtures"
 	@echo "  make event-alpha-no-key-report  Print fixture market-anomaly event alpha radar"
+	@echo "  make event-catalyst-search-fixture-report  Print fixture catalyst-search diagnostics for anomalies"
 	@echo "  make event-alpha-cycle  Run one fixture Event Alpha research cycle"
 	@echo "  make event-alpha-cycle-llm  Run one fixture Event Alpha cycle with fixture LLM metadata"
+	@echo "  make event-alpha-cycle-search  Run one fixture Event Alpha cycle with catalyst search"
+	@echo "  make event-alpha-cycle-search-llm  Run one fixture Event Alpha cycle with catalyst search and fixture LLM metadata"
 	@echo "  make event-alpha-cycle-send  Run one Event Alpha cycle with opt-in research digest send flag"
 	@echo "  make event-alpha-alerts-report  Print Event Alpha alert snapshot cohorts"
 	@echo "  make event-alpha-fill-outcomes  Fill Event Alpha alert outcomes from local prices"
@@ -281,6 +285,18 @@ event-alpha-no-key-report:
 	RSI_EVENT_ANOMALY_MIN_VOLUME_MCAP=$(EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP) \
 	$(PYTHON) main.py --event-alpha-radar-report
 
+event-catalyst-search-fixture-report:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
+	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
+	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
+	RSI_EVENT_ANOMALY_MIN_RETURN_24H=$(EVENT_ALPHA_ANOMALY_MIN_RETURN_24H) \
+	RSI_EVENT_ANOMALY_MIN_VOLUME_MCAP=$(EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP) \
+	RSI_EVENT_CATALYST_SEARCH_ENABLED=1 \
+	RSI_EVENT_CATALYST_SEARCH_PROVIDER=fixture \
+	RSI_EVENT_CATALYST_SEARCH_FIXTURE_PATH=$(EVENT_CATALYST_SEARCH_FIXTURE_PATH) \
+	$(PYTHON) main.py --event-catalyst-search-report
+
 event-alpha-cycle:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
@@ -301,6 +317,42 @@ event-alpha-cycle-llm:
 	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
 	RSI_EVENT_ANOMALY_MIN_RETURN_24H=$(EVENT_ALPHA_ANOMALY_MIN_RETURN_24H) \
 	RSI_EVENT_ANOMALY_MIN_VOLUME_MCAP=$(EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP) \
+	RSI_EVENT_WATCHLIST_ENABLED=1 \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_LLM_MODE=$(EVENT_ALERT_LLM_MODE) \
+	RSI_EVENT_LLM_PROVIDER=$(EVENT_ALERT_LLM_PROVIDER) \
+	RSI_EVENT_LLM_EXTRACTOR_MODE=advisory \
+	RSI_EVENT_LLM_EXTRACTOR_PROVIDER=$(EVENT_ALERT_LLM_PROVIDER) \
+	$(PYTHON) main.py --event-alpha-cycle --with-llm
+
+event-alpha-cycle-search:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
+	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
+	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
+	RSI_EVENT_ANOMALY_MIN_RETURN_24H=$(EVENT_ALPHA_ANOMALY_MIN_RETURN_24H) \
+	RSI_EVENT_ANOMALY_MIN_VOLUME_MCAP=$(EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP) \
+	RSI_EVENT_CATALYST_SEARCH_ENABLED=1 \
+	RSI_EVENT_CATALYST_SEARCH_PROVIDER=fixture \
+	RSI_EVENT_CATALYST_SEARCH_FIXTURE_PATH=$(EVENT_CATALYST_SEARCH_FIXTURE_PATH) \
+	RSI_EVENT_WATCHLIST_ENABLED=1 \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	$(PYTHON) main.py --event-alpha-cycle
+
+event-alpha-cycle-search-llm:
+	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
+	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
+	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
+	RSI_EVENT_ANOMALY_MIN_RETURN_24H=$(EVENT_ALPHA_ANOMALY_MIN_RETURN_24H) \
+	RSI_EVENT_ANOMALY_MIN_VOLUME_MCAP=$(EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP) \
+	RSI_EVENT_CATALYST_SEARCH_ENABLED=1 \
+	RSI_EVENT_CATALYST_SEARCH_PROVIDER=fixture \
+	RSI_EVENT_CATALYST_SEARCH_FIXTURE_PATH=$(EVENT_CATALYST_SEARCH_FIXTURE_PATH) \
 	RSI_EVENT_WATCHLIST_ENABLED=1 \
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
