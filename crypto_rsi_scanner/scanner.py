@@ -64,6 +64,7 @@ from . import event_fade
 from . import event_cache
 from . import event_discovery
 from . import event_alerts
+from . import event_alpha_alert_store
 from . import event_alpha_pipeline
 from . import event_alpha_router
 from . import event_clock
@@ -1246,6 +1247,15 @@ def _event_feedback_config_from_runtime(path: str | None = None) -> event_feedba
     return event_feedback.EventFeedbackConfig(path=feedback_path)
 
 
+def _event_alpha_alert_store_config_from_runtime(
+    path: str | None = None,
+) -> event_alpha_alert_store.EventAlphaAlertStoreConfig:
+    alert_path = Path(path).expanduser() if path else config.EVENT_ALPHA_ALERT_STORE_PATH
+    if not alert_path.is_absolute():
+        alert_path = config.DATA_DIR / alert_path
+    return event_alpha_alert_store.EventAlphaAlertStoreConfig(path=alert_path)
+
+
 def _setup_event_discovery_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -1412,6 +1422,13 @@ def event_alpha_cycle(
         route=True,
     )
     print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
+    store_result = event_alpha_alert_store.write_alert_snapshots(
+        pipeline_result.alerts,
+        cfg=_event_alpha_alert_store_config_from_runtime(),
+        now=now,
+    )
+    print("")
+    print(event_alpha_alert_store.format_alert_store_write_result(store_result))
     if send:
         _send_event_alert_digest(pipeline_result.alerts, alert_cfg, now=now)
 
@@ -1495,6 +1512,41 @@ def event_feedback_report(path: str | None = None, verbose: bool = False) -> Non
     feedback_cfg = _event_feedback_config_from_runtime(path)
     result = event_feedback.load_feedback(feedback_cfg.path)
     print(event_feedback.format_feedback_report(result))
+
+
+def event_alpha_alerts_report(
+    path: str | None = None,
+    feedback_path: str | None = None,
+    verbose: bool = False,
+) -> None:
+    """Print Event Alpha alert snapshot cohorts and outcome fields."""
+    _setup_event_discovery_logging(verbose)
+    store_cfg = _event_alpha_alert_store_config_from_runtime(path)
+    result = event_alpha_alert_store.load_alert_snapshots(store_cfg.path)
+    feedback_cfg = _event_feedback_config_from_runtime(feedback_path)
+    feedback = event_feedback.load_feedback(feedback_cfg.path)
+    feedback_rows = [record.__dict__ for record in feedback.records]
+    print(event_alpha_alert_store.format_alert_snapshot_report(result, feedback_rows=feedback_rows))
+
+
+def event_alpha_fill_outcomes(
+    price_path: str,
+    out_path: str,
+    *,
+    path: str | None = None,
+    verbose: bool = False,
+) -> None:
+    """Fill Event Alpha alert snapshot outcomes from a local OHLCV price fixture."""
+    _setup_event_discovery_logging(verbose)
+    store_cfg = _event_alpha_alert_store_config_from_runtime(path)
+    snapshots = event_alpha_alert_store.load_alert_snapshots(store_cfg.path)
+    result = event_alpha_alert_store.fill_alert_outcomes(
+        snapshots.rows,
+        price_path,
+        out_path,
+        source_path=store_cfg.path,
+    )
+    print(event_alpha_alert_store.format_outcome_fill_result(result))
 
 
 def event_llm_shadow_report(verbose: bool = False, event_now: str | datetime | None = None) -> None:
@@ -3131,6 +3183,22 @@ def cli() -> None:
         help="Print research-only Event Alpha Radar route decisions from watchlist state.",
     )
     parser.add_argument(
+        "--event-alpha-alerts-report",
+        action="store_true",
+        help="Print research-only Event Alpha alert snapshot cohorts and filled outcomes.",
+    )
+    parser.add_argument(
+        "--event-alpha-alert-store-path",
+        default=None,
+        help="Optional Event Alpha alert snapshot JSONL path for report/outcome commands.",
+    )
+    parser.add_argument(
+        "--event-alpha-fill-outcomes",
+        nargs=2,
+        metavar=("PRICES", "OUT"),
+        help="Fill Event Alpha alert snapshot outcomes from local OHLCV price fixture PRICES and write OUT.",
+    )
+    parser.add_argument(
         "--event-feedback-mark",
         metavar="TARGET",
         help=(
@@ -3469,6 +3537,21 @@ def cli() -> None:
         return
     if args.event_alpha_router_report:
         event_alpha_router_report(verbose=args.verbose)
+        return
+    if args.event_alpha_alerts_report:
+        event_alpha_alerts_report(
+            path=args.event_alpha_alert_store_path,
+            feedback_path=args.event_feedback_path,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_alpha_fill_outcomes:
+        event_alpha_fill_outcomes(
+            args.event_alpha_fill_outcomes[0],
+            args.event_alpha_fill_outcomes[1],
+            path=args.event_alpha_alert_store_path,
+            verbose=args.verbose,
+        )
         return
     if args.event_feedback_mark:
         event_feedback_mark(

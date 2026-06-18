@@ -134,7 +134,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   normal RSI routing, or execution) · `main.py --event-feedback-mark` /
   `main.py --event-feedback-report` (append/read lightweight Event Alpha
   feedback labels such as useful/junk/watch/missed as research JSONL artifacts
-  only) · `make event-alpha-eval` (offline Event Alpha route/feedback golden
+  only) · `main.py --event-alpha-alerts-report` /
+  `main.py --event-alpha-fill-outcomes` and `make event-alpha-alerts-report` /
+  `make event-alpha-fill-outcomes` (read/write Event Alpha alert snapshot
+  artifacts and fill 1h/4h/24h/72h/7d plus MFE/MAE outcomes from local OHLCV
+  fixtures; no live DB/paper/trading writes) · `make event-alpha-eval` (offline Event Alpha route/feedback golden
   eval) · `make event-alert-no-key-report` /
   `make event-alert-no-key-llm-report` / `make event-alert-no-key-send`
   (no-key public RSS/GDELT/Polymarket event-alert research surfaces; send still
@@ -264,12 +268,14 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_models.py` | immutable event-discovery dataclasses for raw events, normalized events, links, classifications, and candidates |
 | `event_discovery.py` | research-only event radar orchestration: normalize → dedupe → resolve → classify → optional fade scoring, grouped auto reports, and validation sample exports |
 | `event_alerts.py` | pure research-alert ranking/tiering for discovery candidates; no labels, paper trades, normal RSI routing, or execution |
-| `event_playbooks.py` | deterministic Event Alpha Radar playbook scoring; labels candidates as proxy fade, proxy attention, direct event, infrastructure, market anomaly, source-noise, or ambiguous control without creating trades or triggers |
+| `event_playbooks.py` | deterministic Event Alpha Radar playbook scoring; labels candidates as proxy fade/attention, listings, unlocks, airdrops/TGEs, fan/sports, political memes, RWA/AI IPO proxies, security/regulatory shocks, infrastructure, market anomalies, source-noise, or ambiguous controls without creating trades or triggers |
 | `event_llm_models.py` / `event_llm_analyzer.py` / `llm_providers/` | research-only LLM relationship analysis for discovery candidates; verifies quoted evidence, compares LLM role/action with rule output, and can feed opt-in advisory event-alert tier quality control |
 | `event_llm_extraction_models.py` / `event_llm_extractor.py` | research-only LLM raw-event extraction for catalysts, asset/project mentions, false-positive terms, and date hints; extracted assets may become resolver hints in the unified Event Alpha cycle but must still be validated by deterministic resolver/classifier logic |
 | `event_market_enrichment.py` / `event_anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; anomalies without catalyst evidence remain store-only/radar evidence and cannot create event-fade triggers |
+| `event_graph.py` | research-only catalyst clustering by external asset/event type/event-date bucket; used for watchlist identity while preserving rejected/noise asset links |
 | `event_watchlist.py` | research-only Event Alpha Radar state cache; tracks raw/radar/watchlist/high-priority/event-passed/armed/triggered/terminal transitions and duplicate suppression without routing alerts or writing live storage |
 | `event_alpha_router.py` | artifact-only Event Alpha Radar route decisions from watchlist state; local research output only, no sends/trades/live writes |
+| `event_alpha_alert_store.py` | research-only Event Alpha alert snapshot/outcome JSONL artifacts; reports cohorts and fills local OHLCV outcomes without live DB, paper, or execution writes |
 | `event_feedback.py` / `event_alpha_eval.py` | lightweight Event Alpha feedback JSONL artifacts and offline route/feedback golden evals; review metadata only |
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |

@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Finish Event Alpha Radar graph, playbook, and alert-store phases · Codex
+**Why:** The Pro-model polish plan still had unfinished later phases: catalyst
+graph identity, broader deterministic playbooks, and alert snapshot/outcome
+artifacts. The radar needed those pieces before we could honestly call the
+phase plan complete.
+**Changes:**
+- Added `event_graph.py` to cluster differently worded events by external
+  asset, event type, and event-date bucket while preserving rejected/noise asset
+  links for review.
+- Updated watchlist keys/state to use catalyst cluster identity so repeated
+  source variants escalate the same research candidate instead of fragmenting
+  state.
+- Expanded `event_playbooks.py` beyond generic buckets into listing, perp
+  listing, unlock, airdrop/TGE, fan/sports, political meme, RWA pre-IPO,
+  AI IPO, security/regulatory shock, and unknown market-anomaly playbooks.
+- Added playbook hypothesis, verification, timing-window, and invalidation
+  fields to event-alert reports and Telegram research digest text.
+- Added `event_alpha_alert_store.py`, `--event-alpha-alerts-report`,
+  `--event-alpha-fill-outcomes`, `make event-alpha-alerts-report`, and
+  `make event-alpha-fill-outcomes` for research-only alert snapshots and
+  1h/4h/24h/72h/7d plus MFE/MAE outcome filling from local price fixtures.
+- Updated `.env.example`, `AGENTS.md`, `ROADMAP.md`, and `DECISIONS.md`.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 311/311. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. Full `make verify PYTHON=python3`
+passed after documentation updates.
+**Notes/risks:** All new paths are artifact/report-only. Non-proxy/direct
+playbooks can become research alerts, but cannot create `TRIGGERED_FADE`;
+event-fade triggers still come only from `event_fade.py`.
+
 ## 2026-06-18 — Feed LLM extraction hints into Event Alpha resolution · Codex
 **Why:** The Pro-model plan called out that relationship-only LLM analysis can
 reject bad links but cannot find missed proxy assets if the deterministic

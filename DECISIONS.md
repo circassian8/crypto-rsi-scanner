@@ -16,6 +16,34 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep Event Alpha alert snapshots artifact-only
+**Status:** accepted
+**Decision:** Event Alpha cycles may append research-only alert snapshots to
+`event_alpha_alerts.jsonl`, and CLI/Make commands may report those rows or fill
+1h/4h/24h/72h/7d plus MFE/MAE outcomes from local price fixtures. These
+artifacts must not write live signal/outcome/paper tables, route normal RSI
+alerts, open paper trades, execute orders, or affect event-fade eligibility.
+**Why:** The radar needs a measurable history of what it surfaced, by playbook,
+tier, LLM role, source, market-anomaly score, BTC regime, feedback label, and
+outcome. Keeping that history in JSONL artifacts preserves auditability without
+promoting the research sleeve into trading infrastructure.
+**Revisit when:** Reviewed alert snapshots demonstrate stable value and the
+human explicitly approves a separate promoted notification or paper-tracking
+path.
+
+## 2026-06-18 - Use catalyst clusters as Event Alpha research identity
+**Status:** accepted
+**Decision:** Event Alpha may cluster source variants by
+`external_asset_slug + event_type + event_date_bucket` and use that cluster id
+in watchlist keys. Clusters preserve all raw/source evidence and rejected asset
+links, but they do not create candidates, alerts, trades, paper rows, or
+event-fade eligibility.
+**Why:** Repeated articles often describe the same catalyst in different words.
+Stable cluster identity prevents watchlist fragmentation while keeping
+source-noise and direct/non-proxy links auditable as controls.
+**Revisit when:** Reviewed clusters show obvious over-merging across unrelated
+catalysts or under-merging of the same dated event.
+
 ## 2026-06-18 - Allow LLM extraction hints upstream of deterministic resolution
 **Status:** accepted
 **Decision:** The unified Event Alpha cycle may run raw-event LLM extraction
@@ -98,13 +126,18 @@ useful enough for a human-approved research digest or paper-tracking workflow.
 ## 2026-06-18 - Keep Event Alpha playbooks deterministic and non-triggering
 **Status:** accepted
 **Decision:** Event Alpha Radar playbooks may label research candidates as
-`proxy_fade`, `proxy_attention`, `direct_event`, `infrastructure_mention`,
-`market_anomaly`, `source_noise_control`, or `ambiguous_control`, and may attach
-playbook score/action metadata to reports and watchlist state. Playbooks must
-not create `TRIGGERED_FADE`; only the `proxy_fade` playbook may preserve a
+`proxy_fade`, `proxy_attention`, `listing_volatility`,
+`perp_listing_squeeze`, `unlock_supply_pressure`,
+`airdrop_tge_sell_pressure`, `fan_sports_event`, `political_meme_event`,
+`rwa_preipo_proxy`, `ai_ipo_proxy`, `security_or_regulatory_shock`,
+`direct_event`, `infrastructure_mention`, `market_anomaly`,
+`market_anomaly_unknown`, `source_noise_control`, or `ambiguous_control`, and
+may attach score/action, hypothesis, verification, timing-window, and
+invalidation metadata to reports, snapshots, and watchlist state. Playbooks
+must not create `TRIGGERED_FADE`; only the `proxy_fade` playbook may preserve a
 `SHORT_TRIGGERED` signal that was already emitted by the pure `event_fade.py`
-engine. Direct, infrastructure, source-noise, ambiguous, and market-anomaly
-playbooks remain review/control evidence only.
+engine. Direct/listing/unlock/sports/political/security playbooks may produce
+research alerts, but they cannot become event-fade triggers.
 **Why:** Playbooks make the research thesis auditable without giving the
 classification layer authority to trade or bypass event-fade hard gates.
 **Revisit when:** Reviewed Event Alpha samples show a playbook should be

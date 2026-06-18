@@ -83,6 +83,7 @@ def _entry_from_case(case: Mapping[str, Any]) -> event_watchlist.EventWatchlistE
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
         key=str(case.get("key") or f"{case.get('id', symbol)}|coin|rel|asset|time"),
+        cluster_id=case.get("cluster_id") or "spacex|ipo_proxy|2026-06-20",
         event_id=str(case.get("event_id") or case.get("id") or f"{symbol}-event"),
         coin_id=str(case.get("coin_id") or symbol.lower()),
         symbol=symbol,

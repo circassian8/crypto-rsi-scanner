@@ -10,6 +10,7 @@ from typing import Iterable
 from . import (
     event_alerts,
     event_alpha_router,
+    event_graph,
     event_llm_analyzer,
     event_llm_extractor,
     event_watchlist,
@@ -45,6 +46,10 @@ class EventAlphaPipelineResult:
     @property
     def candidates(self) -> int:
         return len(self.discovery_result.candidates)
+
+    @property
+    def clusters(self) -> int:
+        return len(event_graph.build_event_clusters(self.discovery_result))
 
     @property
     def watchlist_entries(self) -> int:
@@ -135,7 +140,7 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
         (
             f"raw_events={result.raw_events} · extractions={result.extractions}/{len(result.extraction_rows)} · "
             f"extraction_hints_applied={result.extraction_hint_events} · "
-            f"candidates={result.candidates} · alerts={len(result.alerts)}"
+            f"candidates={result.candidates} · clusters={result.clusters} · alerts={len(result.alerts)}"
         ),
         (
             f"watchlist_entries={result.watchlist_entries} · "

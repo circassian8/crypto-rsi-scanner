@@ -66,6 +66,10 @@ class EventAlertCandidate:
     playbook_action: str | None = None
     playbook_reason: str | None = None
     playbook_can_trigger_fade: bool = False
+    playbook_hypothesis: str | None = None
+    playbook_what_to_verify: tuple[str, ...] = ()
+    playbook_timing_window: str | None = None
+    playbook_invalidation: str | None = None
 
     @property
     def symbol(self) -> str:
@@ -190,6 +194,12 @@ def format_event_alert_report(alerts: Iterable[EventAlertCandidate]) -> str:
             )
             if alert.playbook_reason:
                 rows.append(f"  playbook reason: {alert.playbook_reason}")
+            if alert.playbook_hypothesis:
+                rows.append(f"  hypothesis: {alert.playbook_hypothesis}")
+            if alert.playbook_timing_window:
+                rows.append(f"  timing window: {alert.playbook_timing_window}")
+            if alert.playbook_invalidation:
+                rows.append(f"  invalidation: {alert.playbook_invalidation}")
         rows.append(f"  reason: {alert.reason}")
         if alert.llm_asset_role:
             rows.append(
@@ -204,6 +214,8 @@ def format_event_alert_report(alerts: Iterable[EventAlertCandidate]) -> str:
         if alert.llm_adjustment_reason:
             rows.append(f"  llm adjustment reason: {alert.llm_adjustment_reason}")
         rows.append(f"  what user should verify: {'; '.join(alert.verify)}")
+        if alert.playbook_what_to_verify:
+            rows.append(f"  playbook verify: {'; '.join(alert.playbook_what_to_verify)}")
         if alert.rejected_reason:
             rows.append(f"  rejected: {alert.rejected_reason}")
         rows.append(
@@ -240,6 +252,10 @@ def format_event_alert_telegram_digest(alerts: Iterable[EventAlertCandidate]) ->
                 f"playbook={_esc(alert.playbook_type)} "
                 f"action={_esc(alert.playbook_action or 'store_only')}"
             )
+            if alert.playbook_hypothesis:
+                lines.append(f"hypothesis={_esc(alert.playbook_hypothesis)}")
+            if alert.playbook_invalidation:
+                lines.append(f"invalidation={_esc(alert.playbook_invalidation)}")
         if alert.llm_adjustment_reason:
             lines.append(
                 f"llm={_esc(alert.llm_asset_role or 'unknown')} "
@@ -278,6 +294,10 @@ def _build_alert_candidate(
         playbook_action=playbook.recommended_action,
         playbook_reason=playbook.reason,
         playbook_can_trigger_fade=playbook.can_trigger_fade,
+        playbook_hypothesis=playbook.hypothesis,
+        playbook_what_to_verify=playbook.what_to_verify,
+        playbook_timing_window=playbook.timing_window,
+        playbook_invalidation=playbook.invalidation,
     )
 
 
@@ -349,9 +369,10 @@ def _tier(
 def _rejected_reason(candidate: DiscoveredEventFadeCandidate, cfg: EventAlertConfig) -> str | None:
     cls = candidate.classification
     reasons: list[str] = []
-    if cls.is_direct_beneficiary or cls.asset_role == ROLE_DIRECT_BENEFICIARY:
+    direct_research = _is_direct_research_playbook_event(candidate)
+    if (cls.is_direct_beneficiary or cls.asset_role == ROLE_DIRECT_BENEFICIARY) and not direct_research:
         reasons.append("direct beneficiary")
-    if cls.relationship_type == "ambiguous" or not cls.is_proxy_narrative:
+    if (cls.relationship_type == "ambiguous" or not cls.is_proxy_narrative) and not direct_research:
         reasons.append("not a confirmed proxy narrative")
     if cls.asset_role in {ROLE_TICKER_WORD_COLLISION, ROLE_INFRASTRUCTURE, ROLE_MENTIONED_ASSET}:
         reasons.append(cls.asset_role)
@@ -364,6 +385,24 @@ def _rejected_reason(candidate: DiscoveredEventFadeCandidate, cfg: EventAlertCon
     if is_market_recap_event(candidate.event):
         reasons.append("market recap evidence only")
     return "; ".join(dict.fromkeys(reasons)) or None
+
+
+def _is_direct_research_playbook_event(candidate: DiscoveredEventFadeCandidate) -> bool:
+    event_type = str(candidate.event.event_type or "")
+    relationship = str(candidate.classification.relationship_type or "")
+    return event_type in {
+        "exchange_listing",
+        "perp_listing",
+        "token_unlock",
+        "airdrop",
+        "tge",
+        "sports_event",
+        "political_event",
+    } or relationship in {
+        "direct_listing",
+        "direct_unlock",
+        "direct_protocol_event",
+    }
 
 
 def _proxy_quality(candidate: DiscoveredEventFadeCandidate) -> int:

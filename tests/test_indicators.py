@@ -4059,8 +4059,9 @@ def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_nois
         event_discovery.EventDiscoveryResult((), (), (), (), (attention,)),
         now=now,
     )[0]
-    assert attention_alert.playbook_type == event_playbooks.EventPlaybookType.PROXY_ATTENTION.value
+    assert attention_alert.playbook_type == event_playbooks.EventPlaybookType.RWA_PREIPO_PROXY.value
     assert attention_alert.playbook_can_trigger_fade is False
+    assert attention_alert.playbook_hypothesis
 
     direct = event_discovery.run_discovery(
         [raw_event(
@@ -4076,8 +4077,9 @@ def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_nois
         event_discovery.EventDiscoveryResult((), (), (), (), (direct,)),
         now=now,
     )[0]
-    assert direct_alert.playbook_type == event_playbooks.EventPlaybookType.DIRECT_EVENT.value
+    assert direct_alert.playbook_type == event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value
     assert direct_alert.playbook_can_trigger_fade is False
+    assert direct_alert.tier != event_alerts.EventAlertTier.TRIGGERED_FADE
 
     link = EventAssetLink(
         event_id="noise",
@@ -4162,6 +4164,203 @@ def test_event_playbooks_classify_proxy_attention_direct_infrastructure_and_nois
     assert infra_assessment.playbook_type == event_playbooks.EventPlaybookType.INFRASTRUCTURE_MENTION.value
     assert infra_assessment.max_research_tier == "RADAR_DIGEST"
 
+    def manual_candidate(raw_id, event_type, title, body, *, external_asset="SpaceX", role="proxy_instrument",
+                         relationship="proxy_attention", proxy=True, direct=False):
+        event = NormalizedEvent(
+            event_id=raw_id,
+            raw_ids=(raw_id,),
+            event_name=title,
+            event_type=event_type,
+            event_time=now,
+            event_time_confidence=0.90,
+            first_seen_time=now,
+            source="test",
+            source_urls=(f"https://example.test/{raw_id}",),
+            external_asset=external_asset,
+            description=body,
+            confidence=0.90,
+        )
+        asset = DiscoveredAsset(coin_id=raw_id, symbol=raw_id.upper(), name=raw_id.title())
+        return DiscoveredEventFadeCandidate(
+            event=event,
+            asset=asset,
+            link=EventAssetLink(raw_id, asset.coin_id, asset.symbol, asset.name, 0.95, "alias", (asset.symbol,)),
+            classification=EventClassification(
+                event_id=raw_id,
+                coin_id=asset.coin_id,
+                is_proxy_narrative=proxy,
+                is_direct_beneficiary=direct,
+                relationship_type=relationship,
+                confidence=0.90,
+                classifier_version="test",
+                reason="fixture",
+                evidence=(title,),
+                asset_role=role,
+                asset_role_confidence=0.90,
+                asset_role_reason="fixture",
+                asset_role_evidence=(body,),
+            ),
+            fade_candidate=None,
+            fade_signal=None,
+            data_quality={},
+        )
+
+    cases = [
+        (
+            manual_candidate("perp", "perp_listing", "PERP futures listing", "Perp listing opens."),
+            event_playbooks.EventPlaybookType.PERP_LISTING_SQUEEZE,
+        ),
+        (
+            manual_candidate("unlock", "token_unlock", "UNLOCK vesting event", "Large unlock starts.", proxy=False,
+                             direct=True, role="direct_beneficiary", relationship="direct_unlock"),
+            event_playbooks.EventPlaybookType.UNLOCK_SUPPLY_PRESSURE,
+        ),
+        (
+            manual_candidate("airdrop", "airdrop", "AIRDROP claim opens", "Airdrop claim starts.", proxy=False,
+                             direct=True, role="direct_beneficiary", relationship="direct_protocol_event"),
+            event_playbooks.EventPlaybookType.AIRDROP_TGE_SELL_PRESSURE,
+        ),
+        (
+            manual_candidate("fan", "sports_event", "FAN token World Cup match", "Fan token pumps into match.",
+                             external_asset="World Cup"),
+            event_playbooks.EventPlaybookType.FAN_SPORTS_EVENT,
+        ),
+        (
+            manual_candidate("politics", "political_event", "MEME election catalyst", "Political meme token event.",
+                             external_asset="US election"),
+            event_playbooks.EventPlaybookType.POLITICAL_MEME_EVENT,
+        ),
+        (
+            manual_candidate("ai", "ipo_proxy", "AI token OpenAI pre-IPO exposure",
+                             "Token offers OpenAI synthetic exposure.", external_asset="OpenAI"),
+            event_playbooks.EventPlaybookType.AI_IPO_PROXY,
+        ),
+        (
+            manual_candidate("shock", "security_event", "SHOCK exploit disclosed", "Security exploit hits protocol.",
+                             proxy=False, direct=True, role="direct_beneficiary", relationship="direct_protocol_event"),
+            event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK,
+        ),
+    ]
+    for candidate, expected in cases:
+        assessment = event_playbooks.assess_event_playbook(
+            candidate,
+            {
+                "asset_resolution": 95,
+                "source_quality": 85,
+                "classifier": 90,
+                "event_time_quality": 90,
+                "market_move_volume": 70,
+                "derivatives_crowding": 20,
+            },
+        )
+        assert assessment.playbook_type == expected.value
+        assert assessment.can_trigger_fade is False
+        assert assessment.hypothesis
+        assert assessment.what_to_verify
+        assert assessment.timing_window
+        assert assessment.invalidation
+
+
+def test_event_graph_clusters_catalyst_variants_and_rejects_noise_links():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_graph
+    from crypto_rsi_scanner.event_models import (
+        DiscoveredAsset,
+        DiscoveredEventFadeCandidate,
+        EventAssetLink,
+        EventClassification,
+        EventDiscoveryResult,
+        NormalizedEvent,
+    )
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    event_time = datetime(2026, 6, 20, 13, 30, tzinfo=timezone.utc)
+
+    def event(event_id, title):
+        return NormalizedEvent(
+            event_id=event_id,
+            raw_ids=(f"raw-{event_id}",),
+            event_name=title,
+            event_type="ipo_proxy",
+            event_time=event_time,
+            event_time_confidence=0.90,
+            first_seen_time=now,
+            source="test",
+            source_urls=(f"https://example.test/{event_id}",),
+            external_asset="SpaceX",
+            description=title,
+            confidence=0.90,
+        )
+
+    events = (
+        event("spacex-1", "SpaceX IPO trading starts Friday"),
+        event("spacex-2", "SpaceX pre-IPO market opens on June 20"),
+        event("spacex-3", "Bitcoin World covers SpaceX prediction market volume"),
+    )
+
+    def candidate(norm_event, coin_id, symbol, *, role="proxy_instrument", proxy=True, direct=False):
+        asset = DiscoveredAsset(coin_id=coin_id, symbol=symbol, name=symbol)
+        relationship = "proxy_exposure" if proxy else "publisher_suffix_false_positive"
+        return DiscoveredEventFadeCandidate(
+            event=norm_event,
+            asset=asset,
+            link=EventAssetLink(
+                norm_event.event_id,
+                coin_id,
+                symbol,
+                symbol,
+                0.95,
+                "alias",
+                (symbol, norm_event.event_name),
+            ),
+            classification=EventClassification(
+                event_id=norm_event.event_id,
+                coin_id=coin_id,
+                is_proxy_narrative=proxy,
+                is_direct_beneficiary=direct,
+                relationship_type=relationship,
+                confidence=0.90,
+                classifier_version="test",
+                reason="fixture",
+                evidence=(norm_event.event_name,),
+                asset_role=role,
+                asset_role_confidence=0.90,
+                asset_role_reason="fixture",
+                asset_role_evidence=(symbol,),
+            ),
+            fade_candidate=None,
+            fade_signal=None,
+            data_quality={},
+        )
+
+    result = EventDiscoveryResult(
+        raw_events=(),
+        normalized_events=events,
+        links=(),
+        classifications=(),
+        candidates=(
+            candidate(events[0], "velvet", "VELVET"),
+            candidate(events[1], "aster", "ASTER"),
+            candidate(events[2], "bitcoin", "BTC", role="mentioned_asset", proxy=False),
+        ),
+    )
+
+    clusters = event_graph.build_event_clusters(result)
+    assert len(clusters) == 1
+    cluster = clusters[0]
+    assert cluster.cluster_id == "spacex|ipo-proxy|2026-06-20"
+    assert set(cluster.event_ids) == {"spacex-1", "spacex-2", "spacex-3"}
+    links = {link.symbol: link for link in cluster.asset_links}
+    assert links["VELVET"].accepted is True
+    assert links["ASTER"].accepted is True
+    assert links["BTC"].accepted is False
+    assert links["BTC"].playbook_type == "source_noise_control"
+    assert "mentioned_asset" in (links["BTC"].rejected_reason or "")
+    report = event_graph.format_event_cluster_report(clusters)
+    assert "EVENT CLUSTER REPORT" in report
+    assert "VELVET/velvet accepted" in report
+    assert "BTC/bitcoin rejected" in report
+
 
 def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
     import contextlib
@@ -4234,6 +4433,7 @@ def test_event_alpha_pipeline_runs_watchlist_and_router_cycle():
         )
         assert pipe.raw_events == 20
         assert pipe.candidates == 17
+        assert pipe.clusters >= 1
         assert len(pipe.alerts) == 17
         assert pipe.watchlist_entries == 17
         assert pipe.watchlist_escalations >= 1
@@ -4247,6 +4447,7 @@ def test_event_alpha_pipeline_runs_watchlist_and_router_cycle():
         text = event_alpha_pipeline.format_event_alpha_pipeline_report(pipe)
         assert "EVENT ALPHA PIPELINE REPORT" in text
         assert "raw_events=20" in text
+        assert "clusters=" in text
         assert "TRIGGERED_FADE_RESEARCH" in text
         assert "no trades, paper rows, or live RSI routing" in text
 
@@ -4266,6 +4467,124 @@ def test_event_alpha_pipeline_runs_watchlist_and_router_cycle():
         assert disabled.router_result is None
         assert "watchlist refresh skipped" in "; ".join(disabled.warnings)
         assert "router skipped" in "; ".join(disabled.warnings)
+
+
+def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_alert_store, event_alerts
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    alerts = event_alerts.build_event_alert_candidates(
+        _full_event_discovery_fixture_result(),
+        now=now,
+    )
+    assert any(alert.symbol == "TESTVELVET" for alert in alerts)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        store_path = Path(tmp) / "event_alpha_alerts.jsonl"
+        cfg = event_alpha_alert_store.EventAlphaAlertStoreConfig(path=store_path)
+        wrote = event_alpha_alert_store.write_alert_snapshots(alerts, cfg=cfg, now=now)
+        assert wrote.rows_written == len(alerts)
+        loaded = event_alpha_alert_store.load_alert_snapshots(store_path)
+        assert loaded.rows_read == len(alerts)
+        report = event_alpha_alert_store.format_alert_snapshot_report(loaded)
+        assert "EVENT ALPHA ALERT SNAPSHOT REPORT" in report
+        assert "by playbook:" in report
+        assert "by tier:" in report
+
+        prices_path = Path(tmp) / "prices.json"
+        prices_path.write_text(json.dumps({
+            "source": "fixture",
+            "interval": "1h",
+            "prices": [
+                {"asset_symbol": "TESTVELVET", "timestamp": "2026-06-15T17:00:00Z", "close": 9.0, "high": 9.2, "low": 8.8},
+                {"asset_symbol": "TESTVELVET", "timestamp": "2026-06-15T20:00:00Z", "close": 8.2, "high": 8.5, "low": 8.0},
+                {"asset_symbol": "TESTVELVET", "timestamp": "2026-06-16T16:00:00Z", "close": 7.2, "high": 7.4, "low": 6.9},
+                {"asset_symbol": "TESTVELVET", "timestamp": "2026-06-18T16:00:00Z", "close": 6.0, "high": 6.3, "low": 5.8},
+                {"asset_symbol": "TESTVELVET", "timestamp": "2026-06-22T16:00:00Z", "close": 5.4, "high": 5.6, "low": 5.1},
+            ],
+        }), encoding="utf-8")
+        out_path = Path(tmp) / "with_outcomes.jsonl"
+        filled = event_alpha_alert_store.fill_alert_outcomes(
+            loaded.rows,
+            prices_path,
+            out_path,
+            source_path=store_path,
+        )
+        assert filled.rows_written == len(alerts)
+        assert filled.rows_with_outcomes >= 1
+        out_rows = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines()]
+        velvet = next(row for row in out_rows if row.get("asset_symbol") == "TESTVELVET")
+        assert velvet["outcome_price_interval"] == "1h"
+        assert velvet["return_1h"] is not None
+        assert velvet["return_24h"] is not None
+        assert velvet["return_72h"] is not None
+        assert velvet["return_7d"] is not None
+        assert velvet["max_favorable_excursion"] is not None
+        assert velvet["max_adverse_excursion"] is not None
+        outcome_report = event_alpha_alert_store.format_alert_snapshot_report(
+            event_alpha_alert_store.load_alert_snapshots(out_path)
+        )
+        assert "outcomes:" in outcome_report
+
+
+def test_event_alpha_alert_store_scanner_report_and_outcome_fill_commands():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import config, event_alpha_alert_store, event_alerts, scanner
+
+    now = datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc)
+    alerts = event_alerts.build_event_alert_candidates(_full_event_discovery_fixture_result(), now=now)
+    original = {
+        "EVENT_ALPHA_ALERT_STORE_PATH": config.EVENT_ALPHA_ALERT_STORE_PATH,
+        "EVENT_ALPHA_FEEDBACK_PATH": config.EVENT_ALPHA_FEEDBACK_PATH,
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        store_path = Path(tmp) / "alerts.jsonl"
+        feedback_path = Path(tmp) / "feedback.jsonl"
+        config.EVENT_ALPHA_ALERT_STORE_PATH = store_path
+        config.EVENT_ALPHA_FEEDBACK_PATH = feedback_path
+        event_alpha_alert_store.write_alert_snapshots(
+            alerts,
+            cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(path=store_path),
+            now=now,
+        )
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_alerts_report()
+            text = out.getvalue()
+            assert "EVENT ALPHA ALERT SNAPSHOT REPORT" in text
+            assert "by playbook:" in text
+
+            prices_path = Path(tmp) / "prices.json"
+            prices_path.write_text(json.dumps({
+                "source": "fixture",
+                "interval": "1h",
+                "prices": [
+                    {"asset_symbol": "TESTVELVET", "timestamp": "2026-06-15T17:00:00Z", "close": 9.0, "high": 9.1, "low": 8.9},
+                    {"asset_symbol": "TESTVELVET", "timestamp": "2026-06-16T16:00:00Z", "close": 7.0, "high": 7.3, "low": 6.8},
+                    {"asset_symbol": "TESTVELVET", "timestamp": "2026-06-18T16:00:00Z", "close": 6.0, "high": 6.2, "low": 5.8},
+                    {"asset_symbol": "TESTVELVET", "timestamp": "2026-06-22T16:00:00Z", "close": 5.0, "high": 5.3, "low": 4.9},
+                ],
+            }), encoding="utf-8")
+            filled_path = Path(tmp) / "filled.jsonl"
+            fill_out = io.StringIO()
+            with contextlib.redirect_stdout(fill_out):
+                scanner.event_alpha_fill_outcomes(str(prices_path), str(filled_path))
+            fill_text = fill_out.getvalue()
+            assert "EVENT ALPHA ALERT OUTCOMES FILLED" in fill_text
+            assert filled_path.exists()
+        finally:
+            for name, value in original.items():
+                setattr(config, name, value)
 
 
 def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies():
@@ -4290,6 +4609,7 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
         "EVENT_WATCHLIST_ENABLED": config.EVENT_WATCHLIST_ENABLED,
         "EVENT_WATCHLIST_STATE_PATH": config.EVENT_WATCHLIST_STATE_PATH,
         "EVENT_ALPHA_ROUTER_ENABLED": config.EVENT_ALPHA_ROUTER_ENABLED,
+        "EVENT_ALPHA_ALERT_STORE_PATH": config.EVENT_ALPHA_ALERT_STORE_PATH,
         "EVENT_ALERTS_ENABLED": config.EVENT_ALERTS_ENABLED,
     }
     with tempfile.TemporaryDirectory() as tmp:
@@ -4307,6 +4627,7 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
         config.EVENT_WATCHLIST_ENABLED = True
         config.EVENT_WATCHLIST_STATE_PATH = Path(tmp) / "watchlist.jsonl"
         config.EVENT_ALPHA_ROUTER_ENABLED = True
+        config.EVENT_ALPHA_ALERT_STORE_PATH = Path(tmp) / "event_alpha_alerts.jsonl"
         config.EVENT_ALERTS_ENABLED = False
         try:
             out = io.StringIO()
@@ -4321,6 +4642,7 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
             assert "routes: STORE_ONLY=1" in text
             assert "market_anomaly" in text
             assert config.EVENT_WATCHLIST_STATE_PATH.exists()
+            assert config.EVENT_ALPHA_ALERT_STORE_PATH.exists()
         finally:
             for name, value in original.items():
                 setattr(config, name, value)
@@ -4374,6 +4696,7 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         "EVENT_WATCHLIST_ENABLED",
         "EVENT_WATCHLIST_STATE_PATH",
         "EVENT_ALPHA_ROUTER_ENABLED",
+        "EVENT_ALPHA_ALERT_STORE_PATH",
         "EVENT_ALERTS_ENABLED",
         "EVENT_LLM_EXTRACTOR_MODE",
         "EVENT_LLM_EXTRACTOR_PROVIDER",
@@ -4423,6 +4746,7 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         config.EVENT_WATCHLIST_ENABLED = True
         config.EVENT_WATCHLIST_STATE_PATH = Path(tmp) / "watchlist.jsonl"
         config.EVENT_ALPHA_ROUTER_ENABLED = True
+        config.EVENT_ALPHA_ALERT_STORE_PATH = Path(tmp) / "event_alpha_alerts.jsonl"
         config.EVENT_ALERTS_ENABLED = False
         config.EVENT_LLM_EXTRACTOR_MODE = "shadow"
         config.EVENT_LLM_EXTRACTOR_PROVIDER = "fixture"
@@ -4441,6 +4765,7 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
             assert "candidates=1" in text
             assert "STEALTH/stealth-alpha" in text
             assert config.EVENT_WATCHLIST_STATE_PATH.exists()
+            assert config.EVENT_ALPHA_ALERT_STORE_PATH.exists()
         finally:
             scanner._event_llm_extraction_provider = original_extraction_provider
             scanner._event_llm_provider = original_relationship_provider
@@ -4612,6 +4937,7 @@ def test_event_alpha_router_routes_watchlist_escalations_safely():
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
             row_type="event_watchlist_state",
             key=f"{symbol}|coin|rel|asset|time",
+            cluster_id="spacex|ipo_proxy|2026-06-20",
             event_id=f"{symbol}-event",
             coin_id=symbol.lower(),
             symbol=symbol,
@@ -4710,6 +5036,7 @@ def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
         key="feed|solana|proxy_attention|SpaceX|",
+        cluster_id="spacex|ipo_proxy|2026-06-18",
         event_id="feed",
         coin_id="solana",
         symbol="SOL",
@@ -4884,10 +5211,15 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event-alpha-cycle:" in text
     assert "event-alpha-cycle-llm:" in text
     assert "event-alpha-cycle-send:" in text
+    assert "event-alpha-alerts-report:" in text
+    assert "event-alpha-fill-outcomes:" in text
     assert "--event-alpha-cycle" in text
+    assert "--event-alpha-alerts-report" in text
+    assert "--event-alpha-fill-outcomes" in text
     assert "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1" in text
     assert "RSI_EVENT_WATCHLIST_ENABLED=1" in text
     assert "RSI_EVENT_ALPHA_ROUTER_ENABLED=1" in text
+    assert "RSI_EVENT_ALPHA_ALERT_STORE_PATH" in text
     assert "event-watchlist-refresh:" in text
     assert "event-watchlist-report:" in text
     assert "event-alpha-router-report:" in text

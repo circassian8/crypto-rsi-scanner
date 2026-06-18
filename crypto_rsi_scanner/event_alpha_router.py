@@ -172,6 +172,7 @@ def _route_entry(
         event_playbooks.EventPlaybookType.SOURCE_NOISE_CONTROL.value,
         event_playbooks.EventPlaybookType.AMBIGUOUS_CONTROL.value,
         event_playbooks.EventPlaybookType.MARKET_ANOMALY.value,
+        event_playbooks.EventPlaybookType.MARKET_ANOMALY_UNKNOWN.value,
     }:
         return EventAlphaRouteDecision(
             entry=entry,
@@ -181,15 +182,30 @@ def _route_entry(
             warnings=tuple(warnings),
         )
 
-    if playbook in {
-        event_playbooks.EventPlaybookType.DIRECT_EVENT.value,
-        event_playbooks.EventPlaybookType.INFRASTRUCTURE_MENTION.value,
-    }:
+    if playbook == event_playbooks.EventPlaybookType.INFRASTRUCTURE_MENTION.value:
         return EventAlphaRouteDecision(
             entry=entry,
             route=EventAlphaRoute.LOCAL_REPORT,
             alertable=False,
-            reason="Direct and infrastructure playbooks may be reviewed locally but cannot enter research digest routing.",
+            reason="Infrastructure playbooks may be reviewed locally but cannot enter research digest routing.",
+            warnings=tuple(warnings),
+        )
+
+    if playbook in _NON_FADE_RESEARCH_PLAYBOOKS:
+        route = (
+            EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+            if state in {
+                event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+                event_watchlist.EventWatchlistState.ARMED.value,
+                event_watchlist.EventWatchlistState.EVENT_PASSED.value,
+            }
+            else EventAlphaRoute.RESEARCH_DIGEST
+        )
+        return EventAlphaRouteDecision(
+            entry=entry,
+            route=route,
+            alertable=True,
+            reason="Non-fade event playbook produced a research-only state escalation.",
             warnings=tuple(warnings),
         )
 
@@ -254,3 +270,17 @@ def _decision_sort_key(decision: EventAlphaRouteDecision) -> tuple[int, int, str
     }
     entry = decision.entry
     return (rank[decision.route], -entry.highest_score, entry.symbol)
+
+
+_NON_FADE_RESEARCH_PLAYBOOKS = {
+    event_playbooks.EventPlaybookType.DIRECT_EVENT.value,
+    event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value,
+    event_playbooks.EventPlaybookType.PERP_LISTING_SQUEEZE.value,
+    event_playbooks.EventPlaybookType.UNLOCK_SUPPLY_PRESSURE.value,
+    event_playbooks.EventPlaybookType.AIRDROP_TGE_SELL_PRESSURE.value,
+    event_playbooks.EventPlaybookType.FAN_SPORTS_EVENT.value,
+    event_playbooks.EventPlaybookType.POLITICAL_MEME_EVENT.value,
+    event_playbooks.EventPlaybookType.RWA_PREIPO_PROXY.value,
+    event_playbooks.EventPlaybookType.AI_IPO_PROXY.value,
+    event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK.value,
+}

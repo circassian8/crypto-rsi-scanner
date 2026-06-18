@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alerts, event_fade
+from . import event_alerts, event_fade, event_graph
 
 WATCHLIST_SCHEMA_VERSION = "event_watchlist_v1"
 
@@ -52,6 +52,7 @@ class EventWatchlistEntry:
     schema_version: str
     row_type: str
     key: str
+    cluster_id: str | None
     event_id: str
     coin_id: str
     symbol: str
@@ -165,14 +166,12 @@ def load_watchlist(
 
 def watchlist_key(alert: event_alerts.EventAlertCandidate) -> str:
     candidate = alert.discovery_candidate
-    event = candidate.event
-    classification = candidate.classification
+    cluster_id = event_graph.cluster_id_for_event(candidate.event)
+    playbook = alert.playbook_type or candidate.classification.relationship_type
     parts = (
-        event.event_id,
+        cluster_id,
         candidate.asset.coin_id,
-        classification.relationship_type,
-        event.external_asset or "",
-        event.event_time.isoformat() if event.event_time else "",
+        playbook,
     )
     return "|".join(str(part) for part in parts)
 
@@ -256,6 +255,7 @@ def _entry_from_alert(
         schema_version=WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
         key=watchlist_key(alert),
+        cluster_id=event_graph.cluster_id_for_event(event),
         event_id=str(event.event_id),
         coin_id=str(candidate.asset.coin_id),
         symbol=str(candidate.asset.symbol),
@@ -455,6 +455,7 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             schema_version=str(row.get("schema_version") or WATCHLIST_SCHEMA_VERSION),
             row_type="event_watchlist_state",
             key=key,
+            cluster_id=_optional_str(row.get("cluster_id")),
             event_id=event_id,
             coin_id=coin_id,
             symbol=symbol,
@@ -517,6 +518,7 @@ def _entry_lines(entry: EventWatchlistEntry) -> list[str]:
         f"{entry.state:<16} score={entry.latest_score:>3} high={entry.highest_score:>3} "
         f"{entry.symbol}/{entry.coin_id}",
         f"  event: {entry.latest_event_name}",
+        f"  cluster: {entry.cluster_id or 'legacy'}",
         f"  external: {entry.external_asset or 'unknown'} · relationship: {entry.relationship_type}",
         f"  first_seen: {entry.first_seen_at} · last_seen: {entry.last_seen_at}",
         f"  tier: {entry.latest_tier or 'unknown'} · source_count: {entry.source_count} · source: {entry.latest_source}",
