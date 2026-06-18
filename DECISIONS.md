@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Require identity proof before catalyst-search attachment
+**Status:** accepted
+**Decision:** Dynamic catalyst-search results may attach to a market anomaly
+only when the source evidence names the anomaly asset through a strong identity
+signal: `$SYMBOL`, spot/perp pair format, exact project name or alias, contract
+address, token/coin/crypto context, or a quote-validated LLM extraction that
+the deterministic resolver validates to the same asset. Catalyst terms alone
+must be capped below attachment confidence, and common-word symbols such as
+HYPE, PRIME, OPEN, and BEAT must reject generic lowercase word matches.
+Router lanes (`DAILY_DIGEST`, `INSTANT_ESCALATION`, `TRIGGERED_FADE`) are
+research delivery metadata only; they do not create trading authority.
+**Why:** The Event Alpha loop searches noisy public sources around hot assets.
+Without identity proof, articles about IPO hype, publisher names, unrelated
+listings, or generic market catalysts can attach to the wrong token and pollute
+research alerts.
+**Revisit when:** A reviewed Event Alpha sample shows the identity caps are too
+strict for a specific source/playbook and a narrower, test-backed exception is
+approved.
+
 ## 2026-06-18 - Treat catalyst-search live providers as scored evidence only
 **Status:** accepted
 **Decision:** Event Alpha catalyst search may use fixture, GDELT, project RSS,

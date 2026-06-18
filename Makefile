@@ -93,7 +93,7 @@ help:
 	@echo "  make event-alpha-fill-outcomes  Fill Event Alpha alert outcomes from local prices"
 	@echo "  make event-watchlist-refresh  Refresh fixture event-alpha watchlist state"
 	@echo "  make event-watchlist-report  Print latest event-alpha watchlist state"
-	@echo "  make event-alpha-router-report  Route latest watchlist state for research output"
+	@echo "  make event-alpha-router-report  Route latest watchlist state with daily/instant/triggered lanes"
 	@echo "  make event-feedback-report  Print latest event-alpha feedback artifact"
 	@echo "  make event-alert-no-key-report  Print no-key public-source event research alerts"
 	@echo "  make event-alert-no-key-llm-report  Print no-key event alerts with LLM advisory metadata"

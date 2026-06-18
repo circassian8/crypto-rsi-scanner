@@ -86,9 +86,16 @@ class EventWatchlistEntry:
     latest_llm_asset_role: str | None = None
     latest_llm_confidence: float | None = None
     latest_market_snapshot: dict[str, Any] = field(default_factory=dict)
+    latest_score_components: dict[str, Any] = field(default_factory=dict)
     alert_history: list[dict[str, Any]] = field(default_factory=list)
     state_changed: bool = False
     escalation: bool = False
+    score_jump: int = 0
+    source_count_increased: bool = False
+    event_time_upgraded: bool = False
+    derivatives_crowding_upgraded: bool = False
+    cluster_confidence_upgraded: bool = False
+    material_change_reasons: tuple[str, ...] = ()
     should_alert: bool = False
     suppressed_reason: str | None = None
     warnings: tuple[str, ...] = ()
@@ -238,7 +245,9 @@ def _entry_from_alert(
     state_changed = previous_state is not None and previous_state != state.value
     escalation = previous_state is None and rank >= _STATE_RANK[EventWatchlistState.RADAR.value]
     escalation = escalation or (previous_state is not None and rank > previous_rank)
-    should_alert = escalation and state not in {EventWatchlistState.INVALIDATED, EventWatchlistState.EXPIRED}
+    material_reasons = _material_change_reasons(alert, prior)
+    terminal = state in {EventWatchlistState.INVALIDATED, EventWatchlistState.EXPIRED}
+    should_alert = (escalation or bool(material_reasons) or state == EventWatchlistState.TRIGGERED_FADE) and not terminal
     observed_iso = observed.isoformat()
     first_seen = prior.first_seen_at if prior else observed_iso
     history = list(prior.alert_history if prior else [])
@@ -249,6 +258,7 @@ def _entry_from_alert(
         "score": alert.opportunity_score,
         "rule_playbook_type": alert.rule_playbook_type,
         "effective_playbook_type": alert.effective_playbook_type or alert.playbook_type,
+        "material_change_reasons": list(material_reasons),
         "should_alert": should_alert,
     })
     history = history[-max(1, cfg.max_alert_history):]
@@ -330,14 +340,60 @@ def _entry_from_alert(
         latest_llm_asset_role=alert.llm_asset_role,
         latest_llm_confidence=alert.llm_confidence,
         latest_market_snapshot=_market_snapshot(alert),
+        latest_score_components=dict(alert.score_components),
         alert_history=history,
         state_changed=state_changed,
         escalation=escalation,
+        score_jump=_score_jump(alert, prior),
+        source_count_increased="new_independent_source" in material_reasons,
+        event_time_upgraded="event_time_upgrade" in material_reasons,
+        derivatives_crowding_upgraded="derivatives_crowding_upgrade" in material_reasons,
+        cluster_confidence_upgraded="cluster_confidence_upgrade" in material_reasons,
+        material_change_reasons=material_reasons,
         should_alert=should_alert,
         suppressed_reason=None if should_alert else _suppressed_reason(state, previous_state, state_changed),
         warnings=tuple(warnings),
     )
     return entry
+
+
+def _material_change_reasons(
+    alert: event_alerts.EventAlertCandidate,
+    prior: EventWatchlistEntry | None,
+) -> tuple[str, ...]:
+    if prior is None:
+        return ()
+    reasons: list[str] = []
+    score_jump = _score_jump(alert, prior)
+    if score_jump >= 10:
+        reasons.append("score_jump")
+    current_sources = int(alert.score_components.get("independent_source_count") or len(alert.discovery_candidate.event.raw_ids))
+    previous_sources = int(prior.latest_score_components.get("independent_source_count") or prior.source_count or 0)
+    if current_sources > previous_sources:
+        reasons.append("new_independent_source")
+    current_time = int(alert.score_components.get("event_time_consensus") or alert.score_components.get("event_time_quality") or 0)
+    previous_time = int(
+        prior.latest_score_components.get("event_time_consensus")
+        or prior.latest_score_components.get("event_time_quality")
+        or 0
+    )
+    if current_time >= 75 and current_time > previous_time:
+        reasons.append("event_time_upgrade")
+    current_derivatives = int(alert.score_components.get("derivatives_crowding") or 0)
+    previous_derivatives = int(prior.latest_score_components.get("derivatives_crowding") or 0)
+    if current_derivatives >= 50 and (previous_derivatives < 50 or current_derivatives - previous_derivatives >= 20):
+        reasons.append("derivatives_crowding_upgrade")
+    current_cluster = int(alert.score_components.get("cluster_confidence") or 0)
+    previous_cluster = int(prior.latest_score_components.get("cluster_confidence") or 0)
+    if current_cluster >= 65 and (previous_cluster < 65 or current_cluster - previous_cluster >= 15):
+        reasons.append("cluster_confidence_upgrade")
+    return tuple(dict.fromkeys(reasons))
+
+
+def _score_jump(alert: event_alerts.EventAlertCandidate, prior: EventWatchlistEntry | None) -> int:
+    if prior is None:
+        return 0
+    return int(alert.opportunity_score) - int(prior.latest_score or 0)
 
 
 def _state_from_alert(
@@ -498,9 +554,16 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             latest_llm_asset_role=_optional_str(row.get("latest_llm_asset_role")),
             latest_llm_confidence=_optional_float(row.get("latest_llm_confidence")),
             latest_market_snapshot=dict(row.get("latest_market_snapshot") or {}),
+            latest_score_components=dict(row.get("latest_score_components") or {}),
             alert_history=list(row.get("alert_history") or []),
             state_changed=bool(row.get("state_changed")),
             escalation=bool(row.get("escalation")),
+            score_jump=int(row.get("score_jump") or 0),
+            source_count_increased=bool(row.get("source_count_increased")),
+            event_time_upgraded=bool(row.get("event_time_upgraded")),
+            derivatives_crowding_upgraded=bool(row.get("derivatives_crowding_upgraded")),
+            cluster_confidence_upgraded=bool(row.get("cluster_confidence_upgraded")),
+            material_change_reasons=tuple(str(value) for value in row.get("material_change_reasons") or ()),
             should_alert=bool(row.get("should_alert")),
             suppressed_reason=_optional_str(row.get("suppressed_reason")),
             warnings=tuple(str(value) for value in row.get("warnings") or ()),
@@ -545,7 +608,13 @@ def _entry_lines(entry: EventWatchlistEntry) -> list[str]:
         f"  tier: {entry.latest_tier or 'unknown'} · source_count: {entry.source_count} · source: {entry.latest_source}",
         playbook_line,
         f"  transition: {entry.previous_state or 'new'} -> {entry.state}"
-        + (" · alertable escalation" if entry.should_alert else f" · suppressed: {entry.suppressed_reason}"),
+        + (
+            " · alertable escalation"
+            if entry.should_alert and not entry.material_change_reasons
+            else f" · alertable material change: {', '.join(entry.material_change_reasons)}"
+            if entry.should_alert
+            else f" · suppressed: {entry.suppressed_reason}"
+        ),
     ]
 
 

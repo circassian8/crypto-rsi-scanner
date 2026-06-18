@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -81,6 +82,19 @@ HIGH_CONFIDENCE_SOURCE_HINTS = (
     "gdelt",
     "official",
 )
+COMMON_WORD_SYMBOLS = {
+    "HYPE",
+    "PRIME",
+    "OPEN",
+    "BEAT",
+    "BILL",
+    "CASH",
+    "REAL",
+    "JUST",
+    "HUMAN",
+    "HUMANITY",
+    "AI",
+}
 
 
 @dataclass(frozen=True)
@@ -110,6 +124,12 @@ class SearchQuery:
     rank: int
     score: int = 0
     score_reasons: tuple[str, ...] = ()
+    coin_id: str | None = None
+    project_name: str | None = None
+    aliases: tuple[str, ...] = ()
+    contract_addresses: tuple[str, ...] = ()
+    is_common_word_symbol: bool = False
+    identity_terms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -129,6 +149,12 @@ class CatalystSearchRunResult:
     rejected_result_events: tuple[SearchResultEvent, ...] = ()
     attached_raw_events: tuple[RawDiscoveredEvent, ...] = ()
     warnings: tuple[str, ...] = ()
+    provider_fetch_count: int = 0
+    provider_cache_hits: int = 0
+    provider_cache_misses: int = 0
+    query_count: int = 0
+    result_count: int = 0
+    rejected_count: int = 0
 
     @property
     def attached_result_count(self) -> int:
@@ -137,6 +163,30 @@ class CatalystSearchRunResult:
     @property
     def rejected_result_count(self) -> int:
         return len(self.rejected_result_events)
+
+
+@dataclass(frozen=True)
+class _AnomalyIdentity:
+    symbol: str
+    coin_id: str | None = None
+    project_name: str | None = None
+    aliases: tuple[str, ...] = ()
+    contract_addresses: tuple[str, ...] = ()
+
+    @property
+    def is_common_word_symbol(self) -> bool:
+        return bool(self.symbol and self.symbol.upper() in COMMON_WORD_SYMBOLS)
+
+    @property
+    def identity_terms(self) -> tuple[str, ...]:
+        terms: list[str] = []
+        for value in (self.project_name, self.coin_id, *self.aliases):
+            text = str(value or "").strip()
+            if not text:
+                continue
+            terms.append(text)
+            terms.append(text.replace("-", " "))
+        return tuple(dict.fromkeys(term for term in terms if len(term) >= 3))
 
 
 class CatalystSearchProvider(Protocol):
@@ -176,18 +226,23 @@ class FixtureCatalystSearchProvider:
         max_results_per_query: int,
         now: datetime | None = None,
     ) -> CatalystSearchRunResult:
-        query_rows = self._load_rows()
+        queries_tuple = tuple(queries)
+        rows_by_query = self._load_rows()
         result_events: list[SearchResultEvent] = []
         warnings: list[str] = []
-        for query in queries:
-            matches = _fixture_matches(query_rows, query.query)
+        for query in queries_tuple:
+            matches = _fixture_matches(rows_by_query, query.query)
             for raw in matches[: max(0, max_results_per_query)]:
                 result_events.append(SearchResultEvent(query=query, raw_event=raw))
         return CatalystSearchRunResult(
             provider=self.name,
-            queries=tuple(queries),
+            queries=queries_tuple,
             result_events=tuple(result_events),
             warnings=tuple(warnings),
+            provider_fetch_count=1 if queries_tuple else 0,
+            provider_cache_misses=1 if queries_tuple else 0,
+            query_count=len(queries_tuple),
+            result_count=len(result_events),
         )
 
     def _load_rows(self) -> dict[str, tuple[RawDiscoveredEvent, ...]]:
@@ -246,6 +301,9 @@ class CompositeCatalystSearchProvider:
         result_events: list[SearchResultEvent] = []
         rejected: list[SearchResultEvent] = []
         warnings: list[str] = []
+        fetch_count = 0
+        cache_hits = 0
+        cache_misses = 0
         for provider in self.providers:
             try:
                 result = provider.search(query_rows, max_results_per_query=max_results_per_query, now=now)
@@ -255,12 +313,21 @@ class CompositeCatalystSearchProvider:
             result_events.extend(result.result_events)
             rejected.extend(result.rejected_result_events)
             warnings.extend(result.warnings)
+            fetch_count += result.provider_fetch_count
+            cache_hits += result.provider_cache_hits
+            cache_misses += result.provider_cache_misses
         return CatalystSearchRunResult(
             provider=self.name,
             queries=query_rows,
             result_events=tuple(result_events),
             rejected_result_events=tuple(rejected),
             warnings=tuple(dict.fromkeys(warnings)),
+            provider_fetch_count=fetch_count,
+            provider_cache_hits=cache_hits,
+            provider_cache_misses=cache_misses,
+            query_count=len(query_rows),
+            result_count=len(result_events),
+            rejected_count=len(rejected),
         )
 
 
@@ -294,19 +361,36 @@ class EventProviderCatalystSearchProvider:
         observed = _as_utc(now or datetime.now(timezone.utc))
         start = observed - timedelta(hours=max(0.0, self.lookback_hours))
         end = observed + timedelta(days=max(0.0, self.horizon_days))
+        query_rows = tuple(queries)
         result_events: list[SearchResultEvent] = []
         warnings: list[str] = []
-        for query in queries:
+        cache: dict[tuple[str, ...], tuple[RawDiscoveredEvent, ...]] = {}
+        fetch_count = 0
+        cache_hits = 0
+        cache_misses = 0
+        for query in query_rows:
+            cache_key = self.cache_key_for_query(query)
+            if cache_key in cache:
+                events = cache[cache_key]
+                cache_hits += 1
+            else:
+                cache_misses += 1
+                fetch_count += 1
+                events = ()
+                try:
+                    provider = self.event_provider_factory(query)
+                    events = tuple(provider.fetch_events(start, end))  # type: ignore[attr-defined]
+                except Exception as exc:  # noqa: BLE001
+                    warnings.append(f"{self.name} search failed for {query.query!r}: {exc}")
+                cache[cache_key] = events
             try:
-                provider = self.event_provider_factory(query)
-                events = provider.fetch_events(start, end)  # type: ignore[attr-defined]
+                matched = [
+                    raw for raw in events
+                    if not self.filter_by_query or _raw_event_matches_query(raw, query)
+                ][: max(0, max_results_per_query)]
             except Exception as exc:  # noqa: BLE001
-                warnings.append(f"{self.name} search failed for {query.query!r}: {exc}")
-                continue
-            matched = [
-                raw for raw in events
-                if not self.filter_by_query or _raw_event_matches_query(raw, query)
-            ][: max(0, max_results_per_query)]
+                warnings.append(f"{self.name} filter failed for {query.query!r}: {exc}")
+                matched = []
             for raw in matched:
                 result_events.append(SearchResultEvent(
                     query=query,
@@ -314,10 +398,18 @@ class EventProviderCatalystSearchProvider:
                 ))
         return CatalystSearchRunResult(
             provider=self.name,
-            queries=tuple(queries),
+            queries=query_rows,
             result_events=tuple(result_events),
             warnings=tuple(dict.fromkeys(warnings)),
+            provider_fetch_count=fetch_count,
+            provider_cache_hits=cache_hits,
+            provider_cache_misses=cache_misses,
+            query_count=len(query_rows),
+            result_count=len(result_events),
         )
+
+    def cache_key_for_query(self, query: SearchQuery) -> tuple[str, ...]:
+        return (self.name, query.query)
 
 
 class GdeltCatalystSearchProvider(EventProviderCatalystSearchProvider):
@@ -358,6 +450,10 @@ class ProjectRssCatalystSearchProvider(EventProviderCatalystSearchProvider):
 
         super().__init__(factory, name=self.name)
 
+    def cache_key_for_query(self, query: SearchQuery) -> tuple[str, ...]:
+        del query
+        return (self.name, "feed_bundle")
+
 
 class CryptoPanicCatalystSearchProvider(EventProviderCatalystSearchProvider):
     name = "cryptopanic"
@@ -383,6 +479,9 @@ class CryptoPanicCatalystSearchProvider(EventProviderCatalystSearchProvider):
 
         super().__init__(factory, name=self.name)
 
+    def cache_key_for_query(self, query: SearchQuery) -> tuple[str, ...]:
+        return (self.name, query.symbol, query.query)
+
 
 class PolymarketCatalystSearchProvider(EventProviderCatalystSearchProvider):
     name = "polymarket"
@@ -402,6 +501,10 @@ class PolymarketCatalystSearchProvider(EventProviderCatalystSearchProvider):
             )
 
         super().__init__(factory, name=self.name, filter_by_query=True)
+
+    def cache_key_for_query(self, query: SearchQuery) -> tuple[str, ...]:
+        del query
+        return (self.name, "gamma_events")
 
 
 def run_catalyst_search(
@@ -434,6 +537,7 @@ def run_catalyst_search(
             provider=getattr(provider, "name", cfg.provider),
             queries=queries,
             warnings=(f"catalyst search provider failed: {exc}",),
+            query_count=len(queries),
         )
     accepted_results: list[SearchResultEvent] = []
     rejected_results: list[SearchResultEvent] = list(provider_rejected)
@@ -482,15 +586,39 @@ def run_catalyst_search(
         rejected_result_events=tuple(rejected_results),
         attached_raw_events=tuple(attached),
         warnings=tuple(dict.fromkeys(warnings)),
+        provider_fetch_count=provider_result.provider_fetch_count,
+        provider_cache_hits=provider_result.provider_cache_hits,
+        provider_cache_misses=provider_result.provider_cache_misses,
+        query_count=len(queries),
+        result_count=len(accepted_results),
+        rejected_count=len(rejected_results),
     )
 
 
 def generate_search_queries_for_anomaly(raw_market_anomaly_event: RawDiscoveredEvent) -> tuple[str, ...]:
     """Return deterministic review queries for a market-anomaly raw event."""
-    symbol = _event_symbol(raw_market_anomaly_event)
+    identity = _identity_for_raw_event(raw_market_anomaly_event)
+    symbol = identity.symbol
     if not symbol:
         return ()
-    return tuple(template.format(symbol=symbol) for template in QUERY_TEMPLATES)
+    queries: list[str] = [template.format(symbol=symbol) for template in QUERY_TEMPLATES]
+    if identity.project_name:
+        queries.extend((
+            f"{identity.project_name} crypto catalyst",
+            f"{identity.project_name} Binance listing",
+            f"{identity.project_name} token unlock",
+            f"{identity.project_name} synthetic exposure",
+        ))
+    for alias in identity.aliases[:4]:
+        if alias and alias.casefold() not in {symbol.casefold(), (identity.project_name or "").casefold()}:
+            queries.append(f"{alias} crypto catalyst")
+    queries.extend((
+        f"{symbol}USDT Binance listing",
+        f"{symbol}-USDT perp listing",
+    ))
+    for address in identity.contract_addresses[:2]:
+        queries.append(f"{address} crypto catalyst")
+    return tuple(dict.fromkeys(query for query in queries if query.strip()))
 
 
 def generate_search_query_objects_for_anomaly(
@@ -498,7 +626,8 @@ def generate_search_query_objects_for_anomaly(
     *,
     max_queries: int | None = None,
 ) -> tuple[SearchQuery, ...]:
-    symbol = _event_symbol(raw_market_anomaly_event)
+    identity = _identity_for_raw_event(raw_market_anomaly_event)
+    symbol = identity.symbol
     queries = generate_search_queries_for_anomaly(raw_market_anomaly_event)
     if max_queries is not None:
         queries = queries[: max(0, max_queries)]
@@ -509,6 +638,12 @@ def generate_search_query_objects_for_anomaly(
             query=query,
             symbol=symbol,
             rank=idx + 1,
+            coin_id=identity.coin_id,
+            project_name=identity.project_name,
+            aliases=identity.aliases,
+            contract_addresses=identity.contract_addresses,
+            is_common_word_symbol=identity.is_common_word_symbol,
+            identity_terms=identity.identity_terms,
         )
         score = score_search_query(base, raw_market_anomaly_event)
         out.append(replace(base, score=score.score, score_reasons=score.reason_codes))
@@ -561,20 +696,28 @@ def score_search_result(
     )))
     score = max(0.0, min(1.0, float(raw_event.source_confidence or 0.0))) * 35
     reasons = [f"source_confidence_{int(round(float(raw_event.source_confidence or 0.0) * 100))}"]
-    if query.symbol and query.symbol.casefold() in text:
-        score += 18
-        reasons.append("query_symbol_match")
+    identity_reason = _identity_match_reason(raw_event, query, anomaly)
+    identity_missing = identity_reason is None
+    common_word_rejected = identity_reason == "common_word_identity_rejected"
+    if identity_reason and identity_reason != "common_word_identity_rejected":
+        score += {
+            "identity_match_strong": 26,
+            "identity_match_pair": 24,
+            "identity_match_contract": 28,
+            "identity_match_alias": 22,
+            "identity_match_project": 22,
+            "identity_match_token_context": 20,
+            "identity_match_llm_resolver_validated": 20,
+        }.get(identity_reason, 18)
+        reasons.append(identity_reason)
     elif query.symbol in {"BTC", "ETH"} and _looks_generic_major_market_article(text):
         score -= 25
         reasons.append("generic_major_market_penalty")
     if anomaly is not None:
-        anomaly_symbol = _event_symbol(anomaly).casefold()
-        anomaly_name = _event_name(anomaly).casefold()
-        if anomaly_symbol and anomaly_symbol in text:
-            score += 8
-            reasons.append("anomaly_symbol_match")
-        if anomaly_name and anomaly_name in text:
-            score += 8
+        identity = _identity_for_raw_event(anomaly)
+        anomaly_name = clean_text(identity.project_name or _event_name(anomaly))
+        if identity_reason and anomaly_name and anomaly_name in text:
+            score += 6
             reasons.append("anomaly_project_match")
     catalyst_hits = _weighted_term_hits(text, CATALYST_TERM_WEIGHTS)
     if catalyst_hits:
@@ -604,6 +747,12 @@ def score_search_result(
     if not raw_event.source_url and raw_event.provider not in {"fixture_search_result", "manual_json"}:
         score -= 8
         reasons.append("missing_source_url_penalty")
+    if common_word_rejected:
+        score = min(score, 35)
+        reasons.append("common_word_identity_rejected")
+    elif identity_missing:
+        score = min(score, 45)
+        reasons.append("identity_missing_cap")
     return CatalystSearchScore(max(0, min(100, int(round(score)))), tuple(dict.fromkeys(reasons)))
 
 
@@ -666,6 +815,12 @@ def format_catalyst_search_report(result: CatalystSearchRunResult | None) -> str
         f"provider={result.provider} · queries={len(result.queries)} · "
         f"accepted_results={len(result.result_events)} · rejected_results={len(result.rejected_result_events)} · "
         f"attached_raw_events={len(result.attached_raw_events)}"
+    )
+    rows.append(
+        f"provider_fetches={result.provider_fetch_count} · cache_hits={result.provider_cache_hits} · "
+        f"cache_misses={result.provider_cache_misses} · query_count={result.query_count or len(result.queries)} · "
+        f"result_count={result.result_count or len(result.result_events)} · "
+        f"rejected_count={result.rejected_count or len(result.rejected_result_events)}"
     )
     if result.warnings:
         rows.append("warnings: " + "; ".join(result.warnings))
@@ -754,17 +909,250 @@ def _fixture_matches(
 
 
 def _raw_event_matches_query(raw: RawDiscoveredEvent, query: SearchQuery) -> bool:
+    if result_mentions_anomaly_identity(raw, query, None):
+        return True
     text = clean_text(" ".join(str(part or "") for part in (raw.title, raw.body, raw.source_url)))
     if not text:
         return False
     symbol = query.symbol.casefold()
-    if symbol and symbol in text:
+    if symbol and not query.is_common_word_symbol and _case_sensitive_symbol_in_source(raw, query.symbol):
         return True
     query_terms = [
         term for term in clean_text(query.query).split()
         if len(term) >= 4 and term not in {"crypto", "token", "why"}
     ]
     return any(term in text for term in query_terms)
+
+
+def result_mentions_anomaly_identity(
+    raw_event: RawDiscoveredEvent,
+    query: SearchQuery,
+    anomaly: RawDiscoveredEvent | None,
+) -> bool:
+    """Return true when a search result names the anomaly asset, not just a catalyst."""
+    return _identity_match_reason(raw_event, query, anomaly) not in {None, "common_word_identity_rejected"}
+
+
+def _identity_match_reason(
+    raw_event: RawDiscoveredEvent,
+    query: SearchQuery,
+    anomaly: RawDiscoveredEvent | None = None,
+) -> str | None:
+    identity = _query_identity(query, anomaly)
+    raw_source = " ".join(str(part or "") for part in (
+        raw_event.title,
+        raw_event.body,
+        raw_event.source_url,
+        _event_name(raw_event),
+    ))
+    raw_lower = raw_source.casefold()
+    text = clean_text(raw_source)
+    symbol = identity.symbol.upper()
+    if not symbol:
+        return None
+
+    for address in identity.contract_addresses:
+        if address and address.casefold() in raw_lower:
+            return "identity_match_contract"
+
+    if _pair_symbol_in_source(raw_source, symbol):
+        return "identity_match_pair"
+    if _dollar_symbol_in_source(raw_source, symbol):
+        return "identity_match_strong"
+    if _case_sensitive_symbol_in_source(raw_event, symbol):
+        if identity.is_common_word_symbol:
+            return "identity_match_strong"
+        return "identity_match_strong"
+    if _token_context_in_text(text, symbol):
+        return "identity_match_token_context"
+
+    for term in identity.identity_terms:
+        normalized = clean_text(term)
+        if not normalized or len(normalized) < 3:
+            continue
+        if normalized in text:
+            if identity.project_name and normalized == clean_text(identity.project_name):
+                return "identity_match_project"
+            return "identity_match_alias"
+
+    if _llm_extraction_mentions_identity(raw_event, identity):
+        return "identity_match_llm_resolver_validated"
+
+    if identity.is_common_word_symbol and symbol.casefold() in text:
+        return "common_word_identity_rejected"
+    return None
+
+
+def _query_identity(query: SearchQuery, anomaly: RawDiscoveredEvent | None = None) -> _AnomalyIdentity:
+    if query.identity_terms or query.coin_id or query.project_name or query.aliases or query.contract_addresses:
+        return _AnomalyIdentity(
+            symbol=query.symbol.upper(),
+            coin_id=query.coin_id,
+            project_name=query.project_name,
+            aliases=tuple(query.aliases),
+            contract_addresses=tuple(query.contract_addresses),
+        )
+    if anomaly is not None:
+        return _identity_for_raw_event(anomaly)
+    return _AnomalyIdentity(symbol=query.symbol.upper(), coin_id=query.coin_id)
+
+
+def _identity_for_raw_event(raw: RawDiscoveredEvent) -> _AnomalyIdentity:
+    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    market = payload.get("market") if isinstance(payload.get("market"), Mapping) else {}
+    asset = payload.get("asset") if isinstance(payload.get("asset"), Mapping) else {}
+    anomaly = payload.get("anomaly") if isinstance(payload.get("anomaly"), Mapping) else {}
+    symbol = _event_symbol(raw)
+    coin_id = _first_text(
+        market.get("coin_id"),
+        asset.get("coin_id"),
+        payload.get("coin_id"),
+        market.get("id"),
+        asset.get("id"),
+    )
+    project_name = _first_text(
+        market.get("name"),
+        asset.get("name"),
+        payload.get("name"),
+        anomaly.get("name"),
+    )
+    aliases = _tuple_texts(
+        market.get("aliases"),
+        asset.get("aliases"),
+        payload.get("aliases"),
+        project_name,
+        coin_id.replace("-", " ") if coin_id else None,
+    )
+    contracts = _contract_addresses(
+        market.get("contract_addresses"),
+        asset.get("contract_addresses"),
+        payload.get("contract_addresses"),
+        market.get("contract_address"),
+        asset.get("contract_address"),
+        payload.get("contract_address"),
+    )
+    return _AnomalyIdentity(
+        symbol=symbol,
+        coin_id=coin_id,
+        project_name=project_name,
+        aliases=aliases,
+        contract_addresses=contracts,
+    )
+
+
+def _first_text(*values: object) -> str | None:
+    for value in values:
+        text = str(value or "").strip()
+        if text and text.lower() not in {"none", "null"}:
+            return text
+    return None
+
+
+def _tuple_texts(*values: object) -> tuple[str, ...]:
+    out: list[str] = []
+    for value in values:
+        if value in (None, ""):
+            continue
+        if isinstance(value, Mapping):
+            iterable = value.values()
+        elif isinstance(value, (list, tuple, set)):
+            iterable = value
+        else:
+            iterable = (value,)
+        for item in iterable:
+            text = str(item or "").strip()
+            if text:
+                out.append(text)
+    return tuple(dict.fromkeys(out))
+
+
+def _contract_addresses(*values: object) -> tuple[str, ...]:
+    out: list[str] = []
+    for value in values:
+        if value in (None, ""):
+            continue
+        if isinstance(value, Mapping):
+            iterable = value.values()
+        elif isinstance(value, (list, tuple, set)):
+            iterable = value
+        else:
+            iterable = (value,)
+        for item in iterable:
+            text = str(item or "").strip()
+            if text:
+                out.append(text.casefold())
+    return tuple(dict.fromkeys(out))
+
+
+def _pair_symbol_in_source(raw_source: str, symbol: str) -> bool:
+    if not symbol:
+        return False
+    pattern = rf"(?<![A-Za-z0-9]){re.escape(symbol)}(?:[-_/]?)USDT(?![A-Za-z0-9])"
+    return re.search(pattern, raw_source, flags=re.IGNORECASE) is not None
+
+
+def _dollar_symbol_in_source(raw_source: str, symbol: str) -> bool:
+    if not symbol:
+        return False
+    return re.search(rf"(?<![A-Za-z0-9])\${re.escape(symbol)}(?![A-Za-z0-9])", raw_source, flags=re.IGNORECASE) is not None
+
+
+def _case_sensitive_symbol_in_source(raw_event: RawDiscoveredEvent, symbol: str) -> bool:
+    if not symbol:
+        return False
+    source = " ".join(str(part or "") for part in (raw_event.title, raw_event.body, _event_name(raw_event)))
+    return re.search(rf"(?<![A-Za-z0-9]){re.escape(symbol)}(?![A-Za-z0-9])", source) is not None
+
+
+def _token_context_in_text(text: str, symbol: str) -> bool:
+    if not symbol:
+        return False
+    lower = symbol.casefold()
+    return any(
+        phrase in text
+        for phrase in (
+            f"{lower} token",
+            f"{lower} coin",
+            f"{lower} crypto",
+            f"token {lower}",
+            f"coin {lower}",
+        )
+    )
+
+
+def _llm_extraction_mentions_identity(raw_event: RawDiscoveredEvent, identity: _AnomalyIdentity) -> bool:
+    payload = raw_event.raw_json if isinstance(raw_event.raw_json, Mapping) else {}
+    extraction = payload.get("llm_extraction") if isinstance(payload.get("llm_extraction"), Mapping) else {}
+    mentions = extraction.get("crypto_asset_mentions") if isinstance(extraction.get("crypto_asset_mentions"), list) else []
+    symbol = identity.symbol.casefold()
+    coin_id = (identity.coin_id or "").casefold()
+    for mention in mentions:
+        if not isinstance(mention, Mapping):
+            continue
+        try:
+            confidence = float(mention.get("confidence") or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        if confidence < 0.70:
+            continue
+        mention_type = clean_text(mention.get("mention_type"))
+        if mention_type in {"publisher", "source noise", "ordinary word", "false positive"}:
+            continue
+        mention_coin = str(
+            mention.get("resolved_coin_id")
+            or mention.get("coin_id")
+            or mention.get("asset_coin_id")
+            or ""
+        ).casefold()
+        mention_symbol = str(mention.get("symbol") or "").casefold()
+        resolver_validated = bool(
+            mention.get("resolver_validated")
+            or (coin_id and mention_coin == coin_id)
+            or (symbol and mention_symbol == symbol)
+        )
+        if resolver_validated and ((coin_id and mention_coin == coin_id) or (symbol and mention_symbol == symbol)):
+            return True
+    return False
 
 
 def _weighted_term_hits(text: str, weights: Mapping[str, int]) -> tuple[str, ...]:
@@ -808,6 +1196,12 @@ def _annotate_search_source(
         "provider": provider_name,
         "query": query.query,
         "symbol": query.symbol,
+        "coin_id": query.coin_id,
+        "project_name": query.project_name,
+        "aliases": list(query.aliases),
+        "contract_addresses": list(query.contract_addresses),
+        "is_common_word_symbol": query.is_common_word_symbol,
+        "identity_terms": list(query.identity_terms),
         "query_score": query.score,
         "query_score_reasons": list(query.score_reasons),
         "research_only": True,

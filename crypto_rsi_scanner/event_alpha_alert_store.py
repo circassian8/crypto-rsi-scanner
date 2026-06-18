@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alerts, event_graph, event_playbooks
+from . import event_alerts, event_alpha_outcomes, event_graph, event_playbooks
 
 ALERT_STORE_SCHEMA_VERSION = "event_alpha_alert_snapshot_v1"
 
@@ -192,6 +192,9 @@ def format_alert_snapshot_report(
     mfe_mae = _mfe_mae_by_playbook(rows)
     if mfe_mae:
         out.append(mfe_mae)
+    outcome_metrics = event_alpha_outcomes.summarize_outcome_metrics(rows)
+    if outcome_metrics:
+        out.append(outcome_metrics)
     out.append("")
     for row in sorted(rows, key=lambda item: str(item.get("observed_at") or ""), reverse=True)[:20]:
         out.append(
@@ -211,7 +214,9 @@ def format_alert_snapshot_report(
                 f"72h={_fmt_pct(row.get('return_72h'))} "
                 f"7d={_fmt_pct(row.get('return_7d'))} "
                 f"MFE={_fmt_pct(row.get('max_favorable_excursion'))} "
-                f"MAE={_fmt_pct(row.get('max_adverse_excursion'))}"
+                f"MAE={_fmt_pct(row.get('max_adverse_excursion'))} "
+                f"vol={_fmt_bool(row.get('volatility_hit'))} "
+                f"up_fade={_fmt_bool(row.get('up_then_fade_hit'))}"
             )
     return "\n".join(out).rstrip()
 
@@ -417,6 +422,13 @@ def _outcome_for_row(row: Mapping[str, Any], price_rows: tuple[dict[str, Any], .
         out["direction_hit"] = primary_return < 0
     else:
         out["direction_hit"] = None
+    out.update(event_alpha_outcomes.compute_playbook_outcome_metrics(
+        row,
+        sorted_rows,
+        entry_price=entry,
+        observed_at=observed,
+        returns=out,
+    ))
     return out
 
 

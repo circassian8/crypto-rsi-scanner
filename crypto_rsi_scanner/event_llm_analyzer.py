@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
+from . import event_llm_budget
 from . import event_alerts
 from .event_llm_models import (
     ASSET_ROLE_VALUES,
@@ -55,6 +56,8 @@ class EventLLMConfig:
     max_calls_per_day: int = 0
     max_estimated_cost_usd_per_day: float = 0.0
     cache_ttl_hours: float = 0.0
+    budget_ledger_path: Path | None = None
+    estimated_cost_per_call_usd: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -91,6 +94,21 @@ def analyze_event_candidates(
         alert for alert in alerts
         if alert.opportunity_score >= cfg.min_prefilter_score
     ][: max(0, cfg.max_candidates_per_run)]
+    provider_name = str(getattr(provider, "name", cfg.provider))
+    provider_model = getattr(provider, "model", cfg.model)
+    budget = event_llm_budget.EventLLMBudgetRunTracker(
+        cfg=event_llm_budget.EventLLMBudgetConfig(
+            ledger_path=cfg.budget_ledger_path,
+            estimated_cost_per_call_usd=cfg.estimated_cost_per_call_usd,
+            max_calls_per_run=cfg.max_calls_per_run,
+            max_calls_per_day=cfg.max_calls_per_day,
+            max_estimated_cost_usd_per_day=cfg.max_estimated_cost_usd_per_day,
+        ),
+        provider=provider_name,
+        model=str(provider_model or ""),
+        prompt_version=cfg.prompt_version,
+        call_kind="relationship",
+    )
     for alert in selected:
         candidate = alert.discovery_candidate
         packet = build_evidence_packet(
@@ -102,26 +120,28 @@ def analyze_event_candidates(
         )
         warnings: list[str] = []
         raw: dict[str, Any] | None
-        provider_name = str(getattr(provider, "name", cfg.provider))
-        provider_model = getattr(provider, "model", cfg.model)
         cache_key = _cache_key(packet, cfg, provider_name, provider_model)
         cached = cache.get(cache_key)
         cache_status = "miss"
         if isinstance(cached, Mapping) and isinstance(cached.get("raw"), Mapping) and _cache_entry_fresh(cached, cfg):
             raw = dict(cached["raw"])
             cache_status = "hit"
+            budget.record_cache_hit()
         elif isinstance(cached, Mapping):
+            budget.record_cache_miss()
             warnings.append(
                 "LLM analysis cache entry ignored: old cache format"
                 if not isinstance(cached.get("raw"), Mapping)
                 else "LLM analysis cache entry expired"
             )
-            if _budget_exhausted(calls_attempted, cfg):
+            if _budget_exhausted(calls_attempted, cfg) or not budget.can_attempt():
                 raw = None
                 cache_status = "skipped_budget"
-                warnings.append("LLM analysis skipped: call budget exhausted")
+                budget.record_skipped()
+                warnings.append(budget.exhausted_warning())
             else:
                 calls_attempted += 1
+                budget.record_attempt()
                 provider_result = provider.analyze_relationship(packet)
                 raw = provider_result.raw
                 if provider_result.warning:
@@ -136,12 +156,15 @@ def analyze_event_candidates(
                     )
                     cache_changed = True
         else:
-            if _budget_exhausted(calls_attempted, cfg):
+            budget.record_cache_miss()
+            if _budget_exhausted(calls_attempted, cfg) or not budget.can_attempt():
                 raw = None
                 cache_status = "skipped_budget"
-                warnings.append("LLM analysis skipped: call budget exhausted")
+                budget.record_skipped()
+                warnings.append(budget.exhausted_warning())
             else:
                 calls_attempted += 1
+                budget.record_attempt()
                 provider_result = provider.analyze_relationship(packet)
                 raw = provider_result.raw
                 if provider_result.warning:
@@ -179,6 +202,17 @@ def analyze_event_candidates(
         ))
     if cache_changed:
         _write_cache(cfg.cache_path, cache)
+    budget_snapshot = budget.flush()
+    if budget_snapshot.warning and rows:
+        last = rows[-1]
+        rows[-1] = EventLLMReportRow(
+            candidate=last.candidate,
+            alert=last.alert,
+            analysis=last.analysis,
+            agreement=last.agreement,
+            warnings=tuple(dict.fromkeys((*last.warnings, budget_snapshot.warning))),
+            cache_status=last.cache_status,
+        )
     return rows
 
 

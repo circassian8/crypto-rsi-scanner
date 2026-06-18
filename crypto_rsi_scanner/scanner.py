@@ -1221,6 +1221,8 @@ def _event_llm_config_from_runtime() -> event_llm_analyzer.EventLLMConfig:
         max_calls_per_day=config.EVENT_LLM_MAX_CALLS_PER_DAY,
         max_estimated_cost_usd_per_day=config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY,
         cache_ttl_hours=config.EVENT_LLM_CACHE_TTL_HOURS,
+        budget_ledger_path=config.EVENT_LLM_BUDGET_LEDGER_PATH,
+        estimated_cost_per_call_usd=config.EVENT_LLM_ESTIMATED_COST_PER_CALL_USD,
     )
 
 
@@ -1238,6 +1240,8 @@ def _event_llm_extractor_config_from_runtime() -> event_llm_extractor.EventLLMEx
         max_calls_per_day=config.EVENT_LLM_MAX_CALLS_PER_DAY,
         max_estimated_cost_usd_per_day=config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY,
         cache_ttl_hours=config.EVENT_LLM_CACHE_TTL_HOURS,
+        budget_ledger_path=config.EVENT_LLM_BUDGET_LEDGER_PATH,
+        estimated_cost_per_call_usd=config.EVENT_LLM_ESTIMATED_COST_PER_CALL_USD,
     )
 
 
@@ -1252,6 +1256,17 @@ def _event_watchlist_config_from_runtime() -> event_watchlist.EventWatchlistConf
 def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRouterConfig:
     return event_alpha_router.EventAlphaRouterConfig(
         enabled=config.EVENT_ALPHA_ROUTER_ENABLED,
+        daily_digest_enabled=config.EVENT_ALPHA_ROUTER_DAILY_DIGEST_ENABLED,
+        instant_enabled=config.EVENT_ALPHA_ROUTER_INSTANT_ENABLED,
+        max_digest_items=config.EVENT_ALPHA_ROUTER_MAX_DIGEST_ITEMS,
+        max_high_priority_per_day=config.EVENT_ALPHA_ROUTER_MAX_HIGH_PRIORITY_PER_DAY,
+        per_key_cooldown_hours=config.EVENT_ALPHA_ROUTER_PER_KEY_COOLDOWN_HOURS,
+        alert_on_score_jump=config.EVENT_ALPHA_ROUTER_ALERT_ON_SCORE_JUMP,
+        score_jump_threshold=config.EVENT_ALPHA_ROUTER_SCORE_JUMP_THRESHOLD,
+        alert_on_new_independent_source=config.EVENT_ALPHA_ROUTER_ALERT_ON_NEW_INDEPENDENT_SOURCE,
+        alert_on_event_time_upgrade=config.EVENT_ALPHA_ROUTER_ALERT_ON_EVENT_TIME_UPGRADE,
+        alert_on_derivatives_crowding_upgrade=config.EVENT_ALPHA_ROUTER_ALERT_ON_DERIVATIVES_CROWDING_UPGRADE,
+        alert_on_cluster_confidence_upgrade=config.EVENT_ALPHA_ROUTER_ALERT_ON_CLUSTER_CONFIDENCE_UPGRADE,
     )
 
 

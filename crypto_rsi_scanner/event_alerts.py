@@ -11,7 +11,7 @@ import math
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Iterable
+from typing import Any, Iterable
 
 from . import event_fade, event_graph, event_playbooks
 from .event_classification import (
@@ -52,7 +52,7 @@ class EventAlertCandidate:
     discovery_candidate: DiscoveredEventFadeCandidate
     tier: EventAlertTier
     opportunity_score: int
-    score_components: dict[str, int] = field(default_factory=dict)
+    score_components: dict[str, Any] = field(default_factory=dict)
     reason: str = ""
     verify: tuple[str, ...] = ()
     rejected_reason: str | None = None
@@ -368,7 +368,7 @@ def _score_components(
     candidate: DiscoveredEventFadeCandidate,
     now: datetime,
     cluster: event_graph.EventCluster | None = None,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     cls = candidate.classification
     event = candidate.event
     fade_candidate = candidate.fade_candidate
@@ -378,6 +378,7 @@ def _score_components(
     if is_market_recap_event(event):
         source_quality -= 25
     fade_components = fade_candidate.component_scores if fade_candidate is not None else {}
+    accepted_link = _cluster_link_for_candidate(candidate, cluster)
     return {
         "asset_resolution": _clamp(candidate.link.link_confidence * 100),
         "proxy_relationship": _proxy_quality(candidate),
@@ -391,10 +392,14 @@ def _score_components(
         "fade_score": _clamp(signal.fade_score if signal else 0),
         "classifier": _clamp(cls.confidence * 100),
         "cluster_confirmation": _cluster_confirmation_quality(candidate, cluster),
+        "cluster_confidence": _clamp(cluster.cluster_confidence if cluster else 0),
+        "independent_source_count": int(cluster.independent_source_count if cluster else len(event.raw_ids)),
+        "accepted_link_kind": accepted_link.accepted_kind if accepted_link else "none",
+        "event_time_consensus": _clamp(cluster.event_time_consensus if cluster else 0),
     }
 
 
-def _weighted_score(components: dict[str, int]) -> int:
+def _weighted_score(components: dict[str, Any]) -> int:
     return _clamp(
         components["asset_resolution"] * 0.20
         + components["proxy_relationship"] * 0.20
@@ -404,7 +409,7 @@ def _weighted_score(components: dict[str, int]) -> int:
         + components["derivatives_crowding"] * 0.10
         + components["event_time_quality"] * 0.05
         + components["novelty_freshness"] * 0.05
-        + min(8, components.get("cluster_confirmation", 0) * 0.08)
+        + min(8, _num(components.get("cluster_confirmation", 0)) * 0.08)
     )
 
 
@@ -776,7 +781,21 @@ def _cluster_confirmation_quality(
         return 0
     if candidate.link.link_confidence < 0.80:
         return 0
-    matching_link = next(
+    matching_link = _cluster_link_for_candidate(candidate, cluster)
+    if matching_link is None or not _cluster_link_kind_matches_candidate(candidate, matching_link):
+        return 0
+    if cluster.independent_source_count < 2 and cluster.event_time_consensus < 100:
+        return 0
+    return _clamp(cluster.cluster_confidence)
+
+
+def _cluster_link_for_candidate(
+    candidate: DiscoveredEventFadeCandidate,
+    cluster: event_graph.EventCluster | None,
+) -> event_graph.EventClusterAssetLink | None:
+    if cluster is None:
+        return None
+    return next(
         (
             link for link in cluster.asset_links
             if link.event_id == candidate.event.event_id
@@ -784,11 +803,24 @@ def _cluster_confirmation_quality(
         ),
         None,
     )
-    if matching_link is None or matching_link.accepted_kind not in {"proxy", "direct", "supply", "derivatives"}:
-        return 0
-    if cluster.independent_source_count < 2:
-        return 0
-    return _clamp(cluster.cluster_confidence)
+
+
+def _cluster_link_kind_matches_candidate(
+    candidate: DiscoveredEventFadeCandidate,
+    link: event_graph.EventClusterAssetLink,
+) -> bool:
+    kind = link.accepted_kind
+    cls = candidate.classification
+    event_type = candidate.event.event_type
+    if kind == "proxy":
+        return cls.is_proxy_narrative and cls.asset_role in {ROLE_PROXY_INSTRUMENT, ROLE_PROXY_VENUE}
+    if kind == "direct":
+        return cls.is_direct_beneficiary or cls.relationship_type.startswith("direct_")
+    if kind == "supply":
+        return event_type in {"token_unlock", "airdrop", "tge"} or "unlock" in cls.relationship_type
+    if kind == "derivatives":
+        return event_type == "perp_listing" or "perp" in cls.relationship_type or "futures" in cls.relationship_type
+    return False
 
 
 def _hard_rejection_wins(candidate: DiscoveredEventFadeCandidate, rejected_reason: str | None) -> bool:

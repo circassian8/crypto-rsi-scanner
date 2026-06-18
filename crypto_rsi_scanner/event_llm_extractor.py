@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
+from . import event_llm_budget
 from .event_llm_extraction_models import (
     ASSET_MENTION_TYPE_VALUES,
     CATALYST_TYPE_VALUES,
@@ -96,6 +97,8 @@ class EventLLMExtractorConfig:
     max_calls_per_day: int = 0
     max_estimated_cost_usd_per_day: float = 0.0
     cache_ttl_hours: float = 0.0
+    budget_ledger_path: Path | None = None
+    estimated_cost_per_call_usd: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -129,6 +132,19 @@ def analyze_raw_events(
     provider_name = str(getattr(provider, "name", cfg.provider))
     provider_model = getattr(provider, "model", cfg.model)
     calls_attempted = 0
+    budget = event_llm_budget.EventLLMBudgetRunTracker(
+        cfg=event_llm_budget.EventLLMBudgetConfig(
+            ledger_path=cfg.budget_ledger_path,
+            estimated_cost_per_call_usd=cfg.estimated_cost_per_call_usd,
+            max_calls_per_run=cfg.max_calls_per_run,
+            max_calls_per_day=cfg.max_calls_per_day,
+            max_estimated_cost_usd_per_day=cfg.max_estimated_cost_usd_per_day,
+        ),
+        provider=provider_name,
+        model=str(provider_model or ""),
+        prompt_version=cfg.prompt_version,
+        call_kind="extractor",
+    )
     for raw_event, priority in selected:
         packet = build_raw_event_packet(raw_event, prompt_version=cfg.prompt_version)
         warnings: list[str] = []
@@ -138,18 +154,22 @@ def analyze_raw_events(
         if isinstance(cached, Mapping) and isinstance(cached.get("raw"), Mapping) and _cache_entry_fresh(cached, cfg):
             raw = dict(cached["raw"])
             cache_status = "hit"
+            budget.record_cache_hit()
         elif isinstance(cached, Mapping):
+            budget.record_cache_miss()
             warnings.append(
                 "LLM extraction cache entry ignored: old cache format"
                 if not isinstance(cached.get("raw"), Mapping)
                 else "LLM extraction cache entry expired"
             )
-            if _budget_exhausted(calls_attempted, cfg):
+            if _budget_exhausted(calls_attempted, cfg) or not budget.can_attempt():
                 raw = None
                 cache_status = "skipped_budget"
-                warnings.append("LLM extraction skipped: call budget exhausted")
+                budget.record_skipped()
+                warnings.append(budget.exhausted_warning())
             else:
                 calls_attempted += 1
+                budget.record_attempt()
                 provider_result = provider.extract_raw_event(packet)
                 raw = provider_result.raw
                 if provider_result.warning:
@@ -158,12 +178,15 @@ def analyze_raw_events(
                     cache[cache_key] = _cache_entry(raw, packet, provider_name, provider_model, cfg)
                     cache_changed = True
         else:
-            if _budget_exhausted(calls_attempted, cfg):
+            budget.record_cache_miss()
+            if _budget_exhausted(calls_attempted, cfg) or not budget.can_attempt():
                 raw = None
                 cache_status = "skipped_budget"
-                warnings.append("LLM extraction skipped: call budget exhausted")
+                budget.record_skipped()
+                warnings.append(budget.exhausted_warning())
             else:
                 calls_attempted += 1
+                budget.record_attempt()
                 provider_result = provider.extract_raw_event(packet)
                 raw = provider_result.raw
                 if provider_result.warning:
@@ -195,6 +218,17 @@ def analyze_raw_events(
         ))
     if cache_changed:
         _write_cache(cfg.cache_path, cache)
+    budget_snapshot = budget.flush()
+    if budget_snapshot.warning and rows:
+        last = rows[-1]
+        rows[-1] = EventLLMExtractionReportRow(
+            raw_event=last.raw_event,
+            extraction=last.extraction,
+            warnings=tuple(dict.fromkeys((*last.warnings, budget_snapshot.warning))),
+            extraction_priority_score=last.extraction_priority_score,
+            extraction_priority_reasons=last.extraction_priority_reasons,
+            cache_status=last.cache_status,
+        )
     return rows
 
 

@@ -20,10 +20,28 @@ class EventAlphaRoute(str, Enum):
     TRIGGERED_FADE_RESEARCH = "TRIGGERED_FADE_RESEARCH"
 
 
+class EventAlphaRouteLane(str, Enum):
+    DAILY_DIGEST = "DAILY_DIGEST"
+    INSTANT_ESCALATION = "INSTANT_ESCALATION"
+    TRIGGERED_FADE = "TRIGGERED_FADE"
+    LOCAL_ONLY = "LOCAL_ONLY"
+
+
 @dataclass(frozen=True)
 class EventAlphaRouterConfig:
     enabled: bool = False
     include_suppressed: bool = True
+    daily_digest_enabled: bool = True
+    instant_enabled: bool = True
+    max_digest_items: int = 20
+    max_high_priority_per_day: int = 3
+    per_key_cooldown_hours: float = 12.0
+    alert_on_score_jump: bool = True
+    score_jump_threshold: int = 10
+    alert_on_new_independent_source: bool = True
+    alert_on_event_time_upgrade: bool = True
+    alert_on_derivatives_crowding_upgrade: bool = True
+    alert_on_cluster_confidence_upgrade: bool = True
 
 
 @dataclass(frozen=True)
@@ -32,6 +50,7 @@ class EventAlphaRouteDecision:
     route: EventAlphaRoute
     alertable: bool
     reason: str
+    lane: EventAlphaRouteLane = EventAlphaRouteLane.LOCAL_ONLY
     warnings: tuple[str, ...] = ()
 
 
@@ -54,7 +73,7 @@ def route_watchlist(
 ) -> EventAlphaRouterResult:
     """Convert latest watchlist state into artifact-only research route decisions."""
     cfg = cfg or EventAlphaRouterConfig()
-    decisions = [_route_entry(entry, cfg=cfg) for entry in read_result.entries]
+    decisions = _apply_route_caps([_route_entry(entry, cfg=cfg) for entry in read_result.entries], cfg)
     if not cfg.include_suppressed:
         decisions = [decision for decision in decisions if decision.alertable]
     return EventAlphaRouterResult(
@@ -84,6 +103,10 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
     for decision in result.decisions:
         counts[decision.route.value] = counts.get(decision.route.value, 0) + 1
     rows.append("routes: " + ", ".join(f"{route}={count}" for route, count in sorted(counts.items())))
+    lane_counts: dict[str, int] = {}
+    for decision in result.decisions:
+        lane_counts[decision.lane.value] = lane_counts.get(decision.lane.value, 0) + 1
+    rows.append("lanes: " + ", ".join(f"{lane}={count}" for lane, count in sorted(lane_counts.items())))
     rows.append("")
     for decision in result.decisions:
         entry = decision.entry
@@ -101,6 +124,7 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
             f"action={entry.latest_playbook_action or 'store_only'}"
         )
         rows.append(f"  route reason: {decision.reason}")
+        rows.append(f"  lane: {decision.lane.value}")
         if entry.latest_llm_asset_role:
             rows.append(
                 f"  llm: role={entry.latest_llm_asset_role} "
@@ -142,7 +166,7 @@ def format_routed_telegram_digest(decisions: Iterable[EventAlphaRouteDecision]) 
         if entry.latest_llm_asset_role:
             conf = entry.latest_llm_confidence if entry.latest_llm_confidence is not None else 0.0
             lines.append(f"llm={_esc(entry.latest_llm_asset_role)} conf={conf:.2f}")
-        lines.append(f"route_reason={_esc(decision.reason)}")
+        lines.append(f"lane={_esc(decision.lane.value)} route_reason={_esc(decision.reason)}")
         warnings = tuple(dict.fromkeys((*entry.warnings, *decision.warnings)))
         if warnings:
             lines.append("warnings=" + _esc("; ".join(warnings[:3])))
@@ -164,6 +188,7 @@ def _route_entry(
             route=EventAlphaRoute.STORE_ONLY,
             alertable=False,
             reason="Event Alpha router is disabled; retaining watchlist row as research evidence only.",
+            lane=EventAlphaRouteLane.LOCAL_ONLY,
             warnings=tuple(warnings),
         )
 
@@ -173,15 +198,7 @@ def _route_entry(
             route=EventAlphaRoute.STORE_ONLY,
             alertable=False,
             reason="Raw, expired, or invalidated watchlist state is stored only.",
-            warnings=tuple(warnings),
-        )
-
-    if not entry.should_alert:
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.SUPPRESS_DUPLICATE,
-            alertable=False,
-            reason=entry.suppressed_reason or "No meaningful state escalation since the previous observation.",
+            lane=EventAlphaRouteLane.LOCAL_ONLY,
             warnings=tuple(warnings),
         )
 
@@ -192,6 +209,7 @@ def _route_entry(
                 route=EventAlphaRoute.TRIGGERED_FADE_RESEARCH,
                 alertable=True,
                 reason="Proxy-fade playbook reached TRIGGERED_FADE from the deterministic event_fade engine.",
+                lane=EventAlphaRouteLane.TRIGGERED_FADE,
                 warnings=tuple(warnings),
             )
         warnings.append("non-proxy playbook cannot route triggered fade")
@@ -200,6 +218,18 @@ def _route_entry(
             route=EventAlphaRoute.LOCAL_REPORT,
             alertable=False,
             reason="Triggered state is retained for local review because the playbook is not proxy_fade.",
+            lane=EventAlphaRouteLane.LOCAL_ONLY,
+            warnings=tuple(warnings),
+        )
+
+    material_allowed, material_reason = _material_change_allowed(entry, cfg)
+    if not entry.should_alert or not material_allowed:
+        return EventAlphaRouteDecision(
+            entry=entry,
+            route=EventAlphaRoute.SUPPRESS_DUPLICATE,
+            alertable=False,
+            reason=material_reason or entry.suppressed_reason or "No meaningful state escalation since the previous observation.",
+            lane=EventAlphaRouteLane.LOCAL_ONLY,
             warnings=tuple(warnings),
         )
 
@@ -214,6 +244,7 @@ def _route_entry(
             route=EventAlphaRoute.STORE_ONLY,
             alertable=False,
             reason="Control/anomaly playbooks are evidence only until catalyst and asset identity are validated.",
+            lane=EventAlphaRouteLane.LOCAL_ONLY,
             warnings=tuple(warnings),
         )
 
@@ -223,6 +254,7 @@ def _route_entry(
             route=EventAlphaRoute.LOCAL_REPORT,
             alertable=False,
             reason="Infrastructure playbooks may be reviewed locally but cannot enter research digest routing.",
+            lane=EventAlphaRouteLane.LOCAL_ONLY,
             warnings=tuple(warnings),
         )
 
@@ -239,8 +271,11 @@ def _route_entry(
         return EventAlphaRouteDecision(
             entry=entry,
             route=route,
-            alertable=True,
+            alertable=cfg.instant_enabled if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH else cfg.daily_digest_enabled,
             reason="Non-fade event playbook produced a research-only state escalation.",
+            lane=EventAlphaRouteLane.INSTANT_ESCALATION
+            if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+            else EventAlphaRouteLane.DAILY_DIGEST,
             warnings=tuple(warnings),
         )
 
@@ -257,8 +292,11 @@ def _route_entry(
         return EventAlphaRouteDecision(
             entry=entry,
             route=route,
-            alertable=True,
+            alertable=cfg.instant_enabled if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH else cfg.daily_digest_enabled,
             reason="Proxy candidate escalated to a higher watchlist state.",
+            lane=EventAlphaRouteLane.INSTANT_ESCALATION
+            if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+            else EventAlphaRouteLane.DAILY_DIGEST,
             warnings=tuple(warnings),
         )
 
@@ -272,8 +310,9 @@ def _route_entry(
         return EventAlphaRouteDecision(
             entry=entry,
             route=EventAlphaRoute.RESEARCH_DIGEST,
-            alertable=True,
+            alertable=cfg.daily_digest_enabled,
             reason="Proxy candidate produced a meaningful radar/watchlist escalation.",
+            lane=EventAlphaRouteLane.DAILY_DIGEST,
             warnings=tuple(warnings),
         )
 
@@ -282,8 +321,137 @@ def _route_entry(
         route=EventAlphaRoute.LOCAL_REPORT,
         alertable=False,
         reason="Unrecognized playbook/state combination is kept in local research output only.",
+        lane=EventAlphaRouteLane.LOCAL_ONLY,
         warnings=tuple(warnings),
     )
+
+
+def _material_change_allowed(
+    entry: event_watchlist.EventWatchlistEntry,
+    cfg: EventAlphaRouterConfig,
+) -> tuple[bool, str | None]:
+    reasons = set(entry.material_change_reasons)
+    if not reasons:
+        return True, None
+    allowed = False
+    blocked: list[str] = []
+    if "score_jump" in reasons:
+        if cfg.alert_on_score_jump and entry.score_jump >= cfg.score_jump_threshold:
+            allowed = True
+        else:
+            blocked.append("score jump alerts disabled or below threshold")
+    if "new_independent_source" in reasons:
+        if cfg.alert_on_new_independent_source:
+            allowed = True
+        else:
+            blocked.append("new source alerts disabled")
+    if "event_time_upgrade" in reasons:
+        if cfg.alert_on_event_time_upgrade:
+            allowed = True
+        else:
+            blocked.append("event-time upgrade alerts disabled")
+    if "derivatives_crowding_upgrade" in reasons:
+        if cfg.alert_on_derivatives_crowding_upgrade:
+            allowed = True
+        else:
+            blocked.append("derivatives upgrade alerts disabled")
+    if "cluster_confidence_upgrade" in reasons:
+        if cfg.alert_on_cluster_confidence_upgrade:
+            allowed = True
+        else:
+            blocked.append("cluster-confidence upgrade alerts disabled")
+    if not allowed:
+        return False, "; ".join(blocked) or "material-change alerts disabled"
+    return True, None
+
+
+def _apply_route_caps(
+    decisions: list[EventAlphaRouteDecision],
+    cfg: EventAlphaRouterConfig,
+) -> list[EventAlphaRouteDecision]:
+    digest_seen = 0
+    high_seen = 0
+    out: list[EventAlphaRouteDecision] = []
+    for decision in sorted(decisions, key=_decision_sort_key):
+        if not decision.alertable:
+            out.append(decision)
+            continue
+        if decision.lane == EventAlphaRouteLane.TRIGGERED_FADE:
+            out.append(decision)
+            continue
+        if _cooldown_active(decision.entry, cfg):
+            out.append(EventAlphaRouteDecision(
+                entry=decision.entry,
+                route=EventAlphaRoute.SUPPRESS_DUPLICATE,
+                alertable=False,
+                reason=f"Per-key cooldown active ({cfg.per_key_cooldown_hours:g}h).",
+                lane=EventAlphaRouteLane.LOCAL_ONLY,
+                warnings=decision.warnings,
+            ))
+            continue
+        if decision.lane == EventAlphaRouteLane.INSTANT_ESCALATION:
+            high_seen += 1
+            if cfg.max_high_priority_per_day and high_seen > cfg.max_high_priority_per_day:
+                out.append(EventAlphaRouteDecision(
+                    entry=decision.entry,
+                    route=EventAlphaRoute.SUPPRESS_DUPLICATE,
+                    alertable=False,
+                    reason="High-priority route cap reached for this run.",
+                    lane=EventAlphaRouteLane.LOCAL_ONLY,
+                    warnings=decision.warnings,
+                ))
+                continue
+        if decision.lane == EventAlphaRouteLane.DAILY_DIGEST:
+            digest_seen += 1
+            if cfg.max_digest_items and digest_seen > cfg.max_digest_items:
+                out.append(EventAlphaRouteDecision(
+                    entry=decision.entry,
+                    route=EventAlphaRoute.SUPPRESS_DUPLICATE,
+                    alertable=False,
+                    reason="Daily digest item cap reached for this run.",
+                    lane=EventAlphaRouteLane.LOCAL_ONLY,
+                    warnings=decision.warnings,
+                ))
+                continue
+        out.append(decision)
+    return out
+
+
+def _cooldown_active(
+    entry: event_watchlist.EventWatchlistEntry,
+    cfg: EventAlphaRouterConfig,
+) -> bool:
+    if entry.escalation or entry.material_change_reasons:
+        return False
+    if cfg.per_key_cooldown_hours <= 0 or not entry.alert_history:
+        return False
+    latest = entry.alert_history[-1]
+    latest_ts = _parse_iso(latest.get("observed_at"))
+    if latest_ts is None:
+        return False
+    for prior in entry.alert_history[:-1]:
+        if not bool(prior.get("should_alert")):
+            continue
+        prior_ts = _parse_iso(prior.get("observed_at"))
+        if prior_ts is None:
+            continue
+        age_hours = (latest_ts - prior_ts).total_seconds() / 3600.0
+        if 0 <= age_hours < cfg.per_key_cooldown_hours:
+            return True
+    return False
+
+
+def _parse_iso(value: object):
+    from datetime import datetime, timezone
+
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
 
 
 def _is_raw_or_terminal(state: str) -> bool:

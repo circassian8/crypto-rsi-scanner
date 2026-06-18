@@ -3122,6 +3122,30 @@ def test_event_alerts_short_triggered_candidate_gets_triggered_fade_tier():
     assert "SHORT_TRIGGERED" in by_symbol["TESTVELVET"].reason
 
 
+def test_event_alerts_expose_cluster_components_without_boosting_noise():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alerts
+
+    result = _llm_golden_result()
+    alerts = event_alerts.build_event_alert_candidates(
+        result,
+        cfg=event_alerts.EventAlertConfig(),
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+    by_key = {
+        (alert.discovery_candidate.event.event_id, alert.coin_id): alert
+        for alert in alerts
+    }
+    velvet = by_key[("llm-velvet-spacex", "velvet")]
+    assert "cluster_confidence" in velvet.score_components
+    assert "independent_source_count" in velvet.score_components
+    assert "accepted_link_kind" in velvet.score_components
+    assert "event_time_consensus" in velvet.score_components
+
+    word_collision = by_key[("llm-hype-word-collision", "hyperliquid")]
+    assert word_collision.score_components["cluster_confirmation"] == 0
+
+
 def test_event_alerts_rejection_gates_override_inconsistent_triggered_signal():
     from dataclasses import replace
     from datetime import datetime, timezone
@@ -3522,6 +3546,66 @@ def test_event_llm_budget_skips_lower_priority_rows_and_cache_hits_are_free():
         )
         assert [row.cache_status for row in cached_rows] == ["hit", "miss"]
         assert cached_provider.calls == 1
+
+
+def test_event_llm_budget_ledger_persists_daily_caps_and_cost_limit():
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    result, alerts, _ = _llm_golden_alerts_and_rows(min_prefilter_score=0)
+
+    class CountingProvider(FixtureLLMRelationshipProvider):
+        def __init__(self, path):
+            super().__init__(path, required=True)
+            self.calls = 0
+
+        def analyze_relationship(self, packet):
+            self.calls += 1
+            return super().analyze_relationship(packet)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ledger_path = Path(tmp) / "llm_budget.json"
+        first = CountingProvider(_llm_golden_fixture_path())
+        rows = event_llm_analyzer.analyze_event_candidates(
+            result,
+            alerts[:1],
+            first,
+            cfg=event_llm_analyzer.EventLLMConfig(
+                min_prefilter_score=0,
+                max_candidates_per_run=1,
+                max_calls_per_day=1,
+                budget_ledger_path=ledger_path,
+                estimated_cost_per_call_usd=0.02,
+                max_estimated_cost_usd_per_day=0.02,
+            ),
+        )
+        assert first.calls == 1
+        assert rows[0].cache_status == "miss"
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        entry = ledger["entries"][0]
+        assert entry["relationship_calls_attempted"] == 1
+        assert entry["estimated_cost_usd"] == 0.02
+
+        second = CountingProvider(_llm_golden_fixture_path())
+        skipped = event_llm_analyzer.analyze_event_candidates(
+            result,
+            alerts[:1],
+            second,
+            cfg=event_llm_analyzer.EventLLMConfig(
+                min_prefilter_score=0,
+                max_candidates_per_run=1,
+                max_calls_per_day=1,
+                budget_ledger_path=ledger_path,
+                estimated_cost_per_call_usd=0.02,
+                max_estimated_cost_usd_per_day=0.02,
+            ),
+        )
+        assert second.calls == 0
+        assert skipped[0].cache_status == "skipped_budget"
+        assert any("budget" in warning for warning in skipped[0].warnings)
 
 
 def test_makefile_has_event_llm_eval_target():
@@ -4729,6 +4813,185 @@ def test_event_catalyst_search_scores_filter_low_quality_results():
     assert "rejected_results=1" in report
 
 
+def test_event_catalyst_search_requires_identity_before_attaching_catalyst_terms():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    anomaly = RawDiscoveredEvent(
+        raw_id="market_anomaly:pump:2026-06-18",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="PUMP market anomaly",
+        body="No catalyst validated.",
+        raw_json={
+            "market": {
+                "symbol": "PUMP",
+                "coin_id": "pump-fun",
+                "name": "Pump.fun",
+                "aliases": ["Pump.fun", "Pump Protocol"],
+            },
+            "anomaly": {"score": 95},
+        },
+        source_confidence=0.55,
+        content_hash="anomaly-pump",
+    )
+    unrelated = RawDiscoveredEvent(
+        raw_id="other-listing",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/other",
+        title="Binance will list Other Protocol (OTHER)",
+        body="Binance listing catalyst for Other only.",
+        raw_json={"event": {"event_type": "exchange_listing", "event_time": "2026-06-18T20:00:00Z"}},
+        source_confidence=0.95,
+        content_hash="other-listing",
+    )
+    alias = RawDiscoveredEvent(
+        raw_id="pump-alias",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/pump",
+        title="Pump.fun confirms PUMPUSDT perp listing",
+        body="Pump.fun will launch PUMPUSDT futures trading.",
+        raw_json={"event": {"event_type": "perp_listing", "event_time": "2026-06-18T20:00:00Z"}},
+        source_confidence=0.95,
+        content_hash="pump-alias",
+    )
+    query = event_catalyst_search.generate_search_query_objects_for_anomaly(anomaly, max_queries=20)[0]
+    unrelated_score = event_catalyst_search.score_search_result(unrelated, query, anomaly, now=now)
+    alias_score = event_catalyst_search.score_search_result(alias, query, anomaly, now=now)
+    assert "identity_missing_cap" in unrelated_score.reason_codes
+    assert unrelated_score.score < 50
+    assert any(
+        reason in alias_score.reason_codes
+        for reason in ("identity_match_alias", "identity_match_pair", "identity_match_project")
+    )
+    assert alias_score.score >= 50
+
+
+def test_event_catalyst_search_rejects_common_word_symbol_without_strong_identity():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    anomaly = RawDiscoveredEvent(
+        raw_id="market_anomaly:hype:2026-06-18",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="HYPE market anomaly",
+        body="No catalyst validated.",
+        raw_json={"market": {"symbol": "HYPE", "coin_id": "hyperliquid", "name": "Hyperliquid"}, "anomaly": {"score": 95}},
+        source_confidence=0.55,
+        content_hash="anomaly-hype",
+    )
+    generic = RawDiscoveredEvent(
+        raw_id="ipo-hype",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/hype",
+        title="IPO hype builds around Stripe",
+        body="A story about IPO hype and prediction markets for private companies.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="ipo-hype",
+    )
+    query = event_catalyst_search.generate_search_query_objects_for_anomaly(anomaly, max_queries=1)[0]
+    score = event_catalyst_search.score_search_result(generic, query, anomaly, now=now)
+    assert "common_word_identity_rejected" in score.reason_codes
+    assert score.score < 50
+
+
+def test_event_catalyst_search_identity_can_come_from_resolver_validated_llm_extraction():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="stealth-source",
+        provider="fixture_search_result",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/stealth",
+        title="New protocol launches OpenAI pre-IPO exposure",
+        body="A venue launches OpenAI pre-IPO exposure.",
+        raw_json={
+            "llm_extraction": {
+                "crypto_asset_mentions": [
+                    {
+                        "name": "Stealth Alpha",
+                        "symbol": "STEALTH",
+                        "coin_id": "stealth-alpha",
+                        "confidence": 0.91,
+                        "resolver_validated": True,
+                        "mention_type": "project_or_token",
+                    }
+                ]
+            }
+        },
+        source_confidence=0.85,
+        content_hash="stealth-source",
+    )
+    query = event_catalyst_search.SearchQuery(
+        anomaly_raw_id="market_anomaly:stealth-alpha:2026-06-18",
+        query="STEALTH OpenAI exposure",
+        symbol="STEALTH",
+        rank=1,
+        coin_id="stealth-alpha",
+    )
+    assert event_catalyst_search.result_mentions_anomaly_identity(raw, query, None) is True
+
+
+def test_event_catalyst_search_provider_cache_fetches_broad_sources_once():
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_catalyst_search
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    article = {
+        "id": "pump-rss",
+        "title": "Pump.fun confirms PUMPUSDT perp listing",
+        "body": "Pump.fun will launch PUMPUSDT futures trading.",
+        "published_at": now.isoformat(),
+        "fetched_at": now.isoformat(),
+        "url": "https://example.test/pump-rss",
+        "source_confidence": 0.90,
+    }
+    queries = tuple(
+        event_catalyst_search.SearchQuery(
+            anomaly_raw_id=f"market_anomaly:pump:{idx}",
+            query=f"PUMP catalyst {idx}",
+            symbol="PUMP",
+            rank=idx,
+            coin_id="pump-fun",
+            project_name="Pump.fun",
+            aliases=("Pump.fun",),
+        )
+        for idx in range(10)
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "rss.json"
+        path.write_text(json.dumps({"articles": [article]}), encoding="utf-8")
+        provider = event_catalyst_search.ProjectRssCatalystSearchProvider(path=path)
+        result = provider.search(queries, max_results_per_query=1, now=now)
+        assert result.provider_fetch_count == 1
+        assert result.provider_cache_misses == 1
+        assert result.provider_cache_hits == 9
+        assert result.query_count == 10
+
+
 def test_event_anomaly_lifecycle_tracks_found_validated_and_expired_states():
     from datetime import datetime, timedelta, timezone
     from crypto_rsi_scanner import (
@@ -5637,6 +5900,69 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
         )
         assert "outcomes:" in outcome_report
         assert "MFE/MAE by playbook:" in outcome_report
+        assert "Outcome metrics by playbook:" in outcome_report
+
+
+def test_event_alpha_outcomes_playbook_specific_metrics():
+    from crypto_rsi_scanner import event_alpha_outcomes
+
+    listing_row = {
+        "observed_at": "2026-06-18T12:00:00+00:00",
+        "entry_reference_price": 10.0,
+        "playbook_type": "listing_volatility",
+        "expected_direction": "volatility",
+        "success_metric": "volatility",
+        "primary_horizon": "24h",
+    }
+    prices = [
+        {"timestamp": "2026-06-18T13:00:00+00:00", "close": 10.5, "high": 11.5, "low": 9.8},
+        {"timestamp": "2026-06-18T20:00:00+00:00", "close": 9.2, "high": 10.0, "low": 8.8},
+    ]
+    metrics = event_alpha_outcomes.compute_playbook_outcome_metrics(
+        listing_row,
+        prices,
+        returns={"max_favorable_excursion": 0.15, "max_adverse_excursion": 0.12, "primary_horizon_return": -0.08},
+    )
+    assert metrics["volatility_hit"] is True
+    assert metrics["mfe_mae_ratio"] > 1.0
+
+    proxy_row = {
+        "observed_at": "2026-06-18T12:00:00+00:00",
+        "entry_reference_price": 10.0,
+        "playbook_type": "proxy_attention",
+        "expected_direction": "up_then_fade",
+        "success_metric": "mfe_mae",
+        "primary_horizon": "72h",
+    }
+    proxy_metrics = event_alpha_outcomes.compute_playbook_outcome_metrics(
+        proxy_row,
+        prices,
+        returns={"return_72h": -0.10, "max_favorable_excursion": 0.15, "max_adverse_excursion": 0.05},
+    )
+    assert proxy_metrics["up_then_fade_hit"] is True
+
+    unlock_row = {
+        "observed_at": "2026-06-18T12:00:00+00:00",
+        "entry_reference_price": 10.0,
+        "playbook_type": "unlock_supply_pressure",
+        "expected_direction": "down",
+        "success_metric": "direction_hit",
+        "primary_horizon": "24h",
+        "btc_primary_horizon_return": 0.02,
+    }
+    unlock_metrics = event_alpha_outcomes.compute_playbook_outcome_metrics(
+        unlock_row,
+        prices,
+        returns={"primary_horizon_return": -0.08},
+    )
+    assert unlock_metrics["underperformance_vs_btc"] == -0.10
+
+    anomaly_row = {
+        "event_type": "exchange_listing",
+        "source": "market_anomaly+catalyst_search",
+    }
+    anomaly_metrics = event_alpha_outcomes.compute_playbook_outcome_metrics(anomaly_row, [])
+    assert anomaly_metrics["catalyst_found_after_anomaly"] is True
 
 
 def test_event_alpha_alert_store_snapshot_policy_filters_rows():
@@ -6191,6 +6517,73 @@ def test_event_alpha_router_routes_watchlist_escalations_safely():
     assert "PFADE" in routed_digest
     assert "ATTN" in routed_digest
     assert "BADTRIG" not in routed_digest
+
+
+def test_event_alpha_router_routes_material_changes_with_lanes():
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_router, event_playbooks, event_watchlist
+
+    def row(symbol, *, reasons=(), score_jump=0, state=None, playbook=None, should_alert=True):
+        return event_watchlist.EventWatchlistEntry(
+            schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+            row_type="event_watchlist_state",
+            key=f"{symbol}|coin|rel",
+            cluster_id="spacex|ipo_proxy|2026-06-20",
+            event_id=f"{symbol}-event",
+            coin_id=symbol.lower(),
+            symbol=symbol,
+            relationship_type="proxy_attention",
+            external_asset="SpaceX",
+            event_time="2026-06-20T13:30:00+00:00",
+            state=state or event_watchlist.EventWatchlistState.WATCHLIST.value,
+            previous_state=state or event_watchlist.EventWatchlistState.WATCHLIST.value,
+            first_seen_at="2026-06-18T12:00:00+00:00",
+            last_seen_at="2026-06-18T14:00:00+00:00",
+            source_count=2,
+            highest_score=80,
+            latest_score=80,
+            latest_tier="WATCHLIST",
+            latest_event_name=f"{symbol} SpaceX event",
+            latest_source="test",
+            latest_playbook_type=playbook or event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+            latest_playbook_score=80,
+            latest_playbook_action="watchlist",
+            should_alert=should_alert,
+            score_jump=score_jump,
+            material_change_reasons=tuple(reasons),
+            alert_history=[
+                {"observed_at": "2026-06-18T12:00:00+00:00", "should_alert": False},
+                {"observed_at": "2026-06-18T14:00:00+00:00", "should_alert": should_alert},
+            ],
+            suppressed_reason=None if should_alert else "duplicate state, no escalation",
+        )
+
+    read = event_watchlist.EventWatchlistReadResult(
+        state_path=Path("watchlist.jsonl"),
+        rows_read=5,
+        latest_only=True,
+        entries=[
+            row("JUMP", reasons=("score_jump",), score_jump=15),
+            row("SRC", reasons=("new_independent_source",)),
+            row("TIME", reasons=("event_time_upgrade",)),
+            row("DUP", should_alert=False),
+            row(
+                "TRIG",
+                state=event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+                playbook=event_playbooks.EventPlaybookType.PROXY_FADE.value,
+                should_alert=False,
+            ),
+        ],
+    )
+    result = event_alpha_router.route_watchlist(read, cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True))
+    by_symbol = {decision.entry.symbol: decision for decision in result.decisions}
+    assert by_symbol["JUMP"].alertable is True
+    assert by_symbol["JUMP"].lane == event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST
+    assert by_symbol["SRC"].alertable is True
+    assert by_symbol["TIME"].alertable is True
+    assert by_symbol["DUP"].route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE
+    assert by_symbol["TRIG"].route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
+    assert by_symbol["TRIG"].lane == event_alpha_router.EventAlphaRouteLane.TRIGGERED_FADE
 
 
 def test_event_alpha_cycle_send_uses_router_approved_decisions_only():

@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Harden Event Alpha catalyst identity and routing · Codex
+**Why:** The dynamic Event Alpha catalyst-search loop needed to avoid attaching
+generic catalyst articles to hot tickers, reduce repeated provider fetches, make
+LLM budgets durable across runs, and route material watchlist updates as clean
+research alerts without changing trading boundaries.
+**Changes:**
+- Made catalyst-search queries identity-aware with coin/project aliases,
+  contracts, pair formats, common-word symbol rejection, LLM extraction identity
+  hints, and result reason codes such as `identity_missing_cap` and
+  `common_word_identity_rejected`.
+- Added per-run provider fetch/cache stats and broad-source caching so RSS and
+  Polymarket fetch once per run while query-specific providers cache duplicate
+  searches.
+- Added persistent JSON LLM budget ledger tracking daily extractor/relationship
+  calls, cache hits/misses, skipped rows, and estimated cost; wired runtime
+  config and `.env.example`.
+- Added cluster confidence/source/time/link-kind components to Event Alpha
+  alerts, material-change watchlist markers, router lanes, per-run route caps,
+  and triggered-fade routing before duplicate suppression.
+- Added playbook-specific Event Alpha outcome metrics for volatility,
+  up-then-fade, MFE/MAE ratio, benchmark underperformance hooks, timing, and
+  anomaly→catalyst tracking.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, and regression tests.
+**Verify:** `python3 tests/test_indicators.py` passed 333/333.
+`make event-llm-eval PYTHON=python3` passed 9/9 golden cases. `make
+event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases. `make
+event-alpha-eval PYTHON=python3` passed 11/11 golden checks. `make verify
+PYTHON=python3` passed. `python3 -m compileall -q crypto_rsi_scanner tests`
+passed.
+**Notes/risks:** This remains research-only. Search hits, LLM outputs, cluster
+boosts, and router lanes still cannot create normal RSI alerts, paper trades,
+live signal rows, orders, or `TRIGGERED_FADE`; deterministic `event_fade.py`
+plus `proxy_fade` remains the only triggered-fade path.
+
 ## 2026-06-18 — Operationalize Event Alpha catalyst search profiles · Codex
 **Why:** The Event Alpha catalyst-search loop needed to move beyond fixture
 attachment into live-source evidence adapters, explicit search quality gates,
