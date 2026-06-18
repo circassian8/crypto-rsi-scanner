@@ -3912,6 +3912,212 @@ def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
             setattr(config, name, value)
 
 
+def test_event_watchlist_refresh_tracks_escalations_and_suppresses_duplicates():
+    import tempfile
+    from dataclasses import replace
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alerts, event_discovery, event_watchlist
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="watch-pumpx",
+        provider="test",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/watch-pumpx",
+        title="PumpX token offers synthetic exposure to SpaceX pre-IPO market",
+        body="PumpX token holders can trade synthetic exposure to SpaceX before the IPO.",
+        raw_json={
+            "event": {
+                "event_id": "watch-pumpx",
+                "event_name": "PumpX SpaceX proxy watch",
+                "event_type": "ipo_proxy",
+                "event_time": "2026-06-20T13:30:00Z",
+                "event_time_confidence": 0.90,
+                "external_asset": "SpaceX",
+                "confidence": 0.90,
+                "description": "PumpX token holders can trade synthetic exposure to SpaceX before the IPO.",
+            }
+        },
+        source_confidence=0.90,
+        content_hash="watch-pumpx",
+    )
+    asset = DiscoveredAsset(
+        coin_id="pumpx",
+        symbol="PUMPX",
+        name="PumpX",
+        aliases=("pumpx token", "PumpX"),
+    )
+    discovery = event_discovery.run_discovery([raw], [asset], now=now)
+    base = event_alerts.build_event_alert_candidates(discovery, now=now)[0]
+    radar = replace(base, tier=event_alerts.EventAlertTier.RADAR_DIGEST, opportunity_score=60)
+    watch = replace(base, tier=event_alerts.EventAlertTier.WATCHLIST, opportunity_score=75)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        state_path = Path(tmp) / "watchlist.jsonl"
+        cfg = event_watchlist.EventWatchlistConfig(enabled=True, state_path=state_path)
+        first = event_watchlist.refresh_watchlist([radar], cfg=cfg, now=now)
+        assert first.rows_written == 1
+        assert first.entries[0].state == event_watchlist.EventWatchlistState.RADAR.value
+        assert first.entries[0].should_alert is True
+        assert first.entries[0].first_radar_at == now.isoformat()
+
+        duplicate = event_watchlist.refresh_watchlist(
+            [radar],
+            cfg=cfg,
+            now=datetime(2026, 6, 18, 13, 0, tzinfo=timezone.utc),
+        )
+        assert duplicate.entries[0].state == event_watchlist.EventWatchlistState.RADAR.value
+        assert duplicate.entries[0].should_alert is False
+        assert duplicate.entries[0].suppressed_reason == "duplicate state, no escalation"
+        assert duplicate.entries[0].first_seen_at == first.entries[0].first_seen_at
+
+        escalated = event_watchlist.refresh_watchlist(
+            [watch],
+            cfg=cfg,
+            now=datetime(2026, 6, 18, 14, 0, tzinfo=timezone.utc),
+        )
+        assert escalated.entries[0].state == event_watchlist.EventWatchlistState.WATCHLIST.value
+        assert escalated.entries[0].previous_state == event_watchlist.EventWatchlistState.RADAR.value
+        assert escalated.entries[0].should_alert is True
+        assert escalated.entries[0].highest_score == 75
+        assert len(event_watchlist.load_watchlist(state_path, latest_only=False).entries) == 3
+
+
+def test_event_watchlist_expiration_and_backward_compatible_reads():
+    import json
+    import tempfile
+    from dataclasses import replace
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alerts, event_discovery, event_watchlist
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="expired-proxy",
+        provider="test",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/expired",
+        title="PumpX token offers synthetic exposure to SpaceX pre-IPO market",
+        body="PumpX token holders can trade synthetic exposure to SpaceX before the IPO.",
+        raw_json={
+            "event": {
+                "event_id": "expired-proxy",
+                "event_name": "Expired proxy event",
+                "event_type": "ipo_proxy",
+                "event_time": "2026-06-14T13:30:00Z",
+                "event_time_confidence": 0.90,
+                "external_asset": "SpaceX",
+                "confidence": 0.90,
+                "description": "PumpX token holders can trade synthetic exposure to SpaceX before the IPO.",
+            }
+        },
+        source_confidence=0.90,
+        content_hash="expired-proxy",
+    )
+    asset = DiscoveredAsset(coin_id="pumpx", symbol="PUMPX", name="PumpX", aliases=("pumpx token",))
+    alert = event_alerts.build_event_alert_candidates(
+        event_discovery.run_discovery([raw], [asset], now=now),
+        now=now,
+    )[0]
+    alert = replace(alert, tier=event_alerts.EventAlertTier.RADAR_DIGEST, opportunity_score=60)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        state_path = Path(tmp) / "watchlist.jsonl"
+        cfg = event_watchlist.EventWatchlistConfig(
+            enabled=True,
+            state_path=state_path,
+            expire_hours_after_event=72,
+        )
+        result = event_watchlist.refresh_watchlist([alert], cfg=cfg, now=now)
+        assert result.entries[0].state == event_watchlist.EventWatchlistState.EXPIRED.value
+        assert result.entries[0].should_alert is False
+        assert result.entries[0].suppressed_reason == "terminal non-alert state"
+
+        old_path = Path(tmp) / "old-watchlist.jsonl"
+        old_path.write_text(
+            json.dumps({
+                "row_type": "event_watchlist_state",
+                "key": "old|coin|rel||",
+                "event_id": "old",
+                "coin_id": "coin",
+                "symbol": "OLD",
+                "relationship_type": "proxy_attention",
+                "state": "RADAR",
+                "last_seen_at": now.isoformat(),
+                "latest_score": 61,
+            }) + "\nnot-json\n",
+            encoding="utf-8",
+        )
+        loaded = event_watchlist.load_watchlist(old_path)
+        assert loaded.rows_read == 1
+        assert loaded.entries[0].state == event_watchlist.EventWatchlistState.RADAR.value
+        assert loaded.entries[0].highest_score == 61
+
+
+def test_event_watchlist_scanner_refresh_and_report_with_fixture_anomalies():
+    import contextlib
+    import io
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+
+    original = {
+        "EVENT_DISCOVERY_EVENTS_PATH": config.EVENT_DISCOVERY_EVENTS_PATH,
+        "EVENT_DISCOVERY_ALIASES_PATH": config.EVENT_DISCOVERY_ALIASES_PATH,
+        "EVENT_DISCOVERY_UNIVERSE_PATH": config.EVENT_DISCOVERY_UNIVERSE_PATH,
+        "EVENT_DISCOVERY_UNIVERSE_LIVE": config.EVENT_DISCOVERY_UNIVERSE_LIVE,
+        "EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT": config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT,
+        "EVENT_MARKET_ENRICHMENT_ENABLED": config.EVENT_MARKET_ENRICHMENT_ENABLED,
+        "EVENT_ANOMALY_SCANNER_ENABLED": config.EVENT_ANOMALY_SCANNER_ENABLED,
+        "EVENT_ANOMALY_MIN_RETURN_24H": config.EVENT_ANOMALY_MIN_RETURN_24H,
+        "EVENT_ANOMALY_MIN_VOLUME_MCAP": config.EVENT_ANOMALY_MIN_VOLUME_MCAP,
+        "EVENT_ANOMALY_MIN_VOLUME_ZSCORE": config.EVENT_ANOMALY_MIN_VOLUME_ZSCORE,
+        "EVENT_ANOMALY_MAX_ASSETS": config.EVENT_ANOMALY_MAX_ASSETS,
+        "EVENT_WATCHLIST_ENABLED": config.EVENT_WATCHLIST_ENABLED,
+        "EVENT_WATCHLIST_STATE_PATH": config.EVENT_WATCHLIST_STATE_PATH,
+        "EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT": config.EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT,
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        config.EVENT_DISCOVERY_EVENTS_PATH = None
+        config.EVENT_DISCOVERY_ALIASES_PATH = None
+        config.EVENT_DISCOVERY_UNIVERSE_PATH = Path("fixtures/coingecko_smoke/top_markets.json")
+        config.EVENT_DISCOVERY_UNIVERSE_LIVE = False
+        config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT = 0
+        config.EVENT_MARKET_ENRICHMENT_ENABLED = True
+        config.EVENT_ANOMALY_SCANNER_ENABLED = True
+        config.EVENT_ANOMALY_MIN_RETURN_24H = 0.03
+        config.EVENT_ANOMALY_MIN_VOLUME_MCAP = 0.05
+        config.EVENT_ANOMALY_MIN_VOLUME_ZSCORE = 3.0
+        config.EVENT_ANOMALY_MAX_ASSETS = 10
+        config.EVENT_WATCHLIST_ENABLED = True
+        config.EVENT_WATCHLIST_STATE_PATH = Path(tmp) / "watchlist.jsonl"
+        config.EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT = 72
+        try:
+            refresh_out = io.StringIO()
+            with contextlib.redirect_stdout(refresh_out):
+                scanner.event_watchlist_refresh()
+            refresh_text = refresh_out.getvalue()
+            assert "EVENT WATCHLIST REFRESH" in refresh_text
+            assert "rows_written: 1" in refresh_text
+            assert "alertable escalations: 0" in refresh_text
+
+            report_out = io.StringIO()
+            with contextlib.redirect_stdout(report_out):
+                scanner.event_watchlist_report()
+            report_text = report_out.getvalue()
+            assert "EVENT WATCHLIST REPORT" in report_text
+            assert "RAW_EVIDENCE" in report_text
+            assert "SOL/solana" in report_text
+        finally:
+            for name, value in original.items():
+                setattr(config, name, value)
+
+
 def test_makefile_has_event_alpha_no_key_target():
     from pathlib import Path
 
@@ -3919,6 +4125,9 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event-alpha-no-key-report:" in text
     assert "--event-alpha-radar-report" in text
     assert "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1" in text
+    assert "event-watchlist-refresh:" in text
+    assert "event-watchlist-report:" in text
+    assert "--event-watchlist-refresh" in text
 
 
 def test_event_discovery_asset_role_demotes_proxy_context_noise():

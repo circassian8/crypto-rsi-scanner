@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-18 - Keep Event Alpha watchlist artifact-only
+**Status:** accepted
+**Decision:** Event Alpha Radar watchlist state may persist local JSONL rows for
+research candidates, including first/last seen timestamps, source count, score
+history, latest market/LLM context, state transitions, duplicate suppression,
+and alertable-escalation metadata. It must remain a research artifact: it must
+not route Telegram alerts, write live signal/outcome/paper rows, open paper
+trades, execute orders, or allow watchlist state to create `TRIGGERED_FADE`.
+**Why:** The radar needs memory so repeated articles/anomalies do not become
+repeated prompts, but persistent state is not evidence of edge. Event-fade
+triggers still come only from `event_fade.py` hard gates and reviewed validation
+remains required before promotion.
+**Revisit when:** A reviewed Event Alpha sample proves state escalations are
+useful enough for a human-approved research digest or paper-tracking workflow.
+
 ## 2026-06-18 - Keep market anomalies evidence-only until catalyst validation
 **Status:** accepted
 **Decision:** Event Alpha Radar market enrichment may fill research candidate

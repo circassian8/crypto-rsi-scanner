@@ -368,10 +368,11 @@ EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN = int(os.getenv("RSI_EVENT_LLM_EXTRACTOR_
 EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES = _env_bool("RSI_EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES", True)
 _EVENT_LLM_EXTRACTOR_CACHE_PATH_RAW = os.getenv("RSI_EVENT_LLM_EXTRACTOR_CACHE_PATH", "")
 EVENT_LLM_EXTRACTOR_PROMPT_VERSION = os.getenv("RSI_EVENT_LLM_EXTRACTOR_PROMPT_VERSION", "llm_raw_event_extraction_v1")
+_EVENT_WATCHLIST_STATE_PATH_RAW = os.getenv("RSI_EVENT_WATCHLIST_STATE_PATH", "")
 
-# Event Alpha Radar research phases. Market enrichment and anomaly scanning are
-# implemented but disabled by default; watchlist state and routing remain future
-# opt-ins until explicitly promoted.
+# Event Alpha Radar research phases. Market enrichment, anomaly scanning, and
+# watchlist state are implemented but disabled by default; routing remains a
+# future opt-in until explicitly promoted.
 EVENT_MARKET_ENRICHMENT_ENABLED = _env_bool("RSI_EVENT_MARKET_ENRICHMENT_ENABLED", False)
 EVENT_ANOMALY_SCANNER_ENABLED = _env_bool("RSI_EVENT_ANOMALY_SCANNER_ENABLED", False)
 EVENT_ANOMALY_MIN_RETURN_24H = float(os.getenv("RSI_EVENT_ANOMALY_MIN_RETURN_24H", "0.30"))
@@ -379,6 +380,7 @@ EVENT_ANOMALY_MIN_VOLUME_MCAP = float(os.getenv("RSI_EVENT_ANOMALY_MIN_VOLUME_MC
 EVENT_ANOMALY_MIN_VOLUME_ZSCORE = float(os.getenv("RSI_EVENT_ANOMALY_MIN_VOLUME_ZSCORE", "3.0"))
 EVENT_ANOMALY_MAX_ASSETS = int(os.getenv("RSI_EVENT_ANOMALY_MAX_ASSETS", "50"))
 EVENT_WATCHLIST_ENABLED = _env_bool("RSI_EVENT_WATCHLIST_ENABLED", False)
+EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT = float(os.getenv("RSI_EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT", "72"))
 EVENT_ALPHA_ROUTER_ENABLED = _env_bool("RSI_EVENT_ALPHA_ROUTER_ENABLED", False)
 
 # Macro context header in the digest (Fear & Greed + BTC trend + breadth).
@@ -602,6 +604,13 @@ if EVENT_DISCOVERY_UNIVERSE_PATH is not None and not EVENT_DISCOVERY_UNIVERSE_PA
 EVENT_DISCOVERY_CACHE_DIR = Path(_EVENT_DISCOVERY_CACHE_DIR_RAW).expanduser()
 if not EVENT_DISCOVERY_CACHE_DIR.is_absolute():
     EVENT_DISCOVERY_CACHE_DIR = DATA_DIR / EVENT_DISCOVERY_CACHE_DIR
+EVENT_WATCHLIST_STATE_PATH = (
+    Path(_EVENT_WATCHLIST_STATE_PATH_RAW).expanduser()
+    if _EVENT_WATCHLIST_STATE_PATH_RAW
+    else EVENT_DISCOVERY_CACHE_DIR / "event_watchlist_state.jsonl"
+)
+if not EVENT_WATCHLIST_STATE_PATH.is_absolute():
+    EVENT_WATCHLIST_STATE_PATH = DATA_DIR / EVENT_WATCHLIST_STATE_PATH
 EVENT_LLM_CACHE_PATH = Path(_EVENT_LLM_CACHE_PATH_RAW).expanduser() if _EVENT_LLM_CACHE_PATH_RAW else None
 if EVENT_LLM_CACHE_PATH is not None and not EVENT_LLM_CACHE_PATH.is_absolute():
     EVENT_LLM_CACHE_PATH = DATA_DIR / EVENT_LLM_CACHE_PATH

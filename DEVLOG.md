@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-18 — Add Event Alpha watchlist state · Codex
+**Why:** The Event Alpha Radar needs memory so repeated articles/anomalies do
+not become repeated prompts, and so only meaningful state escalations are
+surfaced for review. This adds a persistent research-only watchlist around
+event-alert candidates without promoting alerts, paper trades, or execution.
+**Changes:**
+- Added `event_watchlist.py` with append-only JSONL state for
+  `RAW_EVIDENCE`, `RADAR`, `WATCHLIST`, `HIGH_PRIORITY`, `EVENT_PASSED`,
+  `ARMED`, `TRIGGERED_FADE`, `INVALIDATED`, and `EXPIRED`.
+- Watchlist entries track first/last seen timestamps, source count, highest and
+  latest score, latest tier, market/LLM context, alert history, duplicate
+  suppression, and alertable-escalation metadata.
+- Added `main.py --event-watchlist-refresh`, `main.py --event-watchlist-report`,
+  `make event-watchlist-refresh`, and `make event-watchlist-report`.
+- Added disabled-by-default watchlist config/path env vars and documented the
+  artifact-only boundary in `AGENTS.md`, `DECISIONS.md`, and `ROADMAP.md`.
+- Added tests for escalation tracking, duplicate suppression, expiration,
+  backward-compatible watchlist reads, scanner wiring, and Makefile targets.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 298/298. `make
+event-watchlist-refresh EVENT_WATCHLIST_STATE_PATH=/tmp/.../watchlist.jsonl
+PYTHON=python3` plus `make event-watchlist-report` wrote/read one fixture SOL
+`RAW_EVIDENCE` row with zero alertable escalations. `make
+event-llm-extract-eval PYTHON=python3` passed 7/7 golden cases. `make
+event-llm-eval PYTHON=python3` passed 9/9 golden cases. `make verify
+PYTHON=python3` passed 298/298 tests, alert render smoke, fixture backtest
+smoke, and paper scoreboard.
+**Notes/risks:** The watchlist is state memory only. It cannot create
+`TRIGGERED_FADE`, route Telegram research digests, affect normal RSI alerts,
+write live signal/outcome/paper rows, open paper trades, or execute orders.
+Remaining Event Alpha Radar phases are playbook scoring, research routing, and
+feedback/evals.
+
 ## 2026-06-18 — Add market enrichment and anomaly radar phase · Codex
 **Why:** The Event Alpha Radar needs market confirmation and anomaly-first
 discovery without turning hot coins into event-fade candidates. This implements

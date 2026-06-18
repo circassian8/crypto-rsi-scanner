@@ -68,6 +68,7 @@ from . import event_llm_extractor
 from . import event_provider_status
 from . import event_price_history
 from . import event_validation
+from . import event_watchlist
 from .event_models import EventDiscoveryResult
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
 from .llm_providers.fixture import FixtureLLMExtractionProvider, FixtureLLMRelationshipProvider
@@ -1206,12 +1207,41 @@ def _event_llm_extractor_config_from_runtime() -> event_llm_extractor.EventLLMEx
     )
 
 
+def _event_watchlist_config_from_runtime() -> event_watchlist.EventWatchlistConfig:
+    return event_watchlist.EventWatchlistConfig(
+        enabled=config.EVENT_WATCHLIST_ENABLED,
+        state_path=config.EVENT_WATCHLIST_STATE_PATH,
+        expire_hours_after_event=config.EVENT_WATCHLIST_EXPIRE_HOURS_AFTER_EVENT,
+    )
+
+
 def _setup_event_discovery_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s %(levelname)-5s %(message)s",
         datefmt="%H:%M:%S",
     )
+
+
+def _event_alpha_inputs_configured() -> bool:
+    return bool(
+        config.EVENT_ANOMALY_SCANNER_ENABLED
+        or config.EVENT_MARKET_ENRICHMENT_ENABLED
+        or _event_discovery_paths_configured()
+    )
+
+
+def _event_alerts_from_config(with_llm: bool = False) -> list[event_alerts.EventAlertCandidate]:
+    cfg = _event_alert_config_from_runtime()
+    result = _event_discovery_result_from_config()
+    alerts = event_alerts.build_event_alert_candidates(result, cfg=cfg)
+    if with_llm:
+        llm_cfg = _event_llm_config_from_runtime()
+        provider = _event_llm_provider(llm_cfg)
+        if provider is not None:
+            rows = event_llm_analyzer.analyze_event_candidates(result, alerts, provider, cfg=llm_cfg)
+            alerts = event_alerts.apply_llm_advisory(alerts, rows, cfg, enabled=llm_cfg.mode == "advisory")
+    return alerts
 
 
 def event_discovery_report(verbose: bool = False) -> None:
@@ -1267,26 +1297,40 @@ def event_alert_report(verbose: bool = False, send: bool = False, with_llm: bool
 def event_alpha_radar_report(verbose: bool = False, with_llm: bool = False) -> None:
     """Print the opt-in event alpha radar with market enrichment/anomalies."""
     _setup_event_discovery_logging(verbose)
-    if not (
-        config.EVENT_ANOMALY_SCANNER_ENABLED
-        or config.EVENT_MARKET_ENRICHMENT_ENABLED
-        or _event_discovery_paths_configured()
-    ):
+    if not _event_alpha_inputs_configured():
         print(
             "No event-alpha radar inputs ready. Configure event sources or enable "
             "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
         )
         return
-    cfg = _event_alert_config_from_runtime()
-    result = _event_discovery_result_from_config()
-    alerts = event_alerts.build_event_alert_candidates(result, cfg=cfg)
-    if with_llm:
-        llm_cfg = _event_llm_config_from_runtime()
-        provider = _event_llm_provider(llm_cfg)
-        if provider is not None:
-            rows = event_llm_analyzer.analyze_event_candidates(result, alerts, provider, cfg=llm_cfg)
-            alerts = event_alerts.apply_llm_advisory(alerts, rows, cfg, enabled=llm_cfg.mode == "advisory")
+    alerts = _event_alerts_from_config(with_llm=with_llm)
     print(event_alerts.format_event_alert_report(alerts))
+
+
+def event_watchlist_refresh(verbose: bool = False, with_llm: bool = False) -> None:
+    """Append research-only Event Alpha Radar watchlist state."""
+    _setup_event_discovery_logging(verbose)
+    watch_cfg = _event_watchlist_config_from_runtime()
+    if not watch_cfg.enabled:
+        print("Event watchlist refresh disabled. Set RSI_EVENT_WATCHLIST_ENABLED=1 for this research command.")
+        return
+    if not _event_alpha_inputs_configured():
+        print(
+            "No event-watchlist inputs ready. Configure event sources or enable "
+            "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
+        )
+        return
+    alerts = _event_alerts_from_config(with_llm=with_llm)
+    result = event_watchlist.refresh_watchlist(alerts, cfg=watch_cfg)
+    print(event_watchlist.format_watchlist_refresh_result(result))
+
+
+def event_watchlist_report(verbose: bool = False) -> None:
+    """Print latest research-only Event Alpha Radar watchlist state."""
+    _setup_event_discovery_logging(verbose)
+    watch_cfg = _event_watchlist_config_from_runtime()
+    result = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    print(event_watchlist.format_watchlist_report(result))
 
 
 def event_llm_shadow_report(verbose: bool = False) -> None:
@@ -2881,6 +2925,16 @@ def cli() -> None:
         help="Print research-only event alpha radar with opt-in market enrichment/anomaly inputs.",
     )
     parser.add_argument(
+        "--event-watchlist-refresh",
+        action="store_true",
+        help="Refresh research-only event alpha watchlist state from current alert candidates.",
+    )
+    parser.add_argument(
+        "--event-watchlist-report",
+        action="store_true",
+        help="Print latest research-only event alpha watchlist state.",
+    )
+    parser.add_argument(
         "--event-llm-shadow-report",
         action="store_true",
         help="Print research-only shadow LLM relationship analysis for event candidates.",
@@ -3156,6 +3210,12 @@ def cli() -> None:
         return
     if args.event_alpha_radar_report:
         event_alpha_radar_report(verbose=args.verbose, with_llm=args.with_llm)
+        return
+    if args.event_watchlist_refresh:
+        event_watchlist_refresh(verbose=args.verbose, with_llm=args.with_llm)
+        return
+    if args.event_watchlist_report:
+        event_watchlist_report(verbose=args.verbose)
         return
     if args.event_llm_shadow_report:
         event_llm_shadow_report(verbose=args.verbose)

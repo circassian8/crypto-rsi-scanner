@@ -113,7 +113,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `main.py --event-alpha-radar-report` / `make event-alpha-no-key-report`
   (research-only Event Alpha Radar view with opt-in market enrichment and
   market-anomaly rows; anomalies without catalyst evidence stay low-authority
-  review evidence) · `make event-alert-no-key-report` /
+  review evidence) · `main.py --event-watchlist-refresh` /
+  `main.py --event-watchlist-report` and `make event-watchlist-refresh` /
+  `make event-watchlist-report` (append/read research-only Event Alpha Radar
+  watchlist state; duplicate rows are persisted but only meaningful state
+  escalations are alertable metadata) · `make event-alert-no-key-report` /
   `make event-alert-no-key-llm-report` / `make event-alert-no-key-send`
   (no-key public RSS/GDELT/Polymarket event-alert research surfaces; send still
   requires explicit alert enablement) · `main.py --event-discovery-refresh` (fetch
@@ -245,6 +249,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_llm_models.py` / `event_llm_analyzer.py` / `llm_providers/` | research-only LLM relationship analysis for discovery candidates; verifies quoted evidence, compares LLM role/action with rule output, and can feed opt-in advisory event-alert tier quality control |
 | `event_llm_extraction_models.py` / `event_llm_extractor.py` | research-only LLM raw-event extraction for catalysts, asset/project mentions, false-positive terms, and date hints; extracted assets must still be validated by deterministic resolver logic |
 | `event_market_enrichment.py` / `event_anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; anomalies without catalyst evidence remain store-only/radar evidence and cannot create event-fade triggers |
+| `event_watchlist.py` | research-only Event Alpha Radar state cache; tracks raw/radar/watchlist/high-priority/event-passed/armed/triggered/terminal transitions and duplicate suppression without routing alerts or writing live storage |
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |
 | `event_validation.py` | research-only validation-sample loader/reviewer/labeling-queue/merger for human labels, outcome metrics, and promotion blockers |
 | `event_resolver.py` / `event_classification.py` | conservative asset matching and deterministic proxy/direct classification |
@@ -355,14 +360,19 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   candidates, alerts, paper trades, live DB rows, or event-fade eligibility
   unless deterministic resolver/classifier gates validate the asset and event
   through the normal discovery path.
-- Event Alpha Radar market enrichment and anomaly scanning are research-only and
-  disabled by default. Market enrichment may fill candidate market snapshots
-  from CoinGecko-style fixture/live rows, but raw reviewed event payloads win
-  when both exist. The market anomaly scanner may create low-authority raw
-  research events from top movers, volume/mcap spikes, or volume z-scores, but
-  anomalies without dated catalyst/source evidence must stay store-only or local
-  radar evidence; they cannot create proxy eligibility, `TRIGGERED_FADE`, normal
-  RSI alerts, paper trades, live DB writes, or execution.
+- Event Alpha Radar market enrichment, anomaly scanning, and watchlist state are
+  research-only and disabled by default. Market enrichment may fill candidate
+  market snapshots from CoinGecko-style fixture/live rows, but raw reviewed
+  event payloads win when both exist. The market anomaly scanner may create
+  low-authority raw research events from top movers, volume/mcap spikes, or
+  volume z-scores, but anomalies without dated catalyst/source evidence must
+  stay store-only or local radar evidence. The watchlist may append JSONL state
+  rows under the research cache for `RAW_EVIDENCE`, `RADAR`, `WATCHLIST`,
+  `HIGH_PRIORITY`, `EVENT_PASSED`, `ARMED`, `TRIGGERED_FADE`, `INVALIDATED`,
+  and `EXPIRED`, and may mark duplicate rows as suppressed unless state
+  escalates. None of these paths can create proxy eligibility, create
+  `TRIGGERED_FADE`, route normal RSI alerts, open paper trades, write live
+  signal/outcome/paper tables, or execute orders.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, explicit
   `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise
