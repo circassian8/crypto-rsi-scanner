@@ -136,6 +136,7 @@ def _run_record(
     router = getattr(result, "router_result", None)
     extraction_rows = list(getattr(result, "extraction_rows", ()) or ())
     relationship_rows = list(getattr(result, "relationship_rows", ()) or ())
+    card_paths = tuple(str(path) for path in getattr(result, "research_card_paths", ()) or ())
     llm_stats = _llm_stats((*extraction_rows, *relationship_rows))
     warnings = list(getattr(result, "warnings", ()) or ())
     if failure:
@@ -173,6 +174,8 @@ def _run_record(
         "send_items_delivered": _int(getattr(result, "send_items_delivered", 0)),
         "send_block_reason": getattr(result, "send_block_reason", None),
         "sent": bool(getattr(result, "send_success", False)),
+        "research_cards_written": len(card_paths),
+        "research_card_paths": card_paths,
         "provider_fetch_count": _int(getattr(catalyst, "provider_fetch_count", 0)),
         "provider_cache_hits": _int(getattr(catalyst, "provider_cache_hits", 0)),
         "provider_cache_misses": _int(getattr(catalyst, "provider_cache_misses", 0)),

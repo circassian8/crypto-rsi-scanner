@@ -320,6 +320,8 @@ def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]
             continue
         route = getattr(decision, "route", "")
         out[key] = {
+            "alert_id": getattr(decision, "alert_id", f"ea:{key}"),
+            "card_id": getattr(decision, "card_id", ""),
             "route": getattr(route, "value", str(route)),
             "route_alertable": bool(getattr(decision, "alertable", False)),
             "route_reason": str(getattr(decision, "reason", "") or ""),

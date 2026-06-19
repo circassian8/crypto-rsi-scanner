@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Polish Event Alpha burn-in daily radar · Codex
+**Why:** Event Alpha needed a coherent daily burn-in surface: profile-aware
+reports, provider health by service/role, active watchlist enrichment hints,
+policy comparison replay, stable alert/card IDs, and a compact scorecard for
+recent run quality.
+**Changes:**
+- Added `event_watchlist_enrichment.py` and integrated derivative/supply
+  enrichment hints into active watchlist monitoring without allowing monitor
+  updates to create `TRIGGERED_FADE`.
+- Added `event_alpha_burn_in.py` plus `--event-alpha-burn-in-scorecard`/`--days`
+  and `make event-alpha-burn-in-scorecard` for local run/alert/feedback/missed/
+  provider/LLM budget summaries.
+- Extended profile-aware report paths in `scanner.py` for daily brief,
+  explain-last-run, router report, card writing, replay comparison, and burn-in
+  status, with latest-profile inference for daily briefs.
+- Upgraded provider health rows to `provider_service:provider_role` keys while
+  preserving legacy name-only backoff compatibility.
+- Added stable routed `alert_id`/`card_id` values to router reports, Telegram
+  digest copy, alert snapshots, feedback lookup, and research-card filenames.
+- Expanded local replay comparison across baseline, priors, LLM advisory,
+  router-threshold, and profile variants.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md`; added regression tests for the new
+  operational paths.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 357/357. `make event-llm-eval
+PYTHON=python3` passed 9/9 golden cases. `make event-llm-extract-eval
+PYTHON=python3` passed 7/7 golden cases. `make event-alpha-eval
+PYTHON=python3` passed 11/11 golden checks. `make verify PYTHON=python3`
+passed. `make event-alpha-burn-in-scorecard PYTHON=python3` printed the local
+7-day burn-in scorecard successfully.
+**Notes/risks:** All new paths remain research-only. Derivatives/supply monitor
+hints can only become router material-change reasons; they cannot create
+`TRIGGERED_FADE`, normal RSI alerts, paper trades, live DB signal rows, or
+execution.
+
 ## 2026-06-19 — Polish Event Alpha policy-comparable daily radar · Codex
 **Why:** The Event Alpha Radar needed one more daily-operations pass so live
 research sources, active watchlist monitoring, prior comparisons, replay, daily

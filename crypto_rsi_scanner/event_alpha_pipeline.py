@@ -18,6 +18,7 @@ from . import (
     event_llm_analyzer,
     event_llm_extractor,
     event_watchlist,
+    event_watchlist_enrichment,
     event_watchlist_market,
     event_watchlist_monitor,
 )
@@ -56,6 +57,7 @@ class EventAlphaPipelineResult:
     send_items_attempted: int = 0
     send_items_delivered: int = 0
     send_block_reason: str | None = None
+    research_card_paths: tuple[Path, ...] = ()
 
     @property
     def raw_events(self) -> int:
@@ -141,6 +143,11 @@ def run_event_alpha_pipeline(
     watchlist_monitor_targeted_lookup: bool = False,
     watchlist_monitor_max_assets: int = 50,
     watchlist_monitor_market_cache_ttl_seconds: int = 900,
+    watchlist_monitor_derivatives_source: str = "cycle",
+    watchlist_monitor_supply_source: str = "cycle",
+    watchlist_monitor_derivatives_rows: Iterable[dict[str, Any]] = (),
+    watchlist_monitor_supply_rows: Iterable[dict[str, Any]] = (),
+    watchlist_monitor_enrichment_max_assets: int = 50,
     watchlist_monitor_route_updates: bool = True,
     extra_warnings: Iterable[str] = (),
 ) -> EventAlphaPipelineResult:
@@ -208,9 +215,20 @@ def run_event_alpha_pipeline(
                 now=observed,
             )
             warnings.extend(f"watchlist market: {warning}" for warning in market_source_result.warnings)
+            enrichment_result = event_watchlist_enrichment.enrichment_for_watchlist(
+                watchlist_read_result,
+                derivatives_source=watchlist_monitor_derivatives_source,
+                supply_source=watchlist_monitor_supply_source,
+                derivatives_rows=watchlist_monitor_derivatives_rows,
+                supply_rows=watchlist_monitor_supply_rows,
+                max_assets=watchlist_monitor_enrichment_max_assets,
+            )
+            warnings.extend(f"watchlist enrichment: {warning}" for warning in enrichment_result.warnings)
             watchlist_monitor_result = event_watchlist_monitor.monitor_watchlist(
                 watchlist_read_result,
                 market_rows=market_source_result.rows,
+                derivatives_by_asset=enrichment_result.derivatives,
+                supply_by_asset=enrichment_result.supply,
                 now=observed,
             )
             watchlist_read_result = event_watchlist_monitor.apply_monitor_updates_to_watchlist(
@@ -270,6 +288,11 @@ def run_event_alpha_operating_cycle(
     watchlist_monitor_targeted_lookup: bool = False,
     watchlist_monitor_max_assets: int = 50,
     watchlist_monitor_market_cache_ttl_seconds: int = 900,
+    watchlist_monitor_derivatives_source: str = "cycle",
+    watchlist_monitor_supply_source: str = "cycle",
+    watchlist_monitor_derivatives_rows: Iterable[dict[str, Any]] = (),
+    watchlist_monitor_supply_rows: Iterable[dict[str, Any]] = (),
+    watchlist_monitor_enrichment_max_assets: int = 50,
     watchlist_monitor_route_updates: bool = True,
     send: bool = False,
     send_callback: ResearchAlertSender | None = None,
@@ -389,6 +412,11 @@ def run_event_alpha_operating_cycle(
         watchlist_monitor_targeted_lookup=watchlist_monitor_targeted_lookup,
         watchlist_monitor_max_assets=watchlist_monitor_max_assets,
         watchlist_monitor_market_cache_ttl_seconds=watchlist_monitor_market_cache_ttl_seconds,
+        watchlist_monitor_derivatives_source=watchlist_monitor_derivatives_source,
+        watchlist_monitor_supply_source=watchlist_monitor_supply_source,
+        watchlist_monitor_derivatives_rows=watchlist_monitor_derivatives_rows,
+        watchlist_monitor_supply_rows=watchlist_monitor_supply_rows,
+        watchlist_monitor_enrichment_max_assets=watchlist_monitor_enrichment_max_assets,
         watchlist_monitor_route_updates=watchlist_monitor_route_updates,
         extra_warnings=warnings,
     )

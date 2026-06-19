@@ -39,6 +39,23 @@ class EventAlphaReplayResult:
     warnings: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class EventAlphaReplayPolicyRow:
+    policy: str
+    alerts: int
+    alertable: int
+    tier_counts: dict[str, int]
+    route_counts: dict[str, int]
+    score_deltas: tuple[tuple[str, int, int], ...] = ()
+    tier_changes: tuple[tuple[str, str, str], ...] = ()
+
+
+@dataclass(frozen=True)
+class EventAlphaReplayComparisonResult:
+    rows: tuple[EventAlphaReplayPolicyRow, ...]
+    warnings: tuple[str, ...] = ()
+
+
 def replay_from_artifacts(
     *,
     alert_rows: Iterable[Mapping[str, Any]] = (),
@@ -165,6 +182,80 @@ def replay_from_raw_events(
     )
 
 
+def compare_replay_policies(
+    *,
+    raw_events: Iterable[RawDiscoveredEvent],
+    assets: Iterable[DiscoveredAsset],
+    market_rows: Iterable[Mapping[str, Any]] = (),
+    policies: Iterable[str] = ("baseline", "llm_advisory", "priors"),
+    alert_cfg: event_alerts.EventAlertConfig | None = None,
+    priors_cfg: event_alpha_priors.EventAlphaPriorsConfig | None = None,
+    llm_provider: object | None = None,
+    llm_cfg: event_llm_analyzer.EventLLMConfig | None = None,
+    router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
+    router_threshold_variant: event_alpha_router.EventAlphaRouterConfig | None = None,
+    profile_variant_router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
+    now: datetime | None = None,
+) -> EventAlphaReplayComparisonResult:
+    """Compare named local replay policies without provider calls or sends."""
+    raw = tuple(raw_events)
+    asset_rows = tuple(assets)
+    market = tuple(dict(row) for row in market_rows if isinstance(row, Mapping))
+    base_router = router_cfg or event_alpha_router.EventAlphaRouterConfig(enabled=True)
+    priors_enabled_cfg = event_alpha_priors.EventAlphaPriorsConfig(
+        enabled=True,
+        path=priors_cfg.path if priors_cfg else None,
+        min_multiplier=priors_cfg.min_multiplier if priors_cfg else 0.70,
+        max_multiplier=priors_cfg.max_multiplier if priors_cfg else 1.30,
+    )
+    rows: list[EventAlphaReplayPolicyRow] = []
+    warnings: list[str] = ["policy comparison is local-only; no live providers or sends were attempted"]
+    for policy in [str(item).strip().lower() for item in policies if str(item).strip()]:
+        use_llm = policy in {"llm", "llm_advisory"}
+        use_priors = policy == "priors"
+        active_router = base_router
+        if policy == "router_threshold_variant":
+            active_router = router_threshold_variant or event_alpha_router.EventAlphaRouterConfig(
+                enabled=base_router.enabled,
+                include_suppressed=base_router.include_suppressed,
+                daily_digest_enabled=base_router.daily_digest_enabled,
+                instant_enabled=base_router.instant_enabled,
+                max_digest_items=base_router.max_digest_items,
+                max_high_priority_per_day=base_router.max_high_priority_per_day,
+                per_key_cooldown_hours=base_router.per_key_cooldown_hours,
+                alert_on_score_jump=True,
+                score_jump_threshold=max(1, base_router.score_jump_threshold // 2),
+                alert_on_new_independent_source=base_router.alert_on_new_independent_source,
+                alert_on_event_time_upgrade=base_router.alert_on_event_time_upgrade,
+                alert_on_derivatives_crowding_upgrade=base_router.alert_on_derivatives_crowding_upgrade,
+                alert_on_cluster_confidence_upgrade=base_router.alert_on_cluster_confidence_upgrade,
+            )
+        elif policy == "profile_variant":
+            active_router = profile_variant_router_cfg or base_router
+        replay = replay_from_raw_events(
+            raw_events=raw,
+            assets=asset_rows,
+            market_rows=market,
+            alert_cfg=alert_cfg,
+            priors_cfg=priors_enabled_cfg if use_priors else event_alpha_priors.EventAlphaPriorsConfig(enabled=False),
+            llm_provider=llm_provider if use_llm else None,
+            llm_cfg=llm_cfg if use_llm else None,
+            router_cfg=active_router,
+            now=now,
+        )
+        rows.append(EventAlphaReplayPolicyRow(
+            policy=policy,
+            alerts=replay.alert_rows,
+            alertable=replay.alertable_count,
+            tier_counts=replay.tier_counts_with_priors or replay.tier_counts or {},
+            route_counts=replay.route_counts or {},
+            score_deltas=replay.score_before_after,
+            tier_changes=replay.tier_changes,
+        ))
+        warnings.extend(replay.warnings)
+    return EventAlphaReplayComparisonResult(rows=tuple(rows), warnings=tuple(dict.fromkeys(warnings)))
+
+
 def load_raw_events_jsonl(path: str | Path) -> list[RawDiscoveredEvent]:
     rows = load_jsonl_rows(path)
     out: list[RawDiscoveredEvent] = []
@@ -245,6 +336,49 @@ def format_replay_report(result: EventAlphaReplayResult) -> str:
         lines.append("warnings: " + "; ".join(result.warnings))
     lines.append("No live providers, Telegram sends, paper trades, live DB rows, or execution were used.")
     return "\n".join(lines)
+
+
+def format_replay_comparison_report(result: EventAlphaReplayComparisonResult) -> str:
+    lines = [
+        "=" * 76,
+        "EVENT ALPHA REPLAY POLICY COMPARISON (local artifacts only)",
+        "=" * 76,
+    ]
+    if not result.rows:
+        lines.append("No replay policy rows.")
+        return "\n".join(lines)
+    baseline = result.rows[0]
+    baseline_routes = baseline.route_counts
+    for row in result.rows:
+        lines.append(
+            f"{row.policy}: alerts={row.alerts} alertable={row.alertable} "
+            f"alertable_delta={row.alertable - baseline.alertable:+d}"
+        )
+        lines.append("  tiers: " + _fmt_counts(row.tier_counts))
+        lines.append("  routes: " + _fmt_counts(row.route_counts))
+        route_changes = _count_delta(row.route_counts, baseline_routes)
+        if route_changes:
+            lines.append("  route_delta: " + _fmt_counts(route_changes))
+        if row.score_deltas:
+            lines.append(
+                "  score_deltas: "
+                + "; ".join(f"{key or 'unknown'} {before}->{after}" for key, before, after in row.score_deltas[:8])
+            )
+        if row.tier_changes:
+            lines.append(
+                "  tier_changes: "
+                + "; ".join(f"{key or 'unknown'} {before}->{after}" for key, before, after in row.tier_changes[:8])
+            )
+    if result.warnings:
+        lines.append("")
+        lines.append("warnings: " + "; ".join(result.warnings))
+    lines.append("No live providers, Telegram sends, paper trades, live DB rows, or execution were used.")
+    return "\n".join(lines).rstrip()
+
+
+def _count_delta(current: Mapping[str, int], baseline: Mapping[str, int]) -> dict[str, int]:
+    keys = set(current) | set(baseline)
+    return {key: int(current.get(key, 0)) - int(baseline.get(key, 0)) for key in sorted(keys) if int(current.get(key, 0)) != int(baseline.get(key, 0))}
 
 
 def _counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:

@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-19 - Keep Event Alpha burn-in polish research-only
+**Status:** accepted
+**Decision:** Event Alpha profile-aware daily reports, service/role provider
+health, active watchlist derivative/supply refresh, replay policy comparison,
+stable routed `alert_id`/`card_id` references, auto-written research cards, and
+burn-in scorecards are operational research tools only. Watchlist enrichment
+may mark material update hints such as derivatives heating or supply pressure,
+but those hints must route through the existing watchlist/router policy and
+must not create `TRIGGERED_FADE`. Replay comparisons and burn-in scorecards
+must read local artifacts and report recommendations only; they must not
+change thresholds, send alerts, write live signal/paper rows, open paper
+trades, or execute.
+**Why:** The radar is now mature enough for daily burn-in, but operational
+visibility and comparison tooling would be unsafe if it silently became signal
+authority.
+**Revisit when:** Burn-in artifacts, feedback, missed-opportunity rows, and
+outcomes show durable playbook/source value and the human explicitly approves a
+separate promotion.
+
 ## 2026-06-19 - Keep Event Alpha replay, priors shadow, and provider health advisory-only
 **Status:** accepted
 **Decision:** Event Alpha may wrap live event-source, catalyst-search,

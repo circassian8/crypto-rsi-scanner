@@ -6611,6 +6611,10 @@ def test_event_alpha_router_routes_watchlist_escalations_safely():
     assert "PFADE" in routed_digest
     assert "ATTN" in routed_digest
     assert "BADTRIG" not in routed_digest
+    assert "alert_id: ea:" in text
+    assert "card_id: card_" in text
+    assert "FEEDBACK_TARGET=ea:" in text
+    assert "alert_id=ea:" in routed_digest
 
 
 def test_event_alpha_router_routes_material_changes_with_lanes():
@@ -6940,6 +6944,14 @@ def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
         assert marked.key == entry.key
         assert marked.state == event_watchlist.EventWatchlistState.WATCHLIST.value
         assert "No live signal" in event_feedback.format_feedback_record(marked, path=cfg.path)
+        by_alert_id = event_feedback.mark_feedback(
+            f"ea:{entry.key}",
+            "watch",
+            watchlist_entries=[entry],
+            cfg=cfg,
+            marked_by="tester",
+        )
+        assert by_alert_id.key == entry.key
 
         try:
             event_feedback.mark_feedback("UNKNOWN", "junk", watchlist_entries=[entry], cfg=cfg)
@@ -6958,9 +6970,10 @@ def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
         assert missed.key is None
         assert missed.label == event_feedback.EventFeedbackLabel.MISSED.value
         loaded = event_feedback.load_feedback(cfg.path)
-        assert loaded.rows_read == 2
+        assert loaded.rows_read == 3
         report = event_feedback.format_feedback_report(loaded)
         assert "useful=1" in report
+        assert "watch=1" in report
         assert "missed=1" in report
 
 
@@ -7433,6 +7446,23 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
     assert "Rejected/noise links: BTC/bitcoin:publisher/source noise" in card.markdown
     assert "World Cup" in card.markdown
     assert ".env" not in card.markdown
+    card_by_alert_id = event_research_cards.render_research_card(
+        routed.alert_id,
+        watchlist_entries=[entry],
+        alert_rows=alerts,
+        route_decisions=[routed],
+        clusters=[cluster],
+    )
+    assert card_by_alert_id.found is True
+    card_dir = __import__("pathlib").Path(__import__("tempfile").mkdtemp())
+    written_cards = event_research_cards.write_research_cards(
+        card_dir,
+        watchlist_entries=[entry],
+        alert_rows=alerts,
+        route_decisions=[routed],
+        selected_tiers=("HIGH_PRIORITY_WATCH",),
+    )
+    assert any(routed.card_id in str(path) for path in written_cards.card_paths)
 
 
 def test_event_alpha_eval_fixture_passes():
@@ -13878,6 +13908,7 @@ def test_event_watchlist_market_targeted_provider_and_fallback():
 
 
 def test_event_provider_health_backoff_and_report():
+    import json
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
@@ -13891,14 +13922,75 @@ def test_event_provider_health_backoff_and_report():
         backoff_minutes=15,
     )
     assert event_provider_health.provider_allowed("gdelt", cfg=cfg, now=now).allowed
-    event_provider_health.record_provider_failure("gdelt", RuntimeError("timeout"), cfg=cfg, now=now)
-    event_provider_health.record_provider_failure("gdelt", RuntimeError("timeout"), cfg=cfg, now=now)
-    decision = event_provider_health.provider_allowed("gdelt", cfg=cfg, now=now)
+    event_provider_health.record_provider_failure(
+        "gdelt",
+        RuntimeError("timeout"),
+        cfg=cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="event_source",
+        provider_kind="event_source",
+    )
+    event_provider_health.record_provider_failure(
+        "gdelt",
+        RuntimeError("timeout"),
+        cfg=cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="event_source",
+        provider_kind="event_source",
+    )
+    event_provider_health.record_provider_success(
+        "gdelt",
+        cfg=cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="catalyst_search",
+        provider_kind="catalyst_search",
+    )
+    decision = event_provider_health.provider_allowed(
+        "gdelt",
+        cfg=cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="event_source",
+    )
     assert decision.allowed is False
     assert "backoff" in (decision.reason or "")
-    text = event_provider_health.format_provider_health_report(event_provider_health.load_provider_health(path))
+    search_decision = event_provider_health.provider_allowed(
+        "gdelt",
+        cfg=cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="catalyst_search",
+    )
+    assert search_decision.allowed is True
+    rows = event_provider_health.load_provider_health(path)
+    assert "gdelt:event_source" in rows
+    assert "gdelt:catalyst_search" in rows
+    text = event_provider_health.format_provider_health_report(rows)
     assert "gdelt" in text
     assert "failures=2" in text
+    assert "service health:" in text
+    assert "role health:" in text
+    assert "event_source:" in text
+    assert "catalyst_search:" in text
+
+    legacy_path = Path(tempfile.mkdtemp()) / "legacy_provider_health.json"
+    legacy_until = (now.replace(hour=11)).isoformat()
+    legacy_path.write_text(
+        json.dumps({"providers": {"gdelt": {"disabled_until": legacy_until, "consecutive_failures": 2}}}),
+        encoding="utf-8",
+    )
+    legacy_cfg = event_provider_health.EventProviderHealthConfig(path=legacy_path)
+    legacy_decision = event_provider_health.provider_allowed(
+        "gdelt",
+        cfg=legacy_cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="event_source",
+    )
+    assert legacy_decision.allowed is False
 
 
 def test_event_provider_health_wraps_event_and_enrichment_providers():
@@ -13933,9 +14025,10 @@ def test_event_provider_health_wraps_event_and_enrichment_providers():
     assert wrapped.fetch_events(now, now) == []
     assert wrapped.last_warnings
     assert wrapped.fetch_events(now, now) == []
-    row = event_provider_health.load_provider_health(path)["flaky_gdelt"]
+    row = event_provider_health.load_provider_health(path)["flaky_gdelt:event_source"]
     assert row["consecutive_failures"] == 0
     assert row["provider_kind"] == "event_source"
+    assert row["provider_role"] == "event_source"
 
     skip_path = Path(tempfile.mkdtemp()) / "skip_health.json"
     skip_now = datetime.now(timezone.utc)
@@ -13975,17 +14068,18 @@ def test_event_provider_health_wraps_event_and_enrichment_providers():
     assets = event_provider_health.HealthCheckedUniverseProvider(FailingUniverse(), cfg=cfg).fetch_assets()
     assert assets == []
     rows = event_provider_health.load_provider_health(path)
-    assert rows["coingecko_universe"]["provider_kind"] == "enrichment"
+    assert rows["coingecko:universe"]["provider_kind"] == "enrichment"
+    assert rows["coingecko:universe"]["provider_role"] == "universe"
 
     missing_fixture = Path(tempfile.mkdtemp()) / "missing-markets.json"
     real_provider = CoinGeckoUniverseProvider(missing_fixture)
     assert event_provider_health.HealthCheckedUniverseProvider(real_provider, cfg=cfg).fetch_assets() == []
     rows = event_provider_health.load_provider_health(path)
-    assert rows["coingecko_universe"]["consecutive_failures"] >= 1
-    assert rows["coingecko_universe"]["last_error_class"]
+    assert rows["coingecko:universe"]["consecutive_failures"] >= 1
+    assert rows["coingecko:universe"]["last_error_class"]
     report = event_provider_health.format_provider_health_report(rows)
     assert "event_source:" in report
-    assert "enrichment:" in report
+    assert "universe:" in report
 
 
 def test_event_alpha_priors_adjust_research_score_but_not_triggered_fade():
@@ -14028,7 +14122,7 @@ def test_event_alpha_priors_shadow_report_and_raw_replay_are_local():
     import tempfile
     from datetime import datetime, timezone
     from pathlib import Path
-    from crypto_rsi_scanner import event_alerts, event_alpha_priors, event_alpha_replay, event_discovery
+    from crypto_rsi_scanner import event_alerts, event_alpha_priors, event_alpha_replay, event_alpha_router, event_discovery
 
     result = _full_event_discovery_fixture_result()
     alerts = event_alerts.build_event_alert_candidates(result)
@@ -14065,6 +14159,26 @@ def test_event_alpha_priors_shadow_report_and_raw_replay_are_local():
     replay_text = event_alpha_replay.format_replay_report(replay)
     assert "local artifacts only" in replay_text
     assert "No live providers" in replay_text
+    comparison = event_alpha_replay.compare_replay_policies(
+        raw_events=result.raw_events,
+        assets=assets,
+        market_rows=market_rows,
+        policies=("baseline", "priors", "router_threshold_variant", "profile_variant"),
+        priors_cfg=event_alpha_priors.EventAlphaPriorsConfig(enabled=True, path=priors_path),
+        router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True, score_jump_threshold=20),
+        profile_variant_router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True, score_jump_threshold=5),
+        now=datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc),
+    )
+    assert [row.policy for row in comparison.rows] == [
+        "baseline",
+        "priors",
+        "router_threshold_variant",
+        "profile_variant",
+    ]
+    comparison_text = event_alpha_replay.format_replay_comparison_report(comparison)
+    assert "EVENT ALPHA REPLAY POLICY COMPARISON" in comparison_text
+    assert "local-only" in comparison_text
+    assert "router_threshold_variant" in comparison_text
 
 
 def test_watchlist_coingecko_targeted_provider_cache_and_fallback():
@@ -14120,6 +14234,58 @@ def test_watchlist_coingecko_targeted_provider_cache_and_fallback():
     assert monitored.rows[0].material_update is True
     updated = event_watchlist_monitor.apply_monitor_updates_to_watchlist(read, monitored)
     assert updated.entries[0].state != "TRIGGERED_FADE"
+
+
+def test_watchlist_monitor_uses_derivatives_and_supply_enrichment_without_triggering_fade():
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_router,
+        event_watchlist,
+        event_watchlist_enrichment,
+        event_watchlist_monitor,
+    )
+
+    entry = _test_watchlist_entry(state="WATCHLIST", symbol="VELVET", coin_id="velvet")
+    read = event_watchlist.EventWatchlistReadResult(
+        state_path=Path("watchlist.jsonl"),
+        rows_read=1,
+        entries=[entry],
+        latest_only=True,
+    )
+    enrichment = event_watchlist_enrichment.enrichment_for_watchlist(
+        read,
+        derivatives_source="fixture",
+        supply_source="fixture",
+        derivatives_rows=[{"coin_id": "velvet", "derivatives_crowding": 68}],
+        supply_rows=[{"coin_id": "velvet", "supply_pressure": 72}],
+    )
+    assert enrichment.assets_requested == 1
+    assert enrichment.derivatives["velvet"]["derivatives_crowding"] == 68
+    assert enrichment.supply["velvet"]["supply_pressure"] == 72
+    monitored = event_watchlist_monitor.monitor_watchlist(
+        read,
+        derivatives_by_asset=enrichment.derivatives,
+        supply_by_asset=enrichment.supply,
+        now=datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc),
+    )
+    row = monitored.rows[0]
+    assert row.material_update is True
+    assert "DERIVATIVES_HEATED" in row.state_transition_hints
+    assert "SUPPLY_PRESSURE_UPGRADED" in row.state_transition_hints
+    updated = event_watchlist_monitor.apply_monitor_updates_to_watchlist(read, monitored)
+    updated_entry = updated.entries[0]
+    assert updated_entry.state == event_watchlist.EventWatchlistState.WATCHLIST.value
+    assert "derivatives_crowding_upgrade" in updated_entry.material_change_reasons
+    assert "supply_pressure_upgrade" in updated_entry.material_change_reasons
+    assert "score_jump" in updated_entry.material_change_reasons
+    routed = event_alpha_router.route_watchlist(
+        updated,
+        cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+    )
+    decision = routed.decisions[0]
+    assert decision.alertable is True
+    assert decision.route != event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
 
 
 def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
@@ -14229,15 +14395,107 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
     assert runs.read_text(encoding="utf-8") == ""
 
 
+def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_burn_in
+
+    now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
+    scorecard = event_alpha_burn_in.build_burn_in_scorecard(
+        days=7,
+        now=now,
+        run_rows=[
+            {
+                "started_at": "2026-06-19T10:00:00+00:00",
+                "success": True,
+                "raw_events": 5,
+                "candidates": 3,
+                "alertable": 1,
+            },
+            {
+                "started_at": "2026-06-18T10:00:00+00:00",
+                "success": False,
+                "raw_events": 0,
+                "candidates": 0,
+                "alertable": 0,
+            },
+        ],
+        alert_rows=[
+            {
+                "observed_at": "2026-06-19T10:01:00+00:00",
+                "alert_key": "cluster|velvet|proxy_attention",
+                "tier": "WATCHLIST",
+                "playbook_type": "proxy_attention",
+                "source": "gdelt",
+            },
+            {
+                "observed_at": "2026-06-19T10:02:00+00:00",
+                "alert_key": "cluster|btc|source_noise_control",
+                "tier": "STORE_ONLY",
+                "playbook_type": "source_noise_control",
+                "source": "rss",
+            },
+        ],
+        feedback_rows=[
+            {
+                "marked_at": "2026-06-19T11:00:00+00:00",
+                "key": "cluster|btc|source_noise_control",
+                "label": "junk",
+            },
+            {
+                "marked_at": "2026-06-19T11:05:00+00:00",
+                "key": "cluster|velvet|proxy_attention",
+                "label": "useful",
+            },
+        ],
+        missed_rows=[
+            {
+                "observed_at": "2026-06-19T11:30:00+00:00",
+                "failure_stage": "resolver_missed_asset",
+            }
+        ],
+        provider_health_rows={
+            "gdelt:event_source": {
+                "provider_key": "gdelt:event_source",
+                "consecutive_failures": 2,
+                "disabled_until": "2026-06-19T12:30:00+00:00",
+            }
+        },
+        llm_budget_rows=[
+            {
+                "date": "2026-06-19",
+                "extractor_calls_attempted": 2,
+                "relationship_calls_attempted": 1,
+                "cache_hits": 4,
+                "cache_misses": 3,
+                "skipped_due_budget": 1,
+                "estimated_cost_usd": 0.12,
+            }
+        ],
+    )
+    text = event_alpha_burn_in.format_burn_in_scorecard(scorecard)
+    assert "EVENT ALPHA BURN-IN SCORECARD" in text
+    assert "runs=2 successful=1 failed=1" in text
+    assert "WATCHLIST=1" in text
+    assert "resolver_missed_asset=1" in text
+    assert "gdelt:event_source(2)" in text
+    assert "calls=3" in text
+    assert "inspect degraded provider health" in text
+    assert "No thresholds, alert tiers, paper trades, live DB rows, or execution were changed." in text
+
+
 def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     text = __import__("pathlib").Path("Makefile").read_text(encoding="utf-8")
     assert "event-alpha-priors-shadow-report:" in text
     assert "event-alpha-burn-in-no-key:" in text
     assert "event-alpha-burn-in-llm:" in text
+    assert "event-alpha-burn-in-scorecard:" in text
     assert "event-alpha-weekly-review:" in text
     assert "--event-alpha-priors-shadow-report" in text
     burn_in = text.split("event-alpha-burn-in-no-key:", 1)[1].split("event-alpha-burn-in-llm:", 1)[0]
     assert "--event-alert-send" not in burn_in
+    assert "--event-alpha-profile no_key_live" in burn_in
+    llm_burn_in = text.split("event-alpha-burn-in-llm:", 1)[1].split("event-alpha-weekly-review:", 1)[0]
+    assert "--event-alpha-profile full_llm_live" in llm_burn_in
 
 
 def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):

@@ -180,6 +180,7 @@ def write_research_cards(
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
     clusters: Iterable[event_graph.EventCluster] = (),
     include_all_alertable: bool = True,
+    selected_tiers: Iterable[str] | None = None,
     limit: int = 25,
     now: datetime | None = None,
 ) -> EventResearchCardWriteResult:
@@ -187,7 +188,12 @@ def write_research_cards(
     target = Path(out_dir).expanduser()
     target.mkdir(parents=True, exist_ok=True)
     observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    entries = _selected_entries(list(watchlist_entries), list(route_decisions), include_all_alertable=include_all_alertable)
+    entries = _selected_entries(
+        list(watchlist_entries),
+        list(route_decisions),
+        include_all_alertable=include_all_alertable,
+        selected_tiers=selected_tiers,
+    )
     card_paths: list[Path] = []
     for entry in entries[: max(1, limit)]:
         card = render_research_card(
@@ -227,10 +233,13 @@ def format_card_write_result(result: EventResearchCardWriteResult) -> str:
 
 
 def _find_entry(key: str, entries: list[event_watchlist.EventWatchlistEntry]) -> event_watchlist.EventWatchlistEntry | None:
-    key_l = key.lower()
+    clean_key = key[3:] if key.startswith("ea:") else key
+    if clean_key.startswith("card_"):
+        clean_key = clean_key[5:]
+    key_l = clean_key.lower()
     matches = [
         entry for entry in entries
-        if key in {entry.key, entry.event_id}
+        if clean_key in {entry.key, entry.event_id}
         or key_l in {entry.symbol.lower(), entry.coin_id.lower()}
     ]
     return matches[0] if matches else None
@@ -241,15 +250,17 @@ def _selected_entries(
     decisions: list[event_alpha_router.EventAlphaRouteDecision],
     *,
     include_all_alertable: bool,
+    selected_tiers: Iterable[str] | None,
 ) -> list[event_watchlist.EventWatchlistEntry]:
     selected_by_key: dict[str, event_watchlist.EventWatchlistEntry] = {}
-    states = {
+    states = set(selected_tiers or {
         event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
         event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
         event_watchlist.EventWatchlistState.WATCHLIST.value,
-    }
+        "HIGH_PRIORITY_WATCH",
+    })
     for entry in entries:
-        if entry.state in states:
+        if entry.state in states or entry.latest_tier in states:
             selected_by_key[entry.key] = entry
     if include_all_alertable:
         for decision in decisions:
@@ -263,15 +274,7 @@ def _selected_entries(
 
 
 def _card_filename(entry: event_watchlist.EventWatchlistEntry) -> str:
-    base = "_".join(
-        part for part in (
-            entry.symbol.upper(),
-            entry.state.lower(),
-            (entry.latest_effective_playbook_type or entry.latest_playbook_type or "playbook"),
-            entry.key,
-        )
-        if part
-    )
+    base = event_alpha_router.card_id_for_entry(entry)
     return _slug(base)[:180] + ".md"
 
 
@@ -301,7 +304,8 @@ def _strip_sensitive(markdown: str) -> str:
 
 
 def _find_alert(key: str, rows: list[Mapping[str, Any]]) -> Mapping[str, Any] | None:
-    key_l = key.lower()
+    clean_key = key[3:] if key.startswith("ea:") else key
+    key_l = clean_key.lower()
     for row in rows:
         values = {
             str(row.get("alert_key") or ""),
@@ -309,7 +313,7 @@ def _find_alert(key: str, rows: list[Mapping[str, Any]]) -> Mapping[str, Any] | 
             str(row.get("asset_symbol") or ""),
             str(row.get("asset_coin_id") or ""),
         }
-        if key in values or key_l in {value.lower() for value in values}:
+        if clean_key in values or key_l in {value.lower() for value in values}:
             return row
     return None
 
@@ -318,10 +322,14 @@ def _find_decision(
     key: str,
     decisions: list[event_alpha_router.EventAlphaRouteDecision],
 ) -> event_alpha_router.EventAlphaRouteDecision | None:
-    key_l = key.lower()
+    clean_key = key[3:] if key.startswith("ea:") else key
+    key_l = clean_key.lower()
     for decision in decisions:
         entry = decision.entry
-        if key in {entry.key, entry.event_id} or key_l in {entry.symbol.lower(), entry.coin_id.lower()}:
+        if clean_key in {entry.key, entry.event_id, decision.alert_id, decision.card_id} or key_l in {
+            entry.symbol.lower(),
+            entry.coin_id.lower(),
+        }:
             return decision
     return None
 

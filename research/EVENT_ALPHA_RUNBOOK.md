@@ -19,9 +19,9 @@ rows, prints router output, and summarizes alert snapshots. If no alerts arrive,
 run:
 
 ```bash
-make event-alpha-explain-last-run
+make event-alpha-explain-last-run PROFILE=no_key_live
 make event-alpha-open-items
-make event-alpha-daily-brief
+make event-alpha-daily-brief PROFILE=no_key_live
 ```
 
 The first command explains where the funnel stopped. The second checks active
@@ -34,6 +34,15 @@ explain without enabling sends:
 
 ```bash
 make event-alpha-burn-in-no-key
+```
+
+For a 7-day operational scorecard across recent run-ledger rows, alert
+snapshots, feedback, missed opportunities, provider health, and LLM budget
+usage:
+
+```bash
+make event-alpha-burn-in-scorecard
+python3 main.py --event-alpha-burn-in-scorecard --days 7
 ```
 
 ## Full LLM No-Send Review
@@ -133,7 +142,7 @@ make event-research-cards ALERT_KEY=cluster_id\|coin_id\|playbook
 Write selected cards and an index:
 
 ```bash
-make event-research-cards-write
+make event-research-cards-write PROFILE=no_key_live
 ```
 
 Cards are Markdown artifacts under `RSI_EVENT_RESEARCH_CARDS_DIR` and include
@@ -141,12 +150,21 @@ playbook, source evidence, LLM interpretation, market confirmation, warnings,
 verification steps, a playbook-specific trade-readiness checklist,
 invalidation, and outcome fields.
 
+Router reports now show stable `alert_id` and `card_id` values. Use the
+`ea:...` alert ID in feedback commands, and the matching `card_...` ID/filename
+when opening generated cards:
+
+```bash
+make event-alpha-router-report PROFILE=no_key_live
+make event-feedback-useful FEEDBACK_TARGET=ea:cluster_id\|coin_id\|playbook
+```
+
 ## When No Alerts Arrive
 
 Run:
 
 ```bash
-make event-alpha-explain-last-run
+make event-alpha-explain-last-run PROFILE=no_key_live
 make event-alpha-status PROFILE=no_key_live
 make event-alpha-runs-report
 ```
@@ -163,9 +181,11 @@ Common causes:
 ## Provider Health and Replay
 
 Provider health is stored locally under `RSI_EVENT_PROVIDER_HEALTH_PATH`.
-Non-fixture event-source, enrichment, and catalyst-search providers may be
-skipped temporarily after repeated failures or DNS-like errors. Inspect grouped
-event-source/enrichment/catalyst-search rows with:
+Non-fixture event-source, universe, derivatives, catalyst-search, and LLM
+providers may be skipped temporarily after repeated failures or DNS-like
+errors. Rows are keyed by `provider_service:provider_role`, while legacy
+name-only rows are still read for backoff compatibility. Inspect grouped
+service/role health with:
 
 ```bash
 make event-alpha-status PROFILE=no_key_live
@@ -191,6 +211,17 @@ python3 main.py --event-alpha-replay \
 ```
 
 This writes no live artifacts and uses a temporary watchlist path.
+
+To compare local replay policies from the same raw event evidence:
+
+```bash
+python3 main.py --event-alpha-replay \
+  --event-alpha-replay-raw-events event_fade_cache/raw_events.jsonl \
+  --event-alpha-replay-market-rows fixtures/coingecko_smoke/top_markets.json \
+  --event-alpha-replay-compare baseline,llm_advisory,priors,router_threshold_variant,profile_variant \
+  --event-alpha-replay-profile no_key_live \
+  --event-alpha-replay-profile-alt research_send
+```
 
 ## Retention
 

@@ -53,6 +53,14 @@ class EventAlphaRouteDecision:
     lane: EventAlphaRouteLane = EventAlphaRouteLane.LOCAL_ONLY
     warnings: tuple[str, ...] = ()
 
+    @property
+    def alert_id(self) -> str:
+        return alert_id_for_entry(self.entry)
+
+    @property
+    def card_id(self) -> str:
+        return card_id_for_entry(self.entry)
+
 
 @dataclass(frozen=True)
 class EventAlphaRouterResult:
@@ -114,6 +122,7 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
             f"{decision.route.value:<24} score={entry.latest_score:>3} high={entry.highest_score:>3} "
             f"{entry.symbol}/{entry.coin_id}"
         )
+        rows.append(f"  alert_id: {decision.alert_id} · card_id: {decision.card_id}")
         rows.append(f"  event: {entry.latest_event_name}")
         rows.append(
             f"  state: {entry.previous_state or 'new'} -> {entry.state} · "
@@ -125,6 +134,8 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
         )
         rows.append(f"  route reason: {decision.reason}")
         rows.append(f"  lane: {decision.lane.value}")
+        rows.append(f"  card: {decision.card_id}.md")
+        rows.append(f"  feedback: make event-feedback-useful FEEDBACK_TARGET={decision.alert_id}")
         if entry.latest_llm_asset_role:
             rows.append(
                 f"  llm: role={entry.latest_llm_asset_role} "
@@ -167,6 +178,7 @@ def format_routed_telegram_digest(decisions: Iterable[EventAlphaRouteDecision]) 
             conf = entry.latest_llm_confidence if entry.latest_llm_confidence is not None else 0.0
             lines.append(f"llm={_esc(entry.latest_llm_asset_role)} conf={conf:.2f}")
         lines.append(f"lane={_esc(decision.lane.value)} route_reason={_esc(decision.reason)}")
+        lines.append(f"alert_id={_esc(decision.alert_id)}")
         warnings = tuple(dict.fromkeys((*entry.warnings, *decision.warnings)))
         if warnings:
             lines.append("warnings=" + _esc("; ".join(warnings[:3])))
@@ -326,6 +338,14 @@ def _route_entry(
     )
 
 
+def alert_id_for_entry(entry: event_watchlist.EventWatchlistEntry) -> str:
+    return f"ea:{entry.key}"
+
+
+def card_id_for_entry(entry: event_watchlist.EventWatchlistEntry) -> str:
+    return "card_" + "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in entry.key)[:180]
+
+
 def _material_change_allowed(
     entry: event_watchlist.EventWatchlistEntry,
     cfg: EventAlphaRouterConfig,
@@ -355,6 +375,8 @@ def _material_change_allowed(
             allowed = True
         else:
             blocked.append("derivatives upgrade alerts disabled")
+    if "supply_pressure_upgrade" in reasons:
+        allowed = True
     if "cluster_confidence_upgrade" in reasons:
         if cfg.alert_on_cluster_confidence_upgrade:
             allowed = True

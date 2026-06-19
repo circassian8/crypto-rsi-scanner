@@ -25,6 +25,7 @@ MONITOR_HINT_TO_ROUTER_REASON = {
     "EVENT_PASSED": "event_time_upgrade",
     "POST_EVENT_MONITORING": "event_time_upgrade",
     "DERIVATIVES_HEATED": "derivatives_crowding_upgrade",
+    "SUPPLY_PRESSURE_UPGRADED": "supply_pressure_upgrade",
     "MARKET_SCORE_JUMP": "score_jump",
 }
 
@@ -46,6 +47,7 @@ class EventWatchlistMonitorRow:
     volume_to_market_cap: float | None
     volume_zscore_24h: float | None
     derivatives_crowding: int
+    supply_pressure: int
     cluster_confidence: int
     state_transition_hints: tuple[str, ...]
     material_update: bool
@@ -65,6 +67,8 @@ def monitor_watchlist(
     read_result: event_watchlist.EventWatchlistReadResult,
     *,
     market_rows: Iterable[Mapping[str, Any]] = (),
+    derivatives_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
+    supply_by_asset: Mapping[str, Mapping[str, Any]] | None = None,
     now: datetime | None = None,
 ) -> EventWatchlistMonitorResult:
     """Refresh active watchlist rows with market/derivative observations.
@@ -75,6 +79,8 @@ def monitor_watchlist(
     """
     observed = _as_utc(now or datetime.now(timezone.utc))
     market_by_key = _market_by_key(market_rows, observed)
+    derivatives_by_key = _normalise_asset_map(derivatives_by_asset or {})
+    supply_by_key = _normalise_asset_map(supply_by_asset or {})
     rows: list[EventWatchlistMonitorRow] = []
     skipped = 0
     for entry in read_result.entries:
@@ -83,7 +89,7 @@ def monitor_watchlist(
             continue
         if entry.state not in ACTIVE_STATES:
             continue
-        rows.append(_row_for_entry(entry, market_by_key, observed))
+        rows.append(_row_for_entry(entry, market_by_key, derivatives_by_key, supply_by_key, observed))
     return EventWatchlistMonitorResult(
         state_path=read_result.state_path,
         observed_at=observed.isoformat(),
@@ -126,6 +132,10 @@ def apply_monitor_updates_to_watchlist(
             for hint in row.state_transition_hints
             if hint in MONITOR_HINT_TO_ROUTER_REASON
         ))
+        if "supply_pressure_upgrade" in reasons:
+            reasons = tuple(
+                dict.fromkeys((*reasons, "score_jump"))
+            )
         if not reasons:
             updated.append(entry)
             continue
@@ -200,7 +210,8 @@ def format_watchlist_monitor_report(result: EventWatchlistMonitorResult) -> str:
             lines.append(f"  event_age_hours: {row.event_age_hours:.1f}")
         lines.append(
             f"  derivatives={row.derivatives_crowding} cluster_conf={row.cluster_confidence} "
-            f"volume/mcap={_fmt_num(row.volume_to_market_cap)} vz={_fmt_num(row.volume_zscore_24h)}"
+            f"supply={row.supply_pressure} volume/mcap={_fmt_num(row.volume_to_market_cap)} "
+            f"vz={_fmt_num(row.volume_zscore_24h)}"
         )
         if row.state_transition_hints:
             lines.append("  hints: " + ", ".join(row.state_transition_hints))
@@ -232,16 +243,37 @@ def load_market_rows(path: str | Path | None) -> list[dict[str, Any]]:
 def _row_for_entry(
     entry: event_watchlist.EventWatchlistEntry,
     market_by_key: Mapping[str, Mapping[str, Any]],
+    derivatives_by_key: Mapping[str, Mapping[str, Any]],
+    supply_by_key: Mapping[str, Mapping[str, Any]],
     observed: datetime,
 ) -> EventWatchlistMonitorRow:
     market = market_by_key.get(entry.coin_id.casefold()) or market_by_key.get(entry.symbol.upper()) or {}
+    derivatives_row = derivatives_by_key.get(entry.coin_id.casefold()) or derivatives_by_key.get(entry.symbol.upper()) or {}
+    supply_row = supply_by_key.get(entry.coin_id.casefold()) or supply_by_key.get(entry.symbol.upper()) or {}
     current_price = _float(market.get("price") or market.get("current_price") or entry.latest_market_snapshot.get("price"))
     return_24h = _float(market.get("return_24h") or entry.latest_market_snapshot.get("return_24h"))
     return_72h = _float(market.get("return_72h") or entry.latest_market_snapshot.get("return_72h"))
     return_7d = _float(market.get("return_7d") or entry.latest_market_snapshot.get("return_7d"))
     volume_mcap = _float(market.get("volume_to_market_cap") or entry.latest_market_snapshot.get("volume_to_market_cap"))
     volume_z = _float(market.get("volume_zscore_24h") or entry.latest_market_snapshot.get("volume_zscore_24h"))
-    derivatives = _int(entry.latest_score_components.get("derivatives_crowding"))
+    derivatives = max(
+        _int(entry.latest_score_components.get("derivatives_crowding")),
+        _int(_first_present(
+            derivatives_row,
+            "derivatives_crowding",
+            "crowding_score",
+            "open_interest_crowding",
+        )),
+    )
+    supply = max(
+        _int(entry.latest_score_components.get("supply_pressure")),
+        _int(_first_present(
+            supply_row,
+            "supply_pressure",
+            "unlock_pressure",
+            "supply_pressure_score",
+        )),
+    )
     cluster_conf = _int(entry.latest_score_components.get("cluster_confidence"))
     event_ts = _dt(entry.event_time)
     countdown = None
@@ -259,11 +291,19 @@ def _row_for_entry(
             hints.append("POST_EVENT_MONITORING")
     if derivatives >= 50:
         hints.append("DERIVATIVES_HEATED")
+    if supply >= 50:
+        hints.append("SUPPLY_PRESSURE_UPGRADED")
     if (return_24h is not None and abs(return_24h) >= 0.15) or (volume_z is not None and volume_z >= 3.0):
         hints.append("MARKET_SCORE_JUMP")
     material = any(
         hint in set(hints)
-        for hint in {"EVENT_TIME_APPROACHING", "EVENT_PASSED", "DERIVATIVES_HEATED", "MARKET_SCORE_JUMP"}
+        for hint in {
+            "EVENT_TIME_APPROACHING",
+            "EVENT_PASSED",
+            "DERIVATIVES_HEATED",
+            "SUPPLY_PRESSURE_UPGRADED",
+            "MARKET_SCORE_JUMP",
+        }
     )
     warnings = tuple(w for w in entry.warnings if w)
     if entry.state == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value:
@@ -284,6 +324,7 @@ def _row_for_entry(
         volume_to_market_cap=volume_mcap,
         volume_zscore_24h=volume_z,
         derivatives_crowding=derivatives,
+        supply_pressure=supply,
         cluster_confidence=cluster_conf,
         state_transition_hints=tuple(dict.fromkeys(hints)),
         material_update=material,
@@ -307,6 +348,32 @@ def _market_by_key(rows: Iterable[Mapping[str, Any]], observed: datetime) -> dic
         if symbol:
             out[symbol] = enriched
     return out
+
+
+def _normalise_asset_map(rows: Mapping[str, Mapping[str, Any]]) -> dict[str, Mapping[str, Any]]:
+    out: dict[str, Mapping[str, Any]] = {}
+    for key, row in rows.items():
+        if not isinstance(row, Mapping):
+            continue
+        text_key = str(key or "").strip()
+        if text_key:
+            out[text_key.casefold()] = row
+            out[text_key.upper()] = row
+        coin_id = str(row.get("coin_id") or row.get("id") or "").strip()
+        symbol = str(row.get("symbol") or row.get("base_symbol") or row.get("base_asset") or "").strip()
+        if coin_id:
+            out[coin_id.casefold()] = row
+        if symbol:
+            out[symbol.upper()] = row
+    return out
+
+
+def _first_present(row: Mapping[str, Any], *keys: str) -> object:
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, ""):
+            return value
+    return None
 
 
 def _fmt_pct(value: float | None) -> str:

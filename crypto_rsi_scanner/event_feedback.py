@@ -180,11 +180,12 @@ def _find_watchlist_entry(
     target: str,
     entries: list[event_watchlist.EventWatchlistEntry],
 ) -> event_watchlist.EventWatchlistEntry | None:
-    target_l = target.strip().lower()
+    clean_target = target[3:] if str(target).startswith("ea:") else target
+    target_l = clean_target.strip().lower()
     exact = [
         entry
         for entry in entries
-        if target == entry.key or target == entry.event_id
+        if clean_target == entry.key or clean_target == entry.event_id
     ]
     if len(exact) == 1:
         return exact[0]
