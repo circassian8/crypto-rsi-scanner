@@ -22,10 +22,14 @@ decision, rationale, and revisit condition.
 for burn-in-safe artifact handling. Profiled runs should write under isolated
 artifact namespaces by default, run-ledger rows and alert snapshots should carry
 joinable run/profile/namespace lineage, and burn-in/readiness/health reports
-should ignore `test`, `fixture`, and `replay` rows unless explicitly asked to
-include them. The artifact doctor may flag missing snapshots, orphaned rows,
-mixed namespaces, missing provider/budget evidence, and card lineage gaps, but
-it is a reporting tool only.
+should ignore `test`, `fixture`, `replay`, and legacy/default rows unless
+explicitly asked to include them for migration review. Alertable run rows that
+claim snapshot writes must have matching alert-snapshot rows in the inspected
+store, while external snapshot paths are reported safely instead of read
+implicitly. The artifact doctor may flag missing snapshots, orphaned rows, mixed
+namespaces, missing provider/budget evidence, unknown feedback/outcome IDs, and
+card lineage gaps; strict mode may escalate migration-tolerant warnings into
+blockers, but it is still a reporting tool only.
 **Why:** Shared flat artifacts made it too easy for fixture/test rows to pollute
 operational burn-in evidence or for alertable runs to lose snapshot lineage.
 The radar needs auditable local files before any human can judge readiness.

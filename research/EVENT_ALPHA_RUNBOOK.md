@@ -57,6 +57,37 @@ python3 main.py --event-alpha-burn-in-checklist --days 7
 The checklist is advisory only. It does not enable sends, change thresholds,
 apply priors, write live signal rows, paper trade, or execute.
 
+## Artifact Hygiene
+
+Profile-specific burn-in and readiness reports count only rows with explicit
+`run_mode` and `artifact_namespace` metadata. Legacy/default rows from earlier
+flat artifact files are ignored by default so a no-key burn-in, LLM burn-in, or
+research-send review cannot borrow unrelated evidence.
+
+Run the artifact doctor before judging a burn-in window:
+
+```bash
+make event-alpha-artifact-doctor PROFILE=no_key_live
+STRICT=1 make event-alpha-artifact-doctor PROFILE=no_key_live
+```
+
+The doctor checks run-ledger to alert-snapshot lineage, missing matching
+snapshot rows for alertable runs, external snapshot paths, orphan alerts,
+mixed namespaces, provider health, budget rows, feedback/outcome IDs, and card
+coverage. Strict mode escalates migration-tolerant warnings such as legacy
+snapshot mismatches, mixed namespaces, missing live provider health, and unknown
+feedback/outcome IDs into blockers.
+
+For migration review only, include legacy/default rows explicitly:
+
+```bash
+INCLUDE_LEGACY=1 make event-alpha-burn-in-scorecard PROFILE=no_key_live
+INCLUDE_LEGACY=1 make event-alpha-artifact-doctor PROFILE=no_key_live
+```
+
+Do not use legacy-included reports as promotion evidence. They are for
+understanding older artifacts while new namespaced burn-in rows accumulate.
+
 For explicit v1 gate flags across scheduled burn-in, research-send readiness,
 and full-LLM live readiness:
 

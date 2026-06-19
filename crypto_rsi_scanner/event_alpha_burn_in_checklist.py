@@ -34,6 +34,11 @@ def build_burn_in_checklist(
     if successful < max(1, min_successful_runs):
         blockers.append("no recent successful Event Alpha cycle runs")
         next_actions.append("run an Event Alpha burn-in cycle for the target profile")
+    if scorecard.legacy_rows_skipped:
+        warnings.append(f"legacy/default artifact rows ignored: {scorecard.legacy_rows_skipped}")
+        next_actions.append("use namespaced burn-in commands before judging promotion readiness")
+    if scorecard.test_rows_skipped:
+        warnings.append(f"test/fixture/replay artifact rows ignored: {scorecard.test_rows_skipped}")
 
     checks["alert_snapshots"] = str(scorecard.alert_snapshot_rows)
     if scorecard.runs_with_alertable_but_no_alert_snapshots:

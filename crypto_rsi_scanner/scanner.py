@@ -2243,6 +2243,7 @@ def event_alpha_burn_in_scorecard(
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
 ) -> None:
     """Print a multi-artifact burn-in scorecard for Event Alpha."""
     _setup_event_discovery_logging(verbose)
@@ -2265,6 +2266,7 @@ def event_alpha_burn_in_scorecard(
         profile=profile_name,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
         days=days,
     )
     print(event_alpha_burn_in.format_burn_in_scorecard(scorecard))
@@ -2277,6 +2279,7 @@ def event_alpha_burn_in_checklist(
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
 ) -> None:
     """Print the operational burn-in acceptance checklist."""
     _setup_event_discovery_logging(verbose)
@@ -2301,6 +2304,7 @@ def event_alpha_burn_in_checklist(
         profile=profile_name,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
         days=days,
     )
     print(checklist.format_burn_in_checklist(checklist.build_burn_in_checklist(scorecard)))
@@ -2312,6 +2316,7 @@ def event_alpha_v1_readiness_report(
     *,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
 ) -> None:
     """Print v1 promotion readiness flags from local research artifacts."""
     _setup_event_discovery_logging(verbose)
@@ -2327,6 +2332,7 @@ def event_alpha_v1_readiness_report(
         days=days,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     print(event_alpha_v1_readiness.format_v1_readiness_report(result))
 
@@ -2336,6 +2342,7 @@ def event_alpha_health_guard_report(
     *,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
 ) -> None:
     """Print Event Alpha freshness/safety health guard status."""
     _setup_event_discovery_logging(verbose)
@@ -2353,6 +2360,7 @@ def event_alpha_health_guard_report(
         ),
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     print(event_alpha_health_guard.format_health_guard_report(result))
 
@@ -2363,6 +2371,8 @@ def event_alpha_artifact_doctor_report(
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
+    strict: bool = False,
 ) -> None:
     """Print artifact lineage/namespace diagnostics for Event Alpha."""
     _setup_event_discovery_logging(verbose)
@@ -2379,6 +2389,9 @@ def event_alpha_artifact_doctor_report(
         profile=profile_name,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
+        strict=strict or bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
     )
     print(event_alpha_artifact_doctor.format_artifact_doctor_report(result))
 
@@ -2403,6 +2416,7 @@ def event_alpha_export_burn_in_pack(
     *,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
 ) -> None:
     """Write a clean Event Alpha burn-in review zip."""
     _setup_event_discovery_logging(verbose)
@@ -2417,6 +2431,7 @@ def event_alpha_export_burn_in_pack(
         outcome_rows=artifacts["outcome_rows"],
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
         days=days,
     )
     from . import event_alpha_burn_in_checklist as checklist
@@ -2432,6 +2447,7 @@ def event_alpha_export_burn_in_pack(
         outcome_rows=artifacts["outcome_rows"],
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
         days=days,
     )
     health = event_alpha_health_guard.evaluate_health_guard(
@@ -2447,6 +2463,7 @@ def event_alpha_export_burn_in_pack(
         ),
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
@@ -2460,6 +2477,9 @@ def event_alpha_export_burn_in_pack(
         profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
+        strict=bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
     )
     router_result = event_alpha_router.route_watchlist(
         artifacts["watchlist"],
@@ -2473,6 +2493,9 @@ def event_alpha_export_burn_in_pack(
         watchlist_entries=artifacts["watchlist"].entries,
         router_result=router_result,
         provider_health_rows=artifacts["provider_rows"],
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     calibration = event_alpha_calibration.format_calibration_report(
         artifacts["alerts"].rows,
@@ -2516,6 +2539,7 @@ def event_alpha_export_burn_in_pack(
         profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
         date_range=f"{days}d",
     )
     print(event_alpha_burn_in_pack.format_burn_in_pack_result(result))
@@ -2648,7 +2672,14 @@ def event_research_cards_write(verbose: bool = False, profile_name: str | None =
     print(event_research_cards.format_card_write_result(result))
 
 
-def event_alpha_explain_last_run(verbose: bool = False, profile_name: str | None = None) -> None:
+def event_alpha_explain_last_run(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
+) -> None:
     """Explain why the latest Event Alpha cycle did or did not alert."""
     _setup_event_discovery_logging(verbose)
     profile, error = _apply_event_alpha_report_profile(profile_name)
@@ -2665,6 +2696,9 @@ def event_alpha_explain_last_run(verbose: bool = False, profile_name: str | None
         runs.rows,
         alert_rows=alerts.rows,
         requested_profile=requested,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     if profile:
         report += (
@@ -2676,7 +2710,14 @@ def event_alpha_explain_last_run(verbose: bool = False, profile_name: str | None
     print(report)
 
 
-def event_alpha_daily_brief_report(verbose: bool = False, profile_name: str | None = None) -> None:
+def event_alpha_daily_brief_report(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
+) -> None:
     """Write and print the daily Event Alpha operating brief."""
     _setup_event_discovery_logging(verbose)
     runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=25)
@@ -2714,6 +2755,9 @@ def event_alpha_daily_brief_report(verbose: bool = False, profile_name: str | No
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
         card_paths=card_write.card_paths,
         requested_profile=profile.name if profile else profile_name,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     result = event_alpha_daily_brief.write_daily_brief(
         config.EVENT_ALPHA_DAILY_BRIEF_PATH,
@@ -4923,6 +4967,16 @@ def cli() -> None:
         help="Include Event Alpha rows marked test/fixture/replay in artifact reports.",
     )
     parser.add_argument(
+        "--event-alpha-include-legacy-artifacts",
+        action="store_true",
+        help="Include legacy/default Event Alpha artifact rows in artifact reports for migration review.",
+    )
+    parser.add_argument(
+        "--event-alpha-artifact-doctor-strict",
+        action="store_true",
+        help="Escalate legacy snapshot mismatches, mixed namespaces, and unknown IDs to artifact-doctor blockers.",
+    )
+    parser.add_argument(
         "--event-alpha-profile-report",
         metavar="PROFILE",
         help="Print an Event Alpha operational profile without running the cycle.",
@@ -5269,6 +5323,7 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
         )
         return
     if args.event_alpha_burn_in_checklist:
@@ -5278,6 +5333,7 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
         )
         return
     if args.event_alpha_v1_readiness:
@@ -5286,6 +5342,7 @@ def cli() -> None:
             verbose=args.verbose,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
         )
         return
     if args.event_alpha_health_guard:
@@ -5293,6 +5350,7 @@ def cli() -> None:
             verbose=args.verbose,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
         )
         return
     if args.event_alpha_artifact_doctor:
@@ -5301,6 +5359,8 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+            strict=args.event_alpha_artifact_doctor_strict,
         )
         return
     if args.event_alpha_tuning_worksheet:
@@ -5313,6 +5373,7 @@ def cli() -> None:
             verbose=args.verbose,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
         )
         return
     if args.event_alpha_calibration_export_priors is not None:
@@ -5337,10 +5398,22 @@ def cli() -> None:
         )
         return
     if args.event_alpha_explain_last_run:
-        event_alpha_explain_last_run(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        event_alpha_explain_last_run(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+        )
         return
     if args.event_alpha_daily_brief:
-        event_alpha_daily_brief_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        event_alpha_daily_brief_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+        )
         return
     if args.event_alpha_replay:
         event_alpha_replay_report(

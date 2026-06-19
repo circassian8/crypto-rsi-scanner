@@ -40,6 +40,7 @@ def evaluate_health_guard(
     now: datetime | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
 ) -> EventAlphaHealthGuardResult:
     """Classify the latest Event Alpha operating state as healthy/degraded/stale/blocked."""
     guard = cfg or EventAlphaHealthGuardConfig()
@@ -50,6 +51,7 @@ def evaluate_health_guard(
             profile=guard.require_profile,
             artifact_namespace=artifact_namespace,
             include_test_artifacts=include_test_artifacts,
+            include_legacy_artifacts=include_legacy_artifacts,
         ),
         key=lambda row: str(row.get("started_at") or row.get("finished_at") or ""),
         reverse=True,
@@ -59,6 +61,7 @@ def evaluate_health_guard(
         profile=guard.require_profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     reason_codes: list[str] = []
     warnings: list[str] = []
@@ -104,6 +107,21 @@ def evaluate_health_guard(
         warnings.append(f"LLM budget skipped rows: {skipped_budget}")
     if any(_int(row.get("alertable")) > 0 for row in runs[:3]) and not alerts:
         reason_codes.append("missing_alert_snapshots")
+    for row in runs[:3]:
+        if _int(row.get("alertable")) <= 0:
+            continue
+        run_id = str(row.get("run_id") or "")
+        matching = sum(1 for alert in alerts if str(alert.get("run_id") or "") == run_id and run_id)
+        availability = event_alpha_artifacts.classify_snapshot_availability(
+            row,
+            None,
+            matching,
+        )
+        if availability not in {
+            event_alpha_artifacts.SNAPSHOT_AVAILABLE,
+            event_alpha_artifacts.SNAPSHOT_UNKNOWN_LEGACY,
+        }:
+            reason_codes.append("missing_alert_snapshots")
     stale_active = _stale_watchlist_count(watchlist_entries, observed, max_age_hours=48.0)
     if stale_active:
         reason_codes.append("stale_watchlist_entries")

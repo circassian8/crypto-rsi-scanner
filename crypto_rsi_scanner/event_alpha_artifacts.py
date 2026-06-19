@@ -13,6 +13,12 @@ RUN_MODES = ("test", "fixture", "replay", "burn_in", "operational")
 NON_OPERATIONAL_RUN_MODES = {"test", "fixture", "replay"}
 LIVE_BURN_IN_PROFILES = {"no_key_live", "no_key_llm", "api_live", "full_llm_live"}
 OPERATIONAL_PROFILES = {"research_send"}
+LEGACY_NAMESPACE = "legacy"
+SNAPSHOT_AVAILABLE = "available"
+SNAPSHOT_MISSING = "missing"
+SNAPSHOT_EXTERNAL_PATH = "external_path"
+SNAPSHOT_TEST_OR_FIXTURE_EXTERNAL = "test_or_fixture_external"
+SNAPSHOT_UNKNOWN_LEGACY = "unknown_legacy"
 
 
 @dataclass(frozen=True)
@@ -143,8 +149,9 @@ def filter_artifact_rows(
     profile: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
 ) -> list[dict[str, Any]]:
-    """Filter local rows to one profile/namespace and exclude test rows by default."""
+    """Filter local rows to one profile/namespace and exclude test/legacy rows by default."""
     profile_key = _clean_optional(profile)
     namespace_key = _clean_optional(artifact_namespace)
     out: list[dict[str, Any]] = []
@@ -154,11 +161,13 @@ def filter_artifact_rows(
         data = dict(row)
         if not include_test_artifacts and is_non_operational_row(data):
             continue
+        if not include_legacy_artifacts and is_legacy_row(data):
+            continue
         if profile_key is not None and _clean_optional(data.get("profile")) not in (None, profile_key):
             continue
         if namespace_key is not None:
             row_ns = _clean_optional(data.get("artifact_namespace") or data.get("namespace"))
-            if row_ns not in (None, namespace_key):
+            if row_ns != namespace_key:
                 continue
         out.append(data)
     return out
@@ -172,8 +181,57 @@ def is_non_operational_row(row: Mapping[str, Any]) -> bool:
     return bool(namespace and namespace in NON_OPERATIONAL_RUN_MODES)
 
 
+def is_legacy_row(row: Mapping[str, Any]) -> bool:
+    mode = _clean_optional(row.get("run_mode"))
+    namespace = _clean_optional(row.get("artifact_namespace") or row.get("namespace"))
+    if mode in (None, LEGACY_NAMESPACE):
+        return True
+    return namespace in (None, LEGACY_NAMESPACE)
+
+
+def classify_snapshot_availability(
+    run_row: Mapping[str, Any],
+    inspected_alert_store_path: str | Path | None,
+    matching_alert_count: int,
+) -> str:
+    """Classify whether a run's claimed snapshots are present in the inspected store."""
+    if matching_alert_count > 0:
+        return SNAPSHOT_AVAILABLE
+    if is_legacy_row(run_row) or not str(run_row.get("run_id") or "").strip():
+        return SNAPSHOT_UNKNOWN_LEGACY
+    run_mode = _clean_optional(run_row.get("run_mode"))
+    external = snapshot_path_is_external(run_row, inspected_alert_store_path)
+    if external and run_mode in NON_OPERATIONAL_RUN_MODES:
+        return SNAPSHOT_TEST_OR_FIXTURE_EXTERNAL
+    if external:
+        return SNAPSHOT_EXTERNAL_PATH
+    return SNAPSHOT_MISSING
+
+
+def snapshot_path_is_external(
+    run_row: Mapping[str, Any],
+    inspected_alert_store_path: str | Path | None,
+) -> bool:
+    row_path = _clean_path(run_row.get("alert_store_path"))
+    inspected = _clean_path(inspected_alert_store_path)
+    return bool(row_path and inspected and row_path != inspected)
+
+
+def safe_path_label(value: object, *, max_len: int = 96) -> str:
+    text = str(value or "").replace("\n", " ").strip()
+    if not text:
+        return "unknown"
+    home = str(Path.home())
+    if home and text.startswith(home):
+        text = "~" + text[len(home):]
+    text = re.sub(r"(?i)(api[_-]?key|token|secret|password)=([^&\\s]+)", r"\1=[redacted]", text)
+    if len(text) > max_len:
+        return "..." + text[-max(8, max_len - 3):]
+    return text
+
+
 def row_namespace(row: Mapping[str, Any]) -> str:
-    return _clean_optional(row.get("artifact_namespace") or row.get("namespace")) or "legacy"
+    return _clean_optional(row.get("artifact_namespace") or row.get("namespace")) or LEGACY_NAMESPACE
 
 
 def row_profile(row: Mapping[str, Any]) -> str:
@@ -206,6 +264,15 @@ def _path_override(env_name: str, default: Path, *, data_dir: Path) -> Path:
 def _resolve_path(value: str | Path, *, data_dir: Path) -> Path:
     path = Path(value).expanduser()
     return path if path.is_absolute() else data_dir / path
+
+
+def _clean_path(value: object) -> str | None:
+    if value in (None, ""):
+        return None
+    try:
+        return str(Path(str(value)).expanduser().resolve(strict=False))
+    except (OSError, RuntimeError, ValueError):
+        return str(value)
 
 
 def _clean_optional(value: object) -> str | None:

@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Harden Event Alpha artifact consistency · Codex
+**Why:** Event Alpha was ready for burn-in, but profile-specific reports still
+needed stronger protection against legacy/default artifacts, missing
+run-to-snapshot joins, and hidden external snapshot paths before daily
+operation can be trusted.
+**Changes:**
+- Extended `event_alpha_artifacts.py` with explicit legacy-row filtering,
+  snapshot availability classification, external-path detection, and safe path
+  labels.
+- Hardened `event_alpha_artifact_doctor.py` so alertable runs with claimed
+  snapshot writes must join to matching alert rows in the inspected store;
+  external snapshot paths, legacy rows, orphan alerts, mixed namespaces,
+  missing provider health, and unknown feedback/outcome IDs are reported with
+  strict-mode escalation where appropriate.
+- Updated burn-in scorecards, checklists, v1 readiness, health guard, daily
+  briefs, explain-last-run, and burn-in-pack export to ignore legacy/default
+  artifacts by default and honor an explicit legacy include flag for migration
+  review.
+- Added CLI/Make/env controls for `--event-alpha-include-legacy-artifacts` and
+  strict artifact doctor mode, plus runbook, roadmap, and decision updates.
+- Expanded tests to cover snapshot lineage, legacy filtering, strict doctor
+  behavior, fixture/test isolation, and profile-specific report warnings.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 360/360. `make event-llm-eval
+PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`, and `make
+event-alpha-eval PYTHON=python3` passed. `make event-alpha-artifact-doctor
+PYTHON=python3 STRICT=1` ran successfully and correctly reported the empty
+`no_key_live` burn-in namespace as `BLOCKED`. `make verify PYTHON=python3`
+passed.
+**Notes/risks:** This is artifact hygiene only. Legacy-included reports are for
+migration review, not promotion evidence. No sends, paper trades, live signal
+rows, normal RSI routing, execution, or `TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-19 — Make Event Alpha artifacts burn-in-safe · Codex
 **Why:** Event Alpha burn-in artifacts were still easy to mix across fixture,
 test, replay, no-key, LLM, and research-send runs. That made readiness reports

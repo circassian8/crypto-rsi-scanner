@@ -49,6 +49,7 @@ def build_v1_readiness(
     profiles: Iterable[str] | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
 ) -> EventAlphaV1ReadinessResult:
     """Build explicit v1 readiness flags without mutating runtime behavior."""
     observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -56,31 +57,42 @@ def build_v1_readiness(
         run_rows,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     alert_data = event_alpha_artifacts.filter_artifact_rows(
         alert_rows,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     feedback_data = event_alpha_artifacts.filter_artifact_rows(
         feedback_rows,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     missed_data = event_alpha_artifacts.filter_artifact_rows(
         missed_rows,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     outcome_data = event_alpha_artifacts.filter_artifact_rows(
         outcome_rows,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
     budget_data = event_alpha_artifacts.filter_artifact_rows(
         llm_budget_rows,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    legacy_rows_available = any(
+        event_alpha_artifacts.is_legacy_row(row)
+        for row in run_rows
+        if isinstance(row, Mapping)
     )
     profile_names = tuple(profiles or ("no_key_live", "research_send", "full_llm_live"))
     profile_rows: list[EventAlphaV1ProfileReadiness] = []
@@ -99,6 +111,7 @@ def build_v1_readiness(
             now=observed,
             artifact_namespace=artifact_namespace,
             include_test_artifacts=include_test_artifacts,
+            include_legacy_artifacts=include_legacy_artifacts,
         ))
 
     ready_send = any(row.ready_for_research_send for row in profile_rows)
@@ -114,6 +127,8 @@ def build_v1_readiness(
     if not run_data:
         blockers.append("no Event Alpha run ledger rows found")
         commands.append("make event-alpha-cycle-profile PROFILE=no_key_live")
+        if legacy_rows_available and not include_legacy_artifacts:
+            warnings.append("legacy/default run rows were ignored; run namespaced burn-in commands or pass --event-alpha-include-legacy-artifacts for migration review")
     if not ready_send:
         commands.append("make event-alpha-burn-in-checklist")
     if not ready_burn_in:
@@ -178,6 +193,7 @@ def _profile_readiness(
     now: datetime,
     artifact_namespace: str | None,
     include_test_artifacts: bool,
+    include_legacy_artifacts: bool,
 ) -> EventAlphaV1ProfileReadiness:
     matching_runs = [
         row for row in run_rows
@@ -194,6 +210,7 @@ def _profile_readiness(
         profile=profile_name,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
         days=days,
         now=now,
     )

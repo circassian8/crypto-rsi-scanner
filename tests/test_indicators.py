@@ -3721,6 +3721,36 @@ def test_event_alpha_artifact_context_and_doctor_filter_modes():
         assert [row["run_id"] for row in filtered] == ["op"]
         assert event_alpha_artifacts.filter_artifact_rows(run_rows) == [run_rows[0]]
         assert len(event_alpha_artifacts.filter_artifact_rows(run_rows, include_test_artifacts=True)) == 2
+        assert event_alpha_artifacts.filter_artifact_rows([{"run_id": "legacy"}]) == []
+        assert event_alpha_artifacts.filter_artifact_rows(
+            [{"run_id": "legacy"}],
+            include_legacy_artifacts=True,
+        ) == [{"run_id": "legacy"}]
+        assert event_alpha_artifacts.classify_snapshot_availability(
+            run_rows[0],
+            "event_alpha_alerts.jsonl",
+            1,
+        ) == event_alpha_artifacts.SNAPSHOT_AVAILABLE
+        assert event_alpha_artifacts.classify_snapshot_availability(
+            {**run_rows[0], "run_id": "missing"},
+            "event_alpha_alerts.jsonl",
+            0,
+        ) == event_alpha_artifacts.SNAPSHOT_MISSING
+        assert event_alpha_artifacts.classify_snapshot_availability(
+            {**run_rows[0], "run_id": "external", "alert_store_path": "/tmp/external-alerts.jsonl"},
+            "/tmp/inspected-alerts.jsonl",
+            0,
+        ) == event_alpha_artifacts.SNAPSHOT_EXTERNAL_PATH
+        assert event_alpha_artifacts.classify_snapshot_availability(
+            {**run_rows[1], "alert_store_path": "/tmp/fixture-alerts.jsonl"},
+            "/tmp/inspected-alerts.jsonl",
+            0,
+        ) == event_alpha_artifacts.SNAPSHOT_TEST_OR_FIXTURE_EXTERNAL
+        assert event_alpha_artifacts.classify_snapshot_availability(
+            {"run_id": "legacy", "alertable": 1},
+            "event_alpha_alerts.jsonl",
+            0,
+        ) == event_alpha_artifacts.SNAPSHOT_UNKNOWN_LEGACY
         ok = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=run_rows,
             alert_rows=alert_rows,
@@ -3736,6 +3766,44 @@ def test_event_alpha_artifact_context_and_doctor_filter_modes():
         )
         assert blocked.status == "BLOCKED"
         assert "wrote zero alert snapshots" in "; ".join(blocked.blockers)
+        missing_match = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{**run_rows[0], "run_id": "missing-match", "snapshot_rows_written": 1}],
+            alert_rows=[],
+            profile="no_key_live",
+            artifact_namespace="no_key_live",
+        )
+        assert missing_match.status == "BLOCKED"
+        assert "alertable_run_missing_matching_snapshot_rows" in "; ".join(missing_match.blockers)
+        fixture_external = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{**run_rows[1], "alert_store_path": "/tmp/fixture-alerts.jsonl"}],
+            alert_rows=[],
+            include_test_artifacts=True,
+            inspected_alert_store_path="/tmp/inspected-alerts.jsonl",
+        )
+        assert fixture_external.status == "WARN"
+        assert "fixture_snapshot_external_allowed" in "; ".join(fixture_external.warnings)
+        legacy = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "legacy", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
+            alert_rows=[],
+            include_legacy_artifacts=True,
+        )
+        assert legacy.status == "WARN"
+        assert "legacy_run_missing_snapshot_rows" in "; ".join(legacy.warnings)
+        legacy_strict = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "legacy", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
+            alert_rows=[],
+            include_legacy_artifacts=True,
+            strict=True,
+        )
+        assert legacy_strict.status == "BLOCKED"
+        assert "legacy_run_missing_snapshot_rows" in "; ".join(legacy_strict.blockers)
+        orphan = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=run_rows[:1],
+            alert_rows=[*alert_rows[:1], {**alert_rows[0], "run_id": "orphan"}],
+            profile="no_key_live",
+            artifact_namespace="no_key_live",
+        )
+        assert "unknown run_id" in "; ".join(orphan.warnings)
     finally:
         for key, value in old_env.items():
             if value is None:
@@ -6292,9 +6360,14 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
         "EVENT_ALPHA_ROUTER_ENABLED": config.EVENT_ALPHA_ROUTER_ENABLED,
         "EVENT_ALPHA_ALERT_STORE_PATH": config.EVENT_ALPHA_ALERT_STORE_PATH,
         "EVENT_ALPHA_RUN_LEDGER_PATH": config.EVENT_ALPHA_RUN_LEDGER_PATH,
+        "EVENT_ALPHA_RUN_MODE": config.EVENT_ALPHA_RUN_MODE,
+        "EVENT_ALPHA_ARTIFACT_NAMESPACE": config.EVENT_ALPHA_ARTIFACT_NAMESPACE,
+        "EVENT_ALPHA_ARTIFACT_BASE_DIR": config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
         "EVENT_ALERTS_ENABLED": config.EVENT_ALERTS_ENABLED,
     }
     with tempfile.TemporaryDirectory() as tmp:
+        root_artifact_path = Path("event_fade_cache/event_alpha_runs.jsonl")
+        root_existed = root_artifact_path.exists()
         config.EVENT_DISCOVERY_EVENTS_PATH = None
         config.EVENT_DISCOVERY_ALIASES_PATH = None
         config.EVENT_DISCOVERY_UNIVERSE_PATH = Path("fixtures/coingecko_smoke/top_markets.json")
@@ -6311,6 +6384,9 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
         config.EVENT_ALPHA_ROUTER_ENABLED = True
         config.EVENT_ALPHA_ALERT_STORE_PATH = Path(tmp) / "event_alpha_alerts.jsonl"
         config.EVENT_ALPHA_RUN_LEDGER_PATH = Path(tmp) / "event_alpha_runs.jsonl"
+        config.EVENT_ALPHA_RUN_MODE = "test"
+        config.EVENT_ALPHA_ARTIFACT_NAMESPACE = "test"
+        config.EVENT_ALPHA_ARTIFACT_BASE_DIR = Path(tmp)
         config.EVENT_ALERTS_ENABLED = False
         try:
             out = io.StringIO()
@@ -6326,8 +6402,15 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
             assert "market_anomaly_unknown" in text
             assert "run ledger updated" in text.lower()
             assert config.EVENT_WATCHLIST_STATE_PATH.exists()
-            assert config.EVENT_ALPHA_ALERT_STORE_PATH.exists()
             assert config.EVENT_ALPHA_RUN_LEDGER_PATH.exists()
+            run_rows = [
+                __import__("json").loads(line)
+                for line in config.EVENT_ALPHA_RUN_LEDGER_PATH.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            assert run_rows[-1]["run_mode"] == "test"
+            assert run_rows[-1]["artifact_namespace"] == "test"
+            assert root_artifact_path.exists() is root_existed
         finally:
             for name, value in original.items():
                 setattr(config, name, value)
@@ -6382,6 +6465,10 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         "EVENT_WATCHLIST_STATE_PATH",
         "EVENT_ALPHA_ROUTER_ENABLED",
         "EVENT_ALPHA_ALERT_STORE_PATH",
+        "EVENT_ALPHA_RUN_LEDGER_PATH",
+        "EVENT_ALPHA_RUN_MODE",
+        "EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
         "EVENT_ALERTS_ENABLED",
         "EVENT_LLM_EXTRACTOR_MODE",
         "EVENT_LLM_EXTRACTOR_PROVIDER",
@@ -6432,6 +6519,10 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
         config.EVENT_WATCHLIST_STATE_PATH = Path(tmp) / "watchlist.jsonl"
         config.EVENT_ALPHA_ROUTER_ENABLED = True
         config.EVENT_ALPHA_ALERT_STORE_PATH = Path(tmp) / "event_alpha_alerts.jsonl"
+        config.EVENT_ALPHA_RUN_LEDGER_PATH = Path(tmp) / "event_alpha_runs.jsonl"
+        config.EVENT_ALPHA_RUN_MODE = "test"
+        config.EVENT_ALPHA_ARTIFACT_NAMESPACE = "test"
+        config.EVENT_ALPHA_ARTIFACT_BASE_DIR = Path(tmp)
         config.EVENT_ALERTS_ENABLED = False
         config.EVENT_LLM_EXTRACTOR_MODE = "advisory"
         config.EVENT_LLM_EXTRACTOR_PROVIDER = "fixture"
@@ -6450,7 +6541,7 @@ def test_event_alpha_cycle_with_llm_feeds_extraction_hints_upstream():
             assert "candidates=1" in text
             assert "STEALTH/stealth-alpha" in text
             assert config.EVENT_WATCHLIST_STATE_PATH.exists()
-            assert config.EVENT_ALPHA_ALERT_STORE_PATH.exists()
+            assert config.EVENT_ALPHA_RUN_LEDGER_PATH.exists()
         finally:
             scanner._event_llm_extraction_provider = original_extraction_provider
             scanner._event_llm_provider = original_relationship_provider
@@ -13964,18 +14055,18 @@ def test_event_alpha_explain_last_run_paths():
     from crypto_rsi_scanner import event_alpha_daily_brief, event_alpha_explain, event_alpha_run_ledger
 
     quiet = event_alpha_explain.format_last_run_explanation([
-        {"run_id": "r1", "success": True, "raw_events": 0, "market_anomalies": 0, "candidates": 0, "alerts": 0, "routed": 0, "alertable": 0}
+        {"run_id": "r1", "run_mode": "burn_in", "artifact_namespace": "no_key_live", "success": True, "raw_events": 0, "market_anomalies": 0, "candidates": 0, "alerts": 0, "routed": 0, "alertable": 0}
     ])
     assert "no source events or market anomalies" in quiet
     routed = event_alpha_explain.format_last_run_explanation([
-        {"run_id": "r2", "success": True, "raw_events": 3, "market_anomalies": 1, "candidates": 2, "alerts": 2, "routed": 2, "alertable": 0, "llm_skipped_due_budget": 1}
-    ], alert_rows=[{"tier": "STORE_ONLY", "rejected_reason": "source_noise"}])
+        {"run_id": "r2", "run_mode": "burn_in", "artifact_namespace": "no_key_live", "success": True, "raw_events": 3, "market_anomalies": 1, "candidates": 2, "alerts": 2, "routed": 2, "alertable": 0, "llm_skipped_due_budget": 1}
+    ], alert_rows=[{"run_mode": "burn_in", "artifact_namespace": "no_key_live", "tier": "STORE_ONLY", "rejected_reason": "source_noise"}])
     assert "router produced no alertable decisions" in routed
     assert "skipped_budget=1" in routed
 
     rows = [
-        {"run_id": "default-newer", "profile": "default", "started_at": "2026-06-19T12:00:00+00:00", "success": True},
-        {"run_id": "no-key-older", "profile": "no_key_live", "started_at": "2026-06-19T10:00:00+00:00", "success": True},
+        {"run_id": "default-newer", "profile": "default", "run_mode": "burn_in", "artifact_namespace": "default", "started_at": "2026-06-19T12:00:00+00:00", "success": True},
+        {"run_id": "no-key-older", "profile": "no_key_live", "run_mode": "burn_in", "artifact_namespace": "no_key_live", "started_at": "2026-06-19T10:00:00+00:00", "success": True},
     ]
     assert event_alpha_run_ledger.latest_run(rows)["run_id"] == "default-newer"
     assert event_alpha_run_ledger.latest_run(rows, "no_key_live")["run_id"] == "no-key-older"
@@ -13985,7 +14076,7 @@ def test_event_alpha_explain_last_run_paths():
     assert "selected_run_profile: no_key_live" in explain
     assert "profile_match: true" in explain
     fallback = event_alpha_explain.format_last_run_explanation(rows, requested_profile="full_llm_live")
-    assert "profile warning:" in fallback
+    assert "No Event Alpha run ledger rows found." in fallback
     markdown = event_alpha_daily_brief.build_daily_brief(
         run_rows=rows,
         requested_profile="no_key_live",
@@ -13993,6 +14084,11 @@ def test_event_alpha_explain_last_run_paths():
     assert "Requested profile: no_key_live" in markdown
     assert "Selected run profile: no_key_live" in markdown
     assert "Profile match: true" in markdown
+    legacy_warning = event_alpha_daily_brief.build_daily_brief(
+        run_rows=[{"run_id": "legacy", "started_at": "2026-06-19T12:00:00+00:00", "success": True}],
+        requested_profile="no_key_live",
+    )
+    assert "only legacy/default run rows were available" in legacy_warning
 
 
 def test_event_watchlist_market_targeted_provider_and_fallback():
@@ -14481,6 +14577,8 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
     markdown = event_alpha_daily_brief.build_daily_brief(
         run_rows=[{
             "run_id": "run-1",
+            "run_mode": "burn_in",
+            "artifact_namespace": "no_key_live",
             "success": True,
             "raw_events": 2,
             "candidates": 1,
@@ -14490,7 +14588,7 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
             "llm_calls_attempted": 0,
             "llm_skipped_due_budget": 1,
         }],
-        alert_rows=[{"alert_key": entry.key, "tier": "HIGH_PRIORITY_WATCH", "asset_symbol": "VELVET", "playbook_type": "proxy_attention"}],
+        alert_rows=[{"run_mode": "burn_in", "artifact_namespace": "no_key_live", "run_id": "run-1", "alert_key": entry.key, "tier": "HIGH_PRIORITY_WATCH", "asset_symbol": "VELVET", "playbook_type": "proxy_attention"}],
         watchlist_entries=[entry],
         provider_health_rows={"gdelt": {"provider_kind": "event_source", "consecutive_failures": 2, "disabled_until": "2026-06-18T10:30:00+00:00"}},
         card_paths=[Path("/tmp/velvet.md")],
@@ -14605,11 +14703,14 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     from crypto_rsi_scanner import event_alpha_burn_in, event_alpha_burn_in_checklist
 
     now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
+    meta = {"profile": "no_key_live", "run_mode": "burn_in", "artifact_namespace": "no_key_live"}
     scorecard = event_alpha_burn_in.build_burn_in_scorecard(
         days=7,
         now=now,
         run_rows=[
             {
+                **meta,
+                "run_id": "run-1",
                 "started_at": "2026-06-19T10:00:00+00:00",
                 "success": True,
                 "raw_events": 5,
@@ -14617,6 +14718,8 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
                 "alertable": 1,
             },
             {
+                **meta,
+                "run_id": "run-2",
                 "started_at": "2026-06-18T10:00:00+00:00",
                 "success": False,
                 "raw_events": 0,
@@ -14626,6 +14729,8 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
         ],
         alert_rows=[
             {
+                **meta,
+                "run_id": "run-1",
                 "observed_at": "2026-06-19T10:01:00+00:00",
                 "alert_key": "cluster|velvet|proxy_attention",
                 "tier": "WATCHLIST",
@@ -14633,6 +14738,8 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
                 "source": "gdelt",
             },
             {
+                **meta,
+                "run_id": "run-1",
                 "observed_at": "2026-06-19T10:02:00+00:00",
                 "alert_key": "cluster|btc|source_noise_control",
                 "tier": "STORE_ONLY",
@@ -14642,11 +14749,13 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
         ],
         feedback_rows=[
             {
+                **meta,
                 "marked_at": "2026-06-19T11:00:00+00:00",
                 "key": "cluster|btc|source_noise_control",
                 "label": "junk",
             },
             {
+                **meta,
                 "marked_at": "2026-06-19T11:05:00+00:00",
                 "key": "cluster|velvet|proxy_attention",
                 "label": "useful",
@@ -14654,6 +14763,7 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
         ],
         outcome_rows=[
             {
+                **meta,
                 "observed_at": "2026-06-19T12:00:00+00:00",
                 "alert_key": "cluster|velvet|proxy_attention",
                 "primary_horizon_return": 0.18,
@@ -14661,6 +14771,7 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
         ],
         missed_rows=[
             {
+                **meta,
                 "observed_at": "2026-06-19T11:30:00+00:00",
                 "failure_stage": "resolver_missed_asset",
             }
@@ -14674,6 +14785,7 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
         },
         llm_budget_rows=[
             {
+                **meta,
                 "date": "2026-06-19",
                 "extractor_calls_attempted": 2,
                 "relationship_calls_attempted": 1,
@@ -14707,11 +14819,11 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     ready_scorecard = event_alpha_burn_in.build_burn_in_scorecard(
         days=7,
         now=now,
-        run_rows=[{"started_at": "2026-06-19T10:00:00+00:00", "success": True, "alertable": 1}],
-        alert_rows=[{"observed_at": "2026-06-19T10:01:00+00:00", "alert_key": "a", "tier": "WATCHLIST"}],
-        feedback_rows=[{"marked_at": "2026-06-19T11:00:00+00:00", "key": "a", "label": "useful"}],
-        outcome_rows=[{"observed_at": "2026-06-19T12:00:00+00:00", "alert_key": "a", "primary_horizon_return": 0.1}],
-        missed_rows=[{"observed_at": "2026-06-19T12:00:00+00:00", "failure_stage": "unknown"}],
+        run_rows=[{**meta, "run_id": "ready-run", "started_at": "2026-06-19T10:00:00+00:00", "success": True, "alertable": 1}],
+        alert_rows=[{**meta, "run_id": "ready-run", "observed_at": "2026-06-19T10:01:00+00:00", "alert_key": "a", "tier": "WATCHLIST"}],
+        feedback_rows=[{**meta, "marked_at": "2026-06-19T11:00:00+00:00", "key": "a", "label": "useful"}],
+        outcome_rows=[{**meta, "observed_at": "2026-06-19T12:00:00+00:00", "alert_key": "a", "primary_horizon_return": 0.1}],
+        missed_rows=[{**meta, "observed_at": "2026-06-19T12:00:00+00:00", "failure_stage": "unknown"}],
         provider_health_rows={"gdelt:event_source": {"provider_key": "gdelt:event_source", "consecutive_failures": 0}},
     )
     assert event_alpha_burn_in_checklist.build_burn_in_checklist(ready_scorecard).ready_for_research_send is True
@@ -14719,7 +14831,7 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     missing_snapshots = event_alpha_burn_in.build_burn_in_scorecard(
         days=7,
         now=now,
-        run_rows=[{"started_at": "2026-06-19T10:00:00+00:00", "success": True, "alertable": 1}],
+        run_rows=[{**meta, "run_id": "missing-run", "started_at": "2026-06-19T10:00:00+00:00", "success": True, "alertable": 1}],
         alert_rows=[],
         missed_rows=[],
         profile="no_key_live",
@@ -14729,6 +14841,23 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     blocked = event_alpha_burn_in_checklist.build_burn_in_checklist(missing_snapshots)
     assert blocked.ready_for_research_send is False
     assert any("alertable runs" in item for item in blocked.blockers)
+
+    legacy_only = event_alpha_burn_in.build_burn_in_scorecard(
+        days=7,
+        now=now,
+        run_rows=[{"run_id": "legacy", "started_at": "2026-06-19T10:00:00+00:00", "success": True}],
+        alert_rows=[{"run_id": "legacy", "observed_at": "2026-06-19T10:01:00+00:00", "alert_key": "legacy-a"}],
+    )
+    assert legacy_only.run_rows == []
+    assert legacy_only.legacy_rows_skipped == 2
+    assert "no operational burn-in rows found" in legacy_only.coverage_warnings
+    legacy_counted = event_alpha_burn_in.build_burn_in_scorecard(
+        days=7,
+        now=now,
+        run_rows=[{"run_id": "legacy", "started_at": "2026-06-19T10:00:00+00:00", "success": True}],
+        include_legacy_artifacts=True,
+    )
+    assert len(legacy_counted.run_rows) == 1
 
 
 def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
@@ -14746,12 +14875,15 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
 
     now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
     run_rows = [
-        {"started_at": "2026-06-19T10:00:00+00:00", "profile": "no_key_live", "success": True, "alertable": 1},
-        {"started_at": "2026-06-19T10:05:00+00:00", "profile": "research_send", "success": True, "alertable": 1},
-        {"started_at": "2026-06-19T10:10:00+00:00", "profile": "full_llm_live", "success": True, "alertable": 1},
+        {"run_id": "no-key-run", "started_at": "2026-06-19T10:00:00+00:00", "profile": "no_key_live", "run_mode": "burn_in", "artifact_namespace": "no_key_live", "success": True, "alertable": 1},
+        {"run_id": "research-send-run", "started_at": "2026-06-19T10:05:00+00:00", "profile": "research_send", "run_mode": "operational", "artifact_namespace": "research_send", "success": True, "alertable": 1},
+        {"run_id": "full-llm-run", "started_at": "2026-06-19T10:10:00+00:00", "profile": "full_llm_live", "run_mode": "burn_in", "artifact_namespace": "full_llm_live", "success": True, "alertable": 1},
     ]
     alert_rows = [
         {
+            "run_id": "no-key-run",
+            "run_mode": "burn_in",
+            "artifact_namespace": "no_key_live",
             "observed_at": "2026-06-19T10:06:00+00:00",
             "alert_key": "cluster|velvet|proxy_attention",
             "tier": "WATCHLIST",
@@ -14762,21 +14894,34 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
             "primary_horizon_return": 0.12,
         },
         {
+            "run_id": "research-send-run",
+            "run_mode": "operational",
+            "artifact_namespace": "research_send",
             "observed_at": "2026-06-19T10:07:00+00:00",
             "alert_key": "cluster|btc|source_noise_control",
             "tier": "RADAR_DIGEST",
             "playbook_type": "source_noise_control",
             "source": "rss",
         },
+        {
+            "run_id": "full-llm-run",
+            "run_mode": "burn_in",
+            "artifact_namespace": "full_llm_live",
+            "observed_at": "2026-06-19T10:08:00+00:00",
+            "alert_key": "cluster|llm|proxy_attention",
+            "tier": "WATCHLIST",
+            "playbook_type": "proxy_attention",
+            "source": "gdelt",
+        },
     ]
     feedback_rows = [
-        {"marked_at": "2026-06-19T11:00:00+00:00", "key": "cluster|velvet|proxy_attention", "label": "useful", "marked_by": "human"},
-        {"marked_at": "2026-06-19T11:01:00+00:00", "key": "cluster|btc|source_noise_control", "label": "junk", "marked_by": "human"},
-        {"marked_at": "2026-06-19T11:02:00+00:00", "key": "cluster|btc|source_noise_control", "label": "junk", "marked_by": "human"},
+        {"run_mode": "burn_in", "artifact_namespace": "no_key_live", "marked_at": "2026-06-19T11:00:00+00:00", "key": "cluster|velvet|proxy_attention", "label": "useful", "marked_by": "human"},
+        {"run_mode": "operational", "artifact_namespace": "research_send", "marked_at": "2026-06-19T11:01:00+00:00", "key": "cluster|btc|source_noise_control", "label": "junk", "marked_by": "human"},
+        {"run_mode": "operational", "artifact_namespace": "research_send", "marked_at": "2026-06-19T11:02:00+00:00", "key": "cluster|btc|source_noise_control", "label": "junk", "marked_by": "human"},
     ]
     missed_rows = [
-        {"observed_at": "2026-06-19T11:30:00+00:00", "failure_stage": "resolver_missed_asset"},
-        {"observed_at": "2026-06-19T11:31:00+00:00", "failure_stage": "resolver_missed_asset"},
+        {"run_mode": "burn_in", "artifact_namespace": "no_key_live", "observed_at": "2026-06-19T11:30:00+00:00", "failure_stage": "resolver_missed_asset"},
+        {"run_mode": "operational", "artifact_namespace": "research_send", "observed_at": "2026-06-19T11:31:00+00:00", "failure_stage": "resolver_missed_asset"},
     ]
     health_rows = {"gdelt:event_source": {"provider_key": "gdelt:event_source", "consecutive_failures": 0}}
     readiness = event_alpha_v1_readiness.build_v1_readiness(
@@ -14804,7 +14949,7 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
     assert guard.status == "HEALTHY"
     assert "profile_mismatch" not in guard.reason_codes
     stale = event_alpha_health_guard.evaluate_health_guard(
-        run_rows=[{"started_at": "2026-06-18T00:00:00+00:00", "profile": "no_key_live", "success": True}],
+        run_rows=[{"run_id": "stale", "started_at": "2026-06-18T00:00:00+00:00", "profile": "no_key_live", "run_mode": "burn_in", "artifact_namespace": "no_key_live", "success": True}],
         cfg=event_alpha_health_guard.EventAlphaHealthGuardConfig(max_run_age_hours=6, max_success_age_hours=12),
         now=now,
     )

@@ -59,6 +59,7 @@ def export_burn_in_pack(
     profile: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
     date_range: str | None = None,
 ) -> EventAlphaBurnInPackResult:
     """Write a clean zip for Pro-model/local review without secrets or caches."""
@@ -66,17 +67,18 @@ def export_burn_in_pack(
     target.parent.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
     files = 0
-    run_data = _filtered(run_rows, profile, artifact_namespace, include_test_artifacts)
-    alert_data = _filtered(alert_rows, profile, artifact_namespace, include_test_artifacts)
-    feedback_data = _filtered(feedback_rows, profile, artifact_namespace, include_test_artifacts)
-    missed_data = _filtered(missed_rows, profile, artifact_namespace, include_test_artifacts)
-    outcome_data = _filtered(outcome_rows, profile, artifact_namespace, include_test_artifacts)
-    budget_data = _filtered(llm_budget_rows, profile, artifact_namespace, include_test_artifacts)
+    run_data = _filtered(run_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    alert_data = _filtered(alert_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    feedback_data = _filtered(feedback_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    missed_data = _filtered(missed_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    outcome_data = _filtered(outcome_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    budget_data = _filtered(llm_budget_rows, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
     manifest = {
         "profile": profile or "any",
         "artifact_namespace": artifact_namespace or "any",
         "date_range": date_range or "unspecified",
         "include_test_artifacts": bool(include_test_artifacts),
+        "include_legacy_artifacts": bool(include_legacy_artifacts),
         "run_rows": len(run_data),
         "alert_rows": len(alert_data),
         "feedback_rows": len(feedback_data),
@@ -119,12 +121,14 @@ def _filtered(
     profile: str | None,
     artifact_namespace: str | None,
     include_test_artifacts: bool,
+    include_legacy_artifacts: bool,
 ) -> list[dict[str, Any]]:
     return event_alpha_artifacts.filter_artifact_rows(
         rows,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
 
 

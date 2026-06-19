@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_run_ledger
+from . import event_alpha_artifacts, event_alpha_run_ledger
 
 
 def format_last_run_explanation(
@@ -12,9 +12,26 @@ def format_last_run_explanation(
     *,
     alert_rows: Iterable[Mapping[str, Any]] = (),
     requested_profile: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
 ) -> str:
-    runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
-    alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
+    raw_runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
+    legacy_available = any(event_alpha_artifacts.is_legacy_row(row) for row in raw_runs)
+    runs = event_alpha_artifacts.filter_artifact_rows(
+        raw_runs,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    alerts = event_alpha_artifacts.filter_artifact_rows(
+        alert_rows,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
     lines = [
         "=" * 76,
         "EVENT ALPHA LAST RUN EXPLAINER (research-only)",
@@ -22,6 +39,8 @@ def format_last_run_explanation(
     ]
     if not runs:
         lines.append("No Event Alpha run ledger rows found.")
+        if requested_profile and legacy_available and not include_legacy_artifacts:
+            lines.append("Legacy/default rows exist but were ignored for this profile-specific explanation.")
         lines.append("Run `make event-alpha-cycle-profile PROFILE=no_key_live` to create a research cycle row.")
         return "\n".join(lines)
     last = event_alpha_run_ledger.latest_run(runs, requested_profile) or runs[0]

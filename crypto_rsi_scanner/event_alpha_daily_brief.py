@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping
 
 from . import (
     event_alpha_calibration,
+    event_alpha_artifacts,
     event_alpha_explain,
     event_alpha_run_ledger,
     event_alpha_router,
@@ -36,13 +37,42 @@ def build_daily_brief(
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     card_paths: Iterable[Path] = (),
     requested_profile: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
     generated_at: datetime | None = None,
 ) -> str:
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
-    alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
-    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
-    missed = [dict(row) for row in missed_rows if isinstance(row, Mapping)]
+    raw_runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
+    legacy_available = any(event_alpha_artifacts.is_legacy_row(row) for row in raw_runs)
+    runs = event_alpha_artifacts.filter_artifact_rows(
+        raw_runs,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    alerts = event_alpha_artifacts.filter_artifact_rows(
+        alert_rows,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    feedback = event_alpha_artifacts.filter_artifact_rows(
+        feedback_rows,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    missed = event_alpha_artifacts.filter_artifact_rows(
+        missed_rows,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
     entries = list(watchlist_entries)
     decisions = list(router_result.decisions if router_result else ())
     alertable = list(router_result.alertable_decisions if router_result else ())
@@ -69,6 +99,8 @@ def build_daily_brief(
     ]
     if mismatch_warning:
         lines.append(f"- Profile warning: {mismatch_warning}")
+    if requested_profile and not runs and legacy_available and not include_legacy_artifacts:
+        lines.append("- Profile warning: only legacy/default run rows were available; they were ignored for this profile brief")
     if latest:
         lines.extend([
             f"- Run: {latest.get('run_id') or 'unknown'}",
@@ -148,6 +180,9 @@ def build_daily_brief(
             runs,
             alert_rows=alerts,
             requested_profile=requested_profile,
+            artifact_namespace=artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+            include_legacy_artifacts=include_legacy_artifacts,
         )))
     else:
         lines.extend(["", "## Why Alerts Were Sent"])

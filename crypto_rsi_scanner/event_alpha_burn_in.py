@@ -32,6 +32,9 @@ class EventAlphaBurnInScorecard:
     llm_budget_row_count: int = 0
     artifact_namespace: str | None = None
     include_test_artifacts: bool = False
+    include_legacy_artifacts: bool = False
+    legacy_rows_skipped: int = 0
+    test_rows_skipped: int = 0
     coverage_warnings: tuple[str, ...] = ()
 
 
@@ -47,20 +50,46 @@ def build_burn_in_scorecard(
     profile: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
     days: int = 7,
     now: datetime | None = None,
 ) -> EventAlphaBurnInScorecard:
     cutoff = (now or datetime.now(timezone.utc)).astimezone(timezone.utc) - timedelta(days=max(1, int(days or 1)))
-    run_data = _artifact_filter(_filter_rows(run_rows, cutoff, ("started_at", "observed_at", "marked_at")), profile, artifact_namespace, include_test_artifacts)
-    alert_data = _artifact_filter(_filter_rows(alert_rows, cutoff, ("observed_at", "started_at")), profile, artifact_namespace, include_test_artifacts)
-    feedback_data = _artifact_filter(_filter_rows(feedback_rows, cutoff, ("marked_at", "observed_at")), profile, artifact_namespace, include_test_artifacts)
-    missed_data = _artifact_filter(_filter_rows(missed_rows, cutoff, ("observed_at", "detected_at", "created_at")), profile, artifact_namespace, include_test_artifacts)
-    budget_data = _artifact_filter(_filter_rows(llm_budget_rows, cutoff, ("date", "updated_at")), profile, artifact_namespace, include_test_artifacts)
-    supplied_outcomes = _artifact_filter(_filter_rows(outcome_rows, cutoff, ("observed_at", "started_at")), profile, artifact_namespace, include_test_artifacts)
+    raw_run_data = _filter_rows(run_rows, cutoff, ("started_at", "observed_at", "marked_at"))
+    raw_alert_data = _filter_rows(alert_rows, cutoff, ("observed_at", "started_at"))
+    raw_feedback_data = _filter_rows(feedback_rows, cutoff, ("marked_at", "observed_at"))
+    raw_missed_data = _filter_rows(missed_rows, cutoff, ("observed_at", "detected_at", "created_at"))
+    raw_budget_data = _filter_rows(llm_budget_rows, cutoff, ("date", "updated_at"))
+    raw_outcomes = _filter_rows(outcome_rows, cutoff, ("observed_at", "started_at"))
+    raw_all = [*raw_run_data, *raw_alert_data, *raw_feedback_data, *raw_missed_data, *raw_budget_data, *raw_outcomes]
+    legacy_skipped = 0 if include_legacy_artifacts else sum(1 for row in raw_all if event_alpha_artifacts.is_legacy_row(row))
+    test_skipped = 0 if include_test_artifacts else sum(1 for row in raw_all if event_alpha_artifacts.is_non_operational_row(row))
+    run_data = _artifact_filter(raw_run_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    alert_data = _artifact_filter(raw_alert_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    feedback_data = _artifact_filter(raw_feedback_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    missed_data = _artifact_filter(raw_missed_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    budget_data = _artifact_filter(raw_budget_data, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
+    supplied_outcomes = _artifact_filter(raw_outcomes, profile, artifact_namespace, include_test_artifacts, include_legacy_artifacts)
     outcome_data = supplied_outcomes or _rows_with_outcomes(alert_data)
     health_data = {str(key): dict(value) for key, value in (provider_health_rows or {}).items()}
     runs_with_alertable = sum(1 for row in run_data if _int(row.get("alertable")) > 0)
-    alertable_without_snapshots = runs_with_alertable if runs_with_alertable and not alert_data else 0
+    alert_counts_by_run_id: dict[str, int] = {}
+    for row in alert_data:
+        run_id = str(row.get("run_id") or "").strip()
+        if run_id:
+            alert_counts_by_run_id[run_id] = alert_counts_by_run_id.get(run_id, 0) + 1
+    alertable_without_snapshots = sum(
+        1 for row in run_data
+        if _int(row.get("alertable")) > 0
+        and event_alpha_artifacts.classify_snapshot_availability(
+            row,
+            None,
+            alert_counts_by_run_id.get(str(row.get("run_id") or "").strip(), 0),
+        ) not in {
+            event_alpha_artifacts.SNAPSHOT_AVAILABLE,
+            event_alpha_artifacts.SNAPSHOT_UNKNOWN_LEGACY,
+        }
+    )
     coverage = _coverage_warnings(
         run_data,
         alert_data,
@@ -82,6 +111,9 @@ def build_burn_in_scorecard(
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+        legacy_rows_skipped=legacy_skipped,
+        test_rows_skipped=test_skipped,
         runs_with_alertable=runs_with_alertable,
         alert_snapshot_rows=len(alert_data),
         runs_with_alertable_but_no_alert_snapshots=alertable_without_snapshots,
@@ -121,7 +153,9 @@ def format_burn_in_scorecard(scorecard: EventAlphaBurnInScorecard) -> str:
         "EVENT ALPHA BURN-IN SCORECARD (research-only)",
         "=" * 76,
         f"window_days={scorecard.days}",
-        f"profile={scorecard.profile or 'any'} namespace={scorecard.artifact_namespace or 'any'} include_test_artifacts={str(scorecard.include_test_artifacts).lower()}",
+        f"profile={scorecard.profile or 'any'} namespace={scorecard.artifact_namespace or 'any'} "
+        f"include_test_artifacts={str(scorecard.include_test_artifacts).lower()} "
+        f"include_legacy_artifacts={str(scorecard.include_legacy_artifacts).lower()}",
         f"runs={len(runs)} successful={successful} failed={len(runs) - successful}",
         (
             "events/candidates/alertable: "
@@ -141,7 +175,8 @@ def format_burn_in_scorecard(scorecard: EventAlphaBurnInScorecard) -> str:
         f"alertable_without_snapshots={scorecard.runs_with_alertable_but_no_alert_snapshots} · "
         f"feedback={scorecard.feedback_row_count} · outcomes={scorecard.outcome_row_count} · "
         f"missed={scorecard.missed_row_count} · provider_health={scorecard.provider_health_row_count} · "
-        f"llm_budget={scorecard.llm_budget_row_count}",
+        f"llm_budget={scorecard.llm_budget_row_count} · "
+        f"legacy_skipped={scorecard.legacy_rows_skipped} · test_skipped={scorecard.test_rows_skipped}",
         "top playbooks: " + _top_line(alerts, "playbook_type"),
         "worst sources: " + _worst_source_line(alerts, feedback),
     ]
@@ -178,12 +213,14 @@ def _artifact_filter(
     profile: str | None,
     artifact_namespace: str | None,
     include_test_artifacts: bool,
+    include_legacy_artifacts: bool,
 ) -> list[dict[str, Any]]:
     return event_alpha_artifacts.filter_artifact_rows(
         rows,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
     )
 
 
@@ -254,6 +291,11 @@ def _coverage_warnings(
     profile: str | None,
 ) -> tuple[str, ...]:
     warnings: list[str] = []
+    if not runs:
+        if profile:
+            warnings.append(f"no operational burn-in rows found for profile {profile}")
+        else:
+            warnings.append("no operational burn-in rows found")
     if any(_int(row.get("alertable")) > 0 for row in runs) and not alerts:
         warnings.append("alert snapshots missing for alertable runs")
     if alerts and not feedback:
