@@ -77,6 +77,7 @@ from . import event_alpha_explain
 from . import event_alpha_health_guard
 from . import event_alpha_missed
 from . import event_alpha_pipeline
+from . import event_alpha_preflight
 from . import event_alpha_priors
 from . import event_alpha_profiles
 from . import event_alpha_replay
@@ -1453,13 +1454,7 @@ def _apply_event_alpha_profile(profile_name: str | None) -> event_alpha_profiles
     return profile
 
 
-def _apply_event_alpha_artifact_context(profile_name: str | None = None) -> event_alpha_artifacts.EventAlphaArtifactContext:
-    context = event_alpha_artifacts.context_from_profile(
-        profile_name,
-        run_mode=config.EVENT_ALPHA_RUN_MODE or None,
-        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
-        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
-    )
+def _apply_event_alpha_context_to_config(context: event_alpha_artifacts.EventAlphaArtifactContext) -> None:
     config.EVENT_ALPHA_RUN_MODE = context.run_mode
     config.EVENT_ALPHA_ARTIFACT_NAMESPACE = context.artifact_namespace
     config.EVENT_ALPHA_ARTIFACT_BASE_DIR = context.base_dir
@@ -1474,7 +1469,76 @@ def _apply_event_alpha_artifact_context(profile_name: str | None = None) -> even
     config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR = context.proposed_eval_cases_dir
     config.EVENT_RESEARCH_CARDS_DIR = context.research_cards_dir
     config.EVENT_LLM_BUDGET_LEDGER_PATH = context.llm_budget_ledger_path
+    config.EVENT_ALPHA_OUTCOMES_PATH = context.outcomes_path
+
+
+def _apply_event_alpha_artifact_context(profile_name: str | None = None) -> event_alpha_artifacts.EventAlphaArtifactContext:
+    context = event_alpha_artifacts.context_from_profile(
+        profile_name,
+        run_mode=config.EVENT_ALPHA_RUN_MODE or None,
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+    )
+    _apply_event_alpha_context_to_config(context)
     return context
+
+
+def resolve_event_alpha_artifact_context_for_report(
+    profile_name: str | None,
+    artifact_namespace: str | None,
+    run_mode: str | None = None,
+    include_test_artifacts: bool = False,
+) -> event_alpha_artifacts.EventAlphaArtifactContext:
+    """Resolve and apply the exact artifact context a report should inspect."""
+    if not profile_name and not artifact_namespace and not config.EVENT_ALPHA_ARTIFACT_NAMESPACE:
+        base_dir = Path(config.EVENT_ALPHA_ARTIFACT_BASE_DIR).expanduser()
+        if not base_dir.is_absolute():
+            base_dir = config.DATA_DIR / base_dir
+        context = event_alpha_artifacts.EventAlphaArtifactContext(
+            profile="default",
+            run_mode=run_mode or config.EVENT_ALPHA_RUN_MODE or "legacy",
+            artifact_namespace="default",
+            base_dir=base_dir,
+            namespace_dir=base_dir,
+            run_ledger_path=Path(config.EVENT_ALPHA_RUN_LEDGER_PATH),
+            alert_store_path=Path(config.EVENT_ALPHA_ALERT_STORE_PATH),
+            watchlist_state_path=Path(config.EVENT_WATCHLIST_STATE_PATH),
+            feedback_path=Path(config.EVENT_ALPHA_FEEDBACK_PATH),
+            missed_path=Path(config.EVENT_ALPHA_MISSED_PATH),
+            priors_path=Path(config.EVENT_ALPHA_PRIORS_PATH),
+            provider_health_path=Path(config.EVENT_PROVIDER_HEALTH_PATH),
+            daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
+            proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
+            research_cards_dir=Path(config.EVENT_RESEARCH_CARDS_DIR),
+            llm_budget_ledger_path=Path(config.EVENT_LLM_BUDGET_LEDGER_PATH),
+            outcomes_path=Path(getattr(config, "EVENT_ALPHA_OUTCOMES_PATH", base_dir / "event_alpha_outcomes.jsonl")),
+        )
+        _apply_event_alpha_context_to_config(context)
+        _normalize_profile_paths()
+        return context
+    profile = _apply_event_alpha_profile(profile_name) if profile_name else None
+    selected_profile = profile.name if profile else profile_name
+    selected_namespace = artifact_namespace or (None if selected_profile else config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None)
+    context = event_alpha_artifacts.context_from_profile(
+        selected_profile,
+        run_mode=run_mode or config.EVENT_ALPHA_RUN_MODE or None,
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+        artifact_namespace=selected_namespace,
+    )
+    _apply_event_alpha_context_to_config(context)
+    _normalize_profile_paths()
+    return context
+
+
+def _event_alpha_context_block(context: event_alpha_artifacts.EventAlphaArtifactContext) -> str:
+    return "\n".join([
+        "artifact context:",
+        f"- profile: {context.profile}",
+        f"- artifact_namespace: {context.artifact_namespace}",
+        f"- run_mode: {context.run_mode}",
+        f"- run_ledger_path: {context.run_ledger_path}",
+        f"- alert_store_path: {context.alert_store_path}",
+    ])
 
 
 def _normalize_profile_paths() -> None:
@@ -1488,6 +1552,7 @@ def _normalize_profile_paths() -> None:
         "EVENT_ALPHA_RUN_LEDGER_PATH",
         "EVENT_ALPHA_MISSED_PATH",
         "EVENT_ALPHA_PRIORS_PATH",
+        "EVENT_ALPHA_OUTCOMES_PATH",
         "EVENT_PROVIDER_HEALTH_PATH",
         "EVENT_ALPHA_DAILY_BRIEF_PATH",
         "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
@@ -1890,6 +1955,44 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
     print("\n".join(lines))
 
 
+def event_alpha_preflight_report(
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    send_requested: bool = False,
+    verbose: bool = False,
+) -> None:
+    """Print profile-scoped Event Alpha preflight blockers before a run."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(event_alpha_preflight.format_preflight_report(
+            event_alpha_preflight.EventAlphaPreflightResult(
+                ready=False,
+                profile=profile_name or "unknown",
+                artifact_namespace=artifact_namespace or "unknown",
+                run_mode=config.EVENT_ALPHA_RUN_MODE or "unknown",
+                paths={},
+                provider_ready_event_sources=0,
+                provider_ready_enrichment_sources=0,
+                blockers=(str(exc),),
+                warnings=(),
+                recommended_next_command=f"make event-alpha-status PROFILE={profile_name or 'no_key_live'}",
+            )
+        ))
+        return
+    provider_report = event_provider_status.build_event_discovery_provider_status(config)
+    result = event_alpha_preflight.run_preflight(
+        profile_name=profile_name,
+        context=context,
+        cfg=config,
+        provider_status=provider_report,
+        send_requested=send_requested,
+    )
+    print(event_alpha_preflight.format_preflight_report(result))
+
+
 def event_alpha_runs_report(path: str | None = None, limit: int = 20, verbose: bool = False) -> None:
     """Print recent Event Alpha cycle run ledger rows."""
     _setup_event_discovery_logging(verbose)
@@ -2131,9 +2234,24 @@ def event_alpha_fill_outcomes(
     print(event_alpha_alert_store.format_outcome_fill_result(result))
 
 
-def event_alpha_missed_report(verbose: bool = False) -> None:
+def event_alpha_missed_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
     """Print missed-opportunity diagnostics from local Event Alpha artifacts."""
     _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
     market_rows = event_alpha_missed.load_market_rows(config.EVENT_DISCOVERY_UNIVERSE_PATH)
     store_cfg = _event_alpha_alert_store_config_from_runtime()
     alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path)
@@ -2153,21 +2271,38 @@ def event_alpha_missed_report(verbose: bool = False) -> None:
     )
     if result.rows:
         event_alpha_missed.write_missed_rows(config.EVENT_ALPHA_MISSED_PATH, result.rows)
+    print(_event_alpha_context_block(context))
     print(event_alpha_missed.format_missed_report(result))
     if result.rows:
         print("")
         print(f"Missed-opportunity rows appended: {config.EVENT_ALPHA_MISSED_PATH}")
 
 
-def event_alpha_calibration_report(verbose: bool = False) -> None:
+def event_alpha_calibration_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
     """Print calibration summaries from alert, feedback, outcome, and missed artifacts."""
     _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
     store_cfg = _event_alpha_alert_store_config_from_runtime()
     alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path)
     feedback_cfg = _event_feedback_config_from_runtime()
     feedback = event_feedback.load_feedback(feedback_cfg.path)
     feedback_rows = [record.__dict__ for record in feedback.records]
     missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
+    print(_event_alpha_context_block(context))
     print(
         event_alpha_calibration.format_calibration_report(
             alerts.rows,
@@ -2177,9 +2312,24 @@ def event_alpha_calibration_report(verbose: bool = False) -> None:
     )
 
 
-def event_source_reliability_report(verbose: bool = False) -> None:
+def event_source_reliability_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
     """Print source/provider reliability summaries from local artifacts."""
     _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
     alerts = event_alpha_alert_store.load_alert_snapshots(
         _event_alpha_alert_store_config_from_runtime().path,
         latest_only=False,
@@ -2188,6 +2338,7 @@ def event_source_reliability_report(verbose: bool = False) -> None:
     feedback_rows = [record.__dict__ for record in feedback.records]
     missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
     runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=50)
+    print(_event_alpha_context_block(context))
     print(
         event_source_reliability.format_source_reliability_report(
             alerts.rows,
@@ -2247,6 +2398,17 @@ def event_alpha_burn_in_scorecard(
 ) -> None:
     """Print a multi-artifact burn-in scorecard for Event Alpha."""
     _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifact_namespace = artifact_namespace or context.artifact_namespace
+    profile_name = profile_name or (context.profile if context.profile != "default" else None)
     runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=500)
     alerts = event_alpha_alert_store.load_alert_snapshots(
         _event_alpha_alert_store_config_from_runtime().path,
@@ -2269,6 +2431,7 @@ def event_alpha_burn_in_scorecard(
         include_legacy_artifacts=include_legacy_artifacts,
         days=days,
     )
+    print(_event_alpha_context_block(context))
     print(event_alpha_burn_in.format_burn_in_scorecard(scorecard))
 
 
@@ -2285,6 +2448,17 @@ def event_alpha_burn_in_checklist(
     _setup_event_discovery_logging(verbose)
     from . import event_alpha_burn_in_checklist as checklist
 
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifact_namespace = artifact_namespace or context.artifact_namespace
+    profile_name = profile_name or (context.profile if context.profile != "default" else None)
     runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=500)
     alerts = event_alpha_alert_store.load_alert_snapshots(
         _event_alpha_alert_store_config_from_runtime().path,
@@ -2307,6 +2481,7 @@ def event_alpha_burn_in_checklist(
         include_legacy_artifacts=include_legacy_artifacts,
         days=days,
     )
+    print(_event_alpha_context_block(context))
     print(checklist.format_burn_in_checklist(checklist.build_burn_in_checklist(scorecard)))
 
 
@@ -2314,12 +2489,23 @@ def event_alpha_v1_readiness_report(
     days: int = 7,
     verbose: bool = False,
     *,
+    profile_name: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
     include_legacy_artifacts: bool = False,
 ) -> None:
     """Print v1 promotion readiness flags from local research artifacts."""
     _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifact_namespace = artifact_namespace or context.artifact_namespace
     artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
     result = event_alpha_v1_readiness.build_v1_readiness(
         run_rows=artifacts["runs"].rows,
@@ -2334,18 +2520,32 @@ def event_alpha_v1_readiness_report(
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
     )
+    print(_event_alpha_context_block(context))
     print(event_alpha_v1_readiness.format_v1_readiness_report(result))
 
 
 def event_alpha_health_guard_report(
     verbose: bool = False,
     *,
+    profile_name: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
     include_legacy_artifacts: bool = False,
 ) -> None:
     """Print Event Alpha freshness/safety health guard status."""
     _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifact_namespace = artifact_namespace or context.artifact_namespace
+    if profile_name and not config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE:
+        config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE = profile_name
     artifacts = _event_alpha_local_artifacts(run_limit=100, latest_alerts=True)
     result = event_alpha_health_guard.evaluate_health_guard(
         run_rows=artifacts["runs"].rows,
@@ -2362,6 +2562,7 @@ def event_alpha_health_guard_report(
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
     )
+    print(_event_alpha_context_block(context))
     print(event_alpha_health_guard.format_health_guard_report(result))
 
 
@@ -2376,6 +2577,17 @@ def event_alpha_artifact_doctor_report(
 ) -> None:
     """Print artifact lineage/namespace diagnostics for Event Alpha."""
     _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifact_namespace = artifact_namespace or context.artifact_namespace
+    profile_name = profile_name or (context.profile if context.profile != "default" else None)
     artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
     cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
     result = event_alpha_artifact_doctor.diagnose_artifacts(
@@ -2393,12 +2605,28 @@ def event_alpha_artifact_doctor_report(
         inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
         strict=strict or bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
     )
+    print(_event_alpha_context_block(context))
     print(event_alpha_artifact_doctor.format_artifact_doctor_report(result))
 
 
-def event_alpha_tuning_worksheet_report(verbose: bool = False) -> None:
+def event_alpha_tuning_worksheet_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
     """Print weekly tuning recommendations without applying them."""
     _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
     artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
     worksheet = event_alpha_tuning.build_tuning_worksheet(
         alert_rows=artifacts["alerts"].rows,
@@ -2406,6 +2634,7 @@ def event_alpha_tuning_worksheet_report(verbose: bool = False) -> None:
         missed_rows=artifacts["missed_rows"],
         run_rows=artifacts["runs"].rows,
     )
+    print(_event_alpha_context_block(context))
     print(event_alpha_tuning.format_tuning_worksheet(worksheet))
 
 
@@ -2414,12 +2643,23 @@ def event_alpha_export_burn_in_pack(
     days: int = 7,
     verbose: bool = False,
     *,
+    profile_name: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
     include_legacy_artifacts: bool = False,
 ) -> None:
     """Write a clean Event Alpha burn-in review zip."""
     _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifact_namespace = artifact_namespace or context.artifact_namespace
     artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
     scorecard = event_alpha_burn_in.build_burn_in_scorecard(
         run_rows=artifacts["runs"].rows,
@@ -2494,6 +2734,9 @@ def event_alpha_export_burn_in_pack(
         router_result=router_result,
         provider_health_rows=artifacts["provider_rows"],
         artifact_namespace=artifact_namespace,
+        run_mode=config.EVENT_ALPHA_RUN_MODE,
+        run_ledger_path=config.EVENT_ALPHA_RUN_LEDGER_PATH,
+        alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
     )
@@ -2643,9 +2886,10 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
 def event_research_cards_write(verbose: bool = False, profile_name: str | None = None) -> None:
     """Write selected Event Alpha research cards and index markdown files."""
     _setup_event_discovery_logging(verbose)
-    _profile, error = _apply_event_alpha_report_profile(profile_name)
-    if error:
-        print(error)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(profile_name, None)
+    except ValueError as exc:
+        print(str(exc))
         return
     watch_cfg = _event_watchlist_config_from_runtime()
     watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
@@ -2669,6 +2913,7 @@ def event_research_cards_write(verbose: bool = False, profile_name: str | None =
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
         now=datetime.now(timezone.utc),
     )
+    print(_event_alpha_context_block(context))
     print(event_research_cards.format_card_write_result(result))
 
 
@@ -2682,10 +2927,17 @@ def event_alpha_explain_last_run(
 ) -> None:
     """Explain why the latest Event Alpha cycle did or did not alert."""
     _setup_event_discovery_logging(verbose)
-    profile, error = _apply_event_alpha_report_profile(profile_name)
-    if error:
-        print(error)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
         return
+    artifact_namespace = artifact_namespace or context.artifact_namespace
+    profile = event_alpha_profiles.get_profile(profile_name) if profile_name else None
     runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=100)
     alerts = event_alpha_alert_store.load_alert_snapshots(
         _event_alpha_alert_store_config_from_runtime().path,
@@ -2707,6 +2959,7 @@ def event_alpha_explain_last_run(
             f"watchlist_enabled={str(bool(config.EVENT_WATCHLIST_ENABLED)).lower()} "
             f"send_enabled={str(bool(config.EVENT_ALERTS_ENABLED)).lower()}"
         )
+    print(_event_alpha_context_block(context))
     print(report)
 
 
@@ -2720,13 +2973,21 @@ def event_alpha_daily_brief_report(
 ) -> None:
     """Write and print the daily Event Alpha operating brief."""
     _setup_event_discovery_logging(verbose)
-    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=25)
-    profile, error = _apply_event_alpha_report_profile(profile_name, infer_latest=True)
-    if error:
-        print(error)
+    selected_profile = profile_name
+    if not selected_profile:
+        selected_profile = _latest_event_alpha_profile_from_runs()
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            selected_profile,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
         return
-    if profile:
-        runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=25)
+    profile = event_alpha_profiles.get_profile(selected_profile) if selected_profile else None
+    artifact_namespace = artifact_namespace or context.artifact_namespace
+    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=25)
     alerts = event_alpha_alert_store.load_alert_snapshots(
         _event_alpha_alert_store_config_from_runtime().path,
         latest_only=True,
@@ -2756,6 +3017,9 @@ def event_alpha_daily_brief_report(
         card_paths=card_write.card_paths,
         requested_profile=profile.name if profile else profile_name,
         artifact_namespace=artifact_namespace,
+        run_mode=context.run_mode,
+        run_ledger_path=context.run_ledger_path,
+        alert_store_path=context.alert_store_path,
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
     )
@@ -2764,7 +3028,7 @@ def event_alpha_daily_brief_report(
         markdown=markdown,
         card_paths=card_write.card_paths,
     )
-    report = event_alpha_daily_brief.format_daily_brief_result(result)
+    report = _event_alpha_context_block(context) + "\n" + event_alpha_daily_brief.format_daily_brief_result(result)
     if profile:
         report += f"\nprofile_applied: {profile.name}"
     print(report)
@@ -4708,6 +4972,11 @@ def cli() -> None:
         help="Print profile-aware Event Alpha source, artifact, send, and LLM budget status.",
     )
     parser.add_argument(
+        "--event-alpha-preflight",
+        action="store_true",
+        help="Preflight profile-scoped Event Alpha artifact paths, providers, LLM budget, and send guards.",
+    )
+    parser.add_argument(
         "--event-watchlist-refresh",
         action="store_true",
         help="Refresh research-only event alpha watchlist state from current alert candidates.",
@@ -5289,6 +5558,14 @@ def cli() -> None:
     if args.event_alpha_status:
         event_alpha_status(profile_name=args.event_alpha_profile, verbose=args.verbose)
         return
+    if args.event_alpha_preflight:
+        event_alpha_preflight_report(
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            send_requested=args.event_alert_send,
+            verbose=args.verbose,
+        )
+        return
     if args.event_alpha_profile_report:
         event_alpha_profile_report(args.event_alpha_profile_report, verbose=args.verbose)
         return
@@ -5308,13 +5585,28 @@ def cli() -> None:
         event_alpha_router_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
         return
     if args.event_alpha_missed_report:
-        event_alpha_missed_report(verbose=args.verbose)
+        event_alpha_missed_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
         return
     if args.event_alpha_calibration_report:
-        event_alpha_calibration_report(verbose=args.verbose)
+        event_alpha_calibration_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
         return
     if args.event_source_reliability_report:
-        event_source_reliability_report(verbose=args.verbose)
+        event_source_reliability_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
         return
     if args.event_alpha_burn_in_scorecard:
         event_alpha_burn_in_scorecard(
@@ -5340,6 +5632,7 @@ def cli() -> None:
         event_alpha_v1_readiness_report(
             days=args.event_alpha_burn_in_days,
             verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
             include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
@@ -5348,6 +5641,7 @@ def cli() -> None:
     if args.event_alpha_health_guard:
         event_alpha_health_guard_report(
             verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
             include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
@@ -5364,13 +5658,19 @@ def cli() -> None:
         )
         return
     if args.event_alpha_tuning_worksheet:
-        event_alpha_tuning_worksheet_report(verbose=args.verbose)
+        event_alpha_tuning_worksheet_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
         return
     if args.event_alpha_export_burn_in_pack:
         event_alpha_export_burn_in_pack(
             args.event_alpha_export_burn_in_pack,
             days=args.event_alpha_burn_in_days,
             verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
             include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,

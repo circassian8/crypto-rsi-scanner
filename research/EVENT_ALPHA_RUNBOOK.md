@@ -11,12 +11,15 @@ Use the no-key profile when you want public RSS/GDELT/Polymarket plus live
 CoinGecko-style market rows without OpenAI calls:
 
 ```bash
+make event-alpha-preflight PROFILE=no_key_live
 make event-alpha-daily-report PROFILE=no_key_live
 ```
 
-This prints profile status, runs the cycle, writes alert snapshots and run-ledger
-rows, prints router output, and summarizes alert snapshots. If no alerts arrive,
-run:
+Preflight resolves the profile namespace, checks that artifact directories can
+be written, verifies provider/LLM/send guard state, and recommends the next
+command. The daily report then prints profile status, runs the cycle, writes
+alert snapshots and run-ledger rows, prints router output, and summarizes alert
+snapshots. If no alerts arrive, run:
 
 ```bash
 make event-alpha-explain-last-run PROFILE=no_key_live
@@ -63,6 +66,14 @@ Profile-specific burn-in and readiness reports count only rows with explicit
 `run_mode` and `artifact_namespace` metadata. Legacy/default rows from earlier
 flat artifact files are ignored by default so a no-key burn-in, LLM burn-in, or
 research-send review cannot borrow unrelated evidence.
+
+Report commands that accept `--event-alpha-profile` resolve artifact paths from
+that profile before loading rows. For example,
+`python3 main.py --event-alpha-artifact-doctor --event-alpha-profile no_key_live`
+reads `event_fade_cache/no_key_live/...` unless you intentionally pass
+`--event-alpha-artifact-namespace` or an explicit path environment override.
+Major reports print their resolved profile, namespace, run mode, run ledger path,
+and alert store path at the top so the reviewed evidence is auditable.
 
 Run the artifact doctor before judging a burn-in window:
 

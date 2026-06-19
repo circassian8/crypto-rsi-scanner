@@ -29,7 +29,10 @@ store, while external snapshot paths are reported safely instead of read
 implicitly. The artifact doctor may flag missing snapshots, orphaned rows, mixed
 namespaces, missing provider/budget evidence, unknown feedback/outcome IDs, and
 card lineage gaps; strict mode may escalate migration-tolerant warnings into
-blockers, but it is still a reporting tool only.
+blockers, but it is still a reporting tool only. Profile-aware reports must
+resolve artifact paths from the requested profile/namespace before loading rows,
+disclose those paths in output, and use preflight only as a blocker/warning
+report, never as a promotion or send mechanism.
 **Why:** Shared flat artifacts made it too easy for fixture/test rows to pollute
 operational burn-in evidence or for alertable runs to lose snapshot lineage.
 The radar needs auditable local files before any human can judge readiness.

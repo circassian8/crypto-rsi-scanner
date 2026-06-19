@@ -3812,6 +3812,196 @@ def test_event_alpha_artifact_context_and_doctor_filter_modes():
                 os.environ[key] = value
 
 
+def test_event_alpha_report_context_and_preflight_are_profile_scoped():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import config, event_alpha_artifacts, event_alpha_preflight, event_alpha_profiles, scanner
+
+    base_attrs = (
+        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "EVENT_ALPHA_RUN_MODE",
+        "EVENT_ALPHA_RUN_LEDGER_PATH",
+        "EVENT_ALPHA_ALERT_STORE_PATH",
+        "EVENT_WATCHLIST_STATE_PATH",
+        "EVENT_ALPHA_FEEDBACK_PATH",
+        "EVENT_ALPHA_MISSED_PATH",
+        "EVENT_ALPHA_PRIORS_PATH",
+        "EVENT_PROVIDER_HEALTH_PATH",
+        "EVENT_ALPHA_DAILY_BRIEF_PATH",
+        "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
+        "EVENT_RESEARCH_CARDS_DIR",
+        "EVENT_LLM_BUDGET_LEDGER_PATH",
+        "EVENT_ALPHA_OUTCOMES_PATH",
+        "EVENT_ALERTS_ENABLED",
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_CHAT_IDS",
+    )
+    profile_attrs = []
+    for profile_name in event_alpha_profiles.profile_names():
+        profile_attrs.extend(event_alpha_profiles.get_profile(profile_name).config_overrides)
+    attrs = tuple(dict.fromkeys((*base_attrs, *profile_attrs)))
+    old_cfg = {name: getattr(config, name) for name in attrs}
+    env_keys = (
+        "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "RSI_EVENT_ALPHA_RUN_MODE",
+        "RSI_EVENT_ALPHA_RUN_LEDGER_PATH",
+        "RSI_EVENT_ALPHA_ALERT_STORE_PATH",
+        "RSI_EVENT_WATCHLIST_STATE_PATH",
+        "RSI_EVENT_ALPHA_FEEDBACK_PATH",
+        "RSI_EVENT_ALPHA_MISSED_PATH",
+        "RSI_EVENT_ALPHA_PRIORS_PATH",
+        "RSI_EVENT_PROVIDER_HEALTH_PATH",
+        "RSI_EVENT_ALPHA_DAILY_BRIEF_PATH",
+        "RSI_EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
+        "RSI_EVENT_RESEARCH_CARDS_DIR",
+        "RSI_EVENT_LLM_BUDGET_LEDGER_PATH",
+        "RSI_EVENT_ALPHA_OUTCOMES_PATH",
+        "OPENAI_API_KEY",
+    )
+    old_env = {key: os.environ.get(key) for key in env_keys}
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            for key in env_keys:
+                os.environ.pop(key, None)
+            base = Path(tmp)
+            config.EVENT_ALPHA_ARTIFACT_BASE_DIR = base
+            config.EVENT_ALPHA_ARTIFACT_NAMESPACE = ""
+            config.EVENT_ALPHA_RUN_MODE = ""
+            config.EVENT_ALPHA_RUN_LEDGER_PATH = base / "event_alpha_runs.jsonl"
+            config.EVENT_ALPHA_ALERT_STORE_PATH = base / "event_alpha_alerts.jsonl"
+            config.EVENT_WATCHLIST_STATE_PATH = base / "event_watchlist_state.jsonl"
+            config.EVENT_ALPHA_FEEDBACK_PATH = base / "event_alpha_feedback.jsonl"
+            config.EVENT_ALPHA_MISSED_PATH = base / "event_alpha_missed.jsonl"
+            config.EVENT_ALPHA_PRIORS_PATH = base / "event_alpha_priors.json"
+            config.EVENT_PROVIDER_HEALTH_PATH = base / "event_provider_health.json"
+            config.EVENT_ALPHA_DAILY_BRIEF_PATH = base / "event_alpha_daily_brief.md"
+            config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR = base / "proposed_eval_cases"
+            config.EVENT_RESEARCH_CARDS_DIR = base / "research_cards"
+            config.EVENT_LLM_BUDGET_LEDGER_PATH = base / "event_llm_budget.json"
+            config.EVENT_ALPHA_OUTCOMES_PATH = base / "event_alpha_outcomes.jsonl"
+            config.EVENT_ALERTS_ENABLED = False
+            config.TELEGRAM_BOT_TOKEN = None
+            config.TELEGRAM_CHAT_IDS = []
+
+            root = base / "event_alpha_runs.jsonl"
+            root.write_text(json.dumps({
+                "row_type": "event_alpha_run",
+                "run_id": "root-run",
+                "profile": "default",
+                "run_mode": "operational",
+                "artifact_namespace": "default",
+                "success": True,
+                "alertable": 0,
+            }) + "\n")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_artifact_doctor_report()
+            text = out.getvalue()
+            assert f"{root}" in text
+            assert "rows: runs=1" in text
+
+            no_key = base / "no_key_live"
+            no_key.mkdir()
+            (no_key / "event_alpha_runs.jsonl").write_text(
+                json.dumps({
+                    "row_type": "event_alpha_run",
+                    "run_id": "no-key-run",
+                    "profile": "no_key_live",
+                    "run_mode": "burn_in",
+                    "artifact_namespace": "no_key_live",
+                    "success": True,
+                    "alertable": 0,
+                }) + "\n",
+                encoding="utf-8",
+            )
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_artifact_doctor_report(profile_name="no_key_live")
+            text = out.getvalue()
+            assert "event_fade_cache" not in text
+            assert f"{no_key / 'event_alpha_runs.jsonl'}" in text
+            assert "rows: runs=1" in text
+            assert "root-run" not in text
+
+            custom = base / "custom_ns"
+            custom.mkdir()
+            (custom / "event_alpha_runs.jsonl").write_text(
+                json.dumps({
+                    "row_type": "event_alpha_run",
+                    "run_id": "custom-run",
+                    "profile": "no_key_live",
+                    "run_mode": "burn_in",
+                    "artifact_namespace": "custom_ns",
+                    "success": True,
+                    "alertable": 0,
+                }) + "\n",
+                encoding="utf-8",
+            )
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_artifact_doctor_report(
+                    profile_name="no_key_live",
+                    artifact_namespace="custom_ns",
+                )
+            text = out.getvalue()
+            assert f"{custom / 'event_alpha_runs.jsonl'}" in text
+            assert "namespace: custom_ns" in text
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="no_key_live")
+            text = out.getvalue()
+            assert "READY_TO_RUN: yes" in text
+            assert "artifact_namespace: no_key_live" in text
+            assert str(no_key / "event_alpha_runs.jsonl") in text
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="full_llm_live")
+            assert "OpenAI LLM profile/provider requires OPENAI_API_KEY" in out.getvalue()
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="research_send")
+            assert "requires RSI_EVENT_ALERTS_ENABLED=1" in out.getvalue()
+
+            bad_base = base / "not-a-dir"
+            bad_base.write_text("file", encoding="utf-8")
+            bad_context = event_alpha_artifacts.context_from_profile(
+                "no_key_live",
+                base_dir=bad_base,
+                artifact_namespace="fixture",
+            )
+            bad = event_alpha_preflight.run_preflight(
+                profile_name="no_key_live",
+                context=bad_context,
+                cfg=config,
+            )
+            assert bad.ready is False
+            joined = "; ".join((*bad.blockers, *bad.warnings))
+            assert "non-operational namespace" in joined
+            assert "not writable" in joined
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="unknown")
+            assert "unknown Event Alpha profile" in out.getvalue()
+    finally:
+        for name, value in old_cfg.items():
+            setattr(config, name, value)
+        for key, value in old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
 def test_event_llm_golden_eval_passes_and_detects_mismatch():
     import json
     import tempfile
@@ -15020,6 +15210,7 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "event-alpha-v1-readiness:" in text
     assert "event-alpha-health-guard:" in text
     assert "event-alpha-artifact-doctor:" in text
+    assert "event-alpha-preflight:" in text
     assert "event-alpha-tuning-worksheet:" in text
     assert "event-alpha-export-burn-in-pack:" in text
     assert "event-alpha-launchd-template:" in text
@@ -15028,6 +15219,7 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "--event-alpha-v1-readiness" in text
     assert "--event-alpha-health-guard" in text
     assert "--event-alpha-artifact-doctor" in text
+    assert "--event-alpha-preflight" in text
     assert "--event-alpha-tuning-worksheet" in text
     assert "--event-alpha-export-burn-in-pack" in text
     assert __import__("pathlib").Path("research/event_alpha_launchd_template.plist").exists()
@@ -15038,6 +15230,25 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "EVENT_ALPHA_PROFILE_DIR" in text
     llm_burn_in = text.split("event-alpha-burn-in-llm:", 1)[1].split("event-alpha-weekly-review:", 1)[0]
     assert "--event-alpha-profile full_llm_live" in llm_burn_in
+
+    import subprocess
+    dry = subprocess.run(
+        ["make", "-n", "event-alpha-daily-llm-report", "PYTHON=python3"],
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout
+    assert "--event-alpha-profile full_llm_live" in dry
+    assert "event_fade_cache/full_llm_live/event_alpha_runs.jsonl" in dry
+    assert "event_fade_cache/no_key_live/event_alpha_runs.jsonl" not in dry
+
+    preflight = subprocess.run(
+        ["make", "-n", "event-alpha-preflight", "PROFILE=no_key_live", "PYTHON=python3"],
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout
+    assert "--event-alpha-preflight --event-alpha-profile no_key_live" in preflight
 
 
 def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):

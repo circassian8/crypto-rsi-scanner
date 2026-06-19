@@ -72,7 +72,7 @@ EVENT_ALPHA_BURN_IN_PACK ?= event_alpha_burn_in_pack.zip
 EVENT_ALPHA_INCLUDE_LEGACY_ARG = $(if $(filter 1 true yes,$(INCLUDE_LEGACY)),--event-alpha-include-legacy-artifacts,)
 EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG = $(if $(filter 1 true yes,$(STRICT)),--event-alpha-artifact-doctor-strict,)
 
-.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-runs-report event-alpha-status event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-runs-report event-alpha-status event-alpha-preflight event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -115,6 +115,7 @@ help:
 	@echo "  make event-alpha-daily-llm-report  Run full-LLM daily report profile without sending"
 	@echo "  make event-alpha-daily-send  Run research-send profile; requires RSI_EVENT_ALERTS_ENABLED=1"
 	@echo "  make event-alpha-health PROFILE=no_key_live  Print profile status, run ledger, and budget status"
+	@echo "  make event-alpha-preflight PROFILE=no_key_live  Check profile paths, providers, LLM budget, and send guards"
 	@echo "  make event-alpha-open-items  Print watchlist monitor, missed, and calibration open items"
 	@echo "  make event-alpha-daily-brief  Write a Markdown daily Event Alpha brief"
 	@echo "  make event-alpha-replay  Replay local Event Alpha artifacts without providers/sends"
@@ -476,6 +477,12 @@ event-alpha-status:
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(PYTHON) main.py --event-alpha-status --event-alpha-profile $(PROFILE)
 
+event-alpha-preflight:
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	$(PYTHON) main.py --event-alpha-preflight --event-alpha-profile $(PROFILE)
+
+event-alpha-daily-report: PROFILE = no_key_live
 event-alpha-daily-report:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	RSI_EVENT_WATCHLIST_MONITOR_ENABLED=1 \
@@ -493,6 +500,7 @@ event-alpha-daily-report:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	$(PYTHON) main.py --event-alpha-alerts-report
 
+event-alpha-daily-llm-report: PROFILE = full_llm_live
 event-alpha-daily-llm-report:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	RSI_EVENT_WATCHLIST_MONITOR_ENABLED=1 \
@@ -575,22 +583,19 @@ event-alpha-router-report:
 
 event-alpha-missed-report:
 	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
-	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
-	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
-	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
-	$(PYTHON) main.py --event-alpha-missed-report
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	$(PYTHON) main.py --event-alpha-missed-report --event-alpha-profile $(PROFILE)
 
 event-alpha-calibration-report:
-	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
-	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
-	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
-	$(PYTHON) main.py --event-alpha-calibration-report
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	$(PYTHON) main.py --event-alpha-calibration-report --event-alpha-profile $(PROFILE)
 
 event-source-reliability-report:
-	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
-	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
-	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
-	$(PYTHON) main.py --event-source-reliability-report
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	$(PYTHON) main.py --event-source-reliability-report --event-alpha-profile $(PROFILE)
 
 event-alpha-calibration-export-priors:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
@@ -633,6 +638,7 @@ event-alpha-priors-shadow-report:
 	RSI_EVENT_ALPHA_PRIORS_PATH=$(EVENT_ALPHA_PRIORS_OUT) \
 	$(PYTHON) main.py --event-alpha-priors-shadow-report
 
+event-alpha-burn-in-no-key: PROFILE = no_key_live
 event-alpha-burn-in-no-key:
 	$(PYTHON) main.py --event-alpha-status --event-alpha-profile no_key_live
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
@@ -640,20 +646,21 @@ event-alpha-burn-in-no-key:
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile no_key_live
 	$(PYTHON) main.py --event-alpha-explain-last-run --event-alpha-profile no_key_live
 
+event-alpha-burn-in-llm: PROFILE = full_llm_live
 event-alpha-burn-in-llm:
 	$(PYTHON) main.py --event-alpha-status --event-alpha-profile full_llm_live
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
 	$(PYTHON) main.py --event-alpha-cycle --event-alpha-profile full_llm_live
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile full_llm_live
 	$(PYTHON) main.py --event-alpha-explain-last-run --event-alpha-profile full_llm_live
-	$(PYTHON) main.py --event-source-reliability-report
+	$(PYTHON) main.py --event-source-reliability-report --event-alpha-profile full_llm_live
 
 event-alpha-weekly-review:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	$(PYTHON) main.py --event-alpha-fill-outcomes $(EVENT_ALPHA_ALERT_PRICES) $(EVENT_ALPHA_ALERT_OUTCOMES)
-	$(PYTHON) main.py --event-alpha-missed-report
-	$(PYTHON) main.py --event-alpha-calibration-report
-	$(PYTHON) main.py --event-source-reliability-report
+	$(PYTHON) main.py --event-alpha-missed-report --event-alpha-profile $(PROFILE)
+	$(PYTHON) main.py --event-alpha-calibration-report --event-alpha-profile $(PROFILE)
+	$(PYTHON) main.py --event-source-reliability-report --event-alpha-profile $(PROFILE)
 	$(MAKE) event-alpha-priors-shadow-report PYTHON=$(PYTHON)
 
 event-alpha-burn-in-scorecard:
@@ -661,21 +668,21 @@ event-alpha-burn-in-scorecard:
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
-	$(PYTHON) main.py --event-alpha-burn-in-scorecard --days 7 --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-burn-in-scorecard --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
 
 event-alpha-burn-in-checklist:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
-	$(PYTHON) main.py --event-alpha-burn-in-checklist --days 7 --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-burn-in-checklist --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
 
 event-alpha-v1-readiness:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
-	$(PYTHON) main.py --event-alpha-v1-readiness --days 7 --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-v1-readiness --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
 
 event-alpha-health-guard:
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
@@ -683,7 +690,7 @@ event-alpha-health-guard:
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_ALPHA_HEALTH_REQUIRE_PROFILE=$(PROFILE) \
-	$(PYTHON) main.py --event-alpha-health-guard --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-health-guard --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
 
 event-alpha-artifact-doctor:
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
@@ -695,10 +702,9 @@ event-alpha-artifact-doctor:
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG)
 
 event-alpha-tuning-worksheet:
-	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
-	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
-	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
-	$(PYTHON) main.py --event-alpha-tuning-worksheet
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	$(PYTHON) main.py --event-alpha-tuning-worksheet --event-alpha-profile $(PROFILE)
 
 event-alpha-export-burn-in-pack:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
@@ -706,7 +712,7 @@ event-alpha-export-burn-in-pack:
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
-	$(PYTHON) main.py --event-alpha-export-burn-in-pack $(EVENT_ALPHA_BURN_IN_PACK) --days 7 --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-export-burn-in-pack $(EVENT_ALPHA_BURN_IN_PACK) --days 7 --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
 
 event-alpha-launchd-template:
 	@echo "Launchd template: research/event_alpha_launchd_template.plist"

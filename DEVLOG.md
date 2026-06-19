@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Add Event Alpha profile preflight · Codex
+**Why:** Event Alpha burn-in reports could still depend on manually injected
+artifact paths, which made it possible for a profile command to inspect the
+wrong namespace. Daily operation also needed an explicit preflight before
+running profile-scoped cycles.
+**Changes:**
+- Added `event_alpha_preflight.py` and `main.py --event-alpha-preflight` to
+  check profile existence, resolved artifact paths, provider readiness, LLM
+  budget/key state, send guards, and writable namespaced artifact directories.
+- Centralized report artifact resolution in `scanner.py` with
+  `resolve_event_alpha_artifact_context_for_report(...)`, then wired burn-in,
+  readiness, health, doctor, brief, missed, calibration, source reliability,
+  tuning, burn-in-pack, explain, and card-writing paths through it.
+- Updated daily briefs and report stdout to disclose profile, namespace,
+  run mode, run ledger path, and alert store path.
+- Made Makefile daily/burn-in/report targets profile-consistent and added
+  `make event-alpha-preflight`.
+- Documented the preflight/profile-path contract in `.env.example`,
+  `ROADMAP.md`, `DECISIONS.md`, and `research/EVENT_ALPHA_RUNBOOK.md`.
+**Verify:** `python3 tests/test_indicators.py` passed 361/361;
+`make event-llm-eval PYTHON=python3`, `make event-llm-extract-eval
+PYTHON=python3`, `make event-alpha-eval PYTHON=python3`, `python3 -m compileall
+-q crypto_rsi_scanner tests`, and `make verify PYTHON=python3` passed.
+`make event-alpha-preflight PROFILE=no_key_live PYTHON=python3` reported
+`READY_TO_RUN: yes`. `make event-alpha-artifact-doctor PROFILE=no_key_live
+STRICT=1 PYTHON=python3` ran and correctly reported `BLOCKED` because the
+`no_key_live` namespace currently has no burn-in run rows.
+**Notes/risks:** This is artifact/readiness plumbing only. It does not enable
+sends, trade, paper trade, write normal RSI signals, alter tiers, or create
+`TRIGGERED_FADE`.
+
 ## 2026-06-19 — Harden Event Alpha artifact consistency · Codex
 **Why:** Event Alpha was ready for burn-in, but profile-specific reports still
 needed stronger protection against legacy/default artifacts, missing
