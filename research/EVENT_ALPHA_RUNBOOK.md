@@ -45,6 +45,18 @@ make event-alpha-burn-in-scorecard
 python3 main.py --event-alpha-burn-in-scorecard --days 7
 ```
 
+Before promoting any research-send burn-in, run the checklist. It reports
+whether the local artifacts are ready, which blockers remain, and the next
+operator actions:
+
+```bash
+make event-alpha-burn-in-checklist
+python3 main.py --event-alpha-burn-in-checklist --days 7
+```
+
+The checklist is advisory only. It does not enable sends, change thresholds,
+apply priors, write live signal rows, paper trade, or execute.
+
 ## Full LLM No-Send Review
 
 Use the full LLM profile only when `OPENAI_API_KEY` is configured and you want
@@ -222,6 +234,15 @@ python3 main.py --event-alpha-replay \
   --event-alpha-replay-profile no_key_live \
   --event-alpha-replay-profile-alt research_send
 ```
+
+Policy comparison reports include candidate-level score, tier, and route diffs.
+Use those rows to see which exact assets gained/lost alertability before
+touching profile or prior settings.
+
+Profile-aware daily briefs and explain-last-run reports prefer the latest run
+matching `--event-alpha-profile`. If no matching run exists, they show an
+explicit requested/selected profile mismatch warning instead of silently
+explaining an unrelated profile.
 
 ## Retention
 

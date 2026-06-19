@@ -36,6 +36,7 @@ class EventAlphaReplayResult:
     route_counts: dict[str, int] | None = None
     score_before_after: tuple[tuple[str, int, int], ...] = ()
     tier_changes: tuple[tuple[str, str, str], ...] = ()
+    candidate_rows: tuple[dict[str, Any], ...] = ()
     warnings: tuple[str, ...] = ()
 
 
@@ -48,11 +49,32 @@ class EventAlphaReplayPolicyRow:
     route_counts: dict[str, int]
     score_deltas: tuple[tuple[str, int, int], ...] = ()
     tier_changes: tuple[tuple[str, str, str], ...] = ()
+    candidate_rows: tuple[dict[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
+class EventAlphaReplayCandidateDiff:
+    policy: str
+    alert_key: str
+    symbol: str
+    playbook: str
+    baseline_score: int | None
+    variant_score: int | None
+    baseline_tier: str | None
+    variant_tier: str | None
+    baseline_route: str | None
+    variant_route: str | None
+    score_delta: int | None
+    tier_changed: bool
+    route_changed: bool
+    feedback_label: str | None = None
+    primary_return: float | None = None
 
 
 @dataclass(frozen=True)
 class EventAlphaReplayComparisonResult:
     rows: tuple[EventAlphaReplayPolicyRow, ...]
+    diffs: tuple[EventAlphaReplayCandidateDiff, ...] = ()
     warnings: tuple[str, ...] = ()
 
 
@@ -86,6 +108,7 @@ def replay_from_artifacts(
         tier_counts=_counts(alerts, "tier"),
         route_counts=_counts(alerts, "route"),
         score_before_after=tuple(scores[:50]),
+        candidate_rows=tuple(_candidate_row_from_mapping(row) for row in alerts),
         warnings=("local artifacts only; no provider fetches or sends were attempted",),
     )
 
@@ -154,6 +177,10 @@ def replay_from_raw_events(
             read_result,
             cfg=router_cfg or event_alpha_router.EventAlphaRouterConfig(enabled=True),
         )
+    route_by_key = {
+        decision.entry.key: decision.route.value
+        for decision in routed.decisions
+    }
     baseline_by_key = {_alert_key(alert): alert for alert in baseline}
     prior_scores: list[tuple[str, int, int]] = []
     tier_changes: list[tuple[str, str, str]] = []
@@ -178,6 +205,10 @@ def replay_from_raw_events(
         route_counts=_counts_from_decisions(routed.decisions),
         score_before_after=tuple(prior_scores[:50]),
         tier_changes=tuple(tier_changes[:50]),
+        candidate_rows=tuple(
+            _candidate_row_from_alert(alert, route_by_key.get(event_watchlist.watchlist_key(alert)))
+            for alert in with_priors
+        ),
         warnings=tuple(dict.fromkeys(warnings)),
     )
 
@@ -195,6 +226,8 @@ def compare_replay_policies(
     router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
     router_threshold_variant: event_alpha_router.EventAlphaRouterConfig | None = None,
     profile_variant_router_cfg: event_alpha_router.EventAlphaRouterConfig | None = None,
+    feedback_rows: Iterable[Mapping[str, Any]] = (),
+    outcome_rows: Iterable[Mapping[str, Any]] = (),
     now: datetime | None = None,
 ) -> EventAlphaReplayComparisonResult:
     """Compare named local replay policies without provider calls or sends."""
@@ -251,9 +284,20 @@ def compare_replay_policies(
             route_counts=replay.route_counts or {},
             score_deltas=replay.score_before_after,
             tier_changes=replay.tier_changes,
+            candidate_rows=replay.candidate_rows,
         ))
         warnings.extend(replay.warnings)
-    return EventAlphaReplayComparisonResult(rows=tuple(rows), warnings=tuple(dict.fromkeys(warnings)))
+    diffs = _policy_diffs(
+        rows,
+        feedback_rows=feedback_rows,
+        outcome_rows=outcome_rows,
+        baseline_policy=str(rows[0].policy) if rows else "baseline",
+    )
+    return EventAlphaReplayComparisonResult(
+        rows=tuple(rows),
+        diffs=diffs,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
 
 
 def load_raw_events_jsonl(path: str | Path) -> list[RawDiscoveredEvent]:
@@ -369,6 +413,28 @@ def format_replay_comparison_report(result: EventAlphaReplayComparisonResult) ->
                 "  tier_changes: "
                 + "; ".join(f"{key or 'unknown'} {before}->{after}" for key, before, after in row.tier_changes[:8])
             )
+    if result.diffs:
+        gained = sum(1 for diff in result.diffs if diff.baseline_tier is None and diff.variant_tier is not None)
+        lost = sum(1 for diff in result.diffs if diff.baseline_tier is not None and diff.variant_tier is None)
+        route_changed = sum(1 for diff in result.diffs if diff.route_changed)
+        tier_up = sum(1 for diff in result.diffs if _tier_rank(diff.variant_tier) > _tier_rank(diff.baseline_tier))
+        tier_down = sum(1 for diff in result.diffs if _tier_rank(diff.variant_tier) < _tier_rank(diff.baseline_tier))
+        lines.extend([
+            "",
+            "candidate diffs:",
+            (
+                f"summary: gained={gained} lost={lost} tier_upgrades={tier_up} "
+                f"tier_downgrades={tier_down} route_changes={route_changed}"
+            ),
+        ])
+        for diff in sorted(result.diffs, key=lambda item: abs(item.score_delta or 0), reverse=True)[:20]:
+            lines.append(
+                f"- {diff.policy} {diff.symbol or 'UNKNOWN'} {diff.alert_key}: "
+                f"score={_fmt_optional(diff.baseline_score)}->{_fmt_optional(diff.variant_score)} "
+                f"tier={diff.baseline_tier or 'none'}->{diff.variant_tier or 'none'} "
+                f"route={diff.baseline_route or 'none'}->{diff.variant_route or 'none'} "
+                f"feedback={diff.feedback_label or 'none'} primary_return={_fmt_return(diff.primary_return)}"
+            )
     if result.warnings:
         lines.append("")
         lines.append("warnings: " + "; ".join(result.warnings))
@@ -379,6 +445,93 @@ def format_replay_comparison_report(result: EventAlphaReplayComparisonResult) ->
 def _count_delta(current: Mapping[str, int], baseline: Mapping[str, int]) -> dict[str, int]:
     keys = set(current) | set(baseline)
     return {key: int(current.get(key, 0)) - int(baseline.get(key, 0)) for key in sorted(keys) if int(current.get(key, 0)) != int(baseline.get(key, 0))}
+
+
+def _policy_diffs(
+    rows: Iterable[EventAlphaReplayPolicyRow],
+    *,
+    feedback_rows: Iterable[Mapping[str, Any]],
+    outcome_rows: Iterable[Mapping[str, Any]],
+    baseline_policy: str,
+) -> tuple[EventAlphaReplayCandidateDiff, ...]:
+    policy_rows = list(rows)
+    baseline = next((row for row in policy_rows if row.policy == baseline_policy), policy_rows[0] if policy_rows else None)
+    if baseline is None:
+        return ()
+    baseline_by_key = {str(row.get("alert_key") or ""): row for row in baseline.candidate_rows}
+    feedback = _feedback_by_key(feedback_rows)
+    outcomes = _outcome_by_key(outcome_rows)
+    diffs: list[EventAlphaReplayCandidateDiff] = []
+    for row in policy_rows:
+        if row.policy == baseline.policy:
+            continue
+        variant_by_key = {str(item.get("alert_key") or ""): item for item in row.candidate_rows}
+        for key in sorted(set(baseline_by_key) | set(variant_by_key)):
+            base = baseline_by_key.get(key)
+            variant = variant_by_key.get(key)
+            base_score = _optional_int(base.get("score") if base else None)
+            variant_score = _optional_int(variant.get("score") if variant else None)
+            score_delta = None if base_score is None or variant_score is None else variant_score - base_score
+            base_tier = _optional_str(base.get("tier") if base else None)
+            variant_tier = _optional_str(variant.get("tier") if variant else None)
+            base_route = _optional_str(base.get("route") if base else None)
+            variant_route = _optional_str(variant.get("route") if variant else None)
+            if (
+                score_delta == 0
+                and base_tier == variant_tier
+                and base_route == variant_route
+                and base is not None
+                and variant is not None
+            ):
+                continue
+            sample = variant or base or {}
+            watch_key = str(sample.get("watchlist_key") or "")
+            outcome = outcomes.get(key) or outcomes.get(watch_key)
+            diffs.append(EventAlphaReplayCandidateDiff(
+                policy=row.policy,
+                alert_key=key,
+                symbol=str(sample.get("symbol") or ""),
+                playbook=str(sample.get("playbook") or ""),
+                baseline_score=base_score,
+                variant_score=variant_score,
+                baseline_tier=base_tier,
+                variant_tier=variant_tier,
+                baseline_route=base_route,
+                variant_route=variant_route,
+                score_delta=score_delta,
+                tier_changed=base_tier != variant_tier,
+                route_changed=base_route != variant_route,
+                feedback_label=feedback.get(key) or feedback.get(watch_key),
+                primary_return=_optional_float(outcome.get("primary_horizon_return")) if outcome else None,
+            ))
+    return tuple(diffs)
+
+
+def _feedback_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        label = str(row.get("label") or "").strip()
+        if not label:
+            continue
+        for field in ("alert_key", "key", "target", "watchlist_key", "snapshot_id"):
+            key = str(row.get(field) or "").strip()
+            if key:
+                out[key] = label
+    return out
+
+
+def _outcome_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        for field in ("alert_key", "key", "watchlist_key", "snapshot_id"):
+            key = str(row.get(field) or "").strip()
+            if key:
+                out[key] = dict(row)
+    return out
 
 
 def _counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:
@@ -440,6 +593,34 @@ def _counts_from_decisions(decisions: Iterable[event_alpha_router.EventAlphaRout
     return dict(sorted(out.items()))
 
 
+def _candidate_row_from_alert(alert: event_alerts.EventAlertCandidate, route: str | None) -> dict[str, Any]:
+    watch_key = event_watchlist.watchlist_key(alert)
+    return {
+        "alert_key": _alert_key(alert),
+        "watchlist_key": watch_key,
+        "symbol": alert.symbol,
+        "coin_id": alert.coin_id,
+        "playbook": alert.effective_playbook_type or alert.playbook_type or "",
+        "score": alert.opportunity_score,
+        "tier": alert.tier.value,
+        "route": route or "STORE_ONLY",
+    }
+
+
+def _candidate_row_from_mapping(row: Mapping[str, Any]) -> dict[str, Any]:
+    alert_key = str(row.get("alert_key") or row.get("snapshot_id") or row.get("event_id") or "")
+    return {
+        "alert_key": alert_key,
+        "watchlist_key": str(row.get("watchlist_key") or row.get("alert_key") or ""),
+        "symbol": str(row.get("asset_symbol") or row.get("symbol") or ""),
+        "coin_id": str(row.get("asset_coin_id") or row.get("coin_id") or ""),
+        "playbook": str(row.get("effective_playbook_type") or row.get("playbook_type") or ""),
+        "score": _int(row.get("opportunity_score") or row.get("latest_score")),
+        "tier": str(row.get("tier") or row.get("latest_tier") or ""),
+        "route": str(row.get("route") or "STORE_ONLY"),
+    }
+
+
 def _alert_key(alert: event_alerts.EventAlertCandidate) -> str:
     event = alert.discovery_candidate.event
     return "|".join((
@@ -454,6 +635,50 @@ def _float(value: object, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _optional_int(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_float(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_str(value: object) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
+def _tier_rank(value: str | None) -> int:
+    order = {
+        None: -1,
+        "": -1,
+        "STORE_ONLY": 0,
+        "RADAR_DIGEST": 1,
+        "WATCHLIST": 2,
+        "HIGH_PRIORITY_WATCH": 3,
+        "TRIGGERED_FADE": 4,
+    }
+    return order.get(value, 0)
+
+
+def _fmt_optional(value: object) -> str:
+    return "none" if value is None else str(value)
+
+
+def _fmt_return(value: float | None) -> str:
+    return "none" if value is None else f"{value:.4f}"
 
 
 def _as_utc(dt: datetime) -> datetime:

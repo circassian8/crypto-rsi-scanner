@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-19 - Keep Event Alpha burn-in checklist as a readiness gate only
+**Status:** accepted
+**Decision:** Event Alpha profile-matched latest-run selection, artifact
+coverage diagnostics, replay candidate diff tables, monitor context in research
+cards, explicit profile artifact policies, and the burn-in acceptance checklist
+are operator-readiness tools only. They may explain whether research-send
+burn-in is ready, blocked, or missing artifacts, but they must not enable
+sends, change alert tiers, apply priors, mutate watchlist state, write normal
+RSI signal rows, paper trade, or execute.
+**Why:** Burn-in readiness needs a single, auditable operational surface. That
+surface is safer when it reports blockers and next actions without becoming an
+authority for alert promotion.
+**Revisit when:** A reviewed burn-in period has enough feedback, outcome, missed
+opportunity, and source-reliability evidence to justify a separate
+human-approved research-send promotion.
+
 ## 2026-06-19 - Keep Event Alpha burn-in polish research-only
 **Status:** accepted
 **Decision:** Event Alpha profile-aware daily reports, service/role provider

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping
 
+from . import event_alpha_run_ledger
+
 
 def format_last_run_explanation(
     run_rows: Iterable[Mapping[str, Any]],
     *,
     alert_rows: Iterable[Mapping[str, Any]] = (),
+    requested_profile: str | None = None,
 ) -> str:
     runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
@@ -21,9 +24,18 @@ def format_last_run_explanation(
         lines.append("No Event Alpha run ledger rows found.")
         lines.append("Run `make event-alpha-cycle-profile PROFILE=no_key_live` to create a research cycle row.")
         return "\n".join(lines)
-    last = runs[0]
+    last = event_alpha_run_ledger.latest_run(runs, requested_profile) or runs[0]
+    selected_profile = str(last.get("profile") or "default")
+    profile_match = (
+        "n/a"
+        if requested_profile is None
+        else str(selected_profile == str(requested_profile)).lower()
+    )
     lines.extend([
         f"run_id: {last.get('run_id') or 'unknown'}",
+        f"requested_profile: {requested_profile or 'latest'}",
+        f"selected_run_profile: {selected_profile}",
+        f"profile_match: {profile_match}",
         f"profile: {last.get('profile') or 'default'} · success={str(bool(last.get('success'))).lower()}",
         f"raw_events={_int(last.get('raw_events'))} · market_anomalies={_int(last.get('market_anomalies'))}",
         f"catalyst_queries={_int(last.get('catalyst_queries'))} · accepted={_int(last.get('catalyst_results_accepted'))} · rejected={_int(last.get('catalyst_results_rejected'))}",
@@ -40,6 +52,9 @@ def format_last_run_explanation(
         f"cache={_int(last.get('llm_cache_hits'))}/{_int(last.get('llm_cache_misses'))} "
         f"calls={_int(last.get('llm_calls_attempted'))} skipped_budget={_int(last.get('llm_skipped_due_budget'))}"
     )
+    mismatch = event_alpha_run_ledger.run_profile_mismatch_warning(requested_profile, last)
+    if mismatch:
+        lines.append(f"profile warning: {mismatch}")
     warnings = [str(item) for item in last.get("warnings") or [] if str(item)]
     if warnings:
         lines.append("warnings: " + "; ".join(warnings[:8]))

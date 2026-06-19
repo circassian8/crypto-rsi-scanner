@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 from . import (
     event_alpha_calibration,
     event_alpha_explain,
+    event_alpha_run_ledger,
     event_alpha_router,
     event_research_cards,
     event_source_reliability,
@@ -34,6 +35,7 @@ def build_daily_brief(
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     card_paths: Iterable[Path] = (),
+    requested_profile: str | None = None,
     generated_at: datetime | None = None,
 ) -> str:
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -44,16 +46,29 @@ def build_daily_brief(
     entries = list(watchlist_entries)
     decisions = list(router_result.decisions if router_result else ())
     alertable = list(router_result.alertable_decisions if router_result else ())
-    latest = runs[0] if runs else {}
+    latest = event_alpha_run_ledger.latest_run(runs, requested_profile) or {}
+    selected_profile = str(latest.get("profile") or "default") if latest else "none"
+    requested = str(requested_profile or "latest").strip() or "latest"
+    profile_match = (
+        "n/a"
+        if not latest or requested_profile is None
+        else str(selected_profile == str(requested_profile)).lower()
+    )
+    mismatch_warning = event_alpha_run_ledger.run_profile_mismatch_warning(requested_profile, latest)
     lines = [
         "# Event Alpha Daily Brief",
         "",
         f"Generated at: {generated.isoformat()}",
+        f"Requested profile: {requested}",
+        f"Selected run profile: {selected_profile}",
+        f"Profile match: {profile_match}",
         "",
         "Research-only. Not a trade signal, paper trade, live RSI signal, or execution.",
         "",
         "## Last Run Health",
     ]
+    if mismatch_warning:
+        lines.append(f"- Profile warning: {mismatch_warning}")
     if latest:
         lines.extend([
             f"- Run: {latest.get('run_id') or 'unknown'}",
@@ -129,7 +144,11 @@ def build_daily_brief(
     lines.extend(_suppression_lines(decisions, entries))
     if not alertable:
         lines.extend(["", "## Why No Alerts"])
-        lines.append(_compact(event_alpha_explain.format_last_run_explanation(runs[:1], alert_rows=alerts)))
+        lines.append(_compact(event_alpha_explain.format_last_run_explanation(
+            runs,
+            alert_rows=alerts,
+            requested_profile=requested_profile,
+        )))
     else:
         lines.extend(["", "## Why Alerts Were Sent"])
         for decision in alertable[:8]:

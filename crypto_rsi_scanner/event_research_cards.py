@@ -9,7 +9,7 @@ import re
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
-from . import event_alpha_router, event_graph, event_watchlist
+from . import event_alpha_router, event_graph, event_watchlist, event_watchlist_monitor
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,7 @@ def render_research_card(
     alert_rows: Iterable[Mapping[str, Any]] = (),
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
     clusters: Iterable[event_graph.EventCluster] = (),
+    monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
 ) -> EventResearchCardResult:
     """Render one Markdown card from local research artifacts."""
     clean_key = str(key or "").strip()
@@ -41,6 +42,7 @@ def render_research_card(
     alert = _find_alert(clean_key, list(alert_rows))
     decision = _find_decision(clean_key, list(route_decisions))
     cluster = _find_cluster(clean_key, list(clusters), entry, alert)
+    monitor_row = _find_monitor_row(clean_key, list(monitor_rows), entry, alert)
     if entry is None and alert is None:
         return EventResearchCardResult(
             key=clean_key,
@@ -105,6 +107,11 @@ def render_research_card(
         f"- Supply pressure: {_score(entry, alert, 'supply_pressure')}",
         f"- Cluster confidence: {_score(entry, alert, 'cluster_confidence')}",
         "",
+        "## Latest Monitor Update",
+    ])
+    lines.extend(_monitor_lines(monitor_row))
+    lines.extend([
+        "",
         "## Why This Matters",
         _why_it_matters(playbook),
         "",
@@ -146,9 +153,11 @@ def render_selected_cards(
     alert_rows: Iterable[Mapping[str, Any]] = (),
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
     clusters: Iterable[event_graph.EventCluster] = (),
+    monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
     limit: int = 10,
 ) -> str:
     cluster_rows = list(clusters)
+    monitor = list(monitor_rows)
     entries = [
         entry for entry in watchlist_entries
         if entry.state in {
@@ -166,6 +175,7 @@ def render_selected_cards(
             alert_rows=alert_rows,
             route_decisions=route_decisions,
             clusters=cluster_rows,
+            monitor_rows=monitor,
         ).markdown
         for entry in entries
     ]
@@ -179,6 +189,7 @@ def write_research_cards(
     alert_rows: Iterable[Mapping[str, Any]] = (),
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
     clusters: Iterable[event_graph.EventCluster] = (),
+    monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
     include_all_alertable: bool = True,
     selected_tiers: Iterable[str] | None = None,
     limit: int = 25,
@@ -202,6 +213,7 @@ def write_research_cards(
             alert_rows=alert_rows,
             route_decisions=route_decisions,
             clusters=clusters,
+            monitor_rows=monitor_rows,
         )
         if not card.found:
             continue
@@ -361,6 +373,38 @@ def _find_cluster(
     return None
 
 
+def _find_monitor_row(
+    key: str,
+    rows: list[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]],
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any] | None:
+    clean_key = key[3:] if key.startswith("ea:") else key
+    key_l = clean_key.lower()
+    identifiers = {
+        clean_key,
+        key_l,
+        str(getattr(entry, "key", "") or ""),
+        str(getattr(entry, "symbol", "") or ""),
+        str(getattr(entry, "coin_id", "") or ""),
+        str(alert.get("alert_key") or "") if alert else "",
+        str(alert.get("asset_symbol") or "") if alert else "",
+        str(alert.get("asset_coin_id") or "") if alert else "",
+    }
+    identifiers_l = {item.lower() for item in identifiers if item}
+    for row in rows:
+        values = {
+            str(_monitor_value(row, "key") or ""),
+            str(_monitor_value(row, "symbol") or ""),
+            str(_monitor_value(row, "coin_id") or ""),
+        }
+        if clean_key in values or key_l in {value.lower() for value in values} or identifiers_l & {
+            value.lower() for value in values if value
+        }:
+            return row
+    return None
+
+
 def _value(entry: Any | None, alert: Mapping[str, Any] | None, entry_field: str, alert_field: str) -> Any:
     if entry is not None and entry_field:
         value = getattr(entry, entry_field, None)
@@ -456,6 +500,35 @@ def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
         if snapshot.get(key) is not None:
             lines.append(f"- {key}: {snapshot.get(key)}")
     return lines or ["- No market snapshot stored."]
+
+
+def _monitor_lines(row: event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any] | None) -> list[str]:
+    if row is None:
+        return [
+            "- No watchlist monitor row found.",
+            "- Monitor data is observation-only and cannot create TRIGGERED_FADE.",
+        ]
+    hints = _monitor_value(row, "state_transition_hints") or ()
+    if isinstance(hints, str):
+        hints = tuple(part.strip() for part in hints.split(",") if part.strip())
+    lines = [
+        f"- Material update: {str(bool(_monitor_value(row, 'material_update'))).lower()}",
+        f"- State transition hints: {', '.join(str(item) for item in hints) if hints else 'none'}",
+        f"- Return 24h / 72h / 7d: {_monitor_value(row, 'return_24h')} / {_monitor_value(row, 'return_72h')} / {_monitor_value(row, 'return_7d')}",
+        f"- Volume z-score / volume-to-market-cap: {_monitor_value(row, 'volume_zscore_24h')} / {_monitor_value(row, 'volume_to_market_cap')}",
+        f"- Derivatives crowding: {_monitor_value(row, 'derivatives_crowding')}",
+        f"- Supply pressure: {_monitor_value(row, 'supply_pressure')}",
+        f"- Event countdown hours: {_monitor_value(row, 'event_countdown_hours') or 'n/a'}",
+        f"- Event age hours: {_monitor_value(row, 'event_age_hours') or 'n/a'}",
+        "- Monitor data is observation-only and cannot create TRIGGERED_FADE.",
+    ]
+    return lines
+
+
+def _monitor_value(row: event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any], field: str) -> Any:
+    if isinstance(row, Mapping):
+        return row.get(field)
+    return getattr(row, field, None)
 
 
 def _verify_lines(alert: Mapping[str, Any] | None, playbook: str) -> list[str]:

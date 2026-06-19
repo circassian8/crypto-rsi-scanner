@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Add Event Alpha burn-in readiness gates · Codex
+**Why:** Event Alpha needed burn-in reports to line up with the requested
+operational profile and to show whether required artifacts are actually present
+before any research-send promotion.
+**Changes:**
+- Added profile-aware latest-run helpers in `event_alpha_run_ledger.py` and
+  wired requested/selected/profile-match output into daily briefs and
+  explain-last-run reports.
+- Extended `event_alpha_burn_in.py` with artifact coverage metrics and added
+  `event_alpha_burn_in_checklist.py`, `--event-alpha-burn-in-checklist`, and
+  `make event-alpha-burn-in-checklist` for readiness blockers/warnings/next
+  actions.
+- Made provider-health wrappers accept deterministic `now` values while keeping
+  legacy provider signatures working.
+- Added candidate-level replay policy diffs with score/tier/route deltas plus
+  optional feedback/outcome context.
+- Added latest watchlist monitor context to research cards and exposed profile
+  artifact-policy contracts in profile/status output.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md`; added regression coverage in
+  `tests/test_indicators.py`.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 358/358. `make event-llm-eval
+PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`,
+`make event-alpha-eval PYTHON=python3`, and `make verify PYTHON=python3`
+passed. `make event-alpha-burn-in-checklist PYTHON=python3` printed the
+research-only checklist successfully.
+**Notes/risks:** The checklist is a readiness report only. It does not enable
+sends, alter thresholds, create `TRIGGERED_FADE`, paper trade, write live signal
+rows, or execute.
+
 ## 2026-06-19 — Polish Event Alpha burn-in daily radar · Codex
 **Why:** Event Alpha needed a coherent daily burn-in surface: profile-aware
 reports, provider health by service/role, active watchlist enrichment hints,

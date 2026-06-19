@@ -71,6 +71,40 @@ def load_run_records(path: str | Path, *, limit: int | None = None) -> EventAlph
     return EventAlphaRunLedgerReadResult(path=p, rows_read=len(rows), rows=rows)
 
 
+def latest_run(rows: Iterable[Mapping[str, Any]], profile: str | None = None) -> dict[str, Any] | None:
+    """Return the newest run, optionally preferring a matching profile."""
+    ordered = _sorted_runs(rows)
+    if not ordered:
+        return None
+    wanted = _profile_key(profile)
+    if wanted is None:
+        return dict(ordered[0])
+    for row in ordered:
+        if _profile_key(row.get("profile")) == wanted:
+            return dict(row)
+    return dict(ordered[0])
+
+
+def latest_runs_by_profile(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Return newest run row per profile using the run ledger timestamp order."""
+    out: dict[str, dict[str, Any]] = {}
+    for row in _sorted_runs(rows):
+        profile = _profile_key(row.get("profile")) or "default"
+        out.setdefault(profile, dict(row))
+    return out
+
+
+def run_profile_mismatch_warning(requested_profile: str | None, selected_run: Mapping[str, Any] | None) -> str | None:
+    """Return a human-readable profile mismatch warning for report headers."""
+    wanted = _profile_key(requested_profile)
+    if wanted is None or not selected_run:
+        return None
+    selected = _profile_key(selected_run.get("profile")) or "default"
+    if selected == wanted:
+        return None
+    return f"requested profile {wanted!r} has no run row; showing latest {selected!r} run instead"
+
+
 def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
     rows = [
         "=" * 76,
@@ -242,6 +276,19 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
             if isinstance(row, dict):
                 rows.append(row)
     return rows
+
+
+def _sorted_runs(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    out = [dict(row) for row in rows if isinstance(row, Mapping)]
+    out.sort(key=lambda row: str(row.get("started_at") or row.get("observed_at") or ""), reverse=True)
+    return out
+
+
+def _profile_key(value: object) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    return text
 
 
 def _json_ready(value: Any) -> Any:

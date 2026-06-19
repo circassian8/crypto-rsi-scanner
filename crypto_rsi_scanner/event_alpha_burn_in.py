@@ -18,6 +18,17 @@ class EventAlphaBurnInScorecard:
     missed_rows: list[dict[str, Any]]
     provider_health_rows: dict[str, dict[str, Any]]
     llm_budget_rows: list[dict[str, Any]]
+    outcome_rows: list[dict[str, Any]]
+    profile: str | None = None
+    runs_with_alertable: int = 0
+    alert_snapshot_rows: int = 0
+    runs_with_alertable_but_no_alert_snapshots: int = 0
+    feedback_row_count: int = 0
+    outcome_row_count: int = 0
+    missed_row_count: int = 0
+    provider_health_row_count: int = 0
+    llm_budget_row_count: int = 0
+    coverage_warnings: tuple[str, ...] = ()
 
 
 def build_burn_in_scorecard(
@@ -28,18 +39,50 @@ def build_burn_in_scorecard(
     missed_rows: Iterable[Mapping[str, Any]] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
+    outcome_rows: Iterable[Mapping[str, Any]] = (),
+    profile: str | None = None,
     days: int = 7,
     now: datetime | None = None,
 ) -> EventAlphaBurnInScorecard:
     cutoff = (now or datetime.now(timezone.utc)).astimezone(timezone.utc) - timedelta(days=max(1, int(days or 1)))
+    run_data = _filter_rows(run_rows, cutoff, ("started_at", "observed_at", "marked_at"))
+    alert_data = _filter_rows(alert_rows, cutoff, ("observed_at", "started_at"))
+    feedback_data = _filter_rows(feedback_rows, cutoff, ("marked_at", "observed_at"))
+    missed_data = _filter_rows(missed_rows, cutoff, ("observed_at", "detected_at", "created_at"))
+    budget_data = _filter_rows(llm_budget_rows, cutoff, ("date", "updated_at"))
+    supplied_outcomes = _filter_rows(outcome_rows, cutoff, ("observed_at", "started_at"))
+    outcome_data = supplied_outcomes or _rows_with_outcomes(alert_data)
+    health_data = {str(key): dict(value) for key, value in (provider_health_rows or {}).items()}
+    runs_with_alertable = sum(1 for row in run_data if _int(row.get("alertable")) > 0)
+    alertable_without_snapshots = runs_with_alertable if runs_with_alertable and not alert_data else 0
+    coverage = _coverage_warnings(
+        run_data,
+        alert_data,
+        feedback_data,
+        outcome_data,
+        missed_data,
+        health_data,
+        profile=profile,
+    )
     return EventAlphaBurnInScorecard(
         days=max(1, int(days or 1)),
-        run_rows=_filter_rows(run_rows, cutoff, ("started_at", "observed_at", "marked_at")),
-        alert_rows=_filter_rows(alert_rows, cutoff, ("observed_at", "started_at")),
-        feedback_rows=_filter_rows(feedback_rows, cutoff, ("marked_at", "observed_at")),
-        missed_rows=_filter_rows(missed_rows, cutoff, ("observed_at", "detected_at", "created_at")),
-        provider_health_rows={str(key): dict(value) for key, value in (provider_health_rows or {}).items()},
-        llm_budget_rows=_filter_rows(llm_budget_rows, cutoff, ("date", "updated_at")),
+        run_rows=run_data,
+        alert_rows=alert_data,
+        feedback_rows=feedback_data,
+        missed_rows=missed_data,
+        provider_health_rows=health_data,
+        llm_budget_rows=budget_data,
+        outcome_rows=outcome_data,
+        profile=profile,
+        runs_with_alertable=runs_with_alertable,
+        alert_snapshot_rows=len(alert_data),
+        runs_with_alertable_but_no_alert_snapshots=alertable_without_snapshots,
+        feedback_row_count=len(feedback_data),
+        outcome_row_count=len(outcome_data),
+        missed_row_count=len(missed_data),
+        provider_health_row_count=len(health_data),
+        llm_budget_row_count=len(budget_data),
+        coverage_warnings=coverage,
     )
 
 
@@ -83,11 +126,20 @@ def format_burn_in_scorecard(scorecard: EventAlphaBurnInScorecard) -> str:
         "missed by stage: " + _count_line(missed, "failure_stage"),
         "provider failures/backoffs: " + _provider_line(health),
         "LLM budget: " + _budget_line(budget),
+        "artifact coverage: "
+        f"runs_with_alertable={scorecard.runs_with_alertable} · "
+        f"alert_snapshots={scorecard.alert_snapshot_rows} · "
+        f"alertable_without_snapshots={scorecard.runs_with_alertable_but_no_alert_snapshots} · "
+        f"feedback={scorecard.feedback_row_count} · outcomes={scorecard.outcome_row_count} · "
+        f"missed={scorecard.missed_row_count} · provider_health={scorecard.provider_health_row_count} · "
+        f"llm_budget={scorecard.llm_budget_row_count}",
         "top playbooks: " + _top_line(alerts, "playbook_type"),
         "worst sources: " + _worst_source_line(alerts, feedback),
-        "",
-        "recommendations:",
     ]
+    if scorecard.coverage_warnings:
+        lines.extend(["", "coverage warnings:"])
+        lines.extend(f"- {warning}" for warning in scorecard.coverage_warnings)
+    lines.extend(["", "recommendations:"])
     lines.extend(f"- {item}" for item in _recommendations(runs, alerts, feedback, missed, health))
     lines.append("No thresholds, alert tiers, paper trades, live DB rows, or execution were changed.")
     return "\n".join(lines).rstrip()
@@ -145,6 +197,69 @@ def _budget_line(rows: Iterable[Mapping[str, Any]]) -> str:
     skipped = sum(_int(row.get("skipped_due_budget")) for row in data)
     cost = sum(_float(row.get("estimated_cost_usd")) for row in data)
     return f"calls={calls} cache={hits}/{misses} skipped={skipped} estimated_cost=${cost:.4f}"
+
+
+def _rows_with_outcomes(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    outcome_fields = (
+        "primary_horizon_return",
+        "return_1h",
+        "return_4h",
+        "return_24h",
+        "return_72h",
+        "return_7d",
+        "max_favorable_excursion",
+        "max_adverse_excursion",
+        "mfe_mae_ratio",
+        "direction_hit",
+        "volatility_hit",
+    )
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if any(row.get(field) not in (None, "") for field in outcome_fields):
+            out.append(dict(row))
+    return out
+
+
+def _coverage_warnings(
+    runs: list[dict[str, Any]],
+    alerts: list[dict[str, Any]],
+    feedback: list[dict[str, Any]],
+    outcomes: list[dict[str, Any]],
+    missed: list[dict[str, Any]],
+    health: Mapping[str, Mapping[str, Any]],
+    *,
+    profile: str | None,
+) -> tuple[str, ...]:
+    warnings: list[str] = []
+    if any(_int(row.get("alertable")) > 0 for row in runs) and not alerts:
+        warnings.append("alert snapshots missing for alertable runs")
+    if alerts and not feedback:
+        warnings.append("no feedback labels for routed alerts")
+    if _matured_alerts(alerts) and not outcomes:
+        warnings.append("no outcomes filled for matured alerts")
+    if not missed:
+        warnings.append("no missed-opportunity rows for burn-in window")
+    live_profiles = {"no_key_live", "no_key_llm", "api_live", "full_llm_live", "research_send"}
+    row_profiles = {str(row.get("profile") or "") for row in runs}
+    profile_name = str(profile or "").strip()
+    live_context = profile_name in live_profiles or bool(row_profiles & live_profiles)
+    if live_context and not health:
+        warnings.append("provider health missing for live profiles")
+    return tuple(dict.fromkeys(warnings))
+
+
+def _matured_alerts(alerts: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    matured: list[dict[str, Any]] = []
+    for row in alerts:
+        tier = str(row.get("tier") or row.get("latest_tier") or "")
+        route = str(row.get("route") or "")
+        if tier in {"WATCHLIST", "HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"} or route in {
+            "RESEARCH_DIGEST",
+            "HIGH_PRIORITY_RESEARCH",
+            "TRIGGERED_FADE_RESEARCH",
+        }:
+            matured.append(dict(row))
+    return matured
 
 
 def _worst_source_line(alerts: list[dict[str, Any]], feedback: list[dict[str, Any]]) -> str:

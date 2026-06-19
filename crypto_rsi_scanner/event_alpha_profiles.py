@@ -14,6 +14,13 @@ class EventAlphaProfile:
     config_overrides: Mapping[str, Any]
     with_llm: bool = False
     send: bool = False
+    snapshot_policy: str = "all"
+    card_auto_write: bool = False
+    card_write_tiers: tuple[str, ...] = ()
+    watchlist_monitor_enabled: bool = False
+    targeted_market_source: str = "cycle"
+    send_lane_policy: str = "no_send"
+    send_guard: str = "send disabled unless --event-alert-send and RSI_EVENT_ALERTS_ENABLED=1 are both set"
 
 
 def profile_names() -> tuple[str, ...]:
@@ -29,6 +36,7 @@ def get_profile(name: str) -> EventAlphaProfile:
 
 
 def format_profile_report(profile: EventAlphaProfile) -> str:
+    policy = artifact_policy(profile)
     rows = [
         "=" * 76,
         "EVENT ALPHA PROFILE REPORT (research-only)",
@@ -56,7 +64,42 @@ def format_profile_report(profile: EventAlphaProfile) -> str:
         rows.extend(["", "LLM budget defaults:"])
         for key, value in budget.items():
             rows.append(f"- {key}={value}")
+    rows.extend(["", "artifact policy:"])
+    for key, value in policy.items():
+        rows.append(f"- {key}={value}")
     return "\n".join(rows)
+
+
+def artifact_policy(profile: EventAlphaProfile) -> dict[str, Any]:
+    """Return the explicit local-artifact/send contract for a profile."""
+    overrides = dict(profile.config_overrides)
+    tiers = overrides.get("EVENT_RESEARCH_CARDS_WRITE_TIERS", profile.card_write_tiers)
+    if isinstance(tiers, str):
+        tiers = tuple(part.strip() for part in tiers.split(",") if part.strip())
+    else:
+        tiers = tuple(tiers)
+    budget = {
+        "max_calls_per_run": overrides.get("EVENT_LLM_MAX_CALLS_PER_RUN", "default"),
+        "max_calls_per_day": overrides.get("EVENT_LLM_MAX_CALLS_PER_DAY", "default"),
+        "max_cost_usd_per_day": overrides.get("EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY", "default"),
+        "cache_ttl_hours": overrides.get("EVENT_LLM_CACHE_TTL_HOURS", "default"),
+    }
+    return {
+        "snapshot_policy": overrides.get("EVENT_ALPHA_SNAPSHOT_POLICY", profile.snapshot_policy),
+        "card_auto_write": overrides.get("EVENT_RESEARCH_CARDS_AUTO_WRITE", profile.card_auto_write),
+        "card_write_tiers": tiers,
+        "watchlist_monitor_enabled": overrides.get(
+            "EVENT_WATCHLIST_MONITOR_ENABLED",
+            profile.watchlist_monitor_enabled,
+        ),
+        "targeted_market_source": overrides.get(
+            "EVENT_WATCHLIST_MONITOR_MARKET_SOURCE",
+            profile.targeted_market_source,
+        ),
+        "llm_budget_caps": budget,
+        "send_lane_policy": profile.send_lane_policy,
+        "send_guard": profile.send_guard,
+    }
 
 
 _FIXTURE_UNIVERSE = Path("fixtures/coingecko_smoke/top_markets.json")
@@ -80,6 +123,8 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_WATCHLIST_ENABLED": True,
             "EVENT_ALPHA_ROUTER_ENABLED": True,
         },
+        snapshot_policy="all",
+        watchlist_monitor_enabled=False,
     ),
     "no_key_live": EventAlphaProfile(
         name="no_key_live",
@@ -100,7 +145,11 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_WATCHLIST_MONITOR_ENABLED": True,
             "EVENT_WATCHLIST_MONITOR_MARKET_SOURCE": "cycle",
             "EVENT_ALPHA_ROUTER_ENABLED": True,
+            "EVENT_ALPHA_SNAPSHOT_POLICY": "sampled_controls",
         },
+        snapshot_policy="sampled_controls",
+        watchlist_monitor_enabled=True,
+        targeted_market_source="cycle",
     ),
     "no_key_llm": EventAlphaProfile(
         name="no_key_llm",
@@ -122,8 +171,10 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_EXTRACTOR_MODE": "advisory",
             "EVENT_WATCHLIST_ENABLED": True,
             "EVENT_ALPHA_ROUTER_ENABLED": True,
+            "EVENT_ALPHA_SNAPSHOT_POLICY": "sampled_controls",
         },
         with_llm=True,
+        snapshot_policy="sampled_controls",
     ),
     "api_live": EventAlphaProfile(
         name="api_live",
@@ -142,7 +193,9 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_CATALYST_SEARCH_PROVIDERS": ("gdelt", "rss", "cryptopanic", "polymarket"),
             "EVENT_WATCHLIST_ENABLED": True,
             "EVENT_ALPHA_ROUTER_ENABLED": True,
+            "EVENT_ALPHA_SNAPSHOT_POLICY": "sampled_controls",
         },
+        snapshot_policy="sampled_controls",
     ),
     "full_llm_live": EventAlphaProfile(
         name="full_llm_live",
@@ -174,8 +227,12 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_WATCHLIST_MONITOR_ENABLED": True,
             "EVENT_WATCHLIST_MONITOR_MARKET_SOURCE": "cycle",
             "EVENT_ALPHA_ROUTER_ENABLED": True,
+            "EVENT_ALPHA_SNAPSHOT_POLICY": "sampled_controls",
         },
         with_llm=True,
+        snapshot_policy="sampled_controls",
+        watchlist_monitor_enabled=True,
+        targeted_market_source="cycle",
     ),
     "research_send": EventAlphaProfile(
         name="research_send",
@@ -196,6 +253,8 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_EXTRACTOR_PROVIDER": "fixture",
             "EVENT_LLM_EXTRACTOR_MODE": "advisory",
             "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
+            "EVENT_RESEARCH_CARDS_AUTO_WRITE": True,
+            "EVENT_RESEARCH_CARDS_WRITE_TIERS": ("HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"),
             "EVENT_WATCHLIST_ENABLED": True,
             "EVENT_WATCHLIST_MONITOR_ENABLED": True,
             "EVENT_WATCHLIST_MONITOR_MARKET_SOURCE": "cycle",
@@ -203,5 +262,12 @@ _PROFILES: dict[str, EventAlphaProfile] = {
         },
         with_llm=True,
         send=True,
+        snapshot_policy="alertable",
+        card_auto_write=True,
+        card_write_tiers=("HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"),
+        watchlist_monitor_enabled=True,
+        targeted_market_source="cycle",
+        send_lane_policy="research_digest_only",
+        send_guard="requires --event-alert-send and RSI_EVENT_ALERTS_ENABLED=1; no paper/live trading",
     ),
 }

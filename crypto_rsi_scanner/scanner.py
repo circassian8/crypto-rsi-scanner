@@ -1340,6 +1340,41 @@ def _event_watchlist_market_provider_from_runtime() -> event_watchlist_market.Ev
     )
 
 
+def _event_watchlist_monitor_result_from_runtime(
+    read_result: event_watchlist.EventWatchlistReadResult,
+    *,
+    now: datetime | None = None,
+) -> event_watchlist_monitor.EventWatchlistMonitorResult:
+    observed = _event_research_now(now)
+    fixture_rows = _event_watchlist_monitor_market_rows_from_runtime()
+    market_source = event_watchlist_market.market_rows_for_watchlist(
+        read_result,
+        source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
+        fixture_rows=fixture_rows,
+        cycle_rows=fixture_rows,
+        targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
+        targeted_provider=_event_watchlist_market_provider_from_runtime(),
+        max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
+        cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
+        now=observed,
+    )
+    enrichment = event_watchlist_enrichment.enrichment_for_watchlist(
+        read_result,
+        derivatives_source=config.EVENT_WATCHLIST_MONITOR_DERIVATIVES_SOURCE,
+        supply_source=config.EVENT_WATCHLIST_MONITOR_SUPPLY_SOURCE,
+        derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
+        supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
+        max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
+    )
+    return event_watchlist_monitor.monitor_watchlist(
+        read_result,
+        market_rows=market_source.rows,
+        derivatives_by_asset=enrichment.derivatives,
+        supply_by_asset=enrichment.supply,
+        now=observed,
+    )
+
+
 def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRouterConfig:
     return event_alpha_router.EventAlphaRouterConfig(
         enabled=config.EVENT_ALPHA_ROUTER_ENABLED,
@@ -1768,13 +1803,19 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
             f"fail_fast_dns={str(bool(config.EVENT_PROVIDER_FAIL_FAST_ON_DNS)).lower()}"
         ),
         f"daily_brief_path: {config.EVENT_ALPHA_DAILY_BRIEF_PATH}",
+    ]
+    if profile:
+        lines.append("artifact policy:")
+        for key, value in event_alpha_profiles.artifact_policy(profile).items():
+            lines.append(f"  {key}={value}")
+    lines.extend([
         "",
         event_provider_status.format_event_discovery_provider_status(provider_report),
         "",
         event_provider_health.format_provider_health_report(
             event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH)
         ),
-    ]
+    ])
     print("\n".join(lines))
 
 
@@ -2110,6 +2151,32 @@ def event_alpha_burn_in_scorecard(days: int = 7, verbose: bool = False) -> None:
     print(event_alpha_burn_in.format_burn_in_scorecard(scorecard))
 
 
+def event_alpha_burn_in_checklist(days: int = 7, verbose: bool = False) -> None:
+    """Print the operational burn-in acceptance checklist."""
+    _setup_event_discovery_logging(verbose)
+    from . import event_alpha_burn_in_checklist as checklist
+
+    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=500)
+    alerts = event_alpha_alert_store.load_alert_snapshots(
+        _event_alpha_alert_store_config_from_runtime().path,
+        latest_only=False,
+    )
+    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
+    missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
+    provider_rows = event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH)
+    budget_rows = event_alpha_burn_in.load_llm_budget_rows(config.EVENT_LLM_BUDGET_LEDGER_PATH)
+    scorecard = event_alpha_burn_in.build_burn_in_scorecard(
+        run_rows=runs.rows,
+        alert_rows=alerts.rows,
+        feedback_rows=[record.__dict__ for record in feedback.records],
+        missed_rows=missed_rows,
+        provider_health_rows=provider_rows,
+        llm_budget_rows=budget_rows,
+        days=days,
+    )
+    print(checklist.format_burn_in_checklist(checklist.build_burn_in_checklist(scorecard)))
+
+
 def event_alpha_calibration_export_priors(out_path: str | None = None, verbose: bool = False) -> None:
     """Write reviewable calibration priors without applying them."""
     _setup_event_discovery_logging(verbose)
@@ -2177,12 +2244,14 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
     store_cfg = _event_alpha_alert_store_config_from_runtime()
     alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path, latest_only=True)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    monitor_result = _event_watchlist_monitor_result_from_runtime(watchlist)
     if target:
         result = event_research_cards.render_research_card(
             target,
             watchlist_entries=watchlist.entries,
             alert_rows=alerts.rows,
             route_decisions=routed.decisions,
+            monitor_rows=monitor_result.rows,
         )
         print(result.markdown)
         return
@@ -2191,6 +2260,7 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
             watchlist_entries=watchlist.entries,
             alert_rows=alerts.rows,
             route_decisions=routed.decisions,
+            monitor_rows=monitor_result.rows,
         )
     )
 
@@ -2209,11 +2279,13 @@ def event_research_cards_write(verbose: bool = False, profile_name: str | None =
         latest_only=True,
     )
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    monitor_result = _event_watchlist_monitor_result_from_runtime(watchlist)
     result = event_research_cards.write_research_cards(
         config.EVENT_RESEARCH_CARDS_DIR,
         watchlist_entries=watchlist.entries,
         alert_rows=alerts.rows,
         route_decisions=routed.decisions,
+        monitor_rows=monitor_result.rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
         now=datetime.now(timezone.utc),
     )
@@ -2223,16 +2295,21 @@ def event_research_cards_write(verbose: bool = False, profile_name: str | None =
 def event_alpha_explain_last_run(verbose: bool = False, profile_name: str | None = None) -> None:
     """Explain why the latest Event Alpha cycle did or did not alert."""
     _setup_event_discovery_logging(verbose)
-    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=1)
     profile, error = _apply_event_alpha_report_profile(profile_name)
     if error:
         print(error)
         return
+    runs = event_alpha_run_ledger.load_run_records(config.EVENT_ALPHA_RUN_LEDGER_PATH, limit=100)
     alerts = event_alpha_alert_store.load_alert_snapshots(
         _event_alpha_alert_store_config_from_runtime().path,
         latest_only=True,
     )
-    report = event_alpha_explain.format_last_run_explanation(runs.rows, alert_rows=alerts.rows)
+    requested = profile.name if profile else profile_name
+    report = event_alpha_explain.format_last_run_explanation(
+        runs.rows,
+        alert_rows=alerts.rows,
+        requested_profile=requested,
+    )
     if profile:
         report += (
             f"\nprofile_adjusted_status: profile={profile.name} "
@@ -2261,11 +2338,13 @@ def event_alpha_daily_brief_report(verbose: bool = False, profile_name: str | No
     missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
     watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
     router_result = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    monitor_result = _event_watchlist_monitor_result_from_runtime(watchlist)
     card_write = event_research_cards.write_research_cards(
         config.EVENT_RESEARCH_CARDS_DIR,
         watchlist_entries=watchlist.entries,
         alert_rows=alerts.rows,
         route_decisions=router_result.decisions,
+        monitor_rows=monitor_result.rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
         now=datetime.now(timezone.utc),
     )
@@ -2278,6 +2357,7 @@ def event_alpha_daily_brief_report(verbose: bool = False, profile_name: str | No
         router_result=router_result,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
         card_paths=card_write.card_paths,
+        requested_profile=profile.name if profile else profile_name,
     )
     result = event_alpha_daily_brief.write_daily_brief(
         config.EVENT_ALPHA_DAILY_BRIEF_PATH,
@@ -4268,6 +4348,11 @@ def cli() -> None:
         help="Print Event Alpha burn-in scorecard from run/alert/feedback/missed/provider artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-burn-in-checklist",
+        action="store_true",
+        help="Print Event Alpha burn-in acceptance checklist for research-send readiness.",
+    )
+    parser.add_argument(
         "--event-alpha-burn-in-days",
         "--days",
         type=int,
@@ -4784,6 +4869,9 @@ def cli() -> None:
         return
     if args.event_alpha_burn_in_scorecard:
         event_alpha_burn_in_scorecard(days=args.event_alpha_burn_in_days, verbose=args.verbose)
+        return
+    if args.event_alpha_burn_in_checklist:
+        event_alpha_burn_in_checklist(days=args.event_alpha_burn_in_days, verbose=args.verbose)
         return
     if args.event_alpha_calibration_export_priors is not None:
         event_alpha_calibration_export_priors(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -123,8 +124,8 @@ class HealthCheckedEventProvider:
         self.provider_key = provider_health_key(self.name, service=self.provider_service, role=self.provider_role)
         self.last_warnings: tuple[str, ...] = ()
 
-    def fetch_events(self, start: datetime, end: datetime) -> list[Any]:
-        observed = datetime.now(timezone.utc)
+    def fetch_events(self, start: datetime, end: datetime, now: datetime | None = None) -> list[Any]:
+        observed = _as_utc(now or datetime.now(timezone.utc))
         decision = provider_allowed(
             self.name,
             cfg=self.cfg,
@@ -136,7 +137,7 @@ class HealthCheckedEventProvider:
             self.last_warnings = (decision.reason or f"provider {self.name} in backoff",)
             return []
         try:
-            rows = list(self.provider.fetch_events(start, end))
+            rows = list(_call_with_optional_now(self.provider.fetch_events, start, end, now=observed))
         except Exception as exc:  # noqa: BLE001 - fail-soft research wrapper
             record_provider_failure(
                 self.name,
@@ -193,10 +194,12 @@ class HealthCheckedUniverseProvider:
         self.provider_key = provider_health_key(self.name, service=self.provider_service, role=self.provider_role)
         self.last_warnings: tuple[str, ...] = ()
 
-    def fetch_assets(self) -> list[Any]:
+    def fetch_assets(self, now: datetime | None = None) -> list[Any]:
+        observed = _as_utc(now or datetime.now(timezone.utc))
         decision = provider_allowed(
             self.name,
             cfg=self.cfg,
+            now=observed,
             provider_service=self.provider_service,
             provider_role=self.provider_role,
         )
@@ -204,12 +207,13 @@ class HealthCheckedUniverseProvider:
             self.last_warnings = (decision.reason or f"provider {self.name} in backoff",)
             return []
         try:
-            rows = list(self.provider.fetch_assets())
+            rows = list(_call_with_optional_now(self.provider.fetch_assets, now=observed))
         except Exception as exc:  # noqa: BLE001 - fail-soft research wrapper
             record_provider_failure(
                 self.name,
                 exc,
                 cfg=self.cfg,
+                now=observed,
                 provider_kind=self.provider_kind,
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
@@ -222,6 +226,7 @@ class HealthCheckedUniverseProvider:
                 self.name,
                 self.last_warnings[0],
                 cfg=self.cfg,
+                now=observed,
                 provider_kind=self.provider_kind,
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
@@ -230,6 +235,7 @@ class HealthCheckedUniverseProvider:
             record_provider_success(
                 self.name,
                 cfg=self.cfg,
+                now=observed,
                 provider_kind=self.provider_kind,
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
@@ -258,10 +264,12 @@ class HealthCheckedDerivativesProvider:
         self.provider_key = provider_health_key(self.name, service=self.provider_service, role=self.provider_role)
         self.last_warnings: tuple[str, ...] = ()
 
-    def fetch_snapshots(self) -> dict[str, Any]:
+    def fetch_snapshots(self, now: datetime | None = None) -> dict[str, Any]:
+        observed = _as_utc(now or datetime.now(timezone.utc))
         decision = provider_allowed(
             self.name,
             cfg=self.cfg,
+            now=observed,
             provider_service=self.provider_service,
             provider_role=self.provider_role,
         )
@@ -269,12 +277,13 @@ class HealthCheckedDerivativesProvider:
             self.last_warnings = (decision.reason or f"provider {self.name} in backoff",)
             return {}
         try:
-            rows = dict(self.provider.fetch_snapshots())
+            rows = dict(_call_with_optional_now(self.provider.fetch_snapshots, now=observed))
         except Exception as exc:  # noqa: BLE001 - fail-soft research wrapper
             record_provider_failure(
                 self.name,
                 exc,
                 cfg=self.cfg,
+                now=observed,
                 provider_kind=self.provider_kind,
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
@@ -287,6 +296,7 @@ class HealthCheckedDerivativesProvider:
                 self.name,
                 self.last_warnings[0],
                 cfg=self.cfg,
+                now=observed,
                 provider_kind=self.provider_kind,
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
@@ -295,6 +305,7 @@ class HealthCheckedDerivativesProvider:
             record_provider_success(
                 self.name,
                 cfg=self.cfg,
+                now=observed,
                 provider_kind=self.provider_kind,
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
@@ -324,6 +335,21 @@ def write_provider_health(path: str | Path, rows: Mapping[str, Mapping[str, Any]
         "providers": {str(key): dict(value) for key, value in rows.items()},
     }
     p.write_text(json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _call_with_optional_now(method: Any, *args: Any, now: datetime) -> Any:
+    """Call provider methods with a deterministic clock only when supported."""
+    try:
+        signature = inspect.signature(method)
+    except (TypeError, ValueError):
+        return method(*args)
+    parameters = signature.parameters
+    accepts_now = "now" in parameters or any(
+        param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values()
+    )
+    if accepts_now:
+        return method(*args, now=now)
+    return method(*args)
 
 
 def provider_allowed(

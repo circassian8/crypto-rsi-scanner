@@ -3629,6 +3629,9 @@ def test_event_alpha_profiles_and_make_targets_are_available():
     assert send.send is True
     report = event_alpha_profiles.format_profile_report(send)
     assert "still requires --event-alert-send" in report
+    assert "artifact policy:" in report
+    assert event_alpha_profiles.artifact_policy(send)["snapshot_policy"] == "alertable"
+    assert event_alpha_profiles.artifact_policy(send)["card_auto_write"] is True
     try:
         event_alpha_profiles.get_profile("unknown")
     except ValueError as exc:
@@ -6996,6 +6999,7 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > 0
         assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] > 0
         assert "LLM budget defaults" in event_alpha_profiles.format_profile_report(profile)
+        assert "artifact policy:" in event_alpha_profiles.format_profile_report(profile)
         assert event_alpha_profiles.get_profile("research_send").config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "alertable"
         assert profile.config_overrides["EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH"].name == "public_rss_feeds.txt"
         assert event_alpha_profiles.get_profile("research_send").config_overrides[
@@ -13857,7 +13861,7 @@ def test_event_research_cards_write_files_and_index():
 
 
 def test_event_alpha_explain_last_run_paths():
-    from crypto_rsi_scanner import event_alpha_explain
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_alpha_explain, event_alpha_run_ledger
 
     quiet = event_alpha_explain.format_last_run_explanation([
         {"run_id": "r1", "success": True, "raw_events": 0, "market_anomalies": 0, "candidates": 0, "alerts": 0, "routed": 0, "alertable": 0}
@@ -13868,6 +13872,27 @@ def test_event_alpha_explain_last_run_paths():
     ], alert_rows=[{"tier": "STORE_ONLY", "rejected_reason": "source_noise"}])
     assert "router produced no alertable decisions" in routed
     assert "skipped_budget=1" in routed
+
+    rows = [
+        {"run_id": "default-newer", "profile": "default", "started_at": "2026-06-19T12:00:00+00:00", "success": True},
+        {"run_id": "no-key-older", "profile": "no_key_live", "started_at": "2026-06-19T10:00:00+00:00", "success": True},
+    ]
+    assert event_alpha_run_ledger.latest_run(rows)["run_id"] == "default-newer"
+    assert event_alpha_run_ledger.latest_run(rows, "no_key_live")["run_id"] == "no-key-older"
+    assert event_alpha_run_ledger.latest_runs_by_profile(rows)["no_key_live"]["run_id"] == "no-key-older"
+    explain = event_alpha_explain.format_last_run_explanation(rows, requested_profile="no_key_live")
+    assert "requested_profile: no_key_live" in explain
+    assert "selected_run_profile: no_key_live" in explain
+    assert "profile_match: true" in explain
+    fallback = event_alpha_explain.format_last_run_explanation(rows, requested_profile="full_llm_live")
+    assert "profile warning:" in fallback
+    markdown = event_alpha_daily_brief.build_daily_brief(
+        run_rows=rows,
+        requested_profile="no_key_live",
+    )
+    assert "Requested profile: no_key_live" in markdown
+    assert "Selected run profile: no_key_live" in markdown
+    assert "Profile match: true" in markdown
 
 
 def test_event_watchlist_market_targeted_provider_and_fallback():
@@ -14082,6 +14107,57 @@ def test_event_provider_health_wraps_event_and_enrichment_providers():
     assert "universe:" in report
 
 
+def test_event_provider_health_wrappers_use_injected_now_and_legacy_signatures():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_provider_health
+
+    now = datetime(2026, 6, 19, 9, 30, tzinfo=timezone.utc)
+    path = Path(tempfile.mkdtemp()) / "health.json"
+    cfg = event_provider_health.EventProviderHealthConfig(path=path)
+
+    class ClockedEventProvider:
+        name = "clocked_events"
+
+        def __init__(self):
+            self.now_seen = None
+
+        def fetch_events(self, start, end, now=None):
+            self.now_seen = now
+            return []
+
+    clocked = ClockedEventProvider()
+    assert event_provider_health.HealthCheckedEventProvider(clocked, cfg=cfg).fetch_events(now, now, now=now) == []
+    assert clocked.now_seen == now
+    rows = event_provider_health.load_provider_health(path)
+    assert rows["clocked_events:event_source"]["last_success_at"] == now.isoformat()
+
+    class LegacyUniverse:
+        name = "legacy_universe"
+
+        def fetch_assets(self):
+            return []
+
+    class ClockedDerivatives:
+        name = "clocked_derivatives"
+
+        def __init__(self):
+            self.now_seen = None
+
+        def fetch_snapshots(self, now=None):
+            self.now_seen = now
+            return {}
+
+    assert event_provider_health.HealthCheckedUniverseProvider(LegacyUniverse(), cfg=cfg).fetch_assets(now=now) == []
+    clocked_derivatives = ClockedDerivatives()
+    assert event_provider_health.HealthCheckedDerivativesProvider(clocked_derivatives, cfg=cfg).fetch_snapshots(now=now) == {}
+    assert clocked_derivatives.now_seen == now
+    rows = event_provider_health.load_provider_health(path)
+    assert rows["legacy_universe:universe"]["last_success_at"] == now.isoformat()
+    assert rows["clocked_derivatives:derivatives"]["last_success_at"] == now.isoformat()
+
+
 def test_event_alpha_priors_adjust_research_score_but_not_triggered_fade():
     import json
     import tempfile
@@ -14175,8 +14251,11 @@ def test_event_alpha_priors_shadow_report_and_raw_replay_are_local():
         "router_threshold_variant",
         "profile_variant",
     ]
+    assert comparison.diffs
+    assert any(diff.policy == "priors" and diff.score_delta for diff in comparison.diffs)
     comparison_text = event_alpha_replay.format_replay_comparison_report(comparison)
     assert "EVENT ALPHA REPLAY POLICY COMPARISON" in comparison_text
+    assert "candidate diffs:" in comparison_text
     assert "local-only" in comparison_text
     assert "router_threshold_variant" in comparison_text
 
@@ -14324,11 +14403,32 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
     assert "Calibration Recommendations" in markdown
     assert ".env" not in markdown
 
-    from crypto_rsi_scanner import event_research_cards
+    from crypto_rsi_scanner import event_research_cards, event_watchlist_monitor
     entry_fade = __import__("dataclasses").replace(
         entry,
         latest_playbook_type="proxy_fade",
         latest_effective_playbook_type="proxy_fade",
+    )
+    monitor_row = event_watchlist_monitor.EventWatchlistMonitorRow(
+        key=entry_fade.key,
+        symbol="VELVET",
+        coin_id="velvet",
+        state="HIGH_PRIORITY",
+        event_name="SpaceX pre-IPO exposure",
+        event_time="2026-06-16T00:00:00+00:00",
+        event_countdown_hours=None,
+        event_age_hours=12.0,
+        current_price=1.23,
+        return_24h=0.24,
+        return_72h=0.72,
+        return_7d=1.4,
+        volume_to_market_cap=0.4,
+        volume_zscore_24h=4.5,
+        derivatives_crowding=68,
+        supply_pressure=20,
+        cluster_confidence=80,
+        state_transition_hints=("MARKET_SCORE_JUMP", "DERIVATIVES_HEATED"),
+        material_update=True,
     )
     card = event_research_cards.render_research_card(
         entry_fade.key,
@@ -14344,8 +14444,13 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
             "playbook_invalidation": "Price reclaims event VWAP",
             "score_components": {"external_catalyst": 90, "event_time_quality": 90, "market_move_volume": 80},
         }],
+        monitor_rows=[monitor_row],
     )
     assert "## Trade-Readiness Checklist" in card.markdown
+    assert "## Latest Monitor Update" in card.markdown
+    assert "MARKET_SCORE_JUMP" in card.markdown
+    assert "DERIVATIVES_HEATED" in card.markdown
+    assert "cannot create TRIGGERED_FADE" in card.markdown
     assert "post-event failure" in card.markdown
 
     replay = event_alpha_replay.replay_from_artifacts(
@@ -14397,7 +14502,7 @@ def test_event_alpha_daily_brief_replay_retention_and_unmatched_feedback():
 
 def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_alpha_burn_in
+    from crypto_rsi_scanner import event_alpha_burn_in, event_alpha_burn_in_checklist
 
     now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
     scorecard = event_alpha_burn_in.build_burn_in_scorecard(
@@ -14447,6 +14552,13 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
                 "label": "useful",
             },
         ],
+        outcome_rows=[
+            {
+                "observed_at": "2026-06-19T12:00:00+00:00",
+                "alert_key": "cluster|velvet|proxy_attention",
+                "primary_horizon_return": 0.18,
+            }
+        ],
         missed_rows=[
             {
                 "observed_at": "2026-06-19T11:30:00+00:00",
@@ -14479,8 +14591,44 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     assert "resolver_missed_asset=1" in text
     assert "gdelt:event_source(2)" in text
     assert "calls=3" in text
+    assert "artifact coverage:" in text
+    assert "alert_snapshots=2" in text
     assert "inspect degraded provider health" in text
     assert "No thresholds, alert tiers, paper trades, live DB rows, or execution were changed." in text
+    checklist = event_alpha_burn_in_checklist.build_burn_in_checklist(
+        scorecard,
+        card_paths=("card.md",),
+    )
+    assert checklist.ready_for_research_send is False
+    assert any("backoff" in item for item in checklist.blockers)
+    checklist_text = event_alpha_burn_in_checklist.format_burn_in_checklist(checklist)
+    assert "READY_FOR_RESEARCH_SEND: no" in checklist_text
+
+    ready_scorecard = event_alpha_burn_in.build_burn_in_scorecard(
+        days=7,
+        now=now,
+        run_rows=[{"started_at": "2026-06-19T10:00:00+00:00", "success": True, "alertable": 1}],
+        alert_rows=[{"observed_at": "2026-06-19T10:01:00+00:00", "alert_key": "a", "tier": "WATCHLIST"}],
+        feedback_rows=[{"marked_at": "2026-06-19T11:00:00+00:00", "key": "a", "label": "useful"}],
+        outcome_rows=[{"observed_at": "2026-06-19T12:00:00+00:00", "alert_key": "a", "primary_horizon_return": 0.1}],
+        missed_rows=[{"observed_at": "2026-06-19T12:00:00+00:00", "failure_stage": "unknown"}],
+        provider_health_rows={"gdelt:event_source": {"provider_key": "gdelt:event_source", "consecutive_failures": 0}},
+    )
+    assert event_alpha_burn_in_checklist.build_burn_in_checklist(ready_scorecard).ready_for_research_send is True
+
+    missing_snapshots = event_alpha_burn_in.build_burn_in_scorecard(
+        days=7,
+        now=now,
+        run_rows=[{"started_at": "2026-06-19T10:00:00+00:00", "success": True, "alertable": 1}],
+        alert_rows=[],
+        missed_rows=[],
+        profile="no_key_live",
+    )
+    assert "alert snapshots missing for alertable runs" in missing_snapshots.coverage_warnings
+    assert "provider health missing for live profiles" in missing_snapshots.coverage_warnings
+    blocked = event_alpha_burn_in_checklist.build_burn_in_checklist(missing_snapshots)
+    assert blocked.ready_for_research_send is False
+    assert any("alertable runs" in item for item in blocked.blockers)
 
 
 def test_makefile_has_event_alpha_burn_in_and_priors_targets():
@@ -14489,6 +14637,7 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "event-alpha-burn-in-no-key:" in text
     assert "event-alpha-burn-in-llm:" in text
     assert "event-alpha-burn-in-scorecard:" in text
+    assert "event-alpha-burn-in-checklist:" in text
     assert "event-alpha-weekly-review:" in text
     assert "--event-alpha-priors-shadow-report" in text
     burn_in = text.split("event-alpha-burn-in-no-key:", 1)[1].split("event-alpha-burn-in-llm:", 1)[0]
