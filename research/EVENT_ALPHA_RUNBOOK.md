@@ -57,6 +57,29 @@ python3 main.py --event-alpha-burn-in-checklist --days 7
 The checklist is advisory only. It does not enable sends, change thresholds,
 apply priors, write live signal rows, paper trade, or execute.
 
+For explicit v1 gate flags across scheduled burn-in, research-send readiness,
+and full-LLM live readiness:
+
+```bash
+make event-alpha-v1-readiness
+python3 main.py --event-alpha-v1-readiness --days 7
+```
+
+This report is the promotion surface. Treat any `READY_*: no` line as a blocker
+until the listed commands and artifacts are reviewed.
+
+For daily freshness and safety checks:
+
+```bash
+make event-alpha-health-guard PROFILE=no_key_live
+python3 main.py --event-alpha-health-guard
+```
+
+The health guard classifies the local research loop as `HEALTHY`, `DEGRADED`,
+`STALE`, or `BLOCKED` based on run age, successful-run age, profile mismatch,
+provider backoff, missing alert snapshots, LLM budget skips, and stale active
+watchlist rows. It reports a next command only; it does not send or mutate state.
+
 ## Full LLM No-Send Review
 
 Use the full LLM profile only when `OPENAI_API_KEY` is configured and you want
@@ -142,6 +165,30 @@ Weekly review stitches the local review loop together:
 ```bash
 make event-alpha-weekly-review
 ```
+
+For a compact manual tuning worksheet that proposes changes without applying
+them:
+
+```bash
+make event-alpha-tuning-worksheet
+python3 main.py --event-alpha-tuning-worksheet
+```
+
+The worksheet groups repeated junk/useful feedback, repeated missed-opportunity
+stages, run failures, and priors-shadow changes into manual review suggestions.
+It never edits priors, thresholds, eval fixtures, alert tiers, or watchlist
+state.
+
+To hand off a clean burn-in review pack:
+
+```bash
+make event-alpha-export-burn-in-pack EVENT_ALPHA_BURN_IN_PACK=/tmp/event_alpha_burn_in_pack.zip
+python3 main.py --event-alpha-export-burn-in-pack /tmp/event_alpha_burn_in_pack.zip
+```
+
+The pack includes text reports and small JSONL artifact excerpts. It excludes
+secrets, `.env`, DB files, logs, caches, virtualenvs, and local ignored
+artifacts.
 
 ## Research Cards
 
@@ -238,6 +285,25 @@ python3 main.py --event-alpha-replay \
 Policy comparison reports include candidate-level score, tier, and route diffs.
 Use those rows to see which exact assets gained/lost alertability before
 touching profile or prior settings.
+
+## Scheduling Templates
+
+Example templates live in:
+
+```bash
+research/event_alpha_launchd_template.plist
+research/event_alpha_cron_example.txt
+make event-alpha-launchd-template
+```
+
+They are intentionally disabled/placeholders. Fill in the project directory and
+Python path manually, then install them yourself if you want daily local
+burn-in. Recommended cadence:
+
+- daily no-key burn-in cycle
+- daily health guard after the cycle
+- weekly tuning worksheet
+- weekly burn-in pack export before external review
 
 Profile-aware daily briefs and explain-last-run reports prefer the latest run
 matching `--event-alpha-profile`. If no matching run exists, they show an

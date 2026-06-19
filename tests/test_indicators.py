@@ -14631,6 +14631,137 @@ def test_event_alpha_burn_in_scorecard_summarizes_operational_health():
     assert any("alertable runs" in item for item in blocked.blockers)
 
 
+def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
+    import tempfile
+    import zipfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_burn_in_pack,
+        event_alpha_health_guard,
+        event_alpha_tuning,
+        event_alpha_v1_readiness,
+        event_research_cards,
+    )
+
+    now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
+    run_rows = [
+        {"started_at": "2026-06-19T10:00:00+00:00", "profile": "no_key_live", "success": True, "alertable": 1},
+        {"started_at": "2026-06-19T10:05:00+00:00", "profile": "research_send", "success": True, "alertable": 1},
+        {"started_at": "2026-06-19T10:10:00+00:00", "profile": "full_llm_live", "success": True, "alertable": 1},
+    ]
+    alert_rows = [
+        {
+            "observed_at": "2026-06-19T10:06:00+00:00",
+            "alert_key": "cluster|velvet|proxy_attention",
+            "tier": "WATCHLIST",
+            "playbook_type": "proxy_attention",
+            "source": "gdelt",
+            "asset_symbol": "VELVET",
+            "asset_coin_id": "velvet",
+            "primary_horizon_return": 0.12,
+        },
+        {
+            "observed_at": "2026-06-19T10:07:00+00:00",
+            "alert_key": "cluster|btc|source_noise_control",
+            "tier": "RADAR_DIGEST",
+            "playbook_type": "source_noise_control",
+            "source": "rss",
+        },
+    ]
+    feedback_rows = [
+        {"marked_at": "2026-06-19T11:00:00+00:00", "key": "cluster|velvet|proxy_attention", "label": "useful", "marked_by": "human"},
+        {"marked_at": "2026-06-19T11:01:00+00:00", "key": "cluster|btc|source_noise_control", "label": "junk", "marked_by": "human"},
+        {"marked_at": "2026-06-19T11:02:00+00:00", "key": "cluster|btc|source_noise_control", "label": "junk", "marked_by": "human"},
+    ]
+    missed_rows = [
+        {"observed_at": "2026-06-19T11:30:00+00:00", "failure_stage": "resolver_missed_asset"},
+        {"observed_at": "2026-06-19T11:31:00+00:00", "failure_stage": "resolver_missed_asset"},
+    ]
+    health_rows = {"gdelt:event_source": {"provider_key": "gdelt:event_source", "consecutive_failures": 0}}
+    readiness = event_alpha_v1_readiness.build_v1_readiness(
+        run_rows=run_rows,
+        alert_rows=alert_rows,
+        feedback_rows=feedback_rows,
+        missed_rows=missed_rows,
+        provider_health_rows=health_rows,
+        outcome_rows=alert_rows,
+        now=now,
+    )
+    readiness_text = event_alpha_v1_readiness.format_v1_readiness_report(readiness)
+    assert "READY_FOR_RESEARCH_SEND: yes" in readiness_text
+    assert "READY_FOR_FULL_LLM_LIVE: yes" in readiness_text
+    assert "profile matrix:" in readiness_text
+
+    guard = event_alpha_health_guard.evaluate_health_guard(
+        run_rows=run_rows,
+        alert_rows=alert_rows,
+        watchlist_entries=[],
+        provider_health_rows=health_rows,
+        cfg=event_alpha_health_guard.EventAlphaHealthGuardConfig(require_profile="no_key_live"),
+        now=now,
+    )
+    assert guard.status == "DEGRADED"
+    assert "profile_mismatch" in guard.reason_codes
+    stale = event_alpha_health_guard.evaluate_health_guard(
+        run_rows=[{"started_at": "2026-06-18T00:00:00+00:00", "profile": "no_key_live", "success": True}],
+        cfg=event_alpha_health_guard.EventAlphaHealthGuardConfig(max_run_age_hours=6, max_success_age_hours=12),
+        now=now,
+    )
+    assert stale.status == "STALE"
+
+    worksheet = event_alpha_tuning.build_tuning_worksheet(
+        alert_rows=alert_rows,
+        feedback_rows=feedback_rows,
+        missed_rows=missed_rows,
+        run_rows=run_rows,
+    )
+    worksheet_text = event_alpha_tuning.format_tuning_worksheet(worksheet)
+    assert "resolver_missed_asset" in worksheet_text
+    assert "source_noise_control" in worksheet_text
+    assert "No thresholds" in worksheet_text
+
+    entry = _test_watchlist_entry(state="HIGH_PRIORITY", symbol="VELVET", coin_id="velvet")
+    card = event_research_cards.render_research_card(
+        entry.key,
+        watchlist_entries=[entry],
+        alert_rows=alert_rows,
+        feedback_rows=feedback_rows,
+        outcome_rows=alert_rows,
+    )
+    assert "## Lifecycle Timeline" in card.markdown
+    assert "feedback: useful" in card.markdown
+    assert "outcome:" in card.markdown
+
+    tmp = Path(tempfile.mkdtemp())
+    cards = tmp / "cards"
+    cards.mkdir()
+    (cards / "card.md").write_text("# Card\nOPENAI_API_KEY\n", encoding="utf-8")
+    (cards / ".env").write_text("SECRET=1\n", encoding="utf-8")
+    out = tmp / "pack.zip"
+    pack = event_alpha_burn_in_pack.export_burn_in_pack(
+        out,
+        daily_brief="# Daily\n",
+        burn_in_scorecard="scorecard\n",
+        v1_readiness=readiness_text,
+        health_guard=event_alpha_health_guard.format_health_guard_report(guard),
+        tuning=worksheet_text,
+        run_rows=run_rows,
+        alert_rows=alert_rows,
+        feedback_rows=feedback_rows,
+        missed_rows=missed_rows,
+        provider_health_rows=health_rows,
+        cards_dir=cards,
+    )
+    assert pack.files_written >= 10
+    with zipfile.ZipFile(out) as zf:
+        names = set(zf.namelist())
+        assert "reports/v1_readiness.txt" in names
+        assert "cards/card.md" in names
+        assert "cards/.env" not in names
+        assert "OPENAI_API_KEY" not in zf.read("cards/card.md").decode()
+
+
 def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     text = __import__("pathlib").Path("Makefile").read_text(encoding="utf-8")
     assert "event-alpha-priors-shadow-report:" in text
@@ -14638,8 +14769,19 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "event-alpha-burn-in-llm:" in text
     assert "event-alpha-burn-in-scorecard:" in text
     assert "event-alpha-burn-in-checklist:" in text
+    assert "event-alpha-v1-readiness:" in text
+    assert "event-alpha-health-guard:" in text
+    assert "event-alpha-tuning-worksheet:" in text
+    assert "event-alpha-export-burn-in-pack:" in text
+    assert "event-alpha-launchd-template:" in text
     assert "event-alpha-weekly-review:" in text
     assert "--event-alpha-priors-shadow-report" in text
+    assert "--event-alpha-v1-readiness" in text
+    assert "--event-alpha-health-guard" in text
+    assert "--event-alpha-tuning-worksheet" in text
+    assert "--event-alpha-export-burn-in-pack" in text
+    assert __import__("pathlib").Path("research/event_alpha_launchd_template.plist").exists()
+    assert __import__("pathlib").Path("research/event_alpha_cron_example.txt").exists()
     burn_in = text.split("event-alpha-burn-in-no-key:", 1)[1].split("event-alpha-burn-in-llm:", 1)[0]
     assert "--event-alert-send" not in burn_in
     assert "--event-alpha-profile no_key_live" in burn_in

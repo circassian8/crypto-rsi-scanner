@@ -1,0 +1,12 @@
+# Event Alpha research-only cron examples.
+# Replace /path/to/crypto-rsi-scanner and /path/to/python before use.
+# These commands do not install themselves and do not enable sends.
+
+# Daily no-key burn-in report at 09:15 local time.
+15 9 * * * cd /path/to/crypto-rsi-scanner && /usr/bin/make event-alpha-burn-in-no-key PYTHON=/path/to/python >> event_alpha_burnin.log 2>&1
+
+# Daily health guard at 09:30 local time.
+30 9 * * * cd /path/to/crypto-rsi-scanner && /usr/bin/make event-alpha-health-guard PROFILE=no_key_live PYTHON=/path/to/python >> event_alpha_health.log 2>&1
+
+# Weekly tuning worksheet every Sunday at 10:00 local time.
+0 10 * * 0 cd /path/to/crypto-rsi-scanner && /usr/bin/make event-alpha-tuning-worksheet PYTHON=/path/to/python >> event_alpha_tuning.log 2>&1

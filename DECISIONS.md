@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-19 - Keep Event Alpha v1 gates report-only
+**Status:** accepted
+**Decision:** Event Alpha v1 readiness flags, health guard statuses, weekly
+tuning worksheets, lifecycle timelines in research cards, clean burn-in export
+packs, and schedule templates are operations/reporting tools only. They may
+summarize artifacts, recommend next commands, export clean review packets, and
+identify stale/degraded burn-in state, but they must not enable sends, change
+alert tiers, apply priors, mutate watchlist state, create `TRIGGERED_FADE`,
+write normal RSI signal rows, paper trade, or execute.
+**Why:** Daily burn-in needs explicit pass/fail gates and handoff artifacts, but
+those gates are safer as auditable operator checks rather than hidden promotion
+logic.
+**Revisit when:** A reviewed burn-in period has enough feedback, outcomes,
+missed-opportunity rows, source reliability, and human approval to promote a
+specific research-send workflow separately.
+
 ## 2026-06-19 - Keep Event Alpha burn-in checklist as a readiness gate only
 **Status:** accepted
 **Decision:** Event Alpha profile-matched latest-run selection, artifact

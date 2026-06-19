@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Add Event Alpha v1 operations gates · Codex
+**Why:** Event Alpha burn-in needed a clear v1 operating surface: readiness
+flags, freshness health checks, review-pack export, and weekly tuning
+suggestions that can run daily without becoming alert or trading authority.
+**Changes:**
+- Added `event_alpha_v1_readiness.py`, `event_alpha_health_guard.py`,
+  `event_alpha_tuning.py`, and `event_alpha_burn_in_pack.py` for pure
+  artifact-based readiness, health, tuning, and clean zip export reports.
+- Wired `--event-alpha-v1-readiness`, `--event-alpha-health-guard`,
+  `--event-alpha-tuning-worksheet`, and
+  `--event-alpha-export-burn-in-pack` through `scanner.py`, plus Make targets
+  and `.env.example` health thresholds.
+- Extended research cards with a lifecycle timeline covering watchlist
+  timestamps, latest monitor context, feedback labels, and filled outcomes.
+- Added disabled launchd/cron schedule examples under `research/` and updated
+  `research/EVENT_ALPHA_RUNBOOK.md`.
+- Ignored local burn-in pack zip artifacts so review exports are not committed.
+- Added offline regression coverage in `tests/test_indicators.py`.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 359/359. Smoke-ran
+`python3 main.py --event-alpha-v1-readiness --days 7`,
+`python3 main.py --event-alpha-health-guard`,
+`python3 main.py --event-alpha-tuning-worksheet`,
+`python3 main.py --event-alpha-export-burn-in-pack
+/tmp/event_alpha_burn_in_pack_smoke.zip`, and the matching Make wrappers.
+`make event-llm-eval PYTHON=python3`, `make event-llm-extract-eval
+PYTHON=python3`, `make event-alpha-eval PYTHON=python3`, and `make verify
+PYTHON=python3` passed.
+**Notes/risks:** These reports and packs are local research artifacts only.
+They do not enable sends, alter alert tiers, apply priors, create
+`TRIGGERED_FADE`, paper trade, write live signal rows, or execute.
+
 ## 2026-06-19 — Add Event Alpha burn-in readiness gates · Codex
 **Why:** Event Alpha needed burn-in reports to line up with the requested
 operational profile and to show whether required artifacts are actually present

@@ -35,6 +35,8 @@ def render_research_card(
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
     clusters: Iterable[event_graph.EventCluster] = (),
     monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
+    feedback_rows: Iterable[Mapping[str, Any]] = (),
+    outcome_rows: Iterable[Mapping[str, Any]] = (),
 ) -> EventResearchCardResult:
     """Render one Markdown card from local research artifacts."""
     clean_key = str(key or "").strip()
@@ -43,6 +45,8 @@ def render_research_card(
     decision = _find_decision(clean_key, list(route_decisions))
     cluster = _find_cluster(clean_key, list(clusters), entry, alert)
     monitor_row = _find_monitor_row(clean_key, list(monitor_rows), entry, alert)
+    feedback = _matching_rows(clean_key, list(feedback_rows), entry, alert)
+    outcome = _find_outcome(clean_key, list(outcome_rows), entry, alert) or alert
     if entry is None and alert is None:
         return EventResearchCardResult(
             key=clean_key,
@@ -112,6 +116,11 @@ def render_research_card(
     lines.extend(_monitor_lines(monitor_row))
     lines.extend([
         "",
+        "## Lifecycle Timeline",
+    ])
+    lines.extend(_lifecycle_lines(entry, alert, monitor_row, feedback, outcome))
+    lines.extend([
+        "",
         "## Why This Matters",
         _why_it_matters(playbook),
         "",
@@ -138,11 +147,11 @@ def render_research_card(
     lines.extend([
         "",
         "## Outcome Tracking Fields",
-        f"- Expected direction: {_value(None, alert, '', 'expected_direction') or 'unknown'}",
-        f"- Primary horizon: {_value(None, alert, '', 'primary_horizon') or 'unknown'}",
-        f"- Success metric: {_value(None, alert, '', 'success_metric') or 'manual'}",
-        f"- Primary horizon return: {_value(None, alert, '', 'primary_horizon_return') or 'blank'}",
-        f"- MFE/MAE: {_value(None, alert, '', 'mfe_mae_ratio') or 'blank'}",
+        f"- Expected direction: {_value(None, outcome, '', 'expected_direction') or 'unknown'}",
+        f"- Primary horizon: {_value(None, outcome, '', 'primary_horizon') or 'unknown'}",
+        f"- Success metric: {_value(None, outcome, '', 'success_metric') or 'manual'}",
+        f"- Primary horizon return: {_value(None, outcome, '', 'primary_horizon_return') or 'blank'}",
+        f"- MFE/MAE: {_value(None, outcome, '', 'mfe_mae_ratio') or 'blank'}",
     ])
     return EventResearchCardResult(key=clean_key, markdown="\n".join(lines).rstrip() + "\n", found=True)
 
@@ -154,6 +163,8 @@ def render_selected_cards(
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
     clusters: Iterable[event_graph.EventCluster] = (),
     monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
+    feedback_rows: Iterable[Mapping[str, Any]] = (),
+    outcome_rows: Iterable[Mapping[str, Any]] = (),
     limit: int = 10,
 ) -> str:
     cluster_rows = list(clusters)
@@ -176,6 +187,8 @@ def render_selected_cards(
             route_decisions=route_decisions,
             clusters=cluster_rows,
             monitor_rows=monitor,
+            feedback_rows=feedback_rows,
+            outcome_rows=outcome_rows,
         ).markdown
         for entry in entries
     ]
@@ -190,6 +203,8 @@ def write_research_cards(
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision] = (),
     clusters: Iterable[event_graph.EventCluster] = (),
     monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
+    feedback_rows: Iterable[Mapping[str, Any]] = (),
+    outcome_rows: Iterable[Mapping[str, Any]] = (),
     include_all_alertable: bool = True,
     selected_tiers: Iterable[str] | None = None,
     limit: int = 25,
@@ -214,6 +229,8 @@ def write_research_cards(
             route_decisions=route_decisions,
             clusters=clusters,
             monitor_rows=monitor_rows,
+            feedback_rows=feedback_rows,
+            outcome_rows=outcome_rows,
         )
         if not card.found:
             continue
@@ -405,6 +422,54 @@ def _find_monitor_row(
     return None
 
 
+def _matching_rows(
+    key: str,
+    rows: list[Mapping[str, Any]],
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> list[Mapping[str, Any]]:
+    clean_key = key[3:] if key.startswith("ea:") else key
+    key_l = clean_key.lower()
+    identifiers = {
+        clean_key,
+        str(getattr(entry, "key", "") or ""),
+        str(getattr(entry, "event_id", "") or ""),
+        str(getattr(entry, "symbol", "") or ""),
+        str(getattr(entry, "coin_id", "") or ""),
+        str(alert.get("alert_key") or "") if alert else "",
+        str(alert.get("event_id") or "") if alert else "",
+        str(alert.get("asset_symbol") or "") if alert else "",
+        str(alert.get("asset_coin_id") or "") if alert else "",
+    }
+    identifiers_l = {item.lower() for item in identifiers if item}
+    matches: list[Mapping[str, Any]] = []
+    for row in rows:
+        values = {
+            str(row.get("key") or ""),
+            str(row.get("target") or ""),
+            str(row.get("alert_key") or ""),
+            str(row.get("event_id") or ""),
+            str(row.get("symbol") or row.get("asset_symbol") or ""),
+            str(row.get("coin_id") or row.get("asset_coin_id") or ""),
+        }
+        values_l = {value.lower() for value in values if value}
+        if key_l in values_l or identifiers_l & values_l:
+            matches.append(row)
+    return matches
+
+
+def _find_outcome(
+    key: str,
+    rows: list[Mapping[str, Any]],
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> Mapping[str, Any] | None:
+    matches = _matching_rows(key, rows, entry, alert)
+    if not matches:
+        return None
+    return sorted(matches, key=lambda row: str(row.get("observed_at") or row.get("updated_at") or ""), reverse=True)[0]
+
+
 def _value(entry: Any | None, alert: Mapping[str, Any] | None, entry_field: str, alert_field: str) -> Any:
     if entry is not None and entry_field:
         value = getattr(entry, entry_field, None)
@@ -523,6 +588,72 @@ def _monitor_lines(row: event_watchlist_monitor.EventWatchlistMonitorRow | Mappi
         "- Monitor data is observation-only and cannot create TRIGGERED_FADE.",
     ]
     return lines
+
+
+def _lifecycle_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+    monitor_row: event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any] | None,
+    feedback_rows: list[Mapping[str, Any]],
+    outcome: Mapping[str, Any] | None,
+) -> list[str]:
+    lines: list[str] = []
+    timeline_fields = (
+        ("first_seen", "first_seen_at"),
+        ("radar", "first_radar_at"),
+        ("watchlisted", "first_watchlisted_at"),
+        ("high_priority", "first_high_priority_at"),
+        ("event_passed", "first_event_passed_at"),
+        ("armed", "first_armed_at"),
+        ("triggered", "first_triggered_at"),
+        ("invalidated", "first_invalidated_at"),
+        ("expired", "first_expired_at"),
+        ("last_seen", "last_seen_at"),
+    )
+    if entry is not None:
+        for label, field in timeline_fields:
+            value = getattr(entry, field, None)
+            if value:
+                lines.append(f"- {label}: {value}")
+    if alert is not None and alert.get("observed_at"):
+        lines.append(f"- alert_snapshot: {alert.get('observed_at')}")
+    if monitor_row is not None:
+        hints = _monitor_value(monitor_row, "state_transition_hints") or ()
+        if isinstance(hints, str):
+            hints = tuple(part.strip() for part in hints.split(",") if part.strip())
+        lines.append(
+            "- latest_monitor: "
+            f"material={str(bool(_monitor_value(monitor_row, 'material_update'))).lower()} "
+            f"hints={', '.join(str(item) for item in hints) if hints else 'none'}"
+        )
+    if feedback_rows:
+        for row in sorted(feedback_rows, key=lambda item: str(item.get("marked_at") or ""), reverse=True)[:5]:
+            lines.append(
+                f"- feedback: {row.get('label') or 'unknown'} at {row.get('marked_at') or 'unknown'} "
+                f"by {row.get('marked_by') or 'unknown'}"
+            )
+    else:
+        lines.append("- feedback: none")
+    if outcome is not None and any(outcome.get(field) not in (None, "") for field in (
+        "primary_horizon_return",
+        "return_24h",
+        "return_72h",
+        "return_7d",
+        "direction_hit",
+        "mfe_mae_ratio",
+    )):
+        lines.append(
+            "- outcome: "
+            f"primary={outcome.get('primary_horizon_return', 'blank')} "
+            f"24h={outcome.get('return_24h', 'blank')} "
+            f"72h={outcome.get('return_72h', 'blank')} "
+            f"7d={outcome.get('return_7d', 'blank')} "
+            f"direction_hit={outcome.get('direction_hit', 'blank')} "
+            f"mfe_mae={outcome.get('mfe_mae_ratio', 'blank')}"
+        )
+    else:
+        lines.append("- outcome: not filled")
+    return lines or ["- No lifecycle timestamps found."]
 
 
 def _monitor_value(row: event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any], field: str) -> Any:
