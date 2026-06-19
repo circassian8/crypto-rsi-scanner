@@ -37,6 +37,7 @@ def render_research_card(
     monitor_rows: Iterable[event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any]] = (),
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
+    generated_at: datetime | None = None,
 ) -> EventResearchCardResult:
     """Render one Markdown card from local research artifacts."""
     clean_key = str(key or "").strip()
@@ -59,6 +60,7 @@ def render_research_card(
     event_name = _value(entry, alert, "latest_event_name", "event_name") or "unknown event"
     tier = _value(entry, alert, "latest_tier", "tier") or "unknown"
     state = entry.state if entry is not None else str(alert.get("state") or "snapshot")
+    generated_iso = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     lines = [
         f"# {symbol} Event Research Card",
         "",
@@ -72,6 +74,17 @@ def render_research_card(
     ]
     if decision is not None:
         lines.append(f"- Route: {decision.route.value} ({decision.reason})")
+    lines.extend([
+        "",
+        "## Artifact Lineage",
+        f"- Generated at: {generated_iso}",
+        f"- Run ID: {_value(None, alert, '', 'run_id') or 'unknown'}",
+        f"- Profile: {_value(None, alert, '', 'profile') or 'unknown'}",
+        f"- Namespace: {_value(None, alert, '', 'artifact_namespace') or 'unknown'}",
+        f"- Snapshot ID: {_value(None, alert, '', 'snapshot_id') or 'unknown'}",
+        f"- Watchlist key: {entry.key if entry is not None else (_value(None, alert, '', 'alert_key') or clean_key)}",
+        f"- Cluster ID: {_value(entry, alert, 'cluster_id', 'cluster_id') or 'unknown'}",
+    ])
     lines.extend([
         "",
         "## Cluster Context",
@@ -231,6 +244,7 @@ def write_research_cards(
             monitor_rows=monitor_rows,
             feedback_rows=feedback_rows,
             outcome_rows=outcome_rows,
+            generated_at=observed,
         )
         if not card.found:
             continue

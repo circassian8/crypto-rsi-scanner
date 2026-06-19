@@ -58,6 +58,18 @@ class EventAlphaPipelineResult:
     send_items_delivered: int = 0
     send_block_reason: str | None = None
     research_card_paths: tuple[Path, ...] = ()
+    run_id: str | None = None
+    profile: str | None = None
+    run_mode: str | None = None
+    artifact_namespace: str | None = None
+    run_ledger_path: str | None = None
+    alert_store_path: str | None = None
+    watchlist_state_path: str | None = None
+    research_cards_dir: str | None = None
+    snapshot_write_attempted: bool = False
+    snapshot_write_success: bool = False
+    snapshot_rows_written: int = 0
+    snapshot_write_block_reason: str | None = None
 
     @property
     def raw_events(self) -> int:

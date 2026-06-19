@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_burn_in, event_alpha_burn_in_checklist, event_alpha_profiles
+from . import event_alpha_artifacts, event_alpha_burn_in, event_alpha_burn_in_checklist, event_alpha_profiles
 
 
 @dataclass(frozen=True)
@@ -47,25 +47,58 @@ def build_v1_readiness(
     days: int = 7,
     now: datetime | None = None,
     profiles: Iterable[str] | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
 ) -> EventAlphaV1ReadinessResult:
     """Build explicit v1 readiness flags without mutating runtime behavior."""
     observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    run_data = [dict(row) for row in run_rows if isinstance(row, Mapping)]
+    run_data = event_alpha_artifacts.filter_artifact_rows(
+        run_rows,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+    )
+    alert_data = event_alpha_artifacts.filter_artifact_rows(
+        alert_rows,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+    )
+    feedback_data = event_alpha_artifacts.filter_artifact_rows(
+        feedback_rows,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+    )
+    missed_data = event_alpha_artifacts.filter_artifact_rows(
+        missed_rows,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+    )
+    outcome_data = event_alpha_artifacts.filter_artifact_rows(
+        outcome_rows,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+    )
+    budget_data = event_alpha_artifacts.filter_artifact_rows(
+        llm_budget_rows,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+    )
     profile_names = tuple(profiles or ("no_key_live", "research_send", "full_llm_live"))
     profile_rows: list[EventAlphaV1ProfileReadiness] = []
     for profile_name in profile_names:
         profile_rows.append(_profile_readiness(
             profile_name,
             run_rows=run_data,
-            alert_rows=alert_rows,
-            feedback_rows=feedback_rows,
-            missed_rows=missed_rows,
+            alert_rows=alert_data,
+            feedback_rows=feedback_data,
+            missed_rows=missed_data,
             provider_health_rows=provider_health_rows or {},
-            llm_budget_rows=llm_budget_rows,
-            outcome_rows=outcome_rows,
+            llm_budget_rows=budget_data,
+            outcome_rows=outcome_data,
             card_paths=tuple(card_paths),
             days=days,
             now=observed,
+            artifact_namespace=artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
         ))
 
     ready_send = any(row.ready_for_research_send for row in profile_rows)
@@ -143,6 +176,8 @@ def _profile_readiness(
     card_paths: tuple[str, ...],
     days: int,
     now: datetime,
+    artifact_namespace: str | None,
+    include_test_artifacts: bool,
 ) -> EventAlphaV1ProfileReadiness:
     matching_runs = [
         row for row in run_rows
@@ -157,6 +192,8 @@ def _profile_readiness(
         llm_budget_rows=llm_budget_rows,
         outcome_rows=outcome_rows,
         profile=profile_name,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
         days=days,
         now=now,
     )

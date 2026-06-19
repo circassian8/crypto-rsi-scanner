@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
-from . import event_watchlist
+from . import event_alpha_artifacts, event_watchlist
 
 
 @dataclass(frozen=True)
@@ -38,14 +38,27 @@ def evaluate_health_guard(
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
     cfg: EventAlphaHealthGuardConfig | None = None,
     now: datetime | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
 ) -> EventAlphaHealthGuardResult:
     """Classify the latest Event Alpha operating state as healthy/degraded/stale/blocked."""
     guard = cfg or EventAlphaHealthGuardConfig()
     observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     runs = sorted(
-        [dict(row) for row in run_rows if isinstance(row, Mapping)],
+        event_alpha_artifacts.filter_artifact_rows(
+            run_rows,
+            profile=guard.require_profile,
+            artifact_namespace=artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        ),
         key=lambda row: str(row.get("started_at") or row.get("finished_at") or ""),
         reverse=True,
+    )
+    alerts = event_alpha_artifacts.filter_artifact_rows(
+        alert_rows,
+        profile=guard.require_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
     )
     reason_codes: list[str] = []
     warnings: list[str] = []
@@ -89,7 +102,7 @@ def evaluate_health_guard(
     if skipped_budget:
         reason_codes.append("llm_budget_skipped")
         warnings.append(f"LLM budget skipped rows: {skipped_budget}")
-    if any(_int(row.get("alertable")) > 0 for row in runs[:3]) and not list(alert_rows):
+    if any(_int(row.get("alertable")) > 0 for row in runs[:3]) and not alerts:
         reason_codes.append("missing_alert_snapshots")
     stale_active = _stale_watchlist_count(watchlist_entries, observed, max_age_hours=48.0)
     if stale_active:

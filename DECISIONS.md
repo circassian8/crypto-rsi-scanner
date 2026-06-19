@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-19 - Keep Event Alpha artifact namespaces isolated and report-only
+**Status:** accepted
+**Decision:** Event Alpha profile, run-mode, and namespace metadata are required
+for burn-in-safe artifact handling. Profiled runs should write under isolated
+artifact namespaces by default, run-ledger rows and alert snapshots should carry
+joinable run/profile/namespace lineage, and burn-in/readiness/health reports
+should ignore `test`, `fixture`, and `replay` rows unless explicitly asked to
+include them. The artifact doctor may flag missing snapshots, orphaned rows,
+mixed namespaces, missing provider/budget evidence, and card lineage gaps, but
+it is a reporting tool only.
+**Why:** Shared flat artifacts made it too easy for fixture/test rows to pollute
+operational burn-in evidence or for alertable runs to lose snapshot lineage.
+The radar needs auditable local files before any human can judge readiness.
+**Revisit when:** Artifact namespaces and doctor checks have accumulated enough
+clean burn-in history to simplify or automate review-pack generation without
+weakening the research-only boundary.
+
 ## 2026-06-19 - Keep Event Alpha v1 gates report-only
 **Status:** accepted
 **Decision:** Event Alpha v1 readiness flags, health guard statuses, weekly

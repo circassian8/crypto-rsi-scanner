@@ -3644,6 +3644,106 @@ def test_event_alpha_profiles_and_make_targets_are_available():
     assert "--event-alpha-profile $(PROFILE)" in text
 
 
+def test_event_alpha_artifact_context_and_doctor_filter_modes():
+    import os
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_artifacts
+
+    env_keys = (
+        "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "RSI_EVENT_ALPHA_RUN_MODE",
+        "RSI_EVENT_ALPHA_RUN_LEDGER_PATH",
+        "RSI_EVENT_ALPHA_ALERT_STORE_PATH",
+        "RSI_EVENT_WATCHLIST_STATE_PATH",
+    )
+    old_env = {key: os.environ.get(key) for key in env_keys}
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            for key in env_keys:
+                os.environ.pop(key, None)
+            os.environ["RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR"] = tmp
+            no_key = event_alpha_artifacts.context_from_profile("no_key_live")
+            assert no_key.run_mode == "burn_in"
+            assert no_key.artifact_namespace == "no_key_live"
+            assert no_key.run_ledger_path == Path(tmp) / "no_key_live" / "event_alpha_runs.jsonl"
+            send = event_alpha_artifacts.context_from_profile("research_send")
+            assert send.run_mode == "operational"
+            assert send.artifact_namespace == "research_send"
+            os.environ["RSI_EVENT_ALPHA_ALERT_STORE_PATH"] = str(Path(tmp) / "explicit.jsonl")
+            explicit = event_alpha_artifacts.context_from_profile("full_llm_live")
+            assert explicit.alert_store_path == Path(tmp) / "explicit.jsonl"
+
+        run_rows = [
+            {
+                "run_id": "op",
+                "profile": "no_key_live",
+                "run_mode": "burn_in",
+                "artifact_namespace": "no_key_live",
+                "alertable": 1,
+                "snapshot_write_success": True,
+                "snapshot_rows_written": 1,
+            },
+            {
+                "run_id": "fixture",
+                "profile": "fixture",
+                "run_mode": "fixture",
+                "artifact_namespace": "fixture",
+                "alertable": 1,
+                "snapshot_write_success": False,
+                "snapshot_write_block_reason": "test_or_fixture_run",
+            },
+        ]
+        alert_rows = [
+            {
+                "run_id": "op",
+                "profile": "no_key_live",
+                "run_mode": "burn_in",
+                "artifact_namespace": "no_key_live",
+                "alert_key": "a",
+                "tier": "WATCHLIST",
+            },
+            {
+                "run_id": "fixture",
+                "profile": "fixture",
+                "run_mode": "fixture",
+                "artifact_namespace": "fixture",
+                "alert_key": "b",
+                "tier": "WATCHLIST",
+            },
+        ]
+        filtered = event_alpha_artifacts.filter_artifact_rows(
+            run_rows,
+            profile="no_key_live",
+            artifact_namespace="no_key_live",
+        )
+        assert [row["run_id"] for row in filtered] == ["op"]
+        assert event_alpha_artifacts.filter_artifact_rows(run_rows) == [run_rows[0]]
+        assert len(event_alpha_artifacts.filter_artifact_rows(run_rows, include_test_artifacts=True)) == 2
+        ok = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=run_rows,
+            alert_rows=alert_rows,
+            profile="no_key_live",
+            artifact_namespace="no_key_live",
+        )
+        assert ok.status == "OK"
+        blocked = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{**run_rows[0], "run_id": "zero", "snapshot_rows_written": 0}],
+            alert_rows=[],
+            profile="no_key_live",
+            artifact_namespace="no_key_live",
+        )
+        assert blocked.status == "BLOCKED"
+        assert "wrote zero alert snapshots" in "; ".join(blocked.blockers)
+    finally:
+        for key, value in old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
 def test_event_llm_golden_eval_passes_and_detects_mismatch():
     import json
     import tempfile
@@ -14701,8 +14801,8 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
         cfg=event_alpha_health_guard.EventAlphaHealthGuardConfig(require_profile="no_key_live"),
         now=now,
     )
-    assert guard.status == "DEGRADED"
-    assert "profile_mismatch" in guard.reason_codes
+    assert guard.status == "HEALTHY"
+    assert "profile_mismatch" not in guard.reason_codes
     stale = event_alpha_health_guard.evaluate_health_guard(
         run_rows=[{"started_at": "2026-06-18T00:00:00+00:00", "profile": "no_key_live", "success": True}],
         cfg=event_alpha_health_guard.EventAlphaHealthGuardConfig(max_run_age_hours=6, max_success_age_hours=12),
@@ -14730,6 +14830,7 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
         outcome_rows=alert_rows,
     )
     assert "## Lifecycle Timeline" in card.markdown
+    assert "## Artifact Lineage" in card.markdown
     assert "feedback: useful" in card.markdown
     assert "outcome:" in card.markdown
 
@@ -14756,7 +14857,9 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
     assert pack.files_written >= 10
     with zipfile.ZipFile(out) as zf:
         names = set(zf.namelist())
+        assert "manifest.json" in names
         assert "reports/v1_readiness.txt" in names
+        assert "reports/artifact_doctor.txt" in names
         assert "cards/card.md" in names
         assert "cards/.env" not in names
         assert "OPENAI_API_KEY" not in zf.read("cards/card.md").decode()
@@ -14771,6 +14874,7 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "event-alpha-burn-in-checklist:" in text
     assert "event-alpha-v1-readiness:" in text
     assert "event-alpha-health-guard:" in text
+    assert "event-alpha-artifact-doctor:" in text
     assert "event-alpha-tuning-worksheet:" in text
     assert "event-alpha-export-burn-in-pack:" in text
     assert "event-alpha-launchd-template:" in text
@@ -14778,6 +14882,7 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "--event-alpha-priors-shadow-report" in text
     assert "--event-alpha-v1-readiness" in text
     assert "--event-alpha-health-guard" in text
+    assert "--event-alpha-artifact-doctor" in text
     assert "--event-alpha-tuning-worksheet" in text
     assert "--event-alpha-export-burn-in-pack" in text
     assert __import__("pathlib").Path("research/event_alpha_launchd_template.plist").exists()
@@ -14785,6 +14890,7 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     burn_in = text.split("event-alpha-burn-in-no-key:", 1)[1].split("event-alpha-burn-in-llm:", 1)[0]
     assert "--event-alert-send" not in burn_in
     assert "--event-alpha-profile no_key_live" in burn_in
+    assert "EVENT_ALPHA_PROFILE_DIR" in text
     llm_burn_in = text.split("event-alpha-burn-in-llm:", 1)[1].split("event-alpha-weekly-review:", 1)[0]
     assert "--event-alpha-profile full_llm_live" in llm_burn_in
 

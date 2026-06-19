@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from . import event_alpha_artifacts
+
 
 @dataclass(frozen=True)
 class EventAlphaBurnInScorecard:
@@ -28,6 +30,8 @@ class EventAlphaBurnInScorecard:
     missed_row_count: int = 0
     provider_health_row_count: int = 0
     llm_budget_row_count: int = 0
+    artifact_namespace: str | None = None
+    include_test_artifacts: bool = False
     coverage_warnings: tuple[str, ...] = ()
 
 
@@ -41,16 +45,18 @@ def build_burn_in_scorecard(
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
     profile: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
     days: int = 7,
     now: datetime | None = None,
 ) -> EventAlphaBurnInScorecard:
     cutoff = (now or datetime.now(timezone.utc)).astimezone(timezone.utc) - timedelta(days=max(1, int(days or 1)))
-    run_data = _filter_rows(run_rows, cutoff, ("started_at", "observed_at", "marked_at"))
-    alert_data = _filter_rows(alert_rows, cutoff, ("observed_at", "started_at"))
-    feedback_data = _filter_rows(feedback_rows, cutoff, ("marked_at", "observed_at"))
-    missed_data = _filter_rows(missed_rows, cutoff, ("observed_at", "detected_at", "created_at"))
-    budget_data = _filter_rows(llm_budget_rows, cutoff, ("date", "updated_at"))
-    supplied_outcomes = _filter_rows(outcome_rows, cutoff, ("observed_at", "started_at"))
+    run_data = _artifact_filter(_filter_rows(run_rows, cutoff, ("started_at", "observed_at", "marked_at")), profile, artifact_namespace, include_test_artifacts)
+    alert_data = _artifact_filter(_filter_rows(alert_rows, cutoff, ("observed_at", "started_at")), profile, artifact_namespace, include_test_artifacts)
+    feedback_data = _artifact_filter(_filter_rows(feedback_rows, cutoff, ("marked_at", "observed_at")), profile, artifact_namespace, include_test_artifacts)
+    missed_data = _artifact_filter(_filter_rows(missed_rows, cutoff, ("observed_at", "detected_at", "created_at")), profile, artifact_namespace, include_test_artifacts)
+    budget_data = _artifact_filter(_filter_rows(llm_budget_rows, cutoff, ("date", "updated_at")), profile, artifact_namespace, include_test_artifacts)
+    supplied_outcomes = _artifact_filter(_filter_rows(outcome_rows, cutoff, ("observed_at", "started_at")), profile, artifact_namespace, include_test_artifacts)
     outcome_data = supplied_outcomes or _rows_with_outcomes(alert_data)
     health_data = {str(key): dict(value) for key, value in (provider_health_rows or {}).items()}
     runs_with_alertable = sum(1 for row in run_data if _int(row.get("alertable")) > 0)
@@ -74,6 +80,8 @@ def build_burn_in_scorecard(
         llm_budget_rows=budget_data,
         outcome_rows=outcome_data,
         profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
         runs_with_alertable=runs_with_alertable,
         alert_snapshot_rows=len(alert_data),
         runs_with_alertable_but_no_alert_snapshots=alertable_without_snapshots,
@@ -113,6 +121,7 @@ def format_burn_in_scorecard(scorecard: EventAlphaBurnInScorecard) -> str:
         "EVENT ALPHA BURN-IN SCORECARD (research-only)",
         "=" * 76,
         f"window_days={scorecard.days}",
+        f"profile={scorecard.profile or 'any'} namespace={scorecard.artifact_namespace or 'any'} include_test_artifacts={str(scorecard.include_test_artifacts).lower()}",
         f"runs={len(runs)} successful={successful} failed={len(runs) - successful}",
         (
             "events/candidates/alertable: "
@@ -162,6 +171,20 @@ def _filter_rows(
         if parsed is None or parsed >= cutoff:
             out.append(dict(row))
     return out
+
+
+def _artifact_filter(
+    rows: Iterable[Mapping[str, Any]],
+    profile: str | None,
+    artifact_namespace: str | None,
+    include_test_artifacts: bool,
+) -> list[dict[str, Any]]:
+    return event_alpha_artifacts.filter_artifact_rows(
+        rows,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+    )
 
 
 def _count_line(rows: Iterable[Mapping[str, Any]], field: str) -> str:

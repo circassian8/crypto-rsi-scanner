@@ -26,6 +26,9 @@ class EventAlphaAlertStoreWriteResult:
     path: Path
     observed_at: str
     rows_written: int
+    attempted: bool = True
+    success: bool = True
+    block_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -54,10 +57,24 @@ def write_alert_snapshots(
     cfg: EventAlphaAlertStoreConfig,
     now: datetime | None = None,
     router_result: Any | None = None,
+    run_id: str | None = None,
+    profile: str | None = None,
+    run_mode: str | None = None,
+    artifact_namespace: str | None = None,
 ) -> EventAlphaAlertStoreWriteResult:
     """Append research-only alert snapshots to JSONL."""
     observed = _as_utc(now or datetime.now(timezone.utc))
     rows = [_snapshot_from_alert(alert, observed) for alert in alerts]
+    rows = [
+        _with_artifact_context(
+            row,
+            run_id=run_id,
+            profile=profile,
+            run_mode=run_mode,
+            artifact_namespace=artifact_namespace,
+        )
+        for row in rows
+    ]
     route_context = _route_context_by_key(router_result)
     rows = [_with_route_context(row, route_context) for row in rows]
     rows = _filter_snapshot_rows(
@@ -75,6 +92,26 @@ def write_alert_snapshots(
         path=cfg.path.expanduser(),
         observed_at=observed.isoformat(),
         rows_written=len(rows),
+        attempted=True,
+        success=True,
+    )
+
+
+def blocked_alert_snapshot_write(
+    *,
+    cfg: EventAlphaAlertStoreConfig,
+    now: datetime | None = None,
+    reason: str,
+) -> EventAlphaAlertStoreWriteResult:
+    """Return a no-write result for intentionally blocked artifact writes."""
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    return EventAlphaAlertStoreWriteResult(
+        path=cfg.path.expanduser(),
+        observed_at=observed.isoformat(),
+        rows_written=0,
+        attempted=False,
+        success=False,
+        block_reason=reason,
     )
 
 
@@ -155,6 +192,9 @@ def format_alert_store_write_result(result: EventAlphaAlertStoreWriteResult) -> 
         f"path: {result.path}",
         f"observed_at: {result.observed_at}",
         f"rows_written: {result.rows_written}",
+        f"attempted: {str(bool(result.attempted)).lower()}",
+        f"success: {str(bool(result.success)).lower()}",
+        *([f"block_reason: {result.block_reason}"] if result.block_reason else []),
         "No live RSI alerts, paper trades, live DB rows, or execution were changed.",
     ])
 
@@ -307,6 +347,26 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "verify": list(alert.verify),
         "rejected_reason": alert.rejected_reason,
     }
+
+
+def _with_artifact_context(
+    row: dict[str, Any],
+    *,
+    run_id: str | None,
+    profile: str | None,
+    run_mode: str | None,
+    artifact_namespace: str | None,
+) -> dict[str, Any]:
+    out = dict(row)
+    if run_id:
+        out["run_id"] = run_id
+    if profile:
+        out["profile"] = profile
+    if run_mode:
+        out["run_mode"] = run_mode
+    if artifact_namespace:
+        out["artifact_namespace"] = artifact_namespace
+    return out
 
 
 def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]]:

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from . import event_alpha_artifacts
+
 
 @dataclass(frozen=True)
 class EventAlphaBurnInPackResult:
@@ -22,6 +24,7 @@ REPORTS = {
     "burn_in_checklist": "reports/burn_in_checklist.txt",
     "v1_readiness": "reports/v1_readiness.txt",
     "health_guard": "reports/health_guard.txt",
+    "artifact_doctor": "reports/artifact_doctor.txt",
     "source_reliability": "reports/source_reliability.txt",
     "calibration": "reports/calibration.txt",
     "missed": "reports/missed_opportunities.txt",
@@ -38,6 +41,7 @@ def export_burn_in_pack(
     burn_in_checklist: str = "",
     v1_readiness: str = "",
     health_guard: str = "",
+    artifact_doctor: str = "",
     source_reliability: str = "",
     calibration: str = "",
     missed: str = "",
@@ -52,24 +56,47 @@ def export_burn_in_pack(
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
     cards_dir: str | Path | None = None,
     proposed_eval_dir: str | Path | None = None,
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+    date_range: str | None = None,
 ) -> EventAlphaBurnInPackResult:
     """Write a clean zip for Pro-model/local review without secrets or caches."""
     target = Path(out_path).expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
     warnings: list[str] = []
     files = 0
+    run_data = _filtered(run_rows, profile, artifact_namespace, include_test_artifacts)
+    alert_data = _filtered(alert_rows, profile, artifact_namespace, include_test_artifacts)
+    feedback_data = _filtered(feedback_rows, profile, artifact_namespace, include_test_artifacts)
+    missed_data = _filtered(missed_rows, profile, artifact_namespace, include_test_artifacts)
+    outcome_data = _filtered(outcome_rows, profile, artifact_namespace, include_test_artifacts)
+    budget_data = _filtered(llm_budget_rows, profile, artifact_namespace, include_test_artifacts)
+    manifest = {
+        "profile": profile or "any",
+        "artifact_namespace": artifact_namespace or "any",
+        "date_range": date_range or "unspecified",
+        "include_test_artifacts": bool(include_test_artifacts),
+        "run_rows": len(run_data),
+        "alert_rows": len(alert_data),
+        "feedback_rows": len(feedback_data),
+        "missed_rows": len(missed_data),
+        "outcome_rows": len(outcome_data),
+    }
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        _writestr(zf, "manifest.json", json.dumps(_json_ready(manifest), indent=2, sort_keys=True) + "\n")
+        files += 1
         for name, arcname in REPORTS.items():
             text = locals().get(name) or f"{name} report not available in this export.\n"
             _writestr(zf, arcname, _strip_sensitive(str(text).rstrip() + "\n"))
             files += 1
         artifacts = {
-            "artifacts/run_rows.jsonl": run_rows,
-            "artifacts/alert_rows.jsonl": alert_rows,
-            "artifacts/feedback_rows.jsonl": feedback_rows,
-            "artifacts/missed_rows.jsonl": missed_rows,
-            "artifacts/outcome_rows.jsonl": outcome_rows,
-            "artifacts/llm_budget_rows.jsonl": llm_budget_rows,
+            "artifacts/run_rows.jsonl": run_data,
+            "artifacts/alert_rows.jsonl": alert_data,
+            "artifacts/feedback_rows.jsonl": feedback_data,
+            "artifacts/missed_rows.jsonl": missed_data,
+            "artifacts/outcome_rows.jsonl": outcome_data,
+            "artifacts/llm_budget_rows.jsonl": budget_data,
         }
         for arcname, rows in artifacts.items():
             _write_jsonl(zf, arcname, rows)
@@ -85,6 +112,20 @@ def export_burn_in_pack(
         _writestr(zf, "README.md", _readme())
         files += 1
     return EventAlphaBurnInPackResult(path=target, files_written=files, warnings=tuple(dict.fromkeys(warnings)))
+
+
+def _filtered(
+    rows: Iterable[Mapping[str, Any]],
+    profile: str | None,
+    artifact_namespace: str | None,
+    include_test_artifacts: bool,
+) -> list[dict[str, Any]]:
+    return event_alpha_artifacts.filter_artifact_rows(
+        rows,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+    )
 
 
 def format_burn_in_pack_result(result: EventAlphaBurnInPackResult) -> str:

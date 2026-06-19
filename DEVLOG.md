@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Make Event Alpha artifacts burn-in-safe · Codex
+**Why:** Event Alpha burn-in artifacts were still easy to mix across fixture,
+test, replay, no-key, LLM, and research-send runs. That made readiness reports
+and review packs vulnerable to false confidence or false blockers.
+**Changes:**
+- Added `event_alpha_artifacts.py` for profile/run-mode/namespace artifact
+  context and operational filtering, plus `event_alpha_artifact_doctor.py` for
+  local lineage/contamination diagnostics.
+- Added run-mode, namespace, artifact-path, snapshot-write, and run-id lineage
+  to Event Alpha pipeline results, run-ledger rows, and alert snapshots.
+- Updated `scanner.py` so profiled Event Alpha cycles resolve namespaced
+  artifact paths, block snapshot writes for `test`/`fixture`/`replay` run modes,
+  and expose `--event-alpha-artifact-doctor`,
+  `--event-alpha-artifact-namespace`, and
+  `--event-alpha-include-test-artifacts`.
+- Made burn-in scorecards, v1 readiness, health guard, and burn-in packs filter
+  non-operational artifact rows by default; burn-in packs now include a manifest
+  and artifact-doctor report, and research cards include artifact lineage.
+- Updated Makefile profile artifact defaults/doctor target, `.env.example`,
+  `ROADMAP.md`, and `DECISIONS.md`; added regression coverage in
+  `tests/test_indicators.py`.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`python3 tests/test_indicators.py` passed 360/360.
+`make event-alpha-artifact-doctor PYTHON=python3` ran and correctly reported a
+blocked no-row `no_key_live` namespace. `make event-llm-eval PYTHON=python3`,
+`make event-llm-extract-eval PYTHON=python3`, `make event-alpha-eval
+PYTHON=python3`, and `make verify PYTHON=python3` passed.
+**Notes/risks:** This is artifact hygiene only. It does not enable sends, alter
+tiers, write normal RSI signals, paper trade, execute, or create
+`TRIGGERED_FADE`.
+
 ## 2026-06-19 — Add Event Alpha v1 operations gates · Codex
 **Why:** Event Alpha burn-in needed a clear v1 operating surface: readiness
 flags, freshness health checks, review-pack export, and weekly tuning

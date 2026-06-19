@@ -58,6 +58,12 @@ def append_run_record(
     return row
 
 
+def run_id_for(started_at: datetime, profile: str | None) -> str:
+    """Return the run_id used across run ledger and alert snapshot artifacts."""
+    started = _as_utc(started_at)
+    return f"{started.isoformat()}|{profile or 'default'}"
+
+
 def load_run_records(path: str | Path, *, limit: int | None = None) -> EventAlphaRunLedgerReadResult:
     """Load recent run ledger rows, tolerating malformed legacy rows."""
     p = Path(path).expanduser()
@@ -125,6 +131,7 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
     for row in result.rows:
         rows.append(
             f"{row.get('started_at', 'unknown')} profile={row.get('profile') or 'default'} "
+            f"mode={row.get('run_mode') or 'legacy'} namespace={row.get('artifact_namespace') or 'legacy'} "
             f"success={str(bool(row.get('success'))).lower()} runtime={float(row.get('runtime_seconds') or 0):.2f}s"
         )
         rows.append(
@@ -135,6 +142,13 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"alerts={int(row.get('alerts') or 0)} routed={int(row.get('routed') or 0)} "
             f"alertable={int(row.get('alertable') or 0)} sent={str(bool(row.get('sent'))).lower()} "
             f"send={int(row.get('send_items_delivered') or 0)}/{int(row.get('send_items_attempted') or 0)}"
+        )
+        rows.append(
+            "  "
+            f"snapshots={int(row.get('snapshot_rows_written') or 0)} "
+            f"attempted={str(bool(row.get('snapshot_write_attempted'))).lower()} "
+            f"success={str(bool(row.get('snapshot_write_success'))).lower()} "
+            f"block={row.get('snapshot_write_block_reason') or 'none'}"
         )
         if row.get("send_block_reason"):
             rows.append(f"  send_block: {row.get('send_block_reason')}")
@@ -175,12 +189,14 @@ def _run_record(
     warnings = list(getattr(result, "warnings", ()) or ())
     if failure:
         warnings.append(failure)
-    run_id = f"{started_at.isoformat()}|{profile or 'default'}"
+    run_id = getattr(result, "run_id", None) or run_id_for(started_at, profile)
     return {
         "schema_version": RUN_LEDGER_SCHEMA_VERSION,
         "row_type": "event_alpha_run",
         "run_id": run_id,
         "profile": profile or "default",
+        "run_mode": getattr(result, "run_mode", None),
+        "artifact_namespace": getattr(result, "artifact_namespace", None),
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
         "runtime_seconds": round(max(0.0, (finished_at - started_at).total_seconds()), 4),
@@ -208,6 +224,10 @@ def _run_record(
         "send_items_delivered": _int(getattr(result, "send_items_delivered", 0)),
         "send_block_reason": getattr(result, "send_block_reason", None),
         "sent": bool(getattr(result, "send_success", False)),
+        "snapshot_write_attempted": bool(getattr(result, "snapshot_write_attempted", False)),
+        "snapshot_write_success": bool(getattr(result, "snapshot_write_success", False)),
+        "snapshot_rows_written": _int(getattr(result, "snapshot_rows_written", 0)),
+        "snapshot_write_block_reason": getattr(result, "snapshot_write_block_reason", None),
         "research_cards_written": len(card_paths),
         "research_card_paths": card_paths,
         "provider_fetch_count": _int(getattr(catalyst, "provider_fetch_count", 0)),
@@ -218,6 +238,10 @@ def _run_record(
         "llm_calls_attempted": llm_stats["calls_attempted"],
         "llm_skipped_due_budget": llm_stats["skipped_due_budget"],
         "watchlist_path": str(getattr(watchlist, "state_path", "") or ""),
+        "run_ledger_path": getattr(result, "run_ledger_path", None),
+        "alert_store_path": getattr(result, "alert_store_path", None),
+        "watchlist_state_path": getattr(result, "watchlist_state_path", None),
+        "research_cards_dir": getattr(result, "research_cards_dir", None),
         "router_enabled": bool(getattr(router, "enabled", False)),
         "warnings": tuple(dict.fromkeys(str(warning) for warning in warnings if str(warning))),
         "success": bool(success),

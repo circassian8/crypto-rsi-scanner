@@ -46,16 +46,20 @@ EVENT_ALPHA_UNIVERSE_PATH ?= fixtures/coingecko_smoke/top_markets.json
 EVENT_ALPHA_ANOMALY_MIN_RETURN_24H ?= 0.03
 EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP ?= 0.05
 EVENT_CATALYST_SEARCH_FIXTURE_PATH ?=
-EVENT_WATCHLIST_STATE_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_watchlist_state.jsonl
-EVENT_ALPHA_ALERT_STORE_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_alpha_alerts.jsonl
-EVENT_ALPHA_RUN_LEDGER_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_alpha_runs.jsonl
-EVENT_ALPHA_MISSED_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_alpha_missed.jsonl
-EVENT_ALPHA_PRIORS_OUT ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_alpha_priors.json
-EVENT_PROVIDER_HEALTH_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_provider_health.json
-EVENT_ALPHA_DAILY_BRIEF_PATH ?= $(EVENT_DISCOVERY_CACHE_DIR)/event_alpha_daily_brief.md
-EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR ?= $(EVENT_DISCOVERY_CACHE_DIR)/proposed_eval_cases
-EVENT_RESEARCH_CARDS_DIR ?= $(EVENT_DISCOVERY_CACHE_DIR)/research_cards
-EVENT_ALPHA_ALERT_OUTCOMES ?= /tmp/event_alpha_alerts_with_outcomes.jsonl
+EVENT_ALPHA_ARTIFACT_BASE_DIR ?= $(EVENT_DISCOVERY_CACHE_DIR)
+EVENT_ALPHA_ARTIFACT_NAMESPACE ?= $(PROFILE)
+EVENT_ALPHA_PROFILE_DIR ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVENT_ALPHA_ARTIFACT_NAMESPACE)
+EVENT_ALPHA_FIXTURE_DIR ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/fixture
+EVENT_WATCHLIST_STATE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_watchlist_state.jsonl
+EVENT_ALPHA_ALERT_STORE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_alerts.jsonl
+EVENT_ALPHA_RUN_LEDGER_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_runs.jsonl
+EVENT_ALPHA_MISSED_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_missed.jsonl
+EVENT_ALPHA_PRIORS_OUT ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_priors.json
+EVENT_PROVIDER_HEALTH_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_provider_health.json
+EVENT_ALPHA_DAILY_BRIEF_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_daily_brief.md
+EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR ?= $(EVENT_ALPHA_PROFILE_DIR)/proposed_eval_cases
+EVENT_RESEARCH_CARDS_DIR ?= $(EVENT_ALPHA_PROFILE_DIR)/research_cards
+EVENT_ALPHA_ALERT_OUTCOMES ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_alerts_with_outcomes.jsonl
 EVENT_ALPHA_ALERT_PRICES ?= fixtures/event_discovery/outcome_prices.json
 PROFILE ?= no_key_live
 ALERT_KEY ?=
@@ -64,7 +68,7 @@ FEEDBACK_NOTES ?=
 CONFIRM ?= 0
 EVENT_ALPHA_BURN_IN_PACK ?= event_alpha_burn_in_pack.zip
 
-.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-runs-report event-alpha-status event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-runs-report event-alpha-status event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -118,6 +122,7 @@ help:
 	@echo "  make event-alpha-burn-in-checklist  Score readiness for research-send burn-in promotion"
 	@echo "  make event-alpha-v1-readiness  Print v1 readiness gates for scheduled burn-in, research-send, and full LLM"
 	@echo "  make event-alpha-health-guard PROFILE=no_key_live  Check run freshness, provider health, snapshots, and budget status"
+	@echo "  make event-alpha-artifact-doctor PROFILE=no_key_live  Diagnose artifact namespace, lineage, and snapshot consistency"
 	@echo "  make event-alpha-tuning-worksheet  Print weekly tuning suggestions without applying changes"
 	@echo "  make event-alpha-export-burn-in-pack  Write clean burn-in review zip"
 	@echo "  make event-alpha-launchd-template  Print Event Alpha launchd/cron template locations"
@@ -347,28 +352,34 @@ event-catalyst-search-fixture-report:
 
 event-alpha-cycle:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=fixture \
+	RSI_EVENT_ALPHA_RUN_MODE=fixture \
 	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
 	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
 	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
 	RSI_EVENT_ANOMALY_MIN_RETURN_24H=$(EVENT_ALPHA_ANOMALY_MIN_RETURN_24H) \
 	RSI_EVENT_ANOMALY_MIN_VOLUME_MCAP=$(EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP) \
 	RSI_EVENT_WATCHLIST_ENABLED=1 \
-	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_watchlist_state.jsonl \
 	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
-	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_alerts.jsonl \
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_runs.jsonl \
 	$(PYTHON) main.py --event-alpha-cycle
 
 event-alpha-cycle-llm:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=fixture \
+	RSI_EVENT_ALPHA_RUN_MODE=fixture \
 	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
 	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
 	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
 	RSI_EVENT_ANOMALY_MIN_RETURN_24H=$(EVENT_ALPHA_ANOMALY_MIN_RETURN_24H) \
 	RSI_EVENT_ANOMALY_MIN_VOLUME_MCAP=$(EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP) \
 	RSI_EVENT_WATCHLIST_ENABLED=1 \
-	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_watchlist_state.jsonl \
 	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
-	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_alerts.jsonl \
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_runs.jsonl \
 	RSI_EVENT_LLM_MODE=$(EVENT_ALERT_LLM_MODE) \
 	RSI_EVENT_LLM_PROVIDER=$(EVENT_ALERT_LLM_PROVIDER) \
 	RSI_EVENT_LLM_EXTRACTOR_MODE=advisory \
@@ -377,6 +388,8 @@ event-alpha-cycle-llm:
 
 event-alpha-cycle-search:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=fixture \
+	RSI_EVENT_ALPHA_RUN_MODE=fixture \
 	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
 	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
 	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
@@ -386,13 +399,16 @@ event-alpha-cycle-search:
 	RSI_EVENT_CATALYST_SEARCH_PROVIDER=fixture \
 	RSI_EVENT_CATALYST_SEARCH_FIXTURE_PATH=$(EVENT_CATALYST_SEARCH_FIXTURE_PATH) \
 	RSI_EVENT_WATCHLIST_ENABLED=1 \
-	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_watchlist_state.jsonl \
 	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
-	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_alerts.jsonl \
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_runs.jsonl \
 	$(PYTHON) main.py --event-alpha-cycle
 
 event-alpha-cycle-search-llm:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=fixture \
+	RSI_EVENT_ALPHA_RUN_MODE=fixture \
 	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
 	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
 	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
@@ -402,9 +418,10 @@ event-alpha-cycle-search-llm:
 	RSI_EVENT_CATALYST_SEARCH_PROVIDER=fixture \
 	RSI_EVENT_CATALYST_SEARCH_FIXTURE_PATH=$(EVENT_CATALYST_SEARCH_FIXTURE_PATH) \
 	RSI_EVENT_WATCHLIST_ENABLED=1 \
-	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_watchlist_state.jsonl \
 	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
-	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_alerts.jsonl \
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_runs.jsonl \
 	RSI_EVENT_LLM_MODE=$(EVENT_ALERT_LLM_MODE) \
 	RSI_EVENT_LLM_PROVIDER=$(EVENT_ALERT_LLM_PROVIDER) \
 	RSI_EVENT_LLM_EXTRACTOR_MODE=advisory \
@@ -413,15 +430,18 @@ event-alpha-cycle-search-llm:
 
 event-alpha-cycle-send:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=fixture \
+	RSI_EVENT_ALPHA_RUN_MODE=fixture \
 	RSI_EVENT_DISCOVERY_UNIVERSE_PATH=$(EVENT_ALPHA_UNIVERSE_PATH) \
 	RSI_EVENT_MARKET_ENRICHMENT_ENABLED=1 \
 	RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 \
 	RSI_EVENT_ANOMALY_MIN_RETURN_24H=$(EVENT_ALPHA_ANOMALY_MIN_RETURN_24H) \
 	RSI_EVENT_ANOMALY_MIN_VOLUME_MCAP=$(EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP) \
 	RSI_EVENT_WATCHLIST_ENABLED=1 \
-	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_watchlist_state.jsonl \
 	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
-	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_alerts.jsonl \
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_FIXTURE_DIR)/event_alpha_runs.jsonl \
 	RSI_EVENT_LLM_MODE=$(EVENT_ALERT_LLM_MODE) \
 	RSI_EVENT_LLM_PROVIDER=$(EVENT_ALERT_LLM_PROVIDER) \
 	RSI_EVENT_LLM_EXTRACTOR_MODE=advisory \
@@ -430,10 +450,14 @@ event-alpha-cycle-send:
 
 event-alpha-cycle-profile:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(PYTHON) main.py --event-alpha-cycle --event-alpha-profile $(PROFILE)
 
 event-alpha-cycle-profile-send:
 	RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(PYTHON) main.py --event-alpha-cycle --event-alpha-profile $(PROFILE) --event-alert-send
 
 event-alpha-runs-report:
@@ -443,6 +467,8 @@ event-alpha-runs-report:
 event-alpha-status:
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(PYTHON) main.py --event-alpha-status --event-alpha-profile $(PROFILE)
 
 event-alpha-daily-report:
@@ -652,7 +678,16 @@ event-alpha-health-guard:
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_ALPHA_HEALTH_REQUIRE_PROFILE=$(PROFILE) \
-	$(PYTHON) main.py --event-alpha-health-guard
+	$(PYTHON) main.py --event-alpha-health-guard --event-alpha-artifact-namespace $(PROFILE)
+
+event-alpha-artifact-doctor:
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
+	RSI_EVENT_ALPHA_FEEDBACK_PATH=$(EVENT_ALPHA_PROFILE_DIR)/event_alpha_feedback.jsonl \
+	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
+	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
 
 event-alpha-tuning-worksheet:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \

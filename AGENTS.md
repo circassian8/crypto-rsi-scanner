@@ -413,6 +413,17 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   proxy eligibility, create `TRIGGERED_FADE`, send Telegram alerts, route normal
   RSI alerts, open paper trades, write live signal/outcome/paper tables, or
   execute orders.
+- Event Alpha artifacts must stay profile/run-mode namespaced for burn-in
+  safety. Profiled runs should resolve local artifacts under
+  `RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR` + `RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE`
+  unless a specific path override is intentionally provided. Run-ledger rows and
+  alert snapshots should carry `run_id`, `profile`, `run_mode`,
+  `artifact_namespace`, and relevant artifact paths. Burn-in/readiness/health
+  reports should ignore `test`, `fixture`, and `replay` rows unless
+  `--event-alpha-include-test-artifacts` is explicitly passed. Use
+  `main.py --event-alpha-artifact-doctor` / `make event-alpha-artifact-doctor`
+  to diagnose mixed namespaces, orphan snapshots, missing provider/budget rows,
+  and missing snapshot writes before treating burn-in artifacts as evidence.
 - Live Coinalyze enrichment may auto-resolve futures symbols. When
   `RSI_EVENT_DISCOVERY_COINALYZE_LIVE=1`, explicit
   `RSI_EVENT_DISCOVERY_COINALYZE_SYMBOLS` still wins; otherwise
