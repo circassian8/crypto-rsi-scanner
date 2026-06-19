@@ -40,7 +40,11 @@ class EventAlphaSendResult:
     lane_items_attempted: dict[str, int] = field(default_factory=dict)
     lane_items_delivered: dict[str, int] = field(default_factory=dict)
     would_send_items: int = 0
+    heartbeat_due: bool = False
     heartbeat_sent: bool = False
+    cooldown_blocks: dict[str, str] = field(default_factory=dict)
+    notification_scope: str | None = None
+    notification_scope_value: str | None = None
 
 
 @dataclass(frozen=True)
@@ -64,7 +68,11 @@ class EventAlphaPipelineResult:
     send_lane_items_attempted: dict[str, int] = field(default_factory=dict)
     send_lane_items_delivered: dict[str, int] = field(default_factory=dict)
     send_would_send_items: int = 0
+    send_heartbeat_due: bool = False
     send_heartbeat_sent: bool = False
+    send_cooldown_blocks: dict[str, str] = field(default_factory=dict)
+    notification_scope: str | None = None
+    notification_scope_value: str | None = None
     notification_burn_in: bool = False
     research_card_paths: tuple[Path, ...] = ()
     run_id: str | None = None
@@ -503,7 +511,11 @@ def _with_send_result(
         send_lane_items_attempted=dict(send_result.lane_items_attempted),
         send_lane_items_delivered=dict(send_result.lane_items_delivered),
         send_would_send_items=send_result.would_send_items,
+        send_heartbeat_due=send_result.heartbeat_due,
         send_heartbeat_sent=send_result.heartbeat_sent,
+        send_cooldown_blocks=dict(send_result.cooldown_blocks),
+        notification_scope=send_result.notification_scope,
+        notification_scope_value=send_result.notification_scope_value,
     )
 
 

@@ -77,6 +77,8 @@ from . import event_alpha_explain
 from . import event_alpha_health_guard
 from . import event_alpha_missed
 from . import event_alpha_notifications
+from . import event_alpha_notification_checklist
+from . import event_alpha_notification_runs
 from . import event_alpha_pipeline
 from . import event_alpha_preflight
 from . import event_alpha_priors
@@ -1176,6 +1178,10 @@ def _event_discovery_result_from_config(
         project_blog_rss_live=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE,
         project_blog_rss_urls=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS,
         project_blog_rss_timeout=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT,
+        project_blog_rss_fail_fast_on_error=(
+            config.EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS
+            and str(config.EVENT_ALPHA_RUN_MODE or "") == "notification_burn_in"
+        ),
         external_ipo_path=config.EVENT_DISCOVERY_EXTERNAL_IPO_PATH,
         sports_fixtures_path=config.EVENT_DISCOVERY_SPORTS_FIXTURES_PATH,
         prediction_market_events_path=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
@@ -1242,11 +1248,20 @@ def _event_alpha_priors_config_from_runtime() -> event_alpha_priors.EventAlphaPr
 
 
 def _event_provider_health_config_from_runtime() -> event_provider_health.EventProviderHealthConfig:
+    notification_mode = str(config.EVENT_ALPHA_RUN_MODE or "") == "notification_burn_in"
     return event_provider_health.EventProviderHealthConfig(
         path=config.EVENT_PROVIDER_HEALTH_PATH,
-        max_consecutive_failures=config.EVENT_PROVIDER_MAX_CONSECUTIVE_FAILURES,
+        max_consecutive_failures=(
+            config.EVENT_ALPHA_NOTIFY_MAX_PROVIDER_FAILURES_BEFORE_SKIP
+            if notification_mode
+            else config.EVENT_PROVIDER_MAX_CONSECUTIVE_FAILURES
+        ),
         backoff_minutes=config.EVENT_PROVIDER_BACKOFF_MINUTES,
-        fail_fast_on_dns=config.EVENT_PROVIDER_FAIL_FAST_ON_DNS,
+        fail_fast_on_dns=(
+            config.EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS
+            if notification_mode
+            else config.EVENT_PROVIDER_FAIL_FAST_ON_DNS
+        ),
     )
 
 
@@ -1400,10 +1415,15 @@ def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRo
     )
 
 
-def _event_alpha_notification_config_from_runtime() -> event_alpha_notifications.EventAlphaNotificationConfig:
+def _event_alpha_notification_config_from_runtime(
+    profile_name: str | None = None,
+) -> event_alpha_notifications.EventAlphaNotificationConfig:
     return event_alpha_notifications.EventAlphaNotificationConfig(
         enabled=config.EVENT_ALERTS_ENABLED,
         mode=config.EVENT_ALERT_MODE,
+        notification_scope=config.EVENT_ALPHA_NOTIFY_SCOPE,
+        profile_name=profile_name,
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
         daily_digest_cooldown_hours=config.EVENT_ALPHA_NOTIFY_DAILY_DIGEST_COOLDOWN_HOURS,
         instant_escalation_cooldown_hours=config.EVENT_ALPHA_NOTIFY_INSTANT_COOLDOWN_HOURS,
         max_instant_per_day=config.EVENT_ALPHA_NOTIFY_MAX_INSTANT_PER_DAY,
@@ -1456,6 +1476,15 @@ def _event_alpha_run_ledger_config_from_runtime(path: str | None = None) -> even
     return event_alpha_run_ledger.EventAlphaRunLedgerConfig(path=ledger_path)
 
 
+def _event_alpha_notification_runs_config_from_runtime(
+    path: str | None = None,
+) -> event_alpha_notification_runs.EventAlphaNotificationRunsConfig:
+    summary_path = Path(path).expanduser() if path else config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH
+    if not summary_path.is_absolute():
+        summary_path = config.DATA_DIR / summary_path
+    return event_alpha_notification_runs.EventAlphaNotificationRunsConfig(path=summary_path)
+
+
 def _apply_event_alpha_profile(profile_name: str | None) -> event_alpha_profiles.EventAlphaProfile | None:
     if not profile_name:
         return None
@@ -1473,6 +1502,7 @@ def _apply_event_alpha_context_to_config(context: event_alpha_artifacts.EventAlp
     config.EVENT_ALPHA_ARTIFACT_BASE_DIR = context.base_dir
     config.EVENT_ALPHA_RUN_LEDGER_PATH = context.run_ledger_path
     config.EVENT_ALPHA_ALERT_STORE_PATH = context.alert_store_path
+    config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH = context.notification_runs_path
     config.EVENT_WATCHLIST_STATE_PATH = context.watchlist_state_path
     config.EVENT_ALPHA_FEEDBACK_PATH = context.feedback_path
     config.EVENT_ALPHA_MISSED_PATH = context.missed_path
@@ -1515,6 +1545,7 @@ def resolve_event_alpha_artifact_context_for_report(
             namespace_dir=base_dir,
             run_ledger_path=Path(config.EVENT_ALPHA_RUN_LEDGER_PATH),
             alert_store_path=Path(config.EVENT_ALPHA_ALERT_STORE_PATH),
+            notification_runs_path=Path(config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH),
             watchlist_state_path=Path(config.EVENT_WATCHLIST_STATE_PATH),
             feedback_path=Path(config.EVENT_ALPHA_FEEDBACK_PATH),
             missed_path=Path(config.EVENT_ALPHA_MISSED_PATH),
@@ -1562,6 +1593,7 @@ def _normalize_profile_paths() -> None:
         "EVENT_WATCHLIST_STATE_PATH",
         "EVENT_WATCHLIST_MONITOR_MARKET_PATH",
         "EVENT_ALPHA_ALERT_STORE_PATH",
+        "EVENT_ALPHA_NOTIFICATION_RUNS_PATH",
         "EVENT_ALPHA_RUN_LEDGER_PATH",
         "EVENT_ALPHA_MISSED_PATH",
         "EVENT_ALPHA_PRIORS_PATH",
@@ -1888,6 +1920,37 @@ def event_alpha_profile_report(profile_name: str, verbose: bool = False) -> None
     print(event_alpha_profiles.format_profile_report(profile))
 
 
+def _notification_runtime_budget_exhausted(started_at: datetime) -> bool:
+    budget = float(getattr(config, "EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS", 120.0) or 0.0)
+    if budget <= 0:
+        return True
+    elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+    return elapsed >= budget
+
+
+def _empty_notification_pipeline_result(
+    *,
+    now: datetime,
+    warning: str,
+) -> event_alpha_pipeline.EventAlphaPipelineResult:
+    watch_cfg = _event_watchlist_config_from_runtime()
+    router_cfg = _event_alpha_router_config_from_runtime()
+    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    router_result = event_alpha_router.route_watchlist(watchlist, cfg=router_cfg)
+    return event_alpha_pipeline.EventAlphaPipelineResult(
+        discovery_result=EventDiscoveryResult((), (), (), (), ()),
+        alerts=[],
+        catalyst_search_result=None,
+        anomaly_lifecycle_result=None,
+        extraction_rows=[],
+        relationship_rows=[],
+        watchlist_result=None,
+        watchlist_monitor_result=None,
+        router_result=router_result,
+        warnings=(warning,),
+    )
+
+
 def event_alpha_notify_cycle(
     verbose: bool = False,
     with_llm: bool = False,
@@ -1912,6 +1975,7 @@ def event_alpha_notify_cycle(
     now = _event_research_now(event_now)
     started_at = datetime.now(timezone.utc)
     run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
+    budget_exhausted = _notification_runtime_budget_exhausted(started_at)
     extraction_provider = None
     extraction_cfg = None
     relationship_provider = None
@@ -1921,43 +1985,57 @@ def event_alpha_notify_cycle(
         extraction_provider = _event_llm_extraction_provider(extraction_cfg)
         relationship_cfg = _event_llm_config_from_runtime()
         relationship_provider = _event_llm_provider(relationship_cfg)
-    catalyst_search_cfg = _event_catalyst_search_config_from_runtime()
-    catalyst_search_provider = _event_catalyst_search_provider(catalyst_search_cfg)
     alert_cfg = _event_alert_config_from_runtime()
-    pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
-        load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
-            now=observed,
-            raw_event_transform=raw_event_transform,
-        ),
-        alert_cfg=alert_cfg,
-        now=now,
-        with_llm=with_llm,
-        extraction_provider=extraction_provider,
-        extraction_cfg=extraction_cfg,
-        catalyst_search_provider=catalyst_search_provider,
-        catalyst_search_cfg=catalyst_search_cfg,
-        relationship_provider=relationship_provider,
-        relationship_cfg=relationship_cfg,
-        watchlist_cfg=_event_watchlist_config_from_runtime(),
-        router_cfg=_event_alpha_router_config_from_runtime(),
-        priors_cfg=_event_alpha_priors_config_from_runtime(),
-        refresh_watchlist=True,
-        route=True,
-        watchlist_monitor_enabled=config.EVENT_WATCHLIST_MONITOR_ENABLED,
-        watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
-        watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
-        watchlist_monitor_market_provider=_event_watchlist_market_provider_from_runtime(),
-        watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
-        watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
-        watchlist_monitor_market_cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
-        watchlist_monitor_derivatives_source=config.EVENT_WATCHLIST_MONITOR_DERIVATIVES_SOURCE,
-        watchlist_monitor_supply_source=config.EVENT_WATCHLIST_MONITOR_SUPPLY_SOURCE,
-        watchlist_monitor_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
-        watchlist_monitor_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
-        watchlist_monitor_enrichment_max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
-        watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
-        send=False,
-    )
+    if budget_exhausted:
+        pipeline_result = _empty_notification_pipeline_result(
+            now=now,
+            warning="notification_runtime_budget_exhausted: skipped source loading before expensive stages",
+        )
+    else:
+        catalyst_search_cfg = _event_catalyst_search_config_from_runtime()
+        catalyst_search_provider = _event_catalyst_search_provider(catalyst_search_cfg)
+        pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+            load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
+                now=observed,
+                raw_event_transform=raw_event_transform,
+            ),
+            alert_cfg=alert_cfg,
+            now=now,
+            with_llm=with_llm,
+            extraction_provider=extraction_provider,
+            extraction_cfg=extraction_cfg,
+            catalyst_search_provider=catalyst_search_provider,
+            catalyst_search_cfg=catalyst_search_cfg,
+            relationship_provider=relationship_provider,
+            relationship_cfg=relationship_cfg,
+            watchlist_cfg=_event_watchlist_config_from_runtime(),
+            router_cfg=_event_alpha_router_config_from_runtime(),
+            priors_cfg=_event_alpha_priors_config_from_runtime(),
+            refresh_watchlist=True,
+            route=True,
+            watchlist_monitor_enabled=config.EVENT_WATCHLIST_MONITOR_ENABLED,
+            watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
+            watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
+            watchlist_monitor_market_provider=_event_watchlist_market_provider_from_runtime(),
+            watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
+            watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
+            watchlist_monitor_market_cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
+            watchlist_monitor_derivatives_source=config.EVENT_WATCHLIST_MONITOR_DERIVATIVES_SOURCE,
+            watchlist_monitor_supply_source=config.EVENT_WATCHLIST_MONITOR_SUPPLY_SOURCE,
+            watchlist_monitor_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
+            watchlist_monitor_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
+            watchlist_monitor_enrichment_max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
+            watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
+            send=False,
+        )
+        if _notification_runtime_budget_exhausted(started_at):
+            pipeline_result = replace(
+                pipeline_result,
+                warnings=tuple(dict.fromkeys((
+                    *pipeline_result.warnings,
+                    "notification_runtime_budget_exhausted: cycle exceeded runtime budget; partial results preserved",
+                ))),
+            )
     card_write = None
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
@@ -1973,7 +2051,28 @@ def event_alpha_notify_cycle(
         pipeline_result = replace(pipeline_result, research_card_paths=card_write.card_paths)
         print(event_research_cards.format_card_write_result(card_write))
         print("")
-    send_result = event_alpha_pipeline.EventAlphaSendResult(requested=False)
+    storage = Storage(config.DB_PATH)
+    try:
+        notification_plan = event_alpha_notifications.build_notification_plan(
+            pipeline_result.router_result.alertable_decisions if pipeline_result.router_result else [],
+            storage=storage,
+            cfg=_event_alpha_notification_config_from_runtime(profile_for_run),
+            now=now,
+            include_health_heartbeat=True,
+        )
+    finally:
+        storage.close()
+    send_result = event_alpha_pipeline.EventAlphaSendResult(
+        requested=False,
+        lane_items_attempted=notification_plan.lane_counts,
+        lane_items_delivered={lane: 0 for lane in event_alpha_notifications.LANES},
+        would_send_items=notification_plan.would_send_count,
+        heartbeat_due=notification_plan.heartbeat_due,
+        cooldown_blocks=dict(notification_plan.blocked_by_lane),
+        notification_scope=notification_plan.notification_scope,
+        notification_scope_value=notification_plan.scope_value,
+        block_reason="send not requested",
+    )
     if send:
         decisions = pipeline_result.router_result.alertable_decisions if pipeline_result.router_result else []
         send_result = _send_event_alpha_routed_digest(
@@ -2001,7 +2100,11 @@ def event_alpha_notify_cycle(
         send_lane_items_attempted=dict(send_result.lane_items_attempted),
         send_lane_items_delivered=dict(send_result.lane_items_delivered),
         send_would_send_items=send_result.would_send_items,
+        send_heartbeat_due=send_result.heartbeat_due,
         send_heartbeat_sent=send_result.heartbeat_sent,
+        send_cooldown_blocks=dict(send_result.cooldown_blocks),
+        notification_scope=send_result.notification_scope,
+        notification_scope_value=send_result.notification_scope_value,
         notification_burn_in=True,
     )
     print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
@@ -2045,10 +2148,25 @@ def event_alpha_notify_cycle(
         notification_burn_in=True,
         success=True,
     )
+    notification_row = event_alpha_notification_runs.append_notification_run(
+        pipeline_result,
+        cfg=_event_alpha_notification_runs_config_from_runtime(),
+        profile=profile_for_run,
+        started_at=started_at,
+        finished_at=datetime.now(timezone.utc),
+        telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        plan=notification_plan,
+        provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
+    )
     print("")
     print(
         "Event Alpha notification run ledger updated: "
         f"{config.EVENT_ALPHA_RUN_LEDGER_PATH} run_id={run_row.get('run_id')}"
+    )
+    print(
+        "Event Alpha notification summary updated: "
+        f"{config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH} run_id={notification_row.get('run_id')}"
     )
 
 
@@ -2073,28 +2191,103 @@ def event_alpha_notify_preview(
         plan = event_alpha_notifications.build_notification_plan(
             routed.decisions,
             storage=storage,
-            cfg=_event_alpha_notification_config_from_runtime(),
+            cfg=_event_alpha_notification_config_from_runtime(profile.name),
             now=datetime.now(timezone.utc),
             include_health_heartbeat=True,
         )
     finally:
         storage.close()
-    llm_budget = (
-        f"provider={config.EVENT_LLM_PROVIDER}/{config.EVENT_LLM_EXTRACTOR_PROVIDER} "
-        f"max_run={config.EVENT_LLM_MAX_CALLS_PER_RUN} max_day={config.EVENT_LLM_MAX_CALLS_PER_DAY} "
-        f"max_cost_day={config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY:g} "
-        f"cache_ttl_hours={config.EVENT_LLM_CACHE_TTL_HOURS:g}"
-    )
     print(event_alpha_notifications.format_preview(
         profile=profile.name,
         artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or profile.name,
         telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
         provider_ready_event_sources=provider.ready_event_source_count,
         provider_ready_enrichment_sources=provider.ready_enrichment_count,
-        llm_budget_status=llm_budget,
+        llm_budget_status=_event_alpha_llm_budget_status(),
         plan=plan,
         card_auto_write=bool(config.EVENT_RESEARCH_CARDS_AUTO_WRITE),
     ))
+
+
+def _event_alpha_llm_budget_status() -> str:
+    return (
+        f"provider={config.EVENT_LLM_PROVIDER}/{config.EVENT_LLM_EXTRACTOR_PROVIDER} "
+        f"max_run={config.EVENT_LLM_MAX_CALLS_PER_RUN} max_day={config.EVENT_LLM_MAX_CALLS_PER_DAY} "
+        f"max_cost_day={config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY:g} "
+        f"cache_ttl_hours={config.EVENT_LLM_CACHE_TTL_HOURS:g}"
+    )
+
+
+def event_alpha_notification_checklist_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+) -> None:
+    """Print day-1 notification startup readiness without sending."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "notify_no_key"
+    try:
+        profile = _apply_event_alpha_profile(selected_profile)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    context = event_alpha_artifacts.context_from_profile(
+        profile.name,
+        run_mode=config.EVENT_ALPHA_RUN_MODE or None,
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+    )
+    provider_status = event_provider_status.build_event_discovery_provider_status(config)
+    preflight = event_alpha_preflight.run_preflight(
+        profile_name=profile.name,
+        context=context,
+        cfg=config,
+        provider_status=provider_status,
+        send_requested=True,
+    )
+    storage = Storage(config.DB_PATH)
+    try:
+        watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
+        routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+        plan = event_alpha_notifications.build_notification_plan(
+            routed.decisions,
+            storage=storage,
+            cfg=_event_alpha_notification_config_from_runtime(profile.name),
+            now=datetime.now(timezone.utc),
+            include_health_heartbeat=True,
+        )
+    finally:
+        storage.close()
+    artifacts = _event_alpha_local_artifacts(run_limit=250, latest_alerts=False)
+    cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=artifacts["runs"].rows,
+        alert_rows=artifacts["alerts"].rows,
+        feedback_rows=artifacts["feedback_rows"],
+        outcome_rows=artifacts["outcome_rows"],
+        card_paths=[str(path) for path in cards_dir.glob("*.md")] if cards_dir.exists() else (),
+        provider_health_rows=artifacts["provider_rows"],
+        llm_budget_rows=artifacts["budget_rows"],
+        profile=profile.name,
+        artifact_namespace=context.artifact_namespace,
+        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
+        strict=False,
+    )
+    result = event_alpha_notification_checklist.build_notification_checklist(
+        profile=profile.name,
+        artifact_namespace=context.artifact_namespace,
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
+        provider_status=provider_status,
+        provider_health_rows=artifacts["provider_rows"],
+        plan=plan,
+        llm_budget_status=_event_alpha_llm_budget_status(),
+        card_auto_write=bool(config.EVENT_RESEARCH_CARDS_AUTO_WRITE),
+        artifact_doctor_status=doctor.status,
+        preflight_blockers=preflight.blockers,
+        preflight_warnings=preflight.warnings,
+    )
+    print(event_alpha_notification_checklist.format_notification_checklist(result))
 
 
 def event_alpha_send_test(verbose: bool = False, *, profile_name: str | None = None) -> None:
@@ -2271,6 +2464,14 @@ def event_alpha_runs_report(path: str | None = None, limit: int = 20, verbose: b
     cfg = _event_alpha_run_ledger_config_from_runtime(path)
     result = event_alpha_run_ledger.load_run_records(cfg.path, limit=limit)
     print(event_alpha_run_ledger.format_run_ledger_report(result))
+
+
+def event_alpha_notification_runs_report(path: str | None = None, limit: int = 20, verbose: bool = False) -> None:
+    """Print recent Event Alpha notification-cycle summary rows."""
+    _setup_event_discovery_logging(verbose)
+    cfg = _event_alpha_notification_runs_config_from_runtime(path)
+    result = event_alpha_notification_runs.load_notification_runs(cfg.path, limit=limit)
+    print(event_alpha_notification_runs.format_notification_runs_report(result))
 
 
 def event_catalyst_search_report(
@@ -3687,7 +3888,7 @@ def _send_event_alpha_routed_digest(
     storage = Storage(config.DB_PATH)
     try:
         now = now or datetime.now(timezone.utc)
-        notif_cfg = _event_alpha_notification_config_from_runtime()
+        notif_cfg = _event_alpha_notification_config_from_runtime(profile)
         notif_cfg = replace(notif_cfg, enabled=cfg.enabled, mode=cfg.mode)
         recipients = storage.active_subscribers() or config.TELEGRAM_CHAT_IDS
         result = event_alpha_notifications.send_notifications(
@@ -5226,9 +5427,24 @@ def cli() -> None:
         help="Preview Event Alpha notification readiness, would-send counts, and lane cooldowns.",
     )
     parser.add_argument(
+        "--event-alpha-notification-checklist",
+        action="store_true",
+        help="Print day-1 Event Alpha notification startup checklist.",
+    )
+    parser.add_argument(
         "--event-alpha-send-test",
         action="store_true",
         help="Send one guarded research-only Event Alpha heartbeat without running providers.",
+    )
+    parser.add_argument(
+        "--event-alpha-notification-runs-report",
+        action="store_true",
+        help="Print recent Event Alpha notification-cycle summary rows.",
+    )
+    parser.add_argument(
+        "--event-alpha-notification-runs-path",
+        default=None,
+        help="Optional Event Alpha notification summary JSONL path.",
     )
     parser.add_argument(
         "--event-alpha-runs-report",
@@ -5840,8 +6056,18 @@ def cli() -> None:
     if args.event_alpha_notify_preview:
         event_alpha_notify_preview(verbose=args.verbose, profile_name=args.event_alpha_profile)
         return
+    if args.event_alpha_notification_checklist:
+        event_alpha_notification_checklist_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        return
     if args.event_alpha_send_test:
         event_alpha_send_test(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        return
+    if args.event_alpha_notification_runs_report:
+        event_alpha_notification_runs_report(
+            path=args.event_alpha_notification_runs_path,
+            limit=args.event_alpha_run_limit,
+            verbose=args.verbose,
+        )
         return
     if args.event_alpha_runs_report:
         event_alpha_runs_report(

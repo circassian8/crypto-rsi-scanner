@@ -529,6 +529,7 @@ def run_manual_discovery(
     project_blog_rss_live: bool = False,
     project_blog_rss_urls: Iterable[str] | None = None,
     project_blog_rss_timeout: float = 10.0,
+    project_blog_rss_fail_fast_on_error: bool = False,
     external_ipo_path: str | Path | None = None,
     sports_fixtures_path: str | Path | None = None,
     prediction_market_events_path: str | Path | None = None,
@@ -617,6 +618,7 @@ def run_manual_discovery(
         project_blog_rss_live=project_blog_rss_live,
         project_blog_rss_urls=project_blog_rss_urls,
         project_blog_rss_timeout=project_blog_rss_timeout,
+        project_blog_rss_fail_fast_on_error=project_blog_rss_fail_fast_on_error,
         external_ipo_path=external_ipo_path,
         sports_fixtures_path=sports_fixtures_path,
         prediction_market_events_path=prediction_market_events_path,
@@ -744,6 +746,7 @@ def load_discovery_events(
     project_blog_rss_live: bool = False,
     project_blog_rss_urls: Iterable[str] | None = None,
     project_blog_rss_timeout: float = 10.0,
+    project_blog_rss_fail_fast_on_error: bool = False,
     external_ipo_path: str | Path | None = None,
     sports_fixtures_path: str | Path | None = None,
     prediction_market_events_path: str | Path | None = None,
@@ -829,6 +832,7 @@ def load_discovery_events(
             live_enabled=project_blog_rss_live,
             feed_urls=project_blog_rss_urls,
             timeout=project_blog_rss_timeout,
+            fail_fast_on_error=project_blog_rss_fail_fast_on_error,
         )
         events.extend(_fetch_provider_events(
             provider,

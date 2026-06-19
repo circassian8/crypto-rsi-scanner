@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Harden Event Alpha day-1 notifications · Codex
+**Why:** Day-1 Event Alpha notifications need to be usable immediately without
+mixing profile cooldowns, hanging on public providers, or implying calibrated
+research/trading trust.
+**Changes:**
+- Scoped notification cooldown/count/dedupe state by namespace/profile/global
+  with legacy-key migration warnings, and made `notify_no_key`, `notify_llm`,
+  and `research_send` use namespace-scoped state.
+- Added notification runtime/timeout/fail-fast controls, RSS provider
+  fail-fast behavior, and CoinGecko notification-mode retry/timeout limits so
+  burn-in runs preserve partial results instead of blocking on slow sources.
+- Added a day-1 notification checklist and notification-run summary artifact,
+  report command, Make targets, and run-ledger notification summary fields.
+- Split readiness into day-1 notification start, calibrated research send, and
+  trading-out-of-scope states; updated routed/heartbeat copy to say
+  `DAY-1 UNVALIDATED`, `Trading action: NONE`, and `Review before acting`.
+- Updated `.env.example`, `DECISIONS.md`, `ROADMAP.md`, the Event Alpha
+  runbook, and regression tests for scoped state, fail-fast behavior,
+  readiness/checklist/reporting, message copy, and Make targets.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed 369/369; `make event-llm-eval
+PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`, `make
+event-alpha-eval PYTHON=python3`, and `make verify PYTHON=python3` passed.
+Also smoke-tested `make event-alpha-notify-no-key PYTHON=python3` with the send
+guard disabled, `make event-alpha-notification-checklist PROFILE=notify_no_key
+PYTHON=python3`, `make event-alpha-notification-runs-report PROFILE=notify_no_key
+PYTHON=python3`, and `make -n event-alpha-notify-start-no-key PYTHON=python3`.
+**Notes/risks:** Live no-key sources can still time out or 403, but notification
+mode records provider backoff/fail-fast warnings and keeps sends guarded by
+`RSI_EVENT_ALERTS_ENABLED=1` plus Telegram configuration. No live trading,
+paper trades, normal RSI signal writes, or LLM-created `TRIGGERED_FADE` were
+added.
+
 ## 2026-06-19 — Add Event Alpha day-1 notification burn-in · Codex
 **Why:** The owner wants immediate Event Alpha research notifications from day
 1 while keeping trading trust, paper trades, normal RSI rows, and calibrated

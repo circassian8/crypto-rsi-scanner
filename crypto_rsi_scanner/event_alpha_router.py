@@ -161,7 +161,10 @@ def format_routed_telegram_digest(
     card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
     lines = [
         "<b>Event Alpha routed research alerts</b>",
-        "<i>Research-only / unvalidated. Not a trade signal, paper trade, or execution.</i>",
+        "<i>Research-only / DAY-1 UNVALIDATED. Not a trade signal, paper trade, or execution.</i>",
+        "Validation status: DAY-1 UNVALIDATED",
+        "Trading action: NONE",
+        "Review before acting.",
     ]
     if profile:
         lines.append(f"profile={_esc(profile)}")
@@ -180,6 +183,8 @@ def format_routed_telegram_digest(
             f"tier={_esc(entry.latest_tier or 'unknown')} route={_esc(decision.route.value)} "
             f"lane={_esc(decision.lane.value)}"
         )
+        if profile:
+            lines.append(f"profile={_esc(profile)} notification_lane={_esc(decision.lane.value)}")
         lines.append(
             f"state={_esc(entry.state)} playbook={_esc(entry.latest_playbook_type or 'unknown')} "
             f"external_catalyst={_esc(entry.external_asset or 'unknown')}"

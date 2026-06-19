@@ -39,12 +39,37 @@ def _base_url_and_headers() -> tuple[str, dict[str, str]]:
 
 
 class CoinGeckoClient:
-    def __init__(self, calls_per_minute: int | None = None):
+    def __init__(
+        self,
+        calls_per_minute: int | None = None,
+        *,
+        timeout_seconds: float | None = None,
+        max_retries: int | None = None,
+    ):
         self.base_url, self.headers = _base_url_and_headers()
         cpm = calls_per_minute or config.CALLS_PER_MINUTE
         self._limiter = _RateLimiter(cpm)
         self._session: aiohttp.ClientSession | None = None
         self._fixture_dir: Path | None = config.FIXTURE_DIR
+        notification_mode = str(getattr(config, "EVENT_ALPHA_RUN_MODE", "") or "") == "notification_burn_in"
+        self.timeout_seconds = (
+            float(timeout_seconds)
+            if timeout_seconds is not None
+            else (
+                float(getattr(config, "EVENT_ALPHA_NOTIFY_PROVIDER_TIMEOUT_SECONDS", 5.0) or 5.0)
+                if notification_mode
+                else 30.0
+            )
+        )
+        self.max_retries = (
+            int(max_retries)
+            if max_retries is not None
+            else (
+                1
+                if notification_mode and bool(getattr(config, "EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS", True))
+                else config.MAX_RETRIES
+            )
+        )
 
     async def __aenter__(self) -> CoinGeckoClient:
         if self._fixture_dir is None:
@@ -63,10 +88,11 @@ class CoinGeckoClient:
 
     async def _get(self, path: str, params: dict) -> dict:
         url = f"{self.base_url}{path}"
-        for attempt in range(config.MAX_RETRIES):
+        max_retries = max(1, int(self.max_retries or 1))
+        for attempt in range(max_retries):
             await self._limiter.acquire()
             try:
-                timeout = aiohttp.ClientTimeout(total=30)
+                timeout = aiohttp.ClientTimeout(total=max(0.1, float(self.timeout_seconds or 30.0)))
                 async with self._session.get(url, params=params, timeout=timeout) as resp:
                     if resp.status == 200:
                         return await resp.json()
@@ -85,11 +111,11 @@ class CoinGeckoClient:
                     text = await resp.text()
                     raise RuntimeError(f"CoinGecko {resp.status}: {text[:200]}")
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                if attempt == config.MAX_RETRIES - 1:
+                if attempt == max_retries - 1:
                     raise
                 log.warning("Request error on %s (attempt %d): %s", path, attempt + 1, e)
                 await asyncio.sleep(2.0 * (attempt + 1))
-        raise RuntimeError(f"CoinGecko request failed after {config.MAX_RETRIES} retries: {path}")
+        raise RuntimeError(f"CoinGecko request failed after {max_retries} retries: {path}")
 
     async def get_top_markets(self, n: int) -> list[dict]:
         if self._fixture_dir is not None:

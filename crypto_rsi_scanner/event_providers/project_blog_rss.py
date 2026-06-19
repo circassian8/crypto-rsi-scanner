@@ -36,6 +36,7 @@ class ProjectBlogRssProvider:
         live_enabled: bool = False,
         feed_urls: Iterable[str] | None = None,
         timeout: float = 10.0,
+        fail_fast_on_error: bool = False,
         opener: UrlOpen | None = None,
         fetched_at: datetime | None = None,
     ) -> None:
@@ -44,6 +45,7 @@ class ProjectBlogRssProvider:
         self.live_enabled = live_enabled
         self.feed_urls = tuple(url.strip() for url in (feed_urls or ()) if url.strip())
         self.timeout = timeout
+        self.fail_fast_on_error = fail_fast_on_error
         self.opener = opener or _urlopen_with_timeout
         self.fetched_at = fetched_at
         self.last_warnings: tuple[str, ...] = ()
@@ -82,6 +84,11 @@ class ProjectBlogRssProvider:
                 if self.required:
                     raise
                 log.warning(warning)
+                if self.fail_fast_on_error:
+                    warning = "Project blog/RSS fail-fast enabled; skipped remaining feeds after first failure"
+                    warnings.append(warning)
+                    log.warning(warning)
+                    break
                 continue
             events.extend(news_events_from_items(
                 rows,

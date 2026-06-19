@@ -128,7 +128,7 @@ def build_v1_readiness(
         warnings.extend(f"{row.profile}: {item}" for item in row.warnings)
         commands.extend(row.recommended_commands)
     if not run_data:
-        blockers.append("no Event Alpha run ledger rows found")
+        warnings.append("no Event Alpha run ledger rows found; calibrated research send still needs burn-in evidence")
         commands.append("make event-alpha-cycle-profile PROFILE=no_key_live")
         if legacy_rows_available and not include_legacy_artifacts:
             warnings.append("legacy/default run rows were ignored; run namespaced burn-in commands or pass --event-alpha-include-legacy-artifacts for migration review")
@@ -155,9 +155,8 @@ def format_v1_readiness_report(result: EventAlphaV1ReadinessResult) -> str:
         "EVENT ALPHA V1 READINESS (research-only)",
         "=" * 76,
         f"generated_at: {result.generated_at}",
-        f"READY_FOR_DAY1_NOTIFICATIONS: {_yes_no(result.ready_for_day1_notifications)}",
+        f"READY_TO_START_DAY1_NOTIFICATIONS: {_yes_no(result.ready_for_day1_notifications)}",
         f"READY_FOR_CALIBRATED_RESEARCH_SEND: {_yes_no(result.ready_for_research_send)}",
-        f"READY_FOR_RESEARCH_SEND: {_yes_no(result.ready_for_research_send)}",
         f"READY_FOR_FULL_LLM_LIVE: {_yes_no(result.ready_for_full_llm_live)}",
         f"READY_FOR_SCHEDULED_BURN_IN: {_yes_no(result.ready_for_scheduled_burn_in)}",
         "READY_FOR_TRADING: no (out of scope)",
@@ -234,10 +233,18 @@ def _profile_readiness(
     warnings = list(checklist.warnings)
     if budget_skips:
         warnings.append("LLM budget skips observed")
-    blockers = list(checklist.blockers)
+    profile_is_notify = False
+    try:
+        profile = event_alpha_profiles.get_profile(profile_name)
+        profile_is_notify = bool(profile.notification_burn_in)
+    except ValueError:
+        profile = None
+    blockers = [] if profile_is_notify else list(checklist.blockers)
+    if profile_is_notify and checklist.blockers:
+        warnings.extend(f"calibrated burn-in blocker: {item}" for item in checklist.blockers)
     blockers.extend(provider_blockers)
     scheduled_ready = bool(matching_runs) and not provider_blockers
-    day1_ready = profile_name in {"notify_no_key", "notify_llm"} and scheduled_ready
+    day1_ready = profile_is_notify and not provider_blockers
     research_send_ready = profile_name == "research_send" and checklist.ready_for_research_send and scheduled_ready
     full_llm_ready = (
         profile_name == "full_llm_live"
@@ -246,9 +253,7 @@ def _profile_readiness(
         and budget_skips == 0
     )
     commands = _commands_for_profile(profile_name, research_send_ready, full_llm_ready, scheduled_ready)
-    try:
-        event_alpha_profiles.get_profile(profile_name)
-    except ValueError:
+    if profile is None:
         blockers.append(f"unknown profile {profile_name}")
     return EventAlphaV1ProfileReadiness(
         profile=profile_name,

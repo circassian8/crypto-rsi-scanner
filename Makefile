@@ -52,6 +52,7 @@ EVENT_ALPHA_PROFILE_DIR ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVENT_ALPHA_ARTIFA
 EVENT_ALPHA_FIXTURE_DIR ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/fixture
 EVENT_WATCHLIST_STATE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_watchlist_state.jsonl
 EVENT_ALPHA_ALERT_STORE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_alerts.jsonl
+EVENT_ALPHA_NOTIFICATION_RUNS_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_notification_runs.jsonl
 EVENT_ALPHA_RUN_LEDGER_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_runs.jsonl
 EVENT_ALPHA_MISSED_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_missed.jsonl
 EVENT_ALPHA_PRIORS_OUT ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_priors.json
@@ -72,7 +73,7 @@ EVENT_ALPHA_BURN_IN_PACK ?= event_alpha_burn_in_pack.zip
 EVENT_ALPHA_INCLUDE_LEGACY_ARG = $(if $(filter 1 true yes,$(INCLUDE_LEGACY)),--event-alpha-include-legacy-artifacts,)
 EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG = $(if $(filter 1 true yes,$(STRICT)),--event-alpha-artifact-doctor-strict,)
 
-.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-notify-cycle event-alpha-notify-no-key event-alpha-notify-llm event-alpha-notify-preview event-alpha-send-test event-alpha-runs-report event-alpha-status event-alpha-preflight event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-notify-cycle event-alpha-notify-no-key event-alpha-notify-llm event-alpha-notify-preview event-alpha-notification-checklist event-alpha-notification-runs-report event-alpha-notify-start-no-key event-alpha-notify-start-llm event-alpha-send-test event-alpha-runs-report event-alpha-status event-alpha-preflight event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -110,8 +111,11 @@ help:
 	@echo "  make event-alpha-cycle-profile PROFILE=no_key_live  Run one Event Alpha cycle using an operational profile"
 	@echo "  make event-alpha-cycle-profile-send PROFILE=research_send  Run a profiled cycle with the explicit send flag"
 	@echo "  make event-alpha-notify-preview PROFILE=notify_no_key  Preview day-1 notification readiness and cooldowns"
+	@echo "  make event-alpha-notification-checklist PROFILE=notify_no_key  Check day-1 notify startup readiness"
 	@echo "  make event-alpha-notify-no-key  Run day-1 no-key notification burn-in; sends only with RSI_EVENT_ALERTS_ENABLED=1"
 	@echo "  make event-alpha-notify-llm  Run day-1 LLM notification burn-in; sends only with RSI_EVENT_ALERTS_ENABLED=1"
+	@echo "  make event-alpha-notification-runs-report PROFILE=notify_no_key  Print notification summary rows"
+	@echo "  Startup: make event-alpha-preflight PROFILE=notify_no_key; make event-alpha-notification-checklist PROFILE=notify_no_key; RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-send-test PROFILE=notify_no_key; RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-no-key"
 	@echo "  make event-alpha-send-test PROFILE=notify_no_key  Send one guarded research-only heartbeat"
 	@echo "  make event-alpha-runs-report  Print Event Alpha cycle run ledger rows"
 	@echo "  make event-alpha-status PROFILE=no_key_live  Print profile-aware Event Alpha readiness/status"
@@ -488,11 +492,34 @@ event-alpha-notify-preview:
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(PYTHON) main.py --event-alpha-notify-preview --event-alpha-profile $(PROFILE)
 
+event-alpha-notification-checklist: PROFILE = notify_no_key
+event-alpha-notification-checklist:
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH=$(EVENT_ALPHA_NOTIFICATION_RUNS_PATH) \
+	$(PYTHON) main.py --event-alpha-notification-checklist --event-alpha-profile $(PROFILE)
+
 event-alpha-send-test: PROFILE = notify_no_key
 event-alpha-send-test:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(PYTHON) main.py --event-alpha-send-test --event-alpha-profile $(PROFILE)
+
+event-alpha-notification-runs-report:
+	RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH=$(EVENT_ALPHA_NOTIFICATION_RUNS_PATH) \
+	$(PYTHON) main.py --event-alpha-notification-runs-report --event-alpha-run-limit 20
+
+event-alpha-notify-start-no-key:
+	$(MAKE) event-alpha-preflight PROFILE=notify_no_key PYTHON=$(PYTHON)
+	$(MAKE) event-alpha-notification-checklist PROFILE=notify_no_key PYTHON=$(PYTHON)
+	RSI_EVENT_ALERTS_ENABLED=1 $(MAKE) event-alpha-send-test PROFILE=notify_no_key PYTHON=$(PYTHON)
+	RSI_EVENT_ALERTS_ENABLED=1 $(MAKE) event-alpha-notify-no-key PYTHON=$(PYTHON)
+
+event-alpha-notify-start-llm:
+	$(MAKE) event-alpha-preflight PROFILE=notify_llm PYTHON=$(PYTHON)
+	$(MAKE) event-alpha-notification-checklist PROFILE=notify_llm PYTHON=$(PYTHON)
+	RSI_EVENT_ALERTS_ENABLED=1 $(MAKE) event-alpha-send-test PROFILE=notify_llm PYTHON=$(PYTHON)
+	RSI_EVENT_ALERTS_ENABLED=1 $(MAKE) event-alpha-notify-llm PYTHON=$(PYTHON)
 
 event-alpha-runs-report:
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \

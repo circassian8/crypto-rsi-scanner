@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
+import re
 
 from . import event_alpha_pipeline, event_alpha_router
 
@@ -34,11 +35,23 @@ LAST_SENT_META_KEYS = {
     LANE_HEALTH_HEARTBEAT: "event_alpha_last_sent_health_heartbeat_at",
 }
 
+NOTIFICATION_SCOPE_GLOBAL = "global"
+NOTIFICATION_SCOPE_NAMESPACE = "namespace"
+NOTIFICATION_SCOPE_PROFILE = "profile"
+NOTIFICATION_SCOPES = (
+    NOTIFICATION_SCOPE_GLOBAL,
+    NOTIFICATION_SCOPE_NAMESPACE,
+    NOTIFICATION_SCOPE_PROFILE,
+)
+
 
 @dataclass(frozen=True)
 class EventAlphaNotificationConfig:
     enabled: bool = False
     mode: str = "research_only"
+    notification_scope: str = NOTIFICATION_SCOPE_GLOBAL
+    profile_name: str | None = None
+    artifact_namespace: str | None = None
     daily_digest_cooldown_hours: float = 12.0
     instant_escalation_cooldown_hours: float = 1.0
     max_instant_per_day: int = 3
@@ -54,6 +67,9 @@ class EventAlphaNotificationPlan:
     heartbeat_due: bool = False
     heartbeat_reason: str = "heartbeat disabled"
     cooldown_status: dict[str, dict[str, Any]] = field(default_factory=dict)
+    notification_scope: str = NOTIFICATION_SCOPE_GLOBAL
+    scope_value: str = NOTIFICATION_SCOPE_GLOBAL
+    migration_warnings: tuple[str, ...] = ()
 
     @property
     def decision_count(self) -> int:
@@ -99,7 +115,10 @@ def build_notification_plan(
     if instant:
         due, reason = lane_due(storage, LANE_INSTANT_ESCALATION, cfg=cfg, now=observed)
         if due:
-            remaining = max(0, cfg.max_instant_per_day - _sent_count_today(storage, LANE_INSTANT_ESCALATION, observed))
+            remaining = max(
+                0,
+                cfg.max_instant_per_day - _sent_count_today(storage, LANE_INSTANT_ESCALATION, observed, cfg),
+            )
             by_lane[LANE_INSTANT_ESCALATION] = instant[:remaining]
             if len(instant) > remaining:
                 blocked[LANE_INSTANT_ESCALATION] = f"daily instant cap reached after {remaining} item(s)"
@@ -141,6 +160,9 @@ def build_notification_plan(
         heartbeat_due=heartbeat_due,
         heartbeat_reason=heartbeat_reason,
         cooldown_status=cooldown_status_by_lane(storage, cfg=cfg, now=observed),
+        notification_scope=_clean_scope(cfg.notification_scope),
+        scope_value=_scope_value(cfg),
+        migration_warnings=legacy_meta_warnings(storage, cfg),
     )
 
 
@@ -155,17 +177,17 @@ def lane_due(
     """Check one lane's send state using lane-specific meta keys."""
     lane_key = _clean_lane(lane)
     if lane_key == LANE_TRIGGERED_FADE and cfg.triggered_fade_dedupe and alert_id:
-        if storage.get_meta(_triggered_alert_meta_key(alert_id)):
+        if storage.get_meta(_triggered_alert_meta_key(alert_id, cfg)):
             return False, f"triggered fade already sent for {alert_id}"
         return True, "due"
     if lane_key == LANE_INSTANT_ESCALATION:
-        sent_today = _sent_count_today(storage, lane_key, now)
+        sent_today = _sent_count_today(storage, lane_key, now, cfg)
         if cfg.max_instant_per_day >= 0 and sent_today >= cfg.max_instant_per_day:
             return False, f"daily instant cap reached ({cfg.max_instant_per_day})"
     cooldown = _cooldown_hours(lane_key, cfg)
     if cooldown <= 0:
         return True, "due"
-    last_raw = storage.get_meta(LAST_SENT_META_KEYS[lane_key])
+    last_raw = storage.get_meta(_last_sent_meta_key(lane_key, cfg))
     last = _parse_iso(last_raw)
     if last is None:
         return True, "due"
@@ -185,12 +207,16 @@ def cooldown_status_by_lane(
     rows: dict[str, dict[str, Any]] = {}
     for lane in LANES:
         due, reason = lane_due(storage, lane, cfg=cfg, now=observed)
+        legacy_key = LAST_SENT_META_KEYS[lane]
         rows[lane] = {
             "due": due,
             "reason": reason,
-            "last_sent_at": storage.get_meta(LAST_SENT_META_KEYS[lane]),
-            "sent_today": _sent_count_today(storage, lane, observed),
-            "meta_key": LAST_SENT_META_KEYS[lane],
+            "last_sent_at": storage.get_meta(_last_sent_meta_key(lane, cfg)),
+            "sent_today": _sent_count_today(storage, lane, observed, cfg),
+            "meta_key": _last_sent_meta_key(lane, cfg),
+            "count_meta_key": _count_meta_key(lane, observed, cfg),
+            "legacy_meta_key": legacy_key,
+            "legacy_last_sent_at": storage.get_meta(legacy_key),
         }
     return rows
 
@@ -202,14 +228,16 @@ def record_lane_sent(
     item_count: int,
     now: datetime,
     alert_ids: Iterable[str] = (),
+    cfg: EventAlphaNotificationConfig | None = None,
 ) -> None:
+    cfg = cfg or EventAlphaNotificationConfig()
     lane_key = _clean_lane(lane)
-    storage.set_meta(LAST_SENT_META_KEYS[lane_key], now.isoformat())
-    count_key = _count_meta_key(lane_key, now)
-    storage.set_meta(count_key, str(_sent_count_today(storage, lane_key, now) + max(0, int(item_count or 0))))
+    storage.set_meta(_last_sent_meta_key(lane_key, cfg), now.isoformat())
+    count_key = _count_meta_key(lane_key, now, cfg)
+    storage.set_meta(count_key, str(_sent_count_today(storage, lane_key, now, cfg) + max(0, int(item_count or 0))))
     if lane_key == LANE_TRIGGERED_FADE:
         for alert_id in alert_ids:
-            storage.set_meta(_triggered_alert_meta_key(alert_id), now.isoformat())
+            storage.set_meta(_triggered_alert_meta_key(alert_id, cfg), now.isoformat())
 
 
 def send_notifications(
@@ -245,6 +273,10 @@ def send_notifications(
             lane_items_attempted=lane_attempts,
             lane_items_delivered={lane: 0 for lane in LANES},
             would_send_items=would_send,
+            heartbeat_due=plan.heartbeat_due,
+            cooldown_blocks=dict(plan.blocked_by_lane),
+            notification_scope=plan.notification_scope,
+            notification_scope_value=plan.scope_value,
         )
     if cfg.mode != "research_only":
         return event_alpha_pipeline.EventAlphaSendResult(
@@ -256,6 +288,10 @@ def send_notifications(
             lane_items_attempted=lane_attempts,
             lane_items_delivered={lane: 0 for lane in LANES},
             would_send_items=would_send,
+            heartbeat_due=plan.heartbeat_due,
+            cooldown_blocks=dict(plan.blocked_by_lane),
+            notification_scope=plan.notification_scope,
+            notification_scope_value=plan.scope_value,
         )
     if would_send <= 0:
         reason = "; ".join(plan.blocked_by_lane.values()) or plan.heartbeat_reason or "no due notifications"
@@ -268,6 +304,10 @@ def send_notifications(
             lane_items_attempted=lane_attempts,
             lane_items_delivered={lane: 0 for lane in LANES},
             would_send_items=0,
+            heartbeat_due=plan.heartbeat_due,
+            cooldown_blocks=dict(plan.blocked_by_lane),
+            notification_scope=plan.notification_scope,
+            notification_scope_value=plan.scope_value,
         )
 
     delivered_by_lane = {lane: 0 for lane in LANES}
@@ -292,6 +332,7 @@ def send_notifications(
                 item_count=len(items),
                 now=observed,
                 alert_ids=[decision.alert_id for decision in items],
+                cfg=cfg,
             )
         else:
             block_reasons.append(f"{lane}: no channel delivered")
@@ -299,7 +340,7 @@ def send_notifications(
         attempted = True
         if send_fn(format_health_heartbeat(profile=profile, result=pipeline_result, now=observed)):
             delivered_by_lane[LANE_HEALTH_HEARTBEAT] = 1
-            record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed)
+            record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed, cfg=cfg)
         else:
             block_reasons.append("health_heartbeat: no channel delivered")
 
@@ -314,8 +355,23 @@ def send_notifications(
         lane_items_attempted=lane_attempts,
         lane_items_delivered=delivered_by_lane,
         would_send_items=would_send,
+        heartbeat_due=plan.heartbeat_due,
         heartbeat_sent=delivered_by_lane[LANE_HEALTH_HEARTBEAT] > 0,
+        cooldown_blocks=dict(plan.blocked_by_lane),
+        notification_scope=plan.notification_scope,
+        notification_scope_value=plan.scope_value,
     )
+
+
+def legacy_meta_warnings(storage: Any, cfg: EventAlphaNotificationConfig) -> tuple[str, ...]:
+    """Return migration warnings for old unscoped notification keys."""
+    if _clean_scope(cfg.notification_scope) == NOTIFICATION_SCOPE_GLOBAL:
+        return ()
+    warnings: list[str] = []
+    for lane, key in LAST_SENT_META_KEYS.items():
+        if storage.get_meta(key):
+            warnings.append(f"legacy unscoped key present for {lane}: {key}")
+    return tuple(warnings)
 
 
 def format_health_heartbeat(
@@ -328,9 +384,17 @@ def format_health_heartbeat(
     warnings = tuple(str(item) for item in getattr(result, "warnings", ()) or () if str(item))
     lines = [
         "<b>Event Alpha notification heartbeat</b>",
-        "<i>Research-only / unvalidated. Not a trade signal.</i>",
+        "<i>Research-only / DAY-1 UNVALIDATED. Not a trade signal.</i>",
+        "Validation status: DAY-1 UNVALIDATED",
+        "Trading action: NONE",
+        "Review before acting.",
         f"profile={_esc(profile or getattr(result, 'profile', None) or 'default')}",
         f"generated_at={_esc(observed.isoformat())}",
+        f"cycle_completed={_yes_no(result is not None and not getattr(result, 'failure', None))}",
+        f"partial_results={_yes_no(_provider_failure_count(warnings) > 0)}",
+        f"provider_failure_count={_provider_failure_count(warnings)}",
+        f"runtime_budget_status={'exhausted' if _runtime_budget_exhausted(warnings) else 'ok'}",
+        f"artifact_doctor_status={_esc(getattr(result, 'artifact_doctor_status', 'not_run') if result is not None else 'not_run')}",
         (
             "run_stats: "
             f"raw_events={_num(result, 'raw_events')} "
@@ -370,6 +434,8 @@ def format_preview(
         "=" * 76,
         f"profile: {profile}",
         f"artifact_namespace: {artifact_namespace}",
+        f"notification_scope: {plan.notification_scope}",
+        f"notification_scope_value: {plan.scope_value}",
         f"telegram_ready: {'yes' if telegram_ready else 'no'}",
         (
             "event_source_readiness: "
@@ -391,8 +457,14 @@ def format_preview(
             f"- {lane}: due={'yes' if status.get('due') else 'no'} "
             f"sent_today={status.get('sent_today', 0)} "
             f"last={status.get('last_sent_at') or 'never'} "
-            f"reason={status.get('reason') or 'unknown'}"
+            f"reason={status.get('reason') or 'unknown'} "
+            f"meta_key={status.get('meta_key') or 'unknown'} "
+            f"count_key={status.get('count_meta_key') or 'unknown'}"
         )
+    if plan.migration_warnings:
+        lines.append("")
+        lines.append("migration warnings:")
+        lines.extend(f"- {warning}" for warning in plan.migration_warnings)
     if plan.blocked_by_lane:
         lines.append("")
         lines.append("blocked lanes:")
@@ -429,26 +501,42 @@ def _cooldown_hours(lane: str, cfg: EventAlphaNotificationConfig) -> float:
     return 0.0
 
 
-def _sent_count_today(storage: Any, lane: str, now: datetime) -> int:
+def _sent_count_today(
+    storage: Any,
+    lane: str,
+    now: datetime,
+    cfg: EventAlphaNotificationConfig | None = None,
+) -> int:
     try:
-        return int(storage.get_meta(_count_meta_key(lane, now)) or "0")
+        return int(storage.get_meta(_count_meta_key(lane, now, cfg)) or "0")
     except (TypeError, ValueError):
         return 0
 
 
-def _count_meta_key(lane: str, now: datetime) -> str:
+def _count_meta_key(lane: str, now: datetime, cfg: EventAlphaNotificationConfig | None = None) -> str:
     suffix = {
         LANE_DAILY_DIGEST: "daily_digest",
         LANE_INSTANT_ESCALATION: "instant",
         LANE_TRIGGERED_FADE: "triggered",
         LANE_HEALTH_HEARTBEAT: "health_heartbeat",
     }[_clean_lane(lane)]
+    if cfg is not None and _clean_scope(cfg.notification_scope) != NOTIFICATION_SCOPE_GLOBAL:
+        return f"event_alpha_notify:{_scope_value(cfg)}:sent_count:{suffix}:{now.date().isoformat()}"
     return f"event_alpha_sent_count_{suffix}_{now.date().isoformat()}"
 
 
-def _triggered_alert_meta_key(alert_id: str) -> str:
+def _triggered_alert_meta_key(alert_id: str, cfg: EventAlphaNotificationConfig | None = None) -> str:
     digest = hashlib.sha1(str(alert_id).encode("utf-8")).hexdigest()[:20]
+    if cfg is not None and _clean_scope(cfg.notification_scope) != NOTIFICATION_SCOPE_GLOBAL:
+        return f"event_alpha_notify:{_scope_value(cfg)}:triggered:{digest}"
     return f"event_alpha_sent_triggered_fade_alert_{digest}"
+
+
+def _last_sent_meta_key(lane: str, cfg: EventAlphaNotificationConfig) -> str:
+    lane_key = _clean_lane(lane)
+    if _clean_scope(cfg.notification_scope) == NOTIFICATION_SCOPE_GLOBAL:
+        return LAST_SENT_META_KEYS[lane_key]
+    return f"event_alpha_notify:{_scope_value(cfg)}:last_sent:{lane_key}"
 
 
 def _clean_lane(lane: str) -> str:
@@ -456,6 +544,26 @@ def _clean_lane(lane: str) -> str:
     if value not in LAST_SENT_META_KEYS:
         raise ValueError(f"unknown Event Alpha notification lane: {lane!r}")
     return value
+
+
+def _clean_scope(scope: str) -> str:
+    value = str(scope or "").strip().lower()
+    return value if value in NOTIFICATION_SCOPES else NOTIFICATION_SCOPE_GLOBAL
+
+
+def _scope_value(cfg: EventAlphaNotificationConfig) -> str:
+    scope = _clean_scope(cfg.notification_scope)
+    if scope == NOTIFICATION_SCOPE_GLOBAL:
+        return NOTIFICATION_SCOPE_GLOBAL
+    if scope == NOTIFICATION_SCOPE_PROFILE:
+        return _clean_token(cfg.profile_name or cfg.artifact_namespace or "default")
+    return _clean_token(cfg.artifact_namespace or cfg.profile_name or "default")
+
+
+def _clean_token(value: object) -> str:
+    text = str(value or "").strip().lower()
+    text = re.sub(r"[^a-z0-9_.-]+", "_", text).strip("._-")
+    return text or "default"
 
 
 def _parse_iso(value: object) -> datetime | None:
@@ -482,3 +590,16 @@ def _num(result: Any | None, attr: str) -> int:
         return int(getattr(result, attr, 0) or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _yes_no(value: bool) -> str:
+    return "yes" if value else "no"
+
+
+def _provider_failure_count(warnings: Iterable[str]) -> int:
+    tokens = ("failed", "failure", "backoff", "rate limit", "timeout", "dns", "429")
+    return sum(1 for warning in warnings if any(token in warning.casefold() for token in tokens))
+
+
+def _runtime_budget_exhausted(warnings: Iterable[str]) -> bool:
+    return any("notification_runtime_budget_exhausted" in warning for warning in warnings)

@@ -46,6 +46,7 @@ def run_preflight(
     paths = {
         "run_ledger_path": context.run_ledger_path,
         "alert_store_path": context.alert_store_path,
+        "notification_runs_path": context.notification_runs_path,
         "watchlist_state_path": context.watchlist_state_path,
         "feedback_path": context.feedback_path,
         "missed_path": context.missed_path,

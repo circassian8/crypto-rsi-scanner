@@ -33,6 +33,7 @@ class EventAlphaArtifactContext:
     namespace_dir: Path
     run_ledger_path: Path
     alert_store_path: Path
+    notification_runs_path: Path
     watchlist_state_path: Path
     feedback_path: Path
     missed_path: Path
@@ -89,6 +90,11 @@ def context_from_profile(
         alert_store_path=_path_override(
             "RSI_EVENT_ALPHA_ALERT_STORE_PATH",
             namespace_dir / "event_alpha_alerts.jsonl",
+            data_dir=config.DATA_DIR,
+        ),
+        notification_runs_path=_path_override(
+            "RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH",
+            namespace_dir / "event_alpha_notification_runs.jsonl",
             data_dir=config.DATA_DIR,
         ),
         watchlist_state_path=_path_override(

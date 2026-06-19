@@ -24,6 +24,7 @@ Then run the no-key startup path:
 
 ```bash
 make event-alpha-preflight PROFILE=notify_no_key
+make event-alpha-notification-checklist PROFILE=notify_no_key
 make event-alpha-send-test PROFILE=notify_no_key
 make event-alpha-notify-preview PROFILE=notify_no_key
 make event-alpha-notify-no-key
@@ -40,6 +41,34 @@ instant escalation, and instant escalation cooldown does not block a
 deterministic proxy-fade `TRIGGERED_FADE`. Triggered-fade notifications dedupe
 by stable alert id. Health heartbeat delivery is once per day by default and
 can report a no-alert run.
+
+Notification delivery state is scoped by profile namespace for `notify_no_key`,
+`notify_llm`, and `research_send`. Scoped keys look like
+`event_alpha_notify:notify_no_key:last_sent:daily_digest` and
+`event_alpha_notify:notify_no_key:sent_count:instant:YYYY-MM-DD`, so a no-key
+digest or instant cap cannot block the LLM or research-send profile. Legacy
+unscoped keys are left in place for migration review and are still used only by
+the explicit `global` notification scope.
+
+Before the first actual send, run the startup checklist:
+
+```bash
+make event-alpha-notification-checklist PROFILE=notify_no_key
+make event-alpha-notification-runs-report PROFILE=notify_no_key
+```
+
+The checklist reports `READY_TO_NOTIFY_NOW`, blockers, warnings, source
+readiness, provider backoff, cooldown meta keys, LLM budget, artifact doctor
+status, and the next commands. Notification cycles also append
+`event_alpha_notification_runs.jsonl` summary rows with due/sent lane counts,
+heartbeat state, would-send counts, cooldown blocks, provider fail-fast blocks,
+runtime-budget status, Telegram readiness, and send-guard state.
+
+Notification profiles use a conservative runtime budget and provider behavior:
+120 seconds max runtime, 5 second provider timeouts, one provider failure before
+skip/backoff, DNS fail-fast, and partial-result continuation. If the runtime
+budget is exhausted, the cycle records `notification_runtime_budget_exhausted`,
+preserves partial results, and still writes heartbeat/run-summary artifacts.
 
 Without `RSI_EVENT_ALERTS_ENABLED=1`, `make event-alpha-notify-no-key` and
 `make event-alpha-notify-llm` still run the radar, write research artifacts, and

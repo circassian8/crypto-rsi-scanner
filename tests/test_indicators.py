@@ -7379,6 +7379,123 @@ def test_event_alpha_notification_lane_state_is_independent_and_dedupes_triggere
     assert "already sent" in deduped.blocked_by_lane[event_alpha_notifications.LANE_TRIGGERED_FADE]
 
 
+def test_event_alpha_notification_state_is_profile_namespace_scoped():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router
+
+    class FakeStorage:
+        def __init__(self):
+            self.meta = {}
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+    storage = FakeStorage()
+    now = datetime(2026, 6, 19, 10, 0, tzinfo=timezone.utc)
+    no_key_cfg = event_alpha_notifications.EventAlphaNotificationConfig(
+        enabled=True,
+        notification_scope="namespace",
+        profile_name="notify_no_key",
+        artifact_namespace="notify_no_key",
+        max_instant_per_day=1,
+    )
+    llm_cfg = event_alpha_notifications.EventAlphaNotificationConfig(
+        enabled=True,
+        notification_scope="namespace",
+        profile_name="notify_llm",
+        artifact_namespace="notify_llm",
+        max_instant_per_day=1,
+    )
+    research_cfg = event_alpha_notifications.EventAlphaNotificationConfig(
+        enabled=True,
+        notification_scope="namespace",
+        profile_name="research_send",
+        artifact_namespace="research_send",
+        max_instant_per_day=1,
+    )
+
+    event_alpha_notifications.record_lane_sent(
+        storage,
+        event_alpha_notifications.LANE_DAILY_DIGEST,
+        item_count=1,
+        now=now,
+        cfg=no_key_cfg,
+    )
+    event_alpha_notifications.record_lane_sent(
+        storage,
+        event_alpha_notifications.LANE_INSTANT_ESCALATION,
+        item_count=1,
+        now=now,
+        cfg=no_key_cfg,
+    )
+    event_alpha_notifications.record_lane_sent(
+        storage,
+        event_alpha_notifications.LANE_TRIGGERED_FADE,
+        item_count=1,
+        now=now,
+        alert_ids=["ea:scoped"],
+        cfg=no_key_cfg,
+    )
+    decision_daily = SimpleNamespace(
+        alertable=True,
+        lane=event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+        alert_id="ea:daily",
+    )
+    decision_instant = SimpleNamespace(
+        alertable=True,
+        lane=event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION,
+        alert_id="ea:instant",
+    )
+    decision_triggered = SimpleNamespace(
+        alertable=True,
+        lane=event_alpha_router.EventAlphaRouteLane.TRIGGERED_FADE,
+        alert_id="ea:scoped",
+    )
+    llm_plan = event_alpha_notifications.build_notification_plan(
+        [decision_daily, decision_triggered],
+        storage=storage,
+        cfg=llm_cfg,
+        now=now,
+    )
+    assert llm_plan.decisions_by_lane[event_alpha_notifications.LANE_DAILY_DIGEST][0].alert_id == "ea:daily"
+    assert llm_plan.decisions_by_lane[event_alpha_notifications.LANE_TRIGGERED_FADE][0].alert_id == "ea:scoped"
+    assert llm_plan.scope_value == "notify_llm"
+
+    research_plan = event_alpha_notifications.build_notification_plan(
+        [decision_instant],
+        storage=storage,
+        cfg=research_cfg,
+        now=now,
+    )
+    assert research_plan.decisions_by_lane[event_alpha_notifications.LANE_INSTANT_ESCALATION][0].alert_id == "ea:instant"
+    preview = event_alpha_notifications.format_preview(
+        profile="notify_llm",
+        artifact_namespace="notify_llm",
+        telegram_ready=False,
+        provider_ready_event_sources=1,
+        provider_ready_enrichment_sources=1,
+        llm_budget_status="fixture",
+        plan=llm_plan,
+        card_auto_write=True,
+    )
+    assert "notification_scope: namespace" in preview
+    assert "event_alpha_notify:notify_llm:last_sent:daily_digest" in preview
+
+    global_cfg = event_alpha_notifications.EventAlphaNotificationConfig(enabled=True, notification_scope="global")
+    event_alpha_notifications.record_lane_sent(
+        storage,
+        event_alpha_notifications.LANE_DAILY_DIGEST,
+        item_count=1,
+        now=now,
+        cfg=global_cfg,
+    )
+    assert storage.meta[event_alpha_notifications.LAST_SENT_META_KEYS[event_alpha_notifications.LANE_DAILY_DIGEST]]
+
+
 def test_event_alpha_routed_notification_message_is_research_only_and_reviewable():
     from crypto_rsi_scanner import event_alpha_router, event_playbooks, event_watchlist
 
@@ -7423,7 +7540,10 @@ def test_event_alpha_routed_notification_message_is_research_only_and_reviewable
         profile="notify_no_key",
         card_path_by_alert_id={decision.alert_id: "/tmp/card.md"},
     )
-    assert "Research-only / unvalidated" in message
+    assert "Research-only / DAY-1 UNVALIDATED" in message
+    assert "Validation status: DAY-1 UNVALIDATED" in message
+    assert "Trading action: NONE" in message
+    assert "Review before acting" in message
     assert "Not a trade signal" in message
     assert "alert_id=ea:spacex|solana|proxy_attention" in message
     assert "playbook=proxy_attention" in message
@@ -7476,6 +7596,153 @@ def test_event_alpha_notification_disabled_records_would_send_and_heartbeat():
     assert result.lane_items_attempted[event_alpha_notifications.LANE_INSTANT_ESCALATION] == 1
     assert result.lane_items_attempted[event_alpha_notifications.LANE_HEALTH_HEARTBEAT] == 1
     assert sent == []
+
+
+def test_event_alpha_notification_runs_and_checklist_report_guard_state():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import (
+        event_alpha_notification_checklist,
+        event_alpha_notification_runs,
+        event_alpha_notifications,
+        event_provider_status,
+    )
+
+    now = datetime(2026, 6, 19, 11, 0, tzinfo=timezone.utc)
+    plan = event_alpha_notifications.EventAlphaNotificationPlan(
+        heartbeat_due=True,
+        cooldown_status=event_alpha_notifications.cooldown_status_by_lane(
+            SimpleNamespace(get_meta=lambda key: None),
+            cfg=event_alpha_notifications.EventAlphaNotificationConfig(
+                notification_scope="namespace",
+                artifact_namespace="notify_no_key",
+            ),
+            now=now,
+        ),
+        notification_scope="namespace",
+        scope_value="notify_no_key",
+    )
+    status = event_provider_status.EventDiscoveryProviderStatus(
+        mode="configured",
+        cache_dir="cache",
+        lookback_hours=24,
+        horizon_days=7,
+        sources=(),
+        enrichment=(),
+        warnings=(),
+        next_steps=(),
+    )
+    checklist = event_alpha_notification_checklist.build_notification_checklist(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        send_guard_enabled=False,
+        telegram_ready=False,
+        provider_status=status,
+        provider_health_rows={},
+        plan=plan,
+        llm_budget_status="provider=fixture/fixture",
+        card_auto_write=True,
+        artifact_doctor_status="WARN",
+    )
+    text = event_alpha_notification_checklist.format_notification_checklist(checklist)
+    assert "READY_TO_NOTIFY_NOW: no" in text
+    assert "actual notify requires RSI_EVENT_ALERTS_ENABLED=1" in text
+    assert "no ready event sources" in text
+    assert "Trading action: NONE" in text
+    assert "event_alpha_notify:notify_no_key:last_sent:daily_digest" in text
+
+    llm_checklist = event_alpha_notification_checklist.build_notification_checklist(
+        profile="notify_llm",
+        artifact_namespace="notify_llm",
+        send_guard_enabled=True,
+        telegram_ready=True,
+        provider_status=status,
+        provider_health_rows={},
+        plan=plan,
+        llm_budget_status="provider=openai/openai",
+        card_auto_write=True,
+        artifact_doctor_status="WARN",
+        preflight_blockers=("OpenAI LLM profile/provider requires OPENAI_API_KEY",),
+    )
+    llm_text = event_alpha_notification_checklist.format_notification_checklist(llm_checklist)
+    assert "use PROFILE=notify_no_key until OPENAI_API_KEY is configured" in llm_text
+
+    result = SimpleNamespace(
+        run_id="run-1",
+        run_mode="notification_burn_in",
+        artifact_namespace="notify_no_key",
+        send_lane_items_attempted={"instant_escalation": 1, "health_heartbeat": 1},
+        send_lane_items_delivered={"instant_escalation": 0, "health_heartbeat": 0},
+        send_heartbeat_due=True,
+        send_heartbeat_sent=False,
+        send_would_send_items=2,
+        send_block_reason="event alerts disabled",
+        send_cooldown_blocks={"daily_digest": "cooldown active"},
+        notification_scope="namespace",
+        notification_scope_value="notify_no_key",
+        warnings=("rss failed: DNS", "notification_runtime_budget_exhausted"),
+    )
+    row = event_alpha_notification_runs.notification_run_record(
+        result,
+        profile="notify_no_key",
+        started_at=now,
+        finished_at=now,
+        telegram_ready=False,
+        send_guard_enabled=False,
+        plan=plan,
+        provider_health_rows={"rss:event_source": {"provider_key": "rss:event_source", "disabled_until": "2026-06-19T12:00:00+00:00"}},
+    )
+    assert row["would_send_count"] == 2
+    assert row["heartbeat_due"] is True
+    assert row["runtime_budget_exhausted"] is True
+    report = event_alpha_notification_runs.format_notification_runs_report(
+        event_alpha_notification_runs.EventAlphaNotificationRunsReadResult(path=__import__("pathlib").Path("/tmp/runs.jsonl"), rows_read=1, rows=[row])
+    )
+    assert "provider_fail_fast_blocks" in report
+    assert "trading action is NONE" in report
+
+
+def test_event_alpha_notification_provider_fail_fast_defaults():
+    from urllib.error import URLError
+    from crypto_rsi_scanner import config
+    from crypto_rsi_scanner.client import CoinGeckoClient
+    from crypto_rsi_scanner.event_providers.project_blog_rss import ProjectBlogRssProvider
+
+    calls = []
+
+    def failing_opener(request, timeout):
+        calls.append((request.full_url, timeout))
+        raise URLError("DNS temporary failure in name resolution")
+
+    provider = ProjectBlogRssProvider(
+        None,
+        live_enabled=True,
+        feed_urls=("https://one.invalid/rss", "https://two.invalid/rss"),
+        timeout=5,
+        fail_fast_on_error=True,
+        opener=failing_opener,
+    )
+    assert provider.fetch_events(
+        __import__("datetime").datetime(2026, 6, 19, tzinfo=__import__("datetime").timezone.utc),
+        __import__("datetime").datetime(2026, 6, 20, tzinfo=__import__("datetime").timezone.utc),
+    ) == []
+    assert len(calls) == 1
+    assert any("skipped remaining feeds" in warning for warning in provider.last_warnings)
+
+    original_mode = config.EVENT_ALPHA_RUN_MODE
+    original_timeout = config.EVENT_ALPHA_NOTIFY_PROVIDER_TIMEOUT_SECONDS
+    original_fast_fail = config.EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS
+    try:
+        config.EVENT_ALPHA_RUN_MODE = "notification_burn_in"
+        config.EVENT_ALPHA_NOTIFY_PROVIDER_TIMEOUT_SECONDS = 4
+        config.EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS = True
+        client = CoinGeckoClient()
+        assert client.timeout_seconds == 4
+        assert client.max_retries == 1
+    finally:
+        config.EVENT_ALPHA_RUN_MODE = original_mode
+        config.EVENT_ALPHA_NOTIFY_PROVIDER_TIMEOUT_SECONDS = original_timeout
+        config.EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS = original_fast_fail
 
 
 def test_event_alpha_send_test_refuses_without_guard_and_does_not_send():
@@ -8280,6 +8547,10 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event-alpha-notify-no-key:" in text
     assert "event-alpha-notify-llm:" in text
     assert "event-alpha-notify-preview:" in text
+    assert "event-alpha-notification-checklist:" in text
+    assert "event-alpha-notification-runs-report:" in text
+    assert "event-alpha-notify-start-no-key:" in text
+    assert "event-alpha-notify-start-llm:" in text
     assert "event-alpha-send-test:" in text
     assert "event-alpha-runs-report:" in text
     assert "event-alpha-status:" in text
@@ -15438,9 +15709,20 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
         now=now,
     )
     readiness_text = event_alpha_v1_readiness.format_v1_readiness_report(readiness)
-    assert "READY_FOR_RESEARCH_SEND: yes" in readiness_text
+    assert "READY_FOR_CALIBRATED_RESEARCH_SEND: yes" in readiness_text
     assert "READY_FOR_FULL_LLM_LIVE: yes" in readiness_text
     assert "profile matrix:" in readiness_text
+
+    day1 = event_alpha_v1_readiness.build_v1_readiness(
+        run_rows=[],
+        provider_health_rows={},
+        now=now,
+        profiles=("notify_no_key", "research_send"),
+    )
+    day1_text = event_alpha_v1_readiness.format_v1_readiness_report(day1)
+    assert "READY_TO_START_DAY1_NOTIFICATIONS: yes" in day1_text
+    assert "READY_FOR_CALIBRATED_RESEARCH_SEND: no" in day1_text
+    assert "Day-1 notifications are unvalidated research output" in day1_text
 
     guard = event_alpha_health_guard.evaluate_health_guard(
         run_rows=run_rows,
@@ -15541,6 +15823,8 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "--event-alpha-preflight" in text
     assert "--event-alpha-notify-cycle --event-alpha-profile $(PROFILE) --event-alert-send" in text
     assert "--event-alpha-notify-preview --event-alpha-profile $(PROFILE)" in text
+    assert "--event-alpha-notification-checklist --event-alpha-profile $(PROFILE)" in text
+    assert "--event-alpha-notification-runs-report" in text
     assert "--event-alpha-send-test --event-alpha-profile $(PROFILE)" in text
     assert "--event-alpha-tuning-worksheet" in text
     assert "--event-alpha-export-burn-in-pack" in text
@@ -15571,6 +15855,14 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
         check=True,
     ).stdout
     assert "--event-alpha-preflight --event-alpha-profile no_key_live" in preflight
+
+    checklist = subprocess.run(
+        ["make", "-n", "event-alpha-notification-checklist", "PROFILE=notify_no_key", "PYTHON=python3"],
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout
+    assert "--event-alpha-notification-checklist --event-alpha-profile notify_no_key" in checklist
 
 
 def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):

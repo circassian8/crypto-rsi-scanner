@@ -248,7 +248,10 @@ def _run_record(
         "send_would_send_items": _int(getattr(result, "send_would_send_items", 0)),
         "send_lane_items_attempted": dict(getattr(result, "send_lane_items_attempted", {}) or {}),
         "send_lane_items_delivered": dict(getattr(result, "send_lane_items_delivered", {}) or {}),
+        "send_heartbeat_due": bool(getattr(result, "send_heartbeat_due", False)),
         "send_heartbeat_sent": bool(getattr(result, "send_heartbeat_sent", False)),
+        "send_cooldown_blocks": dict(getattr(result, "send_cooldown_blocks", {}) or {}),
+        "notification_summary": _notification_summary(result, profile=profile, notify_burn=notify_burn),
         "send_block_reason": getattr(result, "send_block_reason", None),
         "sent": bool(getattr(result, "send_success", False)),
         "snapshot_write_attempted": bool(getattr(result, "snapshot_write_attempted", False)),
@@ -273,6 +276,31 @@ def _run_record(
         "warnings": tuple(dict.fromkeys(str(warning) for warning in warnings if str(warning))),
         "success": bool(success),
         "failure": failure,
+}
+
+
+def _notification_summary(result: Any, *, profile: str | None, notify_burn: bool) -> dict[str, Any]:
+    lane_due = dict(getattr(result, "send_lane_items_attempted", {}) or {})
+    lane_sent = dict(getattr(result, "send_lane_items_delivered", {}) or {})
+    warnings = tuple(str(warning) for warning in getattr(result, "warnings", ()) or () if str(warning))
+    provider_blocks = tuple(
+        warning for warning in warnings
+        if any(token in warning.casefold() for token in ("backoff", "failed", "failure", "timeout", "dns", "429"))
+    )
+    return {
+        "notification_profile": profile or getattr(result, "profile", None) or "default",
+        "notification_burn_in": bool(notify_burn),
+        "scope": getattr(result, "notification_scope", None),
+        "scope_value": getattr(result, "notification_scope_value", None),
+        "lane_counts_due": lane_due,
+        "lane_counts_sent": lane_sent,
+        "heartbeat_due": bool(getattr(result, "send_heartbeat_due", False)),
+        "heartbeat_sent": bool(getattr(result, "send_heartbeat_sent", False)),
+        "would_send_count": _int(getattr(result, "send_would_send_items", 0)),
+        "block_reason": getattr(result, "send_block_reason", None),
+        "cooldown_blocks": dict(getattr(result, "send_cooldown_blocks", {}) or {}),
+        "provider_fail_fast_blocks": provider_blocks,
+        "runtime_budget_exhausted": any("notification_runtime_budget_exhausted" in warning for warning in warnings),
     }
 
 

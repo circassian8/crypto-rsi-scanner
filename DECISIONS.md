@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-19 - Scope Event Alpha notification state by burn-in namespace
+**Status:** accepted
+**Decision:** Day-1 Event Alpha notification state for `notify_no_key`,
+`notify_llm`, and `research_send` is namespace-scoped by default. Lane
+cooldowns, daily instant counts, heartbeat cooldowns, and triggered-fade
+dedupe use scoped metadata keys, while the explicit `global` scope preserves
+legacy unscoped behavior for migration review. Notification cycles may
+fail-fast unhealthy providers, preserve partial results, and write compact
+notification-run summaries, but they remain research-only and day-1
+unvalidated. `TRIGGERED_FADE` still requires deterministic `event_fade.py`
+output on `proxy_fade`; LLM output cannot create it.
+**Why:** The owner wants immediate notifications from separate burn-in
+profiles without one profile suppressing another or unhealthy public sources
+stalling the whole cycle.
+**Revisit when:** Reviewed notification artifacts justify promoting one
+profile into calibrated research send with different delivery rules.
+
 ## 2026-06-19 - Allow day-1 Event Alpha notifications without trading trust
 **Status:** accepted
 **Decision:** Event Alpha may send clearly labeled day-1 research
