@@ -14,6 +14,7 @@ class EventAlphaV1ProfileReadiness:
     profile: str
     successful_runs: int
     latest_run_at: str | None
+    ready_for_day1_notifications: bool
     ready_for_research_send: bool
     ready_for_full_llm_live: bool
     ready_for_scheduled_burn_in: bool
@@ -25,6 +26,7 @@ class EventAlphaV1ProfileReadiness:
 @dataclass(frozen=True)
 class EventAlphaV1ReadinessResult:
     generated_at: str
+    ready_for_day1_notifications: bool
     ready_for_research_send: bool
     ready_for_full_llm_live: bool
     ready_for_scheduled_burn_in: bool
@@ -94,7 +96,7 @@ def build_v1_readiness(
         for row in run_rows
         if isinstance(row, Mapping)
     )
-    profile_names = tuple(profiles or ("no_key_live", "research_send", "full_llm_live"))
+    profile_names = tuple(profiles or ("notify_no_key", "notify_llm", "no_key_live", "research_send", "full_llm_live"))
     profile_rows: list[EventAlphaV1ProfileReadiness] = []
     for profile_name in profile_names:
         profile_rows.append(_profile_readiness(
@@ -114,6 +116,7 @@ def build_v1_readiness(
             include_legacy_artifacts=include_legacy_artifacts,
         ))
 
+    ready_day1 = any(row.ready_for_day1_notifications for row in profile_rows)
     ready_send = any(row.ready_for_research_send for row in profile_rows)
     ready_llm = any(row.profile == "full_llm_live" and row.ready_for_full_llm_live for row in profile_rows)
     ready_burn_in = any(row.ready_for_scheduled_burn_in for row in profile_rows)
@@ -135,6 +138,7 @@ def build_v1_readiness(
         commands.append("make event-alpha-health-guard PROFILE=no_key_live")
     return EventAlphaV1ReadinessResult(
         generated_at=observed.isoformat(),
+        ready_for_day1_notifications=ready_day1,
         ready_for_research_send=ready_send,
         ready_for_full_llm_live=ready_llm,
         ready_for_scheduled_burn_in=ready_burn_in,
@@ -151,15 +155,20 @@ def format_v1_readiness_report(result: EventAlphaV1ReadinessResult) -> str:
         "EVENT ALPHA V1 READINESS (research-only)",
         "=" * 76,
         f"generated_at: {result.generated_at}",
+        f"READY_FOR_DAY1_NOTIFICATIONS: {_yes_no(result.ready_for_day1_notifications)}",
+        f"READY_FOR_CALIBRATED_RESEARCH_SEND: {_yes_no(result.ready_for_research_send)}",
         f"READY_FOR_RESEARCH_SEND: {_yes_no(result.ready_for_research_send)}",
         f"READY_FOR_FULL_LLM_LIVE: {_yes_no(result.ready_for_full_llm_live)}",
         f"READY_FOR_SCHEDULED_BURN_IN: {_yes_no(result.ready_for_scheduled_burn_in)}",
+        "READY_FOR_TRADING: no (out of scope)",
+        "Day-1 notifications are unvalidated research output; calibrated research send still requires burn-in evidence.",
         "",
         "profile matrix:",
     ]
     for row in result.profiles:
         lines.append(
             f"- {row.profile}: runs={row.successful_runs} latest={row.latest_run_at or 'none'} "
+            f"day1_notifications={_yes_no(row.ready_for_day1_notifications)} "
             f"research_send={_yes_no(row.ready_for_research_send)} "
             f"full_llm_live={_yes_no(row.ready_for_full_llm_live)} "
             f"scheduled_burn_in={_yes_no(row.ready_for_scheduled_burn_in)}"
@@ -228,6 +237,7 @@ def _profile_readiness(
     blockers = list(checklist.blockers)
     blockers.extend(provider_blockers)
     scheduled_ready = bool(matching_runs) and not provider_blockers
+    day1_ready = profile_name in {"notify_no_key", "notify_llm"} and scheduled_ready
     research_send_ready = profile_name == "research_send" and checklist.ready_for_research_send and scheduled_ready
     full_llm_ready = (
         profile_name == "full_llm_live"
@@ -244,6 +254,7 @@ def _profile_readiness(
         profile=profile_name,
         successful_runs=len(matching_runs),
         latest_run_at=latest,
+        ready_for_day1_notifications=day1_ready,
         ready_for_research_send=research_send_ready,
         ready_for_full_llm_live=full_llm_ready,
         ready_for_scheduled_burn_in=scheduled_ready,
@@ -259,6 +270,16 @@ def _commands_for_profile(
     full_llm_ready: bool,
     scheduled_ready: bool,
 ) -> tuple[str, ...]:
+    if profile == "notify_no_key":
+        return ("make event-alpha-notify-no-key",) if scheduled_ready else (
+            "make event-alpha-preflight PROFILE=notify_no_key",
+            "make event-alpha-notify-preview PROFILE=notify_no_key",
+        )
+    if profile == "notify_llm":
+        return ("make event-alpha-notify-llm",) if scheduled_ready else (
+            "make event-alpha-preflight PROFILE=notify_llm",
+            "make event-alpha-notify-preview PROFILE=notify_llm",
+        )
     if profile == "research_send":
         return ("RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-daily-send PROFILE=research_send",) if research_send_ready else (
             "make event-alpha-burn-in-checklist",

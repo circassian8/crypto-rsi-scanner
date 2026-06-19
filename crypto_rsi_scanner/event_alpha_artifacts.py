@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
-RUN_MODES = ("test", "fixture", "replay", "burn_in", "operational")
+RUN_MODES = ("test", "fixture", "replay", "burn_in", "notification_burn_in", "operational")
 NON_OPERATIONAL_RUN_MODES = {"test", "fixture", "replay"}
 LIVE_BURN_IN_PROFILES = {"no_key_live", "no_key_llm", "api_live", "full_llm_live"}
+NOTIFICATION_BURN_IN_PROFILES = {"notify_no_key", "notify_llm"}
 OPERATIONAL_PROFILES = {"research_send"}
 LEGACY_NAMESPACE = "legacy"
 SNAPSHOT_AVAILABLE = "available"
@@ -243,6 +244,8 @@ def _default_run_mode(profile: str) -> str:
         return "fixture"
     if profile == "replay":
         return "replay"
+    if profile in NOTIFICATION_BURN_IN_PROFILES:
+        return "notification_burn_in"
     if profile in OPERATIONAL_PROFILES:
         return "operational"
     if profile in LIVE_BURN_IN_PROFILES:

@@ -7190,7 +7190,10 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
         assert "HIGH_PRIORITY_RESEARCH" in sent[0][0]
         assert "HIGH" in sent[0][0]
         assert "DUP" not in sent[0][0]
-        assert FakeStorage.meta.get("event_alert_last_digest_items") == "1"
+        assert any(
+            key.startswith("event_alpha_sent_count_instant_") and value == "1"
+            for key, value in FakeStorage.meta.items()
+        )
 
         FakeStorage.meta = {}
         scanner.send_telegram = lambda message, *, parse_mode=None, chat_ids=None: False
@@ -7199,7 +7202,7 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
         assert failed.success is False
         assert failed.items_attempted == 1
         assert failed.items_delivered == 0
-        assert failed.block_reason == "no channel delivered"
+        assert "no channel delivered" in failed.block_reason
         disabled = scanner._send_event_alpha_routed_digest([high], event_alerts.EventAlertConfig(enabled=False))
         assert disabled.requested is True
         assert disabled.attempted is False
@@ -7208,6 +7211,311 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
         scanner.Storage = original_storage
         scanner.send_telegram = original_send
         config.TELEGRAM_CHAT_IDS = original_ids
+
+
+def test_event_alpha_notification_profiles_and_preflight_guards():
+    import contextlib
+    import io
+    import os
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, event_alpha_artifacts, event_alpha_profiles, scanner
+
+    no_key = event_alpha_profiles.get_profile("notify_no_key")
+    assert no_key.notification_burn_in is True
+    assert no_key.with_llm is False
+    assert no_key.config_overrides["EVENT_DISCOVERY_GDELT_LIVE"] is True
+    assert no_key.config_overrides["EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE"] is True
+    assert no_key.config_overrides["EVENT_ALPHA_ROUTER_ENABLED"] is True
+    assert no_key.config_overrides["EVENT_RESEARCH_CARDS_AUTO_WRITE"] is True
+    assert no_key.config_overrides["EVENT_LLM_PROVIDER"] == "fixture"
+    assert no_key.config_overrides["EVENT_ALPHA_RUN_MODE"] == "notification_burn_in"
+    assert no_key.config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "alertable"
+
+    llm = event_alpha_profiles.get_profile("notify_llm")
+    assert llm.with_llm is True
+    assert llm.config_overrides["EVENT_LLM_PROVIDER"] == "openai"
+    assert llm.config_overrides["EVENT_LLM_EXTRACTOR_PROVIDER"] == "openai"
+    assert llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] <= 10
+    assert llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] <= 50
+    assert llm.config_overrides["EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY"] <= 1.0
+    assert llm.config_overrides["EVENT_LLM_CACHE_TTL_HOURS"] == 168
+
+    ctx = event_alpha_artifacts.context_from_profile("notify_no_key", base_dir=Path("/tmp/event-alpha-test"))
+    assert ctx.run_mode == "notification_burn_in"
+    assert ctx.artifact_namespace == "notify_no_key"
+
+    base_attrs = (
+        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "EVENT_ALPHA_RUN_MODE",
+        "EVENT_ALERTS_ENABLED",
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_CHAT_IDS",
+    )
+    profile_attrs = tuple(dict.fromkeys((*no_key.config_overrides, *llm.config_overrides)))
+    attrs = tuple(name for name in dict.fromkeys((*base_attrs, *profile_attrs)) if hasattr(config, name))
+    original = {name: getattr(config, name) for name in attrs}
+    old_key = os.environ.get("OPENAI_API_KEY")
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ.pop("OPENAI_API_KEY", None)
+            config.EVENT_ALPHA_ARTIFACT_BASE_DIR = Path(tmp)
+            config.EVENT_ALPHA_ARTIFACT_NAMESPACE = ""
+            config.EVENT_ALPHA_RUN_MODE = ""
+            config.EVENT_ALERTS_ENABLED = False
+            config.TELEGRAM_BOT_TOKEN = None
+            config.TELEGRAM_CHAT_IDS = []
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="notify_no_key")
+            text = out.getvalue()
+            assert "requires RSI_EVENT_ALERTS_ENABLED=1" in text
+            assert "requires Telegram token" in text
+
+            config.EVENT_ALERTS_ENABLED = True
+            config.TELEGRAM_BOT_TOKEN = "token"
+            config.TELEGRAM_CHAT_IDS = ["chat"]
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="notify_no_key")
+            assert "READY_TO_RUN: yes" in out.getvalue()
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="notify_llm")
+            assert "OPENAI_API_KEY" in out.getvalue()
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
+        if old_key is None:
+            os.environ.pop("OPENAI_API_KEY", None)
+        else:
+            os.environ["OPENAI_API_KEY"] = old_key
+
+
+def test_event_alpha_notification_lane_state_is_independent_and_dedupes_triggered():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router
+
+    class FakeStorage:
+        def __init__(self):
+            self.meta = {}
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+    def decision(symbol, lane, alert_id=None):
+        return SimpleNamespace(
+            alertable=True,
+            lane=lane,
+            alert_id=alert_id or f"ea:{symbol}",
+        )
+
+    storage = FakeStorage()
+    cfg = event_alpha_notifications.EventAlphaNotificationConfig(
+        enabled=True,
+        daily_digest_cooldown_hours=12,
+        instant_escalation_cooldown_hours=1,
+        max_instant_per_day=1,
+        health_heartbeat_enabled=True,
+    )
+    nine = datetime(2026, 6, 19, 9, 0, tzinfo=timezone.utc)
+    eleven = datetime(2026, 6, 19, 11, 0, tzinfo=timezone.utc)
+    event_alpha_notifications.record_lane_sent(
+        storage,
+        event_alpha_notifications.LANE_DAILY_DIGEST,
+        item_count=1,
+        now=nine,
+    )
+    plan = event_alpha_notifications.build_notification_plan(
+        [
+            decision("DIG", event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST),
+            decision("FAST", event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION),
+            decision("TRIG", event_alpha_router.EventAlphaRouteLane.TRIGGERED_FADE),
+        ],
+        storage=storage,
+        cfg=cfg,
+        now=eleven,
+    )
+    assert event_alpha_notifications.LANE_DAILY_DIGEST not in plan.decisions_by_lane
+    assert plan.decisions_by_lane[event_alpha_notifications.LANE_INSTANT_ESCALATION][0].alert_id == "ea:FAST"
+    assert plan.decisions_by_lane[event_alpha_notifications.LANE_TRIGGERED_FADE][0].alert_id == "ea:TRIG"
+
+    event_alpha_notifications.record_lane_sent(
+        storage,
+        event_alpha_notifications.LANE_INSTANT_ESCALATION,
+        item_count=1,
+        now=eleven,
+    )
+    later = datetime(2026, 6, 19, 12, 30, tzinfo=timezone.utc)
+    capped = event_alpha_notifications.build_notification_plan(
+        [decision("FAST2", event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION)],
+        storage=storage,
+        cfg=cfg,
+        now=later,
+    )
+    assert event_alpha_notifications.LANE_INSTANT_ESCALATION not in capped.decisions_by_lane
+    assert "daily instant cap" in capped.blocked_by_lane[event_alpha_notifications.LANE_INSTANT_ESCALATION]
+
+    event_alpha_notifications.record_lane_sent(
+        storage,
+        event_alpha_notifications.LANE_TRIGGERED_FADE,
+        item_count=1,
+        now=later,
+        alert_ids=["ea:TRIG"],
+    )
+    deduped = event_alpha_notifications.build_notification_plan(
+        [decision("TRIG", event_alpha_router.EventAlphaRouteLane.TRIGGERED_FADE, alert_id="ea:TRIG")],
+        storage=storage,
+        cfg=cfg,
+        now=later,
+    )
+    assert event_alpha_notifications.LANE_TRIGGERED_FADE not in deduped.decisions_by_lane
+    assert "already sent" in deduped.blocked_by_lane[event_alpha_notifications.LANE_TRIGGERED_FADE]
+
+
+def test_event_alpha_routed_notification_message_is_research_only_and_reviewable():
+    from crypto_rsi_scanner import event_alpha_router, event_playbooks, event_watchlist
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="spacex|solana|proxy_attention",
+        cluster_id="spacex|ipo_proxy|2026-06-20",
+        event_id="evt",
+        coin_id="solana",
+        symbol="SOL",
+        relationship_type="proxy_attention",
+        external_asset="SpaceX <IPO>",
+        event_time="2026-06-20T13:30:00+00:00",
+        state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        previous_state="WATCHLIST",
+        first_seen_at="2026-06-19T09:00:00+00:00",
+        last_seen_at="2026-06-19T11:00:00+00:00",
+        source_count=2,
+        highest_score=88,
+        latest_score=88,
+        latest_tier="HIGH_PRIORITY_WATCH",
+        latest_event_name="SpaceX <IPO> proxy heats up",
+        latest_source="test",
+        latest_playbook_type=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+        latest_rule_playbook_type=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+        latest_playbook_action="high_priority_watch",
+        latest_llm_asset_role="proxy_instrument",
+        latest_llm_confidence=0.86,
+        latest_market_snapshot={"price": 123.4, "return_24h": 0.12, "volume_zscore_24h": 3.2},
+        should_alert=True,
+    )
+    decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH,
+        alertable=True,
+        reason="state escalation",
+        lane=event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION,
+    )
+    message = event_alpha_router.format_routed_telegram_digest(
+        [decision],
+        profile="notify_no_key",
+        card_path_by_alert_id={decision.alert_id: "/tmp/card.md"},
+    )
+    assert "Research-only / unvalidated" in message
+    assert "Not a trade signal" in message
+    assert "alert_id=ea:spacex|solana|proxy_attention" in message
+    assert "playbook=proxy_attention" in message
+    assert "tier=HIGH_PRIORITY_WATCH" in message
+    assert "route=HIGH_PRIORITY_RESEARCH" in message
+    assert "lane=INSTANT_ESCALATION" in message
+    assert "external_catalyst=SpaceX &lt;IPO&gt;" in message
+    assert "event_time=2026-06-20T13:30:00+00:00" in message
+    assert "market=price=123.4" in message
+    assert "llm_role=proxy_instrument" in message
+    assert "research_card=/tmp/card.md" in message
+    assert "make event-feedback-useful FEEDBACK_TARGET=ea:spacex|solana|proxy_attention" in message
+    assert "<IPO> proxy" not in message
+
+
+def test_event_alpha_notification_disabled_records_would_send_and_heartbeat():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router
+
+    class FakeStorage:
+        def __init__(self):
+            self.meta = {}
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+    sent = []
+    decision = SimpleNamespace(
+        alertable=True,
+        lane=event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION,
+        alert_id="ea:fast",
+    )
+    result = event_alpha_notifications.send_notifications(
+        [decision],
+        storage=FakeStorage(),
+        cfg=event_alpha_notifications.EventAlphaNotificationConfig(enabled=False),
+        send_fn=lambda message: sent.append(message) or True,
+        now=datetime(2026, 6, 19, 11, 0, tzinfo=timezone.utc),
+        profile="notify_no_key",
+        include_health_heartbeat=True,
+    )
+    assert result.requested is True
+    assert result.attempted is False
+    assert result.block_reason == "event alerts disabled"
+    assert result.would_send_items == 2
+    assert result.lane_items_attempted[event_alpha_notifications.LANE_INSTANT_ESCALATION] == 1
+    assert result.lane_items_attempted[event_alpha_notifications.LANE_HEALTH_HEARTBEAT] == 1
+    assert sent == []
+
+
+def test_event_alpha_send_test_refuses_without_guard_and_does_not_send():
+    import contextlib
+    import io
+    from pathlib import Path
+    from crypto_rsi_scanner import config, event_alpha_profiles, scanner
+
+    base_attrs = (
+        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "EVENT_ALPHA_RUN_MODE",
+        "EVENT_ALERTS_ENABLED",
+        "EVENT_ALERT_MODE",
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_CHAT_IDS",
+    )
+    notify_profile = event_alpha_profiles.get_profile("notify_no_key")
+    attrs = tuple(name for name in dict.fromkeys((*base_attrs, *notify_profile.config_overrides)) if hasattr(config, name))
+    original = {name: getattr(config, name) for name in attrs}
+    original_send = scanner.send_telegram
+    calls = []
+    try:
+        config.EVENT_ALPHA_ARTIFACT_BASE_DIR = Path("/tmp")
+        config.EVENT_ALPHA_ARTIFACT_NAMESPACE = ""
+        config.EVENT_ALPHA_RUN_MODE = ""
+        config.EVENT_ALERTS_ENABLED = False
+        config.EVENT_ALERT_MODE = "research_only"
+        config.TELEGRAM_BOT_TOKEN = "token"
+        config.TELEGRAM_CHAT_IDS = ["chat"]
+        scanner.send_telegram = lambda *args, **kwargs: calls.append((args, kwargs)) or True
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            scanner.event_alpha_send_test(profile_name="notify_no_key")
+        assert "Refusing Event Alpha test send" in out.getvalue()
+        assert calls == []
+    finally:
+        scanner.send_telegram = original_send
+        for name, value in original.items():
+            setattr(config, name, value)
 
 
 def test_event_alpha_run_ledger_records_send_accounting():
@@ -7968,6 +8276,11 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event-alpha-cycle-search-llm:" in text
     assert "--event-catalyst-search-report" in text
     assert "event-alpha-cycle-send:" in text
+    assert "event-alpha-notify-cycle:" in text
+    assert "event-alpha-notify-no-key:" in text
+    assert "event-alpha-notify-llm:" in text
+    assert "event-alpha-notify-preview:" in text
+    assert "event-alpha-send-test:" in text
     assert "event-alpha-runs-report:" in text
     assert "event-alpha-status:" in text
     assert "event-alpha-daily-report:" in text
@@ -7981,6 +8294,7 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "--event-alpha-profile no_key_live" in text
     assert "--event-alpha-profile full_llm_live" in text
     assert "--event-alpha-profile research_send --event-alert-send" in text
+    assert "--event-alpha-notify-cycle --event-alpha-profile $(PROFILE) --event-alert-send" in text
     assert "RSI_EVENT_ALERTS_ENABLED=1" in text
     assert "RSI_EVENT_WATCHLIST_MONITOR_ENABLED=1" in text
     assert "event-alpha-alerts-report:" in text
@@ -15211,6 +15525,11 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "event-alpha-health-guard:" in text
     assert "event-alpha-artifact-doctor:" in text
     assert "event-alpha-preflight:" in text
+    assert "event-alpha-notify-cycle:" in text
+    assert "event-alpha-notify-no-key:" in text
+    assert "event-alpha-notify-llm:" in text
+    assert "event-alpha-notify-preview:" in text
+    assert "event-alpha-send-test:" in text
     assert "event-alpha-tuning-worksheet:" in text
     assert "event-alpha-export-burn-in-pack:" in text
     assert "event-alpha-launchd-template:" in text
@@ -15220,6 +15539,9 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "--event-alpha-health-guard" in text
     assert "--event-alpha-artifact-doctor" in text
     assert "--event-alpha-preflight" in text
+    assert "--event-alpha-notify-cycle --event-alpha-profile $(PROFILE) --event-alert-send" in text
+    assert "--event-alpha-notify-preview --event-alpha-profile $(PROFILE)" in text
+    assert "--event-alpha-send-test --event-alpha-profile $(PROFILE)" in text
     assert "--event-alpha-tuning-worksheet" in text
     assert "--event-alpha-export-burn-in-pack" in text
     assert __import__("pathlib").Path("research/event_alpha_launchd_template.plist").exists()

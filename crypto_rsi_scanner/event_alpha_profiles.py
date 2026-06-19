@@ -21,6 +21,7 @@ class EventAlphaProfile:
     targeted_market_source: str = "cycle"
     send_lane_policy: str = "no_send"
     send_guard: str = "send disabled unless --event-alert-send and RSI_EVENT_ALERTS_ENABLED=1 are both set"
+    notification_burn_in: bool = False
 
 
 def profile_names() -> tuple[str, ...]:
@@ -44,6 +45,7 @@ def format_profile_report(profile: EventAlphaProfile) -> str:
         f"profile={profile.name}",
         profile.description,
         f"with_llm={str(profile.with_llm).lower()} · send_requested={str(profile.send).lower()}",
+        f"notification_burn_in={str(profile.notification_burn_in).lower()}",
         "",
         "config overrides:",
     ]
@@ -99,6 +101,7 @@ def artifact_policy(profile: EventAlphaProfile) -> dict[str, Any]:
         "llm_budget_caps": budget,
         "send_lane_policy": profile.send_lane_policy,
         "send_guard": profile.send_guard,
+        "notification_burn_in": profile.notification_burn_in,
     }
 
 
@@ -269,5 +272,97 @@ _PROFILES: dict[str, EventAlphaProfile] = {
         targeted_market_source="cycle",
         send_lane_policy="research_digest_only",
         send_guard="requires --event-alert-send and RSI_EVENT_ALERTS_ENABLED=1; no paper/live trading",
+    ),
+    "notify_no_key": EventAlphaProfile(
+        name="notify_no_key",
+        description=(
+            "Day-1 no-key Event Alpha notification burn-in using public RSS, GDELT, "
+            "Polymarket, live CoinGecko universe, market enrichment, anomalies, and catalyst search."
+        ),
+        config_overrides={
+            "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": True,
+            "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH": _DEFAULT_RSS_URLS,
+            "EVENT_DISCOVERY_GDELT_LIVE": True,
+            "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": True,
+            "EVENT_DISCOVERY_UNIVERSE_LIVE": True,
+            "EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT": 250,
+            "EVENT_MARKET_ENRICHMENT_ENABLED": True,
+            "EVENT_ANOMALY_SCANNER_ENABLED": True,
+            "EVENT_CATALYST_SEARCH_ENABLED": True,
+            "EVENT_CATALYST_SEARCH_PROVIDER": "gdelt,rss,polymarket",
+            "EVENT_CATALYST_SEARCH_PROVIDERS": ("gdelt", "rss", "polymarket"),
+            "EVENT_LLM_ENABLED": False,
+            "EVENT_LLM_PROVIDER": "fixture",
+            "EVENT_LLM_MODE": "shadow",
+            "EVENT_LLM_EXTRACTOR_ENABLED": False,
+            "EVENT_LLM_EXTRACTOR_PROVIDER": "fixture",
+            "EVENT_LLM_EXTRACTOR_MODE": "shadow",
+            "EVENT_ALPHA_RUN_MODE": "notification_burn_in",
+            "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
+            "EVENT_RESEARCH_CARDS_AUTO_WRITE": True,
+            "EVENT_RESEARCH_CARDS_WRITE_TIERS": ("HIGH_PRIORITY_WATCH", "TRIGGERED_FADE", "WATCHLIST"),
+            "EVENT_WATCHLIST_ENABLED": True,
+            "EVENT_WATCHLIST_MONITOR_ENABLED": True,
+            "EVENT_WATCHLIST_MONITOR_MARKET_SOURCE": "cycle",
+            "EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES": True,
+            "EVENT_ALPHA_ROUTER_ENABLED": True,
+        },
+        snapshot_policy="alertable",
+        card_auto_write=True,
+        card_write_tiers=("HIGH_PRIORITY_WATCH", "TRIGGERED_FADE", "WATCHLIST"),
+        watchlist_monitor_enabled=True,
+        targeted_market_source="cycle",
+        send_lane_policy="notification_lanes",
+        send_guard="requires --event-alert-send plus RSI_EVENT_ALERTS_ENABLED=1 for actual delivery",
+        notification_burn_in=True,
+    ),
+    "notify_llm": EventAlphaProfile(
+        name="notify_llm",
+        description=(
+            "Day-1 Event Alpha notification burn-in with no-key public sources plus "
+            "strictly budgeted OpenAI extraction/advisory metadata."
+        ),
+        config_overrides={
+            "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": True,
+            "EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS_PATH": _DEFAULT_RSS_URLS,
+            "EVENT_DISCOVERY_GDELT_LIVE": True,
+            "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": True,
+            "EVENT_DISCOVERY_UNIVERSE_LIVE": True,
+            "EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT": 250,
+            "EVENT_MARKET_ENRICHMENT_ENABLED": True,
+            "EVENT_ANOMALY_SCANNER_ENABLED": True,
+            "EVENT_CATALYST_SEARCH_ENABLED": True,
+            "EVENT_CATALYST_SEARCH_PROVIDER": "gdelt,rss,polymarket",
+            "EVENT_CATALYST_SEARCH_PROVIDERS": ("gdelt", "rss", "polymarket"),
+            "EVENT_LLM_ENABLED": True,
+            "EVENT_LLM_PROVIDER": "openai",
+            "EVENT_LLM_MODE": "advisory",
+            "EVENT_LLM_MAX_CALLS_PER_RUN": 10,
+            "EVENT_LLM_MAX_CALLS_PER_DAY": 50,
+            "EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY": 1.0,
+            "EVENT_LLM_ESTIMATED_COST_PER_CALL_USD": 0.005,
+            "EVENT_LLM_CACHE_TTL_HOURS": 168,
+            "EVENT_LLM_EXTRACTOR_ENABLED": True,
+            "EVENT_LLM_EXTRACTOR_PROVIDER": "openai",
+            "EVENT_LLM_EXTRACTOR_MODE": "advisory",
+            "EVENT_ALPHA_RUN_MODE": "notification_burn_in",
+            "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
+            "EVENT_RESEARCH_CARDS_AUTO_WRITE": True,
+            "EVENT_RESEARCH_CARDS_WRITE_TIERS": ("HIGH_PRIORITY_WATCH", "TRIGGERED_FADE", "WATCHLIST"),
+            "EVENT_WATCHLIST_ENABLED": True,
+            "EVENT_WATCHLIST_MONITOR_ENABLED": True,
+            "EVENT_WATCHLIST_MONITOR_MARKET_SOURCE": "cycle",
+            "EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES": True,
+            "EVENT_ALPHA_ROUTER_ENABLED": True,
+        },
+        with_llm=True,
+        snapshot_policy="alertable",
+        card_auto_write=True,
+        card_write_tiers=("HIGH_PRIORITY_WATCH", "TRIGGERED_FADE", "WATCHLIST"),
+        watchlist_monitor_enabled=True,
+        targeted_market_source="cycle",
+        send_lane_policy="notification_lanes",
+        send_guard="requires --event-alert-send plus RSI_EVENT_ALERTS_ENABLED=1 for actual delivery",
+        notification_burn_in=True,
     ),
 }

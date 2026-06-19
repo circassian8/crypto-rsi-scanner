@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-19 — Add Event Alpha day-1 notification burn-in · Codex
+**Why:** The owner wants immediate Event Alpha research notifications from day
+1 while keeping trading trust, paper trades, normal RSI rows, and calibrated
+research-send promotion separate from unvalidated alerts.
+**Changes:**
+- Added `notify_no_key` and `notify_llm` profiles with isolated
+`notification_burn_in` artifacts, router/watchlist/card auto-write defaults,
+no-key public sources, and strict OpenAI budget caps for the LLM profile.
+- Added `event_alpha_notifications.py` for lane-specific send state:
+daily digest, instant escalation, deterministic triggered-fade dedupe, and
+health heartbeat. Generic event-alert digest metadata remains separate.
+- Added `main.py --event-alpha-notify-cycle`,
+`--event-alpha-notify-preview`, and `--event-alpha-send-test`, plus Make
+targets for notify no-key/LLM, preview, and test send.
+- Updated routed Telegram copy to always label notifications as
+`Research-only / unvalidated`, include `Not a trade signal`, stable
+`alert_id`/`card_id`, lane/route/tier/playbook, event timing, market summary,
+LLM role/confidence, research-card reference, and feedback command.
+- Split readiness language into day-1 notifications, calibrated research send,
+and trading-out-of-scope fields; documented startup in the runbook and env
+sample.
+- Added regression coverage for profiles, guard/preflight behavior, lane
+cooldowns and triggered-fade dedupe, would-send accounting, message copy,
+Make targets, and test-send refusal without the guard.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed 366/366; `make event-llm-eval
+PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`, and
+`make event-alpha-eval PYTHON=python3` passed; `make
+event-alpha-notify-preview PROFILE=notify_no_key PYTHON=python3` rendered a
+no-send preview; `make verify PYTHON=python3` passed.
+**Notes/risks:** Notification sends remain guarded by `--event-alert-send` plus
+`RSI_EVENT_ALERTS_ENABLED=1` and Telegram config. `TRIGGERED_FADE` still comes
+only from deterministic `event_fade.py` output on `proxy_fade`; LLM output
+cannot create it.
+
 ## 2026-06-19 — Add Event Alpha profile preflight · Codex
 **Why:** Event Alpha burn-in reports could still depend on manually injected
 artifact paths, which made it possible for a profile command to inspect the

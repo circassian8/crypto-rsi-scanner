@@ -81,7 +81,7 @@ def run_preflight(
         warnings.append("no enrichment source is ready; resolver/market evidence may be weak")
 
     _check_llm(profile_key, cfg, blockers=blockers, warnings=warnings)
-    profile_send = bool(profile and profile.send)
+    profile_send = bool(profile and (profile.send or profile.notification_burn_in))
     if send_requested or profile_send:
         if not bool(getattr(cfg, "EVENT_ALERTS_ENABLED", False)):
             blockers.append("send requested/profile requires RSI_EVENT_ALERTS_ENABLED=1")
@@ -165,12 +165,12 @@ def _check_llm(profile_key: str, cfg: Any, *, blockers: list[str], warnings: lis
     wants_openai = (
         (llm_enabled and relationship_provider == "openai")
         or (extractor_enabled and extractor_provider == "openai")
-        or profile_key == "full_llm_live"
+        or profile_key in {"full_llm_live", "notify_llm"}
     )
     max_run = int(getattr(cfg, "EVENT_LLM_MAX_CALLS_PER_RUN", 0) or 0)
     max_day = int(getattr(cfg, "EVENT_LLM_MAX_CALLS_PER_DAY", 0) or 0)
     max_cost = float(getattr(cfg, "EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY", 0.0) or 0.0)
-    if profile_key in {"full_llm_live", "no_key_llm"} and (max_run <= 0 or max_day <= 0 or max_cost <= 0):
+    if profile_key in {"full_llm_live", "no_key_llm", "notify_llm"} and (max_run <= 0 or max_day <= 0 or max_cost <= 0):
         warnings.append("LLM profile has no positive per-run/day/cost budget caps")
     if wants_openai and not os.getenv("OPENAI_API_KEY"):
         blockers.append("OpenAI LLM profile/provider requires OPENAI_API_KEY")

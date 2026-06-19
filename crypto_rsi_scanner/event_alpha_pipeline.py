@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -37,6 +37,10 @@ class EventAlphaSendResult:
     items_attempted: int = 0
     items_delivered: int = 0
     block_reason: str | None = None
+    lane_items_attempted: dict[str, int] = field(default_factory=dict)
+    lane_items_delivered: dict[str, int] = field(default_factory=dict)
+    would_send_items: int = 0
+    heartbeat_sent: bool = False
 
 
 @dataclass(frozen=True)
@@ -57,6 +61,11 @@ class EventAlphaPipelineResult:
     send_items_attempted: int = 0
     send_items_delivered: int = 0
     send_block_reason: str | None = None
+    send_lane_items_attempted: dict[str, int] = field(default_factory=dict)
+    send_lane_items_delivered: dict[str, int] = field(default_factory=dict)
+    send_would_send_items: int = 0
+    send_heartbeat_sent: bool = False
+    notification_burn_in: bool = False
     research_card_paths: tuple[Path, ...] = ()
     run_id: str | None = None
     profile: str | None = None
@@ -491,6 +500,10 @@ def _with_send_result(
         send_items_attempted=send_result.items_attempted,
         send_items_delivered=send_result.items_delivered,
         send_block_reason=send_result.block_reason,
+        send_lane_items_attempted=dict(send_result.lane_items_attempted),
+        send_lane_items_delivered=dict(send_result.lane_items_delivered),
+        send_would_send_items=send_result.would_send_items,
+        send_heartbeat_sent=send_result.heartbeat_sent,
     )
 
 
@@ -508,6 +521,7 @@ def _normalize_send_result(
             items_attempted=len(decisions),
             items_delivered=len(decisions) if raw_result else 0,
             block_reason=None if raw_result else "send callback returned false",
+            would_send_items=len(decisions),
         )
     return EventAlphaSendResult(
         requested=True,
@@ -515,6 +529,7 @@ def _normalize_send_result(
         success=True,
         items_attempted=len(decisions),
         items_delivered=len(decisions),
+        would_send_items=len(decisions),
     )
 
 

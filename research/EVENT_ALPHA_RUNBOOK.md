@@ -5,6 +5,46 @@ refresh watchlist rows, route research digests, write review artifacts, and
 export proposed eval cases. It must not trade, paper trade, write normal RSI
 signal rows, or let LLM/search/watchlist output create `TRIGGERED_FADE`.
 
+## Day-1 Notification Burn-In
+
+Use notification profiles when you want immediate Telegram research
+notifications while still treating every message as unvalidated review output.
+This is not calibrated research send, not a trade signal, and not paper/live
+trading.
+
+Required for actual delivery:
+
+```bash
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_IDS=...
+RSI_EVENT_ALERTS_ENABLED=1
+```
+
+Then run the no-key startup path:
+
+```bash
+make event-alpha-preflight PROFILE=notify_no_key
+make event-alpha-send-test PROFILE=notify_no_key
+make event-alpha-notify-preview PROFILE=notify_no_key
+make event-alpha-notify-no-key
+```
+
+`notify_no_key` uses public RSS, GDELT, Polymarket, live CoinGecko universe,
+market enrichment, anomaly scanning, catalyst search, watchlist monitoring,
+router lanes, and auto-written research cards. `notify_llm` uses the same source
+set plus OpenAI extraction/advisory metadata with conservative defaults:
+10 calls/run, 50 calls/day, $1/day estimated cap, and a 168-hour cache TTL.
+
+Notification lanes are independent: a daily digest cooldown does not block an
+instant escalation, and instant escalation cooldown does not block a
+deterministic proxy-fade `TRIGGERED_FADE`. Triggered-fade notifications dedupe
+by stable alert id. Health heartbeat delivery is once per day by default and
+can report a no-alert run.
+
+Without `RSI_EVENT_ALERTS_ENABLED=1`, `make event-alpha-notify-no-key` and
+`make event-alpha-notify-llm` still run the radar, write research artifacts, and
+print a would-send summary. They do not deliver Telegram messages.
+
 ## Daily No-Key Operation
 
 Use the no-key profile when you want public RSS/GDELT/Polymarket plus live

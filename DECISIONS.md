@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-19 - Allow day-1 Event Alpha notifications without trading trust
+**Status:** accepted
+**Decision:** Event Alpha may send clearly labeled day-1 research
+notifications through `notify_no_key` and `notify_llm` profiles when the
+operator explicitly passes the send flag and sets `RSI_EVENT_ALERTS_ENABLED=1`
+with Telegram credentials. Notification burn-in is distinct from calibrated
+research send and trading readiness: lane-specific cooldown state may deliver
+daily digests, instant escalations, deterministic proxy-fade triggered fades,
+and health heartbeats, but every message must say it is unvalidated research and
+not a trade signal. `TRIGGERED_FADE` remains reserved for deterministic
+`event_fade.py` output on `proxy_fade` rows; LLM output may provide advisory
+metadata only.
+**Why:** The owner wants immediate operational visibility from the radar while
+the system continues collecting burn-in evidence before any calibrated trust or
+trading workflow.
+**Revisit when:** Notification burn-in artifacts, feedback, provider health, and
+outcomes are sufficient to decide whether calibrated research send should have
+different thresholds or delivery rules.
+
 ## 2026-06-19 - Keep Event Alpha artifact namespaces isolated and report-only
 **Status:** accepted
 **Decision:** Event Alpha profile, run-mode, and namespace metadata are required

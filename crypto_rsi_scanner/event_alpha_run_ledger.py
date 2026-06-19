@@ -34,6 +34,7 @@ def append_run_record(
     finished_at: datetime,
     with_llm: bool,
     send_requested: bool,
+    notification_burn_in: bool | None = None,
     success: bool = True,
     failure: str | None = None,
 ) -> dict[str, Any]:
@@ -47,6 +48,7 @@ def append_run_record(
         finished_at=finished,
         with_llm=with_llm,
         send_requested=send_requested,
+        notification_burn_in=notification_burn_in,
         success=success,
         failure=failure,
     )
@@ -132,6 +134,7 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
         rows.append(
             f"{row.get('started_at', 'unknown')} profile={row.get('profile') or 'default'} "
             f"mode={row.get('run_mode') or 'legacy'} namespace={row.get('artifact_namespace') or 'legacy'} "
+            f"notification_burn_in={str(bool(row.get('notification_burn_in'))).lower()} "
             f"success={str(bool(row.get('success'))).lower()} runtime={float(row.get('runtime_seconds') or 0):.2f}s"
         )
         rows.append(
@@ -141,8 +144,19 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"rejected={int(row.get('catalyst_results_rejected') or 0)} candidates={int(row.get('candidates') or 0)} "
             f"alerts={int(row.get('alerts') or 0)} routed={int(row.get('routed') or 0)} "
             f"alertable={int(row.get('alertable') or 0)} sent={str(bool(row.get('sent'))).lower()} "
-            f"send={int(row.get('send_items_delivered') or 0)}/{int(row.get('send_items_attempted') or 0)}"
+            f"send={int(row.get('send_items_delivered') or 0)}/{int(row.get('send_items_attempted') or 0)} "
+            f"would_send={int(row.get('send_would_send_items') or 0)}"
         )
+        lane_attempted = row.get("send_lane_items_attempted") or {}
+        lane_delivered = row.get("send_lane_items_delivered") or {}
+        if lane_attempted or lane_delivered:
+            rows.append(
+                "  send_lanes: "
+                + ", ".join(
+                    f"{lane}={int(lane_delivered.get(lane) or 0)}/{int(lane_attempted.get(lane) or 0)}"
+                    for lane in sorted(set(lane_attempted) | set(lane_delivered))
+                )
+            )
         rows.append(
             "  "
             f"snapshots={int(row.get('snapshot_rows_written') or 0)} "
@@ -175,6 +189,7 @@ def _run_record(
     finished_at: datetime,
     with_llm: bool,
     send_requested: bool,
+    notification_burn_in: bool | None,
     success: bool,
     failure: str | None,
 ) -> dict[str, Any]:
@@ -190,6 +205,13 @@ def _run_record(
     if failure:
         warnings.append(failure)
     run_id = getattr(result, "run_id", None) or run_id_for(started_at, profile)
+    notify_burn = (
+        bool(notification_burn_in)
+        if notification_burn_in is not None
+        else bool(getattr(result, "notification_burn_in", False))
+        or str(getattr(result, "run_mode", "") or "") == "notification_burn_in"
+        or str(profile or "").startswith("notify_")
+    )
     return {
         "schema_version": RUN_LEDGER_SCHEMA_VERSION,
         "row_type": "event_alpha_run",
@@ -197,6 +219,7 @@ def _run_record(
         "profile": profile or "default",
         "run_mode": getattr(result, "run_mode", None),
         "artifact_namespace": getattr(result, "artifact_namespace", None),
+        "notification_burn_in": notify_burn,
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
         "runtime_seconds": round(max(0.0, (finished_at - started_at).total_seconds()), 4),
@@ -222,6 +245,10 @@ def _run_record(
         "send_success": bool(getattr(result, "send_success", False)),
         "send_items_attempted": _int(getattr(result, "send_items_attempted", 0)),
         "send_items_delivered": _int(getattr(result, "send_items_delivered", 0)),
+        "send_would_send_items": _int(getattr(result, "send_would_send_items", 0)),
+        "send_lane_items_attempted": dict(getattr(result, "send_lane_items_attempted", {}) or {}),
+        "send_lane_items_delivered": dict(getattr(result, "send_lane_items_delivered", {}) or {}),
+        "send_heartbeat_sent": bool(getattr(result, "send_heartbeat_sent", False)),
         "send_block_reason": getattr(result, "send_block_reason", None),
         "sent": bool(getattr(result, "send_success", False)),
         "snapshot_write_attempted": bool(getattr(result, "snapshot_write_attempted", False)),

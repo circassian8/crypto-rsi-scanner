@@ -6,7 +6,7 @@ import html
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from . import event_playbooks, event_watchlist
 
@@ -150,13 +150,21 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
     return "\n".join(rows).rstrip()
 
 
-def format_routed_telegram_digest(decisions: Iterable[EventAlphaRouteDecision]) -> str:
+def format_routed_telegram_digest(
+    decisions: Iterable[EventAlphaRouteDecision],
+    *,
+    profile: str | None = None,
+    card_path_by_alert_id: Mapping[str, object] | None = None,
+) -> str:
     """Render router-approved Event Alpha escalations for Telegram."""
     keep = [decision for decision in decisions if decision.alertable]
+    card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
     lines = [
         "<b>Event Alpha routed research alerts</b>",
-        "<i>Research alert only. Not a trade signal, paper trade, or execution.</i>",
+        "<i>Research-only / unvalidated. Not a trade signal, paper trade, or execution.</i>",
     ]
+    if profile:
+        lines.append(f"profile={_esc(profile)}")
     if not keep:
         lines.append("No router-approved escalations.")
         return "\n".join(lines)
@@ -169,16 +177,31 @@ def format_routed_telegram_digest(decisions: Iterable[EventAlphaRouteDecision]) 
         )
         lines.append(_esc(entry.latest_event_name or "unknown event"))
         lines.append(
-            f"state={_esc(entry.state)} playbook={_esc(entry.latest_playbook_type or 'unknown')} "
-            f"external={_esc(entry.external_asset or 'unknown')}"
+            f"tier={_esc(entry.latest_tier or 'unknown')} route={_esc(decision.route.value)} "
+            f"lane={_esc(decision.lane.value)}"
         )
+        lines.append(
+            f"state={_esc(entry.state)} playbook={_esc(entry.latest_playbook_type or 'unknown')} "
+            f"external_catalyst={_esc(entry.external_asset or 'unknown')}"
+        )
+        lines.append(_event_time_line(entry))
+        lines.append("market=" + _esc(_market_summary(entry.latest_market_snapshot)))
         if entry.latest_rule_playbook_type and entry.latest_rule_playbook_type != entry.latest_playbook_type:
             lines.append(f"rule_playbook={_esc(entry.latest_rule_playbook_type)}")
         if entry.latest_llm_asset_role:
             conf = entry.latest_llm_confidence if entry.latest_llm_confidence is not None else 0.0
-            lines.append(f"llm={_esc(entry.latest_llm_asset_role)} conf={conf:.2f}")
-        lines.append(f"lane={_esc(decision.lane.value)} route_reason={_esc(decision.reason)}")
+            lines.append(f"llm_role={_esc(entry.latest_llm_asset_role)} llm_confidence={conf:.2f}")
+        else:
+            lines.append("llm_role=none llm_confidence=n/a")
+        lines.append(f"route_reason={_esc(decision.reason)}")
         lines.append(f"alert_id={_esc(decision.alert_id)}")
+        lines.append(f"card_id={_esc(decision.card_id)}")
+        card_path = card_paths.get(decision.alert_id)
+        if card_path:
+            lines.append(f"research_card={_esc(card_path)}")
+        else:
+            lines.append("research_card=not_written")
+        lines.append(f"feedback=make event-feedback-useful FEEDBACK_TARGET={_esc(decision.alert_id)}")
         warnings = tuple(dict.fromkeys((*entry.warnings, *decision.warnings)))
         if warnings:
             lines.append("warnings=" + _esc("; ".join(warnings[:3])))
@@ -513,3 +536,30 @@ _NON_FADE_RESEARCH_PLAYBOOKS = {
 
 def _esc(value: object) -> str:
     return html.escape(str(value), quote=False)
+
+
+def _event_time_line(entry: event_watchlist.EventWatchlistEntry) -> str:
+    event_time = entry.event_time or "unknown"
+    parsed = _parse_iso(event_time)
+    if parsed is None:
+        return f"event_time={_esc(event_time)} countdown=unknown"
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    hours = (parsed - now).total_seconds() / 3600.0
+    if hours >= 0:
+        countdown = f"T-{hours:.1f}h"
+    else:
+        countdown = f"T+{abs(hours):.1f}h"
+    return f"event_time={_esc(event_time)} countdown={_esc(countdown)}"
+
+
+def _market_summary(snapshot: Mapping[str, object] | None) -> str:
+    if not snapshot:
+        return "no market confirmation snapshot"
+    bits: list[str] = []
+    for key in ("price", "return_24h", "return_72h", "volume_zscore_24h", "rsi_1d", "rsi_4h"):
+        value = snapshot.get(key)
+        if value not in (None, ""):
+            bits.append(f"{key}={value}")
+    return ", ".join(bits[:5]) if bits else "market snapshot present"
