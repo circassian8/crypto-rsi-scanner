@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Harden notification run lock from Codex review · Claude
+**Why:** Codex reviewed the run lock and flagged two P1s and a P3.
+**Changes:**
+- `event_alpha_run_lock.py`: made acquisition **atomic**. Replaced the
+  read-then-write (TOCTOU race where two simultaneous starts could both acquire)
+  with `os.open(O_CREAT|O_EXCL)` via `_create_lock_exclusive`. Stale takeover is
+  also race-safe (`_steal_stale_lock` re-reads to confirm the same stale holder
+  before unlinking, then a single exclusive recreate — exactly one concurrent
+  recoverer wins; the loser re-reads and skips/degrades).
+- `scanner.py`: the notify cycle now **always releases the lock on exceptions**.
+  Split `event_alpha_notify_cycle` into a thin wrapper that runs the renamed
+  `_event_alpha_notify_cycle_body` inside `try/finally`; the body stores the lock
+  in a `lock_holder` dict right after acquiring, and the wrapper releases it in
+  the finally, so an exception in card writing, sending, snapshot/ledger writes,
+  or report formatting still releases the lock.
+- `event_alpha_notifications.py`: the health heartbeat lane now uses the same
+  delivery-ledger dedupe (`skip_as_duplicate`) and `record_sending` path as the
+  digest/escalation lanes for idempotency consistency (P3).
+**Verify:** `.venv/bin/python tests/test_indicators.py` passed 392/392 (added
+`test_event_alpha_run_lock_acquisition_is_atomic` — exactly one of two
+same-instant acquires wins — and `test_event_alpha_notify_cycle_releases_lock_on_exception`).
+`make event-llm-eval`, `make event-llm-extract-eval`, `make event-alpha-eval`,
+and `make verify` (all `PYTHON=.venv/bin/python`) passed. A live fixture notify
+cycle ran end-to-end and left no lock file behind (released by the wrapper).
+**Notes/risks:** Still research-only; no trading/paper/RSI rows or LLM-created
+`TRIGGERED_FADE`. The atomic file lock is single-host best-effort (this
+deployment is one Mac); cross-host coordination would need a shared lock service.
+
 ## 2026-06-20 — Add Event Alpha notification run lock + idempotent delivery ledger · Claude
 **Why:** Scheduled/cron-style day-1 notification runs could overlap (a slow run
 still finishing when the next fires) and double-send a research digest or race on

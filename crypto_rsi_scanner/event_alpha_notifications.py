@@ -357,17 +357,29 @@ def send_notifications(
             if writer:
                 writer.record_failed(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items), error_message="no channel delivered")
     if plan.heartbeat_due:
-        attempted = True
         heartbeat_message = format_health_heartbeat(profile=profile, result=pipeline_result, now=observed)
-        if send_fn(heartbeat_message):
-            delivered_by_lane[LANE_HEALTH_HEARTBEAT] = 1
-            record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed, cfg=cfg)
+        # Same delivery-ledger dedupe as the digest lanes for idempotency. In
+        # practice the heartbeat carries a timestamp so its content hash differs
+        # each run, but this keeps every lane consistently deduped.
+        heartbeat_dup = bool(
+            writer
+            and writer.skip_as_duplicate(
+                message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT"
+            )
+        )
+        if not heartbeat_dup:
+            attempted = True
             if writer:
-                writer.record_delivered(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT", delivered_count=1)
-        else:
-            block_reasons.append("health_heartbeat: no channel delivered")
-            if writer:
-                writer.record_failed(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT", error_message="no channel delivered")
+                writer.record_sending(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT")
+            if send_fn(heartbeat_message):
+                delivered_by_lane[LANE_HEALTH_HEARTBEAT] = 1
+                record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed, cfg=cfg)
+                if writer:
+                    writer.record_delivered(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT", delivered_count=1)
+            else:
+                block_reasons.append("health_heartbeat: no channel delivered")
+                if writer:
+                    writer.record_failed(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT", error_message="no channel delivered")
 
     delivered = sum(delivered_by_lane.values())
     return _result(

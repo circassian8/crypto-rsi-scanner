@@ -17096,6 +17096,26 @@ def test_event_alpha_run_lock_release_after_failsoft_and_distinct_profile_paths(
         assert lock.lock_path_for_context(no_key, lock_name="other").name == "event_alpha_other.lock"
 
 
+def test_event_alpha_run_lock_acquisition_is_atomic():
+    # Two runs starting at the same instant (both would read "no lock") must not
+    # both acquire: O_CREAT|O_EXCL makes exactly one win.
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_run_lock as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        cfg = lock.EventAlphaRunLockConfig(enabled=True, stale_minutes=30)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        a = lock.acquire_run_lock(ctx, cfg=cfg, run_id="A", now=now)
+        b = lock.acquire_run_lock(ctx, cfg=cfg, run_id="B", now=now)
+        assert [a.acquired, b.acquired].count(True) == 1
+        assert [a.skipped_due_to_active_lock, b.skipped_due_to_active_lock].count(True) == 1
+        winner = a if a.acquired else b
+        holder = lock._read_lock(lock.lock_path_for_context(ctx))
+        assert holder is not None and holder["run_id"] == winner.run_id
+
+
 def test_event_alpha_run_lock_disabled_for_fixture_smoke():
     import tempfile
     from datetime import datetime, timezone
@@ -17110,6 +17130,37 @@ def test_event_alpha_run_lock_disabled_for_fixture_smoke():
         assert disabled.status.state == lock.STATE_DISABLED
         assert not disabled.path.exists()
         assert lock.release_run_lock(disabled) is False
+
+
+def test_event_alpha_notify_cycle_releases_lock_on_exception():
+    # The notify-cycle wrapper must release the run lock in a finally even when
+    # the cycle body raises after acquiring (best-effort release on exceptions).
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import scanner, event_alpha_run_lock as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        run_lock = lock.acquire_run_lock(
+            ctx, cfg=lock.EventAlphaRunLockConfig(enabled=True), run_id="r1",
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+        )
+        assert run_lock.owned and run_lock.path.exists()
+
+        def boom(*, lock_holder, **kwargs):
+            lock_holder["lock"] = run_lock
+            raise RuntimeError("kaboom in cycle body")
+
+        original = scanner._event_alpha_notify_cycle_body
+        scanner._event_alpha_notify_cycle_body = boom
+        try:
+            try:
+                scanner.event_alpha_notify_cycle(profile_name="notify_no_key")
+            except RuntimeError:
+                pass
+        finally:
+            scanner._event_alpha_notify_cycle_body = original
+        assert not run_lock.path.exists()
 
 
 def test_event_alpha_delivery_ledger_records_dedupe_and_namespace_isolation():

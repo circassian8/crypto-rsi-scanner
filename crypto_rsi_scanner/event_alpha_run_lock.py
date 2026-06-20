@@ -124,30 +124,6 @@ def acquire_run_lock(
         )
         return EventAlphaRunLock(path, run_id, profile, namespace, name, status, owned=False)
 
-    holder = _read_lock(path)
-    same_run = holder is not None and str(holder.get("run_id") or "") == str(run_id)
-    fresh = holder is not None and not same_run and _is_fresh(holder, observed, cfg.stale_minutes)
-
-    if fresh and not cfg.allow_overlap:
-        status = RunLockStatus(
-            state=STATE_ACTIVE,
-            path=path,
-            acquired=False,
-            skipped_due_to_active_lock=True,
-            stale_recovered=False,
-            holder=holder,
-            message=(
-                "active notification lock held by "
-                f"run_id={holder.get('run_id') or 'unknown'} pid={holder.get('pid') or 'unknown'} "
-                f"acquired_at={holder.get('acquired_at') or 'unknown'}"
-            ),
-        )
-        return EventAlphaRunLock(path, run_id, profile, namespace, name, status, owned=False)
-
-    overlap = fresh and cfg.allow_overlap
-    stale_recovered = holder is not None and not same_run and not fresh
-    warnings = (STALE_LOCK_RECOVERED_WARNING,) if stale_recovered else ()
-
     payload = {
         "schema_version": LOCK_SCHEMA_VERSION,
         "run_id": str(run_id),
@@ -159,46 +135,134 @@ def acquire_run_lock(
         "command": str(command or "notify"),
         "hostname": hostname,
     }
-    written = _write_lock(path, payload)
-    if not written:
-        # Could not persist the lock; degrade to "proceed without enforcement"
-        # rather than blocking the research run.
-        status = RunLockStatus(
-            state=STATE_DISABLED,
-            path=path,
-            acquired=True,
-            skipped_due_to_active_lock=False,
-            stale_recovered=stale_recovered,
+
+    def _acquired(state: str, *, owned: bool, stale_recovered: bool, holder: dict[str, Any] | None, message: str) -> EventAlphaRunLock:
+        return EventAlphaRunLock(
+            path,
+            run_id,
+            profile,
+            namespace,
+            name,
+            RunLockStatus(
+                state=state,
+                path=path,
+                acquired=True,
+                skipped_due_to_active_lock=False,
+                stale_recovered=stale_recovered,
+                holder=holder,
+                message=message,
+                warnings=(STALE_LOCK_RECOVERED_WARNING,) if stale_recovered else (),
+            ),
+            owned=owned,
+        )
+
+    def _degraded(holder: dict[str, Any] | None, stale_recovered: bool) -> EventAlphaRunLock:
+        return EventAlphaRunLock(
+            path,
+            run_id,
+            profile,
+            namespace,
+            name,
+            RunLockStatus(
+                state=STATE_DISABLED,
+                path=path,
+                acquired=True,
+                skipped_due_to_active_lock=False,
+                stale_recovered=stale_recovered,
+                holder=holder,
+                message="run lock could not be written; proceeding without lock enforcement",
+                warnings=("notification_lock_write_failed",) + ((STALE_LOCK_RECOVERED_WARNING,) if stale_recovered else ()),
+            ),
+            owned=False,
+        )
+
+    # Atomic acquisition: O_CREAT|O_EXCL means exactly one of two concurrent
+    # starts can create the lock, closing the read-then-write TOCTOU window.
+    created = _create_lock_exclusive(path, payload)
+    if created is True:
+        return _acquired(STATE_ACQUIRED, owned=True, stale_recovered=False, holder=None, message="notification run lock acquired")
+    if created is None:
+        return _degraded(None, stale_recovered=False)
+
+    # A lock already exists. Inspect the holder.
+    holder = _read_lock(path)
+    if holder is None:
+        # Vanished between create attempt and read; try once more atomically.
+        created = _create_lock_exclusive(path, payload)
+        if created is True:
+            return _acquired(STATE_ACQUIRED, owned=True, stale_recovered=False, holder=None, message="notification run lock acquired")
+        holder = _read_lock(path) or {}
+
+    if str(holder.get("run_id") or "") == str(run_id):
+        # Re-entrant: this run already holds the lock.
+        return _acquired(STATE_ACQUIRED, owned=True, stale_recovered=False, holder=holder, message="notification run lock already held by this run")
+
+    if _is_fresh(holder, observed, cfg.stale_minutes):
+        if cfg.allow_overlap:
+            return _acquired(
+                STATE_OVERLAP_ALLOWED,
+                owned=False,
+                stale_recovered=False,
+                holder=holder,
+                message="overlap allowed (RSI_EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP=1); proceeding alongside existing lock",
+            )
+        return EventAlphaRunLock(
+            path,
+            run_id,
+            profile,
+            namespace,
+            name,
+            RunLockStatus(
+                state=STATE_ACTIVE,
+                path=path,
+                acquired=False,
+                skipped_due_to_active_lock=True,
+                stale_recovered=False,
+                holder=holder,
+                message=(
+                    "active notification lock held by "
+                    f"run_id={holder.get('run_id') or 'unknown'} pid={holder.get('pid') or 'unknown'} "
+                    f"acquired_at={holder.get('acquired_at') or 'unknown'}"
+                ),
+            ),
+            owned=False,
+        )
+
+    # Stale holder: attempt an atomic takeover. Exactly one concurrent recoverer
+    # wins the O_EXCL recreate; the loser re-reads and skips/degrades.
+    if _steal_stale_lock(path, holder, payload):
+        return _acquired(
+            STATE_STALE_RECOVERED,
+            owned=True,
+            stale_recovered=True,
             holder=holder,
-            message="run lock could not be written; proceeding without lock enforcement",
-            warnings=warnings + ("notification_lock_write_failed",),
+            message=(
+                "recovered stale notification lock previously held by "
+                f"run_id={holder.get('run_id') or 'unknown'} pid={holder.get('pid') or 'unknown'}"
+            ),
         )
-        return EventAlphaRunLock(path, run_id, profile, namespace, name, status, owned=False)
-
-    if overlap:
-        state = STATE_OVERLAP_ALLOWED
-        message = "overlap allowed (RSI_EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP=1); proceeding alongside existing lock"
-    elif stale_recovered:
-        state = STATE_STALE_RECOVERED
-        message = (
-            "recovered stale notification lock previously held by "
-            f"run_id={holder.get('run_id') or 'unknown'} pid={holder.get('pid') or 'unknown'}"
+    holder2 = _read_lock(path)
+    if holder2 is not None and str(holder2.get("run_id") or "") == str(run_id):
+        return _acquired(STATE_ACQUIRED, owned=True, stale_recovered=True, holder=holder2, message="notification run lock acquired after stale recovery")
+    if holder2 is not None and _is_fresh(holder2, observed, cfg.stale_minutes) and not cfg.allow_overlap:
+        return EventAlphaRunLock(
+            path,
+            run_id,
+            profile,
+            namespace,
+            name,
+            RunLockStatus(
+                state=STATE_ACTIVE,
+                path=path,
+                acquired=False,
+                skipped_due_to_active_lock=True,
+                stale_recovered=False,
+                holder=holder2,
+                message="active notification lock taken over by a concurrent recoverer",
+            ),
+            owned=False,
         )
-    else:
-        state = STATE_ACQUIRED
-        message = "notification run lock acquired"
-
-    status = RunLockStatus(
-        state=state,
-        path=path,
-        acquired=True,
-        skipped_due_to_active_lock=False,
-        stale_recovered=stale_recovered,
-        holder=holder,
-        message=message,
-        warnings=warnings,
-    )
-    return EventAlphaRunLock(path, run_id, profile, namespace, name, status, owned=True)
+    return _degraded(holder2, stale_recovered=True)
 
 
 def release_run_lock(lock: EventAlphaRunLock | None) -> bool:
@@ -302,16 +366,51 @@ def _read_lock(path: Path) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def _write_lock(path: Path, payload: dict[str, Any]) -> bool:
+def _create_lock_exclusive(path: Path, payload: dict[str, Any]) -> bool | None:
+    """Atomically create the lock file. Returns True (created), False (already
+    exists), or None (could not create — degrade without enforcement)."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        with tmp.open("w", encoding="utf-8") as fh:
+    except OSError:
+        return None
+    try:
+        fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        return False
+    except OSError:
+        return None
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, sort_keys=True, separators=(",", ":"))
-        os.replace(tmp, path)
         return True
     except OSError:
+        try:
+            os.unlink(str(path))
+        except OSError:
+            pass
+        return None
+
+
+def _steal_stale_lock(path: Path, stale_holder: dict[str, Any], payload: dict[str, Any]) -> bool:
+    """Take over a stale lock atomically. Re-reads immediately before unlinking so
+    a fresh replacement created in the meantime is never deleted; the O_EXCL
+    recreate guarantees only one concurrent recoverer wins."""
+    current = _read_lock(path)
+    if current is None:
+        return _create_lock_exclusive(path, payload) is True
+    if (
+        str(current.get("run_id") or "") != str(stale_holder.get("run_id") or "")
+        or str(current.get("acquired_at") or "") != str(stale_holder.get("acquired_at") or "")
+    ):
+        # The lock changed since we judged it stale; do not steal it.
         return False
+    try:
+        os.unlink(str(path))
+    except FileNotFoundError:
+        pass
+    except OSError:
+        return False
+    return _create_lock_exclusive(path, payload) is True
 
 
 def _hostname() -> str:

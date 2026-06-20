@@ -2204,6 +2204,40 @@ def event_alpha_notify_cycle(
     profile_name: str | None = None,
     ignore_provider_backoff: bool = False,
 ) -> None:
+    """Run a day-1 Event Alpha notification cycle, guaranteeing lock release.
+
+    The cycle body acquires the per-profile run lock and stores it in
+    ``lock_holder``; this wrapper releases it in a ``finally`` so any exception
+    in card writing, sending, snapshot/ledger writes, or report formatting still
+    releases the lock (best-effort).
+    """
+    lock_holder: dict[str, object] = {}
+    try:
+        _event_alpha_notify_cycle_body(
+            verbose=verbose,
+            with_llm=with_llm,
+            send=send,
+            event_now=event_now,
+            profile_name=profile_name,
+            ignore_provider_backoff=ignore_provider_backoff,
+            lock_holder=lock_holder,
+        )
+    finally:
+        run_lock = lock_holder.get("lock")
+        if run_lock is not None:
+            event_alpha_run_lock.release_run_lock(run_lock)
+
+
+def _event_alpha_notify_cycle_body(
+    *,
+    verbose: bool = False,
+    with_llm: bool = False,
+    send: bool = False,
+    event_now: str | datetime | None = None,
+    profile_name: str | None = None,
+    ignore_provider_backoff: bool = False,
+    lock_holder: dict[str, object],
+) -> None:
     """Run a day-1 Event Alpha notification burn-in cycle."""
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "notify_no_key"
@@ -2237,6 +2271,7 @@ def event_alpha_notify_cycle(
             command="event-alpha-notify-cycle",
             now=started_at,
         )
+        lock_holder["lock"] = run_lock
         if run_lock.skipped_due_to_active_lock:
             print(f"Event Alpha notify cycle skipped: {run_lock.status.message}.")
             _record_skipped_notification_run(
@@ -2538,9 +2573,8 @@ def event_alpha_notify_cycle(
             f"{pipeline_result.notification_deliveries_skipped_duplicate} skipped_duplicate "
             f"({delivery_cfg.path})."
         )
-    # Best-effort release. A crashed run leaves the lock for the next run to
-    # recover (dead holder PID on this host, or past the stale window).
-    event_alpha_run_lock.release_run_lock(run_lock)
+    # The run lock is released by the event_alpha_notify_cycle wrapper's finally,
+    # so any exception above still releases it (best-effort).
 
 
 def _record_skipped_notification_run(
