@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from . import event_alpha_notification_delivery as delivery
+
 
 @dataclass(frozen=True)
 class EventAlphaNotificationInboxItem:
@@ -18,6 +20,8 @@ class EventAlphaNotificationInboxItem:
     card_path: str
     sent: bool
     would_send: bool
+    blocked_by_guard: bool
+    delivery_state: str
     reviewed: bool
     reason: str
 
@@ -38,9 +42,11 @@ class EventAlphaNotificationInboxResult:
     outcome_rows_read: int
     sent_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     would_send_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    would_send_blocked_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
     triggered_fade_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
     heartbeat_only_runs: tuple[dict[str, Any], ...]
+    duplicate_or_in_flight_runs: tuple[dict[str, Any], ...]
     provider_degraded_runs: tuple[dict[str, Any], ...]
 
 
@@ -56,23 +62,36 @@ def build_notification_inbox(
     alert_store_path: str | Path,
     feedback_path: str | Path,
     outcomes_path: str | Path | None = None,
+    notification_delivery_rows: Iterable[Mapping[str, Any]] = (),
 ) -> EventAlphaNotificationInboxResult:
     """Join notification, alert, card, and feedback artifacts into review queues."""
     runs = [dict(row) for row in notification_runs if isinstance(row, Mapping)]
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
     feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    deliveries = [dict(row) for row in notification_delivery_rows if isinstance(row, Mapping)]
     cards_dir = Path(research_cards_dir).expanduser()
     card_paths = _card_paths(cards_dir)
     reviewed_ids = _reviewed_ids(feedback)
     runs_by_id = {str(row.get("run_id") or ""): row for row in runs if row.get("run_id")}
+    delivery_state_by_run = _latest_delivery_state_by_run(deliveries)
     items = [
-        _inbox_item(row, runs_by_id.get(str(row.get("run_id") or "")), card_paths, reviewed_ids)
+        _inbox_item(
+            row,
+            runs_by_id.get(str(row.get("run_id") or "")),
+            card_paths,
+            reviewed_ids,
+            delivery_state_by_run,
+        )
         for row in alerts
     ]
     sent_without_feedback = tuple(item for item in items if item.sent and not item.reviewed)
     would_send_without_feedback = tuple(
         item for item in items
-        if item.would_send and not item.sent and not item.reviewed
+        if item.would_send and not item.sent and not item.blocked_by_guard and not item.reviewed
+    )
+    would_send_blocked_without_feedback = tuple(
+        item for item in items
+        if item.blocked_by_guard and not item.reviewed
     )
     high_priority_unreviewed = tuple(
         item for item in items
@@ -98,9 +117,11 @@ def build_notification_inbox(
         outcome_rows_read=len(outcomes),
         sent_without_feedback=sent_without_feedback,
         would_send_without_feedback=would_send_without_feedback,
+        would_send_blocked_without_feedback=would_send_blocked_without_feedback,
         high_priority_unreviewed=high_priority_unreviewed,
         triggered_fade_unreviewed=triggered_fade_unreviewed,
         heartbeat_only_runs=tuple(row for row in runs if _heartbeat_only(row)),
+        duplicate_or_in_flight_runs=tuple(row for row in runs if _delivery_suppressed_run(row, delivery_state_by_run)),
         provider_degraded_runs=tuple(row for row in runs if _provider_degraded(row)),
     )
 
@@ -129,9 +150,11 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
     ]
     _append_item_section(lines, "sent notifications without feedback", result.sent_without_feedback, profile=result.profile)
     _append_item_section(lines, "would-send notifications without feedback", result.would_send_without_feedback, profile=result.profile)
+    _append_item_section(lines, "would-send blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
     _append_item_section(lines, "high-priority cards not reviewed", result.high_priority_unreviewed, profile=result.profile)
     _append_item_section(lines, "triggered-fade cards not reviewed", result.triggered_fade_unreviewed, profile=result.profile)
     _append_run_section(lines, "heartbeat-only runs", result.heartbeat_only_runs)
+    _append_run_section(lines, "duplicate/in-flight suppressed runs", result.duplicate_or_in_flight_runs)
     _append_run_section(lines, "provider-degraded notification runs", result.provider_degraded_runs)
     lines.append("Review queue is artifact-only; it does not send, trade, paper trade, or alter Event Alpha tiers.")
     return "\n".join(lines).rstrip()
@@ -153,7 +176,8 @@ def _append_item_section(
     for item in rows[:20]:
         lines.append(
             f"- alert_id={item.alert_id} tier={item.tier} playbook={item.playbook} "
-            f"sent={_yes_no(item.sent)} would_send={_yes_no(item.would_send)}"
+            f"sent={_yes_no(item.sent)} would_send={_yes_no(item.would_send)} "
+            f"delivery_state={item.delivery_state or 'none'}"
         )
         lines.append(f"  card: {item.card_path or 'not_written'}")
         lines.append(f"  run_id: {item.run_id or 'unknown'}")
@@ -191,6 +215,7 @@ def _inbox_item(
     run: Mapping[str, Any] | None,
     card_paths: Mapping[str, Path],
     reviewed_ids: set[str],
+    delivery_state_by_run: Mapping[str, str],
 ) -> EventAlphaNotificationInboxItem:
     alert_key = str(alert.get("alert_key") or "")
     alert_id = str(alert.get("alert_id") or (f"ea:{alert_key}" if alert_key else alert.get("snapshot_id") or "unknown"))
@@ -198,22 +223,53 @@ def _inbox_item(
     card_path = _path_for_card(alert_id, alert_key, card_id, card_paths)
     lane = _lane_for_alert(alert)
     due = _lane_count(run, "lane_counts_due", lane)
-    sent = _lane_count(run, "lane_counts_sent", lane) > 0
+    run_id = str(alert.get("run_id") or (run or {}).get("run_id") or "")
+    delivery_state = str(delivery_state_by_run.get(run_id) or "")
+    suppressed = delivery_state in (delivery.STATE_SKIPPED_DUPLICATE, delivery.STATE_SKIPPED_IN_FLIGHT)
+    blocked_by_guard = delivery_state == delivery.STATE_BLOCKED or _guard_blocked(run)
+    sent = _lane_count(run, "lane_counts_sent", lane) > 0 or delivery_state == delivery.STATE_DELIVERED
     would_send = bool(due or (run and _int(run.get("would_send_count")) > 0))
+    if suppressed:
+        would_send = False
     ids = _alert_ids(alert, alert_id, alert_key, card_id)
     reviewed = bool(ids & reviewed_ids)
     return EventAlphaNotificationInboxItem(
         alert_id=alert_id,
         alert_key=alert_key,
-        run_id=str(alert.get("run_id") or (run or {}).get("run_id") or ""),
+        run_id=run_id,
         tier=str(alert.get("tier") or "UNKNOWN"),
         playbook=str(alert.get("playbook_type") or alert.get("effective_playbook_type") or "unknown"),
         card_path=str(card_path) if card_path else "",
         sent=sent,
         would_send=would_send,
+        blocked_by_guard=blocked_by_guard,
+        delivery_state=delivery_state,
         reviewed=reviewed,
         reason=str(alert.get("route_reason") or alert.get("reason") or (run or {}).get("block_reason") or "review pending"),
     )
+
+
+def _latest_delivery_state_by_run(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
+    by_run: dict[str, str] = {}
+    for row in delivery.latest_rows_by_delivery(rows):
+        run_id = str(row.get("run_id") or "")
+        if run_id:
+            by_run[run_id] = str(row.get("state") or "")
+    return by_run
+
+
+def _delivery_suppressed_run(row: Mapping[str, Any], state_by_run: Mapping[str, str]) -> bool:
+    state = state_by_run.get(str(row.get("run_id") or ""))
+    return state in (delivery.STATE_SKIPPED_DUPLICATE, delivery.STATE_SKIPPED_IN_FLIGHT)
+
+
+def _guard_blocked(row: Mapping[str, Any] | None) -> bool:
+    if not row:
+        return False
+    if _int(row.get("deliveries_blocked")) > 0:
+        return True
+    reason = str(row.get("block_reason") or "").casefold()
+    return "disabled" in reason or "guard" in reason or "research_only" in reason
 
 
 def _lane_for_alert(alert: Mapping[str, Any]) -> str:

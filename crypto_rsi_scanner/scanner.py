@@ -80,8 +80,10 @@ from . import event_alpha_missed
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
 from . import event_alpha_notification_delivery
+from . import event_alpha_notification_go_no_go
 from . import event_alpha_notification_inbox
 from . import event_alpha_notification_runs
+from . import event_alpha_notification_sender
 from . import event_alpha_pipeline
 from . import event_alpha_preflight
 from . import event_alpha_priors
@@ -1559,6 +1561,7 @@ def _event_alpha_notification_delivery_config_from_runtime(
         context,
         dedupe_by_content=config.EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT,
         dedupe_window_hours=config.EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS,
+        in_flight_grace_minutes=config.EVENT_ALPHA_NOTIFICATION_IN_FLIGHT_GRACE_MINUTES,
     )
 
 
@@ -2492,6 +2495,7 @@ def _event_alpha_notify_cycle_body(
         notification_deliveries_delivered=send_result.deliveries_delivered,
         notification_deliveries_failed=send_result.deliveries_failed,
         notification_deliveries_skipped_duplicate=send_result.deliveries_skipped_duplicate,
+        notification_deliveries_skipped_in_flight=send_result.deliveries_skipped_in_flight,
         notification_deliveries_blocked=send_result.deliveries_blocked,
         notification_burn_in=True,
     )
@@ -2570,7 +2574,8 @@ def _event_alpha_notify_cycle_body(
             "Event Alpha notification deliveries recorded: "
             f"{pipeline_result.notification_deliveries_delivered} delivered, "
             f"{pipeline_result.notification_deliveries_failed} failed, "
-            f"{pipeline_result.notification_deliveries_skipped_duplicate} skipped_duplicate "
+            f"{pipeline_result.notification_deliveries_skipped_duplicate} skipped_duplicate, "
+            f"{pipeline_result.notification_deliveries_skipped_in_flight} skipped_in_flight "
             f"({delivery_cfg.path})."
         )
     # The run lock is released by the event_alpha_notify_cycle wrapper's finally,
@@ -2653,6 +2658,81 @@ def event_alpha_notify_preview(
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
         clock_status=clock_status,
     ))
+
+
+def event_alpha_notify_go_no_go(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+) -> None:
+    """Print a concise day-1 notification go/no-go decision."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "notify_no_key"
+    try:
+        profile = _apply_event_alpha_profile(selected_profile)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    context = event_alpha_artifacts.context_from_profile(
+        profile.name,
+        run_mode=config.EVENT_ALPHA_RUN_MODE or None,
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+    )
+    provider_status = event_provider_status.build_event_discovery_provider_status(config)
+    clock_status = _event_clock_status()
+    now = _event_research_now()
+    storage = Storage(config.DB_PATH)
+    try:
+        watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
+        routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+        plan = event_alpha_notifications.build_notification_plan(
+            routed.decisions,
+            storage=storage,
+            cfg=_event_alpha_notification_config_from_runtime(profile.name),
+            now=now,
+            include_health_heartbeat=True,
+        )
+    finally:
+        storage.close()
+    artifacts = _event_alpha_local_artifacts(run_limit=250, latest_alerts=False)
+    delivery_path = event_alpha_notification_delivery.deliveries_path_for_context(context)
+    delivery_rows = event_alpha_notification_delivery.load_delivery_records(delivery_path)
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=artifacts["runs"].rows,
+        alert_rows=artifacts["alerts"].rows,
+        feedback_rows=artifacts["feedback_rows"],
+        outcome_rows=artifacts["outcome_rows"],
+        card_paths=[str(path) for path in _research_card_markdown_paths(context.research_cards_dir)],
+        provider_health_rows=artifacts["provider_rows"],
+        llm_budget_rows=artifacts["budget_rows"],
+        delivery_rows=delivery_rows,
+        profile=profile.name,
+        artifact_namespace=context.artifact_namespace,
+        inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
+        strict=False,
+    )
+    lock_status = event_alpha_run_lock.inspect_run_lock(
+        context,
+        stale_minutes=config.EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES,
+    )
+    result = event_alpha_notification_go_no_go.build_go_no_go(
+        profile=profile.name,
+        artifact_namespace=context.artifact_namespace,
+        telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        lock_status=lock_status,
+        provider_status=provider_status,
+        provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
+        delivery_ledger_path=delivery_path,
+        notification_run_ledger_path=context.notification_runs_path,
+        research_cards_dir=context.research_cards_dir,
+        artifact_doctor_status=doctor.status,
+        cooldown_status=plan.cooldown_status,
+        llm_budget_status=_event_alpha_llm_budget_status(),
+        clock_status=clock_status,
+    )
+    print(event_alpha_notification_go_no_go.format_go_no_go(result))
 
 
 def _event_alpha_llm_budget_status() -> str:
@@ -3439,10 +3519,14 @@ def event_alpha_notification_inbox_report(
     )
     alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path)
     feedback = event_feedback.load_feedback(context.feedback_path)
+    delivery_rows = event_alpha_notification_delivery.load_delivery_records(
+        event_alpha_notification_delivery.deliveries_path_for_context(context)
+    )
     result = event_alpha_notification_inbox.build_notification_inbox(
         notification_runs=notification_runs.rows,
         alert_rows=alerts.rows,
         feedback_rows=[record.__dict__ for record in feedback.records],
+        notification_delivery_rows=delivery_rows,
         research_cards_dir=context.research_cards_dir,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
@@ -3536,15 +3620,35 @@ def event_alpha_notify_fixture_smoke(
         max_instant_per_day=10,
         health_heartbeat_enabled=False,
     )
+    delivery_cfg = _event_alpha_notification_delivery_config_from_runtime(context)
+
+    def _fake_sender(message: str) -> event_alpha_notification_sender.NotificationSendAttemptResult:
+        delivered_messages.append(message)
+        chunks = event_alpha_notification_sender.telegram_chunk_count(message)
+        return event_alpha_notification_sender.NotificationSendAttemptResult(
+            attempted=True,
+            success=True,
+            recipient_count=1,
+            delivered_count=1,
+            failed_count=0,
+            chunk_count=chunks,
+            delivered_chunks=chunks,
+            failed_chunks=0,
+            channel_summary={"channel": "fixture", "delivered_count": 1},
+        )
+
     send_result = event_alpha_notifications.send_notifications(
         [decision],
         storage=fake_storage,
         cfg=notification_cfg,
-        send_fn=lambda message: delivered_messages.append(message) or True,
+        send_fn=_fake_sender,
         now=now,
         profile=context.profile,
         card_path_by_alert_id=_card_paths_by_alert_id([decision], card_write.card_paths),
         include_health_heartbeat=False,
+        delivery_cfg=delivery_cfg,
+        run_id=run_id,
+        namespace=context.artifact_namespace,
     )
     pipeline_result = SimpleNamespace(
         run_id=run_id,
@@ -3586,6 +3690,12 @@ def event_alpha_notify_fixture_smoke(
         snapshot_write_success=True,
         snapshot_rows_written=1,
         snapshot_write_block_reason=None,
+        notification_delivery_records_written=send_result.delivery_records_written,
+        notification_deliveries_delivered=send_result.deliveries_delivered,
+        notification_deliveries_failed=send_result.deliveries_failed,
+        notification_deliveries_skipped_duplicate=send_result.deliveries_skipped_duplicate,
+        notification_deliveries_skipped_in_flight=send_result.deliveries_skipped_in_flight,
+        notification_deliveries_blocked=send_result.deliveries_blocked,
     )
     event_alpha_run_ledger.append_run_record(
         pipeline_result,
@@ -3613,6 +3723,9 @@ def event_alpha_notify_fixture_smoke(
         "=" * 76,
         f"run_id: {run_id}",
         f"fake_sender_delivered: {len(delivered_messages)}",
+        f"delivery_path: {delivery_cfg.path}",
+        f"delivery_records_written: {send_result.delivery_records_written}",
+        f"delivery_delivered: {send_result.deliveries_delivered}",
         f"notification_run_path: {context.notification_runs_path}",
         f"notification_would_send: {notification_row.get('would_send_count')}",
         f"alert_snapshot_path: {snapshot_path}",
@@ -4883,11 +4996,12 @@ def _send_event_alpha_routed_digest(
             delivery_cfg=delivery_cfg,
             run_id=run_id,
             namespace=namespace,
-            send_fn=lambda message: bool(send_telegram(
+            send_fn=lambda message: event_alpha_notification_sender.telegram_send_attempt(
+                send_telegram,
                 message,
                 parse_mode="HTML",
                 chat_ids=recipients,
-            )),
+            ),
         )
         if result.attempted and result.success:
             print(
@@ -6415,6 +6529,11 @@ def cli() -> None:
         help="Preview Event Alpha notification readiness, would-send counts, and lane cooldowns.",
     )
     parser.add_argument(
+        "--event-alpha-notify-go-no-go",
+        action="store_true",
+        help="Print Event Alpha notification preview/send go-no-go readiness.",
+    )
+    parser.add_argument(
         "--event-alpha-notification-checklist",
         action="store_true",
         help="Print day-1 Event Alpha notification startup checklist.",
@@ -7094,6 +7213,9 @@ def cli() -> None:
         return
     if args.event_alpha_notify_preview:
         event_alpha_notify_preview(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        return
+    if args.event_alpha_notify_go_no_go:
+        event_alpha_notify_go_no_go(verbose=args.verbose, profile_name=args.event_alpha_profile)
         return
     if args.event_alpha_notification_checklist:
         event_alpha_notification_checklist_report(verbose=args.verbose, profile_name=args.event_alpha_profile)

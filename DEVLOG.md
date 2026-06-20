@@ -17,6 +17,52 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Polish Event Alpha notification delivery reliability · Codex
+**Why:** Day-1 Event Alpha notification scheduling needed more reliable send
+accounting before real unattended runs: boolean sends hid partial delivery, and
+overlapping jobs could see a `sending` row but still attempt the same content.
+**Changes:**
+- Added `event_alpha_notification_sender.py` with
+  `NotificationSendAttemptResult` and bool/structured result normalization.
+  Existing Telegram sending stays compatible, but Event Alpha delivery rows can
+  now record redacted recipient/chunk counts, partial failures, and channel
+  summaries.
+- Extended `event_alpha_notification_delivery.py` and
+  `event_alpha_notifications.py` with `skipped_in_flight`, configurable
+  `RSI_EVENT_ALPHA_NOTIFICATION_IN_FLIGHT_GRACE_MINUTES` (default 10), planned
+  rows before sending, structured delivered/failed rows, stricter secret
+  redaction, and cooldown marking only after full successful delivery. Partial
+  delivery is recorded as failed metadata and remains retryable.
+- Added `event_alpha_notification_go_no_go.py`,
+  `main.py --event-alpha-notify-go-no-go`, and
+  `make event-alpha-notify-go-no-go` to separate preview readiness from send
+  readiness and summarize Telegram/send guard, locks, provider backoff, artifact
+  writability, doctor status, cooldowns, and next command.
+- Updated notification run, delivery, inbox, daily-brief, fixture-smoke, and
+  runbook surfaces so delivered/failed/duplicate/in-flight/blocked/would-send
+  states are distinct. The fixture smoke now writes a namespaced delivery
+  ledger and reports `delivery_records_written`.
+- Updated `ROADMAP.md`, `DECISIONS.md`, `.env.example`, and
+  `research/EVENT_ALPHA_RUNBOOK.md`. Added regression tests for structured
+  partial delivery, in-flight dedupe/retry, go/no-go output, and fixture
+  delivery-ledger smoke coverage.
+**Verify:** `python3 tests/test_indicators.py` passed 395/395.
+`python3 -m compileall -q crypto_rsi_scanner tests` passed.
+`make event-llm-eval PYTHON=python3` passed 9/9.
+`make event-llm-extract-eval PYTHON=python3` passed 7/7.
+`make event-alpha-eval PYTHON=python3` passed 11/11.
+`make event-alpha-notify-fixture-smoke PYTHON=python3` wrote one delivered
+fixture ledger row. `python3 main.py --event-alpha-notification-deliveries-report
+--event-alpha-profile fixture --event-alpha-artifact-namespace
+fixture_notify_smoke` reported delivered=1. `python3 main.py
+--event-alpha-notify-go-no-go --event-alpha-profile notify_no_key` ran and
+reported preview-ready/send-blocked state. `make verify PYTHON=python3` passed.
+**Notes/risks:** Still research-only. No live trading, paper trades, normal RSI
+signal writes, or LLM-created `TRIGGERED_FADE`. The structured Telegram wrapper
+is best-effort around the existing boolean Telegram sender; it records
+recipient/chunk intent and full-channel success/failure, not provider-native
+per-chat acknowledgement details.
+
 ## 2026-06-20 — Harden notification run lock from Codex review · Claude
 **Why:** Codex reviewed the run lock and flagged two P1s and a P3.
 **Changes:**

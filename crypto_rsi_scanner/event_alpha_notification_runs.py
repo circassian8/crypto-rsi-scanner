@@ -113,6 +113,7 @@ def notification_run_record(
         "deliveries_delivered": _int(getattr(result, "notification_deliveries_delivered", 0)),
         "deliveries_failed": _int(getattr(result, "notification_deliveries_failed", 0)),
         "deliveries_skipped_duplicate": _int(getattr(result, "notification_deliveries_skipped_duplicate", 0)),
+        "deliveries_skipped_in_flight": _int(getattr(result, "notification_deliveries_skipped_in_flight", 0)),
         "deliveries_blocked": _int(getattr(result, "notification_deliveries_blocked", 0)),
         "warnings": tuple(dict.fromkeys(warnings)),
     }
@@ -199,6 +200,7 @@ def format_notification_runs_report(result: EventAlphaNotificationRunsReadResult
             f"deliveries={_int(row.get('deliveries_delivered'))}d/"
             f"{_int(row.get('deliveries_failed'))}f/"
             f"{_int(row.get('deliveries_skipped_duplicate'))}dup/"
+            f"{_int(row.get('deliveries_skipped_in_flight'))}flight/"
             f"{_int(row.get('deliveries_blocked'))}blocked"
         )
         cooldown = row.get("cooldown_blocks") or {}

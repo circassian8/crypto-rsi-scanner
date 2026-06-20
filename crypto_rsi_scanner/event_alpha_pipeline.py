@@ -49,6 +49,7 @@ class EventAlphaSendResult:
     deliveries_delivered: int = 0
     deliveries_failed: int = 0
     deliveries_skipped_duplicate: int = 0
+    deliveries_skipped_in_flight: int = 0
     deliveries_blocked: int = 0
 
 
@@ -88,6 +89,7 @@ class EventAlphaPipelineResult:
     notification_deliveries_delivered: int = 0
     notification_deliveries_failed: int = 0
     notification_deliveries_skipped_duplicate: int = 0
+    notification_deliveries_skipped_in_flight: int = 0
     notification_deliveries_blocked: int = 0
     notification_burn_in: bool = False
     research_card_paths: tuple[Path, ...] = ()

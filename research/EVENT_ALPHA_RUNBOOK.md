@@ -58,6 +58,7 @@ Before the first actual send, run the startup checklist:
 
 ```bash
 make event-alpha-notification-checklist PROFILE=notify_no_key
+make event-alpha-notify-go-no-go PROFILE=notify_no_key
 make event-alpha-notification-runs-report PROFILE=notify_no_key
 make event-alpha-notification-inbox PROFILE=notify_no_key
 make event-alpha-notify-fixture-smoke
@@ -71,11 +72,19 @@ heartbeat state, would-send counts, cooldown blocks, provider fail-fast blocks,
 cycle-completed/partial-results flags, runtime-budget status, Telegram
 readiness, and send-guard state.
 
+`make event-alpha-notify-go-no-go PROFILE=notify_no_key` is the compact final
+send check. It separates preview readiness from send readiness and shows
+Telegram/send-guard state, fixed-clock blockers, run-lock state, provider
+backoff, delivery/run-ledger writability, research-card path writability,
+artifact doctor status, cooldowns, and the next command. It never sends.
+
 The notification inbox joins notification run rows, alert snapshots, research
 cards, and feedback artifacts for one profile namespace. It shows sent
-notifications without feedback, would-send items without feedback, unreviewed
-high-priority and triggered-fade cards, heartbeat-only runs, and provider
-degraded runs. Each alert row includes a feedback helper command such as
+notifications without feedback, would-send items without feedback, would-send
+items blocked by send guard, unreviewed high-priority and triggered-fade cards,
+heartbeat-only runs, duplicate/in-flight suppressed runs, and provider degraded
+runs. Duplicate and in-flight skips are not treated as fresh unreviewed alerts.
+Each alert row includes a feedback helper command such as
 `make event-feedback-useful PROFILE=notify_no_key FEEDBACK_TARGET='ea:...'`.
 
 Provider health has profile-scoped operator commands:
@@ -154,8 +163,14 @@ cycles.
 
 Each lane send is recorded in
 `<namespace>/event_alpha_notification_deliveries.jsonl` as `planned`/`sending`
-then `delivered`/`failed`, or `skipped_duplicate`/`blocked`. Cooldown is only
-marked after a real delivery — never after a dedupe-skip or a failed send.
+then `delivered`/`failed`, or `skipped_duplicate`/`skipped_in_flight`/`blocked`.
+Recent non-terminal planned/sending rows with the same content hash are treated
+as in-flight for `RSI_EVENT_ALPHA_NOTIFICATION_IN_FLIGHT_GRACE_MINUTES` (default
+10 minutes) so overlapping jobs do not double-send. Failed rows and stale
+in-flight rows do not block retry. Structured send attempts record redacted
+recipient and chunk counts; partial delivery is recorded but does not mark lane
+cooldown. Cooldown is only marked after a full successful delivery — never after
+a dedupe-skip, in-flight skip, partial delivery, or failed send.
 Inspect with `make event-alpha-notification-deliveries-report
 PROFILE=notify_no_key`; `make event-alpha-notification-retry-failed
 PROFILE=notify_no_key` lists failed deliveries (dry-run; `CONFIRM=1` required,

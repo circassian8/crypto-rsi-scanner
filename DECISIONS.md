@@ -24,18 +24,23 @@ overlapping cycle skip safely (recorded as a skipped notification run); a stale
 lock (past the stale window, or a dead holder PID on this host) is recovered with
 a warning; the lock is released on completion and a crashed run is recovered by
 the next run. Each lane send is recorded
-(planned/sending/delivered/failed/skipped_duplicate/blocked), and identical
-research content already delivered within the dedupe window is skipped.
-Notification cooldown is only marked after a real delivery — never after a
-dedupe-skip or a failed send. Lock/delivery state is metadata only: it never
-sends, trades, paper trades, writes normal RSI signal rows, or creates
-`TRIGGERED_FADE` (still reserved for `event_fade.py` + `proxy_fade`). Automated
-resend of failed deliveries is intentionally a documented TODO because the ledger
-stores redacted metadata only.
+(planned/sending/delivered/failed/skipped_duplicate/skipped_in_flight/blocked).
+Identical research content already delivered within the dedupe window is
+skipped, and identical content with a recent non-terminal planned/sending row is
+treated as in-flight and skipped for the grace window. Failed rows and stale
+in-flight rows do not block retry. Structured send attempts may record
+recipient/chunk delivery counts and partial failures, but notification cooldown
+is only marked after a full successful delivery — never after a dedupe-skip,
+in-flight skip, partial delivery, or failed send. Lock/delivery state is
+metadata only: it never sends, trades, paper trades, writes normal RSI signal
+rows, or creates `TRIGGERED_FADE` (still reserved for `event_fade.py` +
+`proxy_fade`). Automated resend of failed deliveries is intentionally a
+documented TODO because the ledger stores redacted metadata only.
 **Why:** Cron/launchd notify runs can overlap or retry; without a lock and a
 delivery ledger they could double-send a research digest or race lane cooldown
 state. Idempotent delivery is a prerequisite for trustworthy unattended operation.
-**Revisit when:** We want automated retry/resend, multi-host locking, or a
+**Revisit when:** We want automated retry/resend, multi-host locking, recipient-
+level Telegram acknowledgements beyond current best-effort send wrappers, or a
 notification surface beyond the per-profile deliveries report and Codex's inbox.
 
 ## 2026-06-20 - Keep provider backoff overrides explicit and local

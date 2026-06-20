@@ -3,8 +3,9 @@
 Scheduled notify cycles must not double-send the same research digest if a run
 retries, overlaps, or re-fires within a cooldown gap. This module records each
 lane send attempt as an append-only JSONL event (planned -> sending ->
-delivered/failed, or skipped_duplicate/blocked) keyed by a stable content hash,
-and answers "did we already deliver this exact content recently?".
+delivered/failed, or skipped_duplicate/skipped_in_flight/blocked) keyed by a
+stable content hash, and answers "did we already deliver or start sending this
+exact content recently?".
 
 It owns *delivery bookkeeping* only. It never ranks alerts, sends, trades, paper
 trades, writes normal RSI signal rows, or creates ``TRIGGERED_FADE``. Records and
@@ -31,6 +32,7 @@ STATE_SENDING = "sending"
 STATE_DELIVERED = "delivered"
 STATE_FAILED = "failed"
 STATE_SKIPPED_DUPLICATE = "skipped_duplicate"
+STATE_SKIPPED_IN_FLIGHT = "skipped_in_flight"
 STATE_BLOCKED = "blocked"
 
 STATES = (
@@ -39,20 +41,29 @@ STATES = (
     STATE_DELIVERED,
     STATE_FAILED,
     STATE_SKIPPED_DUPLICATE,
+    STATE_SKIPPED_IN_FLIGHT,
     STATE_BLOCKED,
 )
-TERMINAL_STATES = (STATE_DELIVERED, STATE_FAILED, STATE_SKIPPED_DUPLICATE, STATE_BLOCKED)
+TERMINAL_STATES = (
+    STATE_DELIVERED,
+    STATE_FAILED,
+    STATE_SKIPPED_DUPLICATE,
+    STATE_SKIPPED_IN_FLIGHT,
+    STATE_BLOCKED,
+)
 _STAGE_RANK = {
     STATE_PLANNED: 0,
     STATE_SENDING: 1,
     STATE_BLOCKED: 2,
     STATE_SKIPPED_DUPLICATE: 2,
+    STATE_SKIPPED_IN_FLIGHT: 2,
     STATE_FAILED: 3,
     STATE_DELIVERED: 3,
 }
 
 _DELIVERIES_PATH_ENV = "RSI_EVENT_ALPHA_NOTIFICATION_DELIVERIES_PATH"
 _SECRET_RE = re.compile(r"(?i)(api[_-]?key|token|secret|password|bearer)\s*[=:]\s*\S+")
+_SECRET_KEY_RE = re.compile(r"(?i)(api[_-]?key|token|secret|password|bearer)")
 
 
 @dataclass(frozen=True)
@@ -60,6 +71,7 @@ class NotificationDeliveryConfig:
     path: Path
     dedupe_by_content: bool = True
     dedupe_window_hours: float = 24.0
+    in_flight_grace_minutes: float = 10.0
 
 
 @dataclass(frozen=True)
@@ -79,6 +91,10 @@ class NotificationDeliveryRecord:
     error_message_safe: str | None = None
     recipient_count: int = 0
     delivered_count: int = 0
+    failed_count: int = 0
+    chunk_count: int = 0
+    delivered_chunks: int = 0
+    failed_chunks: int = 0
     channel_summary: dict[str, Any] = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
@@ -101,6 +117,10 @@ class NotificationDeliveryRecord:
             "error_message_safe": self.error_message_safe,
             "recipient_count": int(self.recipient_count or 0),
             "delivered_count": int(self.delivered_count or 0),
+            "failed_count": int(self.failed_count or 0),
+            "chunk_count": int(self.chunk_count or 0),
+            "delivered_chunks": int(self.delivered_chunks or 0),
+            "failed_chunks": int(self.failed_chunks or 0),
             "channel_summary": _json_ready(self.channel_summary or {}),
         }
 
@@ -111,12 +131,20 @@ class DeliverySummary:
     delivered: int = 0
     failed: int = 0
     skipped_duplicate: int = 0
+    skipped_in_flight: int = 0
     blocked: int = 0
     in_flight: int = 0
 
     @property
     def records_written(self) -> int:
-        return self.delivered + self.failed + self.skipped_duplicate + self.blocked + self.in_flight
+        return (
+            self.delivered
+            + self.failed
+            + self.skipped_duplicate
+            + self.skipped_in_flight
+            + self.blocked
+            + self.in_flight
+        )
 
 
 def deliveries_path_for_context(context: Any) -> Path:
@@ -133,11 +161,13 @@ def config_for_context(
     *,
     dedupe_by_content: bool = True,
     dedupe_window_hours: float = 24.0,
+    in_flight_grace_minutes: float = 10.0,
 ) -> NotificationDeliveryConfig:
     return NotificationDeliveryConfig(
         path=deliveries_path_for_context(context),
         dedupe_by_content=bool(dedupe_by_content),
         dedupe_window_hours=float(dedupe_window_hours),
+        in_flight_grace_minutes=float(in_flight_grace_minutes),
     )
 
 
@@ -175,6 +205,10 @@ def build_record(
     error_message: str | None = None,
     recipient_count: int = 0,
     delivered_count: int = 0,
+    failed_count: int = 0,
+    chunk_count: int = 0,
+    delivered_chunks: int = 0,
+    failed_chunks: int = 0,
     channel_summary: Mapping[str, Any] | None = None,
 ) -> NotificationDeliveryRecord:
     return NotificationDeliveryRecord(
@@ -193,6 +227,10 @@ def build_record(
         error_message_safe=_safe_error(error_message),
         recipient_count=int(recipient_count or 0),
         delivered_count=int(delivered_count or 0),
+        failed_count=int(failed_count or 0),
+        chunk_count=int(chunk_count or 0),
+        delivered_chunks=int(delivered_chunks or 0),
+        failed_chunks=int(failed_chunks or 0),
         channel_summary=_redact_mapping(channel_summary or {}),
     )
 
@@ -267,6 +305,36 @@ def find_recent_delivered(
     return best
 
 
+def find_recent_in_flight(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    content_hash: str,
+    namespace: str | None,
+    now: datetime,
+    grace_minutes: float,
+) -> dict[str, Any] | None:
+    """Return a recent latest-state planned/sending row for matching content."""
+    if not content_hash:
+        return None
+    cutoff = _as_utc(now) - timedelta(minutes=max(0.0, float(grace_minutes)))
+    ns = str(namespace or "default")
+    best: dict[str, Any] | None = None
+    best_ts: datetime | None = None
+    for row in latest_rows_by_delivery(rows):
+        if str(row.get("state") or "") not in (STATE_PLANNED, STATE_SENDING):
+            continue
+        if str(row.get("content_hash") or "") != str(content_hash):
+            continue
+        if str(row.get("namespace") or row.get("artifact_namespace") or "default") != ns:
+            continue
+        ts = _parse_iso(row.get("attempted_at"))
+        if ts is None or ts < cutoff:
+            continue
+        if best_ts is None or ts >= best_ts:
+            best, best_ts = dict(row), ts
+    return best
+
+
 def summarize_delivery_rows(rows: Iterable[Mapping[str, Any]]) -> DeliverySummary:
     """Collapse append-only rows to one latest state per delivery_id and count."""
     latest: dict[str, dict[str, Any]] = {}
@@ -290,6 +358,7 @@ def summarize_delivery_rows(rows: Iterable[Mapping[str, Any]]) -> DeliverySummar
         delivered=counts[STATE_DELIVERED],
         failed=counts[STATE_FAILED],
         skipped_duplicate=counts[STATE_SKIPPED_DUPLICATE],
+        skipped_in_flight=counts[STATE_SKIPPED_IN_FLIGHT],
         blocked=counts[STATE_BLOCKED],
         in_flight=in_flight,
     )
@@ -326,7 +395,9 @@ def format_delivery_report(
         f"rows_read: {len(rows)} · deliveries: {summary.rows}",
         (
             f"delivered={summary.delivered} failed={summary.failed} "
-            f"skipped_duplicate={summary.skipped_duplicate} blocked={summary.blocked} "
+            f"skipped_duplicate={summary.skipped_duplicate} "
+            f"skipped_in_flight={summary.skipped_in_flight} "
+            f"blocked={summary.blocked} "
             f"in_flight={summary.in_flight}"
         ),
     ]
@@ -352,6 +423,7 @@ def format_delivery_report(
     lines.extend(_section("latest failures", _filter_state(collapsed, STATE_FAILED), latest_limit))
     lines.extend(_section("latest delivered", _filter_state(collapsed, STATE_DELIVERED), latest_limit))
     lines.extend(_section("latest duplicate skips", _filter_state(collapsed, STATE_SKIPPED_DUPLICATE), latest_limit))
+    lines.extend(_section("latest in-flight skips", _filter_state(collapsed, STATE_SKIPPED_IN_FLIGHT), latest_limit))
     blocked = _filter_state(collapsed, STATE_BLOCKED)
     if blocked:
         lines.extend(_section("latest blocked", blocked, latest_limit))
@@ -402,12 +474,15 @@ def _safe_error(text: object) -> str | None:
 def _redact_mapping(mapping: Mapping[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, value in mapping.items():
-        if isinstance(value, str):
+        key_text = str(key)
+        if _SECRET_KEY_RE.search(key_text):
+            out[key_text] = "[redacted]"
+        elif isinstance(value, str):
             out[str(key)] = _SECRET_RE.sub(r"\1=[redacted]", value)
         elif isinstance(value, Mapping):
             out[str(key)] = _redact_mapping(value)
         else:
-            out[str(key)] = value
+            out[key_text] = value
     return out
 
 

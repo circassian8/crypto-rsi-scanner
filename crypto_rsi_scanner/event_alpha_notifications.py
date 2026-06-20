@@ -15,6 +15,7 @@ from typing import Any, Callable, Iterable, Mapping
 import re
 
 from . import event_alpha_notification_delivery as delivery
+from . import event_alpha_notification_sender as sender
 from . import event_alpha_pipeline, event_alpha_router
 
 LANE_DAILY_DIGEST = "daily_digest"
@@ -87,7 +88,7 @@ class EventAlphaNotificationPlan:
         return counts
 
 
-SendFn = Callable[[str], bool]
+SendFn = Callable[[str], bool | sender.NotificationSendAttemptResult | Mapping[str, Any]]
 
 
 def build_notification_plan(
@@ -291,6 +292,7 @@ def send_notifications(
             deliveries_delivered=int(counts.get(delivery.STATE_DELIVERED, 0)),
             deliveries_failed=int(counts.get(delivery.STATE_FAILED, 0)),
             deliveries_skipped_duplicate=int(counts.get(delivery.STATE_SKIPPED_DUPLICATE, 0)),
+            deliveries_skipped_in_flight=int(counts.get(delivery.STATE_SKIPPED_IN_FLIGHT, 0)),
             deliveries_blocked=int(counts.get(delivery.STATE_BLOCKED, 0)),
             **kwargs,
         )
@@ -339,8 +341,10 @@ def send_notifications(
             continue
         attempted = True
         if writer:
+            writer.record_planned(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items))
             writer.record_sending(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items))
-        if send_fn(message):
+        attempt = _call_send_fn(send_fn, message)
+        if attempt.success:
             delivered_by_lane[lane] = len(items)
             record_lane_sent(
                 storage,
@@ -351,11 +355,23 @@ def send_notifications(
                 cfg=cfg,
             )
             if writer:
-                writer.record_delivered(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items), delivered_count=len(items))
+                writer.record_delivered(
+                    message=message,
+                    lane=lane,
+                    alert_ids=alert_ids,
+                    route=_route_label(items),
+                    attempt=attempt,
+                )
         else:
-            block_reasons.append(f"{lane}: no channel delivered")
+            block_reasons.append(f"{lane}: {attempt.error_message_safe or 'no channel delivered'}")
             if writer:
-                writer.record_failed(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items), error_message="no channel delivered")
+                writer.record_failed(
+                    message=message,
+                    lane=lane,
+                    alert_ids=alert_ids,
+                    route=_route_label(items),
+                    attempt=attempt,
+                )
     if plan.heartbeat_due:
         heartbeat_message = format_health_heartbeat(profile=profile, result=pipeline_result, now=observed)
         # Same delivery-ledger dedupe as the digest lanes for idempotency. In
@@ -370,16 +386,30 @@ def send_notifications(
         if not heartbeat_dup:
             attempted = True
             if writer:
+                writer.record_planned(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT")
                 writer.record_sending(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT")
-            if send_fn(heartbeat_message):
+            attempt = _call_send_fn(send_fn, heartbeat_message)
+            if attempt.success:
                 delivered_by_lane[LANE_HEALTH_HEARTBEAT] = 1
                 record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed, cfg=cfg)
                 if writer:
-                    writer.record_delivered(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT", delivered_count=1)
+                    writer.record_delivered(
+                        message=heartbeat_message,
+                        lane=LANE_HEALTH_HEARTBEAT,
+                        alert_ids=["heartbeat"],
+                        route="HEALTH_HEARTBEAT",
+                        attempt=attempt,
+                    )
             else:
-                block_reasons.append("health_heartbeat: no channel delivered")
+                block_reasons.append(f"health_heartbeat: {attempt.error_message_safe or 'no channel delivered'}")
                 if writer:
-                    writer.record_failed(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT", error_message="no channel delivered")
+                    writer.record_failed(
+                        message=heartbeat_message,
+                        lane=LANE_HEALTH_HEARTBEAT,
+                        alert_ids=["heartbeat"],
+                        route="HEALTH_HEARTBEAT",
+                        attempt=attempt,
+                    )
 
     delivered = sum(delivered_by_lane.values())
     return _result(
@@ -394,6 +424,26 @@ def send_notifications(
         would_send_items=would_send,
         heartbeat_sent=delivered_by_lane[LANE_HEALTH_HEARTBEAT] > 0,
     )
+
+
+def _call_send_fn(send_fn: SendFn, message: str) -> sender.NotificationSendAttemptResult:
+    try:
+        raw = send_fn(message)
+    except Exception as exc:  # noqa: BLE001 - notification delivery must fail soft
+        return sender.NotificationSendAttemptResult(
+            attempted=True,
+            success=False,
+            recipient_count=0,
+            delivered_count=0,
+            failed_count=1,
+            chunk_count=sender.telegram_chunk_count(message),
+            delivered_chunks=0,
+            failed_chunks=sender.telegram_chunk_count(message),
+            error_class=type(exc).__name__,
+            error_message_safe=sender.safe_error(exc),
+            channel_summary={"channel": "unknown", "exception": type(exc).__name__},
+        )
+    return sender.normalize_send_result(raw, message=message, recipient_count=0)
 
 
 class _DeliveryWriter:
@@ -422,6 +472,7 @@ class _DeliveryWriter:
             delivery.STATE_DELIVERED: 0,
             delivery.STATE_FAILED: 0,
             delivery.STATE_SKIPPED_DUPLICATE: 0,
+            delivery.STATE_SKIPPED_IN_FLIGHT: 0,
             delivery.STATE_BLOCKED: 0,
             "records": 0,
         }
@@ -464,7 +515,28 @@ class _DeliveryWriter:
             window_hours=self.cfg.dedupe_window_hours,
         )
         if dup is None:
-            return False
+            in_flight = delivery.find_recent_in_flight(
+                self.existing,
+                content_hash=content_hash,
+                namespace=self.namespace,
+                now=self.now,
+                grace_minutes=self.cfg.in_flight_grace_minutes,
+            )
+            if in_flight is None:
+                return False
+            self._append(
+                alert_ids=alert_ids,
+                lane=lane,
+                route=route,
+                content_hash=content_hash,
+                state=delivery.STATE_SKIPPED_IN_FLIGHT,
+                error_class="in_flight_content",
+                error_message=(
+                    f"in-flight duplicate within {self.cfg.in_flight_grace_minutes:g}m "
+                    f"(prior attempted_at={in_flight.get('attempted_at')})"
+                ),
+            )
+            return True
         self._append(
             alert_ids=alert_ids,
             lane=lane,
@@ -476,10 +548,21 @@ class _DeliveryWriter:
         )
         return True
 
+    def record_planned(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> None:
+        self._append(alert_ids=alert_ids, lane=lane, route=route, content_hash=self._hash(message, lane, alert_ids), state=delivery.STATE_PLANNED)
+
     def record_sending(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> None:
         self._append(alert_ids=alert_ids, lane=lane, route=route, content_hash=self._hash(message, lane, alert_ids), state=delivery.STATE_SENDING)
 
-    def record_delivered(self, *, message: str, lane: str, alert_ids: list[str], route: str, delivered_count: int) -> None:
+    def record_delivered(
+        self,
+        *,
+        message: str,
+        lane: str,
+        alert_ids: list[str],
+        route: str,
+        attempt: sender.NotificationSendAttemptResult,
+    ) -> None:
         self._append(
             alert_ids=alert_ids,
             lane=lane,
@@ -487,19 +570,39 @@ class _DeliveryWriter:
             content_hash=self._hash(message, lane, alert_ids),
             state=delivery.STATE_DELIVERED,
             delivered_at=self.now,
-            delivered_count=delivered_count,
-            channel_summary={"channel": "telegram", "delivered_count": int(delivered_count)},
+            recipient_count=attempt.recipient_count,
+            delivered_count=attempt.delivered_count,
+            failed_count=attempt.failed_count,
+            chunk_count=attempt.chunk_count,
+            delivered_chunks=attempt.delivered_chunks,
+            failed_chunks=attempt.failed_chunks,
+            channel_summary=attempt.channel_summary,
         )
 
-    def record_failed(self, *, message: str, lane: str, alert_ids: list[str], route: str, error_message: str) -> None:
+    def record_failed(
+        self,
+        *,
+        message: str,
+        lane: str,
+        alert_ids: list[str],
+        route: str,
+        attempt: sender.NotificationSendAttemptResult,
+    ) -> None:
         self._append(
             alert_ids=alert_ids,
             lane=lane,
             route=route,
             content_hash=self._hash(message, lane, alert_ids),
             state=delivery.STATE_FAILED,
-            error_class="send_failed",
-            error_message=error_message,
+            error_class=attempt.error_class or "send_failed",
+            error_message=attempt.error_message_safe or "no channel delivered",
+            recipient_count=attempt.recipient_count,
+            delivered_count=attempt.delivered_count,
+            failed_count=attempt.failed_count,
+            chunk_count=attempt.chunk_count,
+            delivered_chunks=attempt.delivered_chunks,
+            failed_chunks=attempt.failed_chunks,
+            channel_summary=attempt.channel_summary,
         )
 
     def record_blocked(self, plan: "EventAlphaNotificationPlan", *, profile: str | None, card_map: dict[str, Any], reason: str) -> None:
