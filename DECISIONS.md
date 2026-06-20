@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-20 - Fail soft Event Alpha notification provider/runtime failures
+**Status:** accepted
+**Decision:** Day-1 Event Alpha notification cycles must treat live provider
+and runtime failures as degraded research output, not process-fatal failures.
+Live CoinGecko market enrichment in notification mode returns empty rows with
+`market_enrichment_live_fetch_failed`, records role-specific provider health,
+and lets discovery/anomaly/watchlist reporting continue. Unexpected pipeline
+exceptions become `notification_cycle_failed_soft: <ErrorClass>` and still
+write run/notification ledgers plus heartbeat would-send/sends when due. The
+preview/checklist surfaces provider backoff and separates preview readiness
+from send readiness.
+**Why:** The owner wants immediate day-1 notifications even when public no-key
+sources or CoinGecko are flaky, while preserving a visible degraded state for
+review.
+**Revisit when:** Notification burn-in has enough clean provider-health and
+feedback history to decide whether any provider failures should block specific
+lanes instead of only degrading heartbeat/run state.
+
 ## 2026-06-19 - Scope Event Alpha notification state by burn-in namespace
 **Status:** accepted
 **Decision:** Day-1 Event Alpha notification state for `notify_no_key`,

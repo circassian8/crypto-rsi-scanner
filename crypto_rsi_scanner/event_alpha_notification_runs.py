@@ -89,6 +89,8 @@ def notification_run_record(
         "started_at": started.isoformat(),
         "finished_at": finished.isoformat(),
         "runtime_seconds": round(max(0.0, (finished - started).total_seconds()), 4),
+        "cycle_completed": bool(getattr(result, "cycle_completed", True)),
+        "partial_results": bool(getattr(result, "partial_results", False)),
         "scope": getattr(result, "notification_scope", None) or getattr(plan, "notification_scope", None),
         "scope_value": getattr(result, "notification_scope_value", None) or getattr(plan, "scope_value", None),
         "lane_counts_due": lane_due,
@@ -151,6 +153,8 @@ def format_notification_runs_report(result: EventAlphaNotificationRunsReadResult
             f"heartbeat={_yes_no(bool(row.get('heartbeat_sent')))}/{_yes_no(bool(row.get('heartbeat_due')))} "
             f"would_send={_int(row.get('would_send_count'))} "
             f"block={row.get('block_reason') or 'none'} "
+            f"cycle_completed={_yes_no(bool(row.get('cycle_completed', True)))} "
+            f"partial_results={_yes_no(bool(row.get('partial_results')))} "
             f"runtime_budget_exhausted={_yes_no(bool(row.get('runtime_budget_exhausted')))}"
         )
         cooldown = row.get("cooldown_blocks") or {}

@@ -4466,6 +4466,105 @@ def test_event_market_enrichment_from_coingecko_rows():
     assert abs(event_market_enrichment.volume_to_market_cap(rows[2]) - 0.06) < 1e-9
 
 
+def test_event_market_enrichment_live_fail_soft_records_provider_health():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_market_enrichment, event_provider_health
+
+    class FailingClient:
+        calls = 0
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return None
+
+        async def get_top_markets(self, n):
+            type(self).calls += 1
+            raise OSError("DNS temporary failure in name resolution")
+
+    now = datetime(2026, 6, 20, 9, 0, tzinfo=timezone.utc)
+    with tempfile.TemporaryDirectory() as tmp:
+        health_cfg = event_provider_health.EventProviderHealthConfig(
+            path=Path(tmp) / "provider_health.json",
+            max_consecutive_failures=1,
+            backoff_minutes=30,
+            fail_fast_on_dns=True,
+        )
+        rows, warnings = event_market_enrichment.load_market_enrichment_rows_safe(
+            None,
+            live=True,
+            fetch_limit=5,
+            fail_soft=True,
+            client_factory=FailingClient,
+            provider_health_cfg=health_cfg,
+            now=now,
+        )
+        assert rows == []
+        assert warnings == ("market_enrichment_live_fetch_failed: OSError",)
+        health = event_provider_health.load_provider_health(health_cfg.path)
+        assert health["coingecko:market_enrichment"]["last_error_class"] == "OSError"
+        assert health["coingecko:market_enrichment"]["disabled_until"]
+
+        class ShouldNotRunClient(FailingClient):
+            calls = 0
+
+        rows_again, warnings_again = event_market_enrichment.load_market_enrichment_rows_safe(
+            None,
+            live=True,
+            fetch_limit=5,
+            fail_soft=True,
+            client_factory=ShouldNotRunClient,
+            provider_health_cfg=health_cfg,
+            now=now,
+        )
+        assert rows_again == []
+        assert ShouldNotRunClient.calls == 0
+        assert any("coingecko:market_enrichment in backoff" in warning for warning in warnings_again)
+
+        try:
+            event_market_enrichment.load_market_enrichment_rows(
+                None,
+                live=True,
+                fetch_limit=5,
+                fail_soft=False,
+                client_factory=FailingClient,
+            )
+        except OSError:
+            pass
+        else:
+            raise AssertionError("non-fail-soft live market enrichment should raise")
+
+
+def test_event_discovery_market_enrichment_failure_continues_fail_soft():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_discovery, event_market_enrichment
+
+    original_loader = event_market_enrichment.load_market_enrichment_rows_safe
+
+    def fake_loader(*args, **kwargs):
+        assert kwargs["fail_soft"] is True
+        return [], ("market_enrichment_live_fetch_failed: OSError",)
+
+    event_market_enrichment.load_market_enrichment_rows_safe = fake_loader
+    try:
+        result = event_discovery.run_manual_discovery(
+            None,
+            None,
+            market_enrichment_enabled=True,
+            market_enrichment_live=True,
+            anomaly_scanner_enabled=True,
+            market_enrichment_fail_soft=True,
+            now=datetime(2026, 6, 20, 9, 0, tzinfo=timezone.utc),
+        )
+    finally:
+        event_market_enrichment.load_market_enrichment_rows_safe = original_loader
+    assert result.raw_events == ()
+    assert "market_enrichment_live_fetch_failed: OSError" in result.warnings
+
+
 def test_event_market_enrichment_fills_candidates_without_overriding_raw_market():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_discovery, event_market_enrichment
@@ -7481,9 +7580,19 @@ def test_event_alpha_notification_state_is_profile_namespace_scoped():
         llm_budget_status="fixture",
         plan=llm_plan,
         card_auto_write=True,
+        provider_health_rows={
+            "coingecko:market_enrichment": {
+                "provider_key": "coingecko:market_enrichment",
+                "consecutive_failures": 1,
+                "disabled_until": "2026-06-19T12:00:00+00:00",
+            }
+        },
     )
     assert "notification_scope: namespace" in preview
     assert "event_alpha_notify:notify_llm:last_sent:daily_digest" in preview
+    assert "partial_results_allowed: yes" in preview
+    assert "provider_health_backoff_count: 1" in preview
+    assert "coingecko:market_enrichment disabled_until=2026-06-19T12:00:00+00:00" in preview
 
     global_cfg = event_alpha_notifications.EventAlphaNotificationConfig(enabled=True, notification_scope="global")
     event_alpha_notifications.record_lane_sent(
@@ -7638,18 +7747,25 @@ def test_event_alpha_notification_runs_and_checklist_report_guard_state():
         send_guard_enabled=False,
         telegram_ready=False,
         provider_status=status,
-        provider_health_rows={},
+        provider_health_rows={
+            "coingecko:market_enrichment": {
+                "provider_key": "coingecko:market_enrichment",
+                "disabled_until": "2026-06-19T12:00:00+00:00",
+            }
+        },
         plan=plan,
         llm_budget_status="provider=fixture/fixture",
         card_auto_write=True,
         artifact_doctor_status="WARN",
     )
     text = event_alpha_notification_checklist.format_notification_checklist(checklist)
+    assert "READY_TO_PREVIEW: yes" in text
     assert "READY_TO_NOTIFY_NOW: no" in text
     assert "actual notify requires RSI_EVENT_ALERTS_ENABLED=1" in text
     assert "no ready event sources" in text
     assert "Trading action: NONE" in text
     assert "event_alpha_notify:notify_no_key:last_sent:daily_digest" in text
+    assert "coingecko:market_enrichment disabled_until=2026-06-19T12:00:00+00:00" in text
 
     llm_checklist = event_alpha_notification_checklist.build_notification_checklist(
         profile="notify_llm",
@@ -7680,6 +7796,8 @@ def test_event_alpha_notification_runs_and_checklist_report_guard_state():
         send_cooldown_blocks={"daily_digest": "cooldown active"},
         notification_scope="namespace",
         notification_scope_value="notify_no_key",
+        cycle_completed=False,
+        partial_results=True,
         warnings=("rss failed: DNS", "notification_runtime_budget_exhausted"),
     )
     row = event_alpha_notification_runs.notification_run_record(
@@ -7694,12 +7812,69 @@ def test_event_alpha_notification_runs_and_checklist_report_guard_state():
     )
     assert row["would_send_count"] == 2
     assert row["heartbeat_due"] is True
+    assert row["cycle_completed"] is False
+    assert row["partial_results"] is True
     assert row["runtime_budget_exhausted"] is True
     report = event_alpha_notification_runs.format_notification_runs_report(
         event_alpha_notification_runs.EventAlphaNotificationRunsReadResult(path=__import__("pathlib").Path("/tmp/runs.jsonl"), rows_read=1, rows=[row])
     )
     assert "provider_fail_fast_blocks" in report
+    assert "partial_results=yes" in report
     assert "trading action is NONE" in report
+
+
+def test_event_alpha_degraded_heartbeat_copy_and_delivery():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import event_alpha_notifications
+
+    class FakeStorage:
+        def __init__(self):
+            self.meta = {}
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+    sent = []
+    result = SimpleNamespace(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        cycle_completed=False,
+        partial_results=True,
+        warnings=("notification_cycle_failed_soft: RuntimeError", "market_enrichment_live_fetch_failed: OSError"),
+        raw_events=0,
+        anomaly_lifecycle_entries=0,
+        candidates=0,
+        watchlist_entries=0,
+        alertable=0,
+        extraction_rows=(),
+        relationship_rows=(),
+    )
+    send_result = event_alpha_notifications.send_notifications(
+        [],
+        storage=FakeStorage(),
+        cfg=event_alpha_notifications.EventAlphaNotificationConfig(enabled=True, notification_scope="namespace", artifact_namespace="notify_no_key"),
+        send_fn=lambda message: sent.append(message) or True,
+        now=datetime(2026, 6, 20, 9, 0, tzinfo=timezone.utc),
+        profile="notify_no_key",
+        pipeline_result=result,
+        include_health_heartbeat=True,
+    )
+    assert send_result.heartbeat_due is True
+    assert send_result.heartbeat_sent is True
+    assert send_result.lane_items_delivered[event_alpha_notifications.LANE_HEALTH_HEARTBEAT] == 1
+    message = sent[0]
+    assert "Research-only / DAY-1 UNVALIDATED" in message
+    assert "Trading action: NONE" in message
+    assert "namespace=notify_no_key" in message
+    assert "cycle_completed=no" in message
+    assert "degraded=yes" in message
+    assert "partial_results=yes" in message
+    assert "alertable_count=0" in message
+    assert "warnings_summary=notification_cycle_failed_soft: RuntimeError" in message
 
 
 def test_event_alpha_notification_provider_fail_fast_defaults():
@@ -7783,6 +7958,86 @@ def test_event_alpha_send_test_refuses_without_guard_and_does_not_send():
         scanner.send_telegram = original_send
         for name, value in original.items():
             setattr(config, name, value)
+
+
+def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledgers():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, event_alpha_profiles, event_alpha_pipeline, scanner
+
+    notify_profile = event_alpha_profiles.get_profile("notify_no_key")
+    base_attrs = (
+        "DB_PATH",
+        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "EVENT_ALPHA_RUN_MODE",
+        "EVENT_ALERTS_ENABLED",
+        "EVENT_ALERT_MODE",
+        "EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS",
+        "EVENT_RESEARCH_CARDS_AUTO_WRITE",
+        "EVENT_RESEARCH_NOW",
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_CHAT_IDS",
+    )
+    attrs = tuple(name for name in dict.fromkeys((*base_attrs, *notify_profile.config_overrides)) if hasattr(config, name))
+    original = {name: getattr(config, name) for name in attrs}
+    original_runner = event_alpha_pipeline.run_event_alpha_operating_cycle
+
+    def raising_runner(**kwargs):
+        raise RuntimeError("simulated CoinGecko market enrichment crash")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        try:
+            config.DB_PATH = tmp_path / "scanner.db"
+            config.EVENT_ALPHA_ARTIFACT_BASE_DIR = tmp_path / "event_alpha"
+            config.EVENT_ALPHA_ARTIFACT_NAMESPACE = ""
+            config.EVENT_ALPHA_RUN_MODE = ""
+            config.EVENT_ALERTS_ENABLED = False
+            config.EVENT_ALERT_MODE = "research_only"
+            config.EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS = True
+            config.EVENT_RESEARCH_CARDS_AUTO_WRITE = False
+            config.EVENT_RESEARCH_NOW = "2026-06-15T16:00:00Z"
+            config.TELEGRAM_BOT_TOKEN = ""
+            config.TELEGRAM_CHAT_IDS = []
+            event_alpha_pipeline.run_event_alpha_operating_cycle = raising_runner
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_notify_cycle(profile_name="notify_no_key")
+            text = out.getvalue()
+            assert "notification_cycle_failed_soft: RuntimeError" in text
+            assert "cycle_completed=false" in text
+            assert "partial_results=true" in text
+
+            namespace_dir = tmp_path / "event_alpha" / "notify_no_key"
+            run_rows = [
+                json.loads(line)
+                for line in (namespace_dir / "event_alpha_runs.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            notification_rows = [
+                json.loads(line)
+                for line in (namespace_dir / "event_alpha_notification_runs.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            assert run_rows[-1]["notification_burn_in"] is True
+            assert run_rows[-1]["cycle_completed"] is False
+            assert run_rows[-1]["partial_results"] is True
+            assert run_rows[-1]["notification_summary"]["heartbeat_due"] is True
+            assert notification_rows[-1]["would_send_count"] == 1
+            assert notification_rows[-1]["heartbeat_due"] is True
+            assert notification_rows[-1]["cycle_completed"] is False
+            assert notification_rows[-1]["partial_results"] is True
+            assert notification_rows[-1]["warnings"] == ["notification_cycle_failed_soft: RuntimeError"]
+            alert_path = namespace_dir / "event_alpha_alerts.jsonl"
+            assert not alert_path.exists() or alert_path.read_text(encoding="utf-8").strip() == ""
+        finally:
+            event_alpha_pipeline.run_event_alpha_operating_cycle = original_runner
+            for name, value in original.items():
+                setattr(config, name, value)
 
 
 def test_event_alpha_run_ledger_records_send_accounting():

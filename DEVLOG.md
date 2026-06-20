@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Fail-soft Event Alpha notification runtime failures · Codex
+**Why:** `notify_no_key` could still crash or hang operationally when live
+CoinGecko market enrichment or other expensive notification stages failed,
+which defeats day-1 degraded heartbeat/run-ledger behavior.
+**Changes:**
+- Added fail-soft live market enrichment that returns empty rows with
+  `market_enrichment_live_fetch_failed`, logs the error, and records
+  `coingecko:market_enrichment` provider-health/backoff rows in notification
+  mode while preserving non-fail-soft raising behavior.
+- Wired notification discovery to continue anomaly/discovery work with empty
+  market rows on live enrichment failures, and added provider-health backoff
+  support for targeted `coingecko:watchlist_market` lookups.
+- Added `NotificationRuntimeBudget`, explicit pipeline `cycle_completed` and
+  `partial_results` flags, and a notification-only fail-soft wrapper that turns
+  unexpected pipeline exceptions into `notification_cycle_failed_soft:
+  <ErrorClass>` while still writing run and notification ledgers.
+- Updated heartbeat, preview, checklist, notification-run report, and run-ledger
+  summaries to show degraded/partial state, runtime-budget status, alertable
+  counts, provider backoff, notification runtime/timeout/fail-fast settings,
+  and preview-vs-send readiness.
+- Updated `.env.example`, `DECISIONS.md`, `ROADMAP.md`, `Makefile`, and the
+  Event Alpha runbook; added regression coverage for live CoinGecko fail-soft
+  enrichment, discovery continuation, degraded heartbeat delivery, and
+  notification-cycle exception handling.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed 373/373; `make event-llm-eval
+PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`, `make
+event-alpha-eval PYTHON=python3`, and `make verify PYTHON=python3` passed.
+Also ran `python3 main.py --event-alpha-notify-cycle --event-alpha-profile
+notify_no_key`; it exited without traceback, marked `partial_results=true`,
+and wrote run/notification summary artifacts with send disabled.
+**Notes/risks:** Public no-key sources can still consume much of the 120s
+notification budget when upstream endpoints time out or rate-limit. The cycle
+now records degraded state and provider backoff instead of crashing, but actual
+delivery remains guarded by `RSI_EVENT_ALERTS_ENABLED=1` plus Telegram config.
+No live trading, paper trades, normal RSI signal writes, or LLM-created
+`TRIGGERED_FADE` were added.
+
 ## 2026-06-19 — Harden Event Alpha day-1 notifications · Codex
 **Why:** Day-1 Event Alpha notifications need to be usable immediately without
 mixing profile cooldowns, hanging on public providers, or implying calibrated

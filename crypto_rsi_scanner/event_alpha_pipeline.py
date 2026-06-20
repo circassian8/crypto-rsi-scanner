@@ -59,6 +59,8 @@ class EventAlphaPipelineResult:
     watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None
     router_result: event_alpha_router.EventAlphaRouterResult | None
     warnings: tuple[str, ...] = ()
+    cycle_completed: bool = True
+    partial_results: bool = False
     send_requested: bool = False
     send_attempted: bool = False
     send_success: bool = False
@@ -595,6 +597,10 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
             f"send_success={str(result.send_success).lower()} · "
             f"send_items={result.send_items_delivered}/{result.send_items_attempted}"
             + (f" · send_block={result.send_block_reason}" if result.send_block_reason else "")
+        ),
+        (
+            f"cycle_completed={str(result.cycle_completed).lower()} · "
+            f"partial_results={str(result.partial_results).lower()}"
         ),
     ]
     if result.warnings:

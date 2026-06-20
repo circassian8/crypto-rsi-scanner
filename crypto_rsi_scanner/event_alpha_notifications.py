@@ -382,6 +382,7 @@ def format_health_heartbeat(
 ) -> str:
     observed = _as_utc(now or datetime.now(timezone.utc))
     warnings = tuple(str(item) for item in getattr(result, "warnings", ()) or () if str(item))
+    partial = bool(getattr(result, "partial_results", False) or _provider_failure_count(warnings) > 0)
     lines = [
         "<b>Event Alpha notification heartbeat</b>",
         "<i>Research-only / DAY-1 UNVALIDATED. Not a trade signal.</i>",
@@ -389,11 +390,14 @@ def format_health_heartbeat(
         "Trading action: NONE",
         "Review before acting.",
         f"profile={_esc(profile or getattr(result, 'profile', None) or 'default')}",
+        f"namespace={_esc(getattr(result, 'artifact_namespace', None) or 'default')}",
         f"generated_at={_esc(observed.isoformat())}",
-        f"cycle_completed={_yes_no(result is not None and not getattr(result, 'failure', None))}",
-        f"partial_results={_yes_no(_provider_failure_count(warnings) > 0)}",
+        f"cycle_completed={_yes_no(bool(getattr(result, 'cycle_completed', result is not None)))}",
+        f"degraded={_yes_no(partial)}",
+        f"partial_results={_yes_no(partial)}",
         f"provider_failure_count={_provider_failure_count(warnings)}",
         f"runtime_budget_status={'exhausted' if _runtime_budget_exhausted(warnings) else 'ok'}",
+        f"alertable_count={_num(result, 'alertable')}",
         f"artifact_doctor_status={_esc(getattr(result, 'artifact_doctor_status', 'not_run') if result is not None else 'not_run')}",
         (
             "run_stats: "
@@ -410,9 +414,9 @@ def format_health_heartbeat(
         ),
     ]
     if warnings:
-        lines.append("provider_warnings=" + _esc("; ".join(warnings[:5])))
+        lines.append("warnings_summary=" + _esc("; ".join(warnings[:5])))
     else:
-        lines.append("provider_warnings=none")
+        lines.append("warnings_summary=none")
     lines.append("next=make event-alpha-notify-preview PROFILE=" + _esc(profile or "notify_no_key"))
     return "\n".join(lines)
 
@@ -427,7 +431,20 @@ def format_preview(
     llm_budget_status: str,
     plan: EventAlphaNotificationPlan,
     card_auto_write: bool,
+    send_guard_enabled: bool = False,
+    partial_results_allowed: bool = True,
+    max_runtime_seconds: float = 120.0,
+    provider_timeout_seconds: float = 5.0,
+    fail_fast_on_dns: bool = True,
+    provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> str:
+    provider_health_rows = provider_health_rows or {}
+    disabled_rows = [
+        f"{row.get('provider_key') or key} disabled_until={row.get('disabled_until')}"
+        for key, row in provider_health_rows.items()
+        if row.get("disabled_until")
+    ]
+    failure_count = sum(int(row.get("consecutive_failures") or 0) for row in provider_health_rows.values())
     lines = [
         "=" * 76,
         "EVENT ALPHA NOTIFICATION PREVIEW (research-only / unvalidated)",
@@ -437,6 +454,14 @@ def format_preview(
         f"notification_scope: {plan.notification_scope}",
         f"notification_scope_value: {plan.scope_value}",
         f"telegram_ready: {'yes' if telegram_ready else 'no'}",
+        "ready_to_preview: yes",
+        f"ready_to_send_now: {'yes' if (telegram_ready and send_guard_enabled) else 'no'}",
+        f"partial_results_allowed: {'yes' if partial_results_allowed else 'no'}",
+        f"max_runtime_seconds: {float(max_runtime_seconds or 0):g}",
+        f"provider_timeout_seconds: {float(provider_timeout_seconds or 0):g}",
+        f"fail_fast_on_dns: {'yes' if fail_fast_on_dns else 'no'}",
+        f"provider_health_failures: {failure_count}",
+        f"provider_health_backoff_count: {len(disabled_rows)}",
         (
             "event_source_readiness: "
             f"event_sources={provider_ready_event_sources} enrichment_sources={provider_ready_enrichment_sources}"
@@ -469,6 +494,10 @@ def format_preview(
         lines.append("")
         lines.append("blocked lanes:")
         lines.extend(f"- {lane}: {reason}" for lane, reason in sorted(plan.blocked_by_lane.items()))
+    if disabled_rows:
+        lines.append("")
+        lines.append("provider backoff:")
+        lines.extend(f"- {row}" for row in disabled_rows[:10])
     lines.append("Preview does not send, trade, paper trade, write normal RSI signals, or alter tiers.")
     return "\n".join(lines).rstrip()
 

@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import config, universe
+from . import config, event_provider_health, universe
 from .client import CoinGeckoClient
 from .event_providers.coingecko_universe import load_market_rows
 from .event_resolver import clean_text
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -31,16 +34,97 @@ def load_market_enrichment_rows(
     fetch_limit: int = 0,
     limit: int | None = None,
     client_factory=CoinGeckoClient,
+    fail_soft: bool = False,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None = None,
+    now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """Load CoinGecko-style market rows for research-only enrichment."""
+    rows, warnings = load_market_enrichment_rows_safe(
+        path,
+        live=live,
+        fetch_limit=fetch_limit,
+        limit=limit,
+        client_factory=client_factory,
+        fail_soft=fail_soft,
+        provider_health_cfg=provider_health_cfg,
+        now=now,
+    )
+    if warnings and not fail_soft:
+        # ``load_market_enrichment_rows_safe`` only returns warnings without
+        # raising when fail_soft=True or a provider is already in backoff.
+        raise RuntimeError("; ".join(warnings))
+    return rows
+
+
+def load_market_enrichment_rows_safe(
+    path: str | Path | None,
+    *,
+    live: bool = False,
+    fetch_limit: int = 0,
+    limit: int | None = None,
+    client_factory=CoinGeckoClient,
+    fail_soft: bool = True,
+    provider_health_cfg: event_provider_health.EventProviderHealthConfig | None = None,
+    now: datetime | None = None,
+) -> tuple[list[dict[str, Any]], tuple[str, ...]]:
+    """Load CoinGecko-style market rows and optionally fail soft.
+
+    Direct non-fail-soft callers keep the previous raising behavior. Notification
+    burn-in callers can set ``fail_soft`` and receive an empty row set plus
+    warning text when live CoinGecko is unavailable.
+    """
     rows: list[dict[str, Any]] = []
-    if path:
-        rows.extend(load_market_rows(path))
-    elif live:
-        rows.extend(_run_async(_fetch_live_markets(fetch_limit=fetch_limit, limit=limit, client_factory=client_factory)))
+    warnings: list[str] = []
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    try:
+        if path:
+            rows.extend(load_market_rows(path))
+        elif live:
+            if provider_health_cfg is not None:
+                decision = event_provider_health.provider_allowed(
+                    "coingecko",
+                    cfg=provider_health_cfg,
+                    now=observed,
+                    provider_service="coingecko",
+                    provider_role="market_enrichment",
+                )
+                if not decision.allowed:
+                    warning = decision.reason or "provider coingecko:market_enrichment in backoff"
+                    return [], (warning,)
+            rows.extend(_run_async(_fetch_live_markets(
+                fetch_limit=fetch_limit,
+                limit=limit,
+                client_factory=client_factory,
+            )))
+            if provider_health_cfg is not None:
+                event_provider_health.record_provider_success(
+                    "coingecko",
+                    cfg=provider_health_cfg,
+                    now=observed,
+                    provider_kind="enrichment",
+                    provider_service="coingecko",
+                    provider_role="market_enrichment",
+                )
+    except Exception as exc:  # noqa: BLE001 - notification/research fail-soft path
+        if provider_health_cfg is not None and live:
+            event_provider_health.record_provider_failure(
+                "coingecko",
+                exc,
+                cfg=provider_health_cfg,
+                now=observed,
+                provider_kind="enrichment",
+                provider_service="coingecko",
+                provider_role="market_enrichment",
+            )
+        warning = f"market_enrichment_live_fetch_failed: {type(exc).__name__}"
+        log.warning("CoinGecko live market enrichment failed: %s", exc)
+        if not fail_soft:
+            raise
+        warnings.append(warning)
+        rows = []
     if limit is not None and limit > 0:
         rows = rows[:limit]
-    return rows
+    return rows, tuple(dict.fromkeys(warnings))
 
 
 def market_snapshots_from_rows(

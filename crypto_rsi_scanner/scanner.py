@@ -1203,6 +1203,7 @@ def _event_discovery_result_from_config(
         market_enrichment_path=config.EVENT_DISCOVERY_UNIVERSE_PATH,
         market_enrichment_live=config.EVENT_DISCOVERY_UNIVERSE_LIVE,
         market_enrichment_fetch_limit=config.EVENT_DISCOVERY_UNIVERSE_FETCH_LIMIT,
+        market_enrichment_fail_soft=_event_alpha_notification_mode(),
         anomaly_scanner_enabled=config.EVENT_ANOMALY_SCANNER_ENABLED,
         anomaly_min_return_24h=config.EVENT_ANOMALY_MIN_RETURN_24H,
         anomaly_min_volume_mcap=config.EVENT_ANOMALY_MIN_VOLUME_MCAP,
@@ -1248,7 +1249,7 @@ def _event_alpha_priors_config_from_runtime() -> event_alpha_priors.EventAlphaPr
 
 
 def _event_provider_health_config_from_runtime() -> event_provider_health.EventProviderHealthConfig:
-    notification_mode = str(config.EVENT_ALPHA_RUN_MODE or "") == "notification_burn_in"
+    notification_mode = _event_alpha_notification_mode()
     return event_provider_health.EventProviderHealthConfig(
         path=config.EVENT_PROVIDER_HEALTH_PATH,
         max_consecutive_failures=(
@@ -1263,6 +1264,10 @@ def _event_provider_health_config_from_runtime() -> event_provider_health.EventP
             else config.EVENT_PROVIDER_FAIL_FAST_ON_DNS
         ),
     )
+
+
+def _event_alpha_notification_mode() -> bool:
+    return str(config.EVENT_ALPHA_RUN_MODE or "") == "notification_burn_in"
 
 
 def _event_alpha_retention_config_from_runtime() -> event_alpha_retention.EventAlphaRetentionConfig:
@@ -1360,6 +1365,7 @@ def _event_watchlist_market_provider_from_runtime() -> event_watchlist_market.Ev
     return event_watchlist_market.CoinGeckoWatchlistMarketProvider(
         live_enabled=bool(config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP and config.EVENT_DISCOVERY_UNIVERSE_LIVE),
         cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
+        provider_health_cfg=_event_provider_health_config_from_runtime() if _event_alpha_notification_mode() else None,
     )
 
 
@@ -1920,18 +1926,60 @@ def event_alpha_profile_report(profile_name: str, verbose: bool = False) -> None
     print(event_alpha_profiles.format_profile_report(profile))
 
 
+class NotificationRuntimeBudget:
+    """Small wall-clock budget helper for day-1 notification cycles."""
+
+    def __init__(self, started_at: datetime, max_seconds: float) -> None:
+        self.started_at = started_at.astimezone(timezone.utc) if started_at.tzinfo else started_at.replace(tzinfo=timezone.utc)
+        self.max_seconds = float(max_seconds or 0.0)
+
+    def remaining_seconds(self) -> float:
+        if self.max_seconds <= 0:
+            return 0.0
+        elapsed = (datetime.now(timezone.utc) - self.started_at).total_seconds()
+        return max(0.0, self.max_seconds - elapsed)
+
+    def exhausted(self) -> bool:
+        return self.max_seconds <= 0 or self.remaining_seconds() <= 0
+
+    def warning_if_low(self, stage: str) -> str | None:
+        if not self.exhausted():
+            return None
+        clean_stage = "".join(ch if ch.isalnum() else "_" for ch in str(stage or "stage").strip().lower()).strip("_")
+        return f"notification_runtime_budget_exhausted_before_{clean_stage or 'stage'}"
+
+
+def _notification_runtime_budget(started_at: datetime) -> NotificationRuntimeBudget:
+    return NotificationRuntimeBudget(
+        started_at,
+        float(getattr(config, "EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS", 120.0) or 0.0),
+    )
+
+
 def _notification_runtime_budget_exhausted(started_at: datetime) -> bool:
-    budget = float(getattr(config, "EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS", 120.0) or 0.0)
-    if budget <= 0:
-        return True
-    elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
-    return elapsed >= budget
+    return _notification_runtime_budget(started_at).exhausted()
+
+
+def _notification_warnings_indicate_partial(warnings: Iterable[str]) -> bool:
+    tokens = (
+        "notification_cycle_failed_soft",
+        "notification_runtime_budget_exhausted",
+        "market_enrichment_live_fetch_failed",
+        "failed",
+        "failure",
+        "timeout",
+        "dns",
+        "backoff",
+        "429",
+    )
+    return any(any(token in str(warning).casefold() for token in tokens) for warning in warnings)
 
 
 def _empty_notification_pipeline_result(
     *,
     now: datetime,
     warning: str,
+    cycle_completed: bool = False,
 ) -> event_alpha_pipeline.EventAlphaPipelineResult:
     watch_cfg = _event_watchlist_config_from_runtime()
     router_cfg = _event_alpha_router_config_from_runtime()
@@ -1948,6 +1996,8 @@ def _empty_notification_pipeline_result(
         watchlist_monitor_result=None,
         router_result=router_result,
         warnings=(warning,),
+        cycle_completed=cycle_completed,
+        partial_results=True,
     )
 
 
@@ -1975,67 +2025,108 @@ def event_alpha_notify_cycle(
     now = _event_research_now(event_now)
     started_at = datetime.now(timezone.utc)
     run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
-    budget_exhausted = _notification_runtime_budget_exhausted(started_at)
+    budget = _notification_runtime_budget(started_at)
+    pre_stage_warnings: list[str] = []
     extraction_provider = None
     extraction_cfg = None
     relationship_provider = None
     relationship_cfg = None
-    if with_llm:
+    llm_budget_warning = budget.warning_if_low("llm")
+    effective_with_llm = with_llm
+    if with_llm and llm_budget_warning:
+        effective_with_llm = False
+        pre_stage_warnings.append(llm_budget_warning)
+    if effective_with_llm:
         extraction_cfg = _event_llm_extractor_config_from_runtime()
         extraction_provider = _event_llm_extraction_provider(extraction_cfg)
         relationship_cfg = _event_llm_config_from_runtime()
         relationship_provider = _event_llm_provider(relationship_cfg)
     alert_cfg = _event_alert_config_from_runtime()
-    if budget_exhausted:
+    discovery_budget_warning = budget.warning_if_low("discovery")
+    if discovery_budget_warning:
         pipeline_result = _empty_notification_pipeline_result(
             now=now,
-            warning="notification_runtime_budget_exhausted: skipped source loading before expensive stages",
+            warning=discovery_budget_warning,
         )
     else:
-        catalyst_search_cfg = _event_catalyst_search_config_from_runtime()
-        catalyst_search_provider = _event_catalyst_search_provider(catalyst_search_cfg)
-        pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
-            load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
-                now=observed,
-                raw_event_transform=raw_event_transform,
-            ),
-            alert_cfg=alert_cfg,
-            now=now,
-            with_llm=with_llm,
-            extraction_provider=extraction_provider,
-            extraction_cfg=extraction_cfg,
-            catalyst_search_provider=catalyst_search_provider,
-            catalyst_search_cfg=catalyst_search_cfg,
-            relationship_provider=relationship_provider,
-            relationship_cfg=relationship_cfg,
-            watchlist_cfg=_event_watchlist_config_from_runtime(),
-            router_cfg=_event_alpha_router_config_from_runtime(),
-            priors_cfg=_event_alpha_priors_config_from_runtime(),
-            refresh_watchlist=True,
-            route=True,
-            watchlist_monitor_enabled=config.EVENT_WATCHLIST_MONITOR_ENABLED,
-            watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
-            watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
-            watchlist_monitor_market_provider=_event_watchlist_market_provider_from_runtime(),
-            watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
-            watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
-            watchlist_monitor_market_cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
-            watchlist_monitor_derivatives_source=config.EVENT_WATCHLIST_MONITOR_DERIVATIVES_SOURCE,
-            watchlist_monitor_supply_source=config.EVENT_WATCHLIST_MONITOR_SUPPLY_SOURCE,
-            watchlist_monitor_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
-            watchlist_monitor_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
-            watchlist_monitor_enrichment_max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
-            watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
-            send=False,
+        catalyst_budget_warning = budget.warning_if_low("catalyst_search")
+        if catalyst_budget_warning:
+            pre_stage_warnings.append(catalyst_budget_warning)
+        catalyst_search_cfg = _event_catalyst_search_config_from_runtime(
+            enabled_override=False if catalyst_budget_warning else None
         )
+        catalyst_search_provider = None if catalyst_budget_warning else _event_catalyst_search_provider(catalyst_search_cfg)
+        watchlist_budget_warning = budget.warning_if_low("watchlist_refresh")
+        if watchlist_budget_warning:
+            pre_stage_warnings.append(watchlist_budget_warning)
+        try:
+            pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+                load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
+                    now=observed,
+                    raw_event_transform=raw_event_transform,
+                ),
+                alert_cfg=alert_cfg,
+                now=now,
+                with_llm=effective_with_llm,
+                extraction_provider=extraction_provider,
+                extraction_cfg=extraction_cfg,
+                catalyst_search_provider=catalyst_search_provider,
+                catalyst_search_cfg=catalyst_search_cfg,
+                relationship_provider=relationship_provider,
+                relationship_cfg=relationship_cfg,
+                watchlist_cfg=_event_watchlist_config_from_runtime(),
+                router_cfg=_event_alpha_router_config_from_runtime(),
+                priors_cfg=_event_alpha_priors_config_from_runtime(),
+                refresh_watchlist=not bool(watchlist_budget_warning),
+                route=True,
+                watchlist_monitor_enabled=(
+                    config.EVENT_WATCHLIST_MONITOR_ENABLED and not bool(watchlist_budget_warning)
+                ),
+                watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
+                watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
+                watchlist_monitor_market_provider=_event_watchlist_market_provider_from_runtime(),
+                watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
+                watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
+                watchlist_monitor_market_cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
+                watchlist_monitor_derivatives_source=config.EVENT_WATCHLIST_MONITOR_DERIVATIVES_SOURCE,
+                watchlist_monitor_supply_source=config.EVENT_WATCHLIST_MONITOR_SUPPLY_SOURCE,
+                watchlist_monitor_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
+                watchlist_monitor_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
+                watchlist_monitor_enrichment_max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
+                watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
+                send=False,
+            )
+        except Exception as exc:  # noqa: BLE001 - notification burn-in must fail soft on provider/runtime errors
+            if not config.EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS:
+                raise
+            warning = f"notification_cycle_failed_soft: {type(exc).__name__}"
+            log.warning("Event Alpha notification cycle failed soft: %s", exc)
+            pipeline_result = _empty_notification_pipeline_result(now=now, warning=warning, cycle_completed=False)
         if _notification_runtime_budget_exhausted(started_at):
             pipeline_result = replace(
                 pipeline_result,
                 warnings=tuple(dict.fromkeys((
                     *pipeline_result.warnings,
-                    "notification_runtime_budget_exhausted: cycle exceeded runtime budget; partial results preserved",
+                    "notification_runtime_budget_exhausted_after_pipeline",
                 ))),
+                partial_results=True,
             )
+        if pre_stage_warnings:
+            pipeline_result = replace(
+                pipeline_result,
+                warnings=tuple(dict.fromkeys((*pre_stage_warnings, *pipeline_result.warnings))),
+                partial_results=True,
+            )
+    pipeline_result = replace(
+        pipeline_result,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        partial_results=(
+            pipeline_result.partial_results
+            or _notification_warnings_indicate_partial(pipeline_result.warnings)
+        ),
+    )
     card_write = None
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
@@ -2206,6 +2297,12 @@ def event_alpha_notify_preview(
         llm_budget_status=_event_alpha_llm_budget_status(),
         plan=plan,
         card_auto_write=bool(config.EVENT_RESEARCH_CARDS_AUTO_WRITE),
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        partial_results_allowed=bool(config.EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS),
+        max_runtime_seconds=config.EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS,
+        provider_timeout_seconds=config.EVENT_ALPHA_NOTIFY_PROVIDER_TIMEOUT_SECONDS,
+        fail_fast_on_dns=bool(config.EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS),
+        provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
     ))
 
 

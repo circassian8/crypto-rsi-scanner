@@ -551,6 +551,7 @@ def run_manual_discovery(
     market_enrichment_path: str | Path | None = None,
     market_enrichment_live: bool = False,
     market_enrichment_fetch_limit: int = 0,
+    market_enrichment_fail_soft: bool = False,
     anomaly_scanner_enabled: bool = False,
     anomaly_min_return_24h: float = 0.30,
     anomaly_min_volume_mcap: float = 0.25,
@@ -629,12 +630,19 @@ def run_manual_discovery(
         provider_health_cfg=provider_health_cfg,
         provider_warnings=provider_warnings,
     )
-    market_rows = event_market_enrichment.load_market_enrichment_rows(
-        market_enrichment_path if market_enrichment_path is not None else universe_path,
-        live=market_enrichment_live,
-        fetch_limit=market_enrichment_fetch_limit or universe_fetch_limit or 0,
-        limit=universe_limit,
-    ) if (market_enrichment_enabled or anomaly_scanner_enabled) else []
+    if market_enrichment_enabled or anomaly_scanner_enabled:
+        market_rows, market_warnings = event_market_enrichment.load_market_enrichment_rows_safe(
+            market_enrichment_path if market_enrichment_path is not None else universe_path,
+            live=market_enrichment_live,
+            fetch_limit=market_enrichment_fetch_limit or universe_fetch_limit or 0,
+            limit=universe_limit,
+            fail_soft=market_enrichment_fail_soft,
+            provider_health_cfg=provider_health_cfg if market_enrichment_fail_soft else None,
+            now=now,
+        )
+        provider_warnings.extend(market_warnings)
+    else:
+        market_rows = []
     if anomaly_scanner_enabled:
         raw_events.extend(event_anomaly_scanner.discover_market_anomalies(
             market_rows,

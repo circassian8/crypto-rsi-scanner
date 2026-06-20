@@ -10,6 +10,7 @@ from . import event_alpha_notifications, event_provider_status
 
 @dataclass(frozen=True)
 class EventAlphaNotificationChecklistResult:
+    ready_to_preview: bool
     ready_to_notify_now: bool
     profile: str
     artifact_namespace: str
@@ -45,6 +46,10 @@ def build_notification_checklist(
     """Build a day-1 notification startup checklist without sending."""
     blockers: list[str] = list(preflight_blockers)
     warnings: list[str] = list(preflight_warnings)
+    preview_blockers = [
+        blocker for blocker in blockers
+        if not _send_blocker(blocker)
+    ]
     if not send_guard_enabled:
         blockers.append("actual notify requires RSI_EVENT_ALERTS_ENABLED=1")
     if not telegram_ready:
@@ -73,6 +78,7 @@ def build_notification_checklist(
     else:
         commands.append("RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-no-key")
     return EventAlphaNotificationChecklistResult(
+        ready_to_preview=not preview_blockers,
         ready_to_notify_now=not blockers,
         profile=profile,
         artifact_namespace=artifact_namespace,
@@ -96,6 +102,7 @@ def format_notification_checklist(result: EventAlphaNotificationChecklistResult)
         "=" * 76,
         "EVENT ALPHA NOTIFICATION STARTUP CHECKLIST (research-only / DAY-1 UNVALIDATED)",
         "=" * 76,
+        f"READY_TO_PREVIEW: {_yes_no(result.ready_to_preview)}",
         f"READY_TO_NOTIFY_NOW: {_yes_no(result.ready_to_notify_now)}",
         "Validation status: DAY-1 UNVALIDATED",
         "Trading action: NONE",
@@ -136,3 +143,8 @@ def format_notification_checklist(result: EventAlphaNotificationChecklistResult)
 
 def _yes_no(value: bool) -> str:
     return "yes" if value else "no"
+
+
+def _send_blocker(text: str) -> bool:
+    lower = str(text or "").casefold()
+    return any(token in lower for token in ("telegram", "rsi_event_alerts_enabled", "send requested", "actual notify"))

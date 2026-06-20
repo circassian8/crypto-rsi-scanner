@@ -57,18 +57,25 @@ make event-alpha-notification-checklist PROFILE=notify_no_key
 make event-alpha-notification-runs-report PROFILE=notify_no_key
 ```
 
-The checklist reports `READY_TO_NOTIFY_NOW`, blockers, warnings, source
-readiness, provider backoff, cooldown meta keys, LLM budget, artifact doctor
-status, and the next commands. Notification cycles also append
+The checklist reports `READY_TO_PREVIEW`, `READY_TO_NOTIFY_NOW`, blockers,
+warnings, source readiness, provider backoff, cooldown meta keys, LLM budget,
+artifact doctor status, and the next commands. Notification cycles also append
 `event_alpha_notification_runs.jsonl` summary rows with due/sent lane counts,
 heartbeat state, would-send counts, cooldown blocks, provider fail-fast blocks,
-runtime-budget status, Telegram readiness, and send-guard state.
+cycle-completed/partial-results flags, runtime-budget status, Telegram
+readiness, and send-guard state.
 
 Notification profiles use a conservative runtime budget and provider behavior:
 120 seconds max runtime, 5 second provider timeouts, one provider failure before
 skip/backoff, DNS fail-fast, and partial-result continuation. If the runtime
 budget is exhausted, the cycle records `notification_runtime_budget_exhausted`,
 preserves partial results, and still writes heartbeat/run-summary artifacts.
+Live CoinGecko market enrichment is fail-soft in notification mode: DNS/network
+failures record `market_enrichment_live_fetch_failed`, update
+`coingecko:market_enrichment` provider health, continue anomaly/discovery with
+empty market rows, and still write run/notification ledgers. Any unexpected
+pipeline exception becomes `notification_cycle_failed_soft: <ErrorClass>` and
+should still produce a degraded heartbeat would-send when heartbeat is due.
 
 Without `RSI_EVENT_ALERTS_ENABLED=1`, `make event-alpha-notify-no-key` and
 `make event-alpha-notify-llm` still run the radar, write research artifacts, and
