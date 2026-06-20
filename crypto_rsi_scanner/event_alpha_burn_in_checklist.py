@@ -78,9 +78,10 @@ def build_burn_in_checklist(
         warnings.append("LLM calls were skipped due to budget caps")
 
     high_priority = _high_priority_alerts(scorecard.alert_rows)
+    research_card_paths = tuple(path for path in card_paths if str(path).rsplit("/", 1)[-1] != "index.md")
     checks["high_priority_or_triggered_alerts"] = str(len(high_priority))
-    checks["research_cards"] = str(len(card_paths))
-    if high_priority and not card_paths:
+    checks["research_cards"] = str(len(research_card_paths))
+    if high_priority and not research_card_paths:
         warnings.append("high-priority/triggered alert snapshots have no research cards")
         next_actions.append("write research cards for high-priority/triggered rows")
 

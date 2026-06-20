@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Polish day-1 Event Alpha provider operations · Codex
+**Why:** Day-1 notification burn-in needed an operator-safe way to inspect and
+clear stale provider backoff, force one run without mutating health state, and
+avoid misleading card coverage from `index.md`.
+**Changes:**
+- Added profile-scoped provider health report/reset commands and Make targets.
+  Reset requires `--confirm`, supports key/service/role/all selectors, clears
+  only `disabled_until` and `consecutive_failures`, and does not call providers
+  or send alerts.
+- Added `RSI_EVENT_ALPHA_IGNORE_PROVIDER_BACKOFF`,
+  `--ignore-provider-backoff`, and `IGNORE_BACKOFF=1` for one-shot notification
+  force-runs. Forced successful attempts leave provider health unchanged; fresh
+  failures are still recorded and the run/notification ledgers include
+  `provider_backoff_ignored_for_run`.
+- Fixed artifact doctor/burn-in card counting so actual research-card files are
+  counted separately from `index.md`, and surfaced
+  `research_card_files` / `research_card_index_present`.
+- Added no-send `event-alpha-day1-start` / `event-alpha-day1-start-llm` flows
+  and post-run notification next-step guidance for reports, inbox, daily brief,
+  artifact doctor, provider health reset, and feedback.
+- Updated `.env.example`, `DECISIONS.md`, `ROADMAP.md`, the Event Alpha runbook,
+  Makefile help/targets, and regression tests.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed 379/379; `make event-llm-eval
+PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`, `make
+event-alpha-eval PYTHON=python3`, and `make verify PYTHON=python3` passed.
+Manual smokes passed: `make event-alpha-day1-start PYTHON=python3`, `make
+event-alpha-notify-fixture-smoke PYTHON=python3`, `python3 main.py
+--event-alpha-notify-cycle --event-alpha-profile notify_no_key`, and `python3
+main.py --event-alpha-provider-health-report --event-alpha-profile
+notify_no_key`. The live no-key notify smoke completed degraded/no-send with
+expected public-provider GDELT/RSS warnings and printed provider reset/feedback
+next steps.
+**Notes/risks:** All paths remain research-only. No live trading, paper trades,
+normal RSI signal writes, or LLM-created `TRIGGERED_FADE` were added.
+
 ## 2026-06-20 — Polish Day-1 Event Alpha notification operations · Codex
 **Why:** Day-1 notification burn-in needed cleaner profile-scoped report
 loading, a practical review inbox, and a safe local smoke path that does not

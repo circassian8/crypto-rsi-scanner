@@ -9,7 +9,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
@@ -1301,6 +1301,7 @@ def _event_provider_health_config_from_runtime() -> event_provider_health.EventP
             if notification_mode
             else config.EVENT_PROVIDER_FAIL_FAST_ON_DNS
         ),
+        ignore_backoff=bool(config.EVENT_ALPHA_IGNORE_PROVIDER_BACKOFF),
     )
 
 
@@ -1628,6 +1629,7 @@ def _event_alpha_context_block(context: event_alpha_artifacts.EventAlphaArtifact
         f"- alert_store_path: {context.alert_store_path}",
         f"- notification_runs_path: {context.notification_runs_path}",
         f"- feedback_path: {context.feedback_path}",
+        f"- provider_health_path: {context.provider_health_path}",
         f"- research_cards_dir: {context.research_cards_dir}",
     ])
 
@@ -1706,6 +1708,13 @@ def _normalize_profile_paths() -> None:
             config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = tuple(dict.fromkeys(urls))
         except OSError:
             config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = ()
+
+
+def _research_card_markdown_paths(cards_dir: str | Path) -> list[Path]:
+    directory = Path(cards_dir)
+    if not directory.exists():
+        return []
+    return sorted(path for path in directory.glob("*.md") if path.name != "index.md")
 
 
 def _latest_event_alpha_profile_from_runs() -> str | None:
@@ -2083,123 +2092,204 @@ def _empty_notification_pipeline_result(
     )
 
 
+def format_event_alpha_notification_next_steps(
+    *,
+    profile: str,
+    provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
+    result: Any | None = None,
+    notification_row: Mapping[str, Any] | None = None,
+) -> str:
+    """Render post-run operator commands without mutating state."""
+    rows = provider_health_rows or {}
+    backoff_keys = tuple(
+        str(row.get("provider_key") or key)
+        for key, row in rows.items()
+        if row.get("disabled_until")
+    )
+    would_send = _int_value(
+        (notification_row or {}).get("would_send_count")
+        if notification_row is not None
+        else getattr(result, "send_would_send_items", 0)
+    )
+    cards_written = len(tuple(getattr(result, "research_card_paths", ()) or ()))
+    alertable = _int_value(getattr(result, "alertable", 0))
+    feedback_target = _first_notification_feedback_target(result)
+    lines = [
+        "=" * 76,
+        "EVENT ALPHA NOTIFICATION NEXT STEPS",
+        "=" * 76,
+        f"- make event-alpha-notification-runs-report PROFILE={profile}",
+        f"- make event-alpha-notification-inbox PROFILE={profile}",
+        f"- make event-alpha-daily-brief PROFILE={profile}",
+        f"- make event-alpha-artifact-doctor PROFILE={profile} STRICT=1",
+        f"- make event-alpha-provider-health-report PROFILE={profile}",
+    ]
+    if backoff_keys:
+        lines.append(
+            f"- make event-alpha-provider-health-reset PROFILE={profile} "
+            f"PROVIDER_KEY={backoff_keys[0]} CONFIRM=1"
+        )
+    if would_send > 0 or cards_written > 0 or alertable > 0:
+        target = feedback_target or "<alert_id_or_card_id>"
+        lines.append(f"- make event-feedback-watch PROFILE={profile} FEEDBACK_TARGET='{target}'")
+    else:
+        lines.append("- no alert/cards produced; review heartbeat status in the runs report and daily brief")
+    lines.append("Research-only follow-up only; these commands do not trade, paper trade, or write normal RSI signals.")
+    return "\n".join(lines).rstrip()
+
+
+def _first_notification_feedback_target(result: Any | None) -> str | None:
+    router_result = getattr(result, "router_result", None)
+    decisions = tuple(getattr(router_result, "alertable_decisions", ()) or ())
+    if not decisions:
+        decisions = tuple(getattr(router_result, "decisions", ()) or ())
+    for decision in decisions:
+        alert_id = str(getattr(decision, "alert_id", "") or "").strip()
+        if alert_id:
+            return alert_id
+        card_id = str(getattr(decision, "card_id", "") or "").strip()
+        if card_id:
+            return card_id
+    for path in tuple(getattr(result, "research_card_paths", ()) or ()):
+        stem = Path(path).stem
+        if stem and stem != "index":
+            return stem
+    return None
+
+
+def _int_value(value: object) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def event_alpha_notify_cycle(
     verbose: bool = False,
     with_llm: bool = False,
     send: bool = False,
     event_now: str | datetime | None = None,
     profile_name: str | None = None,
+    ignore_provider_backoff: bool = False,
 ) -> None:
     """Run a day-1 Event Alpha notification burn-in cycle."""
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "notify_no_key"
     profile = _apply_event_alpha_profile(selected_profile)
-    with_llm = with_llm or profile.with_llm
-    profile_for_run = profile.name
-    run_mode = config.EVENT_ALPHA_RUN_MODE or "notification_burn_in"
-    artifact_namespace = config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None
-    if not _event_alpha_inputs_configured():
-        print(
-            "No Event Alpha notification inputs ready. Configure notify_no_key/notify_llm providers "
-            "or run --event-alpha-notify-preview for readiness details."
-        )
-        return
-    clock_status = _event_clock_status(event_now)
-    now = _event_research_now(event_now)
-    started_at = datetime.now(timezone.utc)
-    run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
-    budget = _notification_runtime_budget(started_at)
-    pre_stage_warnings: list[str] = list(_event_alpha_notify_clock_warnings(clock_status))
-    extraction_provider = None
-    extraction_cfg = None
-    relationship_provider = None
-    relationship_cfg = None
-    llm_budget_warning = budget.warning_if_low("llm")
-    effective_with_llm = with_llm
-    if with_llm and llm_budget_warning:
-        effective_with_llm = False
-        pre_stage_warnings.append(llm_budget_warning)
-    if effective_with_llm:
-        extraction_cfg = _event_llm_extractor_config_from_runtime()
-        extraction_provider = _event_llm_extraction_provider(extraction_cfg)
-        relationship_cfg = _event_llm_config_from_runtime()
-        relationship_provider = _event_llm_provider(relationship_cfg)
-    alert_cfg = _event_alert_config_from_runtime()
-    discovery_budget_warning = budget.warning_if_low("discovery")
-    if discovery_budget_warning:
-        pipeline_result = _empty_notification_pipeline_result(
-            now=now,
-            warning=discovery_budget_warning,
-        )
-    else:
-        catalyst_budget_warning = budget.warning_if_low("catalyst_search")
-        if catalyst_budget_warning:
-            pre_stage_warnings.append(catalyst_budget_warning)
-        catalyst_search_cfg = _event_catalyst_search_config_from_runtime(
-            enabled_override=False if catalyst_budget_warning else None
-        )
-        catalyst_search_provider = None if catalyst_budget_warning else _event_catalyst_search_provider(catalyst_search_cfg)
-        watchlist_budget_warning = budget.warning_if_low("watchlist_refresh")
-        if watchlist_budget_warning:
-            pre_stage_warnings.append(watchlist_budget_warning)
-        try:
-            pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
-                load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
-                    now=observed,
-                    raw_event_transform=raw_event_transform,
-                ),
-                alert_cfg=alert_cfg,
+    previous_ignore_backoff = bool(config.EVENT_ALPHA_IGNORE_PROVIDER_BACKOFF)
+    ignore_backoff_for_run = bool(ignore_provider_backoff or config.EVENT_ALPHA_IGNORE_PROVIDER_BACKOFF)
+    config.EVENT_ALPHA_IGNORE_PROVIDER_BACKOFF = ignore_backoff_for_run
+    try:
+        with_llm = with_llm or profile.with_llm
+        profile_for_run = profile.name
+        run_mode = config.EVENT_ALPHA_RUN_MODE or "notification_burn_in"
+        artifact_namespace = config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None
+        if not _event_alpha_inputs_configured():
+            print(
+                "No Event Alpha notification inputs ready. Configure notify_no_key/notify_llm providers "
+                "or run --event-alpha-notify-preview for readiness details."
+            )
+            return
+        clock_status = _event_clock_status(event_now)
+        now = _event_research_now(event_now)
+        started_at = datetime.now(timezone.utc)
+        run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
+        budget = _notification_runtime_budget(started_at)
+        pre_stage_warnings: list[str] = list(_event_alpha_notify_clock_warnings(clock_status))
+        if ignore_backoff_for_run:
+            pre_stage_warnings.append("provider_backoff_ignored_for_run")
+        extraction_provider = None
+        extraction_cfg = None
+        relationship_provider = None
+        relationship_cfg = None
+        llm_budget_warning = budget.warning_if_low("llm")
+        effective_with_llm = with_llm
+        if with_llm and llm_budget_warning:
+            effective_with_llm = False
+            pre_stage_warnings.append(llm_budget_warning)
+        if effective_with_llm:
+            extraction_cfg = _event_llm_extractor_config_from_runtime()
+            extraction_provider = _event_llm_extraction_provider(extraction_cfg)
+            relationship_cfg = _event_llm_config_from_runtime()
+            relationship_provider = _event_llm_provider(relationship_cfg)
+        alert_cfg = _event_alert_config_from_runtime()
+        discovery_budget_warning = budget.warning_if_low("discovery")
+        if discovery_budget_warning:
+            pipeline_result = _empty_notification_pipeline_result(
                 now=now,
-                with_llm=effective_with_llm,
-                extraction_provider=extraction_provider,
-                extraction_cfg=extraction_cfg,
-                catalyst_search_provider=catalyst_search_provider,
-                catalyst_search_cfg=catalyst_search_cfg,
-                relationship_provider=relationship_provider,
-                relationship_cfg=relationship_cfg,
-                watchlist_cfg=_event_watchlist_config_from_runtime(),
-                router_cfg=_event_alpha_router_config_from_runtime(),
-                priors_cfg=_event_alpha_priors_config_from_runtime(),
-                refresh_watchlist=not bool(watchlist_budget_warning),
-                route=True,
-                watchlist_monitor_enabled=(
-                    config.EVENT_WATCHLIST_MONITOR_ENABLED and not bool(watchlist_budget_warning)
-                ),
-                watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
-                watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
-                watchlist_monitor_market_provider=_event_watchlist_market_provider_from_runtime(),
-                watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
-                watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
-                watchlist_monitor_market_cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
-                watchlist_monitor_derivatives_source=config.EVENT_WATCHLIST_MONITOR_DERIVATIVES_SOURCE,
-                watchlist_monitor_supply_source=config.EVENT_WATCHLIST_MONITOR_SUPPLY_SOURCE,
-                watchlist_monitor_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
-                watchlist_monitor_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
-                watchlist_monitor_enrichment_max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
-                watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
-                send=False,
+                warning=discovery_budget_warning,
             )
-        except Exception as exc:  # noqa: BLE001 - notification burn-in must fail soft on provider/runtime errors
-            if not config.EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS:
-                raise
-            warning = f"notification_cycle_failed_soft: {type(exc).__name__}"
-            log.warning("Event Alpha notification cycle failed soft: %s", exc)
-            pipeline_result = _empty_notification_pipeline_result(now=now, warning=warning, cycle_completed=False)
-        if _notification_runtime_budget_exhausted(started_at):
-            pipeline_result = replace(
-                pipeline_result,
-                warnings=tuple(dict.fromkeys((
-                    *pipeline_result.warnings,
-                    "notification_runtime_budget_exhausted_after_pipeline",
-                ))),
-                partial_results=True,
+        else:
+            catalyst_budget_warning = budget.warning_if_low("catalyst_search")
+            if catalyst_budget_warning:
+                pre_stage_warnings.append(catalyst_budget_warning)
+            catalyst_search_cfg = _event_catalyst_search_config_from_runtime(
+                enabled_override=False if catalyst_budget_warning else None
             )
-        if pre_stage_warnings:
-            pipeline_result = replace(
-                pipeline_result,
-                warnings=tuple(dict.fromkeys((*pre_stage_warnings, *pipeline_result.warnings))),
-                partial_results=True,
-            )
+            catalyst_search_provider = None if catalyst_budget_warning else _event_catalyst_search_provider(catalyst_search_cfg)
+            watchlist_budget_warning = budget.warning_if_low("watchlist_refresh")
+            if watchlist_budget_warning:
+                pre_stage_warnings.append(watchlist_budget_warning)
+            try:
+                pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+                    load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
+                        now=observed,
+                        raw_event_transform=raw_event_transform,
+                    ),
+                    alert_cfg=alert_cfg,
+                    now=now,
+                    with_llm=effective_with_llm,
+                    extraction_provider=extraction_provider,
+                    extraction_cfg=extraction_cfg,
+                    catalyst_search_provider=catalyst_search_provider,
+                    catalyst_search_cfg=catalyst_search_cfg,
+                    relationship_provider=relationship_provider,
+                    relationship_cfg=relationship_cfg,
+                    watchlist_cfg=_event_watchlist_config_from_runtime(),
+                    router_cfg=_event_alpha_router_config_from_runtime(),
+                    priors_cfg=_event_alpha_priors_config_from_runtime(),
+                    refresh_watchlist=not bool(watchlist_budget_warning),
+                    route=True,
+                    watchlist_monitor_enabled=(
+                        config.EVENT_WATCHLIST_MONITOR_ENABLED and not bool(watchlist_budget_warning)
+                    ),
+                    watchlist_monitor_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
+                    watchlist_monitor_market_source=config.EVENT_WATCHLIST_MONITOR_MARKET_SOURCE,
+                    watchlist_monitor_market_provider=_event_watchlist_market_provider_from_runtime(),
+                    watchlist_monitor_targeted_lookup=config.EVENT_WATCHLIST_MONITOR_TARGETED_LOOKUP,
+                    watchlist_monitor_max_assets=config.EVENT_WATCHLIST_MONITOR_MAX_ASSETS,
+                    watchlist_monitor_market_cache_ttl_seconds=config.EVENT_WATCHLIST_MONITOR_MARKET_CACHE_TTL_SECONDS,
+                    watchlist_monitor_derivatives_source=config.EVENT_WATCHLIST_MONITOR_DERIVATIVES_SOURCE,
+                    watchlist_monitor_supply_source=config.EVENT_WATCHLIST_MONITOR_SUPPLY_SOURCE,
+                    watchlist_monitor_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
+                    watchlist_monitor_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
+                    watchlist_monitor_enrichment_max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
+                    watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
+                    send=False,
+                )
+            except Exception as exc:  # noqa: BLE001 - notification burn-in must fail soft on provider/runtime errors
+                if not config.EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS:
+                    raise
+                warning = f"notification_cycle_failed_soft: {type(exc).__name__}"
+                log.warning("Event Alpha notification cycle failed soft: %s", exc)
+                pipeline_result = _empty_notification_pipeline_result(now=now, warning=warning, cycle_completed=False)
+            if _notification_runtime_budget_exhausted(started_at):
+                pipeline_result = replace(
+                    pipeline_result,
+                    warnings=tuple(dict.fromkeys((
+                        *pipeline_result.warnings,
+                        "notification_runtime_budget_exhausted_after_pipeline",
+                    ))),
+                    partial_results=True,
+                )
+            if pre_stage_warnings:
+                pipeline_result = replace(
+                    pipeline_result,
+                    warnings=tuple(dict.fromkeys((*pre_stage_warnings, *pipeline_result.warnings))),
+                    partial_results=True,
+                )
+    finally:
+        config.EVENT_ALPHA_IGNORE_PROVIDER_BACKOFF = previous_ignore_backoff
     pipeline_result = replace(
         pipeline_result,
         clock_status=clock_status,
@@ -2367,7 +2457,14 @@ def event_alpha_notify_cycle(
         "Event Alpha notification summary updated: "
         f"{config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH} run_id={notification_row.get('run_id')}"
     )
-
+    provider_rows = event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH)
+    print("")
+    print(format_event_alpha_notification_next_steps(
+        profile=profile_for_run,
+        provider_health_rows=provider_rows,
+        result=pipeline_result,
+        notification_row=notification_row,
+    ))
 
 def event_alpha_notify_preview(
     verbose: bool = False,
@@ -2476,7 +2573,7 @@ def event_alpha_notification_checklist_report(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
-        card_paths=[str(path) for path in cards_dir.glob("*.md")] if cards_dir.exists() else (),
+        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
         profile=profile.name,
@@ -2794,6 +2891,63 @@ def event_alpha_notification_runs_report(
     result = event_alpha_notification_runs.load_notification_runs(cfg.path, limit=limit)
     print(_event_alpha_context_block(context))
     print(event_alpha_notification_runs.format_notification_runs_report(result))
+
+
+def event_alpha_provider_health_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print profile-scoped provider health/backoff rows."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    rows = event_provider_health.load_provider_health(context.provider_health_path)
+    print(_event_alpha_context_block(context))
+    print(f"provider_health_path: {context.provider_health_path}")
+    print(event_provider_health.format_provider_health_report(rows))
+
+
+def event_alpha_provider_health_reset(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    provider_key: str | None = None,
+    service: str | None = None,
+    role: str | None = None,
+    reset_all: bool = False,
+    confirm: bool = False,
+) -> None:
+    """Clear selected provider health backoff state without calling providers."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    if not confirm:
+        print("Provider health reset refused: pass --confirm to clear local backoff state.")
+        return
+    rows = event_provider_health.load_provider_health(context.provider_health_path)
+    try:
+        updated, result = event_provider_health.reset_provider_health_rows(
+            rows,
+            provider_key=provider_key,
+            service=service,
+            role=role,
+            reset_all=reset_all,
+        )
+    except ValueError as exc:
+        print(f"Provider health reset failed: {exc}")
+        return
+    event_provider_health.write_provider_health(context.provider_health_path, updated)
+    print(_event_alpha_context_block(context))
+    print(event_provider_health.format_provider_health_reset_result(result, path=context.provider_health_path))
 
 
 def event_catalyst_search_report(
@@ -3637,7 +3791,7 @@ def event_alpha_artifact_doctor_report(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
-        card_paths=[str(path) for path in cards_dir.glob("*.md")] if cards_dir.exists() else (),
+        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
         profile=profile_name,
@@ -3753,7 +3907,7 @@ def event_alpha_export_burn_in_pack(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
-        card_paths=[str(path) for path in cards_dir.glob("*.md")] if cards_dir.exists() else (),
+        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
         profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
@@ -6024,6 +6178,11 @@ def cli() -> None:
         help="Run a day-1 Event Alpha notification burn-in cycle with lane-specific guarded sends.",
     )
     parser.add_argument(
+        "--ignore-provider-backoff",
+        action="store_true",
+        help="With --event-alpha-notify-cycle, attempt providers even if local provider health is in backoff for this run only.",
+    )
+    parser.add_argument(
         "--event-alpha-notify-preview",
         action="store_true",
         help="Preview Event Alpha notification readiness, would-send counts, and lane cooldowns.",
@@ -6047,6 +6206,16 @@ def cli() -> None:
         "--event-alpha-notification-inbox",
         action="store_true",
         help="Print unreviewed Event Alpha notification/card follow-up queues.",
+    )
+    parser.add_argument(
+        "--event-alpha-provider-health-report",
+        action="store_true",
+        help="Print profile-scoped Event Alpha provider health/backoff rows.",
+    )
+    parser.add_argument(
+        "--event-alpha-provider-health-reset",
+        action="store_true",
+        help="Clear selected profile-scoped provider health backoff state. Requires --confirm.",
     )
     parser.add_argument(
         "--event-alpha-notify-fixture-smoke",
@@ -6337,6 +6506,26 @@ def cli() -> None:
         "--event-alpha-artifact-namespace",
         default=None,
         help="Restrict Event Alpha artifact reports to this namespace/profile artifact directory.",
+    )
+    parser.add_argument(
+        "--provider-key",
+        default=None,
+        help="Provider health key selector for --event-alpha-provider-health-reset, such as gdelt:event_source.",
+    )
+    parser.add_argument(
+        "--service",
+        default=None,
+        help="Provider health service selector for --event-alpha-provider-health-reset, such as gdelt.",
+    )
+    parser.add_argument(
+        "--role",
+        default=None,
+        help="Provider health role selector for --event-alpha-provider-health-reset, such as event_source.",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="With --event-alpha-provider-health-reset, clear all provider backoffs in the selected profile namespace.",
     )
     parser.add_argument(
         "--event-alpha-include-test-artifacts",
@@ -6663,6 +6852,7 @@ def cli() -> None:
             send=args.event_alert_send,
             event_now=args.event_now,
             profile_name=args.event_alpha_profile,
+            ignore_provider_backoff=args.ignore_provider_backoff,
         )
         return
     if args.event_alpha_notify_preview:
@@ -6688,6 +6878,25 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_provider_health_report:
+        event_alpha_provider_health_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_provider_health_reset:
+        event_alpha_provider_health_reset(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            provider_key=args.provider_key,
+            service=args.service,
+            role=args.role,
+            reset_all=args.all,
+            confirm=args.confirm,
         )
         return
     if args.event_alpha_notify_fixture_smoke:

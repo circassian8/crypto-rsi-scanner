@@ -23,13 +23,16 @@ RSI_EVENT_ALERTS_ENABLED=1
 Then run the no-key startup path:
 
 ```bash
-make event-alpha-preflight PROFILE=notify_no_key
-make event-alpha-notification-checklist PROFILE=notify_no_key
-make event-alpha-send-test PROFILE=notify_no_key
-make event-alpha-notify-preview PROFILE=notify_no_key
+make event-alpha-day1-start
 make event-alpha-notification-inbox PROFILE=notify_no_key
-make event-alpha-notify-no-key
+RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-send-test PROFILE=notify_no_key
+RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-no-key
 ```
+
+`make event-alpha-day1-start` is a no-send operator check. It runs preflight,
+the notification checklist, and the notification preview for `notify_no_key`,
+then prints the two guarded send commands. Use `make event-alpha-day1-start-llm`
+for the same no-send flow against `notify_llm`.
 
 `notify_no_key` uses public RSS, GDELT, Polymarket, live CoinGecko universe,
 market enrichment, anomaly scanning, catalyst search, watchlist monitoring,
@@ -74,6 +77,26 @@ notifications without feedback, would-send items without feedback, unreviewed
 high-priority and triggered-fade cards, heartbeat-only runs, and provider
 degraded runs. Each alert row includes a feedback helper command such as
 `make event-feedback-useful PROFILE=notify_no_key FEEDBACK_TARGET='ea:...'`.
+
+Provider health has profile-scoped operator commands:
+
+```bash
+make event-alpha-provider-health-report PROFILE=notify_no_key
+make event-alpha-provider-health-reset PROFILE=notify_no_key PROVIDER_KEY=gdelt:event_source CONFIRM=1
+make event-alpha-provider-health-reset PROFILE=notify_no_key PROVIDER_ALL=1 CONFIRM=1
+```
+
+The reset command clears `disabled_until` and `consecutive_failures` only. It
+does not call providers, send Telegram messages, trade, paper trade, or write
+normal RSI signal rows. If you need a one-off force run without clearing the
+health artifact, use:
+
+```bash
+make event-alpha-notify-no-key IGNORE_BACKOFF=1
+```
+
+That adds `provider_backoff_ignored_for_run` to the run/notification warnings
+and still records a fresh provider failure if the provider fails again.
 
 `make event-alpha-notify-fixture-smoke` is the local wiring check. It uses a
 fake sender, fixture/test namespace, deterministic clock, and local artifact

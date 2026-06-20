@@ -155,6 +155,23 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
         text=True,
     )
     assert "RSI_EVENT_RESEARCH_NOW=2026-06-20T12:00:00Z" in notify_fixed_dry
+    notify_ignore_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-notify-no-key", "PYTHON=python3", "IGNORE_BACKOFF=1"],
+        cwd=root,
+        text=True,
+    )
+    assert "--ignore-provider-backoff" in notify_ignore_dry
+    day1_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-day1-start", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "event-alpha-preflight PROFILE=notify_no_key" in day1_dry
+    assert "event-alpha-notification-checklist PROFILE=notify_no_key" in day1_dry
+    assert "event-alpha-notify-preview PROFILE=notify_no_key" in day1_dry
+    assert "main.py --event-alpha-send-test" not in day1_dry
+    assert "main.py --event-alpha-notify-cycle" not in day1_dry
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_no_key" in day1_dry
     fixture_dry = subprocess.check_output(
         ["make", "-n", "event-alpha-cycle", "PYTHON=python3"],
         cwd=root,
@@ -3874,6 +3891,31 @@ def test_event_alpha_artifact_context_and_doctor_filter_modes():
             artifact_namespace="no_key_live",
         )
         assert "unknown run_id" in "; ".join(orphan.warnings)
+
+        index_only = event_alpha_artifact_doctor.diagnose_artifacts(
+            card_paths=[Path("/tmp/research_cards/index.md")],
+        )
+        assert index_only.card_files == 0
+        assert index_only.research_card_files == 0
+        assert index_only.research_card_index_present is True
+        two_cards = event_alpha_artifact_doctor.diagnose_artifacts(
+            card_paths=[
+                Path("/tmp/research_cards/index.md"),
+                Path("/tmp/research_cards/card_a.md"),
+                Path("/tmp/research_cards/card_b.md"),
+            ],
+        )
+        assert two_cards.card_files == 2
+        assert two_cards.research_card_files == 2
+        assert two_cards.research_card_index_present is True
+        high_without_card = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{**run_rows[0], "run_id": "hp", "snapshot_rows_written": 1}],
+            alert_rows=[{**alert_rows[0], "run_id": "hp", "tier": "HIGH_PRIORITY_WATCH"}],
+            card_paths=[Path("/tmp/research_cards/index.md")],
+            profile="no_key_live",
+            artifact_namespace="no_key_live",
+        )
+        assert "no research cards" in "; ".join(high_without_card.warnings)
     finally:
         for key, value in old_env.items():
             if value is None:
@@ -7966,6 +8008,58 @@ def test_event_alpha_notification_runs_and_checklist_report_guard_state():
     assert "trading action is NONE" in report
 
 
+def test_event_alpha_notification_next_steps_cover_backoff_feedback_and_heartbeat():
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import event_alpha_router, scanner
+
+    quiet = scanner.format_event_alpha_notification_next_steps(
+        profile="notify_no_key",
+        provider_health_rows={},
+        result=SimpleNamespace(alertable=0, send_would_send_items=0, research_card_paths=()),
+        notification_row={"would_send_count": 0},
+    )
+    assert "event-alpha-notification-runs-report PROFILE=notify_no_key" in quiet
+    assert "event-alpha-daily-brief PROFILE=notify_no_key" in quiet
+    assert "heartbeat status" in quiet
+
+    degraded = scanner.format_event_alpha_notification_next_steps(
+        profile="notify_no_key",
+        provider_health_rows={
+            "gdelt:event_source": {
+                "provider_key": "gdelt:event_source",
+                "disabled_until": "2099-06-20T12:00:00+00:00",
+            }
+        },
+        result=SimpleNamespace(alertable=0, send_would_send_items=0, research_card_paths=()),
+        notification_row={"would_send_count": 0},
+    )
+    assert "event-alpha-provider-health-report PROFILE=notify_no_key" in degraded
+    assert "event-alpha-provider-health-reset PROFILE=notify_no_key PROVIDER_KEY=gdelt:event_source CONFIRM=1" in degraded
+
+    decision = SimpleNamespace(
+        alertable=True,
+        alert_id="ea:feedback-target",
+        card_id="card_feedback",
+    )
+    with_alert = scanner.format_event_alpha_notification_next_steps(
+        profile="notify_no_key",
+        provider_health_rows={},
+        result=SimpleNamespace(
+            alertable=1,
+            send_would_send_items=1,
+            research_card_paths=("/tmp/card_feedback.md",),
+            router_result=SimpleNamespace(
+                alertable_decisions=(decision,),
+                decisions=(decision,),
+            ),
+        ),
+        notification_row={"would_send_count": 1},
+    )
+    assert "event-alpha-notification-inbox PROFILE=notify_no_key" in with_alert
+    assert "event-feedback-watch PROFILE=notify_no_key FEEDBACK_TARGET='ea:feedback-target'" in with_alert
+    assert "Trading action" not in with_alert
+
+
 def test_event_alpha_notification_report_uses_profile_namespace_and_explicit_override():
     import contextlib
     import io
@@ -8079,6 +8173,144 @@ def test_event_alpha_notification_report_uses_profile_namespace_and_explicit_ove
             text = out.getvalue()
             assert f"path: {explicit_path}" in text
             assert "profiles: notify_no_key=1" in text
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
+        for name, value in original_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+def test_event_alpha_provider_health_report_and_reset_are_profile_scoped():
+    import contextlib
+    import io
+    import json
+    import os
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import config, event_alpha_artifacts, event_alpha_profiles, scanner
+
+    profile = event_alpha_profiles.get_profile("notify_no_key")
+    path_attrs = (
+        "EVENT_ALPHA_RUN_LEDGER_PATH",
+        "EVENT_ALPHA_ALERT_STORE_PATH",
+        "EVENT_ALPHA_NOTIFICATION_RUNS_PATH",
+        "EVENT_WATCHLIST_STATE_PATH",
+        "EVENT_ALPHA_FEEDBACK_PATH",
+        "EVENT_ALPHA_MISSED_PATH",
+        "EVENT_ALPHA_PRIORS_PATH",
+        "EVENT_PROVIDER_HEALTH_PATH",
+        "EVENT_ALPHA_DAILY_BRIEF_PATH",
+        "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
+        "EVENT_RESEARCH_CARDS_DIR",
+        "EVENT_LLM_BUDGET_LEDGER_PATH",
+        "EVENT_ALPHA_OUTCOMES_PATH",
+    )
+    attrs = tuple(
+        name
+        for name in dict.fromkeys((
+            "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+            "EVENT_ALPHA_ARTIFACT_NAMESPACE",
+            "EVENT_ALPHA_RUN_MODE",
+            *path_attrs,
+            *profile.config_overrides,
+        ))
+        if hasattr(config, name)
+    )
+    original = {name: getattr(config, name) for name in attrs}
+    env_names = (
+        "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "RSI_EVENT_ALPHA_RUN_MODE",
+        "RSI_EVENT_PROVIDER_HEALTH_PATH",
+    )
+    original_env = {name: os.environ.get(name) for name in env_names}
+    try:
+        for name in env_names:
+            os.environ.pop(name, None)
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config.EVENT_ALPHA_ARTIFACT_BASE_DIR = base
+            config.EVENT_ALPHA_ARTIFACT_NAMESPACE = ""
+            config.EVENT_ALPHA_RUN_MODE = ""
+            context = event_alpha_artifacts.context_from_profile("notify_no_key", base_dir=base)
+            context.provider_health_path.parent.mkdir(parents=True, exist_ok=True)
+            context.provider_health_path.write_text(
+                json.dumps({
+                    "schema_version": "event_provider_health_v1",
+                    "providers": {
+                        "gdelt:event_source": {
+                            "provider": "gdelt",
+                            "provider_key": "gdelt:event_source",
+                            "provider_service": "gdelt",
+                            "provider_role": "event_source",
+                            "consecutive_failures": 2,
+                            "disabled_until": "2099-06-20T12:00:00+00:00",
+                            "last_success_at": "2026-06-19T00:00:00+00:00",
+                            "last_failure_at": "2026-06-20T10:00:00+00:00",
+                            "last_error_class": "HTTPError",
+                        },
+                        "rss:event_source": {
+                            "provider": "rss",
+                            "provider_key": "rss:event_source",
+                            "provider_service": "rss",
+                            "provider_role": "event_source",
+                            "consecutive_failures": 1,
+                            "disabled_until": "2099-06-20T12:00:00+00:00",
+                            "last_error_class": "URLError",
+                        },
+                    },
+                }),
+                encoding="utf-8",
+            )
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_provider_health_report(profile_name="notify_no_key")
+            text = out.getvalue()
+            assert f"provider_health_path: {context.provider_health_path}" in text
+            assert "gdelt:event_source" in text
+            assert "status=backoff" in text
+            assert "RSI_" not in text
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_provider_health_reset(
+                    profile_name="notify_no_key",
+                    provider_key="gdelt:event_source",
+                    confirm=False,
+                )
+            assert "pass --confirm" in out.getvalue()
+            preserved = json.loads(context.provider_health_path.read_text(encoding="utf-8"))["providers"]
+            assert preserved["gdelt:event_source"]["disabled_until"]
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_provider_health_reset(
+                    profile_name="notify_no_key",
+                    provider_key="gdelt:event_source",
+                    confirm=True,
+                )
+            text = out.getvalue()
+            assert "providers_matched: 1" in text
+            rows = json.loads(context.provider_health_path.read_text(encoding="utf-8"))["providers"]
+            assert rows["gdelt:event_source"]["disabled_until"] is None
+            assert rows["gdelt:event_source"]["consecutive_failures"] == 0
+            assert rows["gdelt:event_source"]["last_failure_at"] == "2026-06-20T10:00:00+00:00"
+            assert rows["rss:event_source"]["disabled_until"]
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_provider_health_reset(
+                    profile_name="notify_no_key",
+                    reset_all=True,
+                    confirm=True,
+                )
+            assert "providers_matched: 2" in out.getvalue()
+            rows = json.loads(context.provider_health_path.read_text(encoding="utf-8"))["providers"]
+            assert all(row.get("disabled_until") is None for row in rows.values())
     finally:
         for name, value in original.items():
             setattr(config, name, value)
@@ -8341,6 +8573,7 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
         "EVENT_ALERTS_ENABLED",
         "EVENT_ALERT_MODE",
         "EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS",
+        "EVENT_ALPHA_IGNORE_PROVIDER_BACKOFF",
         "EVENT_RESEARCH_CARDS_AUTO_WRITE",
         "EVENT_RESEARCH_NOW",
         "TELEGRAM_BOT_TOKEN",
@@ -8364,13 +8597,18 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
             config.EVENT_ALERT_MODE = "research_only"
             config.EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS = True
             config.EVENT_RESEARCH_CARDS_AUTO_WRITE = False
+            config.EVENT_ALPHA_IGNORE_PROVIDER_BACKOFF = False
             config.EVENT_RESEARCH_NOW = "2026-06-15T16:00:00Z"
             config.TELEGRAM_BOT_TOKEN = ""
             config.TELEGRAM_CHAT_IDS = []
             event_alpha_pipeline.run_event_alpha_operating_cycle = raising_runner
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
-                scanner.event_alpha_notify_cycle(profile_name="notify_no_key", send=True)
+                scanner.event_alpha_notify_cycle(
+                    profile_name="notify_no_key",
+                    send=True,
+                    ignore_provider_backoff=True,
+                )
             text = out.getvalue()
             assert "notification_cycle_failed_soft: RuntimeError" in text
             assert "fixed research clock blocks notification send" in text
@@ -8398,6 +8636,9 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
             assert notification_rows[-1]["partial_results"] is True
             assert any("notification_cycle_failed_soft: RuntimeError" in item for item in notification_rows[-1]["warnings"])
             assert any("fixed research clock blocks notification send" in item for item in notification_rows[-1]["warnings"])
+            assert any("provider_backoff_ignored_for_run" in item for item in notification_rows[-1]["warnings"])
+            assert any("provider_backoff_ignored_for_run" in item for item in run_rows[-1]["warnings"])
+            assert config.EVENT_ALPHA_IGNORE_PROVIDER_BACKOFF is False
             assert run_rows[-1]["clock_mode"] == "fixed"
             assert "fixed research clock" in (run_rows[-1]["send_block_reason"] or "")
             alert_path = namespace_dir / "event_alpha_alerts.jsonl"
@@ -9278,6 +9519,10 @@ def test_makefile_has_event_alpha_no_key_target():
     assert "event-alpha-notify-preview:" in text
     assert "event-alpha-notification-checklist:" in text
     assert "event-alpha-notification-runs-report:" in text
+    assert "event-alpha-provider-health-report:" in text
+    assert "event-alpha-provider-health-reset:" in text
+    assert "event-alpha-day1-start:" in text
+    assert "event-alpha-day1-start-llm:" in text
     assert "event-alpha-notify-start-no-key:" in text
     assert "event-alpha-notify-start-llm:" in text
     assert "event-alpha-send-test:" in text
@@ -15706,6 +15951,9 @@ def test_event_provider_health_backoff_and_report():
     text = event_provider_health.format_provider_health_report(rows)
     assert "gdelt" in text
     assert "failures=2" in text
+    assert "status=backoff" in event_provider_health.format_provider_health_report(rows, now=now)
+    assert "consecutive_failures=2" in text
+    assert "last_error_class=RuntimeError" in text
     assert "service health:" in text
     assert "role health:" in text
     assert "event_source:" in text
@@ -15726,6 +15974,79 @@ def test_event_provider_health_backoff_and_report():
         provider_role="event_source",
     )
     assert legacy_decision.allowed is False
+
+
+def test_event_provider_health_reset_and_ignore_backoff():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_provider_health
+
+    now = datetime(2026, 6, 20, 10, 0, tzinfo=timezone.utc)
+    path = Path(tempfile.mkdtemp()) / "provider_health.json"
+    cfg = event_provider_health.EventProviderHealthConfig(
+        path=path,
+        max_consecutive_failures=1,
+        backoff_minutes=60,
+    )
+    event_provider_health.record_provider_failure(
+        "gdelt",
+        RuntimeError("timeout"),
+        cfg=cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="event_source",
+        provider_kind="event_source",
+    )
+    event_provider_health.record_provider_failure(
+        "rss",
+        RuntimeError("dns"),
+        cfg=cfg,
+        now=now,
+        provider_service="rss",
+        provider_role="event_source",
+        provider_kind="event_source",
+    )
+    rows = event_provider_health.load_provider_health(path)
+    assert event_provider_health.provider_allowed(
+        "gdelt",
+        cfg=cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="event_source",
+    ).allowed is False
+    ignore_cfg = event_provider_health.EventProviderHealthConfig(path=path, ignore_backoff=True)
+    ignored = event_provider_health.provider_allowed(
+        "gdelt",
+        cfg=ignore_cfg,
+        now=now,
+        provider_service="gdelt",
+        provider_role="event_source",
+    )
+    assert ignored.allowed is True
+    assert ignored.reason == "provider_backoff_ignored_for_run"
+    assert event_provider_health.load_provider_health(path)["gdelt:event_source"]["disabled_until"]
+
+    reset_rows, result = event_provider_health.reset_provider_health_rows(rows, provider_key="gdelt:event_source")
+    assert result.providers_matched == 1
+    assert reset_rows["gdelt:event_source"]["disabled_until"] is None
+    assert reset_rows["gdelt:event_source"]["consecutive_failures"] == 0
+    assert reset_rows["rss:event_source"]["disabled_until"]
+    assert reset_rows["gdelt:event_source"]["last_failure_at"]
+
+    reset_all_rows, all_result = event_provider_health.reset_provider_health_rows(rows, reset_all=True)
+    assert all_result.providers_matched == 2
+    assert all(not row.get("disabled_until") for row in reset_all_rows.values())
+    assert all(int(row.get("consecutive_failures") or 0) == 0 for row in reset_all_rows.values())
+    text = event_provider_health.format_provider_health_reset_result(all_result, path=path)
+    assert "providers_matched: 2" in text
+    assert "RSI_" not in text
+    try:
+        event_provider_health.reset_provider_health_rows(rows)
+    except ValueError as exc:
+        assert "requires" in str(exc)
+    else:
+        raise AssertionError("reset without selector should fail")
 
 
 def test_event_provider_health_wraps_event_and_enrichment_providers():
@@ -15793,6 +16114,37 @@ def test_event_provider_health_wraps_event_and_enrichment_providers():
     assert skipped_wrapped.fetch_events(now, now) == []
     assert skipped.calls == 0
     assert "backoff" in skipped_wrapped.last_warnings[0]
+    ignored_cfg = event_provider_health.EventProviderHealthConfig(
+        path=skip_path,
+        max_consecutive_failures=1,
+        backoff_minutes=15,
+        ignore_backoff=True,
+    )
+    ignored_provider = SkippedProvider()
+    ignored_wrapped = event_provider_health.HealthCheckedEventProvider(ignored_provider, cfg=ignored_cfg)
+    assert ignored_wrapped.fetch_events(now, now) == ["should not call"]
+    assert ignored_provider.calls == 1
+    ignored_rows = event_provider_health.load_provider_health(skip_path)
+    assert (ignored_rows.get("skipped_source:event_source") or ignored_rows["skipped_source"])["disabled_until"]
+
+    class StillFailingProvider:
+        name = "skipped_source"
+
+        def fetch_events(self, start, end):
+            raise RuntimeError("still failing")
+
+    before_row = event_provider_health.load_provider_health(skip_path)
+    before_failures = int(
+        (before_row.get("skipped_source:event_source") or before_row["skipped_source"])["consecutive_failures"]
+    )
+    assert event_provider_health.HealthCheckedEventProvider(
+        StillFailingProvider(),
+        cfg=ignored_cfg,
+    ).fetch_events(now, now) == []
+    after_rows = event_provider_health.load_provider_health(skip_path)
+    after_row = after_rows.get("skipped_source:event_source") or after_rows["skipped_source"]
+    assert int(after_row["consecutive_failures"]) == before_failures + 1
+    assert after_row["disabled_until"]
 
     class FailingUniverse:
         name = "coingecko_universe"
@@ -16550,6 +16902,9 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "event-alpha-notify-no-key:" in text
     assert "event-alpha-notify-llm:" in text
     assert "event-alpha-notify-preview:" in text
+    assert "event-alpha-provider-health-report:" in text
+    assert "event-alpha-provider-health-reset:" in text
+    assert "event-alpha-day1-start:" in text
     assert "event-alpha-send-test:" in text
     assert "event-alpha-tuning-worksheet:" in text
     assert "event-alpha-export-burn-in-pack:" in text

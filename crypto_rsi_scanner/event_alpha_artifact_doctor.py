@@ -19,6 +19,8 @@ class EventAlphaArtifactDoctorResult:
     feedback_rows: int
     outcome_rows: int
     card_files: int
+    research_card_files: int = 0
+    research_card_index_present: bool = False
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -177,7 +179,10 @@ def diagnose_artifacts(
             (blockers if strict else warnings).append(message)
     if profile in {"full_llm_live", "no_key_llm"} and not list(llm_budget_rows):
         warnings.append("LLM budget rows missing for LLM profile")
-    card_count = len([Path(path) for path in card_paths])
+    card_file_paths = [Path(path) for path in card_paths]
+    research_card_paths = [path for path in card_file_paths if path.name != "index.md"]
+    card_count = len(research_card_paths)
+    index_present = any(path.name == "index.md" for path in card_file_paths)
     if alerts and not card_count and any(str(row.get("tier") or "") in {"HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"} for row in alerts):
         warnings.append("high-priority/triggered snapshots exist but no research cards were found")
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
@@ -190,6 +195,8 @@ def diagnose_artifacts(
         feedback_rows=len(feedback),
         outcome_rows=len(outcomes),
         card_files=card_count,
+        research_card_files=card_count,
+        research_card_index_present=index_present,
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -249,6 +256,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             "rows: "
             f"runs={result.run_rows} alerts={result.alert_rows} "
             f"feedback={result.feedback_rows} outcomes={result.outcome_rows} cards={result.card_files}"
+        ),
+        (
+            "research cards: "
+            f"research_card_files={result.research_card_files} "
+            f"research_card_index_present={str(result.research_card_index_present).lower()}"
         ),
         (
             "snapshot lineage: "

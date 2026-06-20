@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-20 - Keep provider backoff overrides explicit and local
+**Status:** accepted
+**Decision:** Event Alpha notification provider-health backoff can be inspected
+and reset through profile-scoped report/reset commands, and a notification run
+may opt into one-shot `IGNORE_BACKOFF` / `--ignore-provider-backoff`. Reset
+commands clear only `disabled_until` and `consecutive_failures` in the selected
+research artifact namespace. One-shot ignore does not clear the provider-health
+file, and successful forced attempts do not mark the provider healthy; fresh
+failures are still recorded.
+**Why:** Day-1 operations need a practical way to recover from stale public
+provider backoff without hiding historical failures or silently promoting
+unhealthy sources.
+**Revisit when:** Provider reliability history is sufficient to replace manual
+backoff reset/force-run with a reviewed automatic recovery policy.
+
 ## 2026-06-20 - Keep notification ops profile-aware and review-first
 **Status:** accepted
 **Decision:** Day-1 Event Alpha notification reports and feedback helpers should

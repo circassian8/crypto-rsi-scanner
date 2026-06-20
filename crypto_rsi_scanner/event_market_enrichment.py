@@ -96,7 +96,7 @@ def load_market_enrichment_rows_safe(
                 limit=limit,
                 client_factory=client_factory,
             )))
-            if provider_health_cfg is not None:
+            if provider_health_cfg is not None and decision.reason != "provider_backoff_ignored_for_run":
                 event_provider_health.record_provider_success(
                     "coingecko",
                     cfg=provider_health_cfg,

@@ -140,7 +140,7 @@ class CoinGeckoWatchlistMarketProvider:
                 )
             self.last_cache_status = "error"
             return [], (f"CoinGecko targeted watchlist lookup failed: {type(exc).__name__}: {exc}",)
-        if self.provider_health_cfg is not None:
+        if self.provider_health_cfg is not None and decision.reason != "provider_backoff_ignored_for_run":
             event_provider_health.record_provider_success(
                 "coingecko",
                 cfg=self.provider_health_cfg,

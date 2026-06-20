@@ -16,6 +16,7 @@ class EventProviderHealthConfig:
     max_consecutive_failures: int = 3
     backoff_minutes: float = 30.0
     fail_fast_on_dns: bool = True
+    ignore_backoff: bool = False
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,14 @@ class ProviderHealthDecision:
     allowed: bool
     reason: str | None = None
     disabled_until: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderHealthResetResult:
+    providers_total: int
+    providers_matched: int
+    provider_keys: tuple[str, ...]
+    selector: str
 
 
 class HealthCheckedProvider:
@@ -91,7 +100,7 @@ class HealthCheckedProvider:
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
             )
-        else:
+        elif decision.reason != "provider_backoff_ignored_for_run":
             record_provider_success(
                 self.name,
                 cfg=self.cfg,
@@ -161,7 +170,7 @@ class HealthCheckedEventProvider:
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
             )
-        else:
+        elif decision.reason != "provider_backoff_ignored_for_run":
             record_provider_success(
                 self.name,
                 cfg=self.cfg,
@@ -231,7 +240,7 @@ class HealthCheckedUniverseProvider:
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
             )
-        else:
+        elif decision.reason != "provider_backoff_ignored_for_run":
             record_provider_success(
                 self.name,
                 cfg=self.cfg,
@@ -301,7 +310,7 @@ class HealthCheckedDerivativesProvider:
                 provider_service=self.provider_service,
                 provider_role=self.provider_role,
             )
-        else:
+        elif decision.reason != "provider_backoff_ignored_for_run":
             record_provider_success(
                 self.name,
                 cfg=self.cfg,
@@ -366,6 +375,13 @@ def provider_allowed(
     disabled_until = _dt(row.get("disabled_until"))
     observed = _as_utc(now or datetime.now(timezone.utc))
     if disabled_until is not None and disabled_until > observed:
+        if cfg.ignore_backoff:
+            return ProviderHealthDecision(
+                provider=key,
+                allowed=True,
+                reason="provider_backoff_ignored_for_run",
+                disabled_until=disabled_until.isoformat(),
+            )
         return ProviderHealthDecision(
             provider=key,
             allowed=False,
@@ -445,7 +461,89 @@ def record_provider_failure(
     return row
 
 
-def format_provider_health_report(rows: Mapping[str, Mapping[str, Any]]) -> str:
+def reset_provider_health_rows(
+    rows: Mapping[str, Mapping[str, Any]],
+    *,
+    provider_key: str | None = None,
+    service: str | None = None,
+    role: str | None = None,
+    reset_all: bool = False,
+) -> tuple[dict[str, dict[str, Any]], ProviderHealthResetResult]:
+    """Return rows with selected provider backoffs cleared."""
+    clean_key = _clean_selector(provider_key)
+    clean_service = _clean_selector(service)
+    clean_role = _clean_selector(role)
+    selector_count = sum(1 for value in (clean_key, clean_service, clean_role) if value) + (1 if reset_all else 0)
+    if selector_count <= 0:
+        raise ValueError("provider health reset requires --provider-key, --service, --role, or --all")
+    if reset_all and selector_count > 1:
+        raise ValueError("--all cannot be combined with provider selectors")
+    if clean_key and (clean_service or clean_role):
+        raise ValueError("--provider-key cannot be combined with --service or --role")
+    out = {str(key): dict(value) for key, value in rows.items()}
+    matched: list[str] = []
+    for key, row in out.items():
+        if not _matches_reset_selector(
+            key,
+            row,
+            provider_key=clean_key,
+            service=clean_service,
+            role=clean_role,
+            reset_all=reset_all,
+        ):
+            continue
+        row["consecutive_failures"] = 0
+        row["disabled_until"] = None
+        matched.append(str(row.get("provider_key") or key))
+    return out, ProviderHealthResetResult(
+        providers_total=len(rows),
+        providers_matched=len(matched),
+        provider_keys=tuple(dict.fromkeys(matched)),
+        selector=_reset_selector_label(
+            provider_key=clean_key,
+            service=clean_service,
+            role=clean_role,
+            reset_all=reset_all,
+        ),
+    )
+
+
+def format_provider_health_reset_result(
+    result: ProviderHealthResetResult,
+    *,
+    path: str | Path,
+) -> str:
+    lines = [
+        "=" * 76,
+        "EVENT PROVIDER HEALTH RESET (research-only)",
+        "=" * 76,
+        f"path: {path}",
+        f"selector: {result.selector}",
+        f"providers_total: {result.providers_total}",
+        f"providers_matched: {result.providers_matched}",
+        "cleared_provider_keys:",
+    ]
+    lines.extend(f"- {key}" for key in result.provider_keys) if result.provider_keys else lines.append("- none")
+    lines.append("Reset clears disabled_until and consecutive_failures only; it does not call providers, send alerts, trade, or paper trade.")
+    return "\n".join(lines).rstrip()
+
+
+def provider_health_status(row: Mapping[str, Any], *, now: datetime | None = None) -> str:
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    disabled_until = _dt(row.get("disabled_until"))
+    if disabled_until is not None and disabled_until > observed:
+        return "backoff"
+    if int(row.get("consecutive_failures") or 0) > 0:
+        return "degraded"
+    return "healthy"
+
+
+def format_provider_health_report(
+    rows: Mapping[str, Mapping[str, Any]],
+    *,
+    now: datetime | None = None,
+) -> str:
+    observed = _as_utc(now or datetime.now(timezone.utc))
     lines = [
         "=" * 76,
         "EVENT PROVIDER HEALTH (research-only)",
@@ -462,9 +560,11 @@ def format_provider_health_report(rows: Mapping[str, Mapping[str, Any]]) -> str:
         disabled = [
             str(row.get("provider_role") or row.get("provider_kind") or key)
             for key, row in items
-            if row.get("disabled_until")
+            if provider_health_status(row, now=observed) == "backoff"
         ]
         status = "degraded" if failures or disabled else "healthy"
+        if disabled:
+            status = "backoff"
         lines.append(
             f"- {service}: {status} roles={len(items)} failures={failures} "
             f"disabled_roles={','.join(disabled) if disabled else 'none'}"
@@ -484,14 +584,19 @@ def format_provider_health_report(rows: Mapping[str, Mapping[str, Any]]) -> str:
         lines.append("")
         lines.append(f"{group}:")
         for provider, row in items:
+            role = row.get("provider_role") or row.get("provider_kind") or "unclassified"
+            failures = int(row.get("consecutive_failures") or 0)
             lines.append(
                 f"- {row.get('provider_key') or provider}: "
+                f"status={provider_health_status(row, now=observed)} "
                 f"service={row.get('provider_service') or _service_from_name(provider)} "
-                f"failures={int(row.get('consecutive_failures') or 0)} "
+                f"role={role} "
+                f"consecutive_failures={failures} "
+                f"failures={failures} "
                 f"disabled_until={row.get('disabled_until') or 'none'} "
-                f"last_success={row.get('last_success_at') or 'never'} "
-                f"last_failure={row.get('last_failure_at') or 'never'} "
-                f"last_error={row.get('last_error_class') or 'none'}"
+                f"last_success_at={row.get('last_success_at') or 'never'} "
+                f"last_failure_at={row.get('last_failure_at') or 'never'} "
+                f"last_error_class={row.get('last_error_class') or 'none'}"
             )
     return "\n".join(lines)
 
@@ -524,6 +629,52 @@ def _service_from_name(name: object) -> str:
         "openai": "openai",
     }
     return aliases.get(text, text.replace("_provider", "") or "provider")
+
+
+def _clean_selector(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _matches_reset_selector(
+    key: str,
+    row: Mapping[str, Any],
+    *,
+    provider_key: str,
+    service: str,
+    role: str,
+    reset_all: bool,
+) -> bool:
+    if reset_all:
+        return True
+    row_key = str(row.get("provider_key") or key)
+    row_service = str(row.get("provider_service") or _service_from_name(row.get("provider") or key))
+    row_role = str(row.get("provider_role") or row.get("provider_kind") or "")
+    if provider_key:
+        return row_key == provider_key or str(key) == provider_key
+    if service and row_service != service:
+        return False
+    if role and row_role != role:
+        return False
+    return True
+
+
+def _reset_selector_label(
+    *,
+    provider_key: str,
+    service: str,
+    role: str,
+    reset_all: bool,
+) -> str:
+    if reset_all:
+        return "all"
+    if provider_key:
+        return f"provider_key={provider_key}"
+    parts = []
+    if service:
+        parts.append(f"service={service}")
+    if role:
+        parts.append(f"role={role}")
+    return " ".join(parts) if parts else "none"
 
 
 def _empty_search_result(provider: str, queries: tuple[Any, ...], warning: str) -> Any:
