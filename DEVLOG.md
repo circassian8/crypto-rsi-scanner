@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Add scheduled Event Alpha notification ops guardrails · Codex
+**Why:** Scheduled day-1 Event Alpha research notifications needed better
+operator controls before launchd/cron burn-in: a redacted environment doctor,
+explicit emergency pause, freshness/SLO checks, and a clean handoff pack.
+**Changes:**
+- Added `event_alpha_environment_doctor.py`, `event_alpha_scheduler.py`,
+  `event_alpha_notification_slo.py`, `event_alpha_notification_pause.py`, and
+  `event_alpha_notification_pack.py`.
+- Wired new CLI/Make surfaces:
+  `--event-alpha-environment-doctor`, `--event-alpha-pause-notifications`,
+  `--event-alpha-resume-notifications`, `--event-alpha-scheduler-status`,
+  `--event-alpha-generate-launchd`,
+  `--event-alpha-notification-slo-report`, and
+  `--event-alpha-export-notification-pack`.
+- Added `RSI_EVENT_ALPHA_NOTIFICATIONS_PAUSED` and
+  `RSI_EVENT_ALPHA_NOTIFICATIONS_PAUSE_REASON`; paused sends still write
+  blocked delivery rows with `error_class=notifications_paused` and do not
+  block discovery/report artifacts.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md`; added offline regression tests for doctor
+  blockers, pause/resume, scheduler status, SLO status, redacted pack export,
+  and Make target wiring.
+**Verify:** `python3 tests/test_indicators.py` (404/404 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make event-llm-eval
+PYTHON=python3`; `make event-llm-extract-eval PYTHON=python3`; `make
+event-alpha-eval PYTHON=python3`; `make verify PYTHON=python3`; `make
+event-alpha-notify-fixture-smoke PYTHON=python3`; `python3 main.py
+--event-alpha-notification-deliveries-report --event-alpha-profile fixture
+--event-alpha-artifact-namespace fixture_notify_smoke`; `python3 main.py
+--event-alpha-notify-go-no-go --event-alpha-profile notify_no_key`;
+`python3 main.py --event-alpha-environment-doctor --event-alpha-profile
+notify_no_key`; `python3 main.py --event-alpha-scheduler-status
+--event-alpha-profile notify_no_key`; `python3 main.py
+--event-alpha-notification-slo-report --event-alpha-profile notify_no_key`;
+`python3 main.py --event-alpha-export-notification-pack --event-alpha-profile
+notify_no_key --out /tmp/event_alpha_notification_pack_verify.zip`.
+**Notes/risks:** The repeated fixture smoke wrote a duplicate-skip row because
+the fixture namespace already had delivered rows; the delivery report confirmed
+the previous delivered rows and the expected dedupe. This remains research-only:
+no live trading, paper trades, normal RSI signal writes, or LLM-created
+`TRIGGERED_FADE`; `TRIGGERED_FADE` remains owned by `event_fade.py` +
+`proxy_fade`.
+
 ## 2026-06-20 — Polish Event Alpha day-1 notification fidelity · Codex
 **Why:** Day-1 Event Alpha notifications needed more faithful delivery state and
 clearer operator UX before unattended research burn-in: Telegram partial sends

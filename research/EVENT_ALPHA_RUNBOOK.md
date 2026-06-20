@@ -59,6 +59,9 @@ Before the first actual send, run the startup checklist:
 ```bash
 make event-alpha-notification-checklist PROFILE=notify_no_key
 make event-alpha-notify-go-no-go PROFILE=notify_no_key
+make event-alpha-environment-doctor PROFILE=notify_no_key
+make event-alpha-scheduler-status PROFILE=notify_no_key
+make event-alpha-notification-slo-report PROFILE=notify_no_key
 make event-alpha-notification-runs-report PROFILE=notify_no_key
 make event-alpha-notification-inbox PROFILE=notify_no_key
 make event-alpha-notify-fixture-smoke
@@ -77,6 +80,31 @@ send check. It separates preview readiness from send readiness and shows
 Telegram/send-guard state, fixed-clock blockers, run-lock state, provider
 backoff, delivery/run-ledger writability, research-card path writability,
 artifact doctor status, cooldowns, and the next command. It never sends.
+
+`make event-alpha-environment-doctor PROFILE=notify_no_key` is the scheduled-run
+environment check. It verifies the active profile, artifact namespace, writable
+lock/delivery/run/card paths, Telegram presence (redacted), send guard, provider
+source readiness, provider backoff, LLM provider/key readiness, clock mode, and
+prints `READY_FOR_SCHEDULED_NOTIFY`.
+
+`make event-alpha-scheduler-status PROFILE=notify_no_key` checks run freshness,
+latest successful run age, latest delivery age, run-lock state, provider
+backoff, health-guard status, and whether the scheduled Make target exists.
+`make event-alpha-notification-slo-report PROFILE=notify_no_key` summarizes
+notification SLO state as `OK`, `DEGRADED`, `STALE`, or `BLOCKED` with the next
+operator action.
+
+Use the emergency pause when you want discovery/reporting to continue while
+blocking Telegram delivery:
+
+```bash
+make event-alpha-pause-notifications PROFILE=notify_no_key REASON="operator pause"
+make event-alpha-resume-notifications PROFILE=notify_no_key CONFIRM=1
+```
+
+Paused sends write blocked delivery rows with `error_class=notifications_paused`.
+The env-level stop switch is `RSI_EVENT_ALPHA_NOTIFICATIONS_PAUSED=1` with an
+optional `RSI_EVENT_ALPHA_NOTIFICATIONS_PAUSE_REASON`.
 
 The notification inbox joins notification run rows, alert snapshots, research
 cards, and feedback artifacts for one profile namespace. It shows sent
@@ -151,6 +179,7 @@ make event-alpha-day1-start                                  # no-send readiness
 RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-send-test PROFILE=notify_no_key
 RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-no-key-scheduled   # or event-alpha-notify-llm-scheduled
 make event-alpha-notification-deliveries-report PROFILE=notify_no_key
+make event-alpha-export-notification-pack PROFILE=notify_no_key
 ```
 
 The run lock lives at `<namespace>/event_alpha_notify.lock`. A fresh lock makes

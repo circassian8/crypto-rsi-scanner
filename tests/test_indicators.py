@@ -17891,6 +17891,241 @@ def test_event_alpha_notification_run_summary_flows_to_runs_doctor_and_brief():
     assert "Notify delivery failures" in brief
 
 
+def test_event_alpha_environment_doctor_blocks_missing_and_unwritable_inputs():
+    import tempfile
+    from pathlib import Path
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import event_alpha_environment_doctor as doctor
+
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        ctx = SimpleNamespace(namespace_dir=base / "notify", base_dir=base, artifact_namespace="notify_no_key")
+        profile = SimpleNamespace(name="notify_no_key", send=True, notification_burn_in=True)
+        provider_status = SimpleNamespace(ready_event_source_count=3, ready_enrichment_count=1)
+        blocked = doctor.build_environment_doctor(
+            profile=profile,
+            context=ctx,
+            provider_status=provider_status,
+            provider_health_rows={},
+            lock_path=base / "notify" / "lock.json",
+            delivery_ledger_path=base / "notify" / "deliveries.jsonl",
+            notification_runs_path=base / "notify" / "runs.jsonl",
+            research_cards_dir=base / "notify" / "cards",
+            telegram_token_present=False,
+            telegram_chat_ids_present=False,
+            send_guard_enabled=False,
+            llm_provider="fixture",
+            llm_enabled=False,
+            llm_extractor_provider="fixture",
+            llm_extractor_enabled=False,
+            openai_key_present=False,
+            clock_status={"now": "wall-clock"},
+            python_executable="python3",
+            working_directory=str(base),
+        )
+        assert not blocked.ready_for_scheduled_notify
+        assert any("TELEGRAM_BOT_TOKEN" in item for item in blocked.blockers)
+        assert "secret" not in doctor.format_environment_doctor(blocked).lower()
+
+        ready = doctor.build_environment_doctor(
+            profile=profile,
+            context=ctx,
+            provider_status=provider_status,
+            provider_health_rows={},
+            lock_path=base / "notify" / "lock.json",
+            delivery_ledger_path=base / "notify" / "deliveries.jsonl",
+            notification_runs_path=base / "notify" / "runs.jsonl",
+            research_cards_dir=base / "notify" / "cards",
+            telegram_token_present=True,
+            telegram_chat_ids_present=True,
+            send_guard_enabled=True,
+            llm_provider="fixture",
+            llm_enabled=False,
+            llm_extractor_provider="fixture",
+            llm_extractor_enabled=False,
+            openai_key_present=False,
+            clock_status={"now": "wall-clock"},
+            python_executable="python3",
+            working_directory=str(base),
+        )
+        assert ready.ready_for_scheduled_notify
+
+        file_base = base / "not_a_dir"
+        file_base.write_text("x", encoding="utf-8")
+        bad_ctx = SimpleNamespace(namespace_dir=file_base / "child", base_dir=file_base, artifact_namespace="notify_no_key")
+        bad = doctor.build_environment_doctor(
+            profile=profile,
+            context=bad_ctx,
+            provider_status=provider_status,
+            provider_health_rows={},
+            lock_path=file_base / "lock.json",
+            delivery_ledger_path=file_base / "deliveries.jsonl",
+            notification_runs_path=file_base / "runs.jsonl",
+            research_cards_dir=file_base / "cards",
+            telegram_token_present=True,
+            telegram_chat_ids_present=True,
+            send_guard_enabled=True,
+            llm_provider="fixture",
+            llm_enabled=False,
+            llm_extractor_provider="fixture",
+            llm_extractor_enabled=False,
+            openai_key_present=False,
+            clock_status={"now": "wall-clock"},
+            python_executable="python3",
+            working_directory=str(base),
+        )
+        assert not bad.ready_for_scheduled_notify
+        assert any("not writable" in item for item in bad.blockers)
+
+
+def test_event_alpha_pause_blocks_delivery_and_resume_requires_confirm():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+    from crypto_rsi_scanner import event_alpha_notification_pause as pause
+    from crypto_rsi_scanner import event_alpha_notifications as notif
+    from crypto_rsi_scanner import event_alpha_router
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        state = pause.write_pause_state(ctx, reason="maintenance window", now=datetime(2026, 6, 20, tzinfo=timezone.utc))
+        assert state.paused
+        refused = pause.clear_pause_state(ctx, confirm=False)
+        assert refused.paused
+        cleared = pause.clear_pause_state(ctx, confirm=True)
+        assert not cleared.paused
+        state = pause.write_pause_state(ctx, reason="maintenance window", now=datetime(2026, 6, 20, tzinfo=timezone.utc))
+
+        path = Path(tmp) / "deliveries.jsonl"
+        cfg = delivery.NotificationDeliveryConfig(path=path, dedupe_window_hours=24)
+        result = notif.send_notifications(
+            [_notify_route_decision("VELVET", event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION, event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH)],
+            storage=_NotifyFakeStorage(),
+            cfg=notif.EventAlphaNotificationConfig(
+                enabled=True,
+                mode="research_only",
+                instant_escalation_cooldown_hours=0,
+                health_heartbeat_enabled=False,
+            ),
+            send_fn=lambda message: True,
+            now=datetime(2026, 6, 20, 12, tzinfo=timezone.utc),
+            delivery_cfg=cfg,
+            run_id="run-paused",
+            namespace="notify_no_key",
+            pause_state=state,
+        )
+        assert not result.attempted
+        assert result.deliveries_blocked == 1
+        rows = delivery.load_delivery_records(path)
+        assert rows[-1]["state"] == delivery.STATE_BLOCKED
+        assert rows[-1]["error_class"] == "notifications_paused"
+
+
+def test_event_alpha_scheduler_slo_and_notification_pack_are_redacted():
+    import tempfile
+    import zipfile
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+    from crypto_rsi_scanner import event_alpha_notification_pack as pack
+    from crypto_rsi_scanner import event_alpha_notification_slo as slo
+    from crypto_rsi_scanner import event_alpha_scheduler as scheduler
+
+    now = datetime(2026, 6, 20, 12, tzinfo=timezone.utc)
+    run = {
+        "row_type": "event_alpha_notification_run",
+        "run_id": "run1",
+        "started_at": (now - timedelta(hours=1)).isoformat(),
+        "cycle_completed": True,
+        "success": True,
+        "would_send_count": 1,
+        "deliveries_failed": 1,
+    }
+    failed = {
+        "row_type": "event_alpha_notification_delivery",
+        "delivery_id": "d1",
+        "state": delivery.STATE_FAILED,
+        "lane": "daily_digest",
+        "attempted_at": (now - timedelta(minutes=5)).isoformat(),
+    }
+    sched = scheduler.build_scheduler_status(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        run_rows=[run],
+        delivery_rows=[failed],
+        lock_status=SimpleNamespace(state="held", message="active lock"),
+        provider_health_rows={"gdelt": {"disabled_until": now.isoformat()}},
+        health_guard_status="DEGRADED",
+        scheduled_target_exists=True,
+        now=now,
+    )
+    assert sched.latest_run_age_hours < 2
+    assert "lock" in " ".join(sched.warnings)
+    assert "event-alpha-notify-no-key-scheduled" in scheduler.generate_launchd_plist(
+        profile="notify_no_key",
+        repo_path="/repo",
+        python_path="/repo/.venv/bin/python",
+    )
+
+    slo_result = slo.build_slo_report(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        notification_runs=[run],
+        delivery_rows=[failed],
+        provider_health_rows={},
+        now=now,
+    )
+    assert slo_result.status == slo.STATUS_BLOCKED
+    assert slo_result.alertable_but_undelivered_count == 1
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = SimpleNamespace(profile="notify_no_key", artifact_namespace="notify_no_key")
+        out = Path(tmp) / "pack.zip"
+        result = pack.export_notification_pack(
+            out_path=out,
+            context=ctx,
+            notification_runs=[run],
+            delivery_rows=[failed],
+            alert_rows=[{"alert_id": "a1", "token": "secret-value"}],
+            provider_health_rows={"svc": {"api_key": "secret-value"}},
+            go_no_go_text="TELEGRAM_BOT_TOKEN=secret-value",
+            environment_doctor_text="OPENAI_API_KEY=secret-value",
+            slo_text="ok",
+        )
+        assert result.files_written >= 7
+        with zipfile.ZipFile(out) as zf:
+            names = set(zf.namelist())
+            assert "reports/go_no_go.txt" in names
+            body = "\n".join(zf.read(name).decode("utf-8") for name in names)
+            assert "secret-value" not in body
+            assert ".env" not in names
+
+
+def test_event_alpha_notification_operational_make_targets_exist():
+    from pathlib import Path
+    import subprocess
+
+    text = Path("Makefile").read_text(encoding="utf-8")
+    for target in (
+        "event-alpha-environment-doctor:",
+        "event-alpha-scheduler-status:",
+        "event-alpha-notification-slo-report:",
+        "event-alpha-export-notification-pack:",
+        "event-alpha-pause-notifications:",
+        "event-alpha-resume-notifications:",
+    ):
+        assert target in text
+    dry = subprocess.run(
+        ["make", "-n", "event-alpha-environment-doctor", "PROFILE=notify_no_key", "PYTHON=python3"],
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout
+    assert "--event-alpha-environment-doctor --event-alpha-profile notify_no_key" in dry
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

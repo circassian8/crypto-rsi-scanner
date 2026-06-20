@@ -30,6 +30,8 @@ class EventAlphaNotificationGoNoGoResult:
     research_cards_writable: bool
     artifact_doctor_status: str
     llm_budget_status: str
+    notifications_paused: bool
+    pause_reason: str
     cooldown_status: dict[str, dict[str, Any]]
     clock_line: str
     blockers: tuple[str, ...]
@@ -57,6 +59,8 @@ def build_go_no_go(
     cooldown_status: Mapping[str, Mapping[str, Any]],
     llm_budget_status: str,
     clock_status: Mapping[str, Any],
+    notifications_paused: bool = False,
+    pause_reason: str = "",
 ) -> EventAlphaNotificationGoNoGoResult:
     """Build a deterministic readiness decision from existing runtime checks."""
     lock_state = str(getattr(lock_status, "state", "unknown") or "unknown")
@@ -87,6 +91,8 @@ def build_go_no_go(
         blockers.append("telegram config is missing")
     if not send_guard_enabled:
         blockers.append("RSI_EVENT_ALERTS_ENABLED is not set")
+    if notifications_paused:
+        blockers.append(f"notifications paused: {pause_reason or 'operator pause'}")
     if str(artifact_doctor_status).upper() == "BLOCKED":
         blockers.append("artifact doctor status is BLOCKED")
     if provider_sources <= 0:
@@ -123,6 +129,8 @@ def build_go_no_go(
         research_cards_writable=cards_writable,
         artifact_doctor_status=str(artifact_doctor_status or "unknown"),
         llm_budget_status=str(llm_budget_status or "unknown"),
+        notifications_paused=bool(notifications_paused),
+        pause_reason=str(pause_reason or ""),
         cooldown_status={str(key): dict(value) for key, value in cooldown_status.items()},
         clock_line=_clock_line(clock_status),
         blockers=tuple(dict.fromkeys(blockers)),
@@ -163,6 +171,8 @@ def format_go_no_go(result: EventAlphaNotificationGoNoGoResult) -> str:
         f"research_cards_writable: {_yes_no(result.research_cards_writable)}",
         f"artifact_doctor_status: {result.artifact_doctor_status}",
         f"LLM budget: {result.llm_budget_status}",
+        f"notifications_paused: {_yes_no(result.notifications_paused)}"
+        + (f" ({result.pause_reason})" if result.pause_reason else ""),
         "",
         "cooldowns:",
     ]

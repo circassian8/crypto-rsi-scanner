@@ -82,8 +82,11 @@ from . import event_alpha_notification_checklist
 from . import event_alpha_notification_delivery
 from . import event_alpha_notification_go_no_go
 from . import event_alpha_notification_inbox
+from . import event_alpha_notification_pack
+from . import event_alpha_notification_pause
 from . import event_alpha_notification_runs
 from . import event_alpha_notification_sender
+from . import event_alpha_notification_slo
 from . import event_alpha_pipeline
 from . import event_alpha_preflight
 from . import event_alpha_priors
@@ -93,8 +96,10 @@ from . import event_alpha_retention
 from . import event_alpha_run_ledger
 from . import event_alpha_run_lock
 from . import event_alpha_router
+from . import event_alpha_scheduler
 from . import event_alpha_tuning
 from . import event_alpha_v1_readiness
+from . import event_alpha_environment_doctor
 from . import event_source_reliability
 from . import event_catalyst_search
 from . import event_clock
@@ -1566,6 +1571,16 @@ def _event_alpha_notification_delivery_config_from_runtime(
     )
 
 
+def _event_alpha_notification_pause_state(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> event_alpha_notification_pause.EventAlphaNotificationPauseState:
+    return event_alpha_notification_pause.read_pause_state(
+        context,
+        env_paused=config.EVENT_ALPHA_NOTIFICATIONS_PAUSED,
+        env_reason=config.EVENT_ALPHA_NOTIFICATIONS_PAUSE_REASON,
+    )
+
+
 def _apply_event_alpha_profile(profile_name: str | None) -> event_alpha_profiles.EventAlphaProfile | None:
     if not profile_name:
         return None
@@ -2266,6 +2281,7 @@ def _event_alpha_notify_cycle_body(
         run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
         lock_context = _event_alpha_notify_context_from_runtime(profile_for_run)
         delivery_cfg = _event_alpha_notification_delivery_config_from_runtime(lock_context)
+        pause_state = _event_alpha_notification_pause_state(lock_context)
         run_lock = event_alpha_run_lock.acquire_run_lock(
             lock_context,
             cfg=_event_alpha_run_lock_config_from_runtime(),
@@ -2288,6 +2304,8 @@ def _event_alpha_notify_cycle_body(
             return
         if run_lock.stale_recovered:
             print(f"Warning: {event_alpha_run_lock.STALE_LOCK_RECOVERED_WARNING} ({run_lock.status.message}).")
+        if pause_state.paused:
+            print(f"Event Alpha notifications paused: {pause_state.reason} ({pause_state.source}).")
         budget = _notification_runtime_budget(started_at)
         pre_stage_warnings: list[str] = list(_event_alpha_notify_clock_warnings(clock_status))
         if ignore_backoff_for_run:
@@ -2471,6 +2489,7 @@ def _event_alpha_notify_cycle_body(
             delivery_cfg=delivery_cfg,
             run_id=run_id,
             namespace=artifact_namespace or lock_context.artifact_namespace,
+            pause_state=pause_state,
         )
     else:
         print("Event Alpha notify cycle send not requested; pass --event-alert-send for guarded delivery or would-send accounting.")
@@ -2720,6 +2739,7 @@ def event_alpha_notify_go_no_go(
         context,
         stale_minutes=config.EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES,
     )
+    pause_state = _event_alpha_notification_pause_state(context)
     result = event_alpha_notification_go_no_go.build_go_no_go(
         profile=profile.name,
         artifact_namespace=context.artifact_namespace,
@@ -2735,8 +2755,315 @@ def event_alpha_notify_go_no_go(
         cooldown_status=plan.cooldown_status,
         llm_budget_status=_event_alpha_llm_budget_status(),
         clock_status=clock_status,
+        notifications_paused=pause_state.paused,
+        pause_reason=pause_state.reason,
     )
     print(event_alpha_notification_go_no_go.format_go_no_go(result))
+
+
+def event_alpha_environment_doctor_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+) -> None:
+    """Print scheduled notification environment readiness for one profile."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "notify_no_key"
+    try:
+        profile = _apply_event_alpha_profile(selected_profile)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    context = event_alpha_artifacts.context_from_profile(
+        profile.name,
+        run_mode=config.EVENT_ALPHA_RUN_MODE or None,
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+    )
+    result = event_alpha_environment_doctor.build_environment_doctor(
+        profile=profile,
+        context=context,
+        provider_status=event_provider_status.build_event_discovery_provider_status(config),
+        provider_health_rows=event_provider_health.load_provider_health(context.provider_health_path),
+        lock_path=event_alpha_run_lock.lock_path_for_context(context),
+        delivery_ledger_path=event_alpha_notification_delivery.deliveries_path_for_context(context),
+        notification_runs_path=context.notification_runs_path,
+        research_cards_dir=context.research_cards_dir,
+        telegram_token_present=bool(config.TELEGRAM_BOT_TOKEN),
+        telegram_chat_ids_present=bool(config.TELEGRAM_CHAT_IDS),
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        llm_provider=config.EVENT_LLM_PROVIDER,
+        llm_enabled=config.EVENT_LLM_ENABLED,
+        llm_extractor_provider=config.EVENT_LLM_EXTRACTOR_PROVIDER,
+        llm_extractor_enabled=config.EVENT_LLM_EXTRACTOR_ENABLED,
+        openai_key_present=bool(config.OPENAI_API_KEY),
+        clock_status=_event_clock_status(),
+        python_executable=sys.executable,
+        working_directory=str(config.DATA_DIR),
+    )
+    print(event_alpha_environment_doctor.format_environment_doctor(result))
+
+
+def event_alpha_pause_notifications(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    reason: str | None = None,
+) -> None:
+    """Write a namespace-scoped notification pause file."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_no_key", None)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    state = event_alpha_notification_pause.write_pause_state(
+        context,
+        reason=reason or "operator pause",
+        now=datetime.now(timezone.utc),
+    )
+    print(event_alpha_notification_pause.format_pause_state(state, action="pause"))
+
+
+def event_alpha_resume_notifications(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    confirm: bool = False,
+) -> None:
+    """Clear the namespace-scoped notification pause file when confirmed."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_no_key", None)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    if not confirm:
+        state = _event_alpha_notification_pause_state(context)
+        print(event_alpha_notification_pause.format_pause_state(state, action="resume-refused"))
+        print("Resume refused: pass --confirm to clear the pause file.")
+        return
+    state = event_alpha_notification_pause.clear_pause_state(context, confirm=True)
+    print(event_alpha_notification_pause.format_pause_state(state, action="resume"))
+
+
+def _event_alpha_health_guard_status_for_context(
+    *,
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    profile_name: str | None,
+) -> str:
+    artifacts = _event_alpha_local_artifacts(run_limit=100, latest_alerts=True)
+    result = event_alpha_health_guard.evaluate_health_guard(
+        run_rows=artifacts["runs"].rows,
+        alert_rows=artifacts["alerts"].rows,
+        watchlist_entries=artifacts["watchlist"].entries,
+        provider_health_rows=artifacts["provider_rows"],
+        llm_budget_rows=artifacts["budget_rows"],
+        cfg=event_alpha_health_guard.EventAlphaHealthGuardConfig(
+            max_run_age_hours=config.EVENT_ALPHA_MAX_RUN_AGE_HOURS,
+            max_success_age_hours=config.EVENT_ALPHA_MAX_SUCCESS_AGE_HOURS,
+            require_profile=profile_name or config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE,
+        ),
+        artifact_namespace=context.artifact_namespace,
+    )
+    return result.status
+
+
+def event_alpha_scheduler_status_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+) -> None:
+    """Print scheduler-facing run freshness, lock, and target status."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "notify_no_key"
+    try:
+        profile = _apply_event_alpha_profile(selected_profile)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    context = _event_alpha_report_context(profile.name, None)
+    runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=100)
+    delivery_path = event_alpha_notification_delivery.deliveries_path_for_context(context)
+    deliveries = event_alpha_notification_delivery.load_delivery_records(delivery_path)
+    lock_status = event_alpha_run_lock.inspect_run_lock(
+        context,
+        stale_minutes=config.EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES,
+    )
+    make_text = (config.DATA_DIR / "Makefile").read_text(encoding="utf-8") if (config.DATA_DIR / "Makefile").exists() else ""
+    target_exists = event_alpha_scheduler.scheduled_command(profile.name).split()[-1] + ":" in make_text
+    result = event_alpha_scheduler.build_scheduler_status(
+        profile=profile.name,
+        artifact_namespace=context.artifact_namespace,
+        run_rows=runs.rows,
+        delivery_rows=deliveries,
+        lock_status=lock_status,
+        provider_health_rows=event_provider_health.load_provider_health(context.provider_health_path),
+        health_guard_status=_event_alpha_health_guard_status_for_context(context=context, profile_name=profile.name),
+        scheduled_target_exists=target_exists,
+        now=datetime.now(timezone.utc),
+    )
+    print(_event_alpha_context_block(context))
+    print(event_alpha_scheduler.format_scheduler_status(result))
+
+
+def event_alpha_generate_launchd(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    out: str | None = None,
+) -> None:
+    """Write a dry-run launchd plist template for scheduled notification runs."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "notify_no_key"
+    try:
+        profile = _apply_event_alpha_profile(selected_profile)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    text = event_alpha_scheduler.generate_launchd_plist(
+        profile=profile.name,
+        repo_path=config.DATA_DIR,
+        python_path=sys.executable,
+    )
+    if out:
+        path = Path(out).expanduser()
+        if not path.is_absolute():
+            path = config.DATA_DIR / path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        print(f"Event Alpha launchd template written: {path}")
+    else:
+        print(text.rstrip())
+
+
+def event_alpha_notification_slo_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print SLO-style notification freshness and delivery health."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_no_key", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    runs = event_alpha_notification_runs.load_notification_runs(context.notification_runs_path, limit=100)
+    delivery_path = event_alpha_notification_delivery.deliveries_path_for_context(context)
+    deliveries = event_alpha_notification_delivery.load_delivery_records(delivery_path)
+    result = event_alpha_notification_slo.build_slo_report(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        notification_runs=runs.rows,
+        delivery_rows=deliveries,
+        provider_health_rows=event_provider_health.load_provider_health(context.provider_health_path),
+        now=datetime.now(timezone.utc),
+    )
+    print(_event_alpha_context_block(context))
+    print(event_alpha_notification_slo.format_slo_report(result))
+
+
+def event_alpha_export_notification_pack(
+    out: str,
+    *,
+    verbose: bool = False,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Export a redacted zip of notification artifacts and operator reports."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_no_key", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    runs = event_alpha_notification_runs.load_notification_runs(context.notification_runs_path, limit=200)
+    delivery_path = event_alpha_notification_delivery.deliveries_path_for_context(context)
+    deliveries = event_alpha_notification_delivery.load_delivery_records(delivery_path)
+    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=False)
+    provider_rows = event_provider_health.load_provider_health(context.provider_health_path)
+    daily_brief = ""
+    try:
+        daily_brief = context.daily_brief_path.read_text(encoding="utf-8")
+    except OSError:
+        daily_brief = ""
+    provider_status = event_provider_status.build_event_discovery_provider_status(config)
+    lock_status = event_alpha_run_lock.inspect_run_lock(context, stale_minutes=config.EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES)
+    storage = Storage(config.DB_PATH)
+    try:
+        plan = event_alpha_notifications.build_notification_plan(
+            [],
+            storage=storage,
+            cfg=_event_alpha_notification_config_from_runtime(context.profile),
+            now=_event_research_now(),
+            include_health_heartbeat=True,
+        )
+    finally:
+        storage.close()
+    pause_state = _event_alpha_notification_pause_state(context)
+    go_no_go = event_alpha_notification_go_no_go.build_go_no_go(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        lock_status=lock_status,
+        provider_status=provider_status,
+        provider_health_rows=provider_rows,
+        delivery_ledger_path=delivery_path,
+        notification_run_ledger_path=context.notification_runs_path,
+        research_cards_dir=context.research_cards_dir,
+        artifact_doctor_status="not_run",
+        cooldown_status=plan.cooldown_status,
+        llm_budget_status=_event_alpha_llm_budget_status(),
+        clock_status=_event_clock_status(),
+        notifications_paused=pause_state.paused,
+        pause_reason=pause_state.reason,
+    )
+    doctor = event_alpha_environment_doctor.build_environment_doctor(
+        profile=context.profile,
+        context=context,
+        provider_status=provider_status,
+        provider_health_rows=provider_rows,
+        lock_path=event_alpha_run_lock.lock_path_for_context(context),
+        delivery_ledger_path=delivery_path,
+        notification_runs_path=context.notification_runs_path,
+        research_cards_dir=context.research_cards_dir,
+        telegram_token_present=bool(config.TELEGRAM_BOT_TOKEN),
+        telegram_chat_ids_present=bool(config.TELEGRAM_CHAT_IDS),
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        llm_provider=config.EVENT_LLM_PROVIDER,
+        llm_enabled=config.EVENT_LLM_ENABLED,
+        llm_extractor_provider=config.EVENT_LLM_EXTRACTOR_PROVIDER,
+        llm_extractor_enabled=config.EVENT_LLM_EXTRACTOR_ENABLED,
+        openai_key_present=bool(config.OPENAI_API_KEY),
+        clock_status=_event_clock_status(),
+        python_executable=sys.executable,
+        working_directory=str(config.DATA_DIR),
+    )
+    slo = event_alpha_notification_slo.build_slo_report(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        notification_runs=runs.rows,
+        delivery_rows=deliveries,
+        provider_health_rows=provider_rows,
+        now=datetime.now(timezone.utc),
+    )
+    result = event_alpha_notification_pack.export_notification_pack(
+        out_path=out,
+        context=context,
+        notification_runs=runs.rows,
+        delivery_rows=deliveries,
+        alert_rows=alerts.rows,
+        provider_health_rows=provider_rows,
+        go_no_go_text=event_alpha_notification_go_no_go.format_go_no_go(go_no_go),
+        environment_doctor_text=event_alpha_environment_doctor.format_environment_doctor(doctor),
+        slo_text=event_alpha_notification_slo.format_slo_report(slo),
+        daily_brief_text=daily_brief,
+        cards_dir=context.research_cards_dir,
+    )
+    print(event_alpha_notification_pack.format_notification_pack_result(result))
 
 
 def _event_alpha_llm_budget_status() -> str:
@@ -2824,7 +3151,12 @@ def event_alpha_notification_checklist_report(
     print(event_alpha_notification_checklist.format_notification_checklist(result))
 
 
-def event_alpha_send_test(verbose: bool = False, *, profile_name: str | None = None) -> None:
+def event_alpha_send_test(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    ignore_notification_pause: bool = False,
+) -> None:
     """Send one guarded research-only heartbeat without running the radar."""
     _setup_event_discovery_logging(verbose)
     selected_profile = profile_name or "notify_no_key"
@@ -2832,6 +3164,16 @@ def event_alpha_send_test(verbose: bool = False, *, profile_name: str | None = N
         profile = _apply_event_alpha_profile(selected_profile)
     except ValueError as exc:
         print(str(exc))
+        return
+    context = event_alpha_artifacts.context_from_profile(
+        profile.name,
+        run_mode=config.EVENT_ALPHA_RUN_MODE or None,
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+    )
+    pause_state = _event_alpha_notification_pause_state(context)
+    if pause_state.paused and not ignore_notification_pause:
+        print(f"Refusing Event Alpha test send: notifications paused ({pause_state.reason}).")
         return
     if not config.EVENT_ALERTS_ENABLED:
         print("Refusing Event Alpha test send: set RSI_EVENT_ALERTS_ENABLED=1 to opt in.")
@@ -4950,6 +5292,7 @@ def _send_event_alpha_routed_digest(
     delivery_cfg: event_alpha_notification_delivery.NotificationDeliveryConfig | None = None,
     run_id: str | None = None,
     namespace: str | None = None,
+    pause_state: event_alpha_notification_pause.EventAlphaNotificationPauseState | None = None,
 ) -> event_alpha_pipeline.EventAlphaSendResult:
     alertable = [decision for decision in decisions if decision.alertable]
     if not alertable and not include_health_heartbeat:
@@ -5002,6 +5345,7 @@ def _send_event_alpha_routed_digest(
             delivery_cfg=delivery_cfg,
             run_id=run_id,
             namespace=namespace,
+            pause_state=pause_state,
             send_fn=lambda message: send_telegram_structured(
                 message,
                 parse_mode="HTML",
@@ -6539,6 +6883,41 @@ def cli() -> None:
         help="Print Event Alpha notification preview/send go-no-go readiness.",
     )
     parser.add_argument(
+        "--event-alpha-environment-doctor",
+        action="store_true",
+        help="Print scheduled Event Alpha notification environment readiness.",
+    )
+    parser.add_argument(
+        "--event-alpha-pause-notifications",
+        action="store_true",
+        help="Write a namespace-scoped Event Alpha notification pause file.",
+    )
+    parser.add_argument(
+        "--event-alpha-resume-notifications",
+        action="store_true",
+        help="Clear the namespace-scoped Event Alpha notification pause file. Requires --confirm.",
+    )
+    parser.add_argument(
+        "--event-alpha-scheduler-status",
+        action="store_true",
+        help="Print Event Alpha scheduled notification run freshness and lock status.",
+    )
+    parser.add_argument(
+        "--event-alpha-generate-launchd",
+        action="store_true",
+        help="Print or write a launchd plist template for scheduled Event Alpha notifications.",
+    )
+    parser.add_argument(
+        "--event-alpha-notification-slo-report",
+        action="store_true",
+        help="Print Event Alpha notification SLO/freshness status.",
+    )
+    parser.add_argument(
+        "--event-alpha-export-notification-pack",
+        action="store_true",
+        help="Write a redacted zip of notification artifacts and operator reports. Use --out OUT.zip.",
+    )
+    parser.add_argument(
         "--event-alpha-notification-checklist",
         action="store_true",
         help="Print day-1 Event Alpha notification startup checklist.",
@@ -6547,6 +6926,11 @@ def cli() -> None:
         "--event-alpha-send-test",
         action="store_true",
         help="Send one guarded research-only Event Alpha heartbeat without running providers.",
+    )
+    parser.add_argument(
+        "--ignore-notification-pause",
+        action="store_true",
+        help="Allow --event-alpha-send-test to bypass the local notification pause file.",
     )
     parser.add_argument(
         "--event-alpha-notification-runs-report",
@@ -6691,6 +7075,11 @@ def cli() -> None:
         default=7,
         dest="event_alpha_burn_in_days",
         help="Lookback window for --event-alpha-burn-in-scorecard.",
+    )
+    parser.add_argument(
+        "--out",
+        default=None,
+        help="Output path for commands that write one artifact, such as --event-alpha-generate-launchd.",
     )
     parser.add_argument(
         "--event-alpha-calibration-export-priors",
@@ -6887,6 +7276,11 @@ def cli() -> None:
         "--all",
         action="store_true",
         help="With --event-alpha-provider-health-reset, clear all provider backoffs in the selected profile namespace.",
+    )
+    parser.add_argument(
+        "--reason",
+        default=None,
+        help="Operator reason for --event-alpha-pause-notifications.",
     )
     parser.add_argument(
         "--event-alpha-include-test-artifacts",
@@ -7222,11 +7616,60 @@ def cli() -> None:
     if args.event_alpha_notify_go_no_go:
         event_alpha_notify_go_no_go(verbose=args.verbose, profile_name=args.event_alpha_profile)
         return
+    if args.event_alpha_environment_doctor:
+        event_alpha_environment_doctor_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        return
+    if args.event_alpha_pause_notifications:
+        event_alpha_pause_notifications(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            reason=args.reason,
+        )
+        return
+    if args.event_alpha_resume_notifications:
+        event_alpha_resume_notifications(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            confirm=args.confirm,
+        )
+        return
+    if args.event_alpha_scheduler_status:
+        event_alpha_scheduler_status_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        return
+    if args.event_alpha_generate_launchd:
+        event_alpha_generate_launchd(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            out=args.out,
+        )
+        return
+    if args.event_alpha_notification_slo_report:
+        event_alpha_notification_slo_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_export_notification_pack:
+        if not args.out:
+            print("--event-alpha-export-notification-pack requires --out OUT.zip")
+            return
+        event_alpha_export_notification_pack(
+            args.out,
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
     if args.event_alpha_notification_checklist:
         event_alpha_notification_checklist_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
         return
     if args.event_alpha_send_test:
-        event_alpha_send_test(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        event_alpha_send_test(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            ignore_notification_pause=args.ignore_notification_pause,
+        )
         return
     if args.event_alpha_notification_runs_report:
         event_alpha_notification_runs_report(

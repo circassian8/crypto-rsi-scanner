@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-20 - Scheduled Event Alpha notifications need operator guardrails
+**Status:** accepted
+**Decision:** Day-1 scheduled Event Alpha notification operations must expose
+redacted, profile-aware environment readiness, scheduler freshness, SLO health,
+and clean artifact export reports before being treated as unattended research
+infrastructure. A namespace-scoped emergency pause file, plus optional
+`RSI_EVENT_ALPHA_NOTIFICATIONS_PAUSED=1`, blocks Telegram delivery while still
+allowing discovery/report artifacts and blocked delivery rows to be written with
+`error_class=notifications_paused`.
+**Why:** Once launchd/cron runs notifications daily, failures need to be
+operator-visible without forcing a live send or hiding audit evidence. The pause
+switch gives the human a safe stop lever without disabling the whole research
+pipeline.
+**Revisit when:** Event Alpha notifications graduate beyond day-1 research
+burn-in, or when recipient-level retry/resend is implemented.
+
 ## 2026-06-20 - Guard scheduled Event Alpha notifications with a run lock and delivery ledger
 **Status:** accepted
 **Decision:** Scheduled day-1 Event Alpha notification cycles use a per-profile

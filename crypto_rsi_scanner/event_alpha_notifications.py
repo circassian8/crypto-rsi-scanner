@@ -256,6 +256,7 @@ def send_notifications(
     delivery_cfg: delivery.NotificationDeliveryConfig | None = None,
     run_id: str | None = None,
     namespace: str | None = None,
+    pause_state: Any | None = None,
 ) -> event_alpha_pipeline.EventAlphaSendResult:
     """Send lane-specific Event Alpha notifications when guards are satisfied.
 
@@ -302,6 +303,27 @@ def send_notifications(
         block_reason = "event alerts disabled" if not cfg.enabled else "event alert mode is not research_only"
         if writer:
             writer.record_blocked(plan, profile=profile, card_map=card_map, reason=block_reason)
+        return _result(
+            requested=True,
+            attempted=False,
+            items_attempted=would_send,
+            items_delivered=0,
+            block_reason=block_reason,
+            lane_items_attempted=lane_attempts,
+            lane_items_delivered={lane: 0 for lane in LANES},
+            would_send_items=would_send,
+        )
+    if bool(getattr(pause_state, "paused", False)):
+        reason = str(getattr(pause_state, "reason", "") or "notifications paused")
+        block_reason = f"notifications paused: {reason}"
+        if writer:
+            writer.record_blocked(
+                plan,
+                profile=profile,
+                card_map=card_map,
+                reason=block_reason,
+                error_class="notifications_paused",
+            )
         return _result(
             requested=True,
             attempted=False,
@@ -688,7 +710,15 @@ class _DeliveryWriter:
             channel_summary=attempt.channel_summary,
         )
 
-    def record_blocked(self, plan: "EventAlphaNotificationPlan", *, profile: str | None, card_map: dict[str, Any], reason: str) -> None:
+    def record_blocked(
+        self,
+        plan: "EventAlphaNotificationPlan",
+        *,
+        profile: str | None,
+        card_map: dict[str, Any],
+        reason: str,
+        error_class: str = "guard_blocked",
+    ) -> None:
         for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST):
             items = plan.decisions_by_lane.get(lane, [])
             if not items:
@@ -703,7 +733,7 @@ class _DeliveryWriter:
                 dedupe_key=self._dedupe_key(message, lane, alert_ids)[0],
                 dedupe_bucket=self._dedupe_key(message, lane, alert_ids)[1],
                 state=delivery.STATE_BLOCKED,
-                error_class="guard_blocked",
+                error_class=error_class,
                 error_message=reason,
             )
         if plan.heartbeat_due:
@@ -716,7 +746,7 @@ class _DeliveryWriter:
                 dedupe_key=self._dedupe_key(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"])[0],
                 dedupe_bucket=self._dedupe_key(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"])[1],
                 state=delivery.STATE_BLOCKED,
-                error_class="guard_blocked",
+                error_class=error_class,
                 error_message=reason,
             )
 
