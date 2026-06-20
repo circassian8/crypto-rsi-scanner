@@ -1123,6 +1123,42 @@ def event_research_now_from_config(override: str | datetime | None = None) -> da
         raise SystemExit(str(exc)) from exc
 
 
+def _event_clock_status(override: str | datetime | None = None) -> dict[str, object]:
+    try:
+        return event_clock.event_clock_status(config.EVENT_RESEARCH_NOW, override=override)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+
+
+def _event_alpha_clock_line(status: dict[str, object]) -> str:
+    age = status.get("fixed_clock_age_hours")
+    age_text = "n/a" if age is None else f"{float(age):.2f}h"
+    return (
+        "clock: "
+        f"mode={status.get('clock_mode') or 'unknown'} "
+        f"research_now={status.get('research_now') or 'unknown'} "
+        f"wall_clock_now={status.get('wall_clock_now') or 'unknown'} "
+        f"fixed_clock_age={age_text}"
+    )
+
+
+def _event_alpha_notify_clock_warnings(status: dict[str, object]) -> tuple[str, ...]:
+    if status.get("clock_mode") != "fixed":
+        return ()
+    warnings = [str(item) for item in status.get("warnings", ()) or () if str(item)]
+    warnings.append("fixed research clock active for notification profile")
+    return tuple(dict.fromkeys(warnings))
+
+
+def _event_alpha_notify_fixed_clock_blocker(status: dict[str, object]) -> str | None:
+    if bool(getattr(config, "EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY", False)):
+        return None
+    blocker = event_clock.fixed_clock_notification_blocker(status)
+    if not blocker:
+        return None
+    return f"fixed research clock blocks notification send: {blocker}"
+
+
 def _event_discovery_result_from_config(
     now: datetime | None = None,
     *,
@@ -1792,6 +1828,7 @@ def event_alpha_cycle(
             "RSI_EVENT_ANOMALY_SCANNER_ENABLED=1 with a CoinGecko universe fixture/live source."
         )
         return
+    clock_status = _event_clock_status(event_now)
     now = _event_research_now(event_now)
     started_at = datetime.now(timezone.utc)
     run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
@@ -1845,6 +1882,7 @@ def event_alpha_cycle(
             alert_cfg,
             now=now,
             profile=profile_for_run,
+            clock_status=clock_status,
         ),
     )
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
@@ -1882,6 +1920,7 @@ def event_alpha_cycle(
         )
     pipeline_result = replace(
         pipeline_result,
+        clock_status=clock_status,
         run_id=run_id,
         profile=profile_for_run,
         run_mode=run_mode,
@@ -2022,11 +2061,12 @@ def event_alpha_notify_cycle(
             "or run --event-alpha-notify-preview for readiness details."
         )
         return
+    clock_status = _event_clock_status(event_now)
     now = _event_research_now(event_now)
     started_at = datetime.now(timezone.utc)
     run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
     budget = _notification_runtime_budget(started_at)
-    pre_stage_warnings: list[str] = []
+    pre_stage_warnings: list[str] = list(_event_alpha_notify_clock_warnings(clock_status))
     extraction_provider = None
     extraction_cfg = None
     relationship_provider = None
@@ -2119,6 +2159,7 @@ def event_alpha_notify_cycle(
             )
     pipeline_result = replace(
         pipeline_result,
+        clock_status=clock_status,
         profile=profile_for_run,
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
@@ -2164,7 +2205,29 @@ def event_alpha_notify_cycle(
         notification_scope_value=notification_plan.scope_value,
         block_reason="send not requested",
     )
-    if send:
+    clock_send_blocker = _event_alpha_notify_fixed_clock_blocker(clock_status)
+    if send and clock_send_blocker:
+        send_result = event_alpha_pipeline.EventAlphaSendResult(
+            requested=True,
+            attempted=False,
+            items_attempted=notification_plan.would_send_count,
+            items_delivered=0,
+            block_reason=clock_send_blocker,
+            lane_items_attempted=notification_plan.lane_counts,
+            lane_items_delivered={lane: 0 for lane in event_alpha_notifications.LANES},
+            would_send_items=notification_plan.would_send_count,
+            heartbeat_due=notification_plan.heartbeat_due,
+            cooldown_blocks=dict(notification_plan.blocked_by_lane),
+            notification_scope=notification_plan.notification_scope,
+            notification_scope_value=notification_plan.scope_value,
+        )
+        pipeline_result = replace(
+            pipeline_result,
+            warnings=tuple(dict.fromkeys((*pipeline_result.warnings, clock_send_blocker))),
+            partial_results=True,
+        )
+        print(f"Event Alpha notify cycle send blocked: {clock_send_blocker}.")
+    elif send:
         decisions = pipeline_result.router_result.alertable_decisions if pipeline_result.router_result else []
         send_result = _send_event_alpha_routed_digest(
             decisions,
@@ -2177,6 +2240,7 @@ def event_alpha_notify_cycle(
                 pipeline_result.research_card_paths,
             ),
             include_health_heartbeat=True,
+            clock_status=clock_status,
         )
     else:
         print("Event Alpha notify cycle send not requested; pass --event-alert-send for guarded delivery or would-send accounting.")
@@ -2212,6 +2276,7 @@ def event_alpha_notify_cycle(
     )
     pipeline_result = replace(
         pipeline_result,
+        clock_status=clock_status,
         run_id=run_id,
         profile=profile_for_run,
         run_mode=run_mode,
@@ -2277,13 +2342,15 @@ def event_alpha_notify_preview(
     provider = event_provider_status.build_event_discovery_provider_status(config)
     watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    clock_status = _event_clock_status()
+    now = _event_research_now()
     storage = Storage(config.DB_PATH)
     try:
         plan = event_alpha_notifications.build_notification_plan(
             routed.decisions,
             storage=storage,
             cfg=_event_alpha_notification_config_from_runtime(profile.name),
-            now=datetime.now(timezone.utc),
+            now=now,
             include_health_heartbeat=True,
         )
     finally:
@@ -2303,6 +2370,7 @@ def event_alpha_notify_preview(
         provider_timeout_seconds=config.EVENT_ALPHA_NOTIFY_PROVIDER_TIMEOUT_SECONDS,
         fail_fast_on_dns=bool(config.EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS),
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
+        clock_status=clock_status,
     ))
 
 
@@ -2335,13 +2403,16 @@ def event_alpha_notification_checklist_report(
         artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
     )
     provider_status = event_provider_status.build_event_discovery_provider_status(config)
+    clock_status = _event_clock_status()
     preflight = event_alpha_preflight.run_preflight(
         profile_name=profile.name,
         context=context,
         cfg=config,
         provider_status=provider_status,
         send_requested=True,
+        clock_status=clock_status,
     )
+    now = _event_research_now()
     storage = Storage(config.DB_PATH)
     try:
         watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
@@ -2350,7 +2421,7 @@ def event_alpha_notification_checklist_report(
             routed.decisions,
             storage=storage,
             cfg=_event_alpha_notification_config_from_runtime(profile.name),
-            now=datetime.now(timezone.utc),
+            now=now,
             include_health_heartbeat=True,
         )
     finally:
@@ -2381,6 +2452,7 @@ def event_alpha_notification_checklist_report(
         llm_budget_status=_event_alpha_llm_budget_status(),
         card_auto_write=bool(config.EVENT_RESEARCH_CARDS_AUTO_WRITE),
         artifact_doctor_status=doctor.status,
+        clock_status=clock_status,
         preflight_blockers=preflight.blockers,
         preflight_warnings=preflight.warnings,
     )
@@ -2404,6 +2476,10 @@ def event_alpha_send_test(verbose: bool = False, *, profile_name: str | None = N
         return
     if not (config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS):
         print("Refusing Event Alpha test send: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS are required.")
+        return
+    clock_blocker = _event_alpha_notify_fixed_clock_blocker(_event_clock_status())
+    if clock_blocker:
+        print(f"Refusing Event Alpha test send: {clock_blocker}.")
         return
     sent = send_telegram(
         event_alpha_notifications.format_health_heartbeat(profile=profile.name),
@@ -2440,6 +2516,7 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
         print(str(exc))
         return
     provider_report = event_provider_status.build_event_discovery_provider_status(config)
+    clock_status = _event_clock_status()
     lines = [
         "=" * 76,
         "EVENT ALPHA STATUS (research-only; profile-aware)",
@@ -2448,6 +2525,7 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
         f"artifact_namespace: {config.EVENT_ALPHA_ARTIFACT_NAMESPACE or 'legacy/default'}",
         f"run_mode: {config.EVENT_ALPHA_RUN_MODE or 'legacy'}",
         f"artifact_base_dir: {config.EVENT_ALPHA_ARTIFACT_BASE_DIR}",
+        _event_alpha_clock_line(clock_status),
         f"send requested by profile: {str(bool(profile and profile.send)).lower()}",
         f"send enabled env: {str(bool(config.EVENT_ALERTS_ENABLED)).lower()}",
         f"LLM relationship: provider={config.EVENT_LLM_PROVIDER} mode={config.EVENT_LLM_MODE} enabled={str(bool(config.EVENT_LLM_ENABLED)).lower()}",
@@ -2545,12 +2623,14 @@ def event_alpha_preflight_report(
         ))
         return
     provider_report = event_provider_status.build_event_discovery_provider_status(config)
+    clock_status = _event_clock_status()
     result = event_alpha_preflight.run_preflight(
         profile_name=profile_name,
         context=context,
         cfg=config,
         provider_status=provider_report,
         send_requested=send_requested,
+        clock_status=clock_status,
     )
     print(event_alpha_preflight.format_preflight_report(result))
 
@@ -3089,6 +3169,8 @@ def event_alpha_v1_readiness_report(
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
+        clock_status=_event_clock_status(),
+        generated_at=_event_research_now(),
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_v1_readiness.format_v1_readiness_report(result))
@@ -3309,6 +3391,8 @@ def event_alpha_export_burn_in_pack(
         alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
+        clock_status=_event_clock_status(),
+        generated_at=_event_research_now(),
     )
     calibration = event_alpha_calibration.format_calibration_report(
         artifacts["alerts"].rows,
@@ -3973,6 +4057,7 @@ def _send_event_alpha_routed_digest(
     pipeline_result: event_alpha_pipeline.EventAlphaPipelineResult | None = None,
     card_path_by_alert_id: dict[str, str | Path] | None = None,
     include_health_heartbeat: bool = False,
+    clock_status: dict[str, object] | None = None,
 ) -> event_alpha_pipeline.EventAlphaSendResult:
     alertable = [decision for decision in decisions if decision.alertable]
     if not alertable and not include_health_heartbeat:
@@ -3987,6 +4072,31 @@ def _send_event_alpha_routed_digest(
         now = now or datetime.now(timezone.utc)
         notif_cfg = _event_alpha_notification_config_from_runtime(profile)
         notif_cfg = replace(notif_cfg, enabled=cfg.enabled, mode=cfg.mode)
+        clock_blocker = _event_alpha_notify_fixed_clock_blocker(clock_status or _event_clock_status())
+        if clock_blocker:
+            plan = event_alpha_notifications.build_notification_plan(
+                alertable,
+                storage=storage,
+                cfg=notif_cfg,
+                now=now,
+                include_health_heartbeat=include_health_heartbeat,
+            )
+            result = event_alpha_pipeline.EventAlphaSendResult(
+                requested=True,
+                attempted=False,
+                items_attempted=plan.would_send_count,
+                items_delivered=0,
+                block_reason=clock_blocker,
+                lane_items_attempted=plan.lane_counts,
+                lane_items_delivered={lane: 0 for lane in event_alpha_notifications.LANES},
+                would_send_items=plan.would_send_count,
+                heartbeat_due=plan.heartbeat_due,
+                cooldown_blocks=dict(plan.blocked_by_lane),
+                notification_scope=plan.notification_scope,
+                notification_scope_value=plan.scope_value,
+            )
+            print(f"Event Alpha routed notifications would send {result.would_send_items} item(s); blocked: {clock_blocker}.")
+            return result
         recipients = storage.active_subscribers() or config.TELEGRAM_CHAT_IDS
         result = event_alpha_notifications.send_notifications(
             alertable,

@@ -59,6 +59,7 @@ class EventAlphaPipelineResult:
     watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None
     router_result: event_alpha_router.EventAlphaRouterResult | None
     warnings: tuple[str, ...] = ()
+    clock_status: dict[str, Any] = field(default_factory=dict)
     cycle_completed: bool = True
     partial_results: bool = False
     send_requested: bool = False

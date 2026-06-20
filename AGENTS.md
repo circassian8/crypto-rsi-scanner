@@ -72,9 +72,13 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `crypto-rsi-scanner-source.zip` via `git archive` so ignored local artifacts
   such as `.env`, DBs, logs, caches, and `.venv` are not shared.
 - **Deterministic event research clock:** event fixture/review commands may set
-  `RSI_EVENT_RESEARCH_NOW` or pass `--event-now`; fixture-oriented Make targets
-  default to `2026-06-15T16:00:00Z` so checked-in June 2026 event fixtures do
-  not age out of lookback windows.
+  `RSI_EVENT_RESEARCH_NOW` or pass `--event-now`. Fixture-oriented Make targets
+  use `EVENT_FIXTURE_NOW` (default `2026-06-15T16:00:00Z`) so checked-in June
+  2026 event fixtures do not age out of lookback windows. Production/profiled
+  notification Make targets leave `EVENT_RESEARCH_NOW` blank by default and use
+  wall-clock UTC unless the operator explicitly sets it; stale/future fixed
+  clocks block actual notification sends unless
+  `RSI_EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY=1` is set.
 - **Standard verification:** `make verify` (runs tests + alert render smoke +
   backtest fixture smoke + paper scoreboard).
 - **Tests (must all pass before you claim done):**

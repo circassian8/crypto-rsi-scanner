@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-20 - Keep Event Alpha notification clocks production-safe
+**Status:** accepted
+**Decision:** Fixture-oriented Event Alpha and event-fade Make targets use
+`EVENT_FIXTURE_NOW` for deterministic checked-in artifacts, while profiled,
+burn-in, notification, and send targets leave `EVENT_RESEARCH_NOW` blank by
+default and therefore use wall-clock UTC. Operator-facing Event Alpha status,
+preflight, notification checklist/preview, daily brief, and run-ledger rows
+must disclose clock mode and fixed-clock age. Actual notification sends are
+blocked when an explicitly fixed research clock is older than 24 hours or more
+than 1 hour in the future unless
+`RSI_EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY=1` is set.
+**Why:** Day-1 notifications need production-clock cooldowns, daily caps, and
+fresh event windows by default. Fixture reproducibility is still useful, but it
+must not silently freeze live notification delivery to an old date.
+**Revisit when:** Notification burn-in is promoted into a separately approved
+research-send workflow with its own scheduling and replay controls.
+
 ## 2026-06-20 - Fail soft Event Alpha notification provider/runtime failures
 **Status:** accepted
 **Decision:** Day-1 Event Alpha notification cycles must treat live provider

@@ -43,6 +43,7 @@ def build_daily_brief(
     alert_store_path: str | Path | None = None,
     include_test_artifacts: bool = False,
     include_legacy_artifacts: bool = False,
+    clock_status: Mapping[str, Any] | None = None,
     generated_at: datetime | None = None,
 ) -> str:
     generated = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -92,6 +93,7 @@ def build_daily_brief(
         "# Event Alpha Daily Brief",
         "",
         f"Generated at: {generated.isoformat()}",
+        _format_clock_status(clock_status or {}),
         f"Requested profile: {requested}",
         f"Artifact namespace: {artifact_namespace or 'any'}",
         f"Run mode: {run_mode or 'unknown'}",
@@ -310,6 +312,18 @@ def _float(value: object) -> float:
         return float(value or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _format_clock_status(status: Mapping[str, Any]) -> str:
+    age = status.get("fixed_clock_age_hours")
+    age_text = "n/a" if age is None else f"{float(age):.2f}h"
+    return (
+        "Clock: "
+        f"mode={status.get('clock_mode') or 'unknown'}; "
+        f"research_now={status.get('research_now') or 'unknown'}; "
+        f"wall_clock_now={status.get('wall_clock_now') or 'unknown'}; "
+        f"fixed_clock_age={age_text}"
+    )
 
 
 def _strip_sensitive(text: str) -> str:

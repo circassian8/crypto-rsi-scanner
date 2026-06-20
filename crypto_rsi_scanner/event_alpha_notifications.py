@@ -437,14 +437,17 @@ def format_preview(
     provider_timeout_seconds: float = 5.0,
     fail_fast_on_dns: bool = True,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
+    clock_status: Mapping[str, Any] | None = None,
 ) -> str:
     provider_health_rows = provider_health_rows or {}
+    clock_status = clock_status or {}
     disabled_rows = [
         f"{row.get('provider_key') or key} disabled_until={row.get('disabled_until')}"
         for key, row in provider_health_rows.items()
         if row.get("disabled_until")
     ]
     failure_count = sum(int(row.get("consecutive_failures") or 0) for row in provider_health_rows.values())
+    fixed_clock_blocked = _fixed_clock_send_blocked(clock_status)
     lines = [
         "=" * 76,
         "EVENT ALPHA NOTIFICATION PREVIEW (research-only / unvalidated)",
@@ -455,7 +458,8 @@ def format_preview(
         f"notification_scope_value: {plan.scope_value}",
         f"telegram_ready: {'yes' if telegram_ready else 'no'}",
         "ready_to_preview: yes",
-        f"ready_to_send_now: {'yes' if (telegram_ready and send_guard_enabled) else 'no'}",
+        f"ready_to_send_now: {'yes' if (telegram_ready and send_guard_enabled and not fixed_clock_blocked) else 'no'}",
+        _format_clock_status(clock_status),
         f"partial_results_allowed: {'yes' if partial_results_allowed else 'no'}",
         f"max_runtime_seconds: {float(max_runtime_seconds or 0):g}",
         f"provider_timeout_seconds: {float(provider_timeout_seconds or 0):g}",
@@ -498,6 +502,11 @@ def format_preview(
         lines.append("")
         lines.append("provider backoff:")
         lines.extend(f"- {row}" for row in disabled_rows[:10])
+    clock_warnings = tuple(str(item) for item in clock_status.get("warnings", ()) or () if str(item))
+    if clock_warnings:
+        lines.append("")
+        lines.append("clock warnings:")
+        lines.extend(f"- {warning}" for warning in clock_warnings)
     lines.append("Preview does not send, trade, paper trade, write normal RSI signals, or alter tiers.")
     return "\n".join(lines).rstrip()
 
@@ -608,6 +617,29 @@ def _parse_iso(value: object) -> datetime | None:
 
 def _as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def _format_clock_status(status: Mapping[str, Any]) -> str:
+    age = status.get("fixed_clock_age_hours")
+    age_text = "n/a" if age is None else f"{float(age):.2f}h"
+    return (
+        "clock: "
+        f"mode={status.get('clock_mode') or 'unknown'} "
+        f"research_now={status.get('research_now') or 'unknown'} "
+        f"wall_clock_now={status.get('wall_clock_now') or 'unknown'} "
+        f"fixed_clock_age={age_text}"
+    )
+
+
+def _fixed_clock_send_blocked(status: Mapping[str, Any]) -> bool:
+    if str(status.get("clock_mode") or "") != "fixed":
+        return False
+    age = status.get("fixed_clock_age_hours")
+    try:
+        hours = float(age)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    return hours > 24.0 or hours < -1.0
 
 
 def _esc(value: object) -> str:

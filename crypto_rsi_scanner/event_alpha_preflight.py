@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
-from . import event_alpha_artifacts, event_alpha_profiles, event_provider_status
+from . import event_alpha_artifacts, event_alpha_profiles, event_clock, event_provider_status
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,7 @@ class EventAlphaPreflightResult:
     paths: dict[str, Path]
     provider_ready_event_sources: int
     provider_ready_enrichment_sources: int
+    clock_status: dict[str, Any] | None = None
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     recommended_next_command: str = "make event-alpha-cycle-profile PROFILE=no_key_live"
@@ -31,6 +32,7 @@ def run_preflight(
     cfg: Any,
     provider_status: event_provider_status.EventDiscoveryProviderStatus | None = None,
     send_requested: bool = False,
+    clock_status: Mapping[str, Any] | None = None,
 ) -> EventAlphaPreflightResult:
     """Check whether a profile-scoped Event Alpha run can write clean artifacts."""
     profile_key = str(profile_name or context.profile or "default").strip() or "default"
@@ -82,8 +84,19 @@ def run_preflight(
         warnings.append("no enrichment source is ready; resolver/market evidence may be weak")
 
     _check_llm(profile_key, cfg, blockers=blockers, warnings=warnings)
-    profile_send = bool(profile and (profile.send or profile.notification_burn_in))
-    if send_requested or profile_send:
+    clock = dict(clock_status or event_clock.event_clock_status(getattr(cfg, "EVENT_RESEARCH_NOW", None)))
+    notification_profile = bool(profile and profile.notification_burn_in) or profile_key.startswith("notify_")
+    if notification_profile and clock.get("clock_mode") == "fixed":
+        warnings.extend(str(item) for item in clock.get("warnings", ()) or () if str(item))
+        warnings.append("fixed research clock active for notification profile")
+        clock_blocker = event_clock.fixed_clock_notification_blocker(clock)
+        if (
+            send_requested
+            and clock_blocker
+            and not bool(getattr(cfg, "EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY", False))
+        ):
+            blockers.append(f"fixed research clock blocks notification send: {clock_blocker}")
+    if send_requested:
         if not bool(getattr(cfg, "EVENT_ALERTS_ENABLED", False)):
             blockers.append("send requested/profile requires RSI_EVENT_ALERTS_ENABLED=1")
         if not _telegram_ready(cfg):
@@ -98,6 +111,7 @@ def run_preflight(
         paths=paths,
         provider_ready_event_sources=status.ready_event_source_count,
         provider_ready_enrichment_sources=status.ready_enrichment_count,
+        clock_status=clock,
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
         recommended_next_command=recommended,
@@ -119,6 +133,7 @@ def format_preflight_report(result: EventAlphaPreflightResult) -> str:
             f"event_sources={result.provider_ready_event_sources} "
             f"enrichment_sources={result.provider_ready_enrichment_sources}"
         ),
+        _format_clock_status(result.clock_status),
         "",
         "paths:",
     ]
@@ -134,6 +149,19 @@ def format_preflight_report(result: EventAlphaPreflightResult) -> str:
         "Preflight checks local research readiness only; it does not send, trade, paper trade, write normal RSI signals, or alter tiers.",
     ])
     return "\n".join(lines).rstrip()
+
+
+def _format_clock_status(status: Mapping[str, Any] | None) -> str:
+    status = status or {}
+    age = status.get("fixed_clock_age_hours")
+    age_text = "n/a" if age is None else f"{float(age):.2f}h"
+    return (
+        "clock: "
+        f"mode={status.get('clock_mode') or 'unknown'} "
+        f"research_now={status.get('research_now') or 'unknown'} "
+        f"wall_clock_now={status.get('wall_clock_now') or 'unknown'} "
+        f"fixed_clock_age={age_text}"
+    )
 
 
 def _check_path(

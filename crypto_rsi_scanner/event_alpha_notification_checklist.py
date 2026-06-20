@@ -18,6 +18,7 @@ class EventAlphaNotificationChecklistResult:
     telegram_ready: bool
     provider_ready_event_sources: int
     provider_ready_enrichment_sources: int
+    clock_status: dict[str, Any]
     llm_budget_status: str
     card_auto_write: bool
     artifact_doctor_status: str
@@ -40,26 +41,35 @@ def build_notification_checklist(
     llm_budget_status: str,
     card_auto_write: bool,
     artifact_doctor_status: str,
+    clock_status: Mapping[str, Any] | None = None,
     preflight_blockers: tuple[str, ...] = (),
     preflight_warnings: tuple[str, ...] = (),
 ) -> EventAlphaNotificationChecklistResult:
     """Build a day-1 notification startup checklist without sending."""
-    blockers: list[str] = list(preflight_blockers)
-    warnings: list[str] = list(preflight_warnings)
+    raw_preflight_blockers = list(preflight_blockers)
     preview_blockers = [
-        blocker for blocker in blockers
+        blocker for blocker in raw_preflight_blockers
         if not _send_blocker(blocker)
     ]
+    send_blockers = [
+        _normalize_send_blocker(blocker)
+        for blocker in raw_preflight_blockers
+        if _send_blocker(blocker)
+    ]
+    blockers: list[str] = list(preview_blockers)
+    warnings: list[str] = list(preflight_warnings)
     if not send_guard_enabled:
-        blockers.append("actual notify requires RSI_EVENT_ALERTS_ENABLED=1")
+        send_blockers.append("send: blocked, RSI_EVENT_ALERTS_ENABLED missing")
     if not telegram_ready:
-        blockers.append("actual notify requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_IDS")
+        send_blockers.append("send: blocked, TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_IDS missing")
     heartbeat_enabled = bool(plan.cooldown_status.get(event_alpha_notifications.LANE_HEALTH_HEARTBEAT) is not None)
     if provider_status.ready_event_source_count <= 0 and not heartbeat_enabled:
+        preview_blockers.append("no ready event sources and health heartbeat is disabled")
         blockers.append("no ready event sources and health heartbeat is disabled")
     elif provider_status.ready_event_source_count <= 0:
         warnings.append("no ready event sources; heartbeat-only notification mode can still report health")
-    if profile == "notify_llm" and "OPENAI_API_KEY" in " ".join(blockers):
+    if profile == "notify_llm" and "OPENAI_API_KEY" in " ".join(raw_preflight_blockers):
+        preview_blockers.append("use PROFILE=notify_no_key until OPENAI_API_KEY is configured")
         blockers.append("use PROFILE=notify_no_key until OPENAI_API_KEY is configured")
     backoff_rows = tuple(
         f"{row.get('provider_key') or key} disabled_until={row.get('disabled_until')}"
@@ -68,6 +78,7 @@ def build_notification_checklist(
     )
     if backoff_rows:
         warnings.append("one or more providers are currently in backoff")
+    full_blockers = [*blockers, *send_blockers]
     commands = [
         f"make event-alpha-preflight PROFILE={profile}",
         f"make event-alpha-notification-checklist PROFILE={profile}",
@@ -79,19 +90,20 @@ def build_notification_checklist(
         commands.append("RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-no-key")
     return EventAlphaNotificationChecklistResult(
         ready_to_preview=not preview_blockers,
-        ready_to_notify_now=not blockers,
+        ready_to_notify_now=not full_blockers,
         profile=profile,
         artifact_namespace=artifact_namespace,
         send_guard_enabled=send_guard_enabled,
         telegram_ready=telegram_ready,
         provider_ready_event_sources=provider_status.ready_event_source_count,
         provider_ready_enrichment_sources=provider_status.ready_enrichment_count,
+        clock_status=dict(clock_status or {}),
         llm_budget_status=llm_budget_status,
         card_auto_write=card_auto_write,
         artifact_doctor_status=artifact_doctor_status,
         cooldown_status=dict(plan.cooldown_status),
         provider_backoff_rows=backoff_rows,
-        blockers=tuple(dict.fromkeys(blockers)),
+        blockers=tuple(dict.fromkeys(full_blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
         next_commands=tuple(commands),
     )
@@ -110,6 +122,7 @@ def format_notification_checklist(result: EventAlphaNotificationChecklistResult)
         f"namespace: {result.artifact_namespace}",
         f"send_guard_enabled: {_yes_no(result.send_guard_enabled)}",
         f"telegram_ready: {_yes_no(result.telegram_ready)}",
+        _format_clock_status(result.clock_status),
         (
             "source_readiness: "
             f"event_sources={result.provider_ready_event_sources} "
@@ -147,4 +160,35 @@ def _yes_no(value: bool) -> str:
 
 def _send_blocker(text: str) -> bool:
     lower = str(text or "").casefold()
-    return any(token in lower for token in ("telegram", "rsi_event_alerts_enabled", "send requested", "actual notify"))
+    return any(
+        token in lower
+        for token in (
+            "telegram",
+            "rsi_event_alerts_enabled",
+            "send requested",
+            "actual notify",
+            "fixed research clock",
+            "notification send",
+        )
+    )
+
+
+def _normalize_send_blocker(text: str) -> str:
+    lower = str(text or "").casefold()
+    if "rsi_event_alerts_enabled" in lower:
+        return "send: blocked, RSI_EVENT_ALERTS_ENABLED missing"
+    if "telegram" in lower:
+        return "send: blocked, TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_IDS missing"
+    return f"send: blocked, {text}"
+
+
+def _format_clock_status(status: Mapping[str, Any]) -> str:
+    age = status.get("fixed_clock_age_hours")
+    age_text = "n/a" if age is None else f"{float(age):.2f}h"
+    return (
+        "clock: "
+        f"mode={status.get('clock_mode') or 'unknown'} "
+        f"research_now={status.get('research_now') or 'unknown'} "
+        f"wall_clock_now={status.get('wall_clock_now') or 'unknown'} "
+        f"fixed_clock_age={age_text}"
+    )

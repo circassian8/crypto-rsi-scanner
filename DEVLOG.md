@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Make Event Alpha notification clocks production-safe · Codex
+**Why:** Day-1 notification/profile Make targets inherited the fixture research
+clock by default, which could freeze live event windows and notification lane
+cooldowns to June 15 unless an operator noticed.
+**Changes:**
+- Split `EVENT_FIXTURE_NOW` from blank-by-default `EVENT_RESEARCH_NOW` in the
+  Makefile. Fixture targets explicitly use the fixture clock; profiled,
+  burn-in, notification, and send targets only pass `RSI_EVENT_RESEARCH_NOW`
+  when explicitly set.
+- Added `event_clock_status` and fixed-clock notification send blocking, plus
+  clock mode/age disclosure in status, preflight, notification preview,
+  notification checklist, daily brief, and run-ledger rows.
+- Normalized notification checklist preview-vs-send blockers so missing send
+  guard/Telegram config is reported once, preview remains allowed, and actual
+  sends are blocked for stale/future fixed clocks unless
+  `RSI_EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY=1`.
+- Updated `.env.example`, `AGENTS.md`, `DECISIONS.md`, `ROADMAP.md`, the Event
+  Alpha runbook, and regression tests for Makefile dry-runs, clock status,
+  fixed-clock blockers, cooldown date keys, and run-ledger clock metadata.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed 373/373; `make event-llm-eval
+PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`, `make
+event-alpha-eval PYTHON=python3`, and `make verify PYTHON=python3` passed.
+Manual smoke `python3 main.py --event-alpha-notify-cycle --event-alpha-profile
+notify_no_key` ran without `RSI_EVENT_RESEARCH_NOW`, used the 2026-06-20 wall
+clock, failed soft on public-provider 429/403 responses, wrote local research
+artifacts, and did not send.
+**Notes/risks:** Actual notification delivery is still guarded by
+`--event-alert-send`, `RSI_EVENT_ALERTS_ENABLED=1`, Telegram config, and now
+the stale/future fixed-clock guard. No live trading, paper trades, normal RSI
+signal writes, or LLM-created `TRIGGERED_FADE` were added.
+
 ## 2026-06-20 — Fail-soft Event Alpha notification runtime failures · Codex
 **Why:** `notify_no_key` could still crash or hang operationally when live
 CoinGecko market enrichment or other expensive notification stages failed,

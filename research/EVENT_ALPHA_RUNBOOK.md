@@ -81,6 +81,15 @@ Without `RSI_EVENT_ALERTS_ENABLED=1`, `make event-alpha-notify-no-key` and
 `make event-alpha-notify-llm` still run the radar, write research artifacts, and
 print a would-send summary. They do not deliver Telegram messages.
 
+Notification targets use the production wall clock by default. The Makefile
+only passes `RSI_EVENT_RESEARCH_NOW` into notification/profile/send targets when
+you explicitly set `EVENT_RESEARCH_NOW=...`; fixture targets use
+`EVENT_FIXTURE_NOW` instead. A fixed notification clock older than 24 hours or
+more than 1 hour in the future blocks actual Telegram delivery unless
+`RSI_EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY=1` is set. Preview, checklist,
+status, daily brief, and run-ledger rows show the active clock mode and fixed
+clock age.
+
 ## Daily No-Key Operation
 
 Use the no-key profile when you want public RSS/GDELT/Polymarket plus live

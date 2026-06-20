@@ -134,6 +134,7 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
         rows.append(
             f"{row.get('started_at', 'unknown')} profile={row.get('profile') or 'default'} "
             f"mode={row.get('run_mode') or 'legacy'} namespace={row.get('artifact_namespace') or 'legacy'} "
+            f"clock={row.get('clock_mode') or 'unknown'} "
             f"notification_burn_in={str(bool(row.get('notification_burn_in'))).lower()} "
             f"success={str(bool(row.get('success'))).lower()} runtime={float(row.get('runtime_seconds') or 0):.2f}s"
         )
@@ -202,6 +203,7 @@ def _run_record(
     card_paths = tuple(str(path) for path in getattr(result, "research_card_paths", ()) or ())
     llm_stats = _llm_stats((*extraction_rows, *relationship_rows))
     warnings = list(getattr(result, "warnings", ()) or ())
+    clock_status = dict(getattr(result, "clock_status", {}) or {})
     if failure:
         warnings.append(failure)
     run_id = getattr(result, "run_id", None) or run_id_for(started_at, profile)
@@ -220,6 +222,10 @@ def _run_record(
         "run_mode": getattr(result, "run_mode", None),
         "artifact_namespace": getattr(result, "artifact_namespace", None),
         "notification_burn_in": notify_burn,
+        "clock_mode": clock_status.get("clock_mode"),
+        "research_now": clock_status.get("research_now"),
+        "wall_clock_now": clock_status.get("wall_clock_now"),
+        "fixed_clock_age_hours": clock_status.get("fixed_clock_age_hours"),
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
         "runtime_seconds": round(max(0.0, (finished_at - started_at).total_seconds()), 4),

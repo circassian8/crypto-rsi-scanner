@@ -132,8 +132,35 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     root = Path(__file__).resolve().parent.parent
     makefile = (root / "Makefile").read_text(encoding="utf-8")
     assert "PYTHON ?= .venv/bin/python" in makefile
-    assert "EVENT_RESEARCH_NOW ?= 2026-06-15T16:00:00Z" in makefile
-    assert "RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW)" in makefile
+    assert "EVENT_FIXTURE_NOW ?= 2026-06-15T16:00:00Z" in makefile
+    assert "EVENT_RESEARCH_NOW ?=" in makefile
+    assert "EVENT_FIXTURE_NOW_ENV = RSI_EVENT_RESEARCH_NOW=$(EVENT_FIXTURE_NOW)" in makefile
+    assert "EVENT_RESEARCH_NOW_ENV = $(if $(strip $(EVENT_RESEARCH_NOW)),RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW),)" in makefile
+    assert "RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \\" not in makefile
+    notify_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-notify-no-key", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "RSI_EVENT_RESEARCH_NOW=" not in notify_dry
+    notify_fixed_dry = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "event-alpha-notify-no-key",
+            "PYTHON=python3",
+            "EVENT_RESEARCH_NOW=2026-06-20T12:00:00Z",
+        ],
+        cwd=root,
+        text=True,
+    )
+    assert "RSI_EVENT_RESEARCH_NOW=2026-06-20T12:00:00Z" in notify_fixed_dry
+    fixture_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-cycle", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "RSI_EVENT_RESEARCH_NOW=2026-06-15T16:00:00Z" in fixture_dry
     assert "check-python:" in makefile
     assert "bootstrap:" in makefile
     assert "python3 -m venv .venv" in makefile
@@ -1070,6 +1097,22 @@ def test_event_clock_parses_research_now_values():
     assert event_clock.event_research_now("2026-06-15T16:00:00Z") == parsed
     assert event_clock.event_research_now("2026-06-14T16:00:00Z", override=parsed) == parsed
     assert scanner.event_research_now_from_config(override="2026-06-15T16:00:00Z") == parsed
+    live_status = event_clock.event_clock_status(wall_clock_now=parsed)
+    assert live_status["clock_mode"] == "live"
+    assert live_status["research_now"] == parsed.isoformat()
+    fixed_status = event_clock.event_clock_status(
+        "2026-06-15T16:00:00Z",
+        wall_clock_now=datetime(2026, 6, 16, 17, 0, tzinfo=timezone.utc),
+    )
+    assert fixed_status["clock_mode"] == "fixed"
+    assert fixed_status["fixed_clock_age_hours"] == 25.0
+    assert "stale" in "; ".join(fixed_status["warnings"])
+    assert "stale" in event_clock.fixed_clock_notification_blocker(fixed_status)
+    future_status = event_clock.event_clock_status(
+        override="2026-06-15T18:00:00Z",
+        wall_clock_now=parsed,
+    )
+    assert "future" in event_clock.fixed_clock_notification_blocker(future_status)
 
     try:
         event_clock.parse_event_now("not-a-date")
@@ -3838,6 +3881,8 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
         "EVENT_LLM_BUDGET_LEDGER_PATH",
         "EVENT_ALPHA_OUTCOMES_PATH",
         "EVENT_ALERTS_ENABLED",
+        "EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY",
+        "EVENT_RESEARCH_NOW",
         "TELEGRAM_BOT_TOKEN",
         "TELEGRAM_CHAT_IDS",
     )
@@ -3886,6 +3931,8 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
             config.EVENT_LLM_BUDGET_LEDGER_PATH = base / "event_llm_budget.json"
             config.EVENT_ALPHA_OUTCOMES_PATH = base / "event_alpha_outcomes.jsonl"
             config.EVENT_ALERTS_ENABLED = False
+            config.EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY = False
+            config.EVENT_RESEARCH_NOW = None
             config.TELEGRAM_BOT_TOKEN = None
             config.TELEGRAM_CHAT_IDS = []
 
@@ -3959,6 +4006,7 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
             text = out.getvalue()
             assert "READY_TO_RUN: yes" in text
             assert "artifact_namespace: no_key_live" in text
+            assert "clock: mode=live" in text
             assert str(no_key / "event_alpha_runs.jsonl") in text
 
             out = io.StringIO()
@@ -3968,7 +4016,7 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
 
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
-                scanner.event_alpha_preflight_report(profile_name="research_send")
+                scanner.event_alpha_preflight_report(profile_name="research_send", send_requested=True)
             assert "requires RSI_EVENT_ALERTS_ENABLED=1" in out.getvalue()
 
             bad_base = base / "not-a-dir"
@@ -7363,14 +7411,43 @@ def test_event_alpha_notification_profiles_and_preflight_guards():
             config.EVENT_ALPHA_ARTIFACT_NAMESPACE = ""
             config.EVENT_ALPHA_RUN_MODE = ""
             config.EVENT_ALERTS_ENABLED = False
+            config.EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY = False
+            config.EVENT_RESEARCH_NOW = None
             config.TELEGRAM_BOT_TOKEN = None
             config.TELEGRAM_CHAT_IDS = []
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
                 scanner.event_alpha_preflight_report(profile_name="notify_no_key")
             text = out.getvalue()
+            assert "READY_TO_RUN: yes" in text
+            assert "requires RSI_EVENT_ALERTS_ENABLED=1" not in text
+            assert "requires Telegram token" not in text
+            assert "clock: mode=live" in text
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="notify_no_key", send_requested=True)
+            text = out.getvalue()
             assert "requires RSI_EVENT_ALERTS_ENABLED=1" in text
             assert "requires Telegram token" in text
+
+            config.EVENT_RESEARCH_NOW = "2026-06-15T16:00:00Z"
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="notify_no_key", send_requested=True)
+            text = out.getvalue()
+            assert "clock: mode=fixed" in text
+            assert "fixed research clock blocks notification send" in text
+
+            config.EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY = True
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_preflight_report(profile_name="notify_no_key", send_requested=True)
+            text = out.getvalue()
+            assert "fixed research clock active for notification profile" in text
+            assert "fixed research clock blocks notification send" not in text
+            config.EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY = False
+            config.EVENT_RESEARCH_NOW = None
 
             config.EVENT_ALERTS_ENABLED = True
             config.TELEGRAM_BOT_TOKEN = "token"
@@ -7593,6 +7670,22 @@ def test_event_alpha_notification_state_is_profile_namespace_scoped():
     assert "partial_results_allowed: yes" in preview
     assert "provider_health_backoff_count: 1" in preview
     assert "coingecko:market_enrichment disabled_until=2026-06-19T12:00:00+00:00" in preview
+    live_day_status = event_alpha_notifications.cooldown_status_by_lane(
+        storage,
+        cfg=llm_cfg,
+        now=datetime(2026, 6, 20, 9, 0, tzinfo=timezone.utc),
+    )
+    fixed_day_status = event_alpha_notifications.cooldown_status_by_lane(
+        storage,
+        cfg=llm_cfg,
+        now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+    )
+    assert "sent_count:instant:2026-06-20" in live_day_status[
+        event_alpha_notifications.LANE_INSTANT_ESCALATION
+    ]["count_meta_key"]
+    assert "sent_count:instant:2026-06-15" in fixed_day_status[
+        event_alpha_notifications.LANE_INSTANT_ESCALATION
+    ]["count_meta_key"]
 
     global_cfg = event_alpha_notifications.EventAlphaNotificationConfig(enabled=True, notification_scope="global")
     event_alpha_notifications.record_lane_sent(
@@ -7761,11 +7854,31 @@ def test_event_alpha_notification_runs_and_checklist_report_guard_state():
     text = event_alpha_notification_checklist.format_notification_checklist(checklist)
     assert "READY_TO_PREVIEW: yes" in text
     assert "READY_TO_NOTIFY_NOW: no" in text
-    assert "actual notify requires RSI_EVENT_ALERTS_ENABLED=1" in text
+    assert "send: blocked, RSI_EVENT_ALERTS_ENABLED missing" in text
+    assert "send: blocked, TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_IDS missing" in text
     assert "no ready event sources" in text
     assert "Trading action: NONE" in text
+    assert "clock: mode=unknown" in text
     assert "event_alpha_notify:notify_no_key:last_sent:daily_digest" in text
     assert "coingecko:market_enrichment disabled_until=2026-06-19T12:00:00+00:00" in text
+    dedup_checklist = event_alpha_notification_checklist.build_notification_checklist(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        send_guard_enabled=False,
+        telegram_ready=False,
+        provider_status=status,
+        provider_health_rows={},
+        plan=plan,
+        llm_budget_status="provider=fixture/fixture",
+        card_auto_write=True,
+        artifact_doctor_status="WARN",
+        preflight_blockers=(
+            "send requested/profile requires RSI_EVENT_ALERTS_ENABLED=1",
+            "send requested/profile requires Telegram token and chat id configuration",
+        ),
+    )
+    assert dedup_checklist.blockers.count("send: blocked, RSI_EVENT_ALERTS_ENABLED missing") == 1
+    assert dedup_checklist.blockers.count("send: blocked, TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_IDS missing") == 1
 
     llm_checklist = event_alpha_notification_checklist.build_notification_checklist(
         profile="notify_llm",
@@ -8006,9 +8119,10 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
             event_alpha_pipeline.run_event_alpha_operating_cycle = raising_runner
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
-                scanner.event_alpha_notify_cycle(profile_name="notify_no_key")
+                scanner.event_alpha_notify_cycle(profile_name="notify_no_key", send=True)
             text = out.getvalue()
             assert "notification_cycle_failed_soft: RuntimeError" in text
+            assert "fixed research clock blocks notification send" in text
             assert "cycle_completed=false" in text
             assert "partial_results=true" in text
 
@@ -8031,7 +8145,10 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
             assert notification_rows[-1]["heartbeat_due"] is True
             assert notification_rows[-1]["cycle_completed"] is False
             assert notification_rows[-1]["partial_results"] is True
-            assert notification_rows[-1]["warnings"] == ["notification_cycle_failed_soft: RuntimeError"]
+            assert any("notification_cycle_failed_soft: RuntimeError" in item for item in notification_rows[-1]["warnings"])
+            assert any("fixed research clock blocks notification send" in item for item in notification_rows[-1]["warnings"])
+            assert run_rows[-1]["clock_mode"] == "fixed"
+            assert "fixed research clock" in (run_rows[-1]["send_block_reason"] or "")
             alert_path = namespace_dir / "event_alpha_alerts.jsonl"
             assert not alert_path.exists() or alert_path.read_text(encoding="utf-8").strip() == ""
         finally:
@@ -8042,6 +8159,7 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
 
 def test_event_alpha_run_ledger_records_send_accounting():
     import tempfile
+    from dataclasses import replace
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import (
@@ -8095,6 +8213,15 @@ def test_event_alpha_run_ledger_records_send_accounting():
 
         delivered = event_alpha_pipeline._normalize_send_result(True, [])
         delivered_result = event_alpha_pipeline._with_send_result(no_decisions, delivered)
+        delivered_result = replace(
+            delivered_result,
+            clock_status={
+                "clock_mode": "fixed",
+                "research_now": "2026-06-15T16:00:00+00:00",
+                "wall_clock_now": "2026-06-20T12:00:00+00:00",
+                "fixed_clock_age_hours": 116.0,
+            },
+        )
         row2 = event_alpha_run_ledger.append_run_record(
             delivered_result,
             cfg=cfg,
@@ -8106,6 +8233,8 @@ def test_event_alpha_run_ledger_records_send_accounting():
         )
         assert row2["send_attempted"] is True
         assert row2["send_success"] is True
+        assert row2["clock_mode"] == "fixed"
+        assert row2["fixed_clock_age_hours"] == 116.0
         assert "send=0/0" in event_alpha_run_ledger.format_run_ledger_report(
             event_alpha_run_ledger.load_run_records(cfg.path)
         )
