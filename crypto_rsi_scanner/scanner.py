@@ -8,6 +8,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -78,6 +79,7 @@ from . import event_alpha_health_guard
 from . import event_alpha_missed
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
+from . import event_alpha_notification_inbox
 from . import event_alpha_notification_runs
 from . import event_alpha_pipeline
 from . import event_alpha_preflight
@@ -1624,7 +1626,48 @@ def _event_alpha_context_block(context: event_alpha_artifacts.EventAlphaArtifact
         f"- run_mode: {context.run_mode}",
         f"- run_ledger_path: {context.run_ledger_path}",
         f"- alert_store_path: {context.alert_store_path}",
+        f"- notification_runs_path: {context.notification_runs_path}",
+        f"- feedback_path: {context.feedback_path}",
+        f"- research_cards_dir: {context.research_cards_dir}",
     ])
+
+
+def _event_alpha_report_path(path: str | None, fallback: Path) -> Path:
+    if path:
+        resolved = Path(path).expanduser()
+        return resolved if resolved.is_absolute() else config.DATA_DIR / resolved
+    return fallback
+
+
+def _event_alpha_report_context(
+    profile_name: str | None,
+    artifact_namespace: str | None,
+) -> event_alpha_artifacts.EventAlphaArtifactContext:
+    if profile_name or artifact_namespace:
+        return resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+    base_dir = Path(config.EVENT_ALPHA_ARTIFACT_BASE_DIR).expanduser()
+    if not base_dir.is_absolute():
+        base_dir = config.DATA_DIR / base_dir
+    return event_alpha_artifacts.EventAlphaArtifactContext(
+        profile="default",
+        run_mode=config.EVENT_ALPHA_RUN_MODE or "legacy",
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "default",
+        base_dir=base_dir,
+        namespace_dir=base_dir,
+        run_ledger_path=Path(config.EVENT_ALPHA_RUN_LEDGER_PATH),
+        alert_store_path=Path(config.EVENT_ALPHA_ALERT_STORE_PATH),
+        notification_runs_path=Path(config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH),
+        watchlist_state_path=Path(config.EVENT_WATCHLIST_STATE_PATH),
+        feedback_path=Path(config.EVENT_ALPHA_FEEDBACK_PATH),
+        missed_path=Path(config.EVENT_ALPHA_MISSED_PATH),
+        priors_path=Path(config.EVENT_ALPHA_PRIORS_PATH),
+        provider_health_path=Path(config.EVENT_PROVIDER_HEALTH_PATH),
+        daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
+        proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
+        research_cards_dir=Path(config.EVENT_RESEARCH_CARDS_DIR),
+        llm_budget_ledger_path=Path(config.EVENT_LLM_BUDGET_LEDGER_PATH),
+        outcomes_path=Path(getattr(config, "EVENT_ALPHA_OUTCOMES_PATH", base_dir / "event_alpha_outcomes.jsonl")),
+    )
 
 
 def _normalize_profile_paths() -> None:
@@ -2507,6 +2550,78 @@ def _card_paths_by_alert_id(
     return out
 
 
+class _FixtureNotificationStorage:
+    def __init__(self) -> None:
+        self.meta: dict[str, str] = {}
+
+    def get_meta(self, key: str) -> str | None:
+        return self.meta.get(key)
+
+    def set_meta(self, key: str, value: str) -> None:
+        self.meta[key] = value
+
+
+def _write_fixture_alert_snapshot(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    entry: event_watchlist.EventWatchlistEntry,
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    run_id: str,
+    observed_at: datetime,
+) -> Path:
+    path = context.alert_store_path.expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    row = {
+        "schema_version": event_alpha_alert_store.ALERT_STORE_SCHEMA_VERSION,
+        "row_type": "event_alpha_alert_snapshot",
+        "snapshot_id": f"{observed_at.isoformat()}|{entry.key}",
+        "alert_key": entry.key,
+        "alert_id": decision.alert_id,
+        "card_id": decision.card_id,
+        "cluster_id": entry.cluster_id,
+        "observed_at": observed_at.isoformat(),
+        "run_id": run_id,
+        "profile": context.profile,
+        "run_mode": context.run_mode,
+        "artifact_namespace": context.artifact_namespace,
+        "event_id": entry.event_id,
+        "event_name": entry.latest_event_name,
+        "event_type": "fixture_notification_smoke",
+        "event_time": entry.event_time,
+        "external_asset": entry.external_asset,
+        "asset_coin_id": entry.coin_id,
+        "asset_symbol": entry.symbol,
+        "asset_name": entry.symbol,
+        "relationship_type": entry.relationship_type,
+        "asset_role": "proxy_instrument",
+        "source": entry.latest_source,
+        "source_count": entry.source_count,
+        "tier": entry.latest_tier,
+        "opportunity_score": entry.latest_score,
+        "score_components": dict(entry.latest_score_components),
+        "playbook_type": entry.latest_playbook_type,
+        "rule_playbook_type": entry.latest_rule_playbook_type,
+        "effective_playbook_type": entry.latest_effective_playbook_type,
+        "playbook_score": entry.latest_playbook_score,
+        "playbook_action": entry.latest_playbook_action,
+        "expected_direction": "review_only",
+        "primary_horizon": "manual",
+        "success_metric": "manual_feedback",
+        "market_price": entry.latest_market_snapshot.get("price"),
+        "return_24h_at_alert": entry.latest_market_snapshot.get("return_24h"),
+        "volume_zscore_24h": entry.latest_market_snapshot.get("volume_zscore_24h"),
+        "route": decision.route.value,
+        "route_alertable": decision.alertable,
+        "route_reason": decision.reason,
+        "reason": decision.reason,
+        "verify": ["fixture smoke confirms fake-sender notification plumbing only"],
+    }
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True, separators=(",", ":")))
+        fh.write("\n")
+    return path
+
+
 def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -> None:
     """Print profile-aware Event Alpha operational status."""
     _setup_event_discovery_logging(verbose)
@@ -2635,19 +2750,49 @@ def event_alpha_preflight_report(
     print(event_alpha_preflight.format_preflight_report(result))
 
 
-def event_alpha_runs_report(path: str | None = None, limit: int = 20, verbose: bool = False) -> None:
+def event_alpha_runs_report(
+    path: str | None = None,
+    limit: int = 20,
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
     """Print recent Event Alpha cycle run ledger rows."""
     _setup_event_discovery_logging(verbose)
-    cfg = _event_alpha_run_ledger_config_from_runtime(path)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    cfg = event_alpha_run_ledger.EventAlphaRunLedgerConfig(
+        path=_event_alpha_report_path(path, context.run_ledger_path)
+    )
     result = event_alpha_run_ledger.load_run_records(cfg.path, limit=limit)
+    print(_event_alpha_context_block(context))
     print(event_alpha_run_ledger.format_run_ledger_report(result))
 
 
-def event_alpha_notification_runs_report(path: str | None = None, limit: int = 20, verbose: bool = False) -> None:
+def event_alpha_notification_runs_report(
+    path: str | None = None,
+    limit: int = 20,
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
     """Print recent Event Alpha notification-cycle summary rows."""
     _setup_event_discovery_logging(verbose)
-    cfg = _event_alpha_notification_runs_config_from_runtime(path)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    cfg = event_alpha_notification_runs.EventAlphaNotificationRunsConfig(
+        path=_event_alpha_report_path(path, context.notification_runs_path)
+    )
     result = event_alpha_notification_runs.load_notification_runs(cfg.path, limit=limit)
+    print(_event_alpha_context_block(context))
     print(event_alpha_notification_runs.format_notification_runs_report(result))
 
 
@@ -2798,12 +2943,20 @@ def event_feedback_mark(
     path: str | None = None,
     allow_unmatched: bool = False,
     verbose: bool = False,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
 ) -> None:
     """Append one lightweight Event Alpha feedback row."""
     _setup_event_discovery_logging(verbose)
     if not label:
         print(f"Event feedback mark failed: --event-feedback-label is required ({', '.join(event_feedback.valid_labels())})")
         return
+    if profile_name or artifact_namespace:
+        try:
+            resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+        except ValueError as exc:
+            print(f"Event feedback mark failed: {exc}")
+            return
     watch_cfg = _event_watchlist_config_from_runtime()
     watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
     feedback_cfg = _event_feedback_config_from_runtime(path)
@@ -2829,6 +2982,8 @@ def event_feedback_shortcut(
     *,
     notes: str | None = None,
     verbose: bool = False,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
 ) -> None:
     """Append quick feedback from a shorthand CLI flag."""
     event_feedback_mark(
@@ -2838,14 +2993,30 @@ def event_feedback_shortcut(
         marked_by="human",
         allow_unmatched=True,
         verbose=verbose,
+        profile_name=profile_name,
+        artifact_namespace=artifact_namespace,
     )
 
 
-def event_feedback_report(path: str | None = None, verbose: bool = False) -> None:
+def event_feedback_report(
+    path: str | None = None,
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
     """Print lightweight Event Alpha feedback artifact rows."""
     _setup_event_discovery_logging(verbose)
-    feedback_cfg = _event_feedback_config_from_runtime(path)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    feedback_cfg = event_feedback.EventFeedbackConfig(
+        path=_event_alpha_report_path(path, context.feedback_path)
+    )
     result = event_feedback.load_feedback(feedback_cfg.path)
+    print(_event_alpha_context_block(context))
     print(event_feedback.format_feedback_report(result))
 
 
@@ -2853,15 +3024,234 @@ def event_alpha_alerts_report(
     path: str | None = None,
     feedback_path: str | None = None,
     verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
 ) -> None:
     """Print Event Alpha alert snapshot cohorts and outcome fields."""
     _setup_event_discovery_logging(verbose)
-    store_cfg = _event_alpha_alert_store_config_from_runtime(path)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    store_cfg = event_alpha_alert_store.EventAlphaAlertStoreConfig(
+        path=_event_alpha_report_path(path, context.alert_store_path),
+        snapshot_policy=config.EVENT_ALPHA_SNAPSHOT_POLICY,
+        sampled_controls_limit=config.EVENT_ALPHA_SNAPSHOT_SAMPLED_CONTROLS,
+    )
     result = event_alpha_alert_store.load_alert_snapshots(store_cfg.path)
-    feedback_cfg = _event_feedback_config_from_runtime(feedback_path)
+    feedback_cfg = event_feedback.EventFeedbackConfig(
+        path=_event_alpha_report_path(feedback_path, context.feedback_path)
+    )
     feedback = event_feedback.load_feedback(feedback_cfg.path)
     feedback_rows = [record.__dict__ for record in feedback.records]
+    print(_event_alpha_context_block(context))
     print(event_alpha_alert_store.format_alert_snapshot_report(result, feedback_rows=feedback_rows))
+
+
+def event_alpha_notification_inbox_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print unreviewed Event Alpha notification/card follow-up queues."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "notify_no_key"
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(selected_profile, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    notification_runs = event_alpha_notification_runs.load_notification_runs(
+        context.notification_runs_path,
+        limit=250,
+    )
+    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path)
+    feedback = event_feedback.load_feedback(context.feedback_path)
+    result = event_alpha_notification_inbox.build_notification_inbox(
+        notification_runs=notification_runs.rows,
+        alert_rows=alerts.rows,
+        feedback_rows=[record.__dict__ for record in feedback.records],
+        research_cards_dir=context.research_cards_dir,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        notification_runs_path=context.notification_runs_path,
+        alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        outcomes_path=context.outcomes_path,
+    )
+    print(event_alpha_notification_inbox.format_notification_inbox(result))
+
+
+def event_alpha_notify_fixture_smoke(
+    verbose: bool = False,
+    *,
+    event_now: str | datetime | None = None,
+) -> None:
+    """Run a local fake-sender Event Alpha notification smoke."""
+    _setup_event_discovery_logging(verbose)
+    now = _event_research_now(event_now)
+    context = event_alpha_artifacts.context_from_profile(
+        "fixture",
+        run_mode="test",
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "fixture_notify_smoke",
+    )
+    _apply_event_alpha_context_to_config(context)
+    _normalize_profile_paths()
+    run_id = event_alpha_run_ledger.run_id_for(now, "fixture")
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="fixture-catalyst|fixture-coin|proxy_attention",
+        cluster_id="fixture-catalyst|proxy_attention|2026-06-15",
+        event_id="fixture-notify-smoke",
+        coin_id="fixture-coin",
+        symbol="FIX",
+        relationship_type="proxy_attention",
+        external_asset="Fixture Catalyst",
+        event_time=now.isoformat(),
+        state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        previous_state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        first_seen_at=now.isoformat(),
+        last_seen_at=now.isoformat(),
+        source_count=2,
+        highest_score=88,
+        latest_score=88,
+        latest_tier="HIGH_PRIORITY_WATCH",
+        latest_event_name="Fixture Event Alpha notification smoke",
+        latest_source="fixture",
+        latest_playbook_type="proxy_attention",
+        latest_rule_playbook_type="proxy_attention",
+        latest_effective_playbook_type="proxy_attention",
+        latest_playbook_score=88,
+        latest_playbook_action="high_priority_watch",
+        latest_market_snapshot={"price": 1.0, "return_24h": 0.12, "volume_zscore_24h": 3.5},
+        latest_score_components={"external_catalyst": 90, "market_move_volume": 75},
+        should_alert=True,
+        material_change_reasons=("fixture_notification_smoke",),
+    )
+    decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH,
+        alertable=True,
+        reason="Fixture high-priority state escalation for notification smoke.",
+        lane=event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION,
+    )
+    card_write = event_research_cards.write_research_cards(
+        context.research_cards_dir,
+        watchlist_entries=[entry],
+        alert_rows=[],
+        route_decisions=[decision],
+        now=now,
+    )
+    snapshot_path = _write_fixture_alert_snapshot(
+        context,
+        entry=entry,
+        decision=decision,
+        run_id=run_id,
+        observed_at=now,
+    )
+    fake_storage = _FixtureNotificationStorage()
+    delivered_messages: list[str] = []
+    notification_cfg = event_alpha_notifications.EventAlphaNotificationConfig(
+        enabled=True,
+        mode="research_only",
+        notification_scope=event_alpha_notifications.NOTIFICATION_SCOPE_NAMESPACE,
+        profile_name=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        daily_digest_cooldown_hours=0,
+        instant_escalation_cooldown_hours=0,
+        max_instant_per_day=10,
+        health_heartbeat_enabled=False,
+    )
+    send_result = event_alpha_notifications.send_notifications(
+        [decision],
+        storage=fake_storage,
+        cfg=notification_cfg,
+        send_fn=lambda message: delivered_messages.append(message) or True,
+        now=now,
+        profile=context.profile,
+        card_path_by_alert_id=_card_paths_by_alert_id([decision], card_write.card_paths),
+        include_health_heartbeat=False,
+    )
+    pipeline_result = SimpleNamespace(
+        run_id=run_id,
+        profile=context.profile,
+        run_mode=context.run_mode,
+        artifact_namespace=context.artifact_namespace,
+        router_result=event_alpha_router.EventAlphaRouterResult(
+            state_path=context.watchlist_state_path,
+            rows_read=1,
+            decisions=[decision],
+            enabled=True,
+        ),
+        alerts=(),
+        warnings=(),
+        clock_status=_event_clock_status(event_now),
+        cycle_completed=True,
+        partial_results=False,
+        send_requested=True,
+        send_attempted=send_result.attempted,
+        send_success=send_result.success,
+        send_items_attempted=send_result.items_attempted,
+        send_items_delivered=send_result.items_delivered,
+        send_block_reason=send_result.block_reason,
+        send_lane_items_attempted=send_result.lane_items_attempted,
+        send_lane_items_delivered=send_result.lane_items_delivered,
+        send_would_send_items=send_result.would_send_items,
+        send_heartbeat_due=send_result.heartbeat_due,
+        send_heartbeat_sent=send_result.heartbeat_sent,
+        send_cooldown_blocks=send_result.cooldown_blocks,
+        notification_scope=send_result.notification_scope,
+        notification_scope_value=send_result.notification_scope_value,
+        notification_burn_in=True,
+        research_card_paths=card_write.card_paths,
+        run_ledger_path=str(context.run_ledger_path),
+        alert_store_path=str(context.alert_store_path),
+        watchlist_state_path=str(context.watchlist_state_path),
+        research_cards_dir=str(context.research_cards_dir),
+        snapshot_write_attempted=True,
+        snapshot_write_success=True,
+        snapshot_rows_written=1,
+        snapshot_write_block_reason=None,
+    )
+    event_alpha_run_ledger.append_run_record(
+        pipeline_result,
+        cfg=event_alpha_run_ledger.EventAlphaRunLedgerConfig(context.run_ledger_path),
+        profile=context.profile,
+        started_at=now,
+        finished_at=now,
+        with_llm=False,
+        send_requested=True,
+        notification_burn_in=True,
+    )
+    notification_row = event_alpha_notification_runs.append_notification_run(
+        pipeline_result,
+        cfg=event_alpha_notification_runs.EventAlphaNotificationRunsConfig(context.notification_runs_path),
+        profile=context.profile,
+        started_at=now,
+        finished_at=now,
+        telegram_ready=False,
+        send_guard_enabled=False,
+    )
+    print(_event_alpha_context_block(context))
+    print("\n".join([
+        "=" * 76,
+        "EVENT ALPHA NOTIFICATION FIXTURE SMOKE (fake sender)",
+        "=" * 76,
+        f"run_id: {run_id}",
+        f"fake_sender_delivered: {len(delivered_messages)}",
+        f"notification_run_path: {context.notification_runs_path}",
+        f"notification_would_send: {notification_row.get('would_send_count')}",
+        f"alert_snapshot_path: {snapshot_path}",
+        f"research_card_count: {card_write.cards_written}",
+        f"research_card_index: {card_write.index_path}",
+        f"feedback: make event-feedback-useful FEEDBACK_TARGET='{decision.alert_id}'",
+        "No live providers, Telegram sends, normal RSI alerts, paper trades, live DB rows, or execution were used.",
+    ]))
 
 
 def event_alpha_fill_outcomes(
@@ -3537,11 +3927,16 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
     )
 
 
-def event_research_cards_write(verbose: bool = False, profile_name: str | None = None) -> None:
+def event_research_cards_write(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+) -> None:
     """Write selected Event Alpha research cards and index markdown files."""
     _setup_event_discovery_logging(verbose)
     try:
-        context = resolve_event_alpha_artifact_context_for_report(profile_name, None)
+        context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
     except ValueError as exc:
         print(str(exc))
         return
@@ -5649,6 +6044,16 @@ def cli() -> None:
         help="Print recent Event Alpha notification-cycle summary rows.",
     )
     parser.add_argument(
+        "--event-alpha-notification-inbox",
+        action="store_true",
+        help="Print unreviewed Event Alpha notification/card follow-up queues.",
+    )
+    parser.add_argument(
+        "--event-alpha-notify-fixture-smoke",
+        action="store_true",
+        help="Run a local fake-sender Event Alpha notification smoke under a fixture namespace.",
+    )
+    parser.add_argument(
         "--event-alpha-notification-runs-path",
         default=None,
         help="Optional Event Alpha notification summary JSONL path.",
@@ -6274,13 +6679,27 @@ def cli() -> None:
             path=args.event_alpha_notification_runs_path,
             limit=args.event_alpha_run_limit,
             verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
         )
+        return
+    if args.event_alpha_notification_inbox:
+        event_alpha_notification_inbox_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_notify_fixture_smoke:
+        event_alpha_notify_fixture_smoke(verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_alpha_runs_report:
         event_alpha_runs_report(
             path=args.event_alpha_run_ledger_path,
             limit=args.event_alpha_run_limit,
             verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
         )
         return
     if args.event_alpha_status:
@@ -6462,13 +6881,19 @@ def cli() -> None:
         event_research_card_report(args.event_research_card, verbose=args.verbose)
         return
     if args.event_research_cards_write:
-        event_research_cards_write(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        event_research_cards_write(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
         return
     if args.event_alpha_alerts_report:
         event_alpha_alerts_report(
             path=args.event_alpha_alert_store_path,
             feedback_path=args.event_feedback_path,
             verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
         )
         return
     if args.event_alpha_fill_outcomes:
@@ -6487,6 +6912,8 @@ def cli() -> None:
             marked_by=args.event_feedback_by,
             path=args.event_feedback_path,
             verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
         )
         return
     feedback_shortcuts = (
@@ -6504,10 +6931,17 @@ def cli() -> None:
                 label,
                 notes=args.event_feedback_notes,
                 verbose=args.verbose,
+                profile_name=args.event_alpha_profile,
+                artifact_namespace=args.event_alpha_artifact_namespace or None,
             )
             return
     if args.event_feedback_report:
-        event_feedback_report(path=args.event_feedback_path, verbose=args.verbose)
+        event_feedback_report(
+            path=args.event_feedback_path,
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
         return
     if args.event_llm_shadow_report:
         event_llm_shadow_report(verbose=args.verbose, event_now=args.event_now)

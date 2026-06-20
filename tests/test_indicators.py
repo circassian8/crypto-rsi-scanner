@@ -161,6 +161,33 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
         text=True,
     )
     assert "RSI_EVENT_RESEARCH_NOW=2026-06-15T16:00:00Z" in fixture_dry
+    notify_report_dry = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "event-alpha-notification-runs-report",
+            "PROFILE=notify_no_key",
+            "PYTHON=python3",
+        ],
+        cwd=root,
+        text=True,
+    )
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_no_key" in notify_report_dry
+    assert "--event-alpha-notification-runs-report --event-alpha-profile notify_no_key" in notify_report_dry
+    assert "RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH=" not in notify_report_dry
+    inbox_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-notification-inbox", "PROFILE=notify_no_key", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-notification-inbox --event-alpha-profile notify_no_key" in inbox_dry
+    fixture_smoke_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-notify-fixture-smoke", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-notify-fixture-smoke" in fixture_smoke_dry
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=fixture_notify_smoke" in fixture_smoke_dry
     assert "check-python:" in makefile
     assert "bootstrap:" in makefile
     assert "python3 -m venv .venv" in makefile
@@ -7933,7 +7960,231 @@ def test_event_alpha_notification_runs_and_checklist_report_guard_state():
     )
     assert "provider_fail_fast_blocks" in report
     assert "partial_results=yes" in report
+    assert "profiles: notify_no_key=1" in report
+    assert "scopes: namespace:notify_no_key=1" in report
+    assert "send totals: lane_sent=0 lane_due=1 would_send=2" in report
     assert "trading action is NONE" in report
+
+
+def test_event_alpha_notification_report_uses_profile_namespace_and_explicit_override():
+    import contextlib
+    import io
+    import json
+    import os
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import config, event_alpha_artifacts, event_alpha_profiles, scanner
+
+    profile = event_alpha_profiles.get_profile("notify_no_key")
+    path_attrs = (
+        "EVENT_ALPHA_RUN_LEDGER_PATH",
+        "EVENT_ALPHA_ALERT_STORE_PATH",
+        "EVENT_ALPHA_NOTIFICATION_RUNS_PATH",
+        "EVENT_WATCHLIST_STATE_PATH",
+        "EVENT_ALPHA_FEEDBACK_PATH",
+        "EVENT_ALPHA_MISSED_PATH",
+        "EVENT_ALPHA_PRIORS_PATH",
+        "EVENT_PROVIDER_HEALTH_PATH",
+        "EVENT_ALPHA_DAILY_BRIEF_PATH",
+        "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
+        "EVENT_RESEARCH_CARDS_DIR",
+        "EVENT_LLM_BUDGET_LEDGER_PATH",
+        "EVENT_ALPHA_OUTCOMES_PATH",
+    )
+    attrs = tuple(
+        name
+        for name in dict.fromkeys((
+            "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+            "EVENT_ALPHA_ARTIFACT_NAMESPACE",
+            "EVENT_ALPHA_RUN_MODE",
+            *path_attrs,
+            *profile.config_overrides,
+        ))
+        if hasattr(config, name)
+    )
+    original = {name: getattr(config, name) for name in attrs}
+    env_names = (
+        "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "RSI_EVENT_ALPHA_RUN_MODE",
+        "RSI_EVENT_ALPHA_RUN_LEDGER_PATH",
+        "RSI_EVENT_ALPHA_ALERT_STORE_PATH",
+        "RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH",
+        "RSI_EVENT_WATCHLIST_STATE_PATH",
+        "RSI_EVENT_ALPHA_FEEDBACK_PATH",
+        "RSI_EVENT_ALPHA_MISSED_PATH",
+        "RSI_EVENT_ALPHA_PRIORS_PATH",
+        "RSI_EVENT_PROVIDER_HEALTH_PATH",
+        "RSI_EVENT_ALPHA_DAILY_BRIEF_PATH",
+        "RSI_EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
+        "RSI_EVENT_RESEARCH_CARDS_DIR",
+        "RSI_EVENT_LLM_BUDGET_LEDGER_PATH",
+        "RSI_EVENT_ALPHA_OUTCOMES_PATH",
+    )
+    original_env = {name: os.environ.get(name) for name in env_names}
+    try:
+        for name in env_names:
+            os.environ.pop(name, None)
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config.EVENT_ALPHA_ARTIFACT_BASE_DIR = base
+            config.EVENT_ALPHA_ARTIFACT_NAMESPACE = ""
+            config.EVENT_ALPHA_RUN_MODE = ""
+            context = event_alpha_artifacts.context_from_profile("notify_no_key", base_dir=base)
+            context.notification_runs_path.parent.mkdir(parents=True, exist_ok=True)
+            row = {
+                "schema_version": "event_alpha_notification_run_v1",
+                "row_type": "event_alpha_notification_run",
+                "run_id": "run-namespaced",
+                "profile": "notify_no_key",
+                "notification_profile": "notify_no_key",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": "notify_no_key",
+                "started_at": "2026-06-20T09:00:00+00:00",
+                "finished_at": "2026-06-20T09:00:01+00:00",
+                "runtime_seconds": 1.0,
+                "cycle_completed": True,
+                "partial_results": False,
+                "scope": "namespace",
+                "scope_value": "notify_no_key",
+                "lane_counts_due": {"instant_escalation": 1},
+                "lane_counts_sent": {"instant_escalation": 1},
+                "heartbeat_due": False,
+                "heartbeat_sent": False,
+                "would_send_count": 1,
+                "telegram_ready": False,
+                "send_guard_enabled": False,
+            }
+            context.notification_runs_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_notification_runs_report(profile_name="notify_no_key")
+            text = out.getvalue()
+            assert "profile: notify_no_key" in text
+            assert "artifact_namespace: notify_no_key" in text
+            assert f"path: {context.notification_runs_path}" in text
+            assert "profiles: notify_no_key=1" in text
+            assert "lanes: instant_escalation=1/1" in text
+
+            explicit_path = base / "explicit_notification_runs.jsonl"
+            explicit = dict(row, run_id="run-explicit")
+            explicit_path.write_text(json.dumps(explicit) + "\n", encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_notification_runs_report(
+                    path=str(explicit_path),
+                    profile_name="notify_no_key",
+                )
+            text = out.getvalue()
+            assert f"path: {explicit_path}" in text
+            assert "profiles: notify_no_key=1" in text
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
+        for name, value in original_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
+def test_event_alpha_notification_inbox_queues_unreviewed_items():
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import event_alpha_notification_inbox
+
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        cards = base / "cards"
+        cards.mkdir()
+        (cards / "card_high.md").write_text("# high\n", encoding="utf-8")
+        (cards / "card_trig.md").write_text("# trig\n", encoding="utf-8")
+        runs = [
+            {
+                "row_type": "event_alpha_notification_run",
+                "run_id": "run-high",
+                "profile": "notify_no_key",
+                "scope": "namespace",
+                "scope_value": "notify_no_key",
+                "started_at": "2026-06-20T09:00:00+00:00",
+                "lane_counts_due": {"instant_escalation": 1},
+                "lane_counts_sent": {"instant_escalation": 1},
+            },
+            {
+                "row_type": "event_alpha_notification_run",
+                "run_id": "run-trig",
+                "profile": "notify_no_key",
+                "scope": "namespace",
+                "scope_value": "notify_no_key",
+                "started_at": "2026-06-20T10:00:00+00:00",
+                "lane_counts_due": {"triggered_fade": 1},
+                "lane_counts_sent": {"triggered_fade": 0},
+                "would_send_count": 1,
+                "partial_results": True,
+                "provider_failure_count": 1,
+            },
+            {
+                "row_type": "event_alpha_notification_run",
+                "run_id": "run-heartbeat",
+                "profile": "notify_no_key",
+                "scope": "namespace",
+                "scope_value": "notify_no_key",
+                "started_at": "2026-06-20T11:00:00+00:00",
+                "lane_counts_due": {"health_heartbeat": 1},
+                "lane_counts_sent": {"health_heartbeat": 0},
+                "heartbeat_due": True,
+            },
+        ]
+        alerts = [
+            {
+                "row_type": "event_alpha_alert_snapshot",
+                "run_id": "run-high",
+                "alert_key": "high-key",
+                "alert_id": "ea:high-key",
+                "card_id": "card_high",
+                "tier": "HIGH_PRIORITY_WATCH",
+                "playbook_type": "proxy_attention",
+                "route": "HIGH_PRIORITY_RESEARCH",
+                "route_reason": "state escalation",
+            },
+            {
+                "row_type": "event_alpha_alert_snapshot",
+                "run_id": "run-trig",
+                "alert_key": "trig-key",
+                "alert_id": "ea:trig-key",
+                "card_id": "card_trig",
+                "tier": "TRIGGERED_FADE",
+                "playbook_type": "proxy_fade",
+                "route": "TRIGGERED_FADE_RESEARCH",
+                "route_reason": "deterministic trigger",
+            },
+        ]
+        result = event_alpha_notification_inbox.build_notification_inbox(
+            notification_runs=runs,
+            alert_rows=alerts,
+            feedback_rows=[],
+            research_cards_dir=cards,
+            profile="notify_no_key",
+            artifact_namespace="notify_no_key",
+            notification_runs_path=base / "notification_runs.jsonl",
+            alert_store_path=base / "alerts.jsonl",
+            feedback_path=base / "feedback.jsonl",
+        )
+        assert len(result.sent_without_feedback) == 1
+        assert result.sent_without_feedback[0].alert_id == "ea:high-key"
+        assert len(result.would_send_without_feedback) == 1
+        assert result.would_send_without_feedback[0].alert_id == "ea:trig-key"
+        assert len(result.high_priority_unreviewed) == 1
+        assert len(result.triggered_fade_unreviewed) == 1
+        assert len(result.heartbeat_only_runs) == 1
+        assert len(result.provider_degraded_runs) == 1
+        text = event_alpha_notification_inbox.format_notification_inbox(result)
+        assert "sent notifications without feedback: 1" in text
+        assert "would-send notifications without feedback: 1" in text
+        assert "card_high.md" in text
+        assert "make event-feedback-useful PROFILE=notify_no_key FEEDBACK_TARGET='ea:high-key'" in text
 
 
 def test_event_alpha_degraded_heartbeat_copy_and_delivery():
@@ -8155,6 +8406,100 @@ def test_event_alpha_notify_cycle_pipeline_exception_fails_soft_and_writes_ledge
             event_alpha_pipeline.run_event_alpha_operating_cycle = original_runner
             for name, value in original.items():
                 setattr(config, name, value)
+
+
+def test_event_alpha_notify_fixture_smoke_writes_namespaced_artifacts():
+    import contextlib
+    import io
+    import json
+    import os
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import config, scanner
+
+    attrs = (
+        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "EVENT_ALPHA_RUN_MODE",
+        "EVENT_ALPHA_RUN_LEDGER_PATH",
+        "EVENT_ALPHA_ALERT_STORE_PATH",
+        "EVENT_ALPHA_NOTIFICATION_RUNS_PATH",
+        "EVENT_WATCHLIST_STATE_PATH",
+        "EVENT_ALPHA_FEEDBACK_PATH",
+        "EVENT_ALPHA_MISSED_PATH",
+        "EVENT_ALPHA_PRIORS_PATH",
+        "EVENT_PROVIDER_HEALTH_PATH",
+        "EVENT_ALPHA_DAILY_BRIEF_PATH",
+        "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
+        "EVENT_RESEARCH_CARDS_DIR",
+        "EVENT_LLM_BUDGET_LEDGER_PATH",
+        "EVENT_ALPHA_OUTCOMES_PATH",
+        "EVENT_RESEARCH_NOW",
+        "EVENT_ALERTS_ENABLED",
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_CHAT_IDS",
+    )
+    original = {name: getattr(config, name) for name in attrs if hasattr(config, name)}
+    env_names = (
+        "RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "RSI_EVENT_ALPHA_RUN_MODE",
+        "RSI_EVENT_ALPHA_ALERT_STORE_PATH",
+        "RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH",
+        "RSI_EVENT_ALPHA_RUN_LEDGER_PATH",
+        "RSI_EVENT_WATCHLIST_STATE_PATH",
+        "RSI_EVENT_ALPHA_FEEDBACK_PATH",
+        "RSI_EVENT_ALPHA_MISSED_PATH",
+        "RSI_EVENT_ALPHA_PRIORS_PATH",
+        "RSI_EVENT_PROVIDER_HEALTH_PATH",
+        "RSI_EVENT_ALPHA_DAILY_BRIEF_PATH",
+        "RSI_EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
+        "RSI_EVENT_RESEARCH_CARDS_DIR",
+        "RSI_EVENT_LLM_BUDGET_LEDGER_PATH",
+        "RSI_EVENT_ALPHA_OUTCOMES_PATH",
+    )
+    original_env = {name: os.environ.get(name) for name in env_names}
+    try:
+        for name in env_names:
+            os.environ.pop(name, None)
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            config.EVENT_ALPHA_ARTIFACT_BASE_DIR = base
+            config.EVENT_ALPHA_ARTIFACT_NAMESPACE = "fixture_notify_smoke"
+            config.EVENT_ALPHA_RUN_MODE = ""
+            config.EVENT_RESEARCH_NOW = None
+            config.EVENT_ALERTS_ENABLED = False
+            config.TELEGRAM_BOT_TOKEN = ""
+            config.TELEGRAM_CHAT_IDS = []
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_notify_fixture_smoke(event_now="2026-06-15T16:00:00Z")
+            text = out.getvalue()
+            assert "EVENT ALPHA NOTIFICATION FIXTURE SMOKE" in text
+            assert "fake_sender_delivered: 1" in text
+            assert "No live providers, Telegram sends" in text
+            namespace = base / "fixture_notify_smoke"
+            assert (namespace / "event_alpha_notification_runs.jsonl").exists()
+            assert (namespace / "event_alpha_alerts.jsonl").exists()
+            assert (namespace / "event_alpha_runs.jsonl").exists()
+            assert (namespace / "research_cards" / "index.md").exists()
+            notification_rows = [
+                json.loads(line)
+                for line in (namespace / "event_alpha_notification_runs.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            assert notification_rows[-1]["artifact_namespace"] == "fixture_notify_smoke"
+            assert notification_rows[-1]["lane_counts_sent"]["instant_escalation"] == 1
+            assert notification_rows[-1]["telegram_ready"] is False
+    finally:
+        for name, value in original.items():
+            setattr(config, name, value)
+        for name, value in original_env.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 def test_event_alpha_run_ledger_records_send_accounting():
@@ -15239,10 +15584,20 @@ def test_event_alpha_explain_last_run_paths():
     markdown = event_alpha_daily_brief.build_daily_brief(
         run_rows=rows,
         requested_profile="no_key_live",
+        clock_status={
+            "clock_mode": "fixed",
+            "research_now": "2026-06-15T16:00:00+00:00",
+            "wall_clock_now": "2026-06-20T16:00:00+00:00",
+            "fixed_clock_age_hours": 120.0,
+            "warnings": ("fixed research clock active", "fixed research clock is stale by 120.0h"),
+        },
     )
     assert "Requested profile: no_key_live" in markdown
     assert "Selected run profile: no_key_live" in markdown
     assert "Profile match: true" in markdown
+    assert "Clock: mode=fixed" in markdown
+    assert "fixed_clock_age_hours=120.00h" in markdown
+    assert "Clock warning: fixed research clock is stale by 120.0h" in markdown
     legacy_warning = event_alpha_daily_brief.build_daily_brief(
         run_rows=[{"run_id": "legacy", "started_at": "2026-06-19T12:00:00+00:00", "success": True}],
         requested_profile="no_key_live",

@@ -27,6 +27,7 @@ make event-alpha-preflight PROFILE=notify_no_key
 make event-alpha-notification-checklist PROFILE=notify_no_key
 make event-alpha-send-test PROFILE=notify_no_key
 make event-alpha-notify-preview PROFILE=notify_no_key
+make event-alpha-notification-inbox PROFILE=notify_no_key
 make event-alpha-notify-no-key
 ```
 
@@ -55,6 +56,8 @@ Before the first actual send, run the startup checklist:
 ```bash
 make event-alpha-notification-checklist PROFILE=notify_no_key
 make event-alpha-notification-runs-report PROFILE=notify_no_key
+make event-alpha-notification-inbox PROFILE=notify_no_key
+make event-alpha-notify-fixture-smoke
 ```
 
 The checklist reports `READY_TO_PREVIEW`, `READY_TO_NOTIFY_NOW`, blockers,
@@ -64,6 +67,18 @@ artifact doctor status, and the next commands. Notification cycles also append
 heartbeat state, would-send counts, cooldown blocks, provider fail-fast blocks,
 cycle-completed/partial-results flags, runtime-budget status, Telegram
 readiness, and send-guard state.
+
+The notification inbox joins notification run rows, alert snapshots, research
+cards, and feedback artifacts for one profile namespace. It shows sent
+notifications without feedback, would-send items without feedback, unreviewed
+high-priority and triggered-fade cards, heartbeat-only runs, and provider
+degraded runs. Each alert row includes a feedback helper command such as
+`make event-feedback-useful PROFILE=notify_no_key FEEDBACK_TARGET='ea:...'`.
+
+`make event-alpha-notify-fixture-smoke` is the local wiring check. It uses a
+fake sender, fixture/test namespace, deterministic clock, and local artifact
+writes only. It must not require Telegram env, live providers, paper trading,
+normal RSI routing, or execution.
 
 Notification profiles use a conservative runtime budget and provider behavior:
 120 seconds max runtime, 5 second provider timeouts, one provider failure before
@@ -159,6 +174,10 @@ reads `event_fade_cache/no_key_live/...` unless you intentionally pass
 `--event-alpha-artifact-namespace` or an explicit path environment override.
 Major reports print their resolved profile, namespace, run mode, run ledger path,
 and alert store path at the top so the reviewed evidence is auditable.
+For notification operations, prefer profile-aware commands such as
+`python3 main.py --event-alpha-notification-runs-report --event-alpha-profile notify_no_key`
+and leave `RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH` blank unless you are
+intentionally inspecting one explicit JSONL file.
 
 Run the artifact doctor before judging a burn-in window:
 

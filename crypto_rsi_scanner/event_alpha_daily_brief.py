@@ -94,6 +94,7 @@ def build_daily_brief(
         "",
         f"Generated at: {generated.isoformat()}",
         _format_clock_status(clock_status or {}),
+        *_format_clock_warning_lines(clock_status or {}),
         f"Requested profile: {requested}",
         f"Artifact namespace: {artifact_namespace or 'any'}",
         f"Run mode: {run_mode or 'unknown'}",
@@ -322,8 +323,13 @@ def _format_clock_status(status: Mapping[str, Any]) -> str:
         f"mode={status.get('clock_mode') or 'unknown'}; "
         f"research_now={status.get('research_now') or 'unknown'}; "
         f"wall_clock_now={status.get('wall_clock_now') or 'unknown'}; "
-        f"fixed_clock_age={age_text}"
+        f"fixed_clock_age_hours={age_text}"
     )
+
+
+def _format_clock_warning_lines(status: Mapping[str, Any]) -> list[str]:
+    warnings = [str(item) for item in status.get("warnings") or () if str(item)]
+    return [f"Clock warning: {warning}" for warning in warnings]
 
 
 def _strip_sensitive(text: str) -> str:

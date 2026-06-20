@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Polish Day-1 Event Alpha notification operations · Codex
+**Why:** Day-1 notification burn-in needed cleaner profile-scoped report
+loading, a practical review inbox, and a safe local smoke path that does not
+touch Telegram or live providers.
+**Changes:**
+- Made notification/run/alert/feedback reports profile/namespace-aware while
+  preserving explicit path overrides, and expanded report context output to
+  include notification, feedback, and research-card paths.
+- Added `event_alpha_notification_inbox.py` plus
+  `--event-alpha-notification-inbox` / `make event-alpha-notification-inbox`
+  to list sent/would-send items missing feedback, unreviewed cards,
+  heartbeat-only runs, and provider-degraded notification runs.
+- Added `--event-alpha-notify-fixture-smoke` / `make
+  event-alpha-notify-fixture-smoke`, which uses a deterministic fixture/test
+  namespace and fake sender to write notification-run, alert snapshot, run
+  ledger, and card artifacts without Telegram, live providers, trades, paper,
+  or normal RSI routing.
+- Improved notification-run summaries, daily brief fixed-clock warning lines,
+  profile-aware feedback shortcuts, Makefile help/targets, `.env.example`,
+  `DECISIONS.md`, `ROADMAP.md`, and the Event Alpha runbook.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed 376/376; `make event-llm-eval
+PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`, `make
+event-alpha-eval PYTHON=python3`, and `make verify PYTHON=python3` passed.
+Manual smokes passed: `python3 main.py --event-alpha-notify-cycle
+--event-alpha-profile notify_no_key` completed in degraded no-send mode and
+wrote notify_no_key run/notification rows; `python3 main.py
+--event-alpha-notification-runs-report --event-alpha-profile notify_no_key`
+loaded the namespaced report; `python3 main.py --event-alpha-notification-inbox
+--event-alpha-profile notify_no_key` printed review queues; `make
+event-alpha-notify-fixture-smoke PYTHON=python3` delivered one fake-sender
+fixture notification and wrote fixture namespace artifacts.
+**Notes/risks:** Public no-key providers returned expected degraded responses
+including RSS 403 and GDELT 429/timeouts during the manual notify cycle. All
+new paths remain research-only and cannot create `TRIGGERED_FADE`, send
+Telegram without explicit send guards, trade, paper trade, or write normal RSI
+signal rows.
+
 ## 2026-06-20 — Make Event Alpha notification clocks production-safe · Codex
 **Why:** Day-1 notification/profile Make targets inherited the fixture research
 clock by default, which could freeze live event windows and notification lane

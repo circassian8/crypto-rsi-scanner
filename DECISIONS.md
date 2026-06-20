@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-20 - Keep notification ops profile-aware and review-first
+**Status:** accepted
+**Decision:** Day-1 Event Alpha notification reports and feedback helpers should
+resolve artifacts from the requested profile/namespace by default, while
+explicit CLI/env path overrides remain intentional one-file inspections.
+Operator inboxes join notification runs, alert snapshots, research cards, and
+feedback rows to show unreviewed sent/would-send items and degraded runs. The
+fixture notification smoke must use only deterministic fixture/test artifacts
+and a fake sender; it must not require Telegram, live providers, paper trades,
+normal RSI routing, or execution.
+**Why:** Notification burn-in needs fast operational review loops without
+mixing profile artifacts or accidentally exercising live delivery/provider
+paths during smoke checks.
+**Revisit when:** Notification burn-in is promoted and a different reviewed
+handoff surface replaces manual feedback/card review.
+
 ## 2026-06-20 - Keep Event Alpha notification clocks production-safe
 **Status:** accepted
 **Decision:** Fixture-oriented Event Alpha and event-fade Make targets use

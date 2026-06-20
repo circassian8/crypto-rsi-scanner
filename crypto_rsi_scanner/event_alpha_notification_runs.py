@@ -134,6 +134,28 @@ def format_notification_runs_report(result: EventAlphaNotificationRunsReadResult
         lines.append("")
         lines.append("No Event Alpha notification run rows found.")
         return "\n".join(lines)
+    summary = _report_summary(result.rows)
+    lines.extend([
+        "profiles: " + _format_counts(summary["profiles"]),
+        "scopes: " + _format_counts(summary["scopes"]),
+        (
+            "send totals: "
+            f"lane_sent={summary['lane_sent']} "
+            f"lane_due={summary['lane_due']} "
+            f"would_send={summary['would_send']}"
+        ),
+        (
+            "heartbeat: "
+            f"sent={summary['heartbeat_sent']} "
+            f"due={summary['heartbeat_due']}"
+        ),
+        (
+            "degraded: "
+            f"provider_failure_runs={summary['provider_failure_runs']} "
+            f"partial_results={summary['partial_results']} "
+            f"runtime_budget_exhausted={summary['runtime_budget_exhausted']}"
+        ),
+    ])
     lines.append("")
     for row in result.rows:
         lines.append(
@@ -166,6 +188,50 @@ def format_notification_runs_report(result: EventAlphaNotificationRunsReadResult
     lines.append("")
     lines.append("Notification runs are unvalidated research output only; trading action is NONE.")
     return "\n".join(lines).rstrip()
+
+
+def _report_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    profiles: dict[str, int] = {}
+    scopes: dict[str, int] = {}
+    lane_sent = 0
+    lane_due = 0
+    would_send = 0
+    heartbeat_sent = 0
+    heartbeat_due = 0
+    provider_failure_runs = 0
+    partial_results = 0
+    runtime_budget_exhausted = 0
+    for row in rows:
+        profile = str(row.get("notification_profile") or row.get("profile") or "default")
+        profiles[profile] = profiles.get(profile, 0) + 1
+        scope = f"{row.get('scope') or 'unknown'}:{row.get('scope_value') or 'unknown'}"
+        scopes[scope] = scopes.get(scope, 0) + 1
+        lane_sent += sum(_int(value) for value in dict(row.get("lane_counts_sent") or {}).values())
+        lane_due += sum(_int(value) for value in dict(row.get("lane_counts_due") or {}).values())
+        would_send += _int(row.get("would_send_count"))
+        heartbeat_sent += 1 if row.get("heartbeat_sent") else 0
+        heartbeat_due += 1 if row.get("heartbeat_due") else 0
+        provider_failure_runs += 1 if _int(row.get("provider_failure_count")) > 0 or row.get("provider_fail_fast_blocks") else 0
+        partial_results += 1 if row.get("partial_results") else 0
+        runtime_budget_exhausted += 1 if row.get("runtime_budget_exhausted") else 0
+    return {
+        "profiles": profiles,
+        "scopes": scopes,
+        "lane_sent": lane_sent,
+        "lane_due": lane_due,
+        "would_send": would_send,
+        "heartbeat_sent": heartbeat_sent,
+        "heartbeat_due": heartbeat_due,
+        "provider_failure_runs": provider_failure_runs,
+        "partial_results": partial_results,
+        "runtime_budget_exhausted": runtime_budget_exhausted,
+    }
+
+
+def _format_counts(counts: Mapping[str, int]) -> str:
+    if not counts:
+        return "none"
+    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
 
 
 def _provider_fail_fast_blocks(
