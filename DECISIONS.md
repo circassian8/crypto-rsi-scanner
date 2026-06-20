@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-20 - Treat no-send previews separately from delivery failures
+**Status:** accepted
+**Decision:** Event Alpha notification SLO reports distinguish intentional
+would-send previews (`send_requested=false`) and send-guard/config blocks from
+actual delivery failures. Preview rows may warn but do not count as alertable
+delivery failures. Send-requested rows with `send_guard_enabled=false` classify
+as `NO_SEND_CONFIG`, not a Telegram outage. `BLOCKED` is reserved for
+send-requested, guard-enabled rows with failed alertable delivery or repeated
+sender-side delivery failures.
+**Why:** Day-1 operators need to know whether the system found something it
+would have sent, versus whether Telegram delivery failed. Treating no-send
+previews as outages makes normal dry runs look broken.
+**Revisit when:** Notification rows gain recipient-level retry state or a
+separate operator dashboard replaces the current SLO text report.
+
 ## 2026-06-20 - Scheduled Event Alpha notifications need operator guardrails
 **Status:** accepted
 **Decision:** Day-1 scheduled Event Alpha notification operations must expose

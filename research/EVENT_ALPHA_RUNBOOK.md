@@ -91,8 +91,12 @@ prints `READY_FOR_SCHEDULED_NOTIFY`.
 latest successful run age, latest delivery age, run-lock state, provider
 backoff, health-guard status, and whether the scheduled Make target exists.
 `make event-alpha-notification-slo-report PROFILE=notify_no_key` summarizes
-notification SLO state as `OK`, `DEGRADED`, `STALE`, or `BLOCKED` with the next
-operator action.
+notification SLO state as `OK`, `NO_SEND_CONFIG`, `DEGRADED`, `STALE`, or
+`BLOCKED` with the next operator action. Would-send preview rows
+(`send_requested=false`) are reported as preview evidence, not delivery
+failures. Send-requested rows with the send guard disabled are `NO_SEND_CONFIG`,
+not Telegram outages. Only send-requested, guard-enabled rows that fail delivery
+become alertable delivery failures.
 
 Use the emergency pause when you want discovery/reporting to continue while
 blocking Telegram delivery:

@@ -12,6 +12,7 @@ STATUS_OK = "OK"
 STATUS_DEGRADED = "DEGRADED"
 STATUS_STALE = "STALE"
 STATUS_BLOCKED = "BLOCKED"
+STATUS_NO_SEND_CONFIG = "NO_SEND_CONFIG"
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,10 @@ class EventAlphaNotificationSLOResult:
     delivery_failure_count: int
     consecutive_failed_or_blocked_sends: int
     alertable_but_undelivered_count: int
+    no_send_preview_runs: int
+    config_blocked_runs: int
+    delivery_failed_runs: int
+    alertable_delivery_failures: int
     blockers: tuple[str, ...]
     warnings: tuple[str, ...]
     next_action: str
@@ -53,10 +58,11 @@ def build_slo_report(
         and str(row.get("state") or "") in {delivery.STATE_DELIVERED, delivery.STATE_PARTIAL_DELIVERED}
     )
     failure_count = sum(1 for row in collapsed if str(row.get("state") or "") == delivery.STATE_FAILED)
-    blocked_count = sum(1 for row in collapsed if str(row.get("state") or "") == delivery.STATE_BLOCKED)
+    blocked_count = sum(1 for row in collapsed if _is_delivery_blocked(row))
     provider_backoff = sum(1 for row in provider_health_rows.values() if row.get("disabled_until"))
     consecutive = _consecutive_bad(collapsed)
-    alertable_undelivered = _alertable_undelivered(runs)
+    run_counts = _classify_notification_runs(runs)
+    alertable_undelivered = run_counts["alertable_delivery_failures"]
     last_run_age = _age_hours(latest, observed, "started_at")
     success_age = _age_hours(success, observed, "started_at")
     heartbeat_age = _age_hours(heartbeat, observed, "delivered_at", fallback="attempted_at")
@@ -75,7 +81,10 @@ def build_slo_report(
         if consecutive >= 3:
             blockers.append(f"{consecutive} consecutive failed/blocked delivery rows")
         if alertable_undelivered > 0:
-            blockers.append(f"{alertable_undelivered} alertable would-send run(s) were not delivered")
+            blockers.append(f"{alertable_undelivered} alertable send run(s) failed delivery")
+    elif run_counts["config_blocked_runs"] > 0:
+        status = STATUS_NO_SEND_CONFIG if status == STATUS_OK else status
+        warnings.append(f"{run_counts['config_blocked_runs']} send-requested run(s) blocked by send configuration")
     elif provider_backoff or failure_count or blocked_count:
         status = STATUS_DEGRADED if status == STATUS_OK else status
         if provider_backoff:
@@ -84,6 +93,8 @@ def build_slo_report(
             warnings.append(f"{failure_count} failed delivery row(s)")
         if blocked_count:
             warnings.append(f"{blocked_count} blocked delivery row(s)")
+    if run_counts["no_send_preview_runs"]:
+        warnings.append(f"{run_counts['no_send_preview_runs']} would-send preview run(s); no delivery expected")
     return EventAlphaNotificationSLOResult(
         profile=str(profile or "default"),
         artifact_namespace=str(artifact_namespace or "default"),
@@ -95,6 +106,10 @@ def build_slo_report(
         delivery_failure_count=failure_count,
         consecutive_failed_or_blocked_sends=consecutive,
         alertable_but_undelivered_count=alertable_undelivered,
+        no_send_preview_runs=run_counts["no_send_preview_runs"],
+        config_blocked_runs=run_counts["config_blocked_runs"],
+        delivery_failed_runs=run_counts["delivery_failed_runs"],
+        alertable_delivery_failures=run_counts["alertable_delivery_failures"],
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
         next_action=_next_action(status, profile),
@@ -115,6 +130,10 @@ def format_slo_report(result: EventAlphaNotificationSLOResult) -> str:
         f"provider_backoff_count: {result.provider_backoff_count}",
         f"delivery_failure_count: {result.delivery_failure_count}",
         f"consecutive_failed_or_blocked_sends: {result.consecutive_failed_or_blocked_sends}",
+        f"would_send_preview_runs: {result.no_send_preview_runs}",
+        f"config_blocked_runs: {result.config_blocked_runs}",
+        f"delivery_failed_runs: {result.delivery_failed_runs}",
+        f"alertable_delivery_failures: {result.alertable_delivery_failures}",
         f"alertable_but_undelivered_count: {result.alertable_but_undelivered_count}",
         "",
         "blockers:",
@@ -134,7 +153,7 @@ def _consecutive_bad(rows: Iterable[Mapping[str, Any]]) -> int:
     count = 0
     for row in ordered:
         state = str(row.get("state") or "")
-        if state in {delivery.STATE_FAILED, delivery.STATE_BLOCKED}:
+        if state == delivery.STATE_FAILED or _is_delivery_blocked(row):
             count += 1
             continue
         if state in {delivery.STATE_DELIVERED, delivery.STATE_PARTIAL_DELIVERED}:
@@ -142,18 +161,52 @@ def _consecutive_bad(rows: Iterable[Mapping[str, Any]]) -> int:
     return count
 
 
-def _alertable_undelivered(runs: Iterable[Mapping[str, Any]]) -> int:
-    total = 0
+def _classify_notification_runs(runs: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counts = {
+        "no_send_preview_runs": 0,
+        "config_blocked_runs": 0,
+        "delivery_failed_runs": 0,
+        "alertable_delivery_failures": 0,
+    }
     for row in runs:
         would_send = _int(row.get("would_send_count"))
+        if would_send <= 0:
+            continue
+        send_requested = bool(row.get("send_requested"))
+        send_guard_enabled = bool(row.get("send_guard_enabled"))
         delivered = _int(row.get("deliveries_delivered")) + _int(row.get("deliveries_partial_delivered"))
-        if would_send > 0 and delivered <= 0 and (
-            _int(row.get("deliveries_failed")) > 0
-            or _int(row.get("deliveries_blocked")) > 0
-            or row.get("block_reason")
+        failed = _int(row.get("deliveries_failed"))
+        blocked = _int(row.get("deliveries_blocked"))
+        duplicate_or_in_flight = _int(row.get("deliveries_skipped_duplicate")) + _int(row.get("deliveries_skipped_in_flight"))
+        if not send_requested:
+            counts["no_send_preview_runs"] += 1
+            continue
+        if not send_guard_enabled:
+            counts["config_blocked_runs"] += 1
+            continue
+        if delivered <= 0 and (
+            failed > 0
+            or _run_block_is_delivery_failure(row)
+            or (duplicate_or_in_flight <= 0 and bool(row.get("block_reason")))
         ):
-            total += 1
-    return total
+            counts["delivery_failed_runs"] += 1
+            counts["alertable_delivery_failures"] += 1
+    return counts
+
+
+def _is_delivery_blocked(row: Mapping[str, Any]) -> bool:
+    if str(row.get("state") or "") != delivery.STATE_BLOCKED:
+        return False
+    error_class = str(row.get("error_class") or "")
+    return error_class not in {"guard_blocked", "notifications_paused", "duplicate_content", "in_flight_content"}
+
+
+def _run_block_is_delivery_failure(row: Mapping[str, Any]) -> bool:
+    blocked = _int(row.get("deliveries_blocked"))
+    if blocked <= 0:
+        return False
+    reason = str(row.get("block_reason") or "").casefold()
+    return not any(token in reason for token in ("event alerts disabled", "not set", "notifications paused", "fixed research clock"))
 
 
 def _latest_delivery(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any] | None:
@@ -203,4 +256,6 @@ def _next_action(status: str, profile: str) -> str:
         return f"run scheduled target manually: make event-alpha-notify-go-no-go PROFILE={profile}"
     if status == STATUS_BLOCKED:
         return f"inspect deliveries: make event-alpha-notification-deliveries-report PROFILE={profile}"
+    if status == STATUS_NO_SEND_CONFIG:
+        return f"enable send guard only when ready: make event-alpha-notify-go-no-go PROFILE={profile}"
     return f"inspect provider health: make event-alpha-provider-health-report PROFILE={profile}"

@@ -99,6 +99,9 @@ def notification_run_record(
         "heartbeat_sent": bool(getattr(result, "send_heartbeat_sent", False)),
         "would_send_count": _int(getattr(result, "send_would_send_items", 0))
         or _int(getattr(plan, "would_send_count", 0)),
+        "send_requested": bool(getattr(result, "send_requested", False)),
+        "send_attempted": bool(getattr(result, "send_attempted", False)),
+        "send_success": bool(getattr(result, "send_success", False)),
         "block_reason": getattr(result, "send_block_reason", None),
         "cooldown_blocks": cooldown_blocks,
         "provider_fail_fast_blocks": provider_blocks,

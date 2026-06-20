@@ -18041,6 +18041,8 @@ def test_event_alpha_scheduler_slo_and_notification_pack_are_redacted():
         "cycle_completed": True,
         "success": True,
         "would_send_count": 1,
+        "send_requested": True,
+        "send_guard_enabled": True,
         "deliveries_failed": 1,
     }
     failed = {
@@ -18079,6 +18081,7 @@ def test_event_alpha_scheduler_slo_and_notification_pack_are_redacted():
     )
     assert slo_result.status == slo.STATUS_BLOCKED
     assert slo_result.alertable_but_undelivered_count == 1
+    assert slo_result.delivery_failed_runs == 1
 
     with tempfile.TemporaryDirectory() as tmp:
         ctx = SimpleNamespace(profile="notify_no_key", artifact_namespace="notify_no_key")
@@ -18124,6 +18127,120 @@ def test_event_alpha_notification_operational_make_targets_exist():
         check=True,
     ).stdout
     assert "--event-alpha-environment-doctor --event-alpha-profile notify_no_key" in dry
+
+
+def test_event_alpha_notification_slo_distinguishes_preview_config_and_delivery_failures():
+    from datetime import datetime, timedelta, timezone
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+    from crypto_rsi_scanner import event_alpha_notification_slo as slo
+
+    now = datetime(2026, 6, 20, 12, tzinfo=timezone.utc)
+    base = {
+        "row_type": "event_alpha_notification_run",
+        "started_at": (now - timedelta(minutes=10)).isoformat(),
+        "cycle_completed": True,
+        "would_send_count": 1,
+    }
+
+    preview = slo.build_slo_report(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        notification_runs=[{**base, "send_requested": False, "send_guard_enabled": False}],
+        delivery_rows=[],
+        provider_health_rows={},
+        now=now,
+    )
+    assert preview.status == slo.STATUS_OK
+    assert preview.no_send_preview_runs == 1
+    assert preview.alertable_delivery_failures == 0
+    assert not preview.blockers
+    assert any("would-send preview" in warning for warning in preview.warnings)
+
+    config_blocked = slo.build_slo_report(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        notification_runs=[{
+            **base,
+            "send_requested": True,
+            "send_guard_enabled": False,
+            "block_reason": "event alerts disabled",
+            "deliveries_blocked": 1,
+        }],
+        delivery_rows=[{
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "blocked",
+            "state": delivery.STATE_BLOCKED,
+            "error_class": "guard_blocked",
+            "lane": "health_heartbeat",
+            "attempted_at": now.isoformat(),
+        }],
+        provider_health_rows={},
+        now=now,
+    )
+    assert config_blocked.status == slo.STATUS_NO_SEND_CONFIG
+    assert config_blocked.config_blocked_runs == 1
+    assert config_blocked.alertable_delivery_failures == 0
+    assert config_blocked.delivery_failure_count == 0
+
+    delivery_failed = slo.build_slo_report(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        notification_runs=[{
+            **base,
+            "send_requested": True,
+            "send_guard_enabled": True,
+            "deliveries_failed": 1,
+            "block_reason": "no channel delivered",
+        }],
+        delivery_rows=[{
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "failed",
+            "state": delivery.STATE_FAILED,
+            "lane": "daily_digest",
+            "attempted_at": now.isoformat(),
+        }],
+        provider_health_rows={},
+        now=now,
+    )
+    assert delivery_failed.status == slo.STATUS_BLOCKED
+    assert delivery_failed.delivery_failed_runs == 1
+    assert delivery_failed.alertable_delivery_failures == 1
+
+    delivered_heartbeat = slo.build_slo_report(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        notification_runs=[{
+            **base,
+            "send_requested": True,
+            "send_guard_enabled": True,
+            "deliveries_delivered": 1,
+            "heartbeat_sent": True,
+        }],
+        delivery_rows=[{
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "delivered",
+            "state": delivery.STATE_DELIVERED,
+            "lane": "health_heartbeat",
+            "attempted_at": now.isoformat(),
+            "delivered_at": now.isoformat(),
+        }],
+        provider_health_rows={},
+        now=now,
+    )
+    assert delivered_heartbeat.status == slo.STATUS_OK
+    assert delivered_heartbeat.last_heartbeat_age_hours == 0
+
+    provider_backoff_preview = slo.build_slo_report(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        notification_runs=[{**base, "send_requested": False, "send_guard_enabled": False}],
+        delivery_rows=[],
+        provider_health_rows={"gdelt": {"disabled_until": now.isoformat()}},
+        now=now,
+    )
+    assert provider_backoff_preview.status == slo.STATUS_DEGRADED
+    assert provider_backoff_preview.alertable_delivery_failures == 0
+    assert any("provider" in warning for warning in provider_backoff_preview.warnings)
 
 
 def _run_all():

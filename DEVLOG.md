@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Polish Event Alpha notification SLO semantics · Codex
+**Why:** The notification SLO report was treating would-send/no-send preview
+runs as alertable undelivered delivery failures, which made intentional dry runs
+look like Telegram outages.
+**Changes:**
+- Added `NO_SEND_CONFIG` SLO status and split run categories in
+  `event_alpha_notification_slo.py`: `no_send_preview_runs`,
+  `config_blocked_runs`, `delivery_failed_runs`, and
+  `alertable_delivery_failures`.
+- Updated notification-run rows to persist `send_requested`,
+  `send_attempted`, and `send_success` so future SLO reports can distinguish
+  preview/config states from sender delivery failures.
+- Added regression tests for preview would-send rows, config-blocked sends,
+  guard-enabled delivery failures, delivered heartbeat OK state, and provider
+  backoff with no send. Updated `ROADMAP.md`, `DECISIONS.md`, and the Event
+  Alpha runbook.
+**Verify:** `python3 tests/test_indicators.py` (405/405 passed);
+`make event-llm-eval PYTHON=python3`; `make event-llm-extract-eval
+PYTHON=python3`; `make event-alpha-eval PYTHON=python3`; `make verify
+PYTHON=python3`; `python3 main.py --event-alpha-notification-slo-report
+--event-alpha-profile notify_no_key`.
+**Notes/risks:** Existing legacy notification rows without `send_requested`
+default to preview/no-send semantics instead of delivery failure. This is
+intentional for day-1 burn-in safety.
+
 ## 2026-06-20 — Add scheduled Event Alpha notification ops guardrails · Codex
 **Why:** Scheduled day-1 Event Alpha research notifications needed better
 operator controls before launchd/cron burn-in: a redacted environment doctor,
