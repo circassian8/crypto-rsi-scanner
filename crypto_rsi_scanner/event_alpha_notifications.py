@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 import re
 
+from . import event_alpha_notification_delivery as delivery
 from . import event_alpha_pipeline, event_alpha_router
 
 LANE_DAILY_DIGEST = "daily_digest"
@@ -251,8 +252,17 @@ def send_notifications(
     pipeline_result: Any | None = None,
     card_path_by_alert_id: Mapping[str, str | Path] | None = None,
     include_health_heartbeat: bool = False,
+    delivery_cfg: delivery.NotificationDeliveryConfig | None = None,
+    run_id: str | None = None,
+    namespace: str | None = None,
 ) -> event_alpha_pipeline.EventAlphaSendResult:
-    """Send lane-specific Event Alpha notifications when guards are satisfied."""
+    """Send lane-specific Event Alpha notifications when guards are satisfied.
+
+    When ``delivery_cfg`` is provided, each lane send is recorded in the
+    idempotent delivery ledger and skipped if identical content was already
+    delivered within the dedupe window. Cooldown is only marked after a real
+    delivery, never after a dedupe-skip or a failed send.
+    """
     observed = _as_utc(now or datetime.now(timezone.utc))
     plan = build_notification_plan(
         decisions,
@@ -263,39 +273,45 @@ def send_notifications(
     )
     lane_attempts = plan.lane_counts
     would_send = plan.would_send_count
-    if not cfg.enabled:
+    card_map = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
+    writer = (
+        _DeliveryWriter(delivery_cfg, run_id=run_id, profile=profile, namespace=namespace, now=observed)
+        if delivery_cfg is not None
+        else None
+    )
+
+    def _result(**kwargs: Any) -> event_alpha_pipeline.EventAlphaSendResult:
+        counts = writer.counts if writer else {}
         return event_alpha_pipeline.EventAlphaSendResult(
-            requested=True,
-            attempted=False,
-            items_attempted=would_send,
-            items_delivered=0,
-            block_reason="event alerts disabled",
-            lane_items_attempted=lane_attempts,
-            lane_items_delivered={lane: 0 for lane in LANES},
-            would_send_items=would_send,
             heartbeat_due=plan.heartbeat_due,
             cooldown_blocks=dict(plan.blocked_by_lane),
             notification_scope=plan.notification_scope,
             notification_scope_value=plan.scope_value,
+            delivery_records_written=int(counts.get("records", 0)),
+            deliveries_delivered=int(counts.get(delivery.STATE_DELIVERED, 0)),
+            deliveries_failed=int(counts.get(delivery.STATE_FAILED, 0)),
+            deliveries_skipped_duplicate=int(counts.get(delivery.STATE_SKIPPED_DUPLICATE, 0)),
+            deliveries_blocked=int(counts.get(delivery.STATE_BLOCKED, 0)),
+            **kwargs,
         )
-    if cfg.mode != "research_only":
-        return event_alpha_pipeline.EventAlphaSendResult(
+
+    if not cfg.enabled or cfg.mode != "research_only":
+        block_reason = "event alerts disabled" if not cfg.enabled else "event alert mode is not research_only"
+        if writer:
+            writer.record_blocked(plan, profile=profile, card_map=card_map, reason=block_reason)
+        return _result(
             requested=True,
             attempted=False,
             items_attempted=would_send,
             items_delivered=0,
-            block_reason="event alert mode is not research_only",
+            block_reason=block_reason,
             lane_items_attempted=lane_attempts,
             lane_items_delivered={lane: 0 for lane in LANES},
             would_send_items=would_send,
-            heartbeat_due=plan.heartbeat_due,
-            cooldown_blocks=dict(plan.blocked_by_lane),
-            notification_scope=plan.notification_scope,
-            notification_scope_value=plan.scope_value,
         )
     if would_send <= 0:
         reason = "; ".join(plan.blocked_by_lane.values()) or plan.heartbeat_reason or "no due notifications"
-        return event_alpha_pipeline.EventAlphaSendResult(
+        return _result(
             requested=True,
             attempted=False,
             items_attempted=0,
@@ -304,26 +320,26 @@ def send_notifications(
             lane_items_attempted=lane_attempts,
             lane_items_delivered={lane: 0 for lane in LANES},
             would_send_items=0,
-            heartbeat_due=plan.heartbeat_due,
-            cooldown_blocks=dict(plan.blocked_by_lane),
-            notification_scope=plan.notification_scope,
-            notification_scope_value=plan.scope_value,
         )
 
     delivered_by_lane = {lane: 0 for lane in LANES}
     attempted = False
     block_reasons: list[str] = []
-    card_map = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
     for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST):
         items = plan.decisions_by_lane.get(lane, [])
         if not items:
             continue
-        attempted = True
         message = event_alpha_router.format_routed_telegram_digest(
             items,
             profile=profile,
             card_path_by_alert_id=card_map,
         )
+        alert_ids = [decision.alert_id for decision in items]
+        if writer and writer.skip_as_duplicate(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items)):
+            continue
+        attempted = True
+        if writer:
+            writer.record_sending(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items))
         if send_fn(message):
             delivered_by_lane[lane] = len(items)
             record_lane_sent(
@@ -331,21 +347,30 @@ def send_notifications(
                 lane,
                 item_count=len(items),
                 now=observed,
-                alert_ids=[decision.alert_id for decision in items],
+                alert_ids=alert_ids,
                 cfg=cfg,
             )
+            if writer:
+                writer.record_delivered(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items), delivered_count=len(items))
         else:
             block_reasons.append(f"{lane}: no channel delivered")
+            if writer:
+                writer.record_failed(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items), error_message="no channel delivered")
     if plan.heartbeat_due:
         attempted = True
-        if send_fn(format_health_heartbeat(profile=profile, result=pipeline_result, now=observed)):
+        heartbeat_message = format_health_heartbeat(profile=profile, result=pipeline_result, now=observed)
+        if send_fn(heartbeat_message):
             delivered_by_lane[LANE_HEALTH_HEARTBEAT] = 1
             record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed, cfg=cfg)
+            if writer:
+                writer.record_delivered(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT", delivered_count=1)
         else:
             block_reasons.append("health_heartbeat: no channel delivered")
+            if writer:
+                writer.record_failed(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT", error_message="no channel delivered")
 
     delivered = sum(delivered_by_lane.values())
-    return event_alpha_pipeline.EventAlphaSendResult(
+    return _result(
         requested=True,
         attempted=attempted,
         success=delivered > 0 and not block_reasons,
@@ -355,12 +380,151 @@ def send_notifications(
         lane_items_attempted=lane_attempts,
         lane_items_delivered=delivered_by_lane,
         would_send_items=would_send,
-        heartbeat_due=plan.heartbeat_due,
         heartbeat_sent=delivered_by_lane[LANE_HEALTH_HEARTBEAT] > 0,
-        cooldown_blocks=dict(plan.blocked_by_lane),
-        notification_scope=plan.notification_scope,
-        notification_scope_value=plan.scope_value,
     )
+
+
+class _DeliveryWriter:
+    """Append-only delivery recorder used by ``send_notifications``.
+
+    Tracks rows written this run and dedupes against prior delivered content so a
+    retried/overlapping cycle cannot re-send an identical research digest.
+    """
+
+    def __init__(
+        self,
+        cfg: delivery.NotificationDeliveryConfig,
+        *,
+        run_id: str | None,
+        profile: str | None,
+        namespace: str | None,
+        now: datetime,
+    ) -> None:
+        self.cfg = cfg
+        self.run_id = str(run_id or "unknown")
+        self.profile = profile
+        self.namespace = namespace
+        self.now = now
+        self.existing = delivery.load_delivery_records(cfg.path)
+        self.counts: dict[str, int] = {
+            delivery.STATE_DELIVERED: 0,
+            delivery.STATE_FAILED: 0,
+            delivery.STATE_SKIPPED_DUPLICATE: 0,
+            delivery.STATE_BLOCKED: 0,
+            "records": 0,
+        }
+
+    def _joined(self, alert_ids: Iterable[str]) -> str:
+        return ",".join(sorted(str(item) for item in alert_ids))
+
+    def _hash(self, message: str, lane: str, alert_ids: Iterable[str]) -> str:
+        return delivery.compute_content_hash(message, alert_id=self._joined(alert_ids), lane=lane, profile=self.profile)
+
+    def _append(self, *, alert_ids: Iterable[str], lane: str, route: str, content_hash: str, state: str, **kwargs: Any) -> None:
+        record = delivery.build_record(
+            run_id=self.run_id,
+            alert_id=self._joined(alert_ids),
+            profile=self.profile,
+            namespace=self.namespace,
+            lane=lane,
+            route=route,
+            content_hash=content_hash,
+            state=state,
+            now=self.now,
+            **kwargs,
+        )
+        row = delivery.append_delivery_record(record, path=self.cfg.path)
+        self.existing.append(row)
+        if state in self.counts:
+            self.counts[state] += 1
+        if state in delivery.TERMINAL_STATES:
+            self.counts["records"] += 1
+
+    def skip_as_duplicate(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> bool:
+        if not self.cfg.dedupe_by_content:
+            return False
+        content_hash = self._hash(message, lane, alert_ids)
+        dup = delivery.find_recent_delivered(
+            self.existing,
+            content_hash=content_hash,
+            namespace=self.namespace,
+            now=self.now,
+            window_hours=self.cfg.dedupe_window_hours,
+        )
+        if dup is None:
+            return False
+        self._append(
+            alert_ids=alert_ids,
+            lane=lane,
+            route=route,
+            content_hash=content_hash,
+            state=delivery.STATE_SKIPPED_DUPLICATE,
+            error_class="duplicate_content",
+            error_message=f"duplicate within {self.cfg.dedupe_window_hours:g}h (prior delivered_at={dup.get('delivered_at')})",
+        )
+        return True
+
+    def record_sending(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> None:
+        self._append(alert_ids=alert_ids, lane=lane, route=route, content_hash=self._hash(message, lane, alert_ids), state=delivery.STATE_SENDING)
+
+    def record_delivered(self, *, message: str, lane: str, alert_ids: list[str], route: str, delivered_count: int) -> None:
+        self._append(
+            alert_ids=alert_ids,
+            lane=lane,
+            route=route,
+            content_hash=self._hash(message, lane, alert_ids),
+            state=delivery.STATE_DELIVERED,
+            delivered_at=self.now,
+            delivered_count=delivered_count,
+            channel_summary={"channel": "telegram", "delivered_count": int(delivered_count)},
+        )
+
+    def record_failed(self, *, message: str, lane: str, alert_ids: list[str], route: str, error_message: str) -> None:
+        self._append(
+            alert_ids=alert_ids,
+            lane=lane,
+            route=route,
+            content_hash=self._hash(message, lane, alert_ids),
+            state=delivery.STATE_FAILED,
+            error_class="send_failed",
+            error_message=error_message,
+        )
+
+    def record_blocked(self, plan: "EventAlphaNotificationPlan", *, profile: str | None, card_map: dict[str, Any], reason: str) -> None:
+        for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST):
+            items = plan.decisions_by_lane.get(lane, [])
+            if not items:
+                continue
+            message = event_alpha_router.format_routed_telegram_digest(items, profile=profile, card_path_by_alert_id=card_map)
+            alert_ids = [decision.alert_id for decision in items]
+            self._append(
+                alert_ids=alert_ids,
+                lane=lane,
+                route=_route_label(items),
+                content_hash=self._hash(message, lane, alert_ids),
+                state=delivery.STATE_BLOCKED,
+                error_class="guard_blocked",
+                error_message=reason,
+            )
+        if plan.heartbeat_due:
+            message = format_health_heartbeat(profile=profile)
+            self._append(
+                alert_ids=["heartbeat"],
+                lane=LANE_HEALTH_HEARTBEAT,
+                route="HEALTH_HEARTBEAT",
+                content_hash=self._hash(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"]),
+                state=delivery.STATE_BLOCKED,
+                error_class="guard_blocked",
+                error_message=reason,
+            )
+
+
+def _route_label(items: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
+    for decision in items:
+        route = getattr(decision, "route", None)
+        if route is not None:
+            return getattr(route, "value", str(route))
+    return ""
 
 
 def legacy_meta_warnings(storage: Any, cfg: EventAlphaNotificationConfig) -> tuple[str, ...]:

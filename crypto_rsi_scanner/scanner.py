@@ -79,6 +79,7 @@ from . import event_alpha_health_guard
 from . import event_alpha_missed
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
+from . import event_alpha_notification_delivery
 from . import event_alpha_notification_inbox
 from . import event_alpha_notification_runs
 from . import event_alpha_pipeline
@@ -88,6 +89,7 @@ from . import event_alpha_profiles
 from . import event_alpha_replay
 from . import event_alpha_retention
 from . import event_alpha_run_ledger
+from . import event_alpha_run_lock
 from . import event_alpha_router
 from . import event_alpha_tuning
 from . import event_alpha_v1_readiness
@@ -1530,6 +1532,36 @@ def _event_alpha_notification_runs_config_from_runtime(
     return event_alpha_notification_runs.EventAlphaNotificationRunsConfig(path=summary_path)
 
 
+def _event_alpha_run_lock_config_from_runtime() -> event_alpha_run_lock.EventAlphaRunLockConfig:
+    return event_alpha_run_lock.EventAlphaRunLockConfig(
+        enabled=config.EVENT_ALPHA_NOTIFY_LOCK_ENABLED,
+        stale_minutes=config.EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES,
+        allow_overlap=config.EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP,
+    )
+
+
+def _event_alpha_notify_context_from_runtime(
+    profile_name: str | None,
+) -> event_alpha_artifacts.EventAlphaArtifactContext:
+    """Resolve the artifact context (namespace dir) for lock/delivery paths."""
+    return event_alpha_artifacts.context_from_profile(
+        profile_name,
+        run_mode=config.EVENT_ALPHA_RUN_MODE or None,
+        base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+    )
+
+
+def _event_alpha_notification_delivery_config_from_runtime(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> event_alpha_notification_delivery.NotificationDeliveryConfig:
+    return event_alpha_notification_delivery.config_for_context(
+        context,
+        dedupe_by_content=config.EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT,
+        dedupe_window_hours=config.EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS,
+    )
+
+
 def _apply_event_alpha_profile(profile_name: str | None) -> event_alpha_profiles.EventAlphaProfile | None:
     if not profile_name:
         return None
@@ -2194,6 +2226,29 @@ def event_alpha_notify_cycle(
         now = _event_research_now(event_now)
         started_at = datetime.now(timezone.utc)
         run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
+        lock_context = _event_alpha_notify_context_from_runtime(profile_for_run)
+        delivery_cfg = _event_alpha_notification_delivery_config_from_runtime(lock_context)
+        run_lock = event_alpha_run_lock.acquire_run_lock(
+            lock_context,
+            cfg=_event_alpha_run_lock_config_from_runtime(),
+            run_id=run_id,
+            profile=profile_for_run,
+            namespace=artifact_namespace or lock_context.artifact_namespace,
+            command="event-alpha-notify-cycle",
+            now=started_at,
+        )
+        if run_lock.skipped_due_to_active_lock:
+            print(f"Event Alpha notify cycle skipped: {run_lock.status.message}.")
+            _record_skipped_notification_run(
+                profile_for_run,
+                run_id=run_id,
+                run_mode=run_mode,
+                artifact_namespace=artifact_namespace,
+                started_at=started_at,
+            )
+            return
+        if run_lock.stale_recovered:
+            print(f"Warning: {event_alpha_run_lock.STALE_LOCK_RECOVERED_WARNING} ({run_lock.status.message}).")
         budget = _notification_runtime_budget(started_at)
         pre_stage_warnings: list[str] = list(_event_alpha_notify_clock_warnings(clock_status))
         if ignore_backoff_for_run:
@@ -2374,6 +2429,9 @@ def event_alpha_notify_cycle(
             ),
             include_health_heartbeat=True,
             clock_status=clock_status,
+            delivery_cfg=delivery_cfg,
+            run_id=run_id,
+            namespace=artifact_namespace or lock_context.artifact_namespace,
         )
     else:
         print("Event Alpha notify cycle send not requested; pass --event-alert-send for guarded delivery or would-send accounting.")
@@ -2393,6 +2451,13 @@ def event_alpha_notify_cycle(
         send_cooldown_blocks=dict(send_result.cooldown_blocks),
         notification_scope=send_result.notification_scope,
         notification_scope_value=send_result.notification_scope_value,
+        notification_lock_acquired=run_lock.acquired,
+        notification_stale_lock_recovered=run_lock.stale_recovered,
+        notification_delivery_records_written=send_result.delivery_records_written,
+        notification_deliveries_delivered=send_result.deliveries_delivered,
+        notification_deliveries_failed=send_result.deliveries_failed,
+        notification_deliveries_skipped_duplicate=send_result.deliveries_skipped_duplicate,
+        notification_deliveries_blocked=send_result.deliveries_blocked,
         notification_burn_in=True,
     )
     print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
@@ -2465,6 +2530,48 @@ def event_alpha_notify_cycle(
         result=pipeline_result,
         notification_row=notification_row,
     ))
+    if delivery_cfg is not None and pipeline_result.notification_delivery_records_written:
+        print(
+            "Event Alpha notification deliveries recorded: "
+            f"{pipeline_result.notification_deliveries_delivered} delivered, "
+            f"{pipeline_result.notification_deliveries_failed} failed, "
+            f"{pipeline_result.notification_deliveries_skipped_duplicate} skipped_duplicate "
+            f"({delivery_cfg.path})."
+        )
+    # Best-effort release. A crashed run leaves the lock for the next run to
+    # recover (dead holder PID on this host, or past the stale window).
+    event_alpha_run_lock.release_run_lock(run_lock)
+
+
+def _record_skipped_notification_run(
+    profile: str,
+    *,
+    run_id: str,
+    run_mode: str,
+    artifact_namespace: str | None,
+    started_at: datetime,
+) -> dict[str, object]:
+    """Record a research-only notification-run row for a cycle skipped by an active lock."""
+    skipped = SimpleNamespace(
+        run_id=run_id,
+        profile=profile,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        notification_skipped_due_to_active_lock=True,
+        notification_lock_acquired=False,
+        warnings=("notification_cycle_skipped_active_lock",),
+        cycle_completed=False,
+    )
+    return event_alpha_notification_runs.append_notification_run(
+        skipped,
+        cfg=_event_alpha_notification_runs_config_from_runtime(),
+        profile=profile,
+        started_at=started_at,
+        finished_at=datetime.now(timezone.utc),
+        telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+    )
+
 
 def event_alpha_notify_preview(
     verbose: bool = False,
@@ -2891,6 +2998,80 @@ def event_alpha_notification_runs_report(
     result = event_alpha_notification_runs.load_notification_runs(cfg.path, limit=limit)
     print(_event_alpha_context_block(context))
     print(event_alpha_notification_runs.format_notification_runs_report(result))
+
+
+def event_alpha_notification_deliveries_report(
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    verbose: bool = False,
+) -> None:
+    """Print the research-only notification delivery ledger for one profile/namespace."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    path = event_alpha_notification_delivery.deliveries_path_for_context(context)
+    rows = event_alpha_notification_delivery.load_delivery_records(path)
+    print(_event_alpha_context_block(context))
+    print("")
+    print(
+        event_alpha_notification_delivery.format_delivery_report(
+            rows,
+            path=path,
+            profile=context.profile,
+            namespace=context.artifact_namespace,
+        )
+    )
+
+
+def event_alpha_notification_retry_failed(
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    confirm: bool = False,
+    verbose: bool = False,
+) -> None:
+    """List failed notification deliveries; resend is a guarded TODO scaffold.
+
+    The delivery ledger keeps redacted metadata only (no full message body), so
+    automated resend is intentionally not wired yet. This stays dry-run unless
+    ``--confirm`` is passed, and even then it only points back at the notify
+    cycle. It never trades, paper trades, or routes RSI rows.
+    """
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    path = event_alpha_notification_delivery.deliveries_path_for_context(context)
+    rows = event_alpha_notification_delivery.load_delivery_records(path)
+    failed = event_alpha_notification_delivery.failed_deliveries(rows)
+    print("=" * 76)
+    print("EVENT ALPHA NOTIFICATION RETRY (research-only; dry-run scaffold)")
+    print("=" * 76)
+    print(f"profile: {context.profile} · namespace: {context.artifact_namespace}")
+    print(f"path: {path}")
+    print(f"failed deliveries: {len(failed)}")
+    for row in failed[:20]:
+        print(
+            f"- {row.get('attempted_at') or 'unknown'} lane={row.get('lane') or 'unknown'} "
+            f"alert_id={row.get('alert_id') or 'n/a'} error={row.get('error_message_safe') or 'unknown'}"
+        )
+    if not failed:
+        print("No failed deliveries to retry.")
+        return
+    if not confirm:
+        print("")
+        print("Dry-run only. Re-run with --confirm to proceed (still requires RSI_EVENT_ALERTS_ENABLED=1 to send).")
+        return
+    print("")
+    print(
+        "Automated resend is not implemented yet (TODO): the deliveries ledger stores redacted "
+        "metadata only, not message bodies. Re-run `make event-alpha-notify-no-key-scheduled` "
+        "(or notify_llm) to regenerate and resend due notifications under the run lock."
+    )
 
 
 def event_alpha_provider_health_report(
@@ -3786,6 +3967,9 @@ def event_alpha_artifact_doctor_report(
     profile_name = profile_name or (context.profile if context.profile != "default" else None)
     artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
     cards_dir = Path(config.EVENT_RESEARCH_CARDS_DIR)
+    delivery_rows = event_alpha_notification_delivery.load_delivery_records(
+        event_alpha_notification_delivery.deliveries_path_for_context(context)
+    )
     result = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=artifacts["runs"].rows,
         alert_rows=artifacts["alerts"].rows,
@@ -3794,6 +3978,7 @@ def event_alpha_artifact_doctor_report(
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
+        delivery_rows=delivery_rows,
         profile=profile_name,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -3926,6 +4111,7 @@ def event_alpha_export_burn_in_pack(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         missed_rows=artifacts["missed_rows"],
+        notification_runs=event_alpha_notification_runs.load_notification_runs(config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH).rows,
         watchlist_entries=artifacts["watchlist"].entries,
         router_result=router_result,
         provider_health_rows=artifacts["provider_rows"],
@@ -4214,6 +4400,7 @@ def event_alpha_daily_brief_report(
         alert_rows=alerts.rows,
         feedback_rows=[record.__dict__ for record in feedback.records],
         missed_rows=missed_rows,
+        notification_runs=event_alpha_notification_runs.load_notification_runs(context.notification_runs_path).rows,
         watchlist_entries=watchlist.entries,
         router_result=router_result,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
@@ -4607,6 +4794,9 @@ def _send_event_alpha_routed_digest(
     card_path_by_alert_id: dict[str, str | Path] | None = None,
     include_health_heartbeat: bool = False,
     clock_status: dict[str, object] | None = None,
+    delivery_cfg: event_alpha_notification_delivery.NotificationDeliveryConfig | None = None,
+    run_id: str | None = None,
+    namespace: str | None = None,
 ) -> event_alpha_pipeline.EventAlphaSendResult:
     alertable = [decision for decision in decisions if decision.alertable]
     if not alertable and not include_health_heartbeat:
@@ -4656,6 +4846,9 @@ def _send_event_alpha_routed_digest(
             pipeline_result=pipeline_result,
             card_path_by_alert_id=card_path_by_alert_id,
             include_health_heartbeat=include_health_heartbeat,
+            delivery_cfg=delivery_cfg,
+            run_id=run_id,
+            namespace=namespace,
             send_fn=lambda message: bool(send_telegram(
                 message,
                 parse_mode="HTML",
@@ -6208,6 +6401,16 @@ def cli() -> None:
         help="Print unreviewed Event Alpha notification/card follow-up queues.",
     )
     parser.add_argument(
+        "--event-alpha-notification-deliveries-report",
+        action="store_true",
+        help="Print the research-only Event Alpha notification delivery ledger for a profile/namespace.",
+    )
+    parser.add_argument(
+        "--event-alpha-notification-retry-failed",
+        action="store_true",
+        help="List failed Event Alpha notification deliveries (dry-run scaffold; --confirm required to proceed).",
+    )
+    parser.add_argument(
         "--event-alpha-provider-health-report",
         action="store_true",
         help="Print profile-scoped Event Alpha provider health/backoff rows.",
@@ -6878,6 +7081,21 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_notification_deliveries_report:
+        event_alpha_notification_deliveries_report(
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_alpha_notification_retry_failed:
+        event_alpha_notification_retry_failed(
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            confirm=args.confirm,
+            verbose=args.verbose,
         )
         return
     if args.event_alpha_provider_health_report:

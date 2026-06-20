@@ -128,6 +128,42 @@ more than 1 hour in the future blocks actual Telegram delivery unless
 status, daily brief, and run-ledger rows show the active clock mode and fixed
 clock age.
 
+### Scheduled day-1 notifications (run lock + delivery ledger)
+
+For unattended/cron-style operation, use the scheduled targets. They add a
+per-profile run lock (so overlapping cron firings can't double-send or race lane
+cooldown state) and an idempotent delivery ledger (so a retried/overlapping run
+cannot re-send identical research content within the dedupe window). They use
+real wall-clock time, fail soft on provider errors, and exit 0 on partial
+provider failures (nonzero only on config/code errors).
+
+```bash
+make event-alpha-day1-start                                  # no-send readiness checks
+RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-send-test PROFILE=notify_no_key
+RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-no-key-scheduled   # or event-alpha-notify-llm-scheduled
+make event-alpha-notification-deliveries-report PROFILE=notify_no_key
+```
+
+The run lock lives at `<namespace>/event_alpha_notify.lock`. A fresh lock makes
+the next run skip safely (recorded as a skipped notification run with
+`skipped_due_to_active_lock`); a stale lock (past
+`RSI_EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES`, or a dead holder PID on this host)
+is recovered with a `stale_notification_lock_recovered` warning. Set
+`RSI_EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP=1` only to intentionally run concurrent
+cycles.
+
+Each lane send is recorded in
+`<namespace>/event_alpha_notification_deliveries.jsonl` as `planned`/`sending`
+then `delivered`/`failed`, or `skipped_duplicate`/`blocked`. Cooldown is only
+marked after a real delivery — never after a dedupe-skip or a failed send.
+Inspect with `make event-alpha-notification-deliveries-report
+PROFILE=notify_no_key`; `make event-alpha-notification-retry-failed
+PROFILE=notify_no_key` lists failed deliveries (dry-run; `CONFIRM=1` required,
+and automated resend is a documented TODO — re-run the scheduled cycle to
+resend). The per-run lock/delivery summary also shows up in
+`make event-alpha-notification-runs-report`, the daily brief, and the artifact
+doctor (which warns on failed deliveries).
+
 ## Daily No-Key Operation
 
 Use the no-key profile when you want public RSS/GDELT/Polymarket plus live

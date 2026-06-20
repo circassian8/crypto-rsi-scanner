@@ -106,8 +106,20 @@ def notification_run_record(
         "runtime_budget_exhausted": any("notification_runtime_budget_exhausted" in warning for warning in warnings),
         "telegram_ready": bool(telegram_ready),
         "send_guard_enabled": bool(send_guard_enabled),
+        "lock_acquired": bool(getattr(result, "notification_lock_acquired", False)),
+        "skipped_due_to_active_lock": bool(getattr(result, "notification_skipped_due_to_active_lock", False)),
+        "stale_lock_recovered": bool(getattr(result, "notification_stale_lock_recovered", False)),
+        "delivery_records_written": _int(getattr(result, "notification_delivery_records_written", 0)),
+        "deliveries_delivered": _int(getattr(result, "notification_deliveries_delivered", 0)),
+        "deliveries_failed": _int(getattr(result, "notification_deliveries_failed", 0)),
+        "deliveries_skipped_duplicate": _int(getattr(result, "notification_deliveries_skipped_duplicate", 0)),
+        "deliveries_blocked": _int(getattr(result, "notification_deliveries_blocked", 0)),
         "warnings": tuple(dict.fromkeys(warnings)),
     }
+
+
+def row_has_delivery_failures(row: Mapping[str, Any]) -> bool:
+    return _int(row.get("deliveries_failed")) > 0
 
 
 def load_notification_runs(path: str | Path, *, limit: int | None = None) -> EventAlphaNotificationRunsReadResult:
@@ -178,6 +190,16 @@ def format_notification_runs_report(result: EventAlphaNotificationRunsReadResult
             f"cycle_completed={_yes_no(bool(row.get('cycle_completed', True)))} "
             f"partial_results={_yes_no(bool(row.get('partial_results')))} "
             f"runtime_budget_exhausted={_yes_no(bool(row.get('runtime_budget_exhausted')))}"
+        )
+        lines.append(
+            "  "
+            f"lock_acquired={_yes_no(bool(row.get('lock_acquired')))} "
+            f"skipped_active_lock={_yes_no(bool(row.get('skipped_due_to_active_lock')))} "
+            f"stale_lock_recovered={_yes_no(bool(row.get('stale_lock_recovered')))} "
+            f"deliveries={_int(row.get('deliveries_delivered'))}d/"
+            f"{_int(row.get('deliveries_failed'))}f/"
+            f"{_int(row.get('deliveries_skipped_duplicate'))}dup/"
+            f"{_int(row.get('deliveries_blocked'))}blocked"
         )
         cooldown = row.get("cooldown_blocks") or {}
         if cooldown:

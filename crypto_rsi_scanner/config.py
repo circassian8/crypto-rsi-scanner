@@ -481,6 +481,17 @@ EVENT_ALPHA_NOTIFY_MAX_PROVIDER_FAILURES_BEFORE_SKIP = int(
 EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS = _env_bool("RSI_EVENT_ALPHA_NOTIFY_FAST_FAIL_ON_DNS", True)
 EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS = _env_bool("RSI_EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS", True)
 EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY = _env_bool("RSI_EVENT_ALPHA_ALLOW_FIXED_NOW_FOR_NOTIFY", False)
+# Per-profile notification run lock: prevents overlapping scheduled notify cycles
+# from double-sending or racing on lane cooldown state. Research-only.
+EVENT_ALPHA_NOTIFY_LOCK_ENABLED = _env_bool("RSI_EVENT_ALPHA_NOTIFY_LOCK_ENABLED", True)
+EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES = float(os.getenv("RSI_EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES", "30"))
+EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP = _env_bool("RSI_EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP", False)
+# Idempotent notification delivery ledger: dedupes identical research digests
+# within a window and records delivered/failed/skipped outcomes. Research-only.
+# Path defaults to <namespace>/event_alpha_notification_deliveries.jsonl;
+# RSI_EVENT_ALPHA_NOTIFICATION_DELIVERIES_PATH overrides it (read where used).
+EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT = _env_bool("RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT", True)
+EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS = float(os.getenv("RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS", "24"))
 EVENT_RESEARCH_CARDS_AUTO_WRITE = _env_bool("RSI_EVENT_RESEARCH_CARDS_AUTO_WRITE", False)
 EVENT_RESEARCH_CARDS_WRITE_TIERS = tuple(
     _env_csv("RSI_EVENT_RESEARCH_CARDS_WRITE_TIERS")

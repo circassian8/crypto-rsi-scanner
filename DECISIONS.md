@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-20 - Guard scheduled Event Alpha notifications with a run lock and delivery ledger
+**Status:** accepted
+**Decision:** Scheduled day-1 Event Alpha notification cycles use a per-profile
+run lock and an idempotent, content-hashed delivery ledger. A fresh lock makes an
+overlapping cycle skip safely (recorded as a skipped notification run); a stale
+lock (past the stale window, or a dead holder PID on this host) is recovered with
+a warning; the lock is released on completion and a crashed run is recovered by
+the next run. Each lane send is recorded
+(planned/sending/delivered/failed/skipped_duplicate/blocked), and identical
+research content already delivered within the dedupe window is skipped.
+Notification cooldown is only marked after a real delivery — never after a
+dedupe-skip or a failed send. Lock/delivery state is metadata only: it never
+sends, trades, paper trades, writes normal RSI signal rows, or creates
+`TRIGGERED_FADE` (still reserved for `event_fade.py` + `proxy_fade`). Automated
+resend of failed deliveries is intentionally a documented TODO because the ledger
+stores redacted metadata only.
+**Why:** Cron/launchd notify runs can overlap or retry; without a lock and a
+delivery ledger they could double-send a research digest or race lane cooldown
+state. Idempotent delivery is a prerequisite for trustworthy unattended operation.
+**Revisit when:** We want automated retry/resend, multi-host locking, or a
+notification surface beyond the per-profile deliveries report and Codex's inbox.
+
 ## 2026-06-20 - Keep provider backoff overrides explicit and local
 **Status:** accepted
 **Decision:** Event Alpha notification provider-health backoff can be inspected

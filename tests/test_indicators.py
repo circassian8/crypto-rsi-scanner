@@ -16990,6 +16990,383 @@ def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):
     )
 
 
+def _notify_artifact_context(base, namespace):
+    from types import SimpleNamespace
+    from pathlib import Path
+
+    base = Path(base)
+    return SimpleNamespace(
+        profile=namespace,
+        run_mode="notification_burn_in",
+        artifact_namespace=namespace,
+        base_dir=base,
+        namespace_dir=base / namespace,
+    )
+
+
+class _NotifyFakeStorage:
+    def __init__(self):
+        self.meta = {}
+
+    def get_meta(self, key):
+        return self.meta.get(key)
+
+    def set_meta(self, key, value):
+        self.meta[key] = value
+
+
+def _notify_route_decision(symbol, lane, route):
+    from crypto_rsi_scanner import event_alpha_router, event_watchlist
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key=f"{symbol}|proxy",
+        cluster_id=f"{symbol}|cluster",
+        event_id=f"evt-{symbol}",
+        coin_id=symbol.lower(),
+        symbol=symbol,
+        relationship_type="proxy_attention",
+        external_asset="SpaceX",
+        event_time="2026-06-20T13:30:00+00:00",
+        state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        previous_state="WATCHLIST",
+        first_seen_at="2026-06-19T09:00:00+00:00",
+        last_seen_at="2026-06-19T11:00:00+00:00",
+    )
+    return event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=route,
+        alertable=True,
+        reason="state escalation",
+        lane=lane,
+    )
+
+
+def test_event_alpha_run_lock_acquire_skip_recover_and_release():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_run_lock as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        cfg = lock.EventAlphaRunLockConfig(enabled=True, stale_minutes=30, allow_overlap=False)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        first = lock.acquire_run_lock(ctx, cfg=cfg, run_id="r1", now=now)
+        assert first.acquired and first.owned
+        assert first.status.state == lock.STATE_ACQUIRED
+        assert first.path.name == "event_alpha_notify.lock"
+        assert first.path.exists()
+
+        second = lock.acquire_run_lock(ctx, cfg=cfg, run_id="r2", now=now)
+        assert not second.acquired
+        assert second.skipped_due_to_active_lock
+        assert second.status.state == lock.STATE_ACTIVE
+        assert not second.owned
+
+        stale_now = datetime(2026, 6, 20, 13, 0, tzinfo=timezone.utc)
+        recovered = lock.acquire_run_lock(ctx, cfg=cfg, run_id="r3", now=stale_now)
+        assert recovered.acquired
+        assert recovered.stale_recovered
+        assert lock.STALE_LOCK_RECOVERED_WARNING in recovered.warnings
+
+        assert lock.release_run_lock(recovered) is True
+        assert not recovered.path.exists()
+        assert lock.inspect_run_lock(ctx, now=stale_now).state == lock.STATE_MISSING
+
+
+def test_event_alpha_run_lock_release_after_failsoft_and_distinct_profile_paths():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_run_lock as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        no_key = _notify_artifact_context(tmp, "notify_no_key")
+        llm = _notify_artifact_context(tmp, "notify_llm")
+        cfg = lock.EventAlphaRunLockConfig(enabled=True, stale_minutes=30)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        assert lock.lock_path_for_context(no_key) != lock.lock_path_for_context(llm)
+        held = lock.acquire_run_lock(no_key, cfg=cfg, run_id="r1", now=now)
+        try:
+            raise RuntimeError("provider blew up (fail-soft)")
+        except RuntimeError:
+            pass
+        assert lock.release_run_lock(held) is True
+        assert not held.path.exists()
+        assert lock.lock_path_for_context(no_key, lock_name="other").name == "event_alpha_other.lock"
+
+
+def test_event_alpha_run_lock_disabled_for_fixture_smoke():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_run_lock as lock
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "fixture")
+        cfg = lock.EventAlphaRunLockConfig(enabled=False)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        disabled = lock.acquire_run_lock(ctx, cfg=cfg, run_id="r1", now=now)
+        assert disabled.acquired
+        assert disabled.status.state == lock.STATE_DISABLED
+        assert not disabled.path.exists()
+        assert lock.release_run_lock(disabled) is False
+
+
+def test_event_alpha_delivery_ledger_records_dedupe_and_namespace_isolation():
+    import tempfile
+    from datetime import datetime, timezone, timedelta
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        path = delivery.deliveries_path_for_context(ctx)
+        assert path == Path(tmp) / "notify_no_key" / "event_alpha_notification_deliveries.jsonl"
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        content_hash = delivery.compute_content_hash("digest body", alert_id="ea:A", lane="daily_digest", profile="notify_no_key")
+        rec = delivery.build_record(
+            run_id="r1", alert_id="ea:A", profile="notify_no_key", namespace="notify_no_key",
+            lane="daily_digest", route="RESEARCH_DIGEST", content_hash=content_hash,
+            state=delivery.STATE_DELIVERED, now=now, delivered_at=now, delivered_count=1,
+        )
+        delivery.append_delivery_record(rec, path=path)
+        rows = delivery.load_delivery_records(path)
+        assert len(rows) == 1 and rows[0]["state"] == "delivered"
+        assert delivery.find_recent_delivered(rows, content_hash=content_hash, namespace="notify_no_key", now=now, window_hours=24) is not None
+        assert delivery.find_recent_delivered(rows, content_hash=content_hash, namespace="notify_llm", now=now, window_hours=24) is None
+        assert delivery.find_recent_delivered(rows, content_hash=content_hash, namespace="notify_no_key", now=now + timedelta(hours=48), window_hours=24) is None
+        other = delivery.compute_content_hash("digest body", alert_id="ea:B", lane="triggered_fade", profile="notify_no_key")
+        assert other != content_hash
+        summary = delivery.summarize_delivery_rows(rows)
+        assert summary.delivered == 1 and summary.failed == 0
+
+
+def test_event_alpha_notification_send_records_delivered_and_marks_cooldown():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notifications as notif,
+        event_alpha_router,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        dcfg = delivery.config_for_context(ctx, dedupe_by_content=True, dedupe_window_hours=24)
+        storage = _NotifyFakeStorage()
+        cfg = notif.EventAlphaNotificationConfig(enabled=True, daily_digest_cooldown_hours=12)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        sent = []
+        decisions = [_notify_route_decision("SOL", event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST, event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST)]
+        result = notif.send_notifications(
+            decisions, storage=storage, cfg=cfg, now=now, profile="notify_no_key",
+            send_fn=lambda message: (sent.append(message) or True),
+            delivery_cfg=dcfg, run_id="r1", namespace="notify_no_key",
+        )
+        assert result.deliveries_delivered == 1
+        assert result.deliveries_failed == 0
+        assert len(sent) == 1
+        assert any(row["state"] == "delivered" for row in delivery.load_delivery_records(dcfg.path))
+        assert storage.get_meta(notif.LAST_SENT_META_KEYS[notif.LANE_DAILY_DIGEST]) is not None
+
+
+def test_event_alpha_notification_send_failed_does_not_mark_cooldown():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notifications as notif,
+        event_alpha_router,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        dcfg = delivery.config_for_context(ctx)
+        storage = _NotifyFakeStorage()
+        cfg = notif.EventAlphaNotificationConfig(enabled=True, daily_digest_cooldown_hours=12)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        decisions = [_notify_route_decision("SOL", event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST, event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST)]
+        result = notif.send_notifications(
+            decisions, storage=storage, cfg=cfg, now=now, profile="notify_no_key",
+            send_fn=lambda message: False,
+            delivery_cfg=dcfg, run_id="r1", namespace="notify_no_key",
+        )
+        assert result.deliveries_failed == 1
+        assert result.deliveries_delivered == 0
+        assert not result.success
+        assert any(row["state"] == "failed" for row in delivery.load_delivery_records(dcfg.path))
+        assert storage.get_meta(notif.LAST_SENT_META_KEYS[notif.LANE_DAILY_DIGEST]) is None
+
+
+def test_event_alpha_notification_send_dedupes_within_window():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notifications as notif,
+        event_alpha_router,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        dcfg = delivery.config_for_context(ctx, dedupe_by_content=True, dedupe_window_hours=24)
+        storage = _NotifyFakeStorage()
+        cfg = notif.EventAlphaNotificationConfig(enabled=True, daily_digest_cooldown_hours=0)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        sent = []
+        send_fn = lambda message: (sent.append(message) or True)
+        decisions = [_notify_route_decision("SOL", event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST, event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST)]
+        first = notif.send_notifications(
+            decisions, storage=storage, cfg=cfg, now=now, profile="notify_no_key",
+            send_fn=send_fn, delivery_cfg=dcfg, run_id="r1", namespace="notify_no_key",
+        )
+        assert first.deliveries_delivered == 1 and len(sent) == 1
+        second = notif.send_notifications(
+            decisions, storage=storage, cfg=cfg, now=now, profile="notify_no_key",
+            send_fn=send_fn, delivery_cfg=dcfg, run_id="r2", namespace="notify_no_key",
+        )
+        assert second.deliveries_skipped_duplicate == 1
+        assert second.deliveries_delivered == 0
+        assert len(sent) == 1  # sender NOT called the second time
+
+        other_ctx = _notify_artifact_context(tmp, "notify_llm")
+        other_cfg = delivery.config_for_context(other_ctx, dedupe_by_content=True, dedupe_window_hours=24)
+        third = notif.send_notifications(
+            decisions, storage=_NotifyFakeStorage(), cfg=cfg, now=now, profile="notify_llm",
+            send_fn=send_fn, delivery_cfg=other_cfg, run_id="r3", namespace="notify_llm",
+        )
+        assert third.deliveries_delivered == 1
+        assert len(sent) == 2
+
+
+def test_event_alpha_notification_send_blocked_when_disabled_records_blocked():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notifications as notif,
+        event_alpha_router,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        dcfg = delivery.config_for_context(ctx)
+        storage = _NotifyFakeStorage()
+        cfg = notif.EventAlphaNotificationConfig(enabled=False)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        sent = []
+        decisions = [_notify_route_decision("SOL", event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST, event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST)]
+        result = notif.send_notifications(
+            decisions, storage=storage, cfg=cfg, now=now, profile="notify_no_key",
+            send_fn=lambda message: (sent.append(message) or True),
+            delivery_cfg=dcfg, run_id="r1", namespace="notify_no_key",
+        )
+        assert not result.attempted
+        assert result.deliveries_blocked >= 1
+        assert len(sent) == 0
+        assert any(row["state"] == "blocked" for row in delivery.load_delivery_records(dcfg.path))
+
+
+def test_event_alpha_delivery_report_groups_by_state_and_redacts_secrets():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+
+    now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+    rows = [
+        delivery.build_record(run_id="r1", alert_id="ea:A", profile="notify_no_key", namespace="notify_no_key", lane="daily_digest", route="RESEARCH_DIGEST", content_hash="hashA", state=delivery.STATE_DELIVERED, now=now, delivered_at=now, delivered_count=1).to_row(),
+        delivery.build_record(run_id="r2", alert_id="ea:B", profile="notify_no_key", namespace="notify_no_key", lane="instant_escalation", route="HIGH_PRIORITY_RESEARCH", content_hash="hashB", state=delivery.STATE_FAILED, now=now, error_message="telegram failed token=SECRET123").to_row(),
+        delivery.build_record(run_id="r3", alert_id="ea:C", profile="notify_no_key", namespace="notify_no_key", lane="daily_digest", route="RESEARCH_DIGEST", content_hash="hashC", state=delivery.STATE_SKIPPED_DUPLICATE, now=now).to_row(),
+    ]
+    report = delivery.format_delivery_report(rows, path="x.jsonl", profile="notify_no_key", namespace="notify_no_key")
+    assert "delivered=1 failed=1 skipped_duplicate=1" in report
+    assert "by lane/state:" in report
+    assert "latest failures:" in report
+    assert "latest duplicate skips:" in report
+    assert "SECRET123" not in report
+    assert "[redacted]" in report
+    assert len(delivery.failed_deliveries(rows)) == 1
+
+
+def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock():
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    for target, profile in (
+        ("event-alpha-notify-no-key-scheduled", "notify_no_key"),
+        ("event-alpha-notify-llm-scheduled", "notify_llm"),
+    ):
+        out = subprocess.run(["make", "-n", target], cwd=root, capture_output=True, text=True, check=True).stdout
+        assert f"--event-alpha-profile {profile}" in out
+        assert "RSI_EVENT_ALPHA_NOTIFY_LOCK_ENABLED=1" in out
+        assert f"RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE={profile}" in out
+        assert "RSI_EVENT_RESEARCH_NOW" not in out
+        assert "--score" not in out
+        assert "paper" not in out
+        assert "main.py --event-alpha-notify-cycle" in out
+
+
+def test_event_alpha_notification_run_summary_flows_to_runs_doctor_and_brief():
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_daily_brief,
+        event_alpha_notification_runs as runs,
+    )
+
+    started = "2026-06-20T12:00:00+00:00"
+    delivered_result = SimpleNamespace(
+        run_id="r1", run_mode="notification_burn_in", artifact_namespace="notify_no_key",
+        warnings=(), notification_lock_acquired=True, notification_stale_lock_recovered=False,
+        notification_skipped_due_to_active_lock=False, notification_delivery_records_written=2,
+        notification_deliveries_delivered=1, notification_deliveries_failed=1,
+        notification_deliveries_skipped_duplicate=0, notification_deliveries_blocked=0,
+    )
+    row = runs.notification_run_record(
+        delivered_result, profile="notify_no_key",
+        started_at=__import__("datetime").datetime.fromisoformat(started),
+        finished_at=__import__("datetime").datetime.fromisoformat(started),
+        telegram_ready=True, send_guard_enabled=True,
+    )
+    assert runs.row_has_delivery_failures(row)
+    report = runs.format_notification_runs_report(
+        runs.EventAlphaNotificationRunsReadResult(path="runs.jsonl", rows_read=1, rows=[row])
+    )
+    assert "lock_acquired=yes" in report
+    assert "deliveries=1d/1f/0dup" in report
+
+    skipped_result = SimpleNamespace(
+        run_id="r2", run_mode="notification_burn_in", artifact_namespace="notify_no_key",
+        warnings=("notification_cycle_skipped_active_lock",),
+        notification_skipped_due_to_active_lock=True, notification_lock_acquired=False,
+    )
+    skipped_row = runs.notification_run_record(
+        skipped_result, profile="notify_no_key",
+        started_at=__import__("datetime").datetime.fromisoformat(started),
+        finished_at=__import__("datetime").datetime.fromisoformat(started),
+        telegram_ready=True, send_guard_enabled=True,
+    )
+    skipped_report = runs.format_notification_runs_report(
+        runs.EventAlphaNotificationRunsReadResult(path="runs.jsonl", rows_read=1, rows=[skipped_row])
+    )
+    assert "skipped_active_lock=yes" in skipped_report
+
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{"run_id": "r", "profile": "notify_no_key", "run_mode": "notification_burn_in", "artifact_namespace": "notify_no_key", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
+        alert_rows=[{"run_id": "r", "profile": "notify_no_key", "run_mode": "notification_burn_in", "artifact_namespace": "notify_no_key", "alert_key": "a", "tier": "WATCHLIST"}],
+        delivery_rows=[{"row_type": "event_alpha_notification_delivery", "delivery_id": "d1", "state": "failed", "lane": "daily_digest"}],
+        profile="notify_no_key", artifact_namespace="notify_no_key",
+    )
+    assert doctor.deliveries_failed == 1
+    assert any("notification deliveries failed" in w for w in doctor.warnings)
+
+    brief = event_alpha_daily_brief.build_daily_brief(
+        run_rows=[{"row_type": "event_alpha_run", "started_at": started, "profile": "notify_no_key", "run_mode": "notification_burn_in", "artifact_namespace": "notify_no_key", "success": True}],
+        notification_runs=[row], requested_profile="notify_no_key", artifact_namespace="notify_no_key",
+    )
+    assert "Notify delivery failures" in brief
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

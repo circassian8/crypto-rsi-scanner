@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 from . import (
     event_alpha_calibration,
     event_alpha_artifacts,
+    event_alpha_notification_runs,
     event_alpha_explain,
     event_alpha_run_ledger,
     event_alpha_router,
@@ -32,6 +33,7 @@ def build_daily_brief(
     alert_rows: Iterable[Mapping[str, Any]] = (),
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     missed_rows: Iterable[Mapping[str, Any]] = (),
+    notification_runs: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
@@ -125,6 +127,21 @@ def build_daily_brief(
             lines.append("- Warnings: " + "; ".join(warnings[:6]))
     else:
         lines.append("- No run ledger rows found.")
+    latest_notification = _latest_notification_run(notification_runs)
+    if latest_notification is not None:
+        lines.append(
+            "- Notify lock/deliveries: "
+            f"lock_acquired={str(bool(latest_notification.get('lock_acquired'))).lower()} "
+            f"skipped_active_lock={str(bool(latest_notification.get('skipped_due_to_active_lock'))).lower()} "
+            f"deliveries={int(latest_notification.get('deliveries_delivered') or 0)}d/"
+            f"{int(latest_notification.get('deliveries_failed') or 0)}f/"
+            f"{int(latest_notification.get('deliveries_skipped_duplicate') or 0)}dup"
+        )
+        if event_alpha_notification_runs.row_has_delivery_failures(latest_notification):
+            lines.append(
+                f"- Notify delivery failures: {int(latest_notification.get('deliveries_failed') or 0)} "
+                "failed delivery row(s) — run --event-alpha-notification-deliveries-report"
+            )
     lines.extend(["", "## Provider Health"])
     lines.extend(_provider_health_lines(provider_health_rows or {}))
     lines.extend(["", "## LLM Budget"])
@@ -228,6 +245,15 @@ def format_daily_brief_result(result: EventAlphaDailyBriefResult) -> str:
 def _compact(report: str) -> str:
     lines = [line for line in str(report or "").splitlines() if line and not line.startswith("=")]
     return "\n".join(f"> {line}" for line in lines[:20])
+
+
+def _latest_notification_run(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any] | None:
+    ordered = sorted(
+        (dict(row) for row in rows if isinstance(row, Mapping)),
+        key=lambda row: str(row.get("started_at") or ""),
+        reverse=True,
+    )
+    return ordered[0] if ordered else None
 
 
 def _provider_health_lines(rows: Mapping[str, Mapping[str, Any]]) -> list[str]:

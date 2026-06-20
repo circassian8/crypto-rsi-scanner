@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import event_alpha_artifacts
+from . import event_alpha_notification_delivery as _delivery
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,8 @@ class EventAlphaArtifactDoctorResult:
     runs_with_external_snapshot_paths: int = 0
     legacy_rows_skipped: int = 0
     legacy_rows_counted: int = 0
+    delivery_rows: int = 0
+    deliveries_failed: int = 0
     strict: bool = False
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
@@ -40,6 +43,7 @@ def diagnose_artifacts(
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
+    delivery_rows: Iterable[Mapping[str, Any]] = (),
     profile: str | None = None,
     artifact_namespace: str | None = None,
     include_test_artifacts: bool = False,
@@ -185,6 +189,11 @@ def diagnose_artifacts(
     index_present = any(path.name == "index.md" for path in card_file_paths)
     if alerts and not card_count and any(str(row.get("tier") or "") in {"HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"} for row in alerts):
         warnings.append("high-priority/triggered snapshots exist but no research cards were found")
+    delivery_summary = _delivery.summarize_delivery_rows([row for row in delivery_rows if isinstance(row, Mapping)])
+    if delivery_summary.failed:
+        warnings.append(
+            f"notification deliveries failed: {delivery_summary.failed} failed delivery row(s) for this profile/namespace"
+        )
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
     return EventAlphaArtifactDoctorResult(
         status=status,
@@ -205,6 +214,8 @@ def diagnose_artifacts(
             1 for row in (*runs, *alerts, *feedback, *outcomes)
             if event_alpha_artifacts.is_legacy_row(row)
         ),
+        delivery_rows=delivery_summary.rows,
+        deliveries_failed=delivery_summary.failed,
         strict=bool(strict),
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
@@ -271,6 +282,10 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         (
             "legacy rows: "
             f"skipped={result.legacy_rows_skipped} counted={result.legacy_rows_counted}"
+        ),
+        (
+            "notification deliveries: "
+            f"rows={result.delivery_rows} failed={result.deliveries_failed}"
         ),
         "",
         "blockers:",

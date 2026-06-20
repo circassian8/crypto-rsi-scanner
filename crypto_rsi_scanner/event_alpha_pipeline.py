@@ -45,6 +45,11 @@ class EventAlphaSendResult:
     cooldown_blocks: dict[str, str] = field(default_factory=dict)
     notification_scope: str | None = None
     notification_scope_value: str | None = None
+    delivery_records_written: int = 0
+    deliveries_delivered: int = 0
+    deliveries_failed: int = 0
+    deliveries_skipped_duplicate: int = 0
+    deliveries_blocked: int = 0
 
 
 @dataclass(frozen=True)
@@ -76,6 +81,14 @@ class EventAlphaPipelineResult:
     send_cooldown_blocks: dict[str, str] = field(default_factory=dict)
     notification_scope: str | None = None
     notification_scope_value: str | None = None
+    notification_lock_acquired: bool = False
+    notification_skipped_due_to_active_lock: bool = False
+    notification_stale_lock_recovered: bool = False
+    notification_delivery_records_written: int = 0
+    notification_deliveries_delivered: int = 0
+    notification_deliveries_failed: int = 0
+    notification_deliveries_skipped_duplicate: int = 0
+    notification_deliveries_blocked: int = 0
     notification_burn_in: bool = False
     research_card_paths: tuple[Path, ...] = ()
     run_id: str | None = None

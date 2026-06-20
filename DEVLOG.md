@@ -17,6 +17,64 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Add Event Alpha notification run lock + idempotent delivery ledger · Claude
+**Why:** Scheduled/cron-style day-1 notification runs could overlap (a slow run
+still finishing when the next fires) and double-send a research digest or race on
+lane cooldown state. We want safe unattended operation while keeping everything
+research-only.
+**Changes:**
+- Added `event_alpha_run_lock.py`: a best-effort, profile/namespace-scoped file
+  lock (`<namespace>/event_alpha_notify.lock`) carrying run_id/profile/namespace/
+  pid/acquired_at/command/hostname. Fresh lock → the next run skips safely and
+  records a skipped notification run; stale lock (time or dead holder PID) → take
+  over with `stale_notification_lock_recovered`; released on completion, and a
+  crashed run is recovered by the next run (dead PID on host / stale window).
+  Config: `RSI_EVENT_ALPHA_NOTIFY_LOCK_ENABLED` (1),
+  `RSI_EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES` (30),
+  `RSI_EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP` (0).
+- Added `event_alpha_notification_delivery.py`: an append-only JSONL delivery
+  ledger (`<namespace>/event_alpha_notification_deliveries.jsonl`) with
+  planned/sending/delivered/failed/skipped_duplicate/blocked states and content-
+  hash dedupe within a window. `event_alpha_notifications.send_notifications`
+  now records each lane send and skips identical content already delivered;
+  cooldown is only marked after a real delivery (never on dedupe-skip or failure).
+  Records and channel summaries are redacted. Config:
+  `RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT` (1),
+  `RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS` (24),
+  `RSI_EVENT_ALPHA_NOTIFICATION_DELIVERIES_PATH` (optional override).
+- Hung the lock/delivery summary off Codex's notification-runs ledger:
+  `notification_run_record` now carries lock_acquired/skipped_due_to_active_lock/
+  stale_lock_recovered + delivery counts, surfaced in the notification-runs
+  report, daily brief, and artifact doctor (which now warns on failed deliveries
+  for the notification namespace). Lock/delivery fields flow via new
+  `EventAlphaSendResult`/`EventAlphaPipelineResult` fields.
+- Added `main.py --event-alpha-notification-deliveries-report` and
+  `--event-alpha-notification-retry-failed` (dry-run scaffold; `--confirm`
+  required; automated resend left as a documented TODO since the ledger stores
+  redacted metadata only). New Make targets:
+  `event-alpha-notify-no-key-scheduled` / `event-alpha-notify-llm-scheduled`
+  (run lock + delivery ledger, real wall-clock time, fail-soft, exit 0 on
+  partial provider failure), `event-alpha-notification-deliveries-report`, and
+  `event-alpha-notification-retry-failed`.
+- `TRIGGERED_FADE` still comes only from `event_fade.py` + `proxy_fade`; no
+  trading, paper trades, normal RSI rows, or LLM-created triggers were added.
+**Verify:** `.venv/bin/python tests/test_indicators.py` passed 390/390 (added 11
+tests: lock acquire/skip/recover/release, fail-soft release, distinct profile
+lock paths, disabled-lock fixture smoke, delivery dedupe/namespace isolation,
+delivered+cooldown, failed-no-cooldown, dedupe-skips-send, blocked-when-disabled,
+report grouping/redaction, scheduled-target invariants, run-summary→runs/doctor/
+brief). `make event-llm-eval`, `make event-llm-extract-eval`,
+`make event-alpha-eval`, and `make verify` (all `PYTHON=.venv/bin/python`)
+passed. A live `--event-alpha-notify-cycle --event-alpha-profile notify_no_key`
+ran end-to-end (network fail-soft, lock acquired/released, notification-runs row
+shows the lock/delivery line); the deliveries report renders the namespaced
+ledger.
+**Notes/risks:** Built on top of Codex's existing notification-runs/inbox/
+checklist work (re-applied fresh after a divergent remote, rather than a
+conflicted merge). Scheduled targets still require `--event-alert-send` plus
+`RSI_EVENT_ALERTS_ENABLED=1` and Telegram config to deliver. Retry-failed is a
+dry-run scaffold only; re-run the scheduled cycle to resend.
+
 ## 2026-06-20 — Polish day-1 Event Alpha provider operations · Codex
 **Why:** Day-1 notification burn-in needed an operator-safe way to inspect and
 clear stale provider backoff, force one run without mutating health state, and
