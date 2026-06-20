@@ -134,9 +134,11 @@ def build_daily_brief(
             f"lock_acquired={str(bool(latest_notification.get('lock_acquired'))).lower()} "
             f"skipped_active_lock={str(bool(latest_notification.get('skipped_due_to_active_lock'))).lower()} "
             f"deliveries={int(latest_notification.get('deliveries_delivered') or 0)}d/"
+            f"{int(latest_notification.get('deliveries_partial_delivered') or 0)}partial/"
             f"{int(latest_notification.get('deliveries_failed') or 0)}f/"
             f"{int(latest_notification.get('deliveries_skipped_duplicate') or 0)}dup/"
-            f"{int(latest_notification.get('deliveries_skipped_in_flight') or 0)}flight"
+            f"{int(latest_notification.get('deliveries_skipped_in_flight') or 0)}flight/"
+            f"{int(latest_notification.get('deliveries_blocked') or 0)}blocked"
         )
         if event_alpha_notification_runs.row_has_delivery_failures(latest_notification):
             lines.append(

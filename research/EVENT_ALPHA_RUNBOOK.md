@@ -163,14 +163,23 @@ cycles.
 
 Each lane send is recorded in
 `<namespace>/event_alpha_notification_deliveries.jsonl` as `planned`/`sending`
-then `delivered`/`failed`, or `skipped_duplicate`/`skipped_in_flight`/`blocked`.
-Recent non-terminal planned/sending rows with the same content hash are treated
-as in-flight for `RSI_EVENT_ALPHA_NOTIFICATION_IN_FLIGHT_GRACE_MINUTES` (default
-10 minutes) so overlapping jobs do not double-send. Failed rows and stale
-in-flight rows do not block retry. Structured send attempts record redacted
-recipient and chunk counts; partial delivery is recorded but does not mark lane
-cooldown. Cooldown is only marked after a full successful delivery — never after
-a dedupe-skip, in-flight skip, partial delivery, or failed send.
+then `delivered`/`partial_delivered`/`failed`, or
+`skipped_duplicate`/`skipped_in_flight`/`blocked`. Deduplication uses stable
+lane keys where available: alert lanes use namespace + lane + alert ids,
+heartbeats use namespace + lane + day + health-status bucket, and daily digests
+use namespace + lane + day + digest bucket. The exact message `content_hash` is
+still stored for audit and for backward compatibility with older rows.
+Recent non-terminal planned/sending rows with the same dedupe key/content hash
+are treated as in-flight for
+`RSI_EVENT_ALPHA_NOTIFICATION_IN_FLIGHT_GRACE_MINUTES` (default 10 minutes) so
+overlapping jobs do not double-send. Failed rows and stale in-flight rows do not
+block retry. Structured Telegram send attempts record redacted recipient and
+chunk counts; partial delivery is recorded separately. By default
+`RSI_EVENT_ALPHA_NOTIFICATION_PARTIAL_MARKS_COOLDOWN=1`, so a partial send marks
+lane cooldown to avoid re-sending the same alert to recipients that already got
+it. Set it to `0` only if you want partial sends to stay retryable without
+cooldown. Cooldown is never marked after a dedupe-skip, in-flight skip, blocked
+row, or zero-recipient failed send.
 Inspect with `make event-alpha-notification-deliveries-report
 PROFILE=notify_no_key`; `make event-alpha-notification-retry-failed
 PROFILE=notify_no_key` lists failed deliveries (dry-run; `CONFIRM=1` required,
@@ -178,6 +187,12 @@ and automated resend is a documented TODO — re-run the scheduled cycle to
 resend). The per-run lock/delivery summary also shows up in
 `make event-alpha-notification-runs-report`, the daily brief, and the artifact
 doctor (which warns on failed deliveries).
+
+`make event-alpha-notify-go-no-go PROFILE=notify_no_key` also prints the
+operator follow-up commands: provider health report, provider reset when any
+provider is in backoff, delivery report, and notification inbox. Use the inbox
+after every partial delivery because those alerts need both delivery review and
+normal useful/junk/watch feedback if any recipient received the message.
 
 ## Daily No-Key Operation
 

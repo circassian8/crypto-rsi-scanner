@@ -48,7 +48,7 @@ from .state_features import (
     volume_price_state,
     volume_z_score,
 )
-from .notifications import notify_all, send_telegram
+from .notifications import notify_all, send_telegram, send_telegram_structured
 from .storage import Storage
 from .universe import (
     candidate_count,
@@ -1562,6 +1562,7 @@ def _event_alpha_notification_delivery_config_from_runtime(
         dedupe_by_content=config.EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT,
         dedupe_window_hours=config.EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS,
         in_flight_grace_minutes=config.EVENT_ALPHA_NOTIFICATION_IN_FLIGHT_GRACE_MINUTES,
+        partial_marks_cooldown=config.EVENT_ALPHA_NOTIFICATION_PARTIAL_MARKS_COOLDOWN,
     )
 
 
@@ -2493,6 +2494,7 @@ def _event_alpha_notify_cycle_body(
         notification_stale_lock_recovered=run_lock.stale_recovered,
         notification_delivery_records_written=send_result.delivery_records_written,
         notification_deliveries_delivered=send_result.deliveries_delivered,
+        notification_deliveries_partial_delivered=send_result.deliveries_partial_delivered,
         notification_deliveries_failed=send_result.deliveries_failed,
         notification_deliveries_skipped_duplicate=send_result.deliveries_skipped_duplicate,
         notification_deliveries_skipped_in_flight=send_result.deliveries_skipped_in_flight,
@@ -2573,7 +2575,9 @@ def _event_alpha_notify_cycle_body(
         print(
             "Event Alpha notification deliveries recorded: "
             f"{pipeline_result.notification_deliveries_delivered} delivered, "
+            f"{pipeline_result.notification_deliveries_partial_delivered} partial_delivered, "
             f"{pipeline_result.notification_deliveries_failed} failed, "
+            f"{pipeline_result.notification_deliveries_blocked} blocked, "
             f"{pipeline_result.notification_deliveries_skipped_duplicate} skipped_duplicate, "
             f"{pipeline_result.notification_deliveries_skipped_in_flight} skipped_in_flight "
             f"({delivery_cfg.path})."
@@ -3692,6 +3696,7 @@ def event_alpha_notify_fixture_smoke(
         snapshot_write_block_reason=None,
         notification_delivery_records_written=send_result.delivery_records_written,
         notification_deliveries_delivered=send_result.deliveries_delivered,
+        notification_deliveries_partial_delivered=send_result.deliveries_partial_delivered,
         notification_deliveries_failed=send_result.deliveries_failed,
         notification_deliveries_skipped_duplicate=send_result.deliveries_skipped_duplicate,
         notification_deliveries_skipped_in_flight=send_result.deliveries_skipped_in_flight,
@@ -3726,6 +3731,7 @@ def event_alpha_notify_fixture_smoke(
         f"delivery_path: {delivery_cfg.path}",
         f"delivery_records_written: {send_result.delivery_records_written}",
         f"delivery_delivered: {send_result.deliveries_delivered}",
+        f"delivery_partial_delivered: {send_result.deliveries_partial_delivered}",
         f"notification_run_path: {context.notification_runs_path}",
         f"notification_would_send: {notification_row.get('would_send_count')}",
         f"alert_snapshot_path: {snapshot_path}",
@@ -4996,8 +5002,7 @@ def _send_event_alpha_routed_digest(
             delivery_cfg=delivery_cfg,
             run_id=run_id,
             namespace=namespace,
-            send_fn=lambda message: event_alpha_notification_sender.telegram_send_attempt(
-                send_telegram,
+            send_fn=lambda message: send_telegram_structured(
                 message,
                 parse_mode="HTML",
                 chat_ids=recipients,

@@ -290,6 +290,7 @@ def send_notifications(
             notification_scope_value=plan.scope_value,
             delivery_records_written=int(counts.get("records", 0)),
             deliveries_delivered=int(counts.get(delivery.STATE_DELIVERED, 0)),
+            deliveries_partial_delivered=int(counts.get(delivery.STATE_PARTIAL_DELIVERED, 0)),
             deliveries_failed=int(counts.get(delivery.STATE_FAILED, 0)),
             deliveries_skipped_duplicate=int(counts.get(delivery.STATE_SKIPPED_DUPLICATE, 0)),
             deliveries_skipped_in_flight=int(counts.get(delivery.STATE_SKIPPED_IN_FLIGHT, 0)),
@@ -344,7 +345,12 @@ def send_notifications(
             writer.record_planned(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items))
             writer.record_sending(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items))
         attempt = _call_send_fn(send_fn, message)
-        if attempt.success:
+        terminal_state = delivery.state_for_send_counts(
+            delivered_count=attempt.delivered_count,
+            failed_count=attempt.failed_count,
+        )
+        partial_marks_cooldown = bool(writer.cfg.partial_marks_cooldown) if writer else True
+        if terminal_state == delivery.STATE_DELIVERED:
             delivered_by_lane[lane] = len(items)
             record_lane_sent(
                 storage,
@@ -355,7 +361,26 @@ def send_notifications(
                 cfg=cfg,
             )
             if writer:
-                writer.record_delivered(
+                writer.record_attempt_result(
+                    message=message,
+                    lane=lane,
+                    alert_ids=alert_ids,
+                    route=_route_label(items),
+                    attempt=attempt,
+                )
+        elif terminal_state == delivery.STATE_PARTIAL_DELIVERED:
+            block_reasons.append(f"{lane}: partial delivery ({attempt.delivered_count}/{attempt.recipient_count} recipient(s))")
+            if partial_marks_cooldown:
+                record_lane_sent(
+                    storage,
+                    lane,
+                    item_count=len(items),
+                    now=observed,
+                    alert_ids=alert_ids,
+                    cfg=cfg,
+                )
+            if writer:
+                writer.record_attempt_result(
                     message=message,
                     lane=lane,
                     alert_ids=alert_ids,
@@ -365,7 +390,7 @@ def send_notifications(
         else:
             block_reasons.append(f"{lane}: {attempt.error_message_safe or 'no channel delivered'}")
             if writer:
-                writer.record_failed(
+                writer.record_attempt_result(
                     message=message,
                     lane=lane,
                     alert_ids=alert_ids,
@@ -389,11 +414,30 @@ def send_notifications(
                 writer.record_planned(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT")
                 writer.record_sending(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT")
             attempt = _call_send_fn(send_fn, heartbeat_message)
-            if attempt.success:
+            terminal_state = delivery.state_for_send_counts(
+                delivered_count=attempt.delivered_count,
+                failed_count=attempt.failed_count,
+            )
+            partial_marks_cooldown = bool(writer.cfg.partial_marks_cooldown) if writer else True
+            if terminal_state == delivery.STATE_DELIVERED:
                 delivered_by_lane[LANE_HEALTH_HEARTBEAT] = 1
                 record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed, cfg=cfg)
                 if writer:
-                    writer.record_delivered(
+                    writer.record_attempt_result(
+                        message=heartbeat_message,
+                        lane=LANE_HEALTH_HEARTBEAT,
+                        alert_ids=["heartbeat"],
+                        route="HEALTH_HEARTBEAT",
+                        attempt=attempt,
+                    )
+            elif terminal_state == delivery.STATE_PARTIAL_DELIVERED:
+                block_reasons.append(
+                    f"health_heartbeat: partial delivery ({attempt.delivered_count}/{attempt.recipient_count} recipient(s))"
+                )
+                if partial_marks_cooldown:
+                    record_lane_sent(storage, LANE_HEALTH_HEARTBEAT, item_count=1, now=observed, cfg=cfg)
+                if writer:
+                    writer.record_attempt_result(
                         message=heartbeat_message,
                         lane=LANE_HEALTH_HEARTBEAT,
                         alert_ids=["heartbeat"],
@@ -403,7 +447,7 @@ def send_notifications(
             else:
                 block_reasons.append(f"health_heartbeat: {attempt.error_message_safe or 'no channel delivered'}")
                 if writer:
-                    writer.record_failed(
+                    writer.record_attempt_result(
                         message=heartbeat_message,
                         lane=LANE_HEALTH_HEARTBEAT,
                         alert_ids=["heartbeat"],
@@ -470,6 +514,7 @@ class _DeliveryWriter:
         self.existing = delivery.load_delivery_records(cfg.path)
         self.counts: dict[str, int] = {
             delivery.STATE_DELIVERED: 0,
+            delivery.STATE_PARTIAL_DELIVERED: 0,
             delivery.STATE_FAILED: 0,
             delivery.STATE_SKIPPED_DUPLICATE: 0,
             delivery.STATE_SKIPPED_IN_FLIGHT: 0,
@@ -483,7 +528,34 @@ class _DeliveryWriter:
     def _hash(self, message: str, lane: str, alert_ids: Iterable[str]) -> str:
         return delivery.compute_content_hash(message, alert_id=self._joined(alert_ids), lane=lane, profile=self.profile)
 
-    def _append(self, *, alert_ids: Iterable[str], lane: str, route: str, content_hash: str, state: str, **kwargs: Any) -> None:
+    def _dedupe_bucket(self, message: str, lane: str, alert_ids: Iterable[str]) -> str:
+        joined = self._joined(alert_ids)
+        day = self.now.date().isoformat()
+        lane_key = _clean_lane(lane)
+        if lane_key == LANE_HEALTH_HEARTBEAT:
+            status = "degraded" if _heartbeat_degraded(message) else "healthy"
+            return f"{day}|{status}"
+        if lane_key == LANE_DAILY_DIGEST:
+            digest_bucket = joined or "digest"
+            return f"{day}|{digest_bucket}"
+        return joined or lane_key
+
+    def _dedupe_key(self, message: str, lane: str, alert_ids: Iterable[str]) -> tuple[str, str]:
+        bucket = self._dedupe_bucket(message, lane, alert_ids)
+        return delivery.compute_dedupe_key(namespace=self.namespace, lane=lane, dedupe_bucket=bucket), bucket
+
+    def _append(
+        self,
+        *,
+        alert_ids: Iterable[str],
+        lane: str,
+        route: str,
+        content_hash: str,
+        state: str,
+        dedupe_key: str | None = None,
+        dedupe_bucket: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         record = delivery.build_record(
             run_id=self.run_id,
             alert_id=self._joined(alert_ids),
@@ -492,6 +564,8 @@ class _DeliveryWriter:
             lane=lane,
             route=route,
             content_hash=content_hash,
+            dedupe_key=dedupe_key,
+            dedupe_bucket=dedupe_bucket,
             state=state,
             now=self.now,
             **kwargs,
@@ -507,17 +581,21 @@ class _DeliveryWriter:
         if not self.cfg.dedupe_by_content:
             return False
         content_hash = self._hash(message, lane, alert_ids)
+        dedupe_key, dedupe_bucket = self._dedupe_key(message, lane, alert_ids)
         dup = delivery.find_recent_delivered(
             self.existing,
             content_hash=content_hash,
+            dedupe_key=dedupe_key,
             namespace=self.namespace,
             now=self.now,
             window_hours=self.cfg.dedupe_window_hours,
+            include_partial=self.cfg.partial_marks_cooldown,
         )
         if dup is None:
             in_flight = delivery.find_recent_in_flight(
                 self.existing,
                 content_hash=content_hash,
+                dedupe_key=dedupe_key,
                 namespace=self.namespace,
                 now=self.now,
                 grace_minutes=self.cfg.in_flight_grace_minutes,
@@ -529,6 +607,8 @@ class _DeliveryWriter:
                 lane=lane,
                 route=route,
                 content_hash=content_hash,
+                dedupe_key=dedupe_key,
+                dedupe_bucket=dedupe_bucket,
                 state=delivery.STATE_SKIPPED_IN_FLIGHT,
                 error_class="in_flight_content",
                 error_message=(
@@ -542,6 +622,8 @@ class _DeliveryWriter:
             lane=lane,
             route=route,
             content_hash=content_hash,
+            dedupe_key=dedupe_key,
+            dedupe_bucket=dedupe_bucket,
             state=delivery.STATE_SKIPPED_DUPLICATE,
             error_class="duplicate_content",
             error_message=f"duplicate within {self.cfg.dedupe_window_hours:g}h (prior delivered_at={dup.get('delivered_at')})",
@@ -549,37 +631,30 @@ class _DeliveryWriter:
         return True
 
     def record_planned(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> None:
-        self._append(alert_ids=alert_ids, lane=lane, route=route, content_hash=self._hash(message, lane, alert_ids), state=delivery.STATE_PLANNED)
-
-    def record_sending(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> None:
-        self._append(alert_ids=alert_ids, lane=lane, route=route, content_hash=self._hash(message, lane, alert_ids), state=delivery.STATE_SENDING)
-
-    def record_delivered(
-        self,
-        *,
-        message: str,
-        lane: str,
-        alert_ids: list[str],
-        route: str,
-        attempt: sender.NotificationSendAttemptResult,
-    ) -> None:
+        dedupe_key, dedupe_bucket = self._dedupe_key(message, lane, alert_ids)
         self._append(
             alert_ids=alert_ids,
             lane=lane,
             route=route,
             content_hash=self._hash(message, lane, alert_ids),
-            state=delivery.STATE_DELIVERED,
-            delivered_at=self.now,
-            recipient_count=attempt.recipient_count,
-            delivered_count=attempt.delivered_count,
-            failed_count=attempt.failed_count,
-            chunk_count=attempt.chunk_count,
-            delivered_chunks=attempt.delivered_chunks,
-            failed_chunks=attempt.failed_chunks,
-            channel_summary=attempt.channel_summary,
+            dedupe_key=dedupe_key,
+            dedupe_bucket=dedupe_bucket,
+            state=delivery.STATE_PLANNED,
         )
 
-    def record_failed(
+    def record_sending(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> None:
+        dedupe_key, dedupe_bucket = self._dedupe_key(message, lane, alert_ids)
+        self._append(
+            alert_ids=alert_ids,
+            lane=lane,
+            route=route,
+            content_hash=self._hash(message, lane, alert_ids),
+            dedupe_key=dedupe_key,
+            dedupe_bucket=dedupe_bucket,
+            state=delivery.STATE_SENDING,
+        )
+
+    def record_attempt_result(
         self,
         *,
         message: str,
@@ -588,14 +663,22 @@ class _DeliveryWriter:
         route: str,
         attempt: sender.NotificationSendAttemptResult,
     ) -> None:
+        state = delivery.state_for_send_counts(
+            delivered_count=attempt.delivered_count,
+            failed_count=attempt.failed_count,
+        )
+        dedupe_key, dedupe_bucket = self._dedupe_key(message, lane, alert_ids)
         self._append(
             alert_ids=alert_ids,
             lane=lane,
             route=route,
             content_hash=self._hash(message, lane, alert_ids),
-            state=delivery.STATE_FAILED,
-            error_class=attempt.error_class or "send_failed",
-            error_message=attempt.error_message_safe or "no channel delivered",
+            dedupe_key=dedupe_key,
+            dedupe_bucket=dedupe_bucket,
+            state=state,
+            delivered_at=self.now if attempt.delivered_count > 0 else None,
+            error_class=None if state == delivery.STATE_DELIVERED else (attempt.error_class or "send_failed"),
+            error_message=None if state == delivery.STATE_DELIVERED else (attempt.error_message_safe or "no channel delivered"),
             recipient_count=attempt.recipient_count,
             delivered_count=attempt.delivered_count,
             failed_count=attempt.failed_count,
@@ -617,6 +700,8 @@ class _DeliveryWriter:
                 lane=lane,
                 route=_route_label(items),
                 content_hash=self._hash(message, lane, alert_ids),
+                dedupe_key=self._dedupe_key(message, lane, alert_ids)[0],
+                dedupe_bucket=self._dedupe_key(message, lane, alert_ids)[1],
                 state=delivery.STATE_BLOCKED,
                 error_class="guard_blocked",
                 error_message=reason,
@@ -628,6 +713,8 @@ class _DeliveryWriter:
                 lane=LANE_HEALTH_HEARTBEAT,
                 route="HEALTH_HEARTBEAT",
                 content_hash=self._hash(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"]),
+                dedupe_key=self._dedupe_key(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"])[0],
+                dedupe_bucket=self._dedupe_key(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"])[1],
                 state=delivery.STATE_BLOCKED,
                 error_class="guard_blocked",
                 error_message=reason,
@@ -847,6 +934,15 @@ def _triggered_alert_meta_key(alert_id: str, cfg: EventAlphaNotificationConfig |
     if cfg is not None and _clean_scope(cfg.notification_scope) != NOTIFICATION_SCOPE_GLOBAL:
         return f"event_alpha_notify:{_scope_value(cfg)}:triggered:{digest}"
     return f"event_alpha_sent_triggered_fade_alert_{digest}"
+
+
+def _heartbeat_degraded(message: str) -> bool:
+    text = str(message or "").casefold()
+    return (
+        "degraded=yes" in text
+        or "partial_results=yes" in text
+        or "runtime_budget_status=exhausted" in text
+    )
 
 
 def _last_sent_meta_key(lane: str, cfg: EventAlphaNotificationConfig) -> str:

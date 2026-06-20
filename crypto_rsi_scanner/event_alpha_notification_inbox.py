@@ -41,6 +41,7 @@ class EventAlphaNotificationInboxResult:
     research_cards_read: int
     outcome_rows_read: int
     sent_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    partial_delivered_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     would_send_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     would_send_blocked_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
@@ -84,7 +85,14 @@ def build_notification_inbox(
         )
         for row in alerts
     ]
-    sent_without_feedback = tuple(item for item in items if item.sent and not item.reviewed)
+    partial_delivered_without_feedback = tuple(
+        item for item in items
+        if item.delivery_state == delivery.STATE_PARTIAL_DELIVERED and not item.reviewed
+    )
+    sent_without_feedback = tuple(
+        item for item in items
+        if item.sent and item.delivery_state != delivery.STATE_PARTIAL_DELIVERED and not item.reviewed
+    )
     would_send_without_feedback = tuple(
         item for item in items
         if item.would_send and not item.sent and not item.blocked_by_guard and not item.reviewed
@@ -116,6 +124,7 @@ def build_notification_inbox(
         research_cards_read=len(card_paths),
         outcome_rows_read=len(outcomes),
         sent_without_feedback=sent_without_feedback,
+        partial_delivered_without_feedback=partial_delivered_without_feedback,
         would_send_without_feedback=would_send_without_feedback,
         would_send_blocked_without_feedback=would_send_blocked_without_feedback,
         high_priority_unreviewed=high_priority_unreviewed,
@@ -149,6 +158,12 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
         "",
     ]
     _append_item_section(lines, "sent notifications without feedback", result.sent_without_feedback, profile=result.profile)
+    _append_item_section(
+        lines,
+        "partial-delivered notifications needing delivery review",
+        result.partial_delivered_without_feedback,
+        profile=result.profile,
+    )
     _append_item_section(lines, "would-send notifications without feedback", result.would_send_without_feedback, profile=result.profile)
     _append_item_section(lines, "would-send blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
     _append_item_section(lines, "high-priority cards not reviewed", result.high_priority_unreviewed, profile=result.profile)
@@ -227,7 +242,10 @@ def _inbox_item(
     delivery_state = str(delivery_state_by_run.get(run_id) or "")
     suppressed = delivery_state in (delivery.STATE_SKIPPED_DUPLICATE, delivery.STATE_SKIPPED_IN_FLIGHT)
     blocked_by_guard = delivery_state == delivery.STATE_BLOCKED or _guard_blocked(run)
-    sent = _lane_count(run, "lane_counts_sent", lane) > 0 or delivery_state == delivery.STATE_DELIVERED
+    sent = (
+        _lane_count(run, "lane_counts_sent", lane) > 0
+        or delivery_state in (delivery.STATE_DELIVERED, delivery.STATE_PARTIAL_DELIVERED)
+    )
     would_send = bool(due or (run and _int(run.get("would_send_count")) > 0))
     if suppressed:
         would_send = False
@@ -251,10 +269,22 @@ def _inbox_item(
 
 def _latest_delivery_state_by_run(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
     by_run: dict[str, str] = {}
+    priority = {
+        delivery.STATE_DELIVERED: 5,
+        delivery.STATE_PARTIAL_DELIVERED: 4,
+        delivery.STATE_FAILED: 3,
+        delivery.STATE_BLOCKED: 2,
+        delivery.STATE_SKIPPED_DUPLICATE: 1,
+        delivery.STATE_SKIPPED_IN_FLIGHT: 1,
+    }
     for row in delivery.latest_rows_by_delivery(rows):
         run_id = str(row.get("run_id") or "")
-        if run_id:
-            by_run[run_id] = str(row.get("state") or "")
+        state = str(row.get("state") or "")
+        if not run_id:
+            continue
+        current = by_run.get(run_id)
+        if current is None or priority.get(state, 0) >= priority.get(current, 0):
+            by_run[run_id] = state
     return by_run
 
 

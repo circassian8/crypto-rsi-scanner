@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 import requests
 
 from . import config, formatting
+from .event_alpha_notification_sender import NotificationSendAttemptResult, safe_error
 
 log = logging.getLogger(__name__)
 
@@ -48,15 +49,47 @@ def send_telegram(
 
     chat_ids defaults to the static list from config; callers (the scanner) pass
     the live subscriber list from the DB instead."""
-    token = config.TELEGRAM_BOT_TOKEN
-    if chat_ids is None:
-        chat_ids = config.TELEGRAM_CHAT_IDS
-    if not token or not chat_ids:
-        return False
+    result = send_telegram_structured(text, parse_mode=parse_mode, chat_ids=chat_ids)
+    return result.delivered_count > 0
 
+
+def send_telegram_structured(
+    text: str,
+    parse_mode: str | None = None,
+    chat_ids: list[str] | tuple[str, ...] | None = None,
+) -> NotificationSendAttemptResult:
+    """Send Telegram and return redacted recipient/chunk delivery details."""
+    token = config.TELEGRAM_BOT_TOKEN
+    configured = chat_ids if chat_ids is not None else config.TELEGRAM_CHAT_IDS
+    recipients = list(configured or [])
     chunks = _message_chunks(text, 4096)
-    sent = 0
-    for chat_id in chat_ids:
+    summary: dict[str, object] = {
+        "channel": "telegram",
+        "recipient_count": len(recipients),
+        "chunk_count": len(chunks),
+    }
+    if not token or not recipients:
+        return NotificationSendAttemptResult(
+            attempted=False,
+            success=False,
+            recipient_count=len(recipients),
+            delivered_count=0,
+            failed_count=0,
+            chunk_count=len(chunks),
+            delivered_chunks=0,
+            failed_chunks=0,
+            error_class="not_configured",
+            error_message_safe="telegram token or chat ids missing",
+            channel_summary={**summary, "configured": False},
+        )
+
+    delivered_recipients = 0
+    failed_recipients = 0
+    delivered_chunks = 0
+    failed_chunks = 0
+    first_error_class: str | None = None
+    first_error_safe: str | None = None
+    for chat_id in recipients:
         delivered_all = True
         for body in chunks:
             payload = {
@@ -73,22 +106,48 @@ def send_telegram(
                     timeout=20,
                 )
                 r.raise_for_status()
+                delivered_chunks += 1
             except Exception as e:
                 delivered_all = False
+                failed_chunks += 1
+                if first_error_class is None:
+                    first_error_class = type(e).__name__
+                    first_error_safe = safe_error(config.redact_token(str(e)))
                 # Most common cause: recipient never pressed Start on the bot.
                 log.error("Telegram send to %s failed: %s", chat_id, config.redact_token(str(e)))
                 break
         if delivered_all:
-            sent += 1
+            delivered_recipients += 1
+        else:
+            failed_recipients += 1
 
-    if sent:
+    if delivered_recipients:
         log.info(
             "Telegram message sent to %d/%d recipient(s) in %d chunk(s)",
-            sent,
-            len(chat_ids),
+            delivered_recipients,
+            len(recipients),
             len(chunks),
         )
-    return sent > 0
+    return NotificationSendAttemptResult(
+        attempted=True,
+        success=delivered_recipients > 0 and failed_recipients == 0,
+        recipient_count=len(recipients),
+        delivered_count=delivered_recipients,
+        failed_count=failed_recipients,
+        chunk_count=len(chunks),
+        delivered_chunks=delivered_chunks,
+        failed_chunks=failed_chunks,
+        error_class=first_error_class,
+        error_message_safe=first_error_safe,
+        channel_summary={
+            **summary,
+            "configured": True,
+            "delivered_count": delivered_recipients,
+            "failed_count": failed_recipients,
+            "delivered_chunks": delivered_chunks,
+            "failed_chunks": failed_chunks,
+        },
+    )
 
 
 def send_discord(text: str) -> bool:

@@ -83,7 +83,7 @@ def normalize_send_result(
 
 
 def telegram_send_attempt(
-    send_fn: Callable[..., bool],
+    send_fn: Callable[..., bool | NotificationSendAttemptResult | Mapping[str, Any]],
     message: str,
     *,
     parse_mode: str | None = None,
@@ -92,7 +92,7 @@ def telegram_send_attempt(
     """Call an existing Telegram bool sender and wrap the result structurally."""
     recipients = len(chat_ids or ())
     try:
-        delivered = bool(send_fn(message, parse_mode=parse_mode, chat_ids=chat_ids))
+        raw = send_fn(message, parse_mode=parse_mode, chat_ids=chat_ids)
     except Exception as exc:  # noqa: BLE001 - notification send path must fail soft
         return NotificationSendAttemptResult(
             attempted=True,
@@ -107,7 +107,7 @@ def telegram_send_attempt(
             error_message_safe=safe_error(exc),
             channel_summary={"channel": "telegram", "exception": type(exc).__name__},
         )
-    return normalize_send_result(delivered, message=message, recipient_count=recipients, channel="telegram")
+    return normalize_send_result(raw, message=message, recipient_count=recipients, channel="telegram")
 
 
 def telegram_chunk_count(message: str, *, limit: int = TELEGRAM_MAX_CHARS) -> int:

@@ -7364,10 +7364,12 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
 
     original_storage = scanner.Storage
     original_send = scanner.send_telegram
+    original_structured_send = scanner.send_telegram_structured
     original_ids = config.TELEGRAM_CHAT_IDS
     FakeStorage.meta = {}
     scanner.Storage = FakeStorage
     scanner.send_telegram = fake_send
+    scanner.send_telegram_structured = fake_send
     config.TELEGRAM_CHAT_IDS = ["fallback"]
     try:
         cfg = event_alerts.EventAlertConfig(enabled=True)
@@ -7413,6 +7415,7 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
 
         FakeStorage.meta = {}
         scanner.send_telegram = lambda message, *, parse_mode=None, chat_ids=None: False
+        scanner.send_telegram_structured = lambda message, *, parse_mode=None, chat_ids=None: False
         failed = scanner._send_event_alpha_routed_digest([high], cfg)
         assert failed.attempted is True
         assert failed.success is False
@@ -7426,6 +7429,7 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
     finally:
         scanner.Storage = original_storage
         scanner.send_telegram = original_send
+        scanner.send_telegram_structured = original_structured_send
         config.TELEGRAM_CHAT_IDS = original_ids
 
 
@@ -8325,6 +8329,8 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
     import tempfile
     from pathlib import Path
 
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
     from crypto_rsi_scanner import event_alpha_notification_inbox
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -8343,6 +8349,17 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
                 "started_at": "2026-06-20T09:00:00+00:00",
                 "lane_counts_due": {"instant_escalation": 1},
                 "lane_counts_sent": {"instant_escalation": 1},
+            },
+            {
+                "row_type": "event_alpha_notification_run",
+                "run_id": "run-partial",
+                "profile": "notify_no_key",
+                "scope": "namespace",
+                "scope_value": "notify_no_key",
+                "started_at": "2026-06-20T09:30:00+00:00",
+                "lane_counts_due": {"instant_escalation": 1},
+                "lane_counts_sent": {"instant_escalation": 0},
+                "deliveries_partial_delivered": 1,
             },
             {
                 "row_type": "event_alpha_notification_run",
@@ -8392,6 +8409,46 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
                 "route": "TRIGGERED_FADE_RESEARCH",
                 "route_reason": "deterministic trigger",
             },
+            {
+                "row_type": "event_alpha_alert_snapshot",
+                "run_id": "run-partial",
+                "alert_key": "partial-key",
+                "alert_id": "ea:partial-key",
+                "card_id": "card_partial",
+                "tier": "WATCHLIST",
+                "playbook_type": "proxy_attention",
+                "route": "RESEARCH_DIGEST",
+                "route_reason": "state escalation",
+            },
+        ]
+        delivery_rows = [
+            delivery.build_record(
+                run_id="run-partial",
+                alert_id="ea:partial-key",
+                profile="notify_no_key",
+                namespace="notify_no_key",
+                lane="instant_escalation",
+                route="HIGH_PRIORITY_RESEARCH",
+                content_hash="hash-partial",
+                state=delivery.STATE_PARTIAL_DELIVERED,
+                now=datetime(2026, 6, 20, 9, 30, tzinfo=timezone.utc),
+                delivered_at=datetime(2026, 6, 20, 9, 30, tzinfo=timezone.utc),
+                delivered_count=1,
+                failed_count=1,
+            ).to_row(),
+            delivery.build_record(
+                run_id="run-heartbeat",
+                alert_id="heartbeat",
+                profile="notify_no_key",
+                namespace="notify_no_key",
+                lane="health_heartbeat",
+                route="HEALTH_HEARTBEAT",
+                content_hash="hash-blocked-heartbeat",
+                state=delivery.STATE_BLOCKED,
+                now=datetime(2026, 6, 20, 11, 0, tzinfo=timezone.utc),
+                error_class="guard_blocked",
+                error_message="event alerts disabled",
+            ).to_row(),
         ]
         result = event_alpha_notification_inbox.build_notification_inbox(
             notification_runs=runs,
@@ -8403,9 +8460,12 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
             notification_runs_path=base / "notification_runs.jsonl",
             alert_store_path=base / "alerts.jsonl",
             feedback_path=base / "feedback.jsonl",
+            notification_delivery_rows=delivery_rows,
         )
         assert len(result.sent_without_feedback) == 1
         assert result.sent_without_feedback[0].alert_id == "ea:high-key"
+        assert len(result.partial_delivered_without_feedback) == 1
+        assert result.partial_delivered_without_feedback[0].alert_id == "ea:partial-key"
         assert len(result.would_send_without_feedback) == 1
         assert result.would_send_without_feedback[0].alert_id == "ea:trig-key"
         assert len(result.high_priority_unreviewed) == 1
@@ -8414,6 +8474,7 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
         assert len(result.provider_degraded_runs) == 1
         text = event_alpha_notification_inbox.format_notification_inbox(result)
         assert "sent notifications without feedback: 1" in text
+        assert "partial-delivered notifications needing delivery review: 1" in text
         assert "would-send notifications without feedback: 1" in text
         assert "card_high.md" in text
         assert "make event-feedback-useful PROFILE=notify_no_key FEEDBACK_TARGET='ea:high-key'" in text
@@ -15275,6 +15336,78 @@ def test_telegram_send_chunks_long_messages():
         config.TELEGRAM_CHAT_IDS = orig_chat_ids
 
 
+def test_telegram_structured_send_tracks_recipients_chunks_and_bool_compat():
+    from crypto_rsi_scanner import notifications, config
+
+    class Response:
+        def __init__(self, fail=False):
+            self.fail = fail
+
+        def raise_for_status(self):
+            if self.fail:
+                raise RuntimeError("bad token=SECRET123")
+
+    calls = []
+    orig_post = notifications.requests.post
+    orig_token = config.TELEGRAM_BOT_TOKEN
+    orig_chat_ids = config.TELEGRAM_CHAT_IDS
+
+    def fake_post(url, json, timeout):
+        calls.append((url, dict(json), timeout))
+        return Response(fail=json["chat_id"] == "bad")
+
+    notifications.requests.post = fake_post
+    config.TELEGRAM_BOT_TOKEN = "SECRET123"
+    config.TELEGRAM_CHAT_IDS = ["good", "bad"]
+    try:
+        result = notifications.send_telegram_structured("hello", parse_mode="HTML")
+        assert result.attempted is True
+        assert result.success is False
+        assert result.recipient_count == 2
+        assert result.delivered_count == 1
+        assert result.failed_count == 1
+        assert result.chunk_count == 1
+        assert result.delivered_chunks == 1
+        assert result.failed_chunks == 1
+        assert "SECRET123" not in str(result.error_message_safe)
+        assert "SECRET123" not in str(result.channel_summary)
+        assert notifications.send_telegram("legacy bool", parse_mode="HTML") is True
+        assert len(calls) >= 4
+    finally:
+        notifications.requests.post = orig_post
+        config.TELEGRAM_BOT_TOKEN = orig_token
+        config.TELEGRAM_CHAT_IDS = orig_chat_ids
+
+
+def test_telegram_structured_send_counts_chunked_success():
+    from crypto_rsi_scanner import notifications, config
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+    calls = []
+    orig_post = notifications.requests.post
+    orig_token = config.TELEGRAM_BOT_TOKEN
+    orig_chat_ids = config.TELEGRAM_CHAT_IDS
+    notifications.requests.post = lambda url, json, timeout: calls.append(json["text"]) or Response()
+    config.TELEGRAM_BOT_TOKEN = "token"
+    config.TELEGRAM_CHAT_IDS = ["1"]
+    try:
+        text = ("alpha\n\n" * 900).strip()
+        result = notifications.send_telegram_structured(text, parse_mode="HTML")
+        assert result.success is True
+        assert result.delivered_count == 1
+        assert result.failed_count == 0
+        assert result.chunk_count == len(calls)
+        assert result.delivered_chunks == result.chunk_count
+        assert result.failed_chunks == 0
+    finally:
+        notifications.requests.post = orig_post
+        config.TELEGRAM_BOT_TOKEN = orig_token
+        config.TELEGRAM_CHAT_IDS = orig_chat_ids
+
+
 def test_scan_staleness_alert_dedup_and_recovery():
     from datetime import datetime, timedelta, timezone
     from crypto_rsi_scanner import telegram, heartbeat, config
@@ -17260,7 +17393,7 @@ def test_event_alpha_notification_send_failed_does_not_mark_cooldown():
         assert storage.get_meta(notif.LAST_SENT_META_KEYS[notif.LANE_DAILY_DIGEST]) is None
 
 
-def test_event_alpha_notification_structured_partial_delivery_does_not_mark_cooldown():
+def test_event_alpha_notification_structured_partial_delivery_marks_cooldown_by_default():
     import tempfile
     from datetime import datetime, timezone
     from crypto_rsi_scanner import (
@@ -17295,15 +17428,54 @@ def test_event_alpha_notification_structured_partial_delivery_does_not_mark_cool
             delivery_cfg=dcfg, run_id="r1", namespace="notify_no_key",
         )
         rows = delivery.load_delivery_records(dcfg.path)
-        failed = [row for row in rows if row["state"] == "failed"][-1]
+        partial_row = [row for row in rows if row["state"] == delivery.STATE_PARTIAL_DELIVERED][-1]
         assert not result.success
-        assert result.deliveries_failed == 1
-        assert failed["recipient_count"] == 2
-        assert failed["delivered_count"] == 1
-        assert failed["failed_count"] == 1
-        assert failed["chunk_count"] == 2
-        assert "SECRET123" not in failed["error_message_safe"]
-        assert "SECRET123" not in str(failed["channel_summary"])
+        assert result.deliveries_partial_delivered == 1
+        assert result.deliveries_failed == 0
+        assert partial_row["recipient_count"] == 2
+        assert partial_row["delivered_count"] == 1
+        assert partial_row["failed_count"] == 1
+        assert partial_row["chunk_count"] == 2
+        assert "SECRET123" not in partial_row["error_message_safe"]
+        assert "SECRET123" not in str(partial_row["channel_summary"])
+        assert storage.get_meta(notif.LAST_SENT_META_KEYS[notif.LANE_DAILY_DIGEST]) is not None
+
+
+def test_event_alpha_notification_structured_partial_delivery_can_skip_cooldown():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notification_sender as sender,
+        event_alpha_notifications as notif,
+        event_alpha_router,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        dcfg = delivery.config_for_context(ctx, partial_marks_cooldown=False)
+        storage = _NotifyFakeStorage()
+        cfg = notif.EventAlphaNotificationConfig(enabled=True, daily_digest_cooldown_hours=12)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        decisions = [_notify_route_decision("SOL", event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST, event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST)]
+        partial = sender.NotificationSendAttemptResult(
+            attempted=True,
+            recipient_count=2,
+            delivered_count=1,
+            failed_count=1,
+            chunk_count=1,
+            delivered_chunks=1,
+            failed_chunks=1,
+            error_class="partial_delivery",
+            error_message_safe="one recipient failed",
+            channel_summary={"channel": "telegram"},
+        )
+        result = notif.send_notifications(
+            decisions, storage=storage, cfg=cfg, now=now, profile="notify_no_key",
+            send_fn=lambda message: partial,
+            delivery_cfg=dcfg, run_id="r1", namespace="notify_no_key",
+        )
+        assert result.deliveries_partial_delivered == 1
         assert storage.get_meta(notif.LAST_SENT_META_KEYS[notif.LANE_DAILY_DIGEST]) is None
 
 
@@ -17346,6 +17518,127 @@ def test_event_alpha_notification_send_dedupes_within_window():
         )
         assert third.deliveries_delivered == 1
         assert len(sent) == 2
+
+
+def test_event_alpha_notification_heartbeat_dedupes_by_daily_status_bucket():
+    import tempfile
+    from datetime import datetime, timezone, timedelta
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import (
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notifications as notif,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        dcfg = delivery.config_for_context(ctx, dedupe_by_content=True, dedupe_window_hours=24)
+        storage = _NotifyFakeStorage()
+        cfg = notif.EventAlphaNotificationConfig(
+            enabled=True,
+            health_heartbeat_enabled=True,
+            health_heartbeat_cooldown_hours=0,
+        )
+        sent = []
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        healthy = SimpleNamespace(
+            profile="notify_no_key",
+            artifact_namespace="notify_no_key",
+            cycle_completed=True,
+            partial_results=False,
+            warnings=(),
+            raw_events=0,
+            anomaly_lifecycle_entries=0,
+            candidates=0,
+            watchlist_entries=0,
+            alertable=0,
+            extraction_rows=(),
+            relationship_rows=(),
+        )
+        first = notif.send_notifications(
+            [],
+            storage=storage,
+            cfg=cfg,
+            now=now,
+            profile="notify_no_key",
+            pipeline_result=healthy,
+            include_health_heartbeat=True,
+            send_fn=lambda body: sent.append(body) or True,
+            delivery_cfg=dcfg,
+            run_id="r1",
+            namespace="notify_no_key",
+        )
+        second = notif.send_notifications(
+            [],
+            storage=storage,
+            cfg=cfg,
+            now=now + timedelta(hours=1),
+            profile="notify_no_key",
+            pipeline_result=healthy,
+            include_health_heartbeat=True,
+            send_fn=lambda body: sent.append(body) or True,
+            delivery_cfg=dcfg,
+            run_id="r2",
+            namespace="notify_no_key",
+        )
+        assert first.deliveries_delivered == 1
+        assert second.deliveries_skipped_duplicate == 1
+        assert len(sent) == 1
+        delivered = [row for row in delivery.load_delivery_records(dcfg.path) if row["state"] == delivery.STATE_DELIVERED][0]
+        skipped = [row for row in delivery.load_delivery_records(dcfg.path) if row["state"] == delivery.STATE_SKIPPED_DUPLICATE][0]
+        assert delivered["content_hash"] != skipped["content_hash"]
+        assert delivered["dedupe_key"] == skipped["dedupe_key"]
+
+
+def test_event_alpha_notification_daily_digest_uses_stable_dedupe_key_before_hash():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notifications as notif,
+        event_alpha_router,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        dcfg = delivery.config_for_context(ctx, dedupe_by_content=True, dedupe_window_hours=24)
+        storage = _NotifyFakeStorage()
+        cfg = notif.EventAlphaNotificationConfig(enabled=True, daily_digest_cooldown_hours=0)
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        decisions = [_notify_route_decision("SOL", event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST, event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST)]
+        alert_id = decisions[0].alert_id
+        dedupe_bucket = f"{now.date().isoformat()}|{alert_id}"
+        dedupe_key = delivery.compute_dedupe_key(
+            namespace="notify_no_key",
+            lane=notif.LANE_DAILY_DIGEST,
+            dedupe_bucket=dedupe_bucket,
+        )
+        delivery.append_delivery_record(
+            delivery.build_record(
+                run_id="prior",
+                alert_id=alert_id,
+                profile="notify_no_key",
+                namespace="notify_no_key",
+                lane=notif.LANE_DAILY_DIGEST,
+                route="RESEARCH_DIGEST",
+                content_hash="older-rendered-content-hash",
+                dedupe_key=dedupe_key,
+                dedupe_bucket=dedupe_bucket,
+                state=delivery.STATE_DELIVERED,
+                now=now,
+                delivered_at=now,
+                delivered_count=1,
+            ),
+            path=dcfg.path,
+        )
+        sent = []
+        result = notif.send_notifications(
+            decisions, storage=storage, cfg=cfg, now=now, profile="notify_no_key",
+            send_fn=lambda body: sent.append(body) or True,
+            delivery_cfg=dcfg, run_id="r1", namespace="notify_no_key",
+        )
+        assert result.deliveries_skipped_duplicate == 1
+        assert result.deliveries_delivered == 0
+        assert sent == []
 
 
 def test_event_alpha_notification_send_skips_recent_in_flight_but_retries_stale():
@@ -17447,11 +17740,14 @@ def test_event_alpha_delivery_report_groups_by_state_and_redacts_secrets():
         delivery.build_record(run_id="r1", alert_id="ea:A", profile="notify_no_key", namespace="notify_no_key", lane="daily_digest", route="RESEARCH_DIGEST", content_hash="hashA", state=delivery.STATE_DELIVERED, now=now, delivered_at=now, delivered_count=1).to_row(),
         delivery.build_record(run_id="r2", alert_id="ea:B", profile="notify_no_key", namespace="notify_no_key", lane="instant_escalation", route="HIGH_PRIORITY_RESEARCH", content_hash="hashB", state=delivery.STATE_FAILED, now=now, error_message="telegram failed token=SECRET123").to_row(),
         delivery.build_record(run_id="r3", alert_id="ea:C", profile="notify_no_key", namespace="notify_no_key", lane="daily_digest", route="RESEARCH_DIGEST", content_hash="hashC", state=delivery.STATE_SKIPPED_DUPLICATE, now=now).to_row(),
+        delivery.build_record(run_id="r4", alert_id="ea:D", profile="notify_no_key", namespace="notify_no_key", lane="daily_digest", route="RESEARCH_DIGEST", content_hash="hashD", state=delivery.STATE_PARTIAL_DELIVERED, now=now, delivered_at=now, delivered_count=1, failed_count=1).to_row(),
     ]
     report = delivery.format_delivery_report(rows, path="x.jsonl", profile="notify_no_key", namespace="notify_no_key")
     assert "delivered=1 failed=1 skipped_duplicate=1" in report
+    assert "partial_delivered=1" in report
     assert "by lane/state:" in report
     assert "latest failures:" in report
+    assert "latest partial deliveries:" in report
     assert "latest duplicate skips:" in report
     assert "SECRET123" not in report
     assert "[redacted]" in report
@@ -17489,6 +17785,30 @@ def test_event_alpha_notification_go_no_go_reports_send_blockers():
     assert "telegram config is missing" in text
     assert "RSI_EVENT_ALERTS_ENABLED is not set" in text
     assert "provider(s) currently in backoff" in text
+    assert "provider health: make event-alpha-provider-health-report PROFILE=notify_no_key" in text
+    assert "provider reset: make event-alpha-provider-health-reset PROFILE=notify_no_key PROVIDER_KEY=all CONFIRM=1" in text
+    assert "delivery report: make event-alpha-notification-deliveries-report PROFILE=notify_no_key" in text
+    assert "notification inbox: make event-alpha-notification-inbox PROFILE=notify_no_key" in text
+    assert "SECRET" not in text
+
+    no_backoff = go.build_go_no_go(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        telegram_ready=True,
+        send_guard_enabled=True,
+        lock_status=SimpleNamespace(state="missing", message="no lock"),
+        provider_status=provider_status,
+        provider_health_rows={},
+        delivery_ledger_path=Path("/tmp/event_alpha_notification_deliveries.jsonl"),
+        notification_run_ledger_path=Path("/tmp/event_alpha_notification_runs.jsonl"),
+        research_cards_dir=Path("/tmp/research_cards"),
+        artifact_doctor_status="OK",
+        cooldown_status={"daily_digest": {"due": True, "sent_today": 0, "reason": "due"}},
+        llm_budget_status="provider=fixture max_run=0",
+        clock_status={"now": "2026-06-20T12:00:00Z", "warnings": ()},
+    )
+    no_backoff_text = go.format_go_no_go(no_backoff)
+    assert "provider reset:" not in no_backoff_text
 
 
 def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock():

@@ -28,6 +28,7 @@ class EventAlphaArtifactDoctorResult:
     legacy_rows_skipped: int = 0
     legacy_rows_counted: int = 0
     delivery_rows: int = 0
+    deliveries_partial_delivered: int = 0
     deliveries_failed: int = 0
     strict: bool = False
     blockers: tuple[str, ...] = ()
@@ -215,6 +216,7 @@ def diagnose_artifacts(
             if event_alpha_artifacts.is_legacy_row(row)
         ),
         delivery_rows=delivery_summary.rows,
+        deliveries_partial_delivered=delivery_summary.partial_delivered,
         deliveries_failed=delivery_summary.failed,
         strict=bool(strict),
         blockers=tuple(dict.fromkeys(blockers)),
@@ -285,7 +287,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         ),
         (
             "notification deliveries: "
-            f"rows={result.delivery_rows} failed={result.deliveries_failed}"
+            f"rows={result.delivery_rows} partial={result.deliveries_partial_delivered} failed={result.deliveries_failed}"
         ),
         "",
         "blockers:",

@@ -111,6 +111,7 @@ def notification_run_record(
         "stale_lock_recovered": bool(getattr(result, "notification_stale_lock_recovered", False)),
         "delivery_records_written": _int(getattr(result, "notification_delivery_records_written", 0)),
         "deliveries_delivered": _int(getattr(result, "notification_deliveries_delivered", 0)),
+        "deliveries_partial_delivered": _int(getattr(result, "notification_deliveries_partial_delivered", 0)),
         "deliveries_failed": _int(getattr(result, "notification_deliveries_failed", 0)),
         "deliveries_skipped_duplicate": _int(getattr(result, "notification_deliveries_skipped_duplicate", 0)),
         "deliveries_skipped_in_flight": _int(getattr(result, "notification_deliveries_skipped_in_flight", 0)),
@@ -201,7 +202,8 @@ def format_notification_runs_report(result: EventAlphaNotificationRunsReadResult
             f"{_int(row.get('deliveries_failed'))}f/"
             f"{_int(row.get('deliveries_skipped_duplicate'))}dup/"
             f"{_int(row.get('deliveries_skipped_in_flight'))}flight/"
-            f"{_int(row.get('deliveries_blocked'))}blocked"
+            f"{_int(row.get('deliveries_blocked'))}blocked "
+            f"partial_delivered={_int(row.get('deliveries_partial_delivered'))}"
         )
         cooldown = row.get("cooldown_blocks") or {}
         if cooldown:

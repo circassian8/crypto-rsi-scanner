@@ -47,6 +47,7 @@ class EventAlphaSendResult:
     notification_scope_value: str | None = None
     delivery_records_written: int = 0
     deliveries_delivered: int = 0
+    deliveries_partial_delivered: int = 0
     deliveries_failed: int = 0
     deliveries_skipped_duplicate: int = 0
     deliveries_skipped_in_flight: int = 0
@@ -87,6 +88,7 @@ class EventAlphaPipelineResult:
     notification_stale_lock_recovered: bool = False
     notification_delivery_records_written: int = 0
     notification_deliveries_delivered: int = 0
+    notification_deliveries_partial_delivered: int = 0
     notification_deliveries_failed: int = 0
     notification_deliveries_skipped_duplicate: int = 0
     notification_deliveries_skipped_in_flight: int = 0

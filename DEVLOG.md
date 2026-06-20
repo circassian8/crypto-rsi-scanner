@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-20 — Polish Event Alpha day-1 notification fidelity · Codex
+**Why:** Day-1 Event Alpha notifications needed more faithful delivery state and
+clearer operator UX before unattended research burn-in: Telegram partial sends
+were too easy to confuse with total failures, and timestamped heartbeats/digests
+needed stable dedupe keys independent of exact rendered content.
+**Changes:**
+- Added `send_telegram_structured()` in `notifications.py` and wired Event Alpha
+  routed sends to use it directly. Legacy `send_telegram()` still returns a
+  bool, while structured results now expose attempted/success, recipient counts,
+  delivered/failed recipient counts, chunk counts, redacted error details, and a
+  redacted channel summary.
+- Extended `event_alpha_notification_delivery.py` and
+  `event_alpha_notifications.py` with `partial_delivered`, stable
+  `dedupe_key`/`dedupe_bucket` fields, heartbeat/day/status and digest/day
+  dedupe buckets, old `content_hash` fallback, and
+  `RSI_EVENT_ALPHA_NOTIFICATION_PARTIAL_MARKS_COOLDOWN` (default true).
+  Partial delivery now marks cooldown by default so successful recipients do not
+  get duplicate alerts, but can be made retryable with the config flag.
+- Surfaced partial/blocked/would-send state through notification run summaries,
+  delivery reports, the daily brief, artifact doctor, and the notification inbox.
+  Partial-delivered alerts now get their own delivery-review queue.
+- Expanded go/no-go output with provider health, provider reset when backoff is
+  active, delivery report, and inbox commands. Updated `.env.example`,
+  `Makefile`, `DECISIONS.md`, `ROADMAP.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md` for the new delivery rules.
+- Added regression tests for structured Telegram delivery, partial cooldown
+  behavior, stable dedupe keys, partial inbox/reporting, and go/no-go commands.
+**Verify:** `python3 tests/test_indicators.py` (400/400 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make event-llm-eval
+PYTHON=python3`; `make event-llm-extract-eval PYTHON=python3`; `make
+event-alpha-eval PYTHON=python3`; `make verify PYTHON=python3`; `make
+event-alpha-notify-fixture-smoke PYTHON=python3`; `python3 main.py
+--event-alpha-notification-deliveries-report --event-alpha-profile fixture
+--event-alpha-artifact-namespace fixture_notify_smoke`; `python3 main.py
+--event-alpha-notify-go-no-go --event-alpha-profile notify_no_key`.
+**Notes/risks:** This stays research-only. No live trading, paper trades, normal
+RSI signal writes, or LLM-created `TRIGGERED_FADE` were added; `TRIGGERED_FADE`
+remains owned by `event_fade.py` + `proxy_fade`.
+
 ## 2026-06-20 — Polish Event Alpha notification delivery reliability · Codex
 **Why:** Day-1 Event Alpha notification scheduling needed more reliable send
 accounting before real unattended runs: boolean sends hid partial delivery, and

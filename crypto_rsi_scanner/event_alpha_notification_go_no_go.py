@@ -35,6 +35,10 @@ class EventAlphaNotificationGoNoGoResult:
     blockers: tuple[str, ...]
     warnings: tuple[str, ...]
     next_command: str
+    provider_health_report_command: str
+    provider_reset_command: str | None
+    delivery_report_command: str
+    notification_inbox_command: str
 
 
 def build_go_no_go(
@@ -101,6 +105,7 @@ def build_go_no_go(
     ready_to_preview = not path_blockers
     ready_to_send = ready_to_preview and not blockers
     next_command = _next_command(str(profile or "notify_no_key"), ready_to_send)
+    clean_profile = str(profile or "notify_no_key")
     return EventAlphaNotificationGoNoGoResult(
         profile=str(profile or "default"),
         artifact_namespace=str(artifact_namespace or "default"),
@@ -123,6 +128,14 @@ def build_go_no_go(
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
         next_command=next_command,
+        provider_health_report_command=f"make event-alpha-provider-health-report PROFILE={clean_profile}",
+        provider_reset_command=(
+            f"make event-alpha-provider-health-reset PROFILE={clean_profile} PROVIDER_KEY=all CONFIRM=1"
+            if backoff_count > 0
+            else None
+        ),
+        delivery_report_command=f"make event-alpha-notification-deliveries-report PROFILE={clean_profile}",
+        notification_inbox_command=f"make event-alpha-notification-inbox PROFILE={clean_profile}",
     )
 
 
@@ -166,6 +179,13 @@ def format_go_no_go(result: EventAlphaNotificationGoNoGoResult) -> str:
     lines.append("")
     lines.append("warnings:")
     lines.extend(f"- {item}" for item in result.warnings) if result.warnings else lines.append("- none")
+    lines.append("")
+    lines.append("operator commands:")
+    lines.append(f"- provider health: {result.provider_health_report_command}")
+    if result.provider_reset_command:
+        lines.append(f"- provider reset: {result.provider_reset_command}")
+    lines.append(f"- delivery report: {result.delivery_report_command}")
+    lines.append(f"- notification inbox: {result.notification_inbox_command}")
     lines.append("")
     lines.append(f"next: {result.next_command}")
     lines.append("Go/no-go is diagnostic only; it does not send, trade, paper trade, or write normal RSI rows.")

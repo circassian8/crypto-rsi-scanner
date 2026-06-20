@@ -3,9 +3,9 @@
 Scheduled notify cycles must not double-send the same research digest if a run
 retries, overlaps, or re-fires within a cooldown gap. This module records each
 lane send attempt as an append-only JSONL event (planned -> sending ->
-delivered/failed, or skipped_duplicate/skipped_in_flight/blocked) keyed by a
-stable content hash, and answers "did we already deliver or start sending this
-exact content recently?".
+delivered/partial_delivered/failed, or skipped_duplicate/skipped_in_flight/
+blocked) keyed by a stable dedupe key with a content-hash fallback, and answers
+"did we already deliver or start sending this lane recently?".
 
 It owns *delivery bookkeeping* only. It never ranks alerts, sends, trades, paper
 trades, writes normal RSI signal rows, or creates ``TRIGGERED_FADE``. Records and
@@ -30,6 +30,7 @@ DELIVERY_SCHEMA_VERSION = "event_alpha_notification_delivery_v1"
 STATE_PLANNED = "planned"
 STATE_SENDING = "sending"
 STATE_DELIVERED = "delivered"
+STATE_PARTIAL_DELIVERED = "partial_delivered"
 STATE_FAILED = "failed"
 STATE_SKIPPED_DUPLICATE = "skipped_duplicate"
 STATE_SKIPPED_IN_FLIGHT = "skipped_in_flight"
@@ -39,6 +40,7 @@ STATES = (
     STATE_PLANNED,
     STATE_SENDING,
     STATE_DELIVERED,
+    STATE_PARTIAL_DELIVERED,
     STATE_FAILED,
     STATE_SKIPPED_DUPLICATE,
     STATE_SKIPPED_IN_FLIGHT,
@@ -46,6 +48,7 @@ STATES = (
 )
 TERMINAL_STATES = (
     STATE_DELIVERED,
+    STATE_PARTIAL_DELIVERED,
     STATE_FAILED,
     STATE_SKIPPED_DUPLICATE,
     STATE_SKIPPED_IN_FLIGHT,
@@ -59,6 +62,7 @@ _STAGE_RANK = {
     STATE_SKIPPED_IN_FLIGHT: 2,
     STATE_FAILED: 3,
     STATE_DELIVERED: 3,
+    STATE_PARTIAL_DELIVERED: 3,
 }
 
 _DELIVERIES_PATH_ENV = "RSI_EVENT_ALPHA_NOTIFICATION_DELIVERIES_PATH"
@@ -72,6 +76,7 @@ class NotificationDeliveryConfig:
     dedupe_by_content: bool = True
     dedupe_window_hours: float = 24.0
     in_flight_grace_minutes: float = 10.0
+    partial_marks_cooldown: bool = True
 
 
 @dataclass(frozen=True)
@@ -85,6 +90,8 @@ class NotificationDeliveryRecord:
     route: str
     content_hash: str
     state: str
+    dedupe_key: str | None = None
+    dedupe_bucket: str | None = None
     attempted_at: str | None = None
     delivered_at: str | None = None
     error_class: str | None = None
@@ -110,6 +117,8 @@ class NotificationDeliveryRecord:
             "lane": self.lane,
             "route": self.route,
             "content_hash": self.content_hash,
+            "dedupe_key": self.dedupe_key,
+            "dedupe_bucket": self.dedupe_bucket,
             "state": self.state,
             "attempted_at": self.attempted_at,
             "delivered_at": self.delivered_at,
@@ -129,6 +138,7 @@ class NotificationDeliveryRecord:
 class DeliverySummary:
     rows: int = 0
     delivered: int = 0
+    partial_delivered: int = 0
     failed: int = 0
     skipped_duplicate: int = 0
     skipped_in_flight: int = 0
@@ -139,6 +149,7 @@ class DeliverySummary:
     def records_written(self) -> int:
         return (
             self.delivered
+            + self.partial_delivered
             + self.failed
             + self.skipped_duplicate
             + self.skipped_in_flight
@@ -162,12 +173,14 @@ def config_for_context(
     dedupe_by_content: bool = True,
     dedupe_window_hours: float = 24.0,
     in_flight_grace_minutes: float = 10.0,
+    partial_marks_cooldown: bool = True,
 ) -> NotificationDeliveryConfig:
     return NotificationDeliveryConfig(
         path=deliveries_path_for_context(context),
         dedupe_by_content=bool(dedupe_by_content),
         dedupe_window_hours=float(dedupe_window_hours),
         in_flight_grace_minutes=float(in_flight_grace_minutes),
+        partial_marks_cooldown=bool(partial_marks_cooldown),
     )
 
 
@@ -181,6 +194,17 @@ def compute_content_hash(message: str, *, alert_id: str, lane: str, profile: str
             str(message or ""),
         ]
     )
+    return hashlib.sha256(parts.encode("utf-8")).hexdigest()[:40]
+
+
+def compute_dedupe_key(
+    *,
+    namespace: str | None,
+    lane: str,
+    dedupe_bucket: str,
+) -> str:
+    """Stable delivery dedupe key independent of generated timestamps."""
+    parts = "\x1f".join([str(namespace or "default"), str(lane or ""), str(dedupe_bucket or "")])
     return hashlib.sha256(parts.encode("utf-8")).hexdigest()[:40]
 
 
@@ -198,6 +222,8 @@ def build_record(
     lane: str,
     route: str | None,
     content_hash: str,
+    dedupe_key: str | None = None,
+    dedupe_bucket: str | None = None,
     state: str,
     now: datetime,
     delivered_at: datetime | None = None,
@@ -220,6 +246,8 @@ def build_record(
         lane=str(lane or ""),
         route=str(route or ""),
         content_hash=str(content_hash),
+        dedupe_key=str(dedupe_key) if dedupe_key else None,
+        dedupe_bucket=str(dedupe_bucket)[:200] if dedupe_bucket else None,
         state=str(state),
         attempted_at=_iso(now),
         delivered_at=_iso(delivered_at) if delivered_at else None,
@@ -278,22 +306,25 @@ def load_delivery_records(path: str | Path) -> list[dict[str, Any]]:
 def find_recent_delivered(
     rows: Iterable[Mapping[str, Any]],
     *,
-    content_hash: str,
+    content_hash: str | None,
+    dedupe_key: str | None = None,
     namespace: str | None,
     now: datetime,
     window_hours: float,
+    include_partial: bool = True,
 ) -> dict[str, Any] | None:
     """Return the most recent delivered row matching content within the window."""
-    if not content_hash:
+    if not content_hash and not dedupe_key:
         return None
     cutoff = _as_utc(now) - timedelta(hours=max(0.0, float(window_hours)))
     ns = str(namespace or "default")
     best: dict[str, Any] | None = None
     best_ts: datetime | None = None
     for row in rows:
-        if str(row.get("state") or "") != STATE_DELIVERED:
+        allowed = (STATE_DELIVERED, STATE_PARTIAL_DELIVERED) if include_partial else (STATE_DELIVERED,)
+        if str(row.get("state") or "") not in allowed:
             continue
-        if str(row.get("content_hash") or "") != str(content_hash):
+        if not _matches_delivery_identity(row, content_hash=content_hash, dedupe_key=dedupe_key):
             continue
         if str(row.get("namespace") or row.get("artifact_namespace") or "default") != ns:
             continue
@@ -308,13 +339,14 @@ def find_recent_delivered(
 def find_recent_in_flight(
     rows: Iterable[Mapping[str, Any]],
     *,
-    content_hash: str,
+    content_hash: str | None,
+    dedupe_key: str | None = None,
     namespace: str | None,
     now: datetime,
     grace_minutes: float,
 ) -> dict[str, Any] | None:
     """Return a recent latest-state planned/sending row for matching content."""
-    if not content_hash:
+    if not content_hash and not dedupe_key:
         return None
     cutoff = _as_utc(now) - timedelta(minutes=max(0.0, float(grace_minutes)))
     ns = str(namespace or "default")
@@ -323,7 +355,7 @@ def find_recent_in_flight(
     for row in latest_rows_by_delivery(rows):
         if str(row.get("state") or "") not in (STATE_PLANNED, STATE_SENDING):
             continue
-        if str(row.get("content_hash") or "") != str(content_hash):
+        if not _matches_delivery_identity(row, content_hash=content_hash, dedupe_key=dedupe_key):
             continue
         if str(row.get("namespace") or row.get("artifact_namespace") or "default") != ns:
             continue
@@ -356,6 +388,7 @@ def summarize_delivery_rows(rows: Iterable[Mapping[str, Any]]) -> DeliverySummar
     return DeliverySummary(
         rows=len(latest),
         delivered=counts[STATE_DELIVERED],
+        partial_delivered=counts[STATE_PARTIAL_DELIVERED],
         failed=counts[STATE_FAILED],
         skipped_duplicate=counts[STATE_SKIPPED_DUPLICATE],
         skipped_in_flight=counts[STATE_SKIPPED_IN_FLIGHT],
@@ -397,6 +430,7 @@ def format_delivery_report(
             f"delivered={summary.delivered} failed={summary.failed} "
             f"skipped_duplicate={summary.skipped_duplicate} "
             f"skipped_in_flight={summary.skipped_in_flight} "
+            f"partial_delivered={summary.partial_delivered} "
             f"blocked={summary.blocked} "
             f"in_flight={summary.in_flight}"
         ),
@@ -421,6 +455,7 @@ def format_delivery_report(
         )
 
     lines.extend(_section("latest failures", _filter_state(collapsed, STATE_FAILED), latest_limit))
+    lines.extend(_section("latest partial deliveries", _filter_state(collapsed, STATE_PARTIAL_DELIVERED), latest_limit))
     lines.extend(_section("latest delivered", _filter_state(collapsed, STATE_DELIVERED), latest_limit))
     lines.extend(_section("latest duplicate skips", _filter_state(collapsed, STATE_SKIPPED_DUPLICATE), latest_limit))
     lines.extend(_section("latest in-flight skips", _filter_state(collapsed, STATE_SKIPPED_IN_FLIGHT), latest_limit))
@@ -435,6 +470,17 @@ def failed_deliveries(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]
     return _filter_state(latest_rows_by_delivery(rows), STATE_FAILED)
 
 
+def state_for_send_counts(*, delivered_count: int, failed_count: int) -> str:
+    """Map structured recipient counts to the delivery terminal state."""
+    delivered = max(0, int(delivered_count or 0))
+    failed = max(0, int(failed_count or 0))
+    if delivered > 0 and failed <= 0:
+        return STATE_DELIVERED
+    if delivered > 0 and failed > 0:
+        return STATE_PARTIAL_DELIVERED
+    return STATE_FAILED
+
+
 def _section(title: str, rows: list[dict[str, Any]], limit: int) -> list[str]:
     out = ["", f"{title}:"]
     if not rows:
@@ -445,7 +491,7 @@ def _section(title: str, rows: list[dict[str, Any]], limit: int) -> list[str]:
         stamp = row.get("delivered_at") or row.get("attempted_at") or "unknown"
         detail = (
             f"- {stamp} lane={row.get('lane') or 'unknown'} alert_id={row.get('alert_id') or 'n/a'} "
-            f"route={row.get('route') or 'n/a'} hash={str(row.get('content_hash') or '')[:12]}"
+            f"route={row.get('route') or 'n/a'} key={str(row.get('dedupe_key') or row.get('content_hash') or '')[:12]}"
         )
         if row.get("error_class"):
             detail += f" error_class={row.get('error_class')}"
@@ -462,6 +508,20 @@ def _filter_state(rows: Iterable[Mapping[str, Any]], state: str) -> list[dict[st
 def _row_rank(row: Mapping[str, Any]) -> tuple[int, str]:
     state = str(row.get("state") or "")
     return (_STAGE_RANK.get(state, 0), str(row.get("delivered_at") or row.get("attempted_at") or ""))
+
+
+def _matches_delivery_identity(
+    row: Mapping[str, Any],
+    *,
+    content_hash: str | None,
+    dedupe_key: str | None,
+) -> bool:
+    row_key = str(row.get("dedupe_key") or "")
+    if dedupe_key and row_key:
+        return row_key == str(dedupe_key)
+    if content_hash:
+        return str(row.get("content_hash") or "") == str(content_hash)
+    return False
 
 
 def _safe_error(text: object) -> str | None:
