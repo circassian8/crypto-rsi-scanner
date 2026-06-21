@@ -261,51 +261,54 @@ def format_exploratory_telegram_digest(
 ) -> str:
     """Render low-confidence Event Alpha evidence for Telegram burn-in review."""
     cfg = cfg or EventAlphaNotificationConfig()
-    card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
+    _ = card_path_by_alert_id  # internal paths stay in artifacts/inbox, not Telegram.
     keep = list(items)
+    max_items = max(1, min(10, int(cfg.exploratory_digest_max_items or 10)))
     lines = [
-        "<b>Exploratory Event Alpha Digest — unvalidated / low-confidence / not a trade signal</b>",
-        "<i>Research-only. Suppressed/store-only rows for operator learning.</i>",
-        "Validation status: DAY-1 UNVALIDATED",
-        "Trading action: NONE",
-        "These rows do not create TRIGGERED_FADE, paper trades, live RSI signals, or execution.",
+        "<b>🟡 Exploratory Event Alpha Digest</b>",
+        "<i>Low-confidence research leads — not trade signals</i>",
+        f"Profile: {_esc(profile or 'unknown')}",
+        f"Items: {len(keep)}",
+        "Research-only / DAY-1 UNVALIDATED. No trades, paper trades, live RSI rows, execution, or TRIGGERED_FADE changes.",
     ]
-    if profile:
-        lines.append(f"profile={_esc(profile)}")
     if not keep:
         lines.append("No exploratory candidates.")
         return "\n".join(lines)
-    for item in keep:
+    footer = "Research cards and feedback commands are available in local artifacts/inbox."
+    displayed = 0
+    truncated = 0
+    max_chars = 3900
+    for item in keep[:max_items]:
         decision = item.decision
         entry = decision.entry
+        block = [
+            "",
+            f"{displayed + 1}. <b>{_esc(entry.symbol or entry.coin_id or 'UNKNOWN')} / {_esc(_human_asset_name(entry.coin_id))}</b>",
+            f"   Move: {_esc(_move_summary(entry.latest_market_snapshot))}",
+            f"   Volume/Mcap: {_esc(_volume_mcap_summary(entry.latest_market_snapshot))}",
+            f"   Playbook: {_esc(_human_playbook(entry.latest_playbook_type or entry.latest_effective_playbook_type or entry.relationship_type))}",
+            f"   Why surfaced: {_esc(_human_why(item.why_included))}",
+            f"   Status: {_esc(_human_status(entry.state, entry.latest_tier, _suppression_reason(decision)))}",
+            f"   Check next: {_esc(_human_check_next(item.what_to_verify))}",
+            f"   Risk: {_esc(_human_risk(entry, decision))}",
+        ]
+        candidate_lines = [*lines, *block]
+        remaining_after_this = len(keep) - displayed - 1
+        candidate_footer = [footer]
+        if remaining_after_this > 0:
+            candidate_footer.insert(0, f"+{remaining_after_this} more in local notification inbox.")
+        if len("\n".join([*candidate_lines, "", *candidate_footer])) > max_chars:
+            truncated = len(keep) - displayed
+            break
+        lines = candidate_lines
+        displayed += 1
+    if len(keep) > displayed:
+        truncated = max(truncated, len(keep) - displayed)
+    if truncated:
         lines.append("")
-        lines.append(
-            f"<b>{_esc(entry.symbol or entry.coin_id or 'UNKNOWN')}</b>/{_esc(entry.coin_id or 'unknown')} "
-            f"score={entry.latest_score} exploratory_rank={item.rank_score:.1f}"
-        )
-        lines.append(_esc(entry.latest_event_name or "unknown event"))
-        lines.append(
-            f"tentative_playbook={_esc(entry.latest_playbook_type or entry.latest_effective_playbook_type or 'unknown')} "
-            f"relationship={_esc(entry.relationship_type or 'unknown')} state={_esc(entry.state or 'unknown')}"
-        )
-        if entry.latest_llm_asset_role:
-            conf = entry.latest_llm_confidence if entry.latest_llm_confidence is not None else 0.0
-            lines.append(f"llm_role={_esc(entry.latest_llm_asset_role)} llm_confidence={conf:.2f}")
-        lines.append(f"source={_esc(entry.latest_source or 'unknown')} source_count={entry.source_count}")
-        if cfg.exploratory_digest_include_rejection_reasons:
-            lines.append(f"suppression_reason={_esc(_suppression_reason(decision) or 'unknown')}")
-        lines.append("why_included=" + _esc("; ".join(item.why_included) or "suppressed row with review value"))
-        lines.append("what_to_verify=" + _esc("; ".join(item.what_to_verify) or "review source evidence manually"))
-        if cfg.exploratory_digest_include_raw_evidence:
-            warnings = tuple(dict.fromkeys((*entry.warnings, *decision.warnings)))
-            if warnings:
-                lines.append("warnings=" + _esc("; ".join(warnings[:3])))
-            lines.append("market=" + _esc(_compact_market(entry.latest_market_snapshot)))
-        lines.append(f"alert_id={_esc(decision.alert_id)}")
-        lines.append(f"card_id={_esc(decision.card_id)}")
-        card_path = card_paths.get(decision.alert_id)
-        lines.append(f"research_card={_esc(card_path) if card_path else 'not_written'}")
-        lines.append(f"feedback=make event-feedback-watch FEEDBACK_TARGET={_esc(decision.alert_id)}")
+        lines.append(f"+{truncated} more in local notification inbox.")
+    lines.append("")
+    lines.append(footer)
     return "\n".join(lines)
 
 
@@ -1046,6 +1049,183 @@ def _compact_market(snapshot: Mapping[str, Any] | None) -> str:
             else:
                 fields.append(f"{key}={value}")
     return " ".join(fields) if fields else "present"
+
+
+def _human_asset_name(coin_id: object) -> str:
+    text = str(coin_id or "unknown").strip()
+    if not text:
+        return "Unknown"
+    return " ".join(part.capitalize() for part in re.split(r"[-_\s]+", text) if part) or text
+
+
+def _human_playbook(value: object) -> str:
+    text = str(value or "unknown").strip()
+    mapping = {
+        "market_anomaly_unknown": "market anomaly / unknown catalyst",
+        "market_anomaly": "market anomaly",
+        "proxy_fade": "proxy fade",
+        "proxy_attention": "proxy attention",
+        "direct_event": "direct event",
+        "infrastructure_mention": "infrastructure mention",
+        "source_noise_control": "source/noise control",
+        "ambiguous_control": "relationship unclear",
+        "ambiguous": "relationship unclear",
+    }
+    return mapping.get(text, text.replace("_", " "))
+
+
+def _human_state(value: object) -> str:
+    text = str(value or "").strip()
+    mapping = {
+        "RAW_EVIDENCE": "raw evidence only",
+        "STORE_ONLY": "stored for research only",
+        "RADAR": "radar",
+        "WATCHLIST": "watchlist",
+        "HIGH_PRIORITY": "high priority",
+        "EVENT_PASSED": "event passed",
+        "ARMED": "armed",
+        "TRIGGERED_FADE": "triggered fade",
+        "INVALIDATED": "invalidated",
+        "EXPIRED": "expired",
+    }
+    return mapping.get(text, text.replace("_", " ").lower() if text else "stored for research only")
+
+
+def _human_reason(value: object) -> str:
+    text = str(value or "").strip()
+    normalized = text.casefold()
+    mapping = {
+        "raw/store-only evidence, no alertable watchlist state": "not alertable yet",
+        "raw, expired, or invalidated watchlist state is stored only.": "not alertable yet",
+        "event alpha router is disabled; retaining watchlist row as research evidence only.": "router disabled",
+    }
+    if normalized in mapping:
+        return mapping[normalized]
+    if "duplicate" in normalized:
+        return "duplicate or repeated evidence"
+    if "cooldown" in normalized:
+        return "cooldown active"
+    if "alertable" in normalized:
+        return "not alertable yet"
+    return text.replace("_", " ") if text else "not alertable yet"
+
+
+def _human_status(state: object, tier: object, reason: object) -> str:
+    state_text = _human_state(state or tier)
+    reason_text = _human_reason(reason)
+    if reason_text and reason_text != state_text:
+        return f"{state_text} — {reason_text}"
+    return state_text
+
+
+def _move_summary(snapshot: Mapping[str, Any] | None) -> str:
+    data = dict(snapshot or {})
+    parts = []
+    for key, label in (("return_24h", "24h"), ("return_72h", "72h"), ("return_7d", "7d")):
+        value = _float_or_none(data.get(key))
+        if value is not None:
+            parts.append(f"{_format_pct_return(value)} {label}")
+    return ", ".join(parts) if parts else "n/a"
+
+
+def _volume_mcap_summary(snapshot: Mapping[str, Any] | None) -> str:
+    data = dict(snapshot or {})
+    value = _float_or_none(data.get("volume_mcap"))
+    if value is None:
+        volume = _float_or_none(data.get("volume_24h") or data.get("spot_volume_24h"))
+        market_cap = _float_or_none(data.get("market_cap"))
+        if volume is not None and market_cap and market_cap > 0:
+            value = volume / market_cap
+    if value is None:
+        return "n/a"
+    return f"{value:.2f}"
+
+
+def _format_pct_return(value: float) -> str:
+    percent = value if abs(value) > 10 else value * 100.0
+    sign = "+" if percent > 0 else ""
+    return f"{sign}{percent:.1f}%"
+
+
+def _float_or_none(value: object) -> float | None:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _human_why(reasons: Iterable[str]) -> str:
+    output: list[str] = []
+    for reason in reasons:
+        text = str(reason or "").strip()
+        lower = text.casefold()
+        if lower.startswith("market anomaly score"):
+            output.append("unusual market move")
+        elif lower.startswith("source quality"):
+            output.append(text)
+        elif lower.startswith("freshness"):
+            output.append("fresh anomaly")
+        elif lower.startswith("cluster confidence"):
+            output.append(text)
+        elif "catalyst" in lower or "external-asset" in lower:
+            output.append("possible catalyst clue")
+        elif "extraction confidence" in lower or "llm" in lower:
+            output.append(text.replace("LLM/extraction", "extraction"))
+        elif text:
+            output.append(text.replace("_", " "))
+    if not output:
+        output.append("suppressed row retained for review")
+    return "; ".join(dict.fromkeys(output[:4]))
+
+
+def _human_check_next(steps: Iterable[str]) -> str:
+    output: list[str] = []
+    for step in steps:
+        text = str(step or "").strip()
+        lower = text.casefold()
+        if "independent catalyst" in lower:
+            output.append("find independent catalyst")
+        elif "liquidity noise" in lower or "organic volume" in lower:
+            output.append("verify liquidity/organic volume")
+        elif "direct event mechanics" in lower:
+            output.append("verify event mechanics/timing")
+        elif "proxy-fade" in lower:
+            output.append("confirm outside proxy-fade path")
+        elif "asset is actually linked" in lower:
+            output.append("verify asset-catalyst link")
+        elif "timestamp" in lower or "provenance" in lower:
+            output.append("verify event time/source")
+        elif "asset identity" in lower:
+            output.append("verify asset identity")
+        elif "dated catalyst" in lower:
+            output.append("look for dated catalyst")
+        elif text:
+            output.append(text)
+    if not output:
+        output.append("review source evidence")
+    return "; ".join(dict.fromkeys(output[:3]))
+
+
+def _human_risk(entry: Any, decision: event_alpha_router.EventAlphaRouteDecision) -> str:
+    risks: list[str] = []
+    playbook = str(entry.latest_playbook_type or entry.latest_effective_playbook_type or "").casefold()
+    relationship = str(entry.relationship_type or "").casefold()
+    components = dict(getattr(entry, "latest_score_components", {}) or {})
+    classifier = _component_score(components, "classifier")
+    if "market_anomaly" in playbook:
+        risks.append("no confirmed narrative")
+    if "ambiguous" in relationship or "ambiguous" in playbook:
+        risks.append("relationship unclear")
+    if classifier and classifier < 60:
+        risks.append("low classifier confidence")
+    if not getattr(entry, "event_time", None):
+        risks.append("no dated catalyst")
+    if int(getattr(entry, "source_count", 0) or 0) <= 1:
+        risks.append("single-source evidence")
+    warnings = tuple(dict.fromkeys((*getattr(entry, "warnings", ()), *getattr(decision, "warnings", ()))))
+    if warnings and len(risks) < 3:
+        risks.append(str(warnings[0]).replace("_", " "))
+    return "; ".join(dict.fromkeys(risks[:3])) if risks else "needs manual confirmation"
 
 
 def legacy_meta_warnings(storage: Any, cfg: EventAlphaNotificationConfig) -> tuple[str, ...]:

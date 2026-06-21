@@ -17344,8 +17344,15 @@ def _notify_suppressed_decision(
         latest_effective_playbook_type=playbook,
         latest_llm_asset_role=llm_role,
         latest_llm_confidence=0.82 if llm_role else None,
-        latest_market_snapshot={"price": 1.23, "return_24h": 0.42, "volume_zscore_24h": 3.4},
+        latest_market_snapshot={
+            "price": 1.23,
+            "return_24h": 0.42,
+            "return_72h": 1.404,
+            "volume_mcap": 0.33,
+            "volume_zscore_24h": 3.4,
+        },
         latest_score_components={
+            "classifier": 48,
             "market_move_volume": 65,
             "source_quality": 55,
             "cluster_confidence": 50,
@@ -17931,10 +17938,28 @@ def test_event_alpha_exploratory_digest_surfaces_suppressed_rows_without_alertin
         assert plan.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 1
         assert plan.would_send_count == 1
         text = notif.format_exploratory_telegram_digest(plan.exploratory_items, profile="notify_no_key")
-        assert "Exploratory Event Alpha Digest" in text
-        assert "not a trade signal" in text
-        assert "suppression_reason=raw/store-only evidence" in text
+        assert "🟡 Exploratory Event Alpha Digest" in text
+        assert "Low-confidence research leads" in text
+        assert "Profile: notify_no_key" in text
+        assert "Items: 1" in text
+        assert text.count("Research-only / DAY-1 UNVALIDATED") == 1
+        assert "1. <b>PUMP / Pump</b>" in text
+        assert "Move: +42.0% 24h, +140.4% 72h" in text
+        assert "Volume/Mcap: 0.33" in text
+        assert "Playbook: market anomaly / unknown catalyst" in text
+        assert "Why surfaced: unusual market move; source quality 55; possible catalyst clue; cluster confidence 50" in text
+        assert "Status: raw evidence only" in text
+        assert "not alertable yet" in text
+        assert "Check next: find independent catalyst; verify liquidity/organic volume" in text
+        assert "Risk: no confirmed narrative; relationship unclear; low classifier confidence" in text
+        assert "local artifacts/inbox" in text
         assert "TRIGGERED_FADE" in text  # only in the explicit cannot-create disclaimer
+        assert "suppression_reason=" not in text
+        assert "alert_id=" not in text
+        assert "card_id=" not in text
+        assert "research_card=" not in text
+        assert "feedback=make" not in text
+        assert "PUMP|proxy" not in text
 
         sent = []
         result = notif.send_notifications(
@@ -17997,6 +18022,29 @@ def test_event_alpha_exploratory_digest_excludes_controls_and_has_own_cooldown()
     )
     with_controls = notif.build_notification_plan([noise], storage=_NotifyFakeStorage(), cfg=include_controls, now=now)
     assert with_controls.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 1
+
+
+def test_event_alpha_exploratory_digest_truncates_compact_numbered_blocks():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notifications as notif
+
+    now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+    decisions = [
+        _notify_suppressed_decision(f"LONG{i}", score=90 - i, source="fixture_source")
+        for i in range(12)
+    ]
+    cfg = notif.EventAlphaNotificationConfig(
+        enabled=True,
+        exploratory_digest_enabled=True,
+        exploratory_digest_max_items=12,
+    )
+    plan = notif.build_notification_plan(decisions, storage=_NotifyFakeStorage(), cfg=cfg, now=now)
+    text = notif.format_exploratory_telegram_digest(plan.exploratory_items, profile="notify_no_key", cfg=cfg)
+    assert "1. <b>LONG0 / Long0</b>" in text
+    assert "8. <b>LONG7 / Long7</b>" in text
+    assert "9. <b>" not in text
+    assert "+4 more in local notification inbox." in text
+    assert len(text) <= 3900
 
 
 def test_event_alpha_delivery_report_groups_by_state_and_redacts_secrets():

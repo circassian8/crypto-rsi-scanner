@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-22 — Make exploratory Telegram digest readable · Codex
+**Why:** The Event Alpha exploratory Telegram digest was technically complete
+but hard to use: each row dumped internal IDs, card paths, feedback commands,
+suppression enums, and repeated boilerplate instead of a concise research
+summary.
+**Changes:**
+- Reworked `format_exploratory_telegram_digest()` to render one compact
+  disclaimer/header, numbered candidate blocks, human playbook/status labels,
+  move and volume/mcap summaries, manual verification steps, and concise risk
+  notes.
+- Hid Telegram-only noise such as `alert_id`, `card_id`, local research-card
+  paths, raw feedback commands, and pipe-delimited internal IDs while leaving
+  those fields available in artifacts/inbox reports.
+- Added Telegram formatting regressions covering hidden internals, one-time
+  disclaimer copy, compact numbered blocks, and size-safe truncation.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (410/410 passed); `make event-alpha-eval
+PYTHON=python3` (11/11 passed); `make verify PYTHON=python3`.
+**Notes/risks:** Formatting-only change. Event Alpha selection, routing,
+scoring, alertability, `TRIGGERED_FADE` authority, paper/live writes, and normal
+RSI alert routing were not changed.
+
 ## 2026-06-22 — Add exploratory Event Alpha notification digest · Codex
 **Why:** Day-1 Event Alpha notifications needed a way to surface suppressed,
 store-only, and low-confidence research rows without promoting them into normal
