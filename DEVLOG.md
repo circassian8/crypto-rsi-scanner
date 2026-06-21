@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-21 — Fix notification SLO latest-run status selection · Codex
+**Why:** A full `notify_llm` run delivered its guarded health heartbeat, but the
+SLO report still showed `NO_SEND_CONFIG` because an older no-send bootstrap row
+was counted as a current status. Historical config-blocked rows should remain
+visible as warnings, not override a newer successful delivery.
+**Changes:**
+- Updated `event_alpha_notification_slo.py` so run classification tracks the
+  latest meaningful send status and only uses that latest status to select
+  `NO_SEND_CONFIG`.
+- Kept historical `config_blocked_runs` and no-send preview counts in the SLO
+  report as warning/accounting fields.
+- Added a regression test covering an older config-blocked run followed by a
+  newer delivered heartbeat.
+**Verify:** `python3 tests/test_indicators.py` (405/405 passed);
+`make event-llm-eval PYTHON=python3`; `make event-llm-extract-eval
+PYTHON=python3`; `make event-alpha-eval PYTHON=python3`; `make verify
+PYTHON=python3`; `make event-alpha-notification-slo-report PROFILE=notify_llm
+PYTHON=python3`; `make event-alpha-notification-slo-report PROFILE=notify_no_key
+PYTHON=python3`.
+**Notes/risks:** The latest live `notify_llm` run sent one research heartbeat to
+Telegram and generated no alertable trading candidates. GDELT/RSS providers are
+still degraded from upstream 429/403 responses.
+
 ## 2026-06-20 — Polish Event Alpha notification SLO semantics · Codex
 **Why:** The notification SLO report was treating would-send/no-send preview
 runs as alertable undelivered delivery failures, which made intentional dry runs

@@ -18230,6 +18230,42 @@ def test_event_alpha_notification_slo_distinguishes_preview_config_and_delivery_
     assert delivered_heartbeat.status == slo.STATUS_OK
     assert delivered_heartbeat.last_heartbeat_age_hours == 0
 
+    delivered_after_old_config_block = slo.build_slo_report(
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        notification_runs=[
+            {
+                **base,
+                "started_at": (now - timedelta(minutes=5)).isoformat(),
+                "send_requested": True,
+                "send_guard_enabled": True,
+                "deliveries_delivered": 1,
+                "heartbeat_sent": True,
+            },
+            {
+                **base,
+                "started_at": (now - timedelta(hours=2)).isoformat(),
+                "send_requested": True,
+                "send_guard_enabled": False,
+                "block_reason": "event alerts disabled",
+                "deliveries_blocked": 1,
+            },
+        ],
+        delivery_rows=[{
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "delivered-latest",
+            "state": delivery.STATE_DELIVERED,
+            "lane": "health_heartbeat",
+            "attempted_at": (now - timedelta(minutes=5)).isoformat(),
+            "delivered_at": (now - timedelta(minutes=5)).isoformat(),
+        }],
+        provider_health_rows={},
+        now=now,
+    )
+    assert delivered_after_old_config_block.status == slo.STATUS_OK
+    assert delivered_after_old_config_block.config_blocked_runs == 1
+    assert delivered_after_old_config_block.alertable_delivery_failures == 0
+
     provider_backoff_preview = slo.build_slo_report(
         profile="notify_no_key",
         artifact_namespace="notify_no_key",

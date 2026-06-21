@@ -82,9 +82,8 @@ def build_slo_report(
             blockers.append(f"{consecutive} consecutive failed/blocked delivery rows")
         if alertable_undelivered > 0:
             blockers.append(f"{alertable_undelivered} alertable send run(s) failed delivery")
-    elif run_counts["config_blocked_runs"] > 0:
+    elif run_counts["latest_meaningful_run_status"] == "config_blocked":
         status = STATUS_NO_SEND_CONFIG if status == STATUS_OK else status
-        warnings.append(f"{run_counts['config_blocked_runs']} send-requested run(s) blocked by send configuration")
     elif provider_backoff or failure_count or blocked_count:
         status = STATUS_DEGRADED if status == STATUS_OK else status
         if provider_backoff:
@@ -93,6 +92,8 @@ def build_slo_report(
             warnings.append(f"{failure_count} failed delivery row(s)")
         if blocked_count:
             warnings.append(f"{blocked_count} blocked delivery row(s)")
+    if run_counts["config_blocked_runs"]:
+        warnings.append(f"{run_counts['config_blocked_runs']} send-requested run(s) blocked by send configuration")
     if run_counts["no_send_preview_runs"]:
         warnings.append(f"{run_counts['no_send_preview_runs']} would-send preview run(s); no delivery expected")
     return EventAlphaNotificationSLOResult(
@@ -161,28 +162,34 @@ def _consecutive_bad(rows: Iterable[Mapping[str, Any]]) -> int:
     return count
 
 
-def _classify_notification_runs(runs: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+def _classify_notification_runs(runs: Iterable[Mapping[str, Any]]) -> dict[str, int | str]:
     counts = {
         "no_send_preview_runs": 0,
         "config_blocked_runs": 0,
         "delivery_failed_runs": 0,
         "alertable_delivery_failures": 0,
+        "latest_meaningful_run_status": "",
     }
     for row in runs:
         would_send = _int(row.get("would_send_count"))
-        if would_send <= 0:
-            continue
         send_requested = bool(row.get("send_requested"))
         send_guard_enabled = bool(row.get("send_guard_enabled"))
         delivered = _int(row.get("deliveries_delivered")) + _int(row.get("deliveries_partial_delivered"))
         failed = _int(row.get("deliveries_failed"))
         blocked = _int(row.get("deliveries_blocked"))
         duplicate_or_in_flight = _int(row.get("deliveries_skipped_duplicate")) + _int(row.get("deliveries_skipped_in_flight"))
+        if would_send <= 0 and delivered <= 0 and failed <= 0 and blocked <= 0 and duplicate_or_in_flight <= 0:
+            continue
         if not send_requested:
             counts["no_send_preview_runs"] += 1
+            _set_latest_status_once(counts, "preview")
             continue
         if not send_guard_enabled:
             counts["config_blocked_runs"] += 1
+            _set_latest_status_once(counts, "config_blocked")
+            continue
+        if delivered > 0:
+            _set_latest_status_once(counts, "delivered")
             continue
         if delivered <= 0 and (
             failed > 0
@@ -191,7 +198,15 @@ def _classify_notification_runs(runs: Iterable[Mapping[str, Any]]) -> dict[str, 
         ):
             counts["delivery_failed_runs"] += 1
             counts["alertable_delivery_failures"] += 1
+            _set_latest_status_once(counts, "delivery_failed")
+            continue
+        _set_latest_status_once(counts, "skipped")
     return counts
+
+
+def _set_latest_status_once(counts: dict[str, int | str], status: str) -> None:
+    if not counts.get("latest_meaningful_run_status"):
+        counts["latest_meaningful_run_status"] = status
 
 
 def _is_delivery_blocked(row: Mapping[str, Any]) -> bool:
