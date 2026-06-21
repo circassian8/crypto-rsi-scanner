@@ -21,12 +21,14 @@ from . import event_alpha_pipeline, event_alpha_router
 LANE_DAILY_DIGEST = "daily_digest"
 LANE_INSTANT_ESCALATION = "instant_escalation"
 LANE_TRIGGERED_FADE = "triggered_fade"
+LANE_EXPLORATORY_DIGEST = "exploratory_digest"
 LANE_HEALTH_HEARTBEAT = "health_heartbeat"
 
 LANES = (
     LANE_DAILY_DIGEST,
     LANE_INSTANT_ESCALATION,
     LANE_TRIGGERED_FADE,
+    LANE_EXPLORATORY_DIGEST,
     LANE_HEALTH_HEARTBEAT,
 )
 
@@ -34,6 +36,7 @@ LAST_SENT_META_KEYS = {
     LANE_DAILY_DIGEST: "event_alpha_last_sent_daily_digest_at",
     LANE_INSTANT_ESCALATION: "event_alpha_last_sent_instant_escalation_at",
     LANE_TRIGGERED_FADE: "event_alpha_last_sent_triggered_fade_at",
+    LANE_EXPLORATORY_DIGEST: "event_alpha_last_sent_exploratory_digest_at",
     LANE_HEALTH_HEARTBEAT: "event_alpha_last_sent_health_heartbeat_at",
 }
 
@@ -60,6 +63,21 @@ class EventAlphaNotificationConfig:
     health_heartbeat_enabled: bool = True
     health_heartbeat_cooldown_hours: float = 24.0
     triggered_fade_dedupe: bool = True
+    exploratory_digest_enabled: bool = False
+    exploratory_digest_max_items: int = 10
+    exploratory_digest_min_score: int = 0
+    exploratory_digest_cooldown_hours: float = 24.0
+    exploratory_digest_include_rejection_reasons: bool = True
+    exploratory_digest_include_raw_evidence: bool = True
+    exploratory_digest_include_controls: bool = False
+
+
+@dataclass(frozen=True)
+class EventAlphaExploratoryDigestItem:
+    decision: event_alpha_router.EventAlphaRouteDecision
+    rank_score: float
+    why_included: tuple[str, ...] = ()
+    what_to_verify: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -68,6 +86,7 @@ class EventAlphaNotificationPlan:
     blocked_by_lane: dict[str, str] = field(default_factory=dict)
     heartbeat_due: bool = False
     heartbeat_reason: str = "heartbeat disabled"
+    exploratory_items: tuple[EventAlphaExploratoryDigestItem, ...] = ()
     cooldown_status: dict[str, dict[str, Any]] = field(default_factory=dict)
     notification_scope: str = NOTIFICATION_SCOPE_GLOBAL
     scope_value: str = NOTIFICATION_SCOPE_GLOBAL
@@ -79,11 +98,12 @@ class EventAlphaNotificationPlan:
 
     @property
     def would_send_count(self) -> int:
-        return self.decision_count + (1 if self.heartbeat_due else 0)
+        return self.decision_count + len(self.exploratory_items) + (1 if self.heartbeat_due else 0)
 
     @property
     def lane_counts(self) -> dict[str, int]:
         counts = {lane: len(self.decisions_by_lane.get(lane, ())) for lane in LANES}
+        counts[LANE_EXPLORATORY_DIGEST] = len(self.exploratory_items)
         counts[LANE_HEALTH_HEARTBEAT] = 1 if self.heartbeat_due else 0
         return counts
 
@@ -101,7 +121,8 @@ def build_notification_plan(
 ) -> EventAlphaNotificationPlan:
     """Return lane-specific due decisions without mutating storage."""
     observed = _as_utc(now or datetime.now(timezone.utc))
-    alertable = [decision for decision in decisions if decision.alertable]
+    all_decisions = list(decisions)
+    alertable = [decision for decision in all_decisions if decision.alertable]
     by_lane: dict[str, list[event_alpha_router.EventAlphaRouteDecision]] = {lane: [] for lane in LANES}
     blocked: dict[str, str] = {}
 
@@ -148,6 +169,16 @@ def build_notification_plan(
         if blocked_count and LANE_TRIGGERED_FADE not in blocked:
             blocked[LANE_TRIGGERED_FADE] = f"{blocked_count} triggered fade item(s) already sent"
 
+    exploratory_items: tuple[EventAlphaExploratoryDigestItem, ...] = ()
+    if cfg.exploratory_digest_enabled:
+        selected = select_exploratory_candidates(all_decisions, cfg=cfg, now=observed)
+        if selected:
+            due, reason = lane_due(storage, LANE_EXPLORATORY_DIGEST, cfg=cfg, now=observed)
+            if due:
+                exploratory_items = selected
+            else:
+                blocked[LANE_EXPLORATORY_DIGEST] = reason
+
     heartbeat_due = False
     heartbeat_reason = "heartbeat disabled"
     if include_health_heartbeat and cfg.health_heartbeat_enabled:
@@ -161,11 +192,121 @@ def build_notification_plan(
         blocked_by_lane=blocked,
         heartbeat_due=heartbeat_due,
         heartbeat_reason=heartbeat_reason,
+        exploratory_items=exploratory_items,
         cooldown_status=cooldown_status_by_lane(storage, cfg=cfg, now=observed),
         notification_scope=_clean_scope(cfg.notification_scope),
         scope_value=_scope_value(cfg),
         migration_warnings=legacy_meta_warnings(storage, cfg),
     )
+
+
+def select_exploratory_candidates(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    cfg: EventAlphaNotificationConfig,
+    now: datetime | None = None,
+) -> tuple[EventAlphaExploratoryDigestItem, ...]:
+    """Pick low-confidence/suppressed rows for a separate operator-learning digest.
+
+    This deliberately does not make the rows alertable. It only surfaces stored
+    evidence for manual review during notification burn-in.
+    """
+    _ = now  # currently reserved for freshness/ranking extensions.
+    if not cfg.exploratory_digest_enabled or cfg.exploratory_digest_max_items <= 0:
+        return ()
+    items: list[EventAlphaExploratoryDigestItem] = []
+    for decision in decisions:
+        if bool(getattr(decision, "alertable", False)):
+            continue
+        entry = decision.entry
+        if (entry.symbol or entry.coin_id) == "":
+            continue
+        if not (entry.latest_source or entry.source_count):
+            continue
+        reason = _suppression_reason(decision)
+        if not reason:
+            continue
+        if entry.latest_score < int(cfg.exploratory_digest_min_score or 0):
+            continue
+        if _is_exploratory_control(entry) and not cfg.exploratory_digest_include_controls:
+            continue
+        if _is_ambiguous_exploratory(entry) and not _ambiguous_has_learning_value(entry):
+            continue
+        rank, why = _exploratory_rank(entry)
+        verify = _exploratory_verify_steps(entry, reason)
+        items.append(EventAlphaExploratoryDigestItem(
+            decision=decision,
+            rank_score=rank,
+            why_included=tuple(why),
+            what_to_verify=tuple(verify),
+        ))
+    items.sort(
+        key=lambda item: (
+            item.rank_score,
+            item.decision.entry.latest_score,
+            item.decision.entry.last_seen_at,
+            item.decision.entry.symbol,
+        ),
+        reverse=True,
+    )
+    return tuple(items[: max(0, int(cfg.exploratory_digest_max_items or 0))])
+
+
+def format_exploratory_telegram_digest(
+    items: Iterable[EventAlphaExploratoryDigestItem],
+    *,
+    profile: str | None = None,
+    card_path_by_alert_id: Mapping[str, str | Path] | None = None,
+    cfg: EventAlphaNotificationConfig | None = None,
+) -> str:
+    """Render low-confidence Event Alpha evidence for Telegram burn-in review."""
+    cfg = cfg or EventAlphaNotificationConfig()
+    card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
+    keep = list(items)
+    lines = [
+        "<b>Exploratory Event Alpha Digest — unvalidated / low-confidence / not a trade signal</b>",
+        "<i>Research-only. Suppressed/store-only rows for operator learning.</i>",
+        "Validation status: DAY-1 UNVALIDATED",
+        "Trading action: NONE",
+        "These rows do not create TRIGGERED_FADE, paper trades, live RSI signals, or execution.",
+    ]
+    if profile:
+        lines.append(f"profile={_esc(profile)}")
+    if not keep:
+        lines.append("No exploratory candidates.")
+        return "\n".join(lines)
+    for item in keep:
+        decision = item.decision
+        entry = decision.entry
+        lines.append("")
+        lines.append(
+            f"<b>{_esc(entry.symbol or entry.coin_id or 'UNKNOWN')}</b>/{_esc(entry.coin_id or 'unknown')} "
+            f"score={entry.latest_score} exploratory_rank={item.rank_score:.1f}"
+        )
+        lines.append(_esc(entry.latest_event_name or "unknown event"))
+        lines.append(
+            f"tentative_playbook={_esc(entry.latest_playbook_type or entry.latest_effective_playbook_type or 'unknown')} "
+            f"relationship={_esc(entry.relationship_type or 'unknown')} state={_esc(entry.state or 'unknown')}"
+        )
+        if entry.latest_llm_asset_role:
+            conf = entry.latest_llm_confidence if entry.latest_llm_confidence is not None else 0.0
+            lines.append(f"llm_role={_esc(entry.latest_llm_asset_role)} llm_confidence={conf:.2f}")
+        lines.append(f"source={_esc(entry.latest_source or 'unknown')} source_count={entry.source_count}")
+        if cfg.exploratory_digest_include_rejection_reasons:
+            lines.append(f"suppression_reason={_esc(_suppression_reason(decision) or 'unknown')}")
+        lines.append("why_included=" + _esc("; ".join(item.why_included) or "suppressed row with review value"))
+        lines.append("what_to_verify=" + _esc("; ".join(item.what_to_verify) or "review source evidence manually"))
+        if cfg.exploratory_digest_include_raw_evidence:
+            warnings = tuple(dict.fromkeys((*entry.warnings, *decision.warnings)))
+            if warnings:
+                lines.append("warnings=" + _esc("; ".join(warnings[:3])))
+            lines.append("market=" + _esc(_compact_market(entry.latest_market_snapshot)))
+        lines.append(f"alert_id={_esc(decision.alert_id)}")
+        lines.append(f"card_id={_esc(decision.card_id)}")
+        card_path = card_paths.get(decision.alert_id)
+        lines.append(f"research_card={_esc(card_path) if card_path else 'not_written'}")
+        lines.append(f"feedback=make event-feedback-watch FEEDBACK_TARGET={_esc(decision.alert_id)}")
+    return "\n".join(lines)
 
 
 def lane_due(
@@ -350,22 +491,34 @@ def send_notifications(
     delivered_by_lane = {lane: 0 for lane in LANES}
     attempted = False
     block_reasons: list[str] = []
-    for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST):
-        items = plan.decisions_by_lane.get(lane, [])
+    for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST, LANE_EXPLORATORY_DIGEST):
+        exploratory = lane == LANE_EXPLORATORY_DIGEST
+        items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
         if not items:
             continue
-        message = event_alpha_router.format_routed_telegram_digest(
-            items,
-            profile=profile,
-            card_path_by_alert_id=card_map,
-        )
-        alert_ids = [decision.alert_id for decision in items]
-        if writer and writer.skip_as_duplicate(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items)):
+        if exploratory:
+            message = format_exploratory_telegram_digest(
+                items,
+                profile=profile,
+                card_path_by_alert_id=card_map,
+                cfg=cfg,
+            )
+            alert_ids = [item.decision.alert_id for item in items]
+            route_label = "EXPLORATORY_DIGEST"
+        else:
+            message = event_alpha_router.format_routed_telegram_digest(
+                items,
+                profile=profile,
+                card_path_by_alert_id=card_map,
+            )
+            alert_ids = [decision.alert_id for decision in items]
+            route_label = _route_label(items)
+        if writer and writer.skip_as_duplicate(message=message, lane=lane, alert_ids=alert_ids, route=route_label):
             continue
         attempted = True
         if writer:
-            writer.record_planned(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items))
-            writer.record_sending(message=message, lane=lane, alert_ids=alert_ids, route=_route_label(items))
+            writer.record_planned(message=message, lane=lane, alert_ids=alert_ids, route=route_label)
+            writer.record_sending(message=message, lane=lane, alert_ids=alert_ids, route=route_label)
         attempt = _call_send_fn(send_fn, message)
         terminal_state = delivery.state_for_send_counts(
             delivered_count=attempt.delivered_count,
@@ -387,7 +540,7 @@ def send_notifications(
                     message=message,
                     lane=lane,
                     alert_ids=alert_ids,
-                    route=_route_label(items),
+                    route=route_label,
                     attempt=attempt,
                 )
         elif terminal_state == delivery.STATE_PARTIAL_DELIVERED:
@@ -406,7 +559,7 @@ def send_notifications(
                     message=message,
                     lane=lane,
                     alert_ids=alert_ids,
-                    route=_route_label(items),
+                    route=route_label,
                     attempt=attempt,
                 )
         else:
@@ -416,7 +569,7 @@ def send_notifications(
                     message=message,
                     lane=lane,
                     alert_ids=alert_ids,
-                    route=_route_label(items),
+                    route=route_label,
                     attempt=attempt,
                 )
     if plan.heartbeat_due:
@@ -557,7 +710,7 @@ class _DeliveryWriter:
         if lane_key == LANE_HEALTH_HEARTBEAT:
             status = "degraded" if _heartbeat_degraded(message) else "healthy"
             return f"{day}|{status}"
-        if lane_key == LANE_DAILY_DIGEST:
+        if lane_key in {LANE_DAILY_DIGEST, LANE_EXPLORATORY_DIGEST}:
             digest_bucket = joined or "digest"
             return f"{day}|{digest_bucket}"
         return joined or lane_key
@@ -719,16 +872,23 @@ class _DeliveryWriter:
         reason: str,
         error_class: str = "guard_blocked",
     ) -> None:
-        for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST):
-            items = plan.decisions_by_lane.get(lane, [])
+        for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST, LANE_EXPLORATORY_DIGEST):
+            exploratory = lane == LANE_EXPLORATORY_DIGEST
+            items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
             if not items:
                 continue
-            message = event_alpha_router.format_routed_telegram_digest(items, profile=profile, card_path_by_alert_id=card_map)
-            alert_ids = [decision.alert_id for decision in items]
+            if exploratory:
+                message = format_exploratory_telegram_digest(items, profile=profile, card_path_by_alert_id=card_map)
+                alert_ids = [item.decision.alert_id for item in items]
+                route_label = "EXPLORATORY_DIGEST"
+            else:
+                message = event_alpha_router.format_routed_telegram_digest(items, profile=profile, card_path_by_alert_id=card_map)
+                alert_ids = [decision.alert_id for decision in items]
+                route_label = _route_label(items)
             self._append(
                 alert_ids=alert_ids,
                 lane=lane,
-                route=_route_label(items),
+                route=route_label,
                 content_hash=self._hash(message, lane, alert_ids),
                 dedupe_key=self._dedupe_key(message, lane, alert_ids)[0],
                 dedupe_bucket=self._dedupe_key(message, lane, alert_ids)[1],
@@ -757,6 +917,135 @@ def _route_label(items: Iterable[event_alpha_router.EventAlphaRouteDecision]) ->
         if route is not None:
             return getattr(route, "value", str(route))
     return ""
+
+
+def _suppression_reason(decision: event_alpha_router.EventAlphaRouteDecision) -> str:
+    entry = decision.entry
+    return str(
+        entry.suppressed_reason
+        or decision.reason
+        or ("; ".join(entry.warnings) if entry.warnings else "")
+    ).strip()
+
+
+def _is_exploratory_control(entry: Any) -> bool:
+    fields = " ".join(
+        str(value or "").casefold()
+        for value in (
+            entry.latest_playbook_type,
+            entry.latest_effective_playbook_type,
+            entry.relationship_type,
+            entry.latest_llm_asset_role,
+            entry.latest_event_name,
+        )
+    )
+    return any(token in fields for token in ("source_noise", "ticker_word_collision", "word_collision"))
+
+
+def _is_ambiguous_exploratory(entry: Any) -> bool:
+    fields = " ".join(
+        str(value or "").casefold()
+        for value in (
+            entry.latest_playbook_type,
+            entry.latest_effective_playbook_type,
+            entry.relationship_type,
+            entry.latest_llm_asset_role,
+        )
+    )
+    return "ambiguous" in fields
+
+
+def _ambiguous_has_learning_value(entry: Any) -> bool:
+    components = dict(getattr(entry, "latest_score_components", {}) or {})
+    return bool(
+        entry.external_asset
+        or entry.event_time
+        or _component_score(components, "market_move_volume") >= 25
+        or _component_score(components, "source_quality") >= 40
+        or _component_score(components, "cluster_confidence") >= 40
+        or int(getattr(entry, "source_count", 0) or 0) > 1
+    )
+
+
+def _exploratory_rank(entry: Any) -> tuple[float, list[str]]:
+    components = dict(getattr(entry, "latest_score_components", {}) or {})
+    market = _component_score(components, "market_move_volume")
+    source_quality = _component_score(components, "source_quality")
+    extraction = max(
+        _component_score(components, "llm_extraction_confidence"),
+        _component_score(components, "extraction_confidence"),
+        float(getattr(entry, "latest_llm_confidence", 0.0) or 0.0) * 100.0,
+    )
+    cluster = _component_score(components, "cluster_confidence")
+    freshness = _component_score(components, "novelty_freshness")
+    catalyst = 20.0 if (entry.external_asset or entry.event_time) else _component_score(components, "catalyst_presence")
+    rank = (
+        float(getattr(entry, "latest_score", 0) or 0)
+        + 0.45 * market
+        + 0.30 * source_quality
+        + 0.25 * extraction
+        + 0.20 * cluster
+        + 0.15 * freshness
+        + catalyst
+    )
+    reasons: list[str] = []
+    if market >= 25:
+        reasons.append(f"market anomaly score {market:g}")
+    if source_quality >= 40:
+        reasons.append(f"source quality {source_quality:g}")
+    if extraction >= 50:
+        reasons.append(f"LLM/extraction confidence {extraction:g}")
+    if catalyst:
+        reasons.append("has catalyst/external-asset evidence")
+    if cluster >= 40:
+        reasons.append(f"cluster confidence {cluster:g}")
+    if freshness >= 40:
+        reasons.append(f"freshness {freshness:g}")
+    if not reasons:
+        reasons.append("suppressed row retained for burn-in review")
+    return rank, reasons
+
+
+def _exploratory_verify_steps(entry: Any, reason: str) -> list[str]:
+    playbook = str(entry.latest_playbook_type or entry.latest_effective_playbook_type or "").casefold()
+    steps = []
+    if "market_anomaly" in playbook:
+        steps.append("find independent catalyst/source evidence for the move")
+        steps.append("check whether the move is liquidity noise or organic volume")
+    elif "direct" in playbook or "listing" in playbook or "unlock" in playbook:
+        steps.append("verify the direct event mechanics and timing")
+        steps.append("check whether this belongs outside proxy-fade research")
+    elif entry.external_asset:
+        steps.append("confirm the crypto asset is actually linked to the external catalyst")
+        steps.append("verify the catalyst timestamp and source provenance")
+    else:
+        steps.append("verify asset identity from source title/body, not publisher or URL noise")
+        steps.append("look for a dated catalyst before escalating")
+    if "duplicate" in str(reason).casefold():
+        steps.append("check whether this is a repeated row rather than a new escalation")
+    return steps
+
+
+def _component_score(components: Mapping[str, Any], key: str) -> float:
+    try:
+        return float(components.get(key) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _compact_market(snapshot: Mapping[str, Any] | None) -> str:
+    data = dict(snapshot or {})
+    if not data:
+        return "missing"
+    fields = []
+    for key in ("price", "return_24h", "return_72h", "volume_zscore_24h", "volume_mcap"):
+        if key in data and data.get(key) not in (None, ""):
+            value = data.get(key)
+            if isinstance(value, float):
+                fields.append(f"{key}={value:.4g}")
+            else:
+                fields.append(f"{key}={value}")
+    return " ".join(fields) if fields else "present"
 
 
 def legacy_meta_warnings(storage: Any, cfg: EventAlphaNotificationConfig) -> tuple[str, ...]:
@@ -871,6 +1160,7 @@ def format_preview(
         f"would_send_daily_digest: {'yes' if plan.lane_counts.get(LANE_DAILY_DIGEST, 0) else 'no'}",
         f"would_send_instant_alerts: {plan.lane_counts.get(LANE_INSTANT_ESCALATION, 0)}",
         f"would_send_triggered_fade: {plan.lane_counts.get(LANE_TRIGGERED_FADE, 0)}",
+        f"would_send_exploratory_digest: {plan.lane_counts.get(LANE_EXPLORATORY_DIGEST, 0)}",
         f"would_send_health_heartbeat: {'yes' if plan.heartbeat_due else 'no'}",
         f"research_card_auto_write: {'yes' if card_auto_write else 'no'}",
         "",
@@ -930,6 +1220,8 @@ def _cooldown_hours(lane: str, cfg: EventAlphaNotificationConfig) -> float:
         return cfg.daily_digest_cooldown_hours
     if lane == LANE_INSTANT_ESCALATION:
         return cfg.instant_escalation_cooldown_hours
+    if lane == LANE_EXPLORATORY_DIGEST:
+        return cfg.exploratory_digest_cooldown_hours
     if lane == LANE_HEALTH_HEARTBEAT:
         return cfg.health_heartbeat_cooldown_hours
     return 0.0
@@ -952,6 +1244,7 @@ def _count_meta_key(lane: str, now: datetime, cfg: EventAlphaNotificationConfig 
         LANE_DAILY_DIGEST: "daily_digest",
         LANE_INSTANT_ESCALATION: "instant",
         LANE_TRIGGERED_FADE: "triggered",
+        LANE_EXPLORATORY_DIGEST: "exploratory",
         LANE_HEALTH_HEARTBEAT: "health_heartbeat",
     }[_clean_lane(lane)]
     if cfg is not None and _clean_scope(cfg.notification_scope) != NOTIFICATION_SCOPE_GLOBAL:

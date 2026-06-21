@@ -48,6 +48,7 @@ def build_environment_doctor(
     llm_extractor_enabled: bool,
     openai_key_present: bool,
     clock_status: Mapping[str, Any],
+    cryptopanic_api_token_present: bool = False,
     python_executable: str | None = None,
     working_directory: str | None = None,
 ) -> EventAlphaEnvironmentDoctorResult:
@@ -90,6 +91,14 @@ def build_environment_doctor(
     if backoff:
         warnings.append(f"{backoff} provider(s) currently in backoff")
     _add_check(checks, "provider_backoff", backoff == 0, f"backoff={backoff}")
+    if not cryptopanic_api_token_present:
+        warnings.append("CryptoPanic API token missing; optional recommended source, not a notify blocker")
+    _add_check(
+        checks,
+        "cryptopanic_optional",
+        True,
+        "token present" if cryptopanic_api_token_present else "optional token missing",
+    )
 
     llm_detail = f"relationship={llm_provider or 'unknown'} enabled={_yes_no(llm_enabled)} extractor={llm_extractor_provider or 'unknown'} enabled={_yes_no(llm_extractor_enabled)}"
     if prof_name == "notify_llm" and (llm_provider == "openai" or llm_extractor_provider == "openai") and not openai_key_present:

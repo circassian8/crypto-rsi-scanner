@@ -46,6 +46,15 @@ deterministic proxy-fade `TRIGGERED_FADE`. Triggered-fade notifications dedupe
 by stable alert id. Health heartbeat delivery is once per day by default and
 can report a no-alert run.
 
+`notify_no_key` and `notify_llm` also enable a separate
+`exploratory_digest` lane during notification burn-in. It surfaces top
+suppressed/store-only/raw-evidence rows for operator learning, with explicit
+“unvalidated / low-confidence / not a trade signal” copy. It is not an alertable
+decision, cannot create `TRIGGERED_FADE`, does not write paper/live/normal RSI
+rows, and has its own cooldown/dedupe state. Source-noise and ticker-collision
+controls are excluded by default unless
+`RSI_EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_CONTROLS=1`.
+
 Notification delivery state is scoped by profile namespace for `notify_no_key`,
 `notify_llm`, and `research_send`. Scoped keys look like
 `event_alpha_notify:notify_no_key:last_sent:daily_digest` and
@@ -65,6 +74,7 @@ make event-alpha-notification-slo-report PROFILE=notify_no_key
 make event-alpha-notification-runs-report PROFILE=notify_no_key
 make event-alpha-notification-inbox PROFILE=notify_no_key
 make event-alpha-notify-fixture-smoke
+RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-telegram-recipient-check PROFILE=notify_no_key
 ```
 
 The checklist reports `READY_TO_PREVIEW`, `READY_TO_NOTIFY_NOW`, blockers,
@@ -114,10 +124,17 @@ The notification inbox joins notification run rows, alert snapshots, research
 cards, and feedback artifacts for one profile namespace. It shows sent
 notifications without feedback, would-send items without feedback, would-send
 items blocked by send guard, unreviewed high-priority and triggered-fade cards,
+exploratory digest items needing review,
 heartbeat-only runs, duplicate/in-flight suppressed runs, and provider degraded
 runs. Duplicate and in-flight skips are not treated as fresh unreviewed alerts.
 Each alert row includes a feedback helper command such as
 `make event-feedback-useful PROFILE=notify_no_key FEEDBACK_TARGET='ea:...'`.
+
+Use `make event-alpha-telegram-recipient-check PROFILE=notify_no_key` after
+configuring Telegram and the send guard. It sends a tiny research-only
+diagnostic to each configured/subscribed recipient, reports delivered/failed
+counts, and prints only redacted chat summaries. If one recipient fails, remove
+or fix it before relying on scheduled notification burn-in.
 
 Provider health has profile-scoped operator commands:
 
@@ -200,8 +217,9 @@ then `delivered`/`partial_delivered`/`failed`, or
 `skipped_duplicate`/`skipped_in_flight`/`blocked`. Deduplication uses stable
 lane keys where available: alert lanes use namespace + lane + alert ids,
 heartbeats use namespace + lane + day + health-status bucket, and daily digests
-use namespace + lane + day + digest bucket. The exact message `content_hash` is
-still stored for audit and for backward compatibility with older rows.
+and exploratory digests use namespace + lane + day + digest bucket. The exact
+message `content_hash` is still stored for audit and for backward compatibility
+with older rows.
 Recent non-terminal planned/sending rows with the same dedupe key/content hash
 are treated as in-flight for
 `RSI_EVENT_ALPHA_NOTIFICATION_IN_FLIGHT_GRACE_MINUTES` (default 10 minutes) so

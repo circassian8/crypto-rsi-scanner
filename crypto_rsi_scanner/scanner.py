@@ -98,6 +98,7 @@ from . import event_alpha_run_lock
 from . import event_alpha_router
 from . import event_alpha_scheduler
 from . import event_alpha_tuning
+from . import event_alpha_telegram_recipient_check
 from . import event_alpha_v1_readiness
 from . import event_alpha_environment_doctor
 from . import event_source_reliability
@@ -1483,6 +1484,13 @@ def _event_alpha_notification_config_from_runtime(
         max_instant_per_day=config.EVENT_ALPHA_NOTIFY_MAX_INSTANT_PER_DAY,
         health_heartbeat_enabled=config.EVENT_ALPHA_NOTIFY_HEALTH_HEARTBEAT_ENABLED,
         health_heartbeat_cooldown_hours=config.EVENT_ALPHA_NOTIFY_HEALTH_HEARTBEAT_COOLDOWN_HOURS,
+        exploratory_digest_enabled=config.EVENT_ALPHA_EXPLORATORY_DIGEST_ENABLED,
+        exploratory_digest_max_items=config.EVENT_ALPHA_EXPLORATORY_DIGEST_MAX_ITEMS,
+        exploratory_digest_min_score=config.EVENT_ALPHA_EXPLORATORY_DIGEST_MIN_SCORE,
+        exploratory_digest_cooldown_hours=config.EVENT_ALPHA_EXPLORATORY_DIGEST_COOLDOWN_HOURS,
+        exploratory_digest_include_rejection_reasons=config.EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_REJECTION_REASONS,
+        exploratory_digest_include_raw_evidence=config.EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_RAW_EVIDENCE,
+        exploratory_digest_include_controls=config.EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_CONTROLS,
     )
 
 
@@ -2431,7 +2439,7 @@ def _event_alpha_notify_cycle_body(
     storage = Storage(config.DB_PATH)
     try:
         notification_plan = event_alpha_notifications.build_notification_plan(
-            pipeline_result.router_result.alertable_decisions if pipeline_result.router_result else [],
+            pipeline_result.router_result.decisions if pipeline_result.router_result else [],
             storage=storage,
             cfg=_event_alpha_notification_config_from_runtime(profile_for_run),
             now=now,
@@ -2473,7 +2481,7 @@ def _event_alpha_notify_cycle_body(
         )
         print(f"Event Alpha notify cycle send blocked: {clock_send_blocker}.")
     elif send:
-        decisions = pipeline_result.router_result.alertable_decisions if pipeline_result.router_result else []
+        decisions = pipeline_result.router_result.decisions if pipeline_result.router_result else []
         send_result = _send_event_alpha_routed_digest(
             decisions,
             alert_cfg,
@@ -2798,6 +2806,7 @@ def event_alpha_environment_doctor_report(
         llm_extractor_enabled=config.EVENT_LLM_EXTRACTOR_ENABLED,
         openai_key_present=bool(config.OPENAI_API_KEY),
         clock_status=_event_clock_status(),
+        cryptopanic_api_token_present=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN),
         python_executable=sys.executable,
         working_directory=str(config.DATA_DIR),
     )
@@ -3039,6 +3048,7 @@ def event_alpha_export_notification_pack(
         llm_extractor_enabled=config.EVENT_LLM_EXTRACTOR_ENABLED,
         openai_key_present=bool(config.OPENAI_API_KEY),
         clock_status=_event_clock_status(),
+        cryptopanic_api_token_present=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN),
         python_executable=sys.executable,
         working_directory=str(config.DATA_DIR),
     )
@@ -3147,6 +3157,7 @@ def event_alpha_notification_checklist_report(
         clock_status=clock_status,
         preflight_blockers=preflight.blockers,
         preflight_warnings=preflight.warnings,
+        cryptopanic_api_token_present=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN),
     )
     print(event_alpha_notification_checklist.format_notification_checklist(result))
 
@@ -3197,6 +3208,38 @@ def event_alpha_send_test(
         print("Event Alpha research-only test heartbeat sent.")
     else:
         print("Event Alpha research-only test heartbeat was not delivered.")
+
+
+def event_alpha_telegram_recipient_check_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+) -> None:
+    """Send a guarded one-message diagnostic to each Telegram recipient."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "notify_no_key"
+    try:
+        profile = _apply_event_alpha_profile(selected_profile)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    storage = Storage(config.DB_PATH)
+    try:
+        recipients = storage.active_subscribers() or config.TELEGRAM_CHAT_IDS
+    finally:
+        storage.close()
+    result = event_alpha_telegram_recipient_check.run_recipient_check(
+        recipients,
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED and config.EVENT_ALERT_MODE == "research_only"),
+        telegram_token_present=bool(config.TELEGRAM_BOT_TOKEN),
+        profile=profile.name,
+        send_one=lambda message, chat_id: send_telegram_structured(
+            message,
+            parse_mode=None,
+            chat_ids=[chat_id],
+        ),
+    )
+    print(event_alpha_telegram_recipient_check.format_recipient_check(result))
 
 
 def _card_paths_by_alert_id(
@@ -3868,11 +3911,13 @@ def event_alpha_notification_inbox_report(
     delivery_rows = event_alpha_notification_delivery.load_delivery_records(
         event_alpha_notification_delivery.deliveries_path_for_context(context)
     )
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     result = event_alpha_notification_inbox.build_notification_inbox(
         notification_runs=notification_runs.rows,
         alert_rows=alerts.rows,
         feedback_rows=[record.__dict__ for record in feedback.records],
         notification_delivery_rows=delivery_rows,
+        watchlist_entries=watchlist.entries,
         research_cards_dir=context.research_cards_dir,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
@@ -5294,23 +5339,24 @@ def _send_event_alpha_routed_digest(
     namespace: str | None = None,
     pause_state: event_alpha_notification_pause.EventAlphaNotificationPauseState | None = None,
 ) -> event_alpha_pipeline.EventAlphaSendResult:
-    alertable = [decision for decision in decisions if decision.alertable]
-    if not alertable and not include_health_heartbeat:
-        print("Event Alpha routed alert sending skipped: no router-approved escalations.")
-        return event_alpha_pipeline.EventAlphaSendResult(
-            requested=True,
-            attempted=False,
-            block_reason="no router-approved escalations",
-        )
+    all_decisions = list(decisions)
+    alertable = [decision for decision in all_decisions if decision.alertable]
     storage = Storage(config.DB_PATH)
     try:
         now = now or datetime.now(timezone.utc)
         notif_cfg = _event_alpha_notification_config_from_runtime(profile)
         notif_cfg = replace(notif_cfg, enabled=cfg.enabled, mode=cfg.mode)
+        if not alertable and not include_health_heartbeat and not notif_cfg.exploratory_digest_enabled:
+            print("Event Alpha routed alert sending skipped: no router-approved escalations.")
+            return event_alpha_pipeline.EventAlphaSendResult(
+                requested=True,
+                attempted=False,
+                block_reason="no router-approved escalations",
+            )
         clock_blocker = _event_alpha_notify_fixed_clock_blocker(clock_status or _event_clock_status())
         if clock_blocker:
             plan = event_alpha_notifications.build_notification_plan(
-                alertable,
+                all_decisions,
                 storage=storage,
                 cfg=notif_cfg,
                 now=now,
@@ -5334,7 +5380,7 @@ def _send_event_alpha_routed_digest(
             return result
         recipients = storage.active_subscribers() or config.TELEGRAM_CHAT_IDS
         result = event_alpha_notifications.send_notifications(
-            alertable,
+            all_decisions,
             storage=storage,
             cfg=notif_cfg,
             now=now,
@@ -6928,6 +6974,11 @@ def cli() -> None:
         help="Send one guarded research-only Event Alpha heartbeat without running providers.",
     )
     parser.add_argument(
+        "--event-alpha-telegram-recipient-check",
+        action="store_true",
+        help="Send a guarded research-only Telegram diagnostic to each configured Event Alpha recipient.",
+    )
+    parser.add_argument(
         "--ignore-notification-pause",
         action="store_true",
         help="Allow --event-alpha-send-test to bypass the local notification pause file.",
@@ -7669,6 +7720,12 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             ignore_notification_pause=args.ignore_notification_pause,
+        )
+        return
+    if args.event_alpha_telegram_recipient_check:
+        event_alpha_telegram_recipient_check_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
         )
         return
     if args.event_alpha_notification_runs_report:

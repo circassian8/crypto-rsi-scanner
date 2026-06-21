@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import event_alpha_notification_delivery as delivery
+from . import event_alpha_notifications, event_alpha_router, event_watchlist
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class EventAlphaNotificationInboxResult:
     partial_delivered_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     would_send_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     would_send_blocked_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    exploratory_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
     triggered_fade_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
     heartbeat_only_runs: tuple[dict[str, Any], ...]
@@ -64,6 +66,7 @@ def build_notification_inbox(
     feedback_path: str | Path,
     outcomes_path: str | Path | None = None,
     notification_delivery_rows: Iterable[Mapping[str, Any]] = (),
+    watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
 ) -> EventAlphaNotificationInboxResult:
     """Join notification, alert, card, and feedback artifacts into review queues."""
     runs = [dict(row) for row in notification_runs if isinstance(row, Mapping)]
@@ -73,6 +76,10 @@ def build_notification_inbox(
     cards_dir = Path(research_cards_dir).expanduser()
     card_paths = _card_paths(cards_dir)
     reviewed_ids = _reviewed_ids(feedback)
+    watch_by_alert = {
+        event_alpha_router.alert_id_for_entry(entry): entry
+        for entry in watchlist_entries
+    }
     runs_by_id = {str(row.get("run_id") or ""): row for row in runs if row.get("run_id")}
     delivery_state_by_run = _latest_delivery_state_by_run(deliveries)
     items = [
@@ -109,6 +116,10 @@ def build_notification_inbox(
         item for item in items
         if not item.reviewed and _is_triggered_fade(item)
     )
+    exploratory_without_feedback = tuple(
+        item for item in _exploratory_items(deliveries, watch_by_alert, reviewed_ids, card_paths)
+        if not item.reviewed
+    )
     outcomes = _read_jsonl(Path(outcomes_path).expanduser()) if outcomes_path else []
     return EventAlphaNotificationInboxResult(
         profile=str(profile or "default"),
@@ -127,6 +138,7 @@ def build_notification_inbox(
         partial_delivered_without_feedback=partial_delivered_without_feedback,
         would_send_without_feedback=would_send_without_feedback,
         would_send_blocked_without_feedback=would_send_blocked_without_feedback,
+        exploratory_without_feedback=exploratory_without_feedback,
         high_priority_unreviewed=high_priority_unreviewed,
         triggered_fade_unreviewed=triggered_fade_unreviewed,
         heartbeat_only_runs=tuple(row for row in runs if _heartbeat_only(row)),
@@ -166,6 +178,7 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
     )
     _append_item_section(lines, "would-send notifications without feedback", result.would_send_without_feedback, profile=result.profile)
     _append_item_section(lines, "would-send blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
+    _append_item_section(lines, "exploratory digest items needing review", result.exploratory_without_feedback, profile=result.profile)
     _append_item_section(lines, "high-priority cards not reviewed", result.high_priority_unreviewed, profile=result.profile)
     _append_item_section(lines, "triggered-fade cards not reviewed", result.triggered_fade_unreviewed, profile=result.profile)
     _append_run_section(lines, "heartbeat-only runs", result.heartbeat_only_runs)
@@ -265,6 +278,50 @@ def _inbox_item(
         reviewed=reviewed,
         reason=str(alert.get("route_reason") or alert.get("reason") or (run or {}).get("block_reason") or "review pending"),
     )
+
+
+def _exploratory_items(
+    deliveries: Iterable[Mapping[str, Any]],
+    watch_by_alert: Mapping[str, event_watchlist.EventWatchlistEntry],
+    reviewed_ids: set[str],
+    card_paths: Mapping[str, Path],
+) -> list[EventAlphaNotificationInboxItem]:
+    items: list[EventAlphaNotificationInboxItem] = []
+    for row in delivery.latest_rows_by_delivery(deliveries):
+        if str(row.get("lane") or "") != event_alpha_notifications.LANE_EXPLORATORY_DIGEST:
+            continue
+        state = str(row.get("state") or "")
+        alert_ids = [part.strip() for part in str(row.get("alert_id") or "").split(",") if part.strip()]
+        if not alert_ids:
+            alert_ids = ["ea:exploratory"]
+        for alert_id in alert_ids:
+            entry = watch_by_alert.get(alert_id)
+            key = alert_id[3:] if alert_id.startswith("ea:") else alert_id
+            ids = {alert_id, key}
+            if entry is not None:
+                ids.update({entry.key, entry.event_id, entry.coin_id, entry.symbol, f"ea:{entry.key}"})
+            reviewed = bool(ids & reviewed_ids)
+            card_path = _path_for_card(alert_id, key, f"card_{key}", card_paths)
+            sent = state in (delivery.STATE_DELIVERED, delivery.STATE_PARTIAL_DELIVERED)
+            would_send = state in (delivery.STATE_BLOCKED, delivery.STATE_PLANNED, delivery.STATE_SENDING)
+            items.append(EventAlphaNotificationInboxItem(
+                alert_id=alert_id,
+                alert_key=key,
+                run_id=str(row.get("run_id") or ""),
+                tier=str(getattr(entry, "latest_tier", "") or "EXPLORATORY"),
+                playbook=str(getattr(entry, "latest_playbook_type", "") or "exploratory"),
+                card_path=str(card_path) if card_path else "",
+                sent=sent,
+                would_send=would_send,
+                blocked_by_guard=state == delivery.STATE_BLOCKED,
+                delivery_state=state,
+                reviewed=reviewed,
+                reason=(
+                    str(getattr(entry, "suppressed_reason", "") or "")
+                    or "exploratory digest item; low-confidence/store-only row needs review"
+                ),
+            ))
+    return items
 
 
 def _latest_delivery_state_by_run(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:

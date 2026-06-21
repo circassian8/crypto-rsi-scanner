@@ -8480,6 +8480,125 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
         assert "make event-feedback-useful PROFILE=notify_no_key FEEDBACK_TARGET='ea:high-key'" in text
 
 
+def test_event_alpha_inbox_and_daily_brief_show_exploratory_digest_separately():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_daily_brief,
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notification_inbox,
+        event_alpha_notifications as notif,
+        event_alpha_router,
+    )
+
+    decision = _notify_suppressed_decision("PUMP", score=72)
+    delivery_row = delivery.build_record(
+        run_id="run-explore",
+        alert_id=decision.alert_id,
+        profile="notify_no_key",
+        namespace="notify_no_key",
+        lane=notif.LANE_EXPLORATORY_DIGEST,
+        route="EXPLORATORY_DIGEST",
+        content_hash="hash-explore",
+        state=delivery.STATE_BLOCKED,
+        now=datetime(2026, 6, 20, 12, tzinfo=timezone.utc),
+        error_class="guard_blocked",
+        error_message="event alerts disabled",
+    ).to_row()
+    inbox = event_alpha_notification_inbox.build_notification_inbox(
+        notification_runs=[],
+        alert_rows=[],
+        feedback_rows=[],
+        notification_delivery_rows=[delivery_row],
+        watchlist_entries=[decision.entry],
+        research_cards_dir="/tmp/cards",
+        profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+        notification_runs_path="/tmp/runs.jsonl",
+        alert_store_path="/tmp/alerts.jsonl",
+        feedback_path="/tmp/feedback.jsonl",
+    )
+    assert len(inbox.exploratory_without_feedback) == 1
+    assert inbox.exploratory_without_feedback[0].alert_id == decision.alert_id
+    inbox_text = event_alpha_notification_inbox.format_notification_inbox(inbox)
+    assert "exploratory digest items needing review: 1" in inbox_text
+    assert "FEEDBACK_TARGET='ea:PUMP|proxy'" in inbox_text
+
+    router_result = event_alpha_router.EventAlphaRouterResult(
+        state_path=__import__("pathlib").Path("/tmp/watchlist.jsonl"),
+        rows_read=1,
+        decisions=[decision],
+        enabled=True,
+    )
+    brief = event_alpha_daily_brief.build_daily_brief(
+        notification_runs=[{
+            "row_type": "event_alpha_notification_run",
+            "started_at": "2026-06-20T12:00:00+00:00",
+            "lane_counts_due": {notif.LANE_EXPLORATORY_DIGEST: 1},
+            "lane_counts_sent": {notif.LANE_EXPLORATORY_DIGEST: 0},
+        }],
+        watchlist_entries=[decision.entry],
+        router_result=router_result,
+        requested_profile="notify_no_key",
+        artifact_namespace="notify_no_key",
+    )
+    assert "## Exploratory Digest" in brief
+    assert "Lane count sent/due: 0/1" in brief
+    assert "PUMP/pump" in brief
+    assert "## Alertable Decisions\n- None." in brief
+
+
+def test_event_alpha_telegram_recipient_check_is_guarded_and_redacted():
+    from crypto_rsi_scanner import event_alpha_telegram_recipient_check as check
+    from crypto_rsi_scanner import event_alpha_notification_sender as sender
+
+    refused = check.run_recipient_check(
+        ["123456"],
+        send_guard_enabled=False,
+        telegram_token_present=True,
+        profile="notify_no_key",
+        send_one=lambda message, chat_id: True,
+    )
+    assert refused.refused
+    assert "RSI_EVENT_ALERTS_ENABLED" in check.format_recipient_check(refused)
+
+    def fake_send(message, chat_id):
+        if chat_id == "bad-chat-id":
+            return sender.NotificationSendAttemptResult(
+                attempted=True,
+                recipient_count=1,
+                delivered_count=0,
+                failed_count=1,
+                chunk_count=1,
+                failed_chunks=1,
+                error_class="Forbidden",
+                error_message_safe="bot blocked token=SECRET",
+            )
+        return sender.NotificationSendAttemptResult(
+            attempted=True,
+            recipient_count=1,
+            delivered_count=1,
+            failed_count=0,
+            chunk_count=1,
+            delivered_chunks=1,
+        )
+
+    result = check.run_recipient_check(
+        ["good-chat-id", "bad-chat-id"],
+        send_guard_enabled=True,
+        telegram_token_present=True,
+        profile="notify_no_key",
+        send_one=fake_send,
+    )
+    text = check.format_recipient_check(result)
+    assert result.delivered_count == 1
+    assert result.failed_count == 1
+    assert "good-chat-id" not in text
+    assert "bad-chat-id" not in text
+    assert "SECRET" not in text
+    assert "[redacted]" in text
+    assert "Suggested next step" in text
+
+
 def test_event_alpha_degraded_heartbeat_copy_and_delivery():
     from datetime import datetime, timezone
     from types import SimpleNamespace
@@ -17187,6 +17306,63 @@ def _notify_route_decision(symbol, lane, route):
     )
 
 
+def _notify_suppressed_decision(
+    symbol,
+    *,
+    key_suffix="proxy",
+    playbook="market_anomaly_unknown",
+    relationship="ambiguous",
+    llm_role=None,
+    score=35,
+    source="fixture_source",
+    reason="raw/store-only evidence, no alertable watchlist state",
+):
+    from crypto_rsi_scanner import event_alpha_router, event_watchlist
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key=f"{symbol}|{key_suffix}",
+        cluster_id=f"{symbol}|cluster",
+        event_id=f"evt-{symbol}",
+        coin_id=symbol.lower(),
+        symbol=symbol,
+        relationship_type=relationship,
+        external_asset="SpaceX" if playbook != "source_noise_control" else None,
+        event_time="2026-06-20T13:30:00+00:00" if playbook != "source_noise_control" else None,
+        state=event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+        previous_state=None,
+        first_seen_at="2026-06-19T09:00:00+00:00",
+        last_seen_at="2026-06-19T11:00:00+00:00",
+        source_count=1,
+        highest_score=score,
+        latest_score=score,
+        latest_tier="STORE_ONLY",
+        latest_event_name=f"{symbol} exploratory catalyst",
+        latest_source=source,
+        latest_playbook_type=playbook,
+        latest_effective_playbook_type=playbook,
+        latest_llm_asset_role=llm_role,
+        latest_llm_confidence=0.82 if llm_role else None,
+        latest_market_snapshot={"price": 1.23, "return_24h": 0.42, "volume_zscore_24h": 3.4},
+        latest_score_components={
+            "market_move_volume": 65,
+            "source_quality": 55,
+            "cluster_confidence": 50,
+            "novelty_freshness": 45,
+        },
+        suppressed_reason=reason,
+        should_alert=False,
+    )
+    return event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=event_alpha_router.EventAlphaRoute.STORE_ONLY,
+        alertable=False,
+        reason=reason,
+        lane=event_alpha_router.EventAlphaRouteLane.LOCAL_ONLY,
+    )
+
+
 def test_event_alpha_run_lock_acquire_skip_recover_and_release():
     import tempfile
     from datetime import datetime, timezone
@@ -17729,6 +17905,98 @@ def test_event_alpha_notification_send_blocked_when_disabled_records_blocked():
         assert result.deliveries_blocked >= 1
         assert len(sent) == 0
         assert any(row["state"] == "blocked" for row in delivery.load_delivery_records(dcfg.path))
+
+
+def test_event_alpha_exploratory_digest_surfaces_suppressed_rows_without_alerting():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notifications as notif,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, "notify_no_key")
+        dcfg = delivery.config_for_context(ctx)
+        storage = _NotifyFakeStorage()
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        decisions = [_notify_suppressed_decision("PUMP", score=70)]
+        cfg = notif.EventAlphaNotificationConfig(
+            enabled=False,
+            exploratory_digest_enabled=True,
+            exploratory_digest_max_items=5,
+        )
+        plan = notif.build_notification_plan(decisions, storage=storage, cfg=cfg, now=now)
+        assert plan.decision_count == 0
+        assert plan.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 1
+        assert plan.would_send_count == 1
+        text = notif.format_exploratory_telegram_digest(plan.exploratory_items, profile="notify_no_key")
+        assert "Exploratory Event Alpha Digest" in text
+        assert "not a trade signal" in text
+        assert "suppression_reason=raw/store-only evidence" in text
+        assert "TRIGGERED_FADE" in text  # only in the explicit cannot-create disclaimer
+
+        sent = []
+        result = notif.send_notifications(
+            decisions,
+            storage=storage,
+            cfg=cfg,
+            now=now,
+            profile="notify_no_key",
+            send_fn=lambda message: sent.append(message) or True,
+            delivery_cfg=dcfg,
+            run_id="run-explore",
+            namespace="notify_no_key",
+        )
+        assert not result.attempted
+        assert result.deliveries_blocked == 1
+        assert result.lane_items_attempted[notif.LANE_EXPLORATORY_DIGEST] == 1
+        assert result.lane_items_attempted[notif.LANE_TRIGGERED_FADE] == 0
+        assert sent == []
+        rows = delivery.load_delivery_records(dcfg.path)
+        assert rows[-1]["lane"] == notif.LANE_EXPLORATORY_DIGEST
+        assert rows[-1]["state"] == delivery.STATE_BLOCKED
+
+
+def test_event_alpha_exploratory_digest_excludes_controls_and_has_own_cooldown():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notifications as notif
+
+    storage = _NotifyFakeStorage()
+    now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+    cfg = notif.EventAlphaNotificationConfig(
+        enabled=True,
+        exploratory_digest_enabled=True,
+        exploratory_digest_cooldown_hours=24,
+        daily_digest_cooldown_hours=24,
+    )
+    notif.record_lane_sent(storage, notif.LANE_DAILY_DIGEST, item_count=1, now=now, cfg=cfg)
+    good = _notify_suppressed_decision("GOOD", score=60)
+    noise = _notify_suppressed_decision(
+        "BTC",
+        key_suffix="source_noise",
+        playbook="source_noise_control",
+        relationship="ticker_word_collision",
+        llm_role="source_noise",
+        score=90,
+    )
+    plan = notif.build_notification_plan([good, noise], storage=storage, cfg=cfg, now=now)
+    assert [item.decision.alert_id for item in plan.exploratory_items] == [good.alert_id]
+    assert notif.LANE_DAILY_DIGEST in plan.blocked_by_lane or plan.lane_counts[notif.LANE_DAILY_DIGEST] == 0
+    assert plan.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 1
+
+    notif.record_lane_sent(storage, notif.LANE_EXPLORATORY_DIGEST, item_count=1, now=now, cfg=cfg)
+    blocked = notif.build_notification_plan([good], storage=storage, cfg=cfg, now=now)
+    assert blocked.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 0
+    assert "cooldown active" in blocked.blocked_by_lane[notif.LANE_EXPLORATORY_DIGEST]
+
+    include_controls = notif.EventAlphaNotificationConfig(
+        enabled=True,
+        exploratory_digest_enabled=True,
+        exploratory_digest_include_controls=True,
+    )
+    with_controls = notif.build_notification_plan([noise], storage=_NotifyFakeStorage(), cfg=include_controls, now=now)
+    assert with_controls.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 1
 
 
 def test_event_alpha_delivery_report_groups_by_state_and_redacts_secrets():

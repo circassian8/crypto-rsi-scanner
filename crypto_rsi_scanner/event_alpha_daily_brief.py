@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 from . import (
     event_alpha_calibration,
     event_alpha_artifacts,
+    event_alpha_notifications,
     event_alpha_notification_runs,
     event_alpha_explain,
     event_alpha_run_ledger,
@@ -158,6 +159,28 @@ def build_daily_brief(
         for decision in alertable[:10]:
             entry = decision.entry
             lines.append(f"- {decision.route.value}: {entry.symbol}/{entry.coin_id} state={entry.state} score={entry.latest_score} reason={decision.reason}")
+    else:
+        lines.append("- None.")
+    exploratory = event_alpha_notifications.select_exploratory_candidates(
+        decisions,
+        cfg=event_alpha_notifications.EventAlphaNotificationConfig(
+            exploratory_digest_enabled=True,
+            exploratory_digest_max_items=5,
+        ),
+        now=generated,
+    )
+    lines.extend(["", "## Exploratory Digest"])
+    exploratory_due = _lane_count(latest_notification, "lane_counts_due", event_alpha_notifications.LANE_EXPLORATORY_DIGEST)
+    exploratory_sent = _lane_count(latest_notification, "lane_counts_sent", event_alpha_notifications.LANE_EXPLORATORY_DIGEST)
+    lines.append(f"- Lane count sent/due: {exploratory_sent}/{exploratory_due}")
+    lines.append("- Unvalidated suppressed/store-only rows for learning; not alertable and not a trade signal.")
+    if exploratory:
+        for item in exploratory[:5]:
+            entry = item.decision.entry
+            lines.append(
+                f"- {entry.symbol}/{entry.coin_id} score={entry.latest_score} "
+                f"playbook={entry.latest_playbook_type or 'unknown'} reason={entry.suppressed_reason or item.decision.reason}"
+            )
     else:
         lines.append("- None.")
     lines.extend(["", "## Active Watchlist"])
@@ -342,6 +365,18 @@ def _float(value: object) -> float:
         return float(value or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _lane_count(row: Mapping[str, Any] | None, field: str, lane: str) -> int:
+    if not row:
+        return 0
+    counts = row.get(field) or {}
+    if not isinstance(counts, Mapping):
+        return 0
+    try:
+        return int(counts.get(lane) or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _format_clock_status(status: Mapping[str, Any]) -> str:

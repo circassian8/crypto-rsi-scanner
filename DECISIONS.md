@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-22 - Keep exploratory notification digest separate from alertable lanes
+**Status:** accepted
+**Decision:** Event Alpha may send a separate `exploratory_digest` during
+day-1 notification burn-in for suppressed, store-only, or raw-evidence rows that
+are useful for operator learning. The lane has its own cooldown/dedupe state and
+must remain separate from `daily_digest`, `instant_escalation`, `triggered_fade`,
+and heartbeat lanes. Exploratory rows are not alertable decisions, are not alert
+snapshots unless a future explicit artifact policy says otherwise, and cannot
+create `TRIGGERED_FADE`, paper trades, live signal rows, or execution. Source
+noise and ticker-collision controls stay excluded by default unless the operator
+explicitly enables control inclusion.
+**Why:** Day-1 operators need to see why the radar is suppressing candidates and
+learn from missed/weak rows without promoting them into research alerts or
+confusing them with delivery failures.
+**Revisit when:** Reviewed feedback shows the exploratory lane is either too
+noisy to be useful or mature enough to become a separate sampled-control artifact
+with explicit retention and review policy.
+
 ## 2026-06-20 - Treat no-send previews separately from delivery failures
 **Status:** accepted
 **Decision:** Event Alpha notification SLO reports distinguish intentional

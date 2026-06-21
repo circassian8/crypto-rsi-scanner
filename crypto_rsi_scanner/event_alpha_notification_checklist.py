@@ -44,6 +44,7 @@ def build_notification_checklist(
     clock_status: Mapping[str, Any] | None = None,
     preflight_blockers: tuple[str, ...] = (),
     preflight_warnings: tuple[str, ...] = (),
+    cryptopanic_api_token_present: bool = False,
 ) -> EventAlphaNotificationChecklistResult:
     """Build a day-1 notification startup checklist without sending."""
     raw_preflight_blockers = list(preflight_blockers)
@@ -71,6 +72,11 @@ def build_notification_checklist(
     if profile == "notify_llm" and "OPENAI_API_KEY" in " ".join(raw_preflight_blockers):
         preview_blockers.append("use PROFILE=notify_no_key until OPENAI_API_KEY is configured")
         blockers.append("use PROFILE=notify_no_key until OPENAI_API_KEY is configured")
+    if not cryptopanic_api_token_present:
+        warnings.append(
+            "optional CryptoPanic API token missing; not blocking notify_no_key/notify_llm, "
+            "but recommended for broader catalyst coverage"
+        )
     backoff_rows = tuple(
         f"{row.get('provider_key') or key} disabled_until={row.get('disabled_until')}"
         for key, row in (provider_health_rows or {}).items()

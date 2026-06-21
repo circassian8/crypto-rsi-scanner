@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-22 — Add exploratory Event Alpha notification digest · Codex
+**Why:** Day-1 Event Alpha notifications needed a way to surface suppressed,
+store-only, and low-confidence research rows without promoting them into normal
+alertable lanes or making them look like trades.
+**Changes:**
+- Added a separate `exploratory_digest` notification lane with its own config,
+  profile defaults, cooldown/dedupe handling, blocked-delivery accounting, and
+  Telegram copy that labels rows as unvalidated research evidence.
+- Wired exploratory candidates into notification planning, daily briefs, inbox
+  review, run output, and `notify_no_key`/`notify_llm` profiles while keeping
+  alertable instant/daily/triggered lanes unchanged.
+- Added a guarded per-recipient Telegram diagnostic command and Make target so
+  operators can verify individual chat delivery without exposing chat IDs.
+- Documented the new lane, recipient check, optional CryptoPanic source warning,
+  and research-only boundaries in the runbook, roadmap, decisions, and env
+  example.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (409/409 passed); `make event-llm-eval
+PYTHON=python3` (9/9 passed); `make event-llm-extract-eval PYTHON=python3`
+(7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11 passed);
+`make verify PYTHON=python3`; `make -n event-alpha-telegram-recipient-check
+PROFILE=notify_no_key PYTHON=python3`; no-send notify-cycle smoke under `/tmp`;
+blocked would-send notify-cycle smoke under `/tmp` recorded 1 blocked
+exploratory digest and no actual sends.
+**Notes/risks:** The exploratory digest is review-only. It cannot create
+`TRIGGERED_FADE`, write paper/live rows, or route normal RSI alerts; source-noise
+and ticker-collision controls are excluded by default unless explicitly enabled.
+
 ## 2026-06-21 — Fix notification SLO latest-run status selection · Codex
 **Why:** A full `notify_llm` run delivered its guarded health heartbeat, but the
 SLO report still showed `NO_SEND_CONFIG` because an older no-send bootstrap row
