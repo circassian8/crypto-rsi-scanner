@@ -111,6 +111,7 @@ from . import event_provider_health
 from . import event_provider_status
 from . import event_price_history
 from . import event_research_cards
+from . import event_source_enrichment
 from . import event_validation
 from . import event_watchlist
 from . import event_watchlist_enrichment
@@ -1511,6 +1512,31 @@ def _event_catalyst_search_config_from_runtime(
     )
 
 
+def _event_impact_hypothesis_search_config_from_runtime(
+    *,
+    enabled_override: bool | None = None,
+) -> event_catalyst_search.EventImpactHypothesisSearchConfig:
+    return event_catalyst_search.EventImpactHypothesisSearchConfig(
+        enabled=config.EVENT_IMPACT_HYPOTHESIS_SEARCH_ENABLED if enabled_override is None else enabled_override,
+        max_hypotheses=config.EVENT_IMPACT_HYPOTHESIS_MAX_HYPOTHESES,
+        max_queries_per_hypothesis=config.EVENT_IMPACT_HYPOTHESIS_MAX_QUERIES_PER_HYPOTHESIS,
+        max_results_per_query=config.EVENT_CATALYST_SEARCH_MAX_RESULTS_PER_QUERY,
+        min_confidence=config.EVENT_IMPACT_HYPOTHESIS_MIN_CONFIDENCE,
+        min_result_confidence=config.EVENT_IMPACT_HYPOTHESIS_MIN_RESULT_CONFIDENCE,
+        require_validated_identity=config.EVENT_IMPACT_HYPOTHESIS_REQUIRE_VALIDATED_IDENTITY,
+    )
+
+
+def _event_source_enrichment_config_from_runtime() -> event_source_enrichment.EventSourceEnrichmentConfig:
+    return event_source_enrichment.EventSourceEnrichmentConfig(
+        enabled=config.EVENT_SOURCE_ENRICHMENT_ENABLED,
+        cache_dir=config.EVENT_SOURCE_ENRICHMENT_CACHE_DIR,
+        timeout_seconds=config.EVENT_SOURCE_ENRICHMENT_TIMEOUT_SECONDS,
+        max_chars=config.EVENT_SOURCE_ENRICHMENT_MAX_CHARS,
+        min_source_confidence=config.EVENT_SOURCE_ENRICHMENT_MIN_SOURCE_CONFIDENCE,
+    )
+
+
 def _event_feedback_config_from_runtime(path: str | None = None) -> event_feedback.EventFeedbackConfig:
     feedback_path = Path(path).expanduser() if path else config.EVENT_ALPHA_FEEDBACK_PATH
     if not feedback_path.is_absolute():
@@ -1954,6 +1980,7 @@ def event_alpha_cycle(
         relationship_provider = _event_llm_provider(relationship_cfg)
     catalyst_search_cfg = _event_catalyst_search_config_from_runtime()
     catalyst_search_provider = _event_catalyst_search_provider(catalyst_search_cfg)
+    hypothesis_search_cfg = _event_impact_hypothesis_search_config_from_runtime()
     alert_cfg = _event_alert_config_from_runtime()
     pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
         load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
@@ -1967,6 +1994,9 @@ def event_alpha_cycle(
         extraction_cfg=extraction_cfg,
         catalyst_search_provider=catalyst_search_provider,
         catalyst_search_cfg=catalyst_search_cfg,
+        hypothesis_search_provider=catalyst_search_provider,
+        hypothesis_search_cfg=hypothesis_search_cfg,
+        source_enrichment_cfg=_event_source_enrichment_config_from_runtime(),
         relationship_provider=relationship_provider,
         relationship_cfg=relationship_cfg,
         watchlist_cfg=_event_watchlist_config_from_runtime(),
@@ -2139,6 +2169,7 @@ def _empty_notification_pipeline_result(
         discovery_result=EventDiscoveryResult((), (), (), (), ()),
         alerts=[],
         catalyst_search_result=None,
+        hypothesis_search_result=None,
         anomaly_lifecycle_result=None,
         extraction_rows=[],
         relationship_rows=[],
@@ -2347,6 +2378,9 @@ def _event_alpha_notify_cycle_body(
                 enabled_override=False if catalyst_budget_warning else None
             )
             catalyst_search_provider = None if catalyst_budget_warning else _event_catalyst_search_provider(catalyst_search_cfg)
+            hypothesis_search_cfg = _event_impact_hypothesis_search_config_from_runtime(
+                enabled_override=False if catalyst_budget_warning else None
+            )
             watchlist_budget_warning = budget.warning_if_low("watchlist_refresh")
             if watchlist_budget_warning:
                 pre_stage_warnings.append(watchlist_budget_warning)
@@ -2363,6 +2397,9 @@ def _event_alpha_notify_cycle_body(
                     extraction_cfg=extraction_cfg,
                     catalyst_search_provider=catalyst_search_provider,
                     catalyst_search_cfg=catalyst_search_cfg,
+                    hypothesis_search_provider=catalyst_search_provider,
+                    hypothesis_search_cfg=hypothesis_search_cfg,
+                    source_enrichment_cfg=_event_source_enrichment_config_from_runtime(),
                     relationship_provider=relationship_provider,
                     relationship_cfg=relationship_cfg,
                     watchlist_cfg=_event_watchlist_config_from_runtime(),

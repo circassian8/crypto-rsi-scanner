@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-23 - Keep impact matching exact and sector hypotheses non-token until validation
+**Status:** accepted
+**Decision:** Event Alpha impact hypotheses must use boundary/phrase-aware
+category matching rather than substring matching, and broad sector/venue/
+infrastructure hypotheses must remain non-token watchlist rows until separate
+source evidence validates a specific asset identity. Candidate symbols may be
+stored as metadata and used for validation searches, but unvalidated hypotheses
+render as `SECTOR` rows. Validation search can promote a hypothesis to token
+scope only after identity-safe evidence links the candidate asset to the
+catalyst/sector.
+**Why:** Substring matches (`match`/`matched`, `open`/`OpenAI`, generic `hype`,
+publisher/source words) and eager sector-to-token rows can make the radar look
+more certain than the evidence supports. The system should discover broadly but
+promote narrowly.
+**Revisit when:** A reviewed validation sample proves that a specific category
+can safely create token-level hypotheses without separate validation evidence.
+
 ## 2026-06-23 - Treat source/search failures as observability, not eligibility
 **Status:** accepted
 **Decision:** Event Alpha source-intake and catalyst-search failures should be

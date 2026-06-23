@@ -113,6 +113,17 @@ class EventCatalystSearchConfig:
 
 
 @dataclass(frozen=True)
+class EventImpactHypothesisSearchConfig:
+    enabled: bool = False
+    max_hypotheses: int = 10
+    max_queries_per_hypothesis: int = 4
+    max_results_per_query: int = 5
+    min_confidence: float = 0.55
+    min_result_confidence: float = 0.50
+    require_validated_identity: bool = True
+
+
+@dataclass(frozen=True)
 class CatalystSearchScore:
     score: int
     reason_codes: tuple[str, ...] = ()
@@ -612,6 +623,102 @@ def run_catalyst_search(
     )
 
 
+def run_hypothesis_search(
+    hypotheses: Iterable[object],
+    provider: CatalystSearchProvider,
+    *,
+    cfg: EventImpactHypothesisSearchConfig | None = None,
+    now: datetime | None = None,
+) -> CatalystSearchRunResult:
+    """Search for asset-validation evidence around impact hypotheses.
+
+    This is separate from market-anomaly catalyst search: accepted rows are
+    source evidence for validating sector/venue/infrastructure hypotheses, not
+    attachments to market anomaly parents.
+    """
+    cfg = cfg or EventImpactHypothesisSearchConfig()
+    provider_name = getattr(provider, "name", "hypothesis_search")
+    if not cfg.enabled:
+        return CatalystSearchRunResult(provider=provider_name, skip_reasons={"profile_disabled": 1})
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    eligible = _eligible_hypotheses(hypotheses, cfg)
+    queries = _queries_for_hypotheses(eligible, cfg)
+    skip_reasons = _hypothesis_search_skip_reasons(tuple(hypotheses), eligible, queries, cfg)
+    warnings: list[str] = []
+    try:
+        provider_result = provider.search(
+            queries,
+            max_results_per_query=cfg.max_results_per_query,
+            now=observed,
+        )
+        warnings.extend(provider_result.warnings)
+        provider_events = provider_result.result_events
+        provider_rejected = list(provider_result.rejected_result_events)
+        skip_reasons = _merge_reason_counts(
+            skip_reasons,
+            getattr(provider_result, "skip_reasons", {}) or {},
+            _skip_reasons_from_warnings(provider_result.warnings),
+        )
+    except Exception as exc:  # noqa: BLE001 - research providers must fail soft.
+        provider_reason = "provider_backoff" if "backoff" in str(exc).casefold() else "provider_unavailable"
+        return CatalystSearchRunResult(
+            provider=provider_name,
+            queries=queries,
+            warnings=(f"hypothesis search provider failed: {exc}",),
+            query_count=len(queries),
+            skip_reasons=_merge_reason_counts(skip_reasons, {provider_reason: 1}),
+        )
+
+    accepted_results: list[SearchResultEvent] = []
+    rejected_results: list[SearchResultEvent] = list(provider_rejected)
+    threshold = _confidence_threshold(cfg.min_result_confidence)
+    seen_content: set[str] = set()
+    for result in provider_events:
+        score = score_search_result(result.raw_event, result.query, None, now=observed)
+        reasons = list(score.reason_codes)
+        content_key = result.raw_event.content_hash or _content_hash(result.raw_event.raw_json or {})
+        if content_key in seen_content:
+            score = CatalystSearchScore(max(0, score.score - 25), (*score.reason_codes, "duplicate_content_penalty"))
+            reasons = list(score.reason_codes)
+        else:
+            seen_content.add(content_key)
+        identity_ok = result_mentions_anomaly_identity(result.raw_event, result.query, None)
+        if cfg.require_validated_identity and not identity_ok:
+            reasons.append("hypothesis_identity_validation_required")
+            rejected_results.append(replace(
+                result,
+                result_score=min(score.score, 45),
+                result_score_reasons=tuple(dict.fromkeys(reasons)),
+                accepted=False,
+            ))
+            continue
+        scored = replace(
+            result,
+            raw_event=_annotate_hypothesis_search_result(result.raw_event, score.score, reasons, result.query),
+            result_score=score.score,
+            result_score_reasons=tuple(dict.fromkeys(reasons)),
+            accepted=score.score >= threshold,
+        )
+        if scored.accepted:
+            accepted_results.append(scored)
+        else:
+            rejected_results.append(scored)
+    return CatalystSearchRunResult(
+        provider=provider_name,
+        queries=queries,
+        result_events=tuple(accepted_results),
+        rejected_result_events=tuple(rejected_results),
+        warnings=tuple(dict.fromkeys(warnings)),
+        provider_fetch_count=provider_result.provider_fetch_count,
+        provider_cache_hits=provider_result.provider_cache_hits,
+        provider_cache_misses=provider_result.provider_cache_misses,
+        query_count=len(queries),
+        result_count=len(accepted_results),
+        rejected_count=len(rejected_results),
+        skip_reasons=skip_reasons,
+    )
+
+
 def generate_search_queries_for_anomaly(raw_market_anomaly_event: RawDiscoveredEvent) -> tuple[str, ...]:
     """Return deterministic review queries for a market-anomaly raw event."""
     identity = _identity_for_raw_event(raw_market_anomaly_event)
@@ -1028,6 +1135,155 @@ def _queries_for_anomalies(
             max_queries=cfg.max_queries_per_anomaly,
         ))
     return tuple(out)
+
+
+def _eligible_hypotheses(
+    hypotheses: Iterable[object],
+    cfg: EventImpactHypothesisSearchConfig,
+) -> tuple[object, ...]:
+    candidates: list[tuple[float, str, object]] = []
+    for hypothesis in hypotheses:
+        try:
+            confidence = float(getattr(hypothesis, "confidence", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        status = str(getattr(hypothesis, "status", "") or "")
+        if status == "validated":
+            continue
+        if confidence < cfg.min_confidence:
+            continue
+        if not tuple(getattr(hypothesis, "candidate_symbols", ()) or ()):
+            continue
+        candidates.append((confidence, str(getattr(hypothesis, "hypothesis_id", "") or ""), hypothesis))
+    candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return tuple(item[2] for item in candidates[: max(0, cfg.max_hypotheses)])
+
+
+def _queries_for_hypotheses(
+    hypotheses: Iterable[object],
+    cfg: EventImpactHypothesisSearchConfig,
+) -> tuple[SearchQuery, ...]:
+    out: list[SearchQuery] = []
+    for hypothesis in hypotheses:
+        base_queries = generate_search_queries_for_hypothesis(hypothesis)[: max(0, cfg.max_queries_per_hypothesis)]
+        identity_by_query = _hypothesis_query_identities(hypothesis, base_queries)
+        for idx, query_text in enumerate(base_queries):
+            identity = identity_by_query.get(query_text) or _HypothesisIdentity(symbol="SECTOR")
+            base = SearchQuery(
+                anomaly_raw_id=str(getattr(hypothesis, "hypothesis_id", "") or "hypothesis"),
+                query=query_text,
+                symbol=identity.symbol,
+                rank=idx + 1,
+                coin_id=identity.coin_id,
+                project_name=identity.project_name,
+                aliases=identity.aliases,
+                contract_addresses=identity.contract_addresses,
+                is_common_word_symbol=identity.symbol.upper() in COMMON_WORD_SYMBOLS,
+                identity_terms=identity.identity_terms,
+            )
+            score = score_search_query(base, None)
+            out.append(replace(base, score=score.score, score_reasons=score.reason_codes))
+    return tuple(out)
+
+
+@dataclass(frozen=True)
+class _HypothesisIdentity:
+    symbol: str
+    coin_id: str | None = None
+    project_name: str | None = None
+    aliases: tuple[str, ...] = ()
+    contract_addresses: tuple[str, ...] = ()
+
+    @property
+    def identity_terms(self) -> tuple[str, ...]:
+        terms = [self.project_name, self.coin_id, self.coin_id.replace("-", " ") if self.coin_id else None, *self.aliases]
+        return tuple(dict.fromkeys(str(term).strip() for term in terms if str(term or "").strip()))
+
+
+def _hypothesis_query_identities(hypothesis: object, query_texts: Iterable[str]) -> dict[str, _HypothesisIdentity]:
+    symbols = tuple(str(symbol).strip().upper() for symbol in getattr(hypothesis, "candidate_symbols", ()) or () if str(symbol).strip())
+    coin_ids = tuple(str(coin_id).strip() for coin_id in getattr(hypothesis, "candidate_coin_ids", ()) or () if str(coin_id).strip())
+    out: dict[str, _HypothesisIdentity] = {}
+    for query in query_texts:
+        query_clean = clean_text(query)
+        for idx, symbol in enumerate(symbols):
+            if not symbol:
+                continue
+            coin_id = coin_ids[idx] if idx < len(coin_ids) else None
+            symbol_pattern = rf"(?<![a-z0-9]){re.escape(symbol.casefold())}(?![a-z0-9])"
+            coin_text = clean_text(coin_id or "")
+            if re.search(symbol_pattern, query_clean) or (coin_text and coin_text in query_clean):
+                out[query] = _HypothesisIdentity(
+                    symbol=symbol,
+                    coin_id=coin_id,
+                    project_name=coin_id.replace("-", " ").title() if coin_id else None,
+                    aliases=(coin_id.replace("-", " ") if coin_id else ""),
+                )
+                break
+    return out
+
+
+def _hypothesis_search_skip_reasons(
+    all_hypotheses: tuple[object, ...],
+    eligible: tuple[object, ...],
+    queries: tuple[SearchQuery, ...],
+    cfg: EventImpactHypothesisSearchConfig,
+) -> dict[str, int]:
+    reasons: dict[str, int] = {}
+    if not cfg.enabled:
+        reasons["profile_disabled"] = 1
+        return reasons
+    if not all_hypotheses:
+        return reasons
+    if not eligible:
+        low_confidence = 0
+        missing_assets = 0
+        already_validated = 0
+        for hypothesis in all_hypotheses:
+            status = str(getattr(hypothesis, "status", "") or "")
+            if status == "validated":
+                already_validated += 1
+                continue
+            try:
+                confidence = float(getattr(hypothesis, "confidence", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                confidence = 0.0
+            if confidence < cfg.min_confidence:
+                low_confidence += 1
+            elif not tuple(getattr(hypothesis, "candidate_symbols", ()) or ()):
+                missing_assets += 1
+        if low_confidence:
+            reasons["low_hypothesis_confidence"] = low_confidence
+        if missing_assets:
+            reasons["hypothesis_assets_missing"] = missing_assets
+        if already_validated:
+            reasons["already_validated"] = already_validated
+        return reasons
+    if not queries:
+        reasons["hypothesis_queries_empty"] = len(eligible)
+    return reasons
+
+
+def _annotate_hypothesis_search_result(
+    raw_event: RawDiscoveredEvent,
+    score: int,
+    reasons: Iterable[str],
+    query: SearchQuery,
+) -> RawDiscoveredEvent:
+    return _annotate_raw_event(
+        raw_event,
+        {
+            "impact_hypothesis_search": {
+                "role": "validation_source_evidence",
+                "hypothesis_id": query.anomaly_raw_id,
+                "query": query.query,
+                "symbol": query.symbol,
+                "score": score,
+                "reasons": list(reasons),
+                "research_only": True,
+            }
+        },
+    )
 
 
 def _confidence_threshold(value: float) -> int:

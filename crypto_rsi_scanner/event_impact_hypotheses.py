@@ -46,6 +46,13 @@ class HypothesisStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class HypothesisScope(str, Enum):
+    SECTOR = "sector"
+    TOKEN = "token"
+    VENUE = "venue"
+    INFRASTRUCTURE = "infrastructure"
+
+
 @dataclass(frozen=True)
 class EventImpactHypothesis:
     hypothesis_id: str
@@ -56,6 +63,7 @@ class EventImpactHypothesis:
     candidate_sectors: tuple[str, ...]
     candidate_symbols: tuple[str, ...]
     candidate_coin_ids: tuple[str, ...] = ()
+    hypothesis_scope: str = HypothesisScope.SECTOR.value
     direction_hint: str = "unknown"
     playbook_hint: str | None = None
     confidence: float = 0.0
@@ -100,7 +108,7 @@ _CATEGORY_RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "category": ImpactCategory.SPORTS_FAN_PROXY,
-        "keywords": ("world cup", "champions league", "match", "fixture", "kickoff", "fan token"),
+        "keywords": ("world cup", "champions league", "fixture", "kickoff", "fan token", "sports event"),
         "secondary": ("fan token", "prediction market", "sports", "team"),
         "sectors": ("fan_tokens", "prediction_markets"),
         "direction": "up_then_fade",
@@ -108,8 +116,8 @@ _CATEGORY_RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "category": ImpactCategory.POLITICAL_MEME_PROXY,
-        "keywords": ("election", "inauguration", "president", "trump", "biden", "political"),
-        "secondary": ("meme", "prediction market", "polymarket", "vote"),
+        "keywords": ("election", "inauguration", "campaign", "debate", "vote", "political"),
+        "secondary": ("meme", "prediction market", "polymarket", "ballot", "candidate"),
         "sectors": ("political_meme_tokens", "prediction_markets"),
         "direction": "up_then_fade",
         "playbook": "political_meme_event",
@@ -124,8 +132,8 @@ _CATEGORY_RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "category": ImpactCategory.PREDICTION_MARKET_INFRA,
-        "keywords": ("prediction market", "polymarket", "oracle", "resolution market"),
-        "secondary": ("oracle", "market", "settlement", "event"),
+        "keywords": ("prediction market", "polymarket", "resolution market"),
+        "secondary": ("oracle", "settlement", "resolution", "infrastructure", "data provider", "chainlink", "uma", "pyth"),
         "sectors": ("prediction_markets", "oracle_infra"),
         "direction": "up",
         "playbook": "infrastructure_mention",
@@ -156,7 +164,7 @@ _CATEGORY_RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "category": ImpactCategory.SECURITY_OR_REGULATORY_SHOCK,
-        "keywords": ("exploit", "hack", "lawsuit", "sec ", "cftc", "regulatory", "security incident"),
+        "keywords": ("exploit", "hack", "lawsuit", "sec", "cftc", "regulatory", "security incident"),
         "secondary": ("probe", "charges", "investigation", "attack"),
         "sectors": ("direct_token_events", "infrastructure_tokens"),
         "direction": "volatility",
@@ -256,16 +264,25 @@ def validate_hypotheses_with_raw_events(
     for hypothesis in hypotheses:
         reasons: list[str] = []
         rejections: list[str] = []
+        matched_symbols: list[str] = []
+        matched_coin_ids: list[str] = []
         for raw in rows:
-            status, reason = _validation_reason(raw, hypothesis)
+            status, reason, symbol, coin_id = _validation_reason(raw, hypothesis)
             if status == "accepted" and reason:
                 reasons.append(reason)
+                if symbol:
+                    matched_symbols.append(symbol)
+                if coin_id:
+                    matched_coin_ids.append(coin_id)
             elif reason:
                 rejections.append(reason)
         if reasons:
             out.append(replace(
                 hypothesis,
                 status=HypothesisStatus.VALIDATED.value,
+                hypothesis_scope=HypothesisScope.TOKEN.value,
+                candidate_symbols=tuple(dict.fromkeys(matched_symbols)) or hypothesis.candidate_symbols,
+                candidate_coin_ids=tuple(dict.fromkeys(matched_coin_ids)) or hypothesis.candidate_coin_ids,
                 validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
             ))
         elif rejections:
@@ -334,6 +351,7 @@ def _hypothesis_from_rule(
     category_value = category.value if isinstance(category, ImpactCategory) else str(category)
     sectors = tuple(str(value) for value in rule.get("sectors", ()) if str(value))
     symbols, coin_ids = _assets_from_taxonomy(sectors, taxonomy)
+    scope = _hypothesis_scope(category_value, text)
     confidence = _hypothesis_confidence(event, rule, text, raws, cluster)
     quotes = _evidence_quotes(text, (*rule.get("keywords", ()), *rule.get("secondary", ())))
     status = (
@@ -350,6 +368,7 @@ def _hypothesis_from_rule(
         candidate_sectors=sectors,
         candidate_symbols=symbols,
         candidate_coin_ids=coin_ids,
+        hypothesis_scope=scope,
         direction_hint=str(rule.get("direction") or "unknown"),
         playbook_hint=str(rule.get("playbook") or ""),
         confidence=confidence,
@@ -368,32 +387,72 @@ def _matched_rules(text: str, event: NormalizedEvent) -> tuple[Mapping[str, Any]
     event_type = clean_text(event.event_type or "")
     matches: list[Mapping[str, Any]] = []
     for rule in _CATEGORY_RULES:
-        keywords = tuple(str(value) for value in rule.get("keywords", ()))
-        secondary = tuple(str(value) for value in rule.get("secondary", ()))
-        primary_hit = any(clean_text(keyword) in text for keyword in keywords if clean_text(keyword))
-        secondary_hit = any(clean_text(keyword) in text for keyword in secondary if clean_text(keyword))
         category = rule["category"]
-        if category == ImpactCategory.LISTING_LIQUIDITY_EVENT and "listing" in event_type:
-            primary_hit = True
-        if category == ImpactCategory.PERP_VENUE_ATTENTION and "perp" in event_type:
-            primary_hit = True
-        if category == ImpactCategory.UNLOCK_SUPPLY_PRESSURE and any(token in event_type for token in ("unlock", "airdrop", "tge")):
-            primary_hit = True
-        if primary_hit and (secondary_hit or _category_can_match_primary_only(category)):
+        if _rule_matches(rule, text, event_type, category):
             matches.append(rule)
     return tuple(matches)
 
 
-def _category_can_match_primary_only(category: ImpactCategory) -> bool:
-    return category in {
-        ImpactCategory.STABLECOIN_REGULATORY,
-        ImpactCategory.SPORTS_FAN_PROXY,
+def _rule_matches(rule: Mapping[str, Any], text: str, event_type: str, category: ImpactCategory) -> bool:
+    keywords = tuple(str(value) for value in rule.get("keywords", ()))
+    secondary = tuple(str(value) for value in rule.get("secondary", ()))
+    primary_hit = _any_term_hit(text, keywords)
+    secondary_hit = _any_term_hit(text, secondary)
+
+    if category == ImpactCategory.LISTING_LIQUIDITY_EVENT and _term_hit(event_type, "listing"):
+        primary_hit = True
+    if category == ImpactCategory.PERP_VENUE_ATTENTION and _term_hit(event_type, "perp"):
+        primary_hit = True
+    if category == ImpactCategory.UNLOCK_SUPPLY_PRESSURE and any(_term_hit(event_type, token) for token in ("unlock", "airdrop", "tge")):
+        primary_hit = True
+
+    if category == ImpactCategory.SPORTS_FAN_PROXY:
+        return primary_hit and (_any_term_hit(text, ("fan token", "sports", "prediction market", "team", "fixture", "kickoff")) or _term_hit(event_type, "sports"))
+    if category == ImpactCategory.POLITICAL_MEME_PROXY:
+        political_context = primary_hit or _term_hit(event_type, "political")
+        proxy_context = _any_term_hit(text, ("meme", "prediction market", "polymarket", "token", "coin"))
+        return political_context and proxy_context
+    if category == ImpactCategory.PREDICTION_MARKET_INFRA:
+        return _any_term_hit(text, ("prediction market", "polymarket", "resolution market")) and _any_term_hit(
+            text,
+            ("oracle", "settlement", "resolution", "infrastructure", "data provider", "chainlink", "uma", "pyth"),
+        )
+    if category == ImpactCategory.STABLECOIN_REGULATORY:
+        return _any_term_hit(text, ("stablecoin", "genius act", "money market", "treasury reserve", "reserve fund")) and _any_term_hit(
+            text,
+            ("regulation", "regulatory", "bill", "senate", "house", "approval", "reserve"),
+        )
+    if category in {
+        ImpactCategory.AI_IPO_PROXY,
+        ImpactCategory.RWA_PREIPO_PROXY,
+        ImpactCategory.TOKENIZED_STOCK_VENUE,
+    }:
+        return primary_hit and secondary_hit
+    if category in {
         ImpactCategory.LISTING_LIQUIDITY_EVENT,
         ImpactCategory.PERP_VENUE_ATTENTION,
         ImpactCategory.UNLOCK_SUPPLY_PRESSURE,
         ImpactCategory.SECURITY_OR_REGULATORY_SHOCK,
-        ImpactCategory.PREDICTION_MARKET_INFRA,
-    }
+    }:
+        return primary_hit
+    return primary_hit and secondary_hit
+
+
+def _hypothesis_scope(category: str, text: str) -> str:
+    if category == ImpactCategory.PREDICTION_MARKET_INFRA.value:
+        return HypothesisScope.INFRASTRUCTURE.value
+    if category in {
+        ImpactCategory.TOKENIZED_STOCK_VENUE.value,
+        ImpactCategory.PERP_VENUE_ATTENTION.value,
+    }:
+        return HypothesisScope.VENUE.value
+    if category in {
+        ImpactCategory.LISTING_LIQUIDITY_EVENT.value,
+        ImpactCategory.UNLOCK_SUPPLY_PRESSURE.value,
+        ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value,
+    } and _any_term_hit(text, ("token", "coin", "listed on", "trading pair", "unlock", "airdrop", "tge")):
+        return HypothesisScope.TOKEN.value
+    return HypothesisScope.SECTOR.value
 
 
 def _market_anomaly_rule() -> Mapping[str, Any]:
@@ -472,18 +531,29 @@ def _external_from_category(category: str) -> str | None:
     return None
 
 
-def _validation_reason(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> tuple[str, str | None]:
+def _validation_reason(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> tuple[str, str | None, str | None, str | None]:
     text = clean_text(_raw_text(raw))
     if not text:
-        return "none", None
+        return "none", None, None, None
     if not _text_mentions_catalyst(text, hypothesis):
-        return "rejected", "source mentions candidate context without the catalyst" if _text_mentions_candidate(text, hypothesis) else None
+        return (
+            "rejected",
+            "source mentions candidate context without the catalyst" if _text_mentions_candidate(text, hypothesis) else None,
+            None,
+            None,
+        )
     symbol_match = _identity_match_from_symbols(raw, hypothesis)
     if not symbol_match.matched:
         if _text_mentions_candidate(text, hypothesis):
-            return "rejected", symbol_match.reason or "candidate identity rejected"
-        return "none", None
-    return "accepted", f"{symbol_match.reason or 'identity_match'} links candidate to {hypothesis.external_asset or hypothesis.impact_category}"
+            return "rejected", symbol_match.reason or "candidate identity rejected", None, None
+        return "none", None, None, None
+    symbol, coin_id = _matched_symbol_and_coin_id(raw, hypothesis)
+    return (
+        "accepted",
+        f"{symbol_match.reason or 'identity_match'} links candidate to {hypothesis.external_asset or hypothesis.impact_category}",
+        symbol,
+        coin_id,
+    )
 
 
 def _identity_match_from_symbols(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> event_identity.IdentityMatchResult:
@@ -514,14 +584,38 @@ def _identity_match_from_symbols(raw: RawDiscoveredEvent, hypothesis: EventImpac
     return event_identity.IdentityMatchResult(False, event_identity.STRENGTH_NONE, None)
 
 
+def _matched_symbol_and_coin_id(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> tuple[str | None, str | None]:
+    strong = (raw.title, raw.body, _event_name(raw))
+    for idx, symbol in enumerate(hypothesis.candidate_symbols):
+        coin_id = hypothesis.candidate_coin_ids[idx] if idx < len(hypothesis.candidate_coin_ids) else None
+        identity = event_identity.AssetIdentity(
+            symbol=symbol,
+            coin_id=coin_id,
+            project_name=None,
+            aliases=(coin_id.replace("-", " ") if coin_id else ""),
+            is_common_word_symbol=symbol.upper() in event_identity.COMMON_WORD_SYMBOLS,
+        )
+        result = event_identity.match_asset_identity(
+            identity,
+            event_identity.IdentityEvidence(
+                strong_content=tuple(str(item or "") for item in strong),
+                url=raw.source_url,
+                source_origin=(raw.provider,),
+            ),
+        )
+        if result.matched:
+            return symbol, coin_id
+    return None, None
+
+
 def _text_mentions_catalyst(text: str, hypothesis: EventImpactHypothesis) -> bool:
     external = clean_text(hypothesis.external_asset or "")
-    if external and external in text:
+    if external and _term_hit(text, external):
         return True
     category_terms = {
         ImpactCategory.RWA_PREIPO_PROXY.value: ("pre ipo", "pre-ipo", "tokenized stock", "synthetic exposure"),
         ImpactCategory.AI_IPO_PROXY.value: ("openai", "anthropic", "pre ipo", "pre-ipo"),
-        ImpactCategory.SPORTS_FAN_PROXY.value: ("world cup", "fan token", "match"),
+        ImpactCategory.SPORTS_FAN_PROXY.value: ("world cup", "fan token", "fixture", "kickoff", "sports event"),
         ImpactCategory.STABLECOIN_REGULATORY.value: ("genius act", "stablecoin", "reserve"),
         ImpactCategory.PREDICTION_MARKET_INFRA.value: ("prediction market", "oracle"),
         ImpactCategory.PERP_VENUE_ATTENTION.value: ("perp", "futures listing"),
@@ -529,11 +623,11 @@ def _text_mentions_catalyst(text: str, hypothesis: EventImpactHypothesis) -> boo
         ImpactCategory.UNLOCK_SUPPLY_PRESSURE.value: ("unlock", "vesting", "airdrop"),
         ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value: ("exploit", "hack", "lawsuit", "regulatory"),
     }.get(hypothesis.impact_category, ())
-    return any(clean_text(term) in text for term in category_terms)
+    return _any_term_hit(text, category_terms)
 
 
 def _text_mentions_candidate(text: str, hypothesis: EventImpactHypothesis) -> bool:
-    return any(clean_text(symbol) in text for symbol in hypothesis.candidate_symbols)
+    return _any_term_hit(text, hypothesis.candidate_symbols)
 
 
 def _hypothesis_confidence(
@@ -549,7 +643,7 @@ def _hypothesis_confidence(
         score += 0.08
     if event.event_time is not None:
         score += 0.06 * float(event.event_time_confidence or 0.0)
-    keyword_hits = sum(1 for keyword in (*rule.get("keywords", ()), *rule.get("secondary", ())) if clean_text(keyword) in text)
+    keyword_hits = sum(1 for keyword in (*rule.get("keywords", ()), *rule.get("secondary", ())) if _term_hit(text, str(keyword)))
     score += min(0.16, keyword_hits * 0.035)
     if cluster is not None:
         score += min(0.12, max(0, cluster.cluster_confidence) / 1000)
@@ -644,6 +738,20 @@ def _evidence_quotes(text: str, terms: Iterable[str]) -> tuple[str, ...]:
         if quote:
             quotes.append(quote)
     return tuple(dict.fromkeys(quotes[:4]))
+
+
+def _any_term_hit(text: str, terms: Iterable[str]) -> bool:
+    return any(_term_hit(text, term) for term in terms)
+
+
+def _term_hit(text: str, term: str) -> bool:
+    source = clean_text(text)
+    needle = clean_text(term)
+    if not source or not needle:
+        return False
+    escaped = re.escape(needle).replace("\\ ", r"\s+")
+    pattern = rf"(?<![a-z0-9]){escaped}(?![a-z0-9])"
+    return re.search(pattern, source) is not None
 
 
 def _event_name(raw: RawDiscoveredEvent) -> str:

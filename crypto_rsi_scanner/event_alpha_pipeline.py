@@ -18,6 +18,7 @@ from . import (
     event_impact_hypotheses,
     event_llm_analyzer,
     event_llm_extractor,
+    event_source_enrichment,
     event_watchlist,
     event_watchlist_enrichment,
     event_watchlist_market,
@@ -28,6 +29,7 @@ from .event_models import EventDiscoveryResult, RawDiscoveredEvent
 RawEventTransform = Callable[[tuple[RawDiscoveredEvent, ...]], Iterable[RawDiscoveredEvent]]
 DiscoveryLoader = Callable[[datetime, RawEventTransform | None], EventDiscoveryResult]
 ResearchAlertSender = Callable[[list[event_alpha_router.EventAlphaRouteDecision]], Any]
+SourceFetchFn = Callable[[str, float], str | bytes]
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,7 @@ class EventAlphaPipelineResult:
     discovery_result: EventDiscoveryResult
     alerts: list[event_alerts.EventAlertCandidate]
     catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None
+    hypothesis_search_result: event_catalyst_search.CatalystSearchRunResult | None
     anomaly_lifecycle_result: event_anomaly_state.EventAnomalyStateResult | None
     extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow]
     relationship_rows: list[event_llm_analyzer.EventLLMReportRow]
@@ -164,10 +167,14 @@ class EventAlphaPipelineResult:
 
     @property
     def hypothesis_search_queries(self) -> int:
+        if self.hypothesis_search_result is not None:
+            return len(self.hypothesis_search_result.queries)
         return len({query for item in self.impact_hypotheses for query in item.search_queries})
 
     @property
     def hypothesis_search_results(self) -> int:
+        if self.hypothesis_search_result is not None:
+            return len(self.hypothesis_search_result.result_events)
         return len([
             item for item in self.impact_hypotheses
             if item.status in {
@@ -220,6 +227,8 @@ def run_event_alpha_pipeline(
     now: datetime | None = None,
     extraction_rows: Iterable[event_llm_extractor.EventLLMExtractionReportRow] = (),
     catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None = None,
+    hypothesis_search_provider: event_catalyst_search.CatalystSearchProvider | None = None,
+    hypothesis_search_cfg: event_catalyst_search.EventImpactHypothesisSearchConfig | None = None,
     source_raw_events: Iterable[RawDiscoveredEvent] = (),
     relationship_provider: object | None = None,
     relationship_cfg: event_llm_analyzer.EventLLMConfig | None = None,
@@ -282,6 +291,28 @@ def run_event_alpha_pipeline(
             impact_hypotheses,
             validation_raw,
         )
+    hypothesis_search_result: event_catalyst_search.CatalystSearchRunResult | None = None
+    if hypothesis_search_cfg is not None and hypothesis_search_cfg.enabled:
+        if hypothesis_search_provider is None:
+            warnings.append("hypothesis search skipped: no provider available")
+            hypothesis_search_result = event_catalyst_search.CatalystSearchRunResult(
+                provider="hypothesis_search",
+                warnings=("hypothesis search skipped: no provider available",),
+                skip_reasons={"provider_unavailable": 1},
+            )
+        else:
+            hypothesis_search_result = event_catalyst_search.run_hypothesis_search(
+                impact_hypotheses,
+                hypothesis_search_provider,
+                cfg=hypothesis_search_cfg,
+                now=observed,
+            )
+            warnings.extend(f"hypothesis search: {warning}" for warning in hypothesis_search_result.warnings)
+            validation_raw = tuple(result.raw_event for result in hypothesis_search_result.result_events)
+            impact_hypotheses = event_impact_hypotheses.validate_hypotheses_with_raw_events(
+                impact_hypotheses,
+                validation_raw,
+            )
 
     anomaly_lifecycle_result = (
         event_anomaly_state.build_anomaly_lifecycle(
@@ -367,6 +398,7 @@ def run_event_alpha_pipeline(
         discovery_result=discovery_result,
         alerts=alerts,
         catalyst_search_result=catalyst_search_result,
+        hypothesis_search_result=hypothesis_search_result,
         anomaly_lifecycle_result=anomaly_lifecycle_result,
         extraction_rows=extraction_rows_list,
         relationship_rows=relationship_rows,
@@ -388,6 +420,10 @@ def run_event_alpha_operating_cycle(
     extraction_cfg: event_llm_extractor.EventLLMExtractorConfig | None = None,
     catalyst_search_provider: event_catalyst_search.CatalystSearchProvider | None = None,
     catalyst_search_cfg: event_catalyst_search.EventCatalystSearchConfig | None = None,
+    hypothesis_search_provider: event_catalyst_search.CatalystSearchProvider | None = None,
+    hypothesis_search_cfg: event_catalyst_search.EventImpactHypothesisSearchConfig | None = None,
+    source_enrichment_cfg: event_source_enrichment.EventSourceEnrichmentConfig | None = None,
+    source_enrichment_fetch_fn: SourceFetchFn | None = None,
     relationship_provider: object | None = None,
     relationship_cfg: event_llm_analyzer.EventLLMConfig | None = None,
     watchlist_cfg: event_watchlist.EventWatchlistConfig | None = None,
@@ -500,12 +536,23 @@ def run_event_alpha_operating_cycle(
                 )
                 warnings.extend(f"catalyst search: {warning}" for warning in catalyst_search_result.warnings)
                 transformed = _merge_catalyst_search_events(transformed, catalyst_search_result)
+        if source_enrichment_cfg is not None and source_enrichment_cfg.enabled:
+            transformed = _enrich_source_events(
+                transformed,
+                cfg=source_enrichment_cfg,
+                fetch_fn=source_enrichment_fetch_fn,
+                warnings=warnings,
+            )
         if llm_transform is not None:
             transformed = tuple(llm_transform(transformed))
         return transformed
 
     raw_event_transform: RawEventTransform | None = None
-    if llm_transform is not None or (catalyst_search_cfg is not None and catalyst_search_cfg.enabled):
+    if (
+        llm_transform is not None
+        or (catalyst_search_cfg is not None and catalyst_search_cfg.enabled)
+        or (source_enrichment_cfg is not None and source_enrichment_cfg.enabled)
+    ):
         raw_event_transform = _combined_raw_event_transform
 
     discovery_result = load_discovery_result(observed, raw_event_transform)
@@ -515,6 +562,8 @@ def run_event_alpha_operating_cycle(
         alert_cfg=alert_cfg,
         now=observed,
         catalyst_search_result=catalyst_search_result,
+        hypothesis_search_provider=hypothesis_search_provider,
+        hypothesis_search_cfg=hypothesis_search_cfg,
         source_raw_events=source_raw_events,
         extraction_rows=extraction_rows,
         relationship_provider=relationship_provider_to_use,
@@ -673,6 +722,38 @@ def _merge_catalyst_search_events(
     return tuple(kept)
 
 
+def _enrich_source_events(
+    raw_events: tuple[RawDiscoveredEvent, ...],
+    *,
+    cfg: event_source_enrichment.EventSourceEnrichmentConfig,
+    fetch_fn: SourceFetchFn | None,
+    warnings: list[str],
+) -> tuple[RawDiscoveredEvent, ...]:
+    enriched: list[RawDiscoveredEvent] = []
+    fetched = 0
+    used_cache = 0
+    selected = 0
+    for raw in raw_events:
+        if not event_source_enrichment.should_enrich_source(
+            raw,
+            min_source_confidence=cfg.min_source_confidence,
+        ):
+            enriched.append(raw)
+            continue
+        selected += 1
+        result = event_source_enrichment.enrich_source_text(raw, cfg=cfg, fetch_fn=fetch_fn)
+        if result.fetched:
+            fetched += 1
+        if result.used_cache:
+            used_cache += 1
+        if result.warning and result.warning not in {"source not selected for enrichment", "source enrichment disabled"}:
+            warnings.append(f"source enrichment: {raw.raw_id}: {result.warning}")
+        enriched.append(event_source_enrichment.annotate_raw_event_with_enrichment(result))
+    if selected:
+        warnings.append(f"source enrichment: selected={selected} fetched={fetched} cache_hits={used_cache}")
+    return tuple(enriched)
+
+
 def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
     """Format a concise Event Alpha cycle summary."""
     lines = [
@@ -726,6 +807,10 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
     if result.catalyst_search_result is not None:
         lines.append("")
         lines.append(event_catalyst_search.format_catalyst_search_report(result.catalyst_search_result))
+    if result.hypothesis_search_result is not None:
+        lines.append("")
+        lines.append("Impact hypothesis validation search:")
+        lines.append(event_catalyst_search.format_catalyst_search_report(result.hypothesis_search_result))
     if result.anomaly_lifecycle_result is not None:
         lines.append("")
         lines.append(event_anomaly_state.format_anomaly_lifecycle_report(result.anomaly_lifecycle_result))

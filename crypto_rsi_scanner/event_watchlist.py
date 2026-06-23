@@ -420,10 +420,12 @@ def _entry_from_hypothesis(
     symbols = tuple(str(value) for value in getattr(hypothesis, "candidate_symbols", ()) or ())
     coin_ids = tuple(str(value) for value in getattr(hypothesis, "candidate_coin_ids", ()) or ())
     category = str(getattr(hypothesis, "impact_category", "") or "impact_hypothesis")
-    symbol = symbols[0] if symbols else "SECTOR"
-    coin_id = coin_ids[0] if coin_ids else category
+    scope = str(getattr(hypothesis, "hypothesis_scope", "") or "sector")
+    token_level = validated and scope == "token"
+    symbol = symbols[0] if token_level and symbols else "SECTOR"
+    coin_id = coin_ids[0] if token_level and coin_ids else category
     playbook = str(getattr(hypothesis, "playbook_hint", "") or "impact_hypothesis")
-    event_name = f"{getattr(hypothesis, 'external_asset', None) or category} impact hypothesis"
+    event_name = f"{getattr(hypothesis, 'external_asset', None) or category} {scope} impact hypothesis"
     reasons = ("hypothesis_validated",) if validated else ()
     history = list(prior.alert_history if prior else [])
     history.append({
@@ -482,7 +484,10 @@ def _entry_from_hypothesis(
         latest_market_snapshot={},
         latest_score_components={
             "hypothesis_confidence": score,
+            "hypothesis_scope": scope,
             "candidate_symbol_count": len(symbols),
+            "candidate_symbols": list(symbols[:12]),
+            "candidate_coin_ids": list(coin_ids[:12]),
             "validation_evidence": 100 if validated else 0,
         },
         alert_history=history,

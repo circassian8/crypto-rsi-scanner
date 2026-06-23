@@ -6504,6 +6504,94 @@ def test_event_impact_hypotheses_generate_seed_categories_and_queries():
     assert "TRIGGERED_FADE" not in event_impact_hypotheses.format_impact_hypothesis_report(hypotheses)
 
 
+def test_event_impact_hypothesis_matching_uses_context_not_substrings():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_impact_hypotheses
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def row(raw_id, title, body, event_type="news", external=None):
+        raw = RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="fixture",
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body,
+            raw_json={
+                "event": {
+                    "event_id": raw_id,
+                    "event_name": title,
+                    "event_type": event_type,
+                    "external_asset": external,
+                    "description": body,
+                    "confidence": 0.85,
+                }
+            },
+            source_confidence=0.85,
+            content_hash=raw_id,
+        )
+        event = NormalizedEvent(
+            event_id=raw_id,
+            raw_ids=(raw_id,),
+            event_name=title,
+            event_type=event_type,
+            event_time=None,
+            event_time_confidence=0.0,
+            first_seen_time=now,
+            source="fixture",
+            source_urls=(raw.source_url,),
+            external_asset=external,
+            description=body,
+            confidence=0.85,
+        )
+        return raw, event
+
+    negatives = [
+        row("matched", "Matched market-anomaly filters", "The market signal was matched by research filters."),
+        row("open", "Open interest rises", "Open markets and open-source tools are not OpenAI proxy catalysts."),
+        row("prime", "Prime liquidity improves", "Prime market depth improved without prime minister or election context."),
+        row("hype", "IPO hype builds", "Generic IPO hype without HYPE, Hyperliquid, tokenized stock, or explicit exposure."),
+    ]
+    result = EventDiscoveryResult(
+        raw_events=tuple(raw for raw, _ in negatives),
+        normalized_events=tuple(event for _, event in negatives),
+        links=(),
+        classifications=(),
+        candidates=(),
+    )
+    hypotheses = event_impact_hypotheses.generate_impact_hypotheses(result, now=now)
+    categories = {item.impact_category for item in hypotheses}
+    assert "sports_fan_proxy" not in categories
+    assert "ai_ipo_proxy" not in categories
+    assert "political_meme_proxy" not in categories
+    assert "rwa_preipo_proxy" not in categories
+
+    positives = [
+        row("sports", "World Cup fan token fixture", "Fan token attention rises before the World Cup kickoff.", "sports_event", "World Cup"),
+        row("political", "Election meme prediction market", "Political meme tokens move around an election prediction market.", "political_event", "Election"),
+        row("infra", "Prediction market oracle selected", "Chainlink oracle infrastructure will settle prediction market outcomes.", "infrastructure_event", "Polymarket"),
+        row("stable", "GENIUS Act stablecoin reserve bill", "Stablecoin reserve regulation advances in the Senate.", "regulatory_event", "GENIUS Act"),
+    ]
+    positive_result = EventDiscoveryResult(
+        raw_events=tuple(raw for raw, _ in positives),
+        normalized_events=tuple(event for _, event in positives),
+        links=(),
+        classifications=(),
+        candidates=(),
+    )
+    positive_categories = {
+        item.impact_category
+        for item in event_impact_hypotheses.generate_impact_hypotheses(positive_result, now=now)
+    }
+    assert "sports_fan_proxy" in positive_categories
+    assert "political_meme_proxy" in positive_categories
+    assert "prediction_market_infra" in positive_categories
+    assert "stablecoin_regulatory" in positive_categories
+
+
 def test_event_impact_hypothesis_validation_is_identity_safe():
     import tempfile
     from datetime import datetime, timezone
@@ -6572,14 +6660,21 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
 
     validated = event_impact_hypotheses.validate_hypotheses_with_raw_events([hypothesis], [good])[0]
     assert validated.status == "validated"
+    assert validated.hypothesis_scope == "token"
+    assert validated.candidate_symbols == ("VELVET",)
     assert any("identity_match" in reason for reason in validated.validation_reasons)
     with tempfile.TemporaryDirectory() as tmp:
         cfg = event_watchlist.EventWatchlistConfig(enabled=True, state_path=Path(tmp) / "watchlist.jsonl")
         first = event_watchlist.refresh_hypothesis_watchlist([hypothesis], cfg=cfg, now=now)
         second = event_watchlist.refresh_hypothesis_watchlist([validated], cfg=cfg, now=now)
         assert first.entries[0].state == event_watchlist.EventWatchlistState.HYPOTHESIS.value
+        assert first.entries[0].symbol == "SECTOR"
+        assert first.entries[0].coin_id == "rwa_preipo_proxy"
+        assert first.entries[0].latest_score_components["candidate_symbols"] == ["VELVET", "HYPE"]
         assert first.entries[0].should_alert is False
         assert second.entries[0].state == event_watchlist.EventWatchlistState.RADAR.value
+        assert second.entries[0].symbol == "VELVET"
+        assert second.entries[0].coin_id == "velvet"
         assert second.entries[0].should_alert is True
         assert second.entries[0].state != event_watchlist.EventWatchlistState.TRIGGERED_FADE.value
     unchanged = event_impact_hypotheses.validate_hypotheses_with_raw_events([hypothesis], [catalyst_only])[0]
@@ -6858,6 +6953,108 @@ def test_event_alpha_pipeline_writes_non_alertable_hypothesis_rows():
         assert "not alertable yet" in digest
 
 
+def test_event_alpha_pipeline_hypothesis_search_validates_before_token_watchlist():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_pipeline,
+        event_alpha_router,
+        event_alerts,
+        event_catalyst_search,
+        event_watchlist,
+    )
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="spacex-sector",
+        provider="rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/spacex-sector",
+        title="SpaceX pre-IPO exposure heats up",
+        body="Tokenized stock venues may see attention around SpaceX pre-IPO markets.",
+        raw_json={
+            "event": {
+                "event_id": "spacex-sector",
+                "event_name": "SpaceX pre-IPO exposure heats up",
+                "event_type": "ipo_proxy",
+                "event_time": "2026-06-20T13:30:00Z",
+                "event_time_confidence": 0.85,
+                "external_asset": "SpaceX",
+                "description": "Tokenized stock venues may see attention around SpaceX pre-IPO markets.",
+                "confidence": 0.88,
+            }
+        },
+        source_confidence=0.88,
+        content_hash="spacex-sector",
+    )
+    validation = RawDiscoveredEvent(
+        raw_id="velvet-validation",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/velvet-spacex",
+        title="VELVET opens SpaceX pre-IPO exposure",
+        body="Velvet Capital users can trade tokenized stock style exposure to SpaceX.",
+        raw_json={},
+        source_confidence=0.92,
+        content_hash="velvet-validation",
+    )
+    event = NormalizedEvent(
+        event_id="spacex-sector",
+        raw_ids=(raw.raw_id,),
+        event_name=raw.title,
+        event_type="ipo_proxy",
+        event_time=now,
+        event_time_confidence=0.85,
+        first_seen_time=now,
+        source=raw.provider,
+        source_urls=(raw.source_url,),
+        external_asset="SpaceX",
+        description=raw.body,
+        confidence=0.88,
+    )
+    result = EventDiscoveryResult(
+        raw_events=(raw,),
+        normalized_events=(event,),
+        links=(),
+        classifications=(),
+        candidates=(),
+    )
+    provider = event_catalyst_search.FixtureCatalystSearchProvider(
+        rows_by_query={"VELVET SpaceX pre-IPO exposure": (validation,)}
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        pipe = event_alpha_pipeline.run_event_alpha_pipeline(
+            result,
+            alert_cfg=event_alerts.EventAlertConfig(),
+            now=now,
+            hypothesis_search_provider=provider,
+            hypothesis_search_cfg=event_catalyst_search.EventImpactHypothesisSearchConfig(
+                enabled=True,
+                max_hypotheses=5,
+                max_queries_per_hypothesis=4,
+                min_confidence=0.50,
+                min_result_confidence=0.50,
+            ),
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(
+                enabled=True,
+                state_path=Path(tmp) / "watchlist.jsonl",
+            ),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=True,
+            route=True,
+        )
+    assert pipe.hypothesis_search_queries > 0
+    assert pipe.hypothesis_search_results >= 1
+    assert pipe.hypotheses_validated >= 1
+    entries = [entry for entry in pipe.watchlist_result.entries if entry.relationship_type == "impact_hypothesis"]
+    assert any(entry.symbol == "VELVET" and entry.state == event_watchlist.EventWatchlistState.RADAR.value for entry in entries)
+    assert all(entry.state != event_watchlist.EventWatchlistState.TRIGGERED_FADE.value for entry in entries)
+
+
 def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery():
     from datetime import datetime, timezone
     from pathlib import Path
@@ -6995,6 +7192,90 @@ def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery()
     assert advisory_pipe.alerts[0].symbol == "STEALTH"
     assert advisory_pipe.watchlist_entries >= 1
     assert advisory_pipe.routed >= 1
+
+
+def test_event_alpha_pipeline_source_enrichment_runs_before_llm_extraction():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_pipeline, event_discovery, event_llm_extractor, event_source_enrichment
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="source-enrich-before-llm",
+        provider="rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/enrich",
+        title="SpaceX pre-IPO exposure opens",
+        body="Short summary without the asset name.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="source-enrich-before-llm",
+    )
+    seen = {"body": ""}
+
+    class Provider:
+        name = "fixture"
+
+        def extract_raw_event(self, packet):
+            seen["body"] = packet["body"]
+            return LLMProviderResult(raw={
+                "confidence": 0.90,
+                "external_catalysts": [{
+                    "name": "SpaceX",
+                    "catalyst_type": "ipo_proxy",
+                    "event_time": None,
+                    "event_time_confidence": 0.0,
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "SpaceX pre-IPO exposure", "source_field": "body", "supports": "external catalyst"}],
+                }],
+                "crypto_asset_mentions": [{
+                    "name": "Velvet Capital",
+                    "symbol": "VELVET",
+                    "coin_id": "velvet",
+                    "contract_address": None,
+                    "mention_type": "project_or_token",
+                    "confidence": 0.90,
+                    "evidence_quotes": [{"text": "Velvet Capital users", "source_field": "body", "supports": "asset mention"}],
+                }],
+                "false_positive_terms": [],
+                "event_date_hints": [],
+                "suggested_followup_queries": [],
+                "warnings": [],
+            })
+
+    def loader(observed, raw_event_transform):
+        transformed = tuple(raw_event_transform((raw,))) if raw_event_transform else (raw,)
+        return EventDiscoveryResult(
+            raw_events=transformed,
+            normalized_events=(),
+            links=(),
+            classifications=(),
+            candidates=(),
+            warnings=(),
+        )
+
+    pipe = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=loader,
+        now=now,
+        with_llm=True,
+        extraction_provider=Provider(),
+        extraction_cfg=event_llm_extractor.EventLLMExtractorConfig(mode="shadow", provider="fixture"),
+        source_enrichment_cfg=event_source_enrichment.EventSourceEnrichmentConfig(
+            enabled=True,
+            max_chars=1000,
+            min_source_confidence=0.50,
+        ),
+        source_enrichment_fetch_fn=lambda url, timeout: (
+            "<html><body>Velvet Capital users can trade SpaceX pre-IPO exposure.</body></html>"
+        ),
+        refresh_watchlist=False,
+        route=False,
+    )
+    assert pipe.extractions == 1
+    assert "Velvet Capital users" in seen["body"]
+    assert "source enrichment: selected=1 fetched=1 cache_hits=0" in "; ".join(pipe.warnings)
 
 
 def test_event_alpha_alert_store_snapshots_and_fills_outcomes():

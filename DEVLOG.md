@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Harden Event Alpha impact discovery · Codex
+**Why:** Impact hypotheses were useful, but broad substring rules and immediate
+sector-to-token watchlist identity could create misleading CHZ/HYPE/VELVET-style
+rows before source evidence validated the specific asset.
+**Changes:**
+- Replaced loose impact-hypothesis substring matching with boundary/phrase-aware
+  category rules and tighter context checks for sports, political, prediction
+  market infrastructure, stablecoin regulatory, and tokenized/pre-IPO catalyst
+  hypotheses.
+- Added `hypothesis_scope` (`sector`, `token`, `venue`, `infrastructure`) so
+  unvalidated sector/venue/infra hypotheses persist as `SECTOR` rows while
+  candidate symbols remain metadata for validation searches.
+- Added separate impact-hypothesis validation search execution using the
+  catalyst-search provider layer, with identity-required result scoring and
+  separate pipeline report metrics from market-anomaly catalyst search.
+- Wired source enrichment into the Event Alpha operating cycle before LLM raw
+  extraction, so quote-validated extraction can use full fetched source text.
+- Enabled hypothesis validation search for `notify_no_key`/`notify_llm` profiles
+  while leaving default config disabled, and made `notify_llm` explicitly enable
+  CryptoPanic as optional live source evidence.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (418/418 passed).
+**Notes/risks:** Research-only hardening. This does not change normal RSI
+alerts, event-fade eligibility, Telegram send guards, paper trades, live signal
+writes, or execution. `TRIGGERED_FADE` remains only from `event_fade.py` +
+`proxy_fade`.
+
 ## 2026-06-23 — Harden Event Alpha source intake observability · Codex
 **Why:** The Event Alpha intelligence layer could generate hypotheses, but
 zero-query catalyst-search runs and RSS feed failures needed clearer
