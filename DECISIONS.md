@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-24 - Validated impact hypotheses may enter capped daily research digest
+**Status:** accepted
+**Decision:** Token-level Event Impact Hypothesis rows must use validated asset
+identity, not candidate order, when writing watchlist rows or digest context.
+If validation lacks a concrete token identity, the row falls back to `SECTOR`
+with a warning. A validated token-level `RADAR` hypothesis may enter a capped
+daily research digest in notification profiles when
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED=1`, but the message/card
+must label it as a research-only validated impact hypothesis, not a trade signal
+or calibrated strategy.
+**Why:** Validated hypotheses are useful operator intelligence only if they
+name the asset that was actually validated. Making them visible in the daily
+research digest helps review them without promoting loose sector hypotheses or
+turning them into trading signals.
+**Revisit when:** A reviewed sample proves a specific impact-hypothesis
+category deserves `WATCHLIST`/`HIGH_PRIORITY` escalation or calibrated outcome
+tracking.
+
 ## 2026-06-24 - Send OpenAI-backed notification profiles on every clean run
 **Status:** accepted
 **Decision:** `notify_llm` and `notify_llm_deep` should use the same

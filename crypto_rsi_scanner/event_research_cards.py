@@ -108,6 +108,12 @@ def render_research_card(
         f"- Relationship: {_value(entry, alert, 'relationship_type', 'relationship_type') or 'unknown'}",
         f"- Rule playbook: {_value(entry, alert, 'latest_rule_playbook_type', 'rule_playbook_type') or 'unknown'}",
         f"- Effective playbook: {_value(entry, alert, 'latest_effective_playbook_type', 'playbook_type') or playbook}",
+    ])
+    hypothesis_lines = _impact_hypothesis_lines(entry)
+    if hypothesis_lines:
+        lines.extend(["", "## Impact Hypothesis Context"])
+        lines.extend(hypothesis_lines)
+    lines.extend([
         "",
         "## LLM Interpretation",
         f"- Role: {_value(entry, alert, 'latest_llm_asset_role', 'llm_asset_role') or 'none'}",
@@ -579,6 +585,31 @@ def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
         if snapshot.get(key) is not None:
             lines.append(f"- {key}: {snapshot.get(key)}")
     return lines or ["- No market snapshot stored."]
+
+
+def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) -> list[str]:
+    if entry is None or entry.relationship_type != "impact_hypothesis":
+        return []
+    components = dict(entry.latest_score_components or {})
+    validated_asset = components.get("validated_asset") if isinstance(components.get("validated_asset"), Mapping) else {}
+    validated_symbol = components.get("validated_symbol") or validated_asset.get("symbol") or entry.symbol
+    validated_coin_id = components.get("validated_coin_id") or validated_asset.get("coin_id") or entry.coin_id
+    candidate_symbols = components.get("candidate_symbols") or []
+    validation_reasons = components.get("validation_reasons") or components.get("validation_reason") or []
+    if isinstance(validation_reasons, str):
+        validation_reasons = [validation_reasons]
+    lines = [
+        f"- Validated asset: {validated_symbol or 'unknown'}/{validated_coin_id or 'unknown'}",
+        f"- Original sector hypothesis: {components.get('hypothesis_scope') or 'unknown'} / {entry.latest_playbook_type or 'impact_hypothesis'}",
+        f"- Candidate source: {entry.latest_source or 'impact_hypothesis'}",
+        f"- Candidate symbols considered: {', '.join(str(item) for item in candidate_symbols[:8]) if candidate_symbols else 'none'}",
+        f"- Why promoted: {entry.suppressed_reason or 'validated impact hypothesis promoted to RADAR'}",
+        "- Safety label: catalyst link validated, but this is not a calibrated strategy or trade signal.",
+        "- Why it may be wrong: validation may be source-thin, asset link may be narrative-only, and the catalyst impact may not move this token.",
+    ]
+    if validation_reasons:
+        lines.append("- Validation evidence: " + "; ".join(str(item) for item in validation_reasons[:4]))
+    return lines
 
 
 def _monitor_lines(row: event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any] | None) -> list[str]:

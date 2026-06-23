@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-24 — Promote validated impact hypotheses safely · Codex
+**Why:** Recent Event Impact Hypothesis artifacts showed two correctness gaps:
+validated token-level hypotheses could use the first taxonomy candidate instead
+of the actually validated asset, and validated `RADAR` hypotheses remained
+invisible in day-1 research notifications.
+**Changes:**
+- Event Impact Hypothesis watchlist rows now select token identity from
+  validated asset evidence first, warn on candidate-order mismatches, and fall
+  back to `SECTOR` when validation lacks a real token identity.
+- Added a capped daily-digest route for validated token-level impact hypotheses
+  in notification profiles. The copy and research cards label these as
+  research-only validated impact hypotheses, not trade signals or calibrated
+  strategies.
+- Refined impact category validation so prediction-market infrastructure,
+  tokenized-equity venues, miner listings, security shocks, and fan/sports
+  events land in their intended categories instead of broad false-positive
+  buckets.
+- Made impact-hypothesis reports latest-run-first by default, with
+  `--all-history` / `ALL_HISTORY=1` for historical rows, and surfaced digest
+  eligibility plus mismatch warnings.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`; `python3
+tests/test_indicators.py` (438/438 passed); `make event-llm-eval
+PYTHON=python3`; `make event-llm-extract-eval PYTHON=python3`; `make
+event-alpha-eval PYTHON=python3`; `make verify PYTHON=python3`; `make
+event-impact-hypothesis-smoke PYTHON=python3`; `make
+event-impact-hypotheses-report PROFILE=notify_llm PYTHON=python3`.
+**Notes/risks:** This only makes validated `RADAR` hypotheses visible in a
+capped daily research digest. It does not create `WATCHLIST`, `HIGH_PRIORITY`,
+paper/live rows, normal RSI rows, trading actions, or `TRIGGERED_FADE`.
+
 ## 2026-06-24 — Make LLM notification profiles send every clean run · Codex
 **Why:** The first post-parallelism `notify_llm` run completed successfully but
 Telegram delivery was held by a 24h exploratory-digest cooldown from the prior

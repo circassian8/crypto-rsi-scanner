@@ -189,7 +189,20 @@ _CATEGORY_RULES: tuple[dict[str, Any], ...] = (
     {
         "category": ImpactCategory.PREDICTION_MARKET_INFRA,
         "keywords": ("prediction market", "polymarket", "resolution market"),
-        "secondary": ("oracle", "settlement", "resolution", "infrastructure", "data provider", "chainlink", "uma", "pyth"),
+        "secondary": (
+            "oracle",
+            "settlement",
+            "resolution",
+            "infrastructure",
+            "data provider",
+            "chainlink",
+            "uma",
+            "pyth",
+            "arbitrum",
+            "ethereum",
+            "smart contract",
+            "platform",
+        ),
         "sectors": ("prediction_markets", "oracle_infra"),
         "direction": "up",
         "playbook": "infrastructure_mention",
@@ -212,7 +225,16 @@ _CATEGORY_RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "category": ImpactCategory.LISTING_LIQUIDITY_EVENT,
-        "keywords": ("binance listing", "exchange listing", "coinbase listing", "spot listing", "listed on"),
+        "keywords": (
+            "binance listing",
+            "exchange listing",
+            "coinbase listing",
+            "spot listing",
+            "listed on",
+            "nasdaq listing",
+            "public listing",
+            "ipo listing",
+        ),
         "secondary": ("trading pair", "liquidity", "launch", "market"),
         "sectors": ("direct_token_events",),
         "direction": "volatility",
@@ -861,7 +883,7 @@ def _rule_matches(rule: Mapping[str, Any], text: str, event_type: str, category:
     if category == ImpactCategory.SPORTS_FAN_PROXY:
         return primary_hit and (_any_term_hit(text, ("fan token", "sports", "prediction market", "team", "fixture", "kickoff")) or _term_hit(event_type, "sports"))
     if category == ImpactCategory.POLITICAL_MEME_PROXY:
-        political_context = primary_hit or _term_hit(event_type, "political")
+        political_context = _has_political_context(text) or _term_hit(event_type, "political")
         proxy_context = _any_term_hit(text, ("meme", "prediction market", "polymarket", "token", "coin"))
         return political_context and proxy_context
     if category == ImpactCategory.PREDICTION_MARKET_INFRA:
@@ -1376,6 +1398,13 @@ def _validation_detail(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesi
     text = clean_text(_raw_text(raw))
     if not text:
         return {"status": "none"}
+    category_rejection = _category_validation_rejection(text, hypothesis)
+    if category_rejection:
+        return {
+            "status": "rejected",
+            "validation_stage": ValidationStage.REJECTED.value,
+            "reason": category_rejection,
+        }
     mentions_candidate = _text_mentions_candidate(text, hypothesis)
     mentions_catalyst = _text_mentions_catalyst(text, hypothesis)
     symbol_match = _identity_match_from_symbols(raw, hypothesis)
@@ -1535,6 +1564,52 @@ def _text_mentions_catalyst(text: str, hypothesis: EventImpactHypothesis) -> boo
 
 def _text_mentions_candidate(text: str, hypothesis: EventImpactHypothesis) -> bool:
     return _any_term_hit(text, hypothesis.candidate_symbols)
+
+
+def _category_validation_rejection(text: str, hypothesis: EventImpactHypothesis) -> str | None:
+    category = str(hypothesis.impact_category or "")
+    if category == ImpactCategory.POLITICAL_MEME_PROXY.value and not _has_political_context(text):
+        if _any_term_hit(text, ("prediction market", "polymarket", "arbitrum", "ethereum", "tokenized equity")):
+            return "political_context_missing_for_prediction_market_validation"
+    if category == ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value and not _has_security_or_regulatory_context(text):
+        if _any_term_hit(text, ("nasdaq listing", "public listing", "ipo listing", "listed on", "miner listing")):
+            return "security_or_regulatory_context_missing_for_listing_validation"
+    return None
+
+
+def _has_political_context(text: str) -> bool:
+    return _any_term_hit(text, (
+        "election",
+        "inauguration",
+        "campaign",
+        "debate",
+        "vote",
+        "political",
+        "ballot",
+        "candidate",
+        "president",
+        "senate",
+        "congress",
+        "trump",
+    ))
+
+
+def _has_security_or_regulatory_context(text: str) -> bool:
+    return _any_term_hit(text, (
+        "exploit",
+        "hack",
+        "lawsuit",
+        "sec",
+        "cftc",
+        "regulatory",
+        "regulation",
+        "security incident",
+        "probe",
+        "charges",
+        "investigation",
+        "attack",
+        "breach",
+    ))
 
 
 def _hypothesis_score_components(

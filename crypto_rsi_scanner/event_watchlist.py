@@ -424,9 +424,13 @@ def _entry_from_hypothesis(
     coin_ids = tuple(str(value) for value in getattr(hypothesis, "candidate_coin_ids", ()) or ())
     category = str(getattr(hypothesis, "impact_category", "") or "impact_hypothesis")
     scope = str(getattr(hypothesis, "hypothesis_scope", "") or "sector")
-    token_level = validated and scope == "token"
-    symbol = symbols[0] if token_level and symbols else "SECTOR"
-    coin_id = coin_ids[0] if token_level and coin_ids else category
+    symbol, coin_id, asset_warnings, validated_asset = _hypothesis_watchlist_asset(
+        hypothesis,
+        candidate_symbols=symbols,
+        candidate_coin_ids=coin_ids,
+        category=category,
+        token_level=validated and scope == "token",
+    )
     playbook = str(getattr(hypothesis, "playbook_hint", "") or "impact_hypothesis")
     event_name = f"{getattr(hypothesis, 'external_asset', None) or category} {scope} impact hypothesis"
     reasons = ("hypothesis_validated",) if validated else ()
@@ -447,6 +451,7 @@ def _entry_from_hypothesis(
             *(prior.warnings if prior else ()),
             *tuple(getattr(hypothesis, "warnings", ()) or ()),
             *tuple(getattr(hypothesis, "rejection_reasons", ()) or ()),
+            *asset_warnings,
         )
         if str(value)
     ))
@@ -491,8 +496,12 @@ def _entry_from_hypothesis(
             "candidate_symbol_count": len(symbols),
             "candidate_symbols": list(symbols[:12]),
             "candidate_coin_ids": list(coin_ids[:12]),
+            "validated_symbol": symbol if symbol != "SECTOR" else None,
+            "validated_coin_id": coin_id if symbol != "SECTOR" else None,
+            "validated_asset": validated_asset,
             "validation_evidence": 100 if validated else 0,
             "validation_stage": validation_stage or "unknown",
+            "validation_reasons": list(getattr(hypothesis, "validation_reasons", ()) or ())[:8],
             "external_entities": list(getattr(hypothesis, "external_entities", ()) or ())[:8],
             "crypto_candidate_assets": list(getattr(hypothesis, "crypto_candidate_assets", ()) or ())[:12],
             "rejected_candidate_assets": list(getattr(hypothesis, "rejected_candidate_assets", ()) or ())[:8],
@@ -509,6 +518,116 @@ def _entry_from_hypothesis(
         ),
         warnings=warnings,
     )
+
+
+def _hypothesis_watchlist_asset(
+    hypothesis: object,
+    *,
+    candidate_symbols: tuple[str, ...],
+    candidate_coin_ids: tuple[str, ...],
+    category: str,
+    token_level: bool,
+) -> tuple[str, str, tuple[str, ...], dict[str, Any]]:
+    """Return the validated token identity for a promoted hypothesis.
+
+    Candidate taxonomy order is intentionally not identity evidence. A validated
+    hypothesis without a validated token identity stays at SECTOR level.
+    """
+    if not token_level:
+        return "SECTOR", category, (), {}
+
+    warnings: list[str] = []
+    asset = _direct_validated_hypothesis_asset(hypothesis)
+    if not asset:
+        asset = _first_validated_asset(getattr(hypothesis, "crypto_candidate_assets", ()) or ())
+    if not asset:
+        asset = _first_validated_asset(getattr(hypothesis, "validated_candidate_assets", ()) or ())
+    if not asset:
+        asset = _first_resolver_validated_asset(getattr(hypothesis, "validated_candidate_assets", ()) or ())
+
+    symbol = str(asset.get("symbol") or "").strip().upper() if asset else ""
+    coin_id = str(asset.get("coin_id") or "").strip() if asset else ""
+    if symbol and not coin_id:
+        coin_id = _coin_id_for_symbol(symbol, candidate_symbols, candidate_coin_ids)
+    if not symbol and coin_id:
+        symbol = _symbol_for_coin_id(coin_id, candidate_symbols, candidate_coin_ids)
+
+    if not symbol and not coin_id:
+        warnings.append("validated_hypothesis_missing_validated_asset")
+        return "SECTOR", category, tuple(warnings), {}
+
+    if candidate_symbols and symbol and candidate_symbols[0].upper() != symbol.upper():
+        warnings.append(
+            "validated_asset_mismatch_candidate_order:"
+            f"first_candidate={candidate_symbols[0].upper()} validated={symbol.upper()}"
+        )
+    normalized = {str(key): value for key, value in dict(asset).items()} if asset else {}
+    normalized["symbol"] = symbol
+    normalized["coin_id"] = coin_id or category
+    return symbol or "SECTOR", coin_id or category, tuple(warnings), normalized
+
+
+def _direct_validated_hypothesis_asset(hypothesis: object) -> dict[str, Any]:
+    symbol = str(getattr(hypothesis, "validated_symbol", "") or "").strip().upper()
+    coin_id = str(getattr(hypothesis, "validated_coin_id", "") or "").strip()
+    if not symbol and not coin_id:
+        return {}
+    return {
+        "source": "validated_hypothesis_fields",
+        "symbol": symbol,
+        "coin_id": coin_id,
+        "validated": True,
+    }
+
+
+def _first_validated_asset(rows: Iterable[object]) -> dict[str, Any]:
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        if not bool(row.get("validated")):
+            continue
+        symbol = str(row.get("symbol") or "").strip().upper()
+        coin_id = str(row.get("coin_id") or "").strip()
+        if symbol or coin_id:
+            data = dict(row)
+            data["symbol"] = symbol
+            data["coin_id"] = coin_id
+            return data
+    return {}
+
+
+def _first_resolver_validated_asset(rows: Iterable[object]) -> dict[str, Any]:
+    resolver_sources = {"deterministic_resolver", "resolver", "hypothesis_search", "candidate_validation_search"}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        source = str(row.get("source") or "")
+        reason = str(row.get("reason") or "")
+        if source not in resolver_sources and "identity_match" not in reason and "validated" not in reason:
+            continue
+        symbol = str(row.get("symbol") or "").strip().upper()
+        coin_id = str(row.get("coin_id") or "").strip()
+        if symbol or coin_id:
+            data = dict(row)
+            data["symbol"] = symbol
+            data["coin_id"] = coin_id
+            data["validated"] = True
+            return data
+    return {}
+
+
+def _coin_id_for_symbol(symbol: str, symbols: tuple[str, ...], coin_ids: tuple[str, ...]) -> str:
+    for idx, candidate in enumerate(symbols):
+        if candidate.upper() == symbol.upper() and idx < len(coin_ids):
+            return str(coin_ids[idx] or "")
+    return ""
+
+
+def _symbol_for_coin_id(coin_id: str, symbols: tuple[str, ...], coin_ids: tuple[str, ...]) -> str:
+    for idx, candidate in enumerate(coin_ids):
+        if str(candidate) == coin_id and idx < len(symbols):
+            return str(symbols[idx] or "").upper()
+    return ""
 
 
 def _material_change_reasons(

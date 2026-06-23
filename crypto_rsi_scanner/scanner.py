@@ -1470,6 +1470,8 @@ def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRo
         daily_digest_enabled=config.EVENT_ALPHA_ROUTER_DAILY_DIGEST_ENABLED,
         instant_enabled=config.EVENT_ALPHA_ROUTER_INSTANT_ENABLED,
         max_digest_items=config.EVENT_ALPHA_ROUTER_MAX_DIGEST_ITEMS,
+        validated_hypothesis_digest_enabled=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED,
+        max_validated_hypothesis_digest_items=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MAX_ITEMS,
         max_high_priority_per_day=config.EVENT_ALPHA_ROUTER_MAX_HIGH_PRIORITY_PER_DAY,
         per_key_cooldown_hours=config.EVENT_ALPHA_ROUTER_PER_KEY_COOLDOWN_HOURS,
         alert_on_score_jump=config.EVENT_ALPHA_ROUTER_ALERT_ON_SCORE_JUMP,
@@ -5416,6 +5418,18 @@ def _router_config_from_profile(profile_name: str | None) -> event_alpha_router.
         daily_digest_enabled=bool(overrides.get("EVENT_ALPHA_ROUTER_DAILY_DIGEST_ENABLED", current.daily_digest_enabled)),
         instant_enabled=bool(overrides.get("EVENT_ALPHA_ROUTER_INSTANT_ENABLED", current.instant_enabled)),
         max_digest_items=int(overrides.get("EVENT_ALPHA_ROUTER_MAX_DIGEST_ITEMS", current.max_digest_items)),
+        validated_hypothesis_digest_enabled=bool(
+            overrides.get(
+                "EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED",
+                current.validated_hypothesis_digest_enabled,
+            )
+        ),
+        max_validated_hypothesis_digest_items=int(
+            overrides.get(
+                "EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MAX_ITEMS",
+                current.max_validated_hypothesis_digest_items,
+            )
+        ),
         max_high_priority_per_day=int(
             overrides.get("EVENT_ALPHA_ROUTER_MAX_HIGH_PRIORITY_PER_DAY", current.max_high_priority_per_day)
         ),
@@ -7381,7 +7395,12 @@ def cli() -> None:
     parser.add_argument(
         "--latest-run",
         action="store_true",
-        help="For impact-hypothesis reports, show only rows from the latest stored run_id.",
+        help="For impact-hypothesis reports, show only rows from the latest stored run_id. This is the default unless --all-history, --run-id, or --since is used.",
+    )
+    parser.add_argument(
+        "--all-history",
+        action="store_true",
+        help="For impact-hypothesis reports, include all historical rows instead of defaulting to the latest run.",
     )
     parser.add_argument(
         "--run-id",
@@ -8161,16 +8180,17 @@ def cli() -> None:
         )
         return
     if args.event_impact_hypotheses_report:
+        latest_hypothesis_run = args.latest_run or not (args.all_history or args.run_id or args.since)
         event_impact_hypotheses_report(
             path=args.event_impact_hypothesis_store_path,
             limit=args.event_alpha_run_limit,
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
-            latest_run=args.latest_run,
+            latest_run=latest_hypothesis_run,
             run_id=args.run_id,
             since=args.since,
-            include_legacy=args.include_legacy or not (args.latest_run or args.run_id or args.since),
+            include_legacy=args.include_legacy or args.all_history,
         )
         return
     if args.event_impact_hypotheses_inbox:

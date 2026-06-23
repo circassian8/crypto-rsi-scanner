@@ -442,14 +442,20 @@ def _format_hypothesis_row(
         out.append(f"  validated_asset: {row.get('validated_symbol') or 'unknown'}/{row.get('validated_coin_id') or 'unknown'}")
     if row.get("promoted_watchlist_key"):
         out.append(f"  promoted_watchlist_key: {row.get('promoted_watchlist_key')}")
+    if str(row.get("status") or "") == "validated" and row.get("validated_symbol") and row.get("promoted_watchlist_key"):
+        out.append("  route_eligibility: daily_digest_candidate")
     if row.get("validation_reasons"):
         out.append("  validated: " + "; ".join(str(item) for item in row["validation_reasons"][:3]))
     if include_rejections and row.get("rejection_reasons"):
         out.append("  rejected: " + "; ".join(str(item) for item in row["rejection_reasons"][:3]))
     if row.get("why_not_promoted"):
         out.append("  why_not_promoted: " + "; ".join(_effective_why_not_promoted(row)[:4]))
-    if row.get("warnings"):
-        out.append("  warnings: " + "; ".join(str(item) for item in row["warnings"][:3]))
+    warnings = [str(item) for item in row.get("warnings") or []]
+    mismatch = _candidate_order_mismatch_warning(row)
+    if mismatch:
+        warnings.append(mismatch)
+    if warnings:
+        out.append("  warnings: " + "; ".join(dict.fromkeys(warnings[:4])))
     return out
 
 
@@ -471,6 +477,19 @@ def _schema_audit_section(rows: list[Mapping[str, Any]]) -> list[str]:
         f"versions={_format_counts(versions)} · legacy_rows={len(legacy)} · "
         + " · ".join(f"missing_{field}={count}" for field, count in missing.items())
     ]
+
+
+def _candidate_order_mismatch_warning(row: Mapping[str, Any]) -> str | None:
+    validated = str(row.get("validated_symbol") or "").strip().upper()
+    if not validated:
+        return None
+    symbols = row.get("candidate_symbols") or ()
+    if not isinstance(symbols, (list, tuple)) or not symbols:
+        return None
+    first = str(symbols[0] or "").strip().upper()
+    if first and first != validated:
+        return f"validated_asset_mismatch_candidate_order:first_candidate={first} validated={validated}"
+    return None
 
 
 def _query_section(rows: list[Mapping[str, Any]], *, limit: int = 12) -> list[str]:

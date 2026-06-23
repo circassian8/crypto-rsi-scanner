@@ -88,16 +88,20 @@ suggestions still need deterministic identity/catalyst validation before they
 can become token-level `RADAR` rows. Use the report's `why_not_promoted`
 section to separate discovery-only leads from identity/catalyst/market/score
 blockers.
-Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`, paper/live rows, or
-`TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from `event_fade.py` plus
-the `proxy_fade` playbook.
+Validated token-level `RADAR` hypotheses can enter a capped daily research
+digest in notification profiles when
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED=1`. The message/card must
+still say this is a validated impact hypothesis, not a calibrated strategy or
+trade signal. Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`,
+paper/live rows, or `TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from
+`event_fade.py` plus the `proxy_fade` playbook.
 
 Each Event Alpha cycle also appends generated hypotheses to a profile-scoped
 research artifact:
 
 ```bash
 make event-impact-hypotheses-report PROFILE=notify_llm
-make event-impact-hypotheses-report PROFILE=notify_llm LATEST=1
+make event-impact-hypotheses-report PROFILE=notify_llm ALL_HISTORY=1
 make event-impact-hypotheses-inbox PROFILE=notify_llm
 make event-impact-hypothesis-smoke
 ```
@@ -115,9 +119,10 @@ evidence samples, schema-audit fields, and `why_not_promoted` diagnostics.
 Suggested LLM/search assets are metadata only until deterministic
 resolver/search evidence validates identity.
 
-Use `LATEST=1` for daily diagnosis so the report focuses on the latest stored
-`run_id` while still printing total/latest/historical/legacy availability. Use
-`RUN_ID=<id>` for a specific cycle and `SINCE=<iso-time>` for a time window.
+The report defaults to the latest stored `run_id` while still printing
+total/latest/historical/legacy availability. Use `ALL_HISTORY=1` for the older
+full-history view, `RUN_ID=<id>` for a specific cycle, and `SINCE=<iso-time>` for
+a time window.
 Add `INCLUDE_LEGACY=1` only when intentionally reviewing old/missing-schema
 rows. Hypothesis reports now separate generated queries from executed queries
 and show query counts by `candidate_discovery`, `candidate_validation`, and

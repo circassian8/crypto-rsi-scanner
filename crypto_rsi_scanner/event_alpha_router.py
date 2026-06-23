@@ -34,6 +34,8 @@ class EventAlphaRouterConfig:
     daily_digest_enabled: bool = True
     instant_enabled: bool = True
     max_digest_items: int = 20
+    validated_hypothesis_digest_enabled: bool = False
+    max_validated_hypothesis_digest_items: int = 5
     max_high_priority_per_day: int = 3
     per_key_cooldown_hours: float = 12.0
     alert_on_score_jump: bool = True
@@ -173,11 +175,15 @@ def format_routed_telegram_digest(
         return "\n".join(lines)
     for decision in keep:
         entry = decision.entry
+        is_validated_hypothesis = _is_validated_hypothesis_digest_entry(entry)
         lines.append("")
         lines.append(
             f"<b>{_esc(decision.route.value)}</b> score={entry.latest_score} "
             f"<b>{_esc(entry.symbol)}</b>"
         )
+        if is_validated_hypothesis:
+            lines.append("<b>Validated impact hypothesis</b>")
+            lines.append("Catalyst link validated, but this is not a calibrated strategy.")
         lines.append(_esc(entry.latest_event_name or "unknown event"))
         lines.append(
             f"tier={_esc(entry.latest_tier or 'unknown')} route={_esc(decision.route.value)} "
@@ -199,6 +205,8 @@ def format_routed_telegram_digest(
         else:
             lines.append("llm_role=none llm_confidence=n/a")
         lines.append(f"route_reason={_esc(decision.reason)}")
+        if is_validated_hypothesis:
+            lines.append("operator_note=Research-only. Not a trade signal. Review the local card before acting.")
         lines.append(f"alert_id={_esc(decision.alert_id)}")
         lines.append(f"card_id={_esc(decision.card_id)}")
         card_path = card_paths.get(decision.alert_id)
@@ -269,6 +277,26 @@ def _route_entry(
             route=EventAlphaRoute.SUPPRESS_DUPLICATE,
             alertable=False,
             reason=material_reason or entry.suppressed_reason or "No meaningful state escalation since the previous observation.",
+            lane=EventAlphaRouteLane.LOCAL_ONLY,
+            warnings=tuple(warnings),
+        )
+
+    if _is_validated_hypothesis_digest_entry(entry):
+        return EventAlphaRouteDecision(
+            entry=entry,
+            route=EventAlphaRoute.RESEARCH_DIGEST,
+            alertable=cfg.daily_digest_enabled and cfg.validated_hypothesis_digest_enabled,
+            reason="Validated impact hypothesis promoted to RADAR.",
+            lane=EventAlphaRouteLane.DAILY_DIGEST,
+            warnings=tuple(warnings),
+        )
+
+    if entry.relationship_type == "impact_hypothesis":
+        return EventAlphaRouteDecision(
+            entry=entry,
+            route=EventAlphaRoute.STORE_ONLY,
+            alertable=False,
+            reason="Impact hypothesis rows require catalyst-link validation and a validated token identity before digest routing.",
             lane=EventAlphaRouteLane.LOCAL_ONLY,
             warnings=tuple(warnings),
         )
@@ -410,6 +438,8 @@ def _material_change_allowed(
             allowed = True
         else:
             blocked.append("cluster-confidence upgrade alerts disabled")
+    if "hypothesis_validated" in reasons:
+        allowed = True
     if not allowed:
         return False, "; ".join(blocked) or "material-change alerts disabled"
     return True, None
@@ -420,6 +450,7 @@ def _apply_route_caps(
     cfg: EventAlphaRouterConfig,
 ) -> list[EventAlphaRouteDecision]:
     digest_seen = 0
+    validated_hypothesis_seen = 0
     high_seen = 0
     out: list[EventAlphaRouteDecision] = []
     for decision in sorted(decisions, key=_decision_sort_key):
@@ -452,6 +483,21 @@ def _apply_route_caps(
                 ))
                 continue
         if decision.lane == EventAlphaRouteLane.DAILY_DIGEST:
+            if _is_validated_hypothesis_digest_entry(decision.entry):
+                validated_hypothesis_seen += 1
+                if (
+                    cfg.max_validated_hypothesis_digest_items
+                    and validated_hypothesis_seen > cfg.max_validated_hypothesis_digest_items
+                ):
+                    out.append(EventAlphaRouteDecision(
+                        entry=decision.entry,
+                        route=EventAlphaRoute.SUPPRESS_DUPLICATE,
+                        alertable=False,
+                        reason="Validated impact hypothesis digest cap reached for this run.",
+                        lane=EventAlphaRouteLane.LOCAL_ONLY,
+                        warnings=decision.warnings,
+                    ))
+                    continue
             digest_seen += 1
             if cfg.max_digest_items and digest_seen > cfg.max_digest_items:
                 out.append(EventAlphaRouteDecision(
@@ -465,6 +511,21 @@ def _apply_route_caps(
                 continue
         out.append(decision)
     return out
+
+
+def _is_validated_hypothesis_digest_entry(entry: event_watchlist.EventWatchlistEntry) -> bool:
+    if entry.relationship_type != "impact_hypothesis":
+        return False
+    if entry.state != event_watchlist.EventWatchlistState.RADAR.value:
+        return False
+    if (entry.symbol or "").upper() == "SECTOR":
+        return False
+    components = entry.latest_score_components or {}
+    if str(components.get("validation_stage") or "") not in {"catalyst_link_validated", "market_confirmed", "promoted_to_radar"}:
+        return False
+    if not (components.get("validated_symbol") or components.get("validated_coin_id") or components.get("validated_asset")):
+        return False
+    return True
 
 
 def _cooldown_active(

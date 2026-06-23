@@ -74,6 +74,7 @@ CONFIRM ?= 0
 STRICT ?= 0
 INCLUDE_LEGACY ?= 0
 LATEST ?= 0
+ALL_HISTORY ?= 0
 RUN_ID ?=
 SINCE ?=
 IGNORE_BACKOFF ?= 0
@@ -156,7 +157,7 @@ help:
 	@echo "  make event-alpha-send-test PROFILE=notify_no_key  Send one guarded research-only heartbeat"
 	@echo "  make event-alpha-telegram-recipient-check PROFILE=notify_no_key  Send guarded per-recipient Telegram diagnostic"
 	@echo "  make event-alpha-runs-report  Print Event Alpha cycle run ledger rows"
-	@echo "  make event-impact-hypotheses-report PROFILE=notify_llm  Print stored Event Impact Hypothesis rows"
+	@echo "  make event-impact-hypotheses-report PROFILE=notify_llm  Print latest-run Event Impact Hypothesis rows; add ALL_HISTORY=1 for full history"
 	@echo "  make event-impact-hypotheses-inbox PROFILE=notify_llm  Print Event Impact Hypothesis rows needing review"
 	@echo "  make event-impact-hypothesis-smoke  Run offline SpaceX -> VELVET hypothesis validation smoke"
 	@echo "  make event-alpha-status PROFILE=no_key_live  Print profile-aware Event Alpha readiness/status"
@@ -704,6 +705,7 @@ event-impact-hypotheses-report:
 	RSI_EVENT_IMPACT_HYPOTHESIS_STORE_PATH=$(EVENT_IMPACT_HYPOTHESIS_STORE_PATH) \
 	$(PYTHON) main.py --event-impact-hypotheses-report --event-alpha-profile $(PROFILE) \
 		$(if $(filter 1 true yes,$(LATEST)),--latest-run,) \
+		$(if $(filter 1 true yes,$(ALL_HISTORY)),--all-history,) \
 		$(if $(strip $(RUN_ID)),--run-id $(RUN_ID),) \
 		$(if $(strip $(SINCE)),--since $(SINCE),) \
 		$(if $(filter 1 true yes,$(INCLUDE_LEGACY)),--include-legacy,)

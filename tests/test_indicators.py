@@ -6968,6 +6968,100 @@ def test_event_impact_hypothesis_matching_uses_context_not_substrings():
     assert "stablecoin_regulatory" in positive_categories
 
 
+def test_event_impact_hypothesis_category_refinements_for_validated_news():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_impact_hypotheses
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 23, 12, 0, tzinfo=timezone.utc)
+
+    def row(raw_id, title, body, event_type="news", external=None):
+        raw = RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="fixture",
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body,
+            raw_json={},
+            source_confidence=0.85,
+            content_hash=raw_id,
+        )
+        event = NormalizedEvent(
+            event_id=raw_id,
+            raw_ids=(raw_id,),
+            event_name=title,
+            event_type=event_type,
+            event_time=None,
+            event_time_confidence=0.0,
+            first_seen_time=now,
+            source="fixture",
+            source_urls=(raw.source_url,),
+            external_asset=external,
+            description=body,
+            confidence=0.85,
+        )
+        return raw, event
+
+    cases = [
+        row(
+            "arb-prediction",
+            "Arbitrum and Ethereum prediction market platform expands",
+            "Arbitrum smart contracts and Ethereum settlement support a new prediction market platform for a Mike Tyson fight.",
+            "infrastructure_event",
+            "Polymarket",
+        ),
+        row(
+            "sol-tokenized-equity",
+            "Solana tokenized equity volume grows",
+            "Solana venue activity rises as tokenized stock markets and synthetic exposure products gain volume.",
+            "rwa_event",
+            "tokenized equity",
+        ),
+        row(
+            "zec-listing",
+            "Zcash miner Nasdaq listing opens",
+            "A Zcash mining company completes a public listing; liquidity and market access may change.",
+            "listing_event",
+            "Nasdaq",
+        ),
+        row(
+            "rune-exploit",
+            "THORChain exploit investigation begins",
+            "THORChain RUNE faces an exploit and security incident investigation after an attack.",
+            "security_event",
+            "THORChain",
+        ),
+        row(
+            "chz-world-cup",
+            "World Cup fan token prediction market",
+            "CHZ-style fan tokens move before a World Cup fixture and team kickoff.",
+            "sports_event",
+            "World Cup",
+        ),
+    ]
+    result = EventDiscoveryResult(
+        raw_events=tuple(raw for raw, _ in cases),
+        normalized_events=tuple(event for _, event in cases),
+        links=(),
+        classifications=(),
+        candidates=(),
+    )
+    by_event: dict[str, set[str]] = {}
+    for item in event_impact_hypotheses.generate_impact_hypotheses(result, now=now):
+        by_event.setdefault(item.source_event_ids[0], set()).add(item.impact_category)
+
+    assert "prediction_market_infra" in by_event["arb-prediction"]
+    assert "political_meme_proxy" not in by_event["arb-prediction"]
+    assert {"tokenized_stock_venue", "rwa_preipo_proxy"} & by_event["sol-tokenized-equity"]
+    assert "political_meme_proxy" not in by_event["sol-tokenized-equity"]
+    assert "listing_liquidity_event" in by_event["zec-listing"]
+    assert "security_or_regulatory_shock" not in by_event["zec-listing"]
+    assert "security_or_regulatory_shock" in by_event["rune-exploit"]
+    assert "sports_fan_proxy" in by_event["chz-world-cup"]
+
+
 def test_event_impact_hypothesis_validation_is_identity_safe():
     import tempfile
     from datetime import datetime, timezone
@@ -7063,6 +7157,91 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
     assert "source_mentions_catalyst_without_candidate_asset" in unchanged.rejection_reasons
     rejected = event_impact_hypotheses.validate_hypotheses_with_raw_events([hypothesis], [url_only])[0]
     assert rejected.status != "validated"
+
+
+def test_event_impact_hypothesis_watchlist_uses_validated_asset_not_first_candidate():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_impact_hypotheses, event_watchlist
+
+    now = datetime(2026, 6, 23, 12, 0, tzinfo=timezone.utc)
+
+    def hypothesis(hypothesis_id, symbols, coin_ids, validated_asset=None, *, category="security_or_regulatory_shock", playbook="security_or_regulatory_shock", status="validated", scope="token"):
+        return event_impact_hypotheses.EventImpactHypothesis(
+            hypothesis_id=hypothesis_id,
+            event_cluster_id=f"cluster:{hypothesis_id}",
+            event_type="news",
+            external_asset="unknown",
+            impact_category=category,
+            candidate_sectors=("infrastructure_tokens",),
+            candidate_symbols=tuple(symbols),
+            candidate_coin_ids=tuple(coin_ids),
+            crypto_candidate_assets=tuple(
+                {"source": "taxonomy", "symbol": symbol, "coin_id": coin_id}
+                for symbol, coin_id in zip(symbols, coin_ids)
+            ) + ((dict(validated_asset, validated=True),) if validated_asset else ()),
+            validated_candidate_assets=((dict(validated_asset, validated=True),) if validated_asset else ()),
+            hypothesis_scope=scope,
+            playbook_hint=playbook,
+            confidence=0.82,
+            hypothesis_score=78,
+            validation_stage=event_impact_hypotheses.ValidationStage.CATALYST_LINK_VALIDATED.value if status == "validated" else event_impact_hypotheses.ValidationStage.SECTOR_HYPOTHESIS.value,
+            status=status,
+            validation_reasons=("identity_match links candidate to catalyst",) if validated_asset else (),
+        )
+
+    rune = hypothesis(
+        "hyp:rune",
+        ("LINK", "PYTH", "RUNE"),
+        ("chainlink", "pyth-network", "thorchain"),
+        {"source": "hypothesis_search", "symbol": "RUNE", "coin_id": "thorchain"},
+    )
+    arb = hypothesis(
+        "hyp:arb",
+        ("TRUMP", "UMA", "GNO"),
+        ("official-trump", "uma", "gnosis"),
+        {"source": "hypothesis_search", "symbol": "ARB", "coin_id": "arbitrum"},
+        category="prediction_market_infra",
+        playbook="infrastructure_mention",
+    )
+    chz = hypothesis(
+        "hyp:chz",
+        ("CHZ", "ARG", "BAR"),
+        ("chiliz", "argentine-football-association-fan-token", "fc-barcelona-fan-token"),
+        {"source": "hypothesis_search", "symbol": "CHZ", "coin_id": "chiliz"},
+        category="sports_fan_proxy",
+        playbook="fan_sports_event",
+    )
+    missing = hypothesis("hyp:missing", ("LINK", "PYTH"), ("chainlink", "pyth-network"), None)
+    sector = hypothesis(
+        "hyp:sector",
+        ("VELVET",),
+        ("velvet",),
+        None,
+        category="rwa_preipo_proxy",
+        playbook="rwa_preipo_proxy",
+        status="hypothesis",
+        scope="sector",
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = event_watchlist.EventWatchlistConfig(enabled=True, state_path=Path(tmp) / "watchlist.jsonl")
+        result = event_watchlist.refresh_hypothesis_watchlist((rune, arb, chz, missing, sector), cfg=cfg, now=now)
+    by_event = {entry.event_id: entry for entry in result.entries}
+    assert by_event["hyp:rune"].symbol == "RUNE"
+    assert by_event["hyp:rune"].coin_id == "thorchain"
+    assert any("first_candidate=LINK validated=RUNE" in warning for warning in by_event["hyp:rune"].warnings)
+    assert by_event["hyp:arb"].symbol == "ARB"
+    assert by_event["hyp:arb"].coin_id == "arbitrum"
+    assert any("first_candidate=TRUMP validated=ARB" in warning for warning in by_event["hyp:arb"].warnings)
+    assert by_event["hyp:chz"].symbol == "CHZ"
+    assert by_event["hyp:chz"].coin_id == "chiliz"
+    assert by_event["hyp:missing"].symbol == "SECTOR"
+    assert by_event["hyp:missing"].coin_id == "security_or_regulatory_shock"
+    assert "validated_hypothesis_missing_validated_asset" in by_event["hyp:missing"].warnings
+    assert by_event["hyp:sector"].symbol == "SECTOR"
+    assert by_event["hyp:sector"].state == event_watchlist.EventWatchlistState.HYPOTHESIS.value
 
 
 def test_event_impact_candidate_discovery_suggests_then_requires_identity_validation():
@@ -8156,6 +8335,8 @@ def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
     assert llm.config_overrides["EVENT_ALPHA_NOTIFY_DAILY_DIGEST_COOLDOWN_HOURS"] == 0.0
     assert llm.config_overrides["EVENT_ALPHA_NOTIFY_HEALTH_HEARTBEAT_COOLDOWN_HOURS"] == 0.0
     assert llm.config_overrides["EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT"] is False
+    assert llm.config_overrides["EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED"] is True
+    assert llm.config_overrides["EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MAX_ITEMS"] == 5
     assert deep.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 20
     assert deep.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"]
     assert deep.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 45.0
@@ -8177,6 +8358,8 @@ def test_notify_no_key_profile_delivers_each_clean_run():
     assert overrides["EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS"] == 0.0
     assert overrides["EVENT_ALPHA_NOTIFY_ALLOW_PARTIAL_RESULTS"] is True
     assert overrides["EVENT_ALPHA_NOTIFY_MAX_PROVIDER_FAILURES_BEFORE_SKIP"] == 1
+    assert overrides["EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED"] is True
+    assert overrides["EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MAX_ITEMS"] == 5
 
 
 def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery():
@@ -9115,6 +9298,135 @@ def test_event_alpha_router_routes_watchlist_escalations_safely():
     assert "card_id: card_" in text
     assert "FEEDBACK_TARGET=ea:" in text
     assert "alert_id=ea:" in routed_digest
+
+
+def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_router, event_research_cards, event_watchlist
+
+    def entry(symbol, score=78, *, should_alert=True):
+        return event_watchlist.EventWatchlistEntry(
+            schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+            row_type="event_watchlist_state",
+            key=f"hypothesis|cluster:{symbol}|security_or_regulatory_shock",
+            cluster_id=f"cluster:{symbol}",
+            event_id=f"hyp:{symbol}",
+            coin_id=symbol.lower(),
+            symbol=symbol,
+            relationship_type="impact_hypothesis",
+            external_asset="unknown",
+            event_time=None,
+            state=event_watchlist.EventWatchlistState.RADAR.value,
+            previous_state=event_watchlist.EventWatchlistState.HYPOTHESIS.value,
+            first_seen_at="2026-06-23T12:00:00+00:00",
+            last_seen_at="2026-06-23T12:30:00+00:00",
+            source_count=1,
+            highest_score=score,
+            latest_score=score,
+            latest_tier="RADAR_DIGEST",
+            latest_event_name=f"{symbol} validated impact hypothesis",
+            latest_source="impact_hypothesis",
+            latest_playbook_type="security_or_regulatory_shock",
+            latest_playbook_score=score,
+            latest_playbook_action="radar_digest",
+            latest_score_components={
+                "validation_stage": "catalyst_link_validated",
+                "validated_symbol": symbol,
+                "validated_coin_id": symbol.lower(),
+                "validated_asset": {"symbol": symbol, "coin_id": symbol.lower(), "validated": True},
+            },
+            material_change_reasons=("hypothesis_validated",),
+            should_alert=should_alert,
+        )
+
+    def proxy_entry(symbol, score=72):
+        return event_watchlist.EventWatchlistEntry(
+            schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+            row_type="event_watchlist_state",
+            key=f"proxy|cluster:{symbol}|proxy_attention",
+            cluster_id=f"cluster:{symbol}",
+            event_id=f"proxy:{symbol}",
+            coin_id=symbol.lower(),
+            symbol=symbol,
+            relationship_type="proxy_attention",
+            external_asset="SpaceX",
+            event_time=None,
+            state=event_watchlist.EventWatchlistState.RADAR.value,
+            previous_state=event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+            first_seen_at="2026-06-23T12:00:00+00:00",
+            last_seen_at="2026-06-23T12:30:00+00:00",
+            source_count=2,
+            highest_score=score,
+            latest_score=score,
+            latest_tier="RADAR_DIGEST",
+            latest_event_name=f"{symbol} proxy candidate",
+            latest_source="test",
+            latest_playbook_type="proxy_attention",
+            latest_playbook_score=score,
+            latest_playbook_action="radar_digest",
+            should_alert=True,
+        )
+
+    read = event_watchlist.EventWatchlistReadResult(
+        state_path=Path("watchlist.jsonl"),
+        rows_read=4,
+        latest_only=True,
+        entries=[entry("RUNE", 90), entry("ARB", 80), proxy_entry("VELVET", 72), entry("SECTOR", 70)],
+    )
+    enabled = event_alpha_router.route_watchlist(
+        read,
+        cfg=event_alpha_router.EventAlphaRouterConfig(
+            enabled=True,
+            validated_hypothesis_digest_enabled=True,
+            max_validated_hypothesis_digest_items=1,
+            max_digest_items=2,
+        ),
+    )
+    by_symbol = {decision.entry.symbol: decision for decision in enabled.decisions}
+    assert by_symbol["RUNE"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+    assert by_symbol["RUNE"].lane == event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST
+    assert by_symbol["RUNE"].alertable is True
+    assert by_symbol["RUNE"].reason == "Validated impact hypothesis promoted to RADAR."
+    assert by_symbol["ARB"].route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE
+    assert by_symbol["ARB"].alertable is False
+    assert by_symbol["ARB"].reason == "Validated impact hypothesis digest cap reached for this run."
+    assert by_symbol["VELVET"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+    assert by_symbol["VELVET"].alertable is True
+    assert by_symbol["SECTOR"].alertable is False
+    assert by_symbol["SECTOR"].route != event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
+
+    disabled = event_alpha_router.route_watchlist(
+        event_watchlist.EventWatchlistReadResult(
+            state_path=Path("watchlist.jsonl"),
+            rows_read=1,
+            latest_only=True,
+            entries=[entry("RUNE", 90)],
+        ),
+        cfg=event_alpha_router.EventAlphaRouterConfig(
+            enabled=True,
+            validated_hypothesis_digest_enabled=False,
+        ),
+    )
+    only = disabled.decisions[0]
+    assert only.route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+    assert only.alertable is False
+
+    message = event_alpha_router.format_routed_telegram_digest([by_symbol["RUNE"]], profile="notify_llm")
+    assert "Validated impact hypothesis" in message
+    assert "Not a trade signal" in message
+    assert "not a calibrated strategy" in message
+
+    card = event_research_cards.render_research_card(
+        "RUNE",
+        watchlist_entries=[by_symbol["RUNE"].entry],
+        route_decisions=[by_symbol["RUNE"]],
+    )
+    assert card.found is True
+    assert "## Impact Hypothesis Context" in card.markdown
+    assert "Validated asset: RUNE/rune" in card.markdown
+    assert "not a calibrated strategy or trade signal" in card.markdown
+    assert "OPENAI_API_KEY" not in card.markdown
+    assert "TELEGRAM_BOT_TOKEN" not in card.markdown
 
 
 def test_event_alpha_router_routes_material_changes_with_lanes():
