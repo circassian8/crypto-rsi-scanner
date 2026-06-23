@@ -188,6 +188,10 @@ def format_impact_hypotheses_store_report(
     )
     promotion_ids = _promoted_hypothesis_ids(watchlist_rows)
     rows.append(f"watchlist promotions linked: {len(promotion_ids)}")
+    rows.append(
+        "route eligibility note: promoted hypothesis rows are watchlist links; "
+        "the Event Alpha router quality gate decides digest vs local-only."
+    )
     rows.append("")
     rows.extend(_hypothesis_section(
         "Pending validation-search hypotheses",
@@ -443,7 +447,7 @@ def _format_hypothesis_row(
     if row.get("promoted_watchlist_key"):
         out.append(f"  promoted_watchlist_key: {row.get('promoted_watchlist_key')}")
     if str(row.get("status") or "") == "validated" and row.get("validated_symbol") and row.get("promoted_watchlist_key"):
-        out.append("  route_eligibility: daily_digest_candidate")
+        out.append("  route_eligibility: linked_watchlist_candidate; router_quality_gate_decides_digest")
     if row.get("validation_reasons"):
         out.append("  validated: " + "; ".join(str(item) for item in row["validation_reasons"][:3]))
     if include_rejections and row.get("rejection_reasons"):

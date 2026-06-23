@@ -96,6 +96,18 @@ trade signal. Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`,
 paper/live rows, or `TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from
 `event_fade.py` plus the `proxy_fade` playbook.
 
+Digest routing is quality-gated. Defaults require score >=
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MIN_SCORE` (65), a validated token
+identity, `catalyst_link_validated` or stronger validation stage, no
+source-noise/ticker-collision gate, a non-ambiguous playbook, and either a
+known external catalyst or explicit direct token-event evidence (exploit,
+listing, unlock, airdrop, or TGE text tied to the token). Use
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT=0` only
+for deliberate review experiments. Delivered validated-hypothesis digest items
+are written to `event_alpha_alerts.jsonl` as research snapshots so
+`make event-alpha-notification-inbox PROFILE=notify_llm` can show them as
+needing useful/junk feedback.
+
 Each Event Alpha cycle also appends generated hypotheses to a profile-scoped
 research artifact:
 

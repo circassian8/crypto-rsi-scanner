@@ -169,7 +169,12 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
         ),
         "",
     ]
-    _append_item_section(lines, "sent notifications without feedback", result.sent_without_feedback, profile=result.profile)
+    _append_item_section(
+        lines,
+        "delivered research digest items needing feedback / sent notifications without feedback",
+        result.sent_without_feedback,
+        profile=result.profile,
+    )
     _append_item_section(
         lines,
         "partial-delivered notifications needing delivery review",
@@ -252,7 +257,7 @@ def _inbox_item(
     lane = _lane_for_alert(alert)
     due = _lane_count(run, "lane_counts_due", lane)
     run_id = str(alert.get("run_id") or (run or {}).get("run_id") or "")
-    delivery_state = str(delivery_state_by_run.get(run_id) or "")
+    delivery_state = str(alert.get("delivered_status") or alert.get("delivery_state") or delivery_state_by_run.get(run_id) or "")
     suppressed = delivery_state in (delivery.STATE_SKIPPED_DUPLICATE, delivery.STATE_SKIPPED_IN_FLIGHT)
     blocked_by_guard = delivery_state == delivery.STATE_BLOCKED or _guard_blocked(run)
     sent = (

@@ -598,17 +598,27 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     validation_reasons = components.get("validation_reasons") or components.get("validation_reason") or []
     if isinstance(validation_reasons, str):
         validation_reasons = [validation_reasons]
+    gate_block = event_alpha_router.validated_hypothesis_digest_block_reason(entry)
+    gate_line = "passed for capped research digest" if gate_block is None else f"local-only: {gate_block}"
+    why_not_promoted = components.get("why_not_promoted") or []
+    if isinstance(why_not_promoted, str):
+        why_not_promoted = [why_not_promoted]
     lines = [
         f"- Validated asset: {validated_symbol or 'unknown'}/{validated_coin_id or 'unknown'}",
-        f"- Original sector hypothesis: {components.get('hypothesis_scope') or 'unknown'} / {entry.latest_playbook_type or 'impact_hypothesis'}",
+        f"- Original sector hypothesis: {', '.join(str(item) for item in (components.get('candidate_sectors') or [])[:6]) or components.get('hypothesis_scope') or 'unknown'}",
         f"- Candidate source: {entry.latest_source or 'impact_hypothesis'}",
         f"- Candidate symbols considered: {', '.join(str(item) for item in candidate_symbols[:8]) if candidate_symbols else 'none'}",
-        f"- Why promoted: {entry.suppressed_reason or 'validated impact hypothesis promoted to RADAR'}",
+        f"- Playbook: {entry.latest_playbook_type or 'impact_hypothesis'}",
+        f"- Quality gate: {gate_line}",
+        f"- Why promoted/local-only: {entry.suppressed_reason or 'validated impact hypothesis promoted to RADAR'}",
         "- Safety label: catalyst link validated, but this is not a calibrated strategy or trade signal.",
         "- Why it may be wrong: validation may be source-thin, asset link may be narrative-only, and the catalyst impact may not move this token.",
+        "- What to verify manually: independent catalyst source, asset identity, liquidity/organic volume, and whether the catalyst actually affects this token.",
     ]
     if validation_reasons:
         lines.append("- Validation evidence: " + "; ".join(str(item) for item in validation_reasons[:4]))
+    if why_not_promoted:
+        lines.append("- Why not promoted diagnostics: " + "; ".join(str(item) for item in why_not_promoted[:4]))
     return lines
 
 

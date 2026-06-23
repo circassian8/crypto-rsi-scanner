@@ -1471,7 +1471,11 @@ def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRo
         instant_enabled=config.EVENT_ALPHA_ROUTER_INSTANT_ENABLED,
         max_digest_items=config.EVENT_ALPHA_ROUTER_MAX_DIGEST_ITEMS,
         validated_hypothesis_digest_enabled=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED,
-        max_validated_hypothesis_digest_items=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MAX_ITEMS,
+        max_validated_hypothesis_digest_items=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_MAX_ITEMS,
+        validated_hypothesis_min_score=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MIN_SCORE,
+        validated_hypothesis_require_external_or_direct_event=(
+            config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT
+        ),
         max_high_priority_per_day=config.EVENT_ALPHA_ROUTER_MAX_HIGH_PRIORITY_PER_DAY,
         per_key_cooldown_hours=config.EVENT_ALPHA_ROUTER_PER_KEY_COOLDOWN_HOURS,
         alert_on_score_jump=config.EVENT_ALPHA_ROUTER_ALERT_ON_SCORE_JUMP,
@@ -2147,6 +2151,7 @@ def event_alpha_cycle(
             profile=profile_for_run,
             run_mode=run_mode,
             artifact_namespace=artifact_namespace,
+            research_card_paths=pipeline_result.research_card_paths,
         )
     pipeline_result = replace(
         pipeline_result,
@@ -2679,6 +2684,7 @@ def _event_alpha_notify_cycle_body(
     )
     print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
     store_cfg = _event_alpha_alert_store_config_from_runtime()
+    delivery_rows = event_alpha_notification_delivery.load_delivery_records(delivery_cfg.path)
     store_result = event_alpha_alert_store.write_alert_snapshots(
         pipeline_result.alerts,
         cfg=store_cfg,
@@ -2688,6 +2694,8 @@ def _event_alpha_notify_cycle_body(
         profile=profile_for_run,
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
+        delivery_rows=delivery_rows,
+        research_card_paths=pipeline_result.research_card_paths,
     )
     pipeline_result = replace(
         pipeline_result,
@@ -5426,8 +5434,23 @@ def _router_config_from_profile(profile_name: str | None) -> event_alpha_router.
         ),
         max_validated_hypothesis_digest_items=int(
             overrides.get(
-                "EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MAX_ITEMS",
-                current.max_validated_hypothesis_digest_items,
+                "EVENT_ALPHA_VALIDATED_HYPOTHESIS_MAX_ITEMS",
+                overrides.get(
+                    "EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MAX_ITEMS",
+                    current.max_validated_hypothesis_digest_items,
+                ),
+            )
+        ),
+        validated_hypothesis_min_score=float(
+            overrides.get(
+                "EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MIN_SCORE",
+                current.validated_hypothesis_min_score,
+            )
+        ),
+        validated_hypothesis_require_external_or_direct_event=bool(
+            overrides.get(
+                "EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT",
+                current.validated_hypothesis_require_external_or_direct_event,
             )
         ),
         max_high_priority_per_day=int(

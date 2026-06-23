@@ -9,7 +9,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alerts, event_alpha_outcomes, event_graph, event_playbooks
+from . import (
+    event_alerts,
+    event_alpha_notification_delivery,
+    event_alpha_outcomes,
+    event_alpha_router,
+    event_graph,
+    event_playbooks,
+)
 
 ALERT_STORE_SCHEMA_VERSION = "event_alpha_alert_snapshot_v1"
 
@@ -61,10 +68,19 @@ def write_alert_snapshots(
     profile: str | None = None,
     run_mode: str | None = None,
     artifact_namespace: str | None = None,
+    delivery_rows: Iterable[Mapping[str, Any]] = (),
+    research_card_paths: Iterable[str | Path] = (),
 ) -> EventAlphaAlertStoreWriteResult:
     """Append research-only alert snapshots to JSONL."""
     observed = _as_utc(now or datetime.now(timezone.utc))
     rows = [_snapshot_from_alert(alert, observed) for alert in alerts]
+    existing_keys = {str(row.get("alert_key") or "") for row in rows}
+    route_rows = [
+        _snapshot_from_route_decision(decision, observed)
+        for decision in _route_decisions_for_snapshots(router_result)
+        if str(getattr(decision.entry, "key", "") or "") not in existing_keys
+    ]
+    rows.extend(route_rows)
     rows = [
         _with_artifact_context(
             row,
@@ -77,6 +93,10 @@ def write_alert_snapshots(
     ]
     route_context = _route_context_by_key(router_result)
     rows = [_with_route_context(row, route_context) for row in rows]
+    delivery_context = _delivery_context_by_alert_id(delivery_rows)
+    card_context = _card_context_by_card_id(research_card_paths)
+    rows = [_with_delivery_context(row, delivery_context) for row in rows]
+    rows = [_with_card_context(row, card_context) for row in rows]
     rows = _filter_snapshot_rows(
         rows,
         policy=cfg.snapshot_policy,
@@ -222,6 +242,9 @@ def format_alert_snapshot_report(
         ("by playbook", "playbook_type"),
         ("by expected direction", "expected_direction"),
         ("by tier", "tier"),
+        ("by route", "route"),
+        ("by delivered status", "delivered_status"),
+        ("by feedback status", "feedback_status"),
         ("by LLM role", "llm_asset_role"),
         ("by source", "source"),
         ("by BTC regime", "btc_regime"),
@@ -258,6 +281,13 @@ def format_alert_snapshot_report(
                 f"vol={_fmt_bool(row.get('volatility_hit'))} "
                 f"up_fade={_fmt_bool(row.get('up_then_fade_hit'))}"
             )
+        if row.get("route") or row.get("delivered_status") or row.get("research_card_path"):
+            out.append(
+                f"  route: {row.get('route') or 'none'} lane={row.get('lane') or 'none'} "
+                f"delivered={row.get('delivered_status') or 'unknown'} feedback={row.get('feedback_status') or 'pending'}"
+            )
+            if row.get("research_card_path"):
+                out.append(f"  card: {row.get('research_card_path')}")
     return "\n".join(out).rstrip()
 
 
@@ -346,6 +376,79 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "reason": alert.reason,
         "verify": list(alert.verify),
         "rejected_reason": alert.rejected_reason,
+        "delivered_status": None,
+        "feedback_status": "pending",
+    }
+
+
+def _snapshot_from_route_decision(
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    observed: datetime,
+) -> dict[str, Any]:
+    entry = decision.entry
+    components = dict(entry.latest_score_components or {})
+    alert_key = str(entry.key)
+    observed_iso = observed.isoformat()
+    playbook = entry.latest_effective_playbook_type or entry.latest_playbook_type or "unknown"
+    validated_asset = components.get("validated_asset") if isinstance(components.get("validated_asset"), Mapping) else {}
+    validated_symbol = components.get("validated_symbol") or validated_asset.get("symbol") or entry.symbol
+    validated_coin_id = components.get("validated_coin_id") or validated_asset.get("coin_id") or entry.coin_id
+    return {
+        "schema_version": ALERT_STORE_SCHEMA_VERSION,
+        "row_type": "event_alpha_alert_snapshot",
+        "snapshot_id": f"{observed_iso}|{alert_key}",
+        "alert_key": alert_key,
+        "cluster_id": entry.cluster_id,
+        "observed_at": observed_iso,
+        "event_id": entry.event_id,
+        "event_name": entry.latest_event_name,
+        "event_type": components.get("event_type") or "impact_hypothesis",
+        "event_time": entry.event_time,
+        "external_asset": entry.external_asset,
+        "asset_coin_id": entry.coin_id,
+        "asset_symbol": entry.symbol,
+        "asset_name": validated_asset.get("name") if isinstance(validated_asset, Mapping) else None,
+        "relationship_type": entry.relationship_type,
+        "asset_role": components.get("asset_role"),
+        "source": entry.latest_source,
+        "source_count": entry.source_count,
+        "tier": entry.latest_tier,
+        "opportunity_score": entry.latest_score,
+        "score_components": components,
+        "playbook_type": playbook,
+        "rule_playbook_type": entry.latest_rule_playbook_type,
+        "effective_playbook_type": playbook,
+        "llm_adjusted_playbook_type": entry.latest_llm_adjusted_playbook_type,
+        "playbook_score": entry.latest_playbook_score,
+        "playbook_action": entry.latest_playbook_action,
+        "llm_asset_role": entry.latest_llm_asset_role,
+        "llm_confidence": entry.latest_llm_confidence,
+        "expected_direction": components.get("direction_hint") or components.get("expected_direction") or "unknown",
+        "primary_horizon": components.get("primary_horizon") or "manual",
+        "success_metric": components.get("success_metric") or "manual",
+        "market_anomaly_bucket": _market_anomaly_bucket(components.get("market_move_volume", 0)),
+        "btc_regime": components.get("btc_regime") or "unknown",
+        "signal_type": components.get("signal_type"),
+        "fade_state": components.get("fade_state"),
+        "state": entry.state,
+        "route": decision.route.value,
+        "lane": decision.lane.value,
+        "alert_id": decision.alert_id,
+        "card_id": decision.card_id,
+        "route_alertable": bool(decision.alertable),
+        "route_reason": decision.reason,
+        "impact_category": components.get("impact_category") or playbook,
+        "validation_stage": components.get("validation_stage"),
+        "hypothesis_id": components.get("hypothesis_id") or entry.event_id,
+        "hypothesis_score": components.get("hypothesis_score") or entry.latest_score,
+        "validated_symbol": validated_symbol,
+        "validated_coin_id": validated_coin_id,
+        "research_card_path": None,
+        "delivered_status": None,
+        "feedback_status": "pending",
+        "reason": decision.reason,
+        "verify": components.get("what_to_verify") or [],
+        "rejected_reason": None,
     }
 
 
@@ -383,10 +486,21 @@ def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]
             "alert_id": getattr(decision, "alert_id", f"ea:{key}"),
             "card_id": getattr(decision, "card_id", ""),
             "route": getattr(route, "value", str(route)),
+            "lane": getattr(getattr(decision, "lane", ""), "value", str(getattr(decision, "lane", ""))),
             "route_alertable": bool(getattr(decision, "alertable", False)),
             "route_reason": str(getattr(decision, "reason", "") or ""),
         }
     return out
+
+
+def _route_decisions_for_snapshots(router_result: Any | None) -> tuple[event_alpha_router.EventAlphaRouteDecision, ...]:
+    if router_result is None:
+        return ()
+    out: list[event_alpha_router.EventAlphaRouteDecision] = []
+    for decision in getattr(router_result, "decisions", ()) or ():
+        if bool(getattr(decision, "alertable", False)):
+            out.append(decision)
+    return tuple(out)
 
 
 def _with_route_context(row: dict[str, Any], route_context: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
@@ -396,6 +510,68 @@ def _with_route_context(row: dict[str, Any], route_context: Mapping[str, Mapping
     out = dict(row)
     out.update(context)
     return out
+
+
+def _delivery_context_by_alert_id(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for row in event_alpha_notification_delivery.latest_rows_by_delivery(rows):
+        state = str(row.get("state") or "")
+        alert_ids = [part.strip() for part in str(row.get("alert_id") or "").split(",") if part.strip()]
+        if not alert_ids:
+            continue
+        context = {
+            "delivered_status": state,
+            "delivery_state": state,
+            "delivery_id": row.get("delivery_id"),
+            "delivery_lane": row.get("lane"),
+            "delivery_delivered_at": row.get("delivered_at"),
+            "delivery_delivered_count": row.get("delivered_count"),
+            "delivery_failed_count": row.get("failed_count"),
+        }
+        for alert_id in alert_ids:
+            out[alert_id] = context
+            if alert_id.startswith("ea:"):
+                out[alert_id[3:]] = context
+            else:
+                out[f"ea:{alert_id}"] = context
+    return out
+
+
+def _with_delivery_context(row: dict[str, Any], context: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    ids = [
+        str(row.get("alert_id") or ""),
+        str(row.get("alert_key") or ""),
+        str(row.get("card_id") or ""),
+    ]
+    for value in ids:
+        if value and value in context:
+            out = dict(row)
+            out.update(context[value])
+            return out
+    return row
+
+
+def _card_context_by_card_id(paths: Iterable[str | Path]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for raw in paths:
+        path = Path(raw).expanduser()
+        if path.name == "index.md":
+            continue
+        stem = path.stem
+        if stem:
+            out[stem] = str(path)
+            if stem.startswith("card_"):
+                out[stem[5:]] = str(path)
+    return out
+
+
+def _with_card_context(row: dict[str, Any], context: Mapping[str, str]) -> dict[str, Any]:
+    for value in (str(row.get("card_id") or ""), str(row.get("alert_id") or "").replace("ea:", "card_")):
+        if value and value in context:
+            out = dict(row)
+            out["research_card_path"] = context[value]
+            return out
+    return row
 
 
 def _filter_snapshot_rows(
@@ -560,16 +736,31 @@ def _mfe_mae_by_playbook(rows: Iterable[Mapping[str, Any]]) -> str:
 def _feedback_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
     out: dict[str, str] = {}
     for row in rows:
-        key = str(row.get("key") or "")
         label = str(row.get("label") or "")
-        if key and label:
+        if not label:
+            continue
+        for field in ("key", "target", "alert_id", "event_id", "coin_id", "symbol", "card_id"):
+            key = str(row.get(field) or "").strip()
+            if not key:
+                continue
             out[key] = label
+            if key.startswith("ea:"):
+                out[key[3:]] = label
+            else:
+                out[f"ea:{key}"] = label
     return out
 
 
 def _with_feedback(row: Mapping[str, Any], feedback_by_key: Mapping[str, str]) -> dict[str, Any]:
     out = dict(row)
-    out["feedback_label"] = feedback_by_key.get(str(row.get("alert_key") or "")) or out.get("feedback_label")
+    label = (
+        feedback_by_key.get(str(row.get("alert_id") or ""))
+        or feedback_by_key.get(str(row.get("alert_key") or ""))
+        or feedback_by_key.get(str(row.get("event_id") or ""))
+        or out.get("feedback_label")
+    )
+    out["feedback_label"] = label
+    out["feedback_status"] = "reviewed" if label else out.get("feedback_status") or "pending"
     return out
 
 

@@ -7020,6 +7020,13 @@ def test_event_impact_hypothesis_category_refinements_for_validated_news():
             "tokenized equity",
         ),
         row(
+            "btc-quantum-policy",
+            "Bitcoin quantum-computing policy shock draws Trump comments",
+            "Bitcoin technology risk rises as quantum-computing policy debate and Trump comments hit crypto headlines.",
+            "technology_risk",
+            "unknown",
+        ),
+        row(
             "zec-listing",
             "Zcash miner Nasdaq listing opens",
             "A Zcash mining company completes a public listing; liquidity and market access may change.",
@@ -7056,6 +7063,8 @@ def test_event_impact_hypothesis_category_refinements_for_validated_news():
     assert "political_meme_proxy" not in by_event["arb-prediction"]
     assert {"tokenized_stock_venue", "rwa_preipo_proxy"} & by_event["sol-tokenized-equity"]
     assert "political_meme_proxy" not in by_event["sol-tokenized-equity"]
+    assert "security_or_regulatory_shock" in by_event["btc-quantum-policy"]
+    assert "political_meme_proxy" not in by_event["btc-quantum-policy"]
     assert "listing_liquidity_event" in by_event["zec-listing"]
     assert "security_or_regulatory_shock" not in by_event["zec-listing"]
     assert "security_or_regulatory_shock" in by_event["rune-exploit"]
@@ -7189,6 +7198,7 @@ def test_event_impact_hypothesis_watchlist_uses_validated_asset_not_first_candid
             validation_stage=event_impact_hypotheses.ValidationStage.CATALYST_LINK_VALIDATED.value if status == "validated" else event_impact_hypotheses.ValidationStage.SECTOR_HYPOTHESIS.value,
             status=status,
             validation_reasons=("identity_match links candidate to catalyst",) if validated_asset else (),
+            evidence_quotes=(f"{validated_asset.get('coin_id', '')} {validated_asset.get('symbol', '')} exploit catalyst link",) if validated_asset else (),
         )
 
     rune = hypothesis(
@@ -7231,6 +7241,14 @@ def test_event_impact_hypothesis_watchlist_uses_validated_asset_not_first_candid
     by_event = {entry.event_id: entry for entry in result.entries}
     assert by_event["hyp:rune"].symbol == "RUNE"
     assert by_event["hyp:rune"].coin_id == "thorchain"
+    assert by_event["hyp:rune"].latest_score_components["hypothesis_id"] == "hyp:rune"
+    assert by_event["hyp:rune"].latest_score_components["impact_category"] == "security_or_regulatory_shock"
+    assert by_event["hyp:rune"].latest_score_components["validation_stage"] == "catalyst_link_validated"
+    assert by_event["hyp:rune"].latest_score_components["hypothesis_score"] == 78
+    assert by_event["hyp:rune"].latest_score_components["score"] == 78
+    assert by_event["hyp:rune"].latest_score_components["validated_symbol"] == "RUNE"
+    assert by_event["hyp:rune"].latest_score_components["validated_coin_id"] == "thorchain"
+    assert by_event["hyp:rune"].latest_score_components["route_eligibility"] == "validated_hypothesis_digest_candidate"
     assert any("first_candidate=LINK validated=RUNE" in warning for warning in by_event["hyp:rune"].warnings)
     assert by_event["hyp:arb"].symbol == "ARB"
     assert by_event["hyp:arb"].coin_id == "arbitrum"
@@ -7242,6 +7260,7 @@ def test_event_impact_hypothesis_watchlist_uses_validated_asset_not_first_candid
     assert "validated_hypothesis_missing_validated_asset" in by_event["hyp:missing"].warnings
     assert by_event["hyp:sector"].symbol == "SECTOR"
     assert by_event["hyp:sector"].state == event_watchlist.EventWatchlistState.HYPOTHESIS.value
+    assert by_event["hyp:sector"].latest_score_components["route_eligibility"] == "local_only"
 
 
 def test_event_impact_candidate_discovery_suggests_then_requires_identity_validation():
@@ -8652,6 +8671,158 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
         assert "Outcome metrics by playbook:" in outcome_report
 
 
+def test_event_alpha_alert_store_persists_validated_route_snapshots_for_inbox_feedback():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_alert_store,
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notification_inbox,
+        event_alpha_router,
+        event_watchlist,
+    )
+
+    now = datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="hypothesis|cluster:rune|security_or_regulatory_shock",
+        cluster_id="cluster:rune",
+        event_id="hyp:rune",
+        coin_id="thorchain",
+        symbol="RUNE",
+        relationship_type="impact_hypothesis",
+        external_asset="unknown",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        previous_state=event_watchlist.EventWatchlistState.HYPOTHESIS.value,
+        first_seen_at="2026-06-24T11:00:00+00:00",
+        last_seen_at="2026-06-24T12:00:00+00:00",
+        source_count=2,
+        highest_score=88,
+        latest_score=88,
+        latest_tier="RADAR_DIGEST",
+        latest_event_name="THORChain exploit validated impact hypothesis",
+        latest_source="impact_hypothesis",
+        latest_playbook_type="security_or_regulatory_shock",
+        latest_effective_playbook_type="security_or_regulatory_shock",
+        latest_playbook_score=88,
+        latest_playbook_action="radar_digest",
+        latest_score_components={
+            "hypothesis_id": "hyp:rune",
+            "impact_category": "security_or_regulatory_shock",
+            "validation_stage": "catalyst_link_validated",
+            "hypothesis_score": 88,
+            "validated_symbol": "RUNE",
+            "validated_coin_id": "thorchain",
+            "validated_asset": {"symbol": "RUNE", "coin_id": "thorchain", "name": "THORChain", "validated": True},
+            "evidence_quotes": ["THORChain RUNE faces an exploit and security incident investigation."],
+            "validation_reasons": ["THORChain RUNE faces an exploit and security incident investigation."],
+        },
+        material_change_reasons=("hypothesis_validated",),
+        should_alert=True,
+    )
+    routed = event_alpha_router.route_watchlist(
+        event_watchlist.EventWatchlistReadResult(
+            state_path=Path("watchlist.jsonl"),
+            rows_read=1,
+            latest_only=True,
+            entries=[entry],
+        ),
+        cfg=event_alpha_router.EventAlphaRouterConfig(
+            enabled=True,
+            validated_hypothesis_digest_enabled=True,
+            validated_hypothesis_min_score=65,
+        ),
+    )
+    decision = routed.alertable_decisions[0]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        card_dir = root / "cards"
+        card_dir.mkdir()
+        card_path = card_dir / f"{decision.card_id}.md"
+        card_path.write_text("# RUNE card\n", encoding="utf-8")
+        delivery_row = delivery.build_record(
+            run_id="run-rune",
+            alert_id=decision.alert_id,
+            profile="notify_llm",
+            namespace="notify_llm",
+            lane="daily_digest",
+            route="RESEARCH_DIGEST",
+            content_hash="hash-rune",
+            state=delivery.STATE_DELIVERED,
+            now=now,
+            delivered_at=now,
+            delivered_count=1,
+        ).to_row()
+        store_path = root / "alerts.jsonl"
+        wrote = event_alpha_alert_store.write_alert_snapshots(
+            [],
+            cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(path=store_path, snapshot_policy="alertable"),
+            now=now,
+            router_result=routed,
+            run_id="run-rune",
+            profile="notify_llm",
+            run_mode="notification_burn_in",
+            artifact_namespace="notify_llm",
+            delivery_rows=[delivery_row],
+            research_card_paths=[card_path],
+        )
+        assert wrote.rows_written == 1
+        loaded = event_alpha_alert_store.load_alert_snapshots(store_path)
+        row = loaded.rows[0]
+        assert row["alert_id"] == decision.alert_id
+        assert row["run_id"] == "run-rune"
+        assert row["artifact_namespace"] == "notify_llm"
+        assert row["asset_symbol"] == "RUNE"
+        assert row["asset_coin_id"] == "thorchain"
+        assert row["route"] == "RESEARCH_DIGEST"
+        assert row["lane"] == "DAILY_DIGEST"
+        assert row["state"] == "RADAR"
+        assert row["impact_category"] == "security_or_regulatory_shock"
+        assert row["validation_stage"] == "catalyst_link_validated"
+        assert row["hypothesis_id"] == "hyp:rune"
+        assert row["hypothesis_score"] == 88
+        assert row["validated_symbol"] == "RUNE"
+        assert row["validated_coin_id"] == "thorchain"
+        assert row["research_card_path"] == str(card_path)
+        assert row["delivered_status"] == delivery.STATE_DELIVERED
+        assert row["feedback_status"] == "pending"
+
+        inbox = event_alpha_notification_inbox.build_notification_inbox(
+            notification_runs=[{"run_id": "run-rune", "lane_counts_sent": {"daily_digest": 1}}],
+            alert_rows=loaded.rows,
+            feedback_rows=[],
+            research_cards_dir=card_dir,
+            profile="notify_llm",
+            artifact_namespace="notify_llm",
+            notification_runs_path=root / "runs.jsonl",
+            alert_store_path=store_path,
+            feedback_path=root / "feedback.jsonl",
+            notification_delivery_rows=[delivery_row],
+        )
+        assert len(inbox.sent_without_feedback) == 1
+        assert inbox.sent_without_feedback[0].alert_id == decision.alert_id
+        text = event_alpha_notification_inbox.format_notification_inbox(inbox)
+        assert "delivered research digest items needing feedback" in text
+
+        reviewed = event_alpha_notification_inbox.build_notification_inbox(
+            notification_runs=[{"run_id": "run-rune", "lane_counts_sent": {"daily_digest": 1}}],
+            alert_rows=loaded.rows,
+            feedback_rows=[{"target": decision.alert_id, "label": "useful"}],
+            research_cards_dir=card_dir,
+            profile="notify_llm",
+            artifact_namespace="notify_llm",
+            notification_runs_path=root / "runs.jsonl",
+            alert_store_path=store_path,
+            feedback_path=root / "feedback.jsonl",
+            notification_delivery_rows=[delivery_row],
+        )
+        assert len(reviewed.sent_without_feedback) == 0
+
+
 def test_event_alpha_outcomes_playbook_specific_metrics():
     from crypto_rsi_scanner import event_alpha_outcomes
 
@@ -9304,17 +9475,27 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
     from pathlib import Path
     from crypto_rsi_scanner import event_alpha_router, event_research_cards, event_watchlist
 
-    def entry(symbol, score=78, *, should_alert=True):
+    def entry(
+        symbol,
+        score=78,
+        *,
+        should_alert=True,
+        impact_category="security_or_regulatory_shock",
+        playbook="security_or_regulatory_shock",
+        external_asset="unknown",
+        evidence=None,
+    ):
+        evidence = evidence or (f"{symbol} {symbol.lower()} exploit catalyst link",)
         return event_watchlist.EventWatchlistEntry(
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
             row_type="event_watchlist_state",
-            key=f"hypothesis|cluster:{symbol}|security_or_regulatory_shock",
+            key=f"hypothesis|cluster:{symbol}|{impact_category}",
             cluster_id=f"cluster:{symbol}",
             event_id=f"hyp:{symbol}",
             coin_id=symbol.lower(),
             symbol=symbol,
             relationship_type="impact_hypothesis",
-            external_asset="unknown",
+            external_asset=external_asset,
             event_time=None,
             state=event_watchlist.EventWatchlistState.RADAR.value,
             previous_state=event_watchlist.EventWatchlistState.HYPOTHESIS.value,
@@ -9326,14 +9507,23 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
             latest_tier="RADAR_DIGEST",
             latest_event_name=f"{symbol} validated impact hypothesis",
             latest_source="impact_hypothesis",
-            latest_playbook_type="security_or_regulatory_shock",
+            latest_playbook_type=playbook,
+            latest_effective_playbook_type=playbook,
             latest_playbook_score=score,
             latest_playbook_action="radar_digest",
             latest_score_components={
+                "hypothesis_id": f"hyp:{symbol}",
+                "impact_category": impact_category,
                 "validation_stage": "catalyst_link_validated",
+                "hypothesis_score": score,
+                "score": score,
+                "playbook_type": playbook,
+                "effective_playbook_type": playbook,
                 "validated_symbol": symbol,
                 "validated_coin_id": symbol.lower(),
-                "validated_asset": {"symbol": symbol, "coin_id": symbol.lower(), "validated": True},
+                "validated_asset": {"symbol": symbol, "coin_id": symbol.lower(), "name": symbol, "validated": True},
+                "evidence_quotes": list(evidence),
+                "validation_reasons": list(evidence),
             },
             material_change_reasons=("hypothesis_validated",),
             should_alert=should_alert,
@@ -9371,7 +9561,26 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
         state_path=Path("watchlist.jsonl"),
         rows_read=4,
         latest_only=True,
-        entries=[entry("RUNE", 90), entry("ARB", 80), proxy_entry("VELVET", 72), entry("SECTOR", 70)],
+        entries=[
+            entry("RUNE", 90, evidence=("THORChain RUNE faces an exploit and security incident investigation.",)),
+            entry(
+                "ZEC",
+                82,
+                impact_category="listing_liquidity_event",
+                playbook="listing_volatility",
+                evidence=("Zcash ZEC miner completes a Nasdaq listing and public market access changes.",),
+            ),
+            entry(
+                "BTC",
+                88,
+                impact_category="political_meme_proxy",
+                playbook="political_meme_event",
+                evidence=("Bitcoin quantum-computing policy debate drew Trump comments.",),
+            ),
+            entry("LOW", 50, evidence=("LOW token exploit catalyst link.",)),
+            proxy_entry("VELVET", 72),
+            entry("SECTOR", 70),
+        ],
     )
     enabled = event_alpha_router.route_watchlist(
         read,
@@ -9387,9 +9596,15 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
     assert by_symbol["RUNE"].lane == event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST
     assert by_symbol["RUNE"].alertable is True
     assert by_symbol["RUNE"].reason == "Validated impact hypothesis promoted to RADAR."
-    assert by_symbol["ARB"].route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE
-    assert by_symbol["ARB"].alertable is False
-    assert by_symbol["ARB"].reason == "Validated impact hypothesis digest cap reached for this run."
+    assert by_symbol["ZEC"].route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE
+    assert by_symbol["ZEC"].alertable is False
+    assert by_symbol["ZEC"].reason == "Validated impact hypothesis digest cap reached for this run."
+    assert by_symbol["BTC"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
+    assert by_symbol["BTC"].alertable is False
+    assert "missing_external_asset_or_clear_direct_token_event" in by_symbol["BTC"].reason
+    assert by_symbol["LOW"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
+    assert by_symbol["LOW"].alertable is False
+    assert "score_below_threshold" in by_symbol["LOW"].reason
     assert by_symbol["VELVET"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
     assert by_symbol["VELVET"].alertable is True
     assert by_symbol["SECTOR"].alertable is False
@@ -9400,7 +9615,7 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
             state_path=Path("watchlist.jsonl"),
             rows_read=1,
             latest_only=True,
-            entries=[entry("RUNE", 90)],
+            entries=[entry("RUNE", 90, evidence=("THORChain RUNE exploit catalyst link.",))],
         ),
         cfg=event_alpha_router.EventAlphaRouterConfig(
             enabled=True,

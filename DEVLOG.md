@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-24 — Gate and persist validated impact hypothesis digests · Codex
+**Why:** `notify_llm` could deliver validated impact-hypothesis digest items
+without writing corresponding alert snapshots, so the notification inbox had no
+per-item feedback queue. Some weak/ambiguous validated hypotheses also needed
+stricter digest eligibility before day-1 research notifications.
+**Changes:**
+- Event Alpha router now applies a configurable validated-hypothesis digest
+  quality gate: validated token identity, catalyst-link validation stage,
+  source-noise/ticker-collision rejection, minimum hypothesis score, non-
+  ambiguous playbook, and either a known external catalyst or explicit direct
+  token-event evidence.
+- Alert snapshots now include router-approved validated digest decisions even
+  when no `EventAlertCandidate` row exists, with route/lane/state/playbook,
+  hypothesis metadata, research card path, delivery status, and feedback status
+  fields for inbox review.
+- Hypothesis watchlist rows now persist richer metadata including
+  `hypothesis_id`, `impact_category`, `validation_stage`, `hypothesis_score`,
+  `direction_hint`, validated identity, route eligibility, evidence quotes, and
+  `why_not_promoted` diagnostics.
+- Refined impact-category matching for prediction-market infrastructure,
+  tokenized-equity venues, Bitcoin quantum/policy shocks, listings, security
+  shocks, and sports/fan-token cases, plus clearer daily brief/card/inbox copy.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`; `python3
+tests/test_indicators.py` (439/439 passed); `make event-llm-eval
+PYTHON=python3`; `make event-llm-extract-eval PYTHON=python3`; `make
+event-alpha-eval PYTHON=python3`; `make verify PYTHON=python3`; manual `make
+event-impact-hypothesis-smoke PYTHON=python3`, `make
+event-impact-hypotheses-report PROFILE=notify_llm PYTHON=python3`, and `make
+event-alpha-notification-inbox PROFILE=notify_llm PYTHON=python3` smoke checks.
+**Notes/risks:** This remains research-only. It does not add live trading,
+paper trades, normal RSI signal writes, or any LLM/provider-created
+`TRIGGERED_FADE`; `TRIGGERED_FADE` remains limited to deterministic
+`event_fade.py` plus `proxy_fade`.
+
 ## 2026-06-24 — Promote validated impact hypotheses safely · Codex
 **Why:** Recent Event Impact Hypothesis artifacts showed two correctness gaps:
 validated token-level hypotheses could use the first taxonomy candidate instead

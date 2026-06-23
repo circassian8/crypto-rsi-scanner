@@ -36,6 +36,8 @@ class EventAlphaRouterConfig:
     max_digest_items: int = 20
     validated_hypothesis_digest_enabled: bool = False
     max_validated_hypothesis_digest_items: int = 5
+    validated_hypothesis_min_score: float = 65.0
+    validated_hypothesis_require_external_or_direct_event: bool = True
     max_high_priority_per_day: int = 3
     per_key_cooldown_hours: float = 12.0
     alert_on_score_jump: bool = True
@@ -281,7 +283,18 @@ def _route_entry(
             warnings=tuple(warnings),
         )
 
-    if _is_validated_hypothesis_digest_entry(entry):
+    if _looks_like_validated_hypothesis(entry):
+        quality_block = _validated_hypothesis_digest_block_reason(entry, cfg)
+        if quality_block:
+            warnings.append(f"validated_hypothesis_digest_blocked:{quality_block}")
+            return EventAlphaRouteDecision(
+                entry=entry,
+                route=EventAlphaRoute.STORE_ONLY,
+                alertable=False,
+                reason=f"Validated impact hypothesis kept local-only: {quality_block}.",
+                lane=EventAlphaRouteLane.LOCAL_ONLY,
+                warnings=tuple(warnings),
+            )
         return EventAlphaRouteDecision(
             entry=entry,
             route=EventAlphaRoute.RESEARCH_DIGEST,
@@ -402,6 +415,14 @@ def card_id_for_entry(entry: event_watchlist.EventWatchlistEntry) -> str:
     return "card_" + "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in entry.key)[:180]
 
 
+def validated_hypothesis_digest_block_reason(
+    entry: event_watchlist.EventWatchlistEntry,
+    cfg: EventAlphaRouterConfig | None = None,
+) -> str | None:
+    """Return why a validated impact hypothesis is local-only, or None if digest-eligible."""
+    return _validated_hypothesis_digest_block_reason(entry, cfg or EventAlphaRouterConfig())
+
+
 def _material_change_allowed(
     entry: event_watchlist.EventWatchlistEntry,
     cfg: EventAlphaRouterConfig,
@@ -483,7 +504,7 @@ def _apply_route_caps(
                 ))
                 continue
         if decision.lane == EventAlphaRouteLane.DAILY_DIGEST:
-            if _is_validated_hypothesis_digest_entry(decision.entry):
+            if _looks_like_validated_hypothesis(decision.entry):
                 validated_hypothesis_seen += 1
                 if (
                     cfg.max_validated_hypothesis_digest_items
@@ -514,6 +535,10 @@ def _apply_route_caps(
 
 
 def _is_validated_hypothesis_digest_entry(entry: event_watchlist.EventWatchlistEntry) -> bool:
+    return _validated_hypothesis_digest_block_reason(entry, EventAlphaRouterConfig()) is None
+
+
+def _looks_like_validated_hypothesis(entry: event_watchlist.EventWatchlistEntry) -> bool:
     if entry.relationship_type != "impact_hypothesis":
         return False
     if entry.state != event_watchlist.EventWatchlistState.RADAR.value:
@@ -526,6 +551,146 @@ def _is_validated_hypothesis_digest_entry(entry: event_watchlist.EventWatchlistE
     if not (components.get("validated_symbol") or components.get("validated_coin_id") or components.get("validated_asset")):
         return False
     return True
+
+
+def _validated_hypothesis_digest_block_reason(
+    entry: event_watchlist.EventWatchlistEntry,
+    cfg: EventAlphaRouterConfig,
+) -> str | None:
+    if entry.relationship_type != "impact_hypothesis":
+        return "not_impact_hypothesis"
+    if entry.state != event_watchlist.EventWatchlistState.RADAR.value:
+        return "not_radar_state"
+    if (entry.symbol or "").upper() == "SECTOR":
+        return "missing_validated_token_identity"
+    components = dict(entry.latest_score_components or {})
+    stage = str(components.get("validation_stage") or "").strip()
+    if stage not in {"catalyst_link_validated", "market_confirmed", "promoted_to_radar"}:
+        return "catalyst_link_not_validated"
+    if not (components.get("validated_symbol") or components.get("validated_coin_id") or components.get("validated_asset")):
+        return "missing_validated_token_identity"
+    playbook = str(entry.latest_effective_playbook_type or entry.latest_playbook_type or "").strip()
+    category = str(components.get("impact_category") or playbook or "").strip()
+    if playbook in {
+        "",
+        "impact_hypothesis",
+        event_playbooks.EventPlaybookType.AMBIGUOUS_CONTROL.value,
+        event_playbooks.EventPlaybookType.SOURCE_NOISE_CONTROL.value,
+        event_playbooks.EventPlaybookType.MARKET_ANOMALY.value,
+        event_playbooks.EventPlaybookType.MARKET_ANOMALY_UNKNOWN.value,
+    }:
+        return "ambiguous_playbook"
+    gate_text = " ".join(
+        str(value or "")
+        for value in (
+            playbook,
+            category,
+            entry.latest_llm_asset_role,
+            *entry.warnings,
+            *(components.get("warnings") or ()),
+            *(components.get("rejection_reasons") or ()),
+            *(components.get("why_not_promoted") or ()),
+        )
+    ).casefold()
+    if "source_noise" in gate_text or "ticker_collision" in gate_text or "word_collision" in gate_text:
+        return "source_noise_or_ticker_collision"
+    score = _hypothesis_score(entry, components)
+    if score < float(cfg.validated_hypothesis_min_score):
+        return f"score_below_threshold:{score:.0f}<{cfg.validated_hypothesis_min_score:.0f}"
+    if cfg.validated_hypothesis_require_external_or_direct_event and _missing_external(entry.external_asset):
+        if not _has_clear_direct_token_event(entry, components):
+            return "missing_external_asset_or_clear_direct_token_event"
+    return None
+
+
+def _hypothesis_score(entry: event_watchlist.EventWatchlistEntry, components: Mapping[str, object]) -> float:
+    for value in (
+        components.get("hypothesis_score"),
+        components.get("score"),
+        entry.latest_score,
+        components.get("hypothesis_confidence"),
+    ):
+        try:
+            num = float(value or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if num > 0:
+            return num
+    return 0.0
+
+
+def _missing_external(value: object) -> bool:
+    text = str(value or "").strip().casefold()
+    return text in {"", "unknown", "none", "null", "n/a", "na", "sector"}
+
+
+def _has_clear_direct_token_event(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, object],
+) -> bool:
+    category = str(components.get("impact_category") or entry.latest_playbook_type or "").strip()
+    evidence_text = _direct_event_evidence_text(entry, components)
+    asset_terms = _asset_identity_terms(entry, components)
+    mentions_asset = any(_term_in_text(term, evidence_text) for term in asset_terms)
+    if not mentions_asset:
+        return False
+    if category == event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK.value:
+        return any(
+            _term_in_text(term, evidence_text)
+            for term in ("exploit", "hack", "lawsuit", "sec", "cftc", "regulatory", "security incident", "attack")
+        )
+    if category == event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value or category == "listing_liquidity_event":
+        return any(
+            _term_in_text(term, evidence_text)
+            for term in ("listing", "listed on", "nasdaq", "public listing", "merger", "coinbase", "binance")
+        )
+    if category == event_playbooks.EventPlaybookType.UNLOCK_SUPPLY_PRESSURE.value:
+        return any(_term_in_text(term, evidence_text) for term in ("unlock", "vesting", "airdrop", "tge", "emission"))
+    return False
+
+
+def _direct_event_evidence_text(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, object],
+) -> str:
+    parts: list[str] = [
+        entry.latest_event_name,
+        entry.latest_source,
+        str(components.get("impact_category") or ""),
+    ]
+    for field in ("validation_reasons", "evidence_quotes", "why_not_promoted"):
+        values = components.get(field) or ()
+        if isinstance(values, str):
+            parts.append(values)
+        elif isinstance(values, Iterable):
+            parts.extend(str(value) for value in values)
+    asset = components.get("validated_asset")
+    if isinstance(asset, Mapping):
+        parts.extend(str(value) for value in asset.values())
+    return " ".join(part for part in parts if part).casefold()
+
+
+def _asset_identity_terms(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, object],
+) -> tuple[str, ...]:
+    terms = [entry.symbol, entry.coin_id, components.get("validated_symbol"), components.get("validated_coin_id")]
+    asset = components.get("validated_asset")
+    if isinstance(asset, Mapping):
+        terms.extend(asset.get(key) for key in ("symbol", "coin_id", "name"))
+    out = [
+        str(term).strip().casefold()
+        for term in terms
+        if str(term or "").strip() and str(term or "").strip().casefold() not in {"sector", "unknown", "none"}
+    ]
+    return tuple(dict.fromkeys(out))
+
+
+def _term_in_text(term: str, text: str) -> bool:
+    clean = str(term or "").strip().casefold()
+    if not clean:
+        return False
+    return clean in text
 
 
 def _cooldown_active(

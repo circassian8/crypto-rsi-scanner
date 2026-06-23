@@ -270,6 +270,33 @@ def build_daily_brief(
             lines.append(f"- {decision.route.value}: {entry.symbol}/{entry.coin_id} state={entry.state} score={entry.latest_score} reason={decision.reason}")
     else:
         lines.append("- None.")
+    lines.extend(["", "## Validated Impact Hypothesis Routing"])
+    alertable_hypotheses = [
+        decision for decision in decisions
+        if decision.entry.relationship_type == "impact_hypothesis" and decision.alertable
+    ]
+    local_validated_hypotheses = [
+        decision for decision in decisions
+        if (
+            decision.entry.relationship_type == "impact_hypothesis"
+            and not decision.alertable
+            and decision.entry.state == event_watchlist.EventWatchlistState.RADAR.value
+            and decision.entry.symbol.upper() != "SECTOR"
+        )
+    ]
+    exploratory_sector_hypotheses = [
+        entry for entry in entries
+        if entry.relationship_type == "impact_hypothesis"
+        and entry.state == event_watchlist.EventWatchlistState.HYPOTHESIS.value
+    ]
+    rejected_hypotheses = [
+        row for row in hypotheses
+        if str(row.get("status") or "") == "rejected" or row.get("why_not_promoted") or row.get("rejection_reasons")
+    ]
+    lines.append("- Alertable validated hypotheses: " + (_brief_decisions(alertable_hypotheses[:5]) or "none"))
+    lines.append("- Local-only validated hypotheses: " + (_brief_decisions(local_validated_hypotheses[:5]) or "none"))
+    lines.append("- Exploratory sector hypotheses: " + (_brief_entries(exploratory_sector_hypotheses[:5]) or "none"))
+    lines.append("- Rejected/why-not-promoted hypotheses: " + (_brief_hypothesis_labels(rejected_hypotheses[:5]) or "none"))
     exploratory = event_alpha_notifications.select_exploratory_candidates(
         decisions,
         cfg=event_alpha_notifications.EventAlphaNotificationConfig(
@@ -507,6 +534,28 @@ def _brief_hypothesis_labels(rows: Iterable[Mapping[str, Any]]) -> str:
             f"/candidate={candidate_label}"
             f"({row.get('validation_stage') or row.get('status') or 'unknown'}"
             f",score={_float(row.get('hypothesis_score') or _float(row.get('confidence')) * 100):.0f})"
+        )
+    return "; ".join(labels)
+
+
+def _brief_decisions(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
+    labels = []
+    for decision in rows:
+        entry = decision.entry
+        labels.append(
+            f"{entry.symbol}/{entry.coin_id}"
+            f"({entry.state},score={entry.latest_score},route={decision.route.value},reason={decision.reason})"
+        )
+    return "; ".join(labels)
+
+
+def _brief_entries(rows: Iterable[event_watchlist.EventWatchlistEntry]) -> str:
+    labels = []
+    for entry in rows:
+        components = entry.latest_score_components or {}
+        labels.append(
+            f"{entry.symbol}/{entry.coin_id}"
+            f"({components.get('impact_category') or entry.latest_playbook_type or 'unknown'},score={entry.latest_score})"
         )
     return "; ".join(labels)
 

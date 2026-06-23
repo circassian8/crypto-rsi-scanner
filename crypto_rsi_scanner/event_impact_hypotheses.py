@@ -242,8 +242,20 @@ _CATEGORY_RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "category": ImpactCategory.SECURITY_OR_REGULATORY_SHOCK,
-        "keywords": ("exploit", "hack", "lawsuit", "sec", "cftc", "regulatory", "security incident"),
-        "secondary": ("probe", "charges", "investigation", "attack"),
+        "keywords": (
+            "exploit",
+            "hack",
+            "lawsuit",
+            "sec",
+            "cftc",
+            "regulatory",
+            "security incident",
+            "quantum",
+            "quantum computing",
+            "technology risk",
+            "policy shock",
+        ),
+        "secondary": ("probe", "charges", "investigation", "attack", "risk", "policy"),
         "sectors": ("direct_token_events", "infrastructure_tokens"),
         "direction": "volatility",
         "playbook": "security_or_regulatory_shock",
@@ -883,6 +895,16 @@ def _rule_matches(rule: Mapping[str, Any], text: str, event_type: str, category:
     if category == ImpactCategory.SPORTS_FAN_PROXY:
         return primary_hit and (_any_term_hit(text, ("fan token", "sports", "prediction market", "team", "fixture", "kickoff")) or _term_hit(event_type, "sports"))
     if category == ImpactCategory.POLITICAL_MEME_PROXY:
+        if _any_term_hit(text, ("tokenized stock", "tokenized equity", "synthetic exposure")):
+            return False
+        if _any_term_hit(text, ("quantum", "quantum computing", "technology risk")) and _any_term_hit(text, ("bitcoin", "btc")):
+            return False
+        if (
+            _any_term_hit(text, ("prediction market", "polymarket"))
+            and _any_term_hit(text, ("arbitrum", "ethereum", "oracle", "settlement", "infrastructure", "platform"))
+            and not _any_term_hit(text, ("election", "inauguration", "campaign", "debate", "vote", "ballot", "candidate", "meme"))
+        ):
+            return False
         political_context = _has_political_context(text) or _term_hit(event_type, "political")
         proxy_context = _any_term_hit(text, ("meme", "prediction market", "polymarket", "token", "coin"))
         return political_context and proxy_context
@@ -1557,7 +1579,15 @@ def _text_mentions_catalyst(text: str, hypothesis: EventImpactHypothesis) -> boo
         ImpactCategory.PERP_VENUE_ATTENTION.value: ("perp", "futures listing"),
         ImpactCategory.LISTING_LIQUIDITY_EVENT.value: ("listing", "listed on"),
         ImpactCategory.UNLOCK_SUPPLY_PRESSURE.value: ("unlock", "vesting", "airdrop"),
-        ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value: ("exploit", "hack", "lawsuit", "regulatory"),
+        ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value: (
+            "exploit",
+            "hack",
+            "lawsuit",
+            "regulatory",
+            "quantum",
+            "technology risk",
+            "policy shock",
+        ),
     }.get(hypothesis.impact_category, ())
     return _any_term_hit(text, category_terms)
 
@@ -1603,6 +1633,10 @@ def _has_security_or_regulatory_context(text: str) -> bool:
         "cftc",
         "regulatory",
         "regulation",
+        "quantum",
+        "quantum computing",
+        "technology risk",
+        "policy shock",
         "security incident",
         "probe",
         "charges",
