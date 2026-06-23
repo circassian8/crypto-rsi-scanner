@@ -49,6 +49,13 @@ deterministic proxy-fade `TRIGGERED_FADE`. Triggered-fade notifications dedupe
 by stable alert id. Health heartbeat delivery is once per day by default and
 can report a no-alert run.
 
+For `notify_no_key`, the operator requested visibility on every run. That
+profile overrides daily, instant, heartbeat, and exploratory digest cooldowns to
+zero and disables stable content dedupe. The run lock and in-flight guard remain
+active, so overlapping scheduled cycles are still protected, but a clean new
+`notify_no_key` run should deliver Telegram output even if the previous run had
+the same health status or digest content.
+
 `notify_no_key` and `notify_llm` also enable a separate
 `exploratory_digest` lane during notification burn-in. It surfaces top
 suppressed/store-only/raw-evidence rows for operator learning, with explicit

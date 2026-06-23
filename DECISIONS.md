@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-23 - Send notify_no_key research notifications on every clean run
+**Status:** accepted
+**Decision:** The `notify_no_key` Event Alpha notification profile should send
+operator-facing research notifications on every clean run. Its notification
+lane cooldowns are zero and content dedupe is disabled for that profile, while
+the per-profile run lock and in-flight delivery guard remain active. This only
+changes delivery frequency for day-1 research notifications; it does not alter
+alert scoring, watchlist routing, normal RSI alerts, paper/live writes, trading,
+or the rule that `TRIGGERED_FADE` only comes from deterministic `event_fade.py`
+plus `proxy_fade`.
+**Why:** The owner wants direct Telegram visibility whenever the Event Alpha
+system runs, including no-alert/degraded heartbeat runs and exploratory digest
+rows for manual review.
+**Revisit when:** Notification volume becomes noisy enough to require
+per-lane cooldowns again, or when `notify_no_key` is replaced by a calibrated
+research-send profile.
+
 ## 2026-06-23 - Separate external catalysts from crypto candidate assets in impact hypotheses
 **Status:** accepted
 **Decision:** Event Alpha impact hypotheses must store external entities,

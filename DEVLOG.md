@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Make notify_no_key send every clean run · Codex
+**Why:** The owner wants Telegram visibility whenever the Event Alpha system
+runs, not only when a lane cooldown or content-dedupe window allows a digest.
+**Changes:**
+- Updated the `notify_no_key` profile so daily, instant, heartbeat, and
+  exploratory digest cooldowns are zero and content dedupe is disabled.
+- Kept overlap/in-flight safeguards active through the existing run lock and
+  delivery ledger, and aligned the scheduled Make target with the no-dedupe
+  delivery policy.
+- Documented the per-run delivery decision in `DECISIONS.md`, `ROADMAP.md`,
+  `.env.example`, and `research/EVENT_ALPHA_RUNBOOK.md`.
+**Verify:** `python3 tests/test_indicators.py` (426/426 passed); `make
+event-llm-eval PYTHON=python3` (9/9 passed); `make event-llm-extract-eval
+PYTHON=python3` (7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11
+passed); `make verify PYTHON=python3`; live `RSI_EVENT_ALERTS_ENABLED=1 make
+event-alpha-notify-no-key PYTHON=python3 IGNORE_BACKOFF=1` delivered 2
+Telegram records (`exploratory_digest` and `health_heartbeat`) with 0 failed,
+0 duplicate, 0 in-flight, and 0 blocked deliveries.
+**Notes/risks:** This is delivery frequency only. It does not change Event Alpha
+scoring, normal RSI alert routing, paper/live writes, trading, or the rule that
+`TRIGGERED_FADE` only comes from deterministic `event_fade.py` plus
+`proxy_fade`.
+
 ## 2026-06-23 — Clean Event Impact Hypothesis semantics · Codex
 **Why:** Pro-model review flagged that external catalysts, candidate crypto
 assets, and validation-search outcomes were still too easy to blur together.
