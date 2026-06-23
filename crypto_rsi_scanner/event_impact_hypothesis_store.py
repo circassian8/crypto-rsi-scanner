@@ -9,7 +9,7 @@ links without relying on ephemeral console output.
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -37,6 +37,12 @@ class EventImpactHypothesisStoreReadResult:
     path: Path
     rows_read: int
     rows: list[dict[str, Any]]
+    total_rows_read: int = 0
+    latest_run_id: str | None = None
+    latest_run_rows_available: int = 0
+    historical_rows_available: int = 0
+    legacy_rows_available: int = 0
+    filters: dict[str, Any] = field(default_factory=dict)
 
 
 def write_impact_hypotheses(
@@ -86,17 +92,52 @@ def write_impact_hypotheses(
         )
 
 
-def load_impact_hypotheses(path: str | Path, *, limit: int | None = None) -> EventImpactHypothesisStoreReadResult:
+def load_impact_hypotheses(
+    path: str | Path,
+    *,
+    limit: int | None = None,
+    latest_run: bool = False,
+    run_id: str | None = None,
+    since: str | datetime | None = None,
+    include_legacy: bool = True,
+) -> EventImpactHypothesisStoreReadResult:
     """Load stored hypothesis rows newest-first, tolerating legacy/bad rows."""
     p = Path(path).expanduser()
-    rows = [
+    all_rows = [
         row for row in _read_jsonl(p)
         if row.get("row_type") == "event_impact_hypothesis"
     ]
-    rows.sort(key=lambda row: str(row.get("observed_at") or row.get("created_at") or ""), reverse=True)
+    all_rows.sort(key=lambda row: str(row.get("observed_at") or row.get("created_at") or ""), reverse=True)
+    latest_id = _latest_run_id(all_rows)
+    latest_count = sum(1 for row in all_rows if _row_run_id(row) == latest_id) if latest_id else 0
+    legacy_count = sum(1 for row in all_rows if _is_legacy_row(row))
+    rows = _filter_rows(
+        all_rows,
+        latest_run=latest_run,
+        latest_run_id=latest_id,
+        run_id=run_id,
+        since=since,
+        include_legacy=include_legacy,
+    )
     if limit is not None and limit > 0:
         rows = rows[:limit]
-    return EventImpactHypothesisStoreReadResult(path=p, rows_read=len(rows), rows=rows)
+    return EventImpactHypothesisStoreReadResult(
+        path=p,
+        rows_read=len(rows),
+        rows=rows,
+        total_rows_read=len(all_rows),
+        latest_run_id=latest_id,
+        latest_run_rows_available=latest_count,
+        historical_rows_available=max(0, len(all_rows) - latest_count),
+        legacy_rows_available=legacy_count,
+        filters={
+            "latest_run": bool(latest_run),
+            "run_id": run_id,
+            "since": since.isoformat() if isinstance(since, datetime) else since,
+            "include_legacy": bool(include_legacy),
+            "limit": limit,
+        },
+    )
 
 
 def format_impact_hypotheses_store_report(
@@ -113,9 +154,15 @@ def format_impact_hypotheses_store_report(
         "=" * 76,
         f"path: {result.path}",
         f"rows_read: {result.rows_read}",
+        f"total_rows_available: {result.total_rows_read or result.rows_read}",
+        f"latest_run_id: {result.latest_run_id or 'unknown'}",
+        f"latest_run_rows_available: {result.latest_run_rows_available}",
+        f"historical_rows_available: {result.historical_rows_available}",
+        f"legacy_rows_available: {result.legacy_rows_available}",
+        "filters: " + _format_filter_summary(result.filters),
     ]
     if not result.rows:
-        rows.extend(["", "No stored impact hypotheses found."])
+        rows.extend(["", "No stored impact hypotheses matched the current report filters."])
         return "\n".join(rows)
 
     rows.extend(_schema_audit_section(result.rows))
@@ -123,6 +170,7 @@ def format_impact_hypotheses_store_report(
     rows.append("statuses: " + _format_counts(_counts(result.rows, "status")))
     rows.append("validation_stages: " + _format_counts(_counts(result.rows, "validation_stage")))
     rows.append("why_not_promoted: " + _format_counts(_reason_counts(result.rows, "why_not_promoted")))
+    rows.extend(_entity_audit_section(result.rows))
     rows.append("scopes: " + _format_counts(_counts(result.rows, "hypothesis_scope")))
     rows.append("candidate_sources: " + _format_counts(_counts(result.rows, "candidate_source")))
     rows.append(
@@ -133,6 +181,10 @@ def format_impact_hypotheses_store_report(
     rows.append(
         "queries: "
         + str(sum(len(row.get("search_queries") or []) for row in result.rows))
+        + " · generated_by_type="
+        + _format_counts(_query_type_counts(result.rows, "generated_queries"))
+        + " · executed_by_type="
+        + _format_counts(_query_type_counts(result.rows, "executed_queries"))
     )
     promotion_ids = _promoted_hypothesis_ids(watchlist_rows)
     rows.append(f"watchlist promotions linked: {len(promotion_ids)}")
@@ -395,7 +447,7 @@ def _format_hypothesis_row(
     if include_rejections and row.get("rejection_reasons"):
         out.append("  rejected: " + "; ".join(str(item) for item in row["rejection_reasons"][:3]))
     if row.get("why_not_promoted"):
-        out.append("  why_not_promoted: " + "; ".join(str(item) for item in row["why_not_promoted"][:4]))
+        out.append("  why_not_promoted: " + "; ".join(_effective_why_not_promoted(row)[:4]))
     if row.get("warnings"):
         out.append("  warnings: " + "; ".join(str(item) for item in row["warnings"][:3]))
     return out
@@ -413,11 +465,7 @@ def _schema_audit_section(rows: list[Mapping[str, Any]]) -> list[str]:
         field: sum(1 for row in rows if field not in row)
         for field in required
     }
-    legacy = [
-        row for row in rows
-        if str(row.get("schema_version") or "") != IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION
-        or any(field not in row for field in required)
-    ]
+    legacy = [row for row in rows if _is_legacy_row(row)]
     return [
         "schema_audit: "
         f"versions={_format_counts(versions)} · legacy_rows={len(legacy)} · "
@@ -428,7 +476,7 @@ def _schema_audit_section(rows: list[Mapping[str, Any]]) -> list[str]:
 def _query_section(rows: list[Mapping[str, Any]], *, limit: int = 12) -> list[str]:
     queries: list[tuple[str, str]] = []
     for row in rows:
-        details = row.get("search_query_details") or []
+        details = row.get("generated_queries") or row.get("search_query_details") or []
         if details:
             for item in details:
                 if not isinstance(item, Mapping):
@@ -442,7 +490,11 @@ def _query_section(rows: list[Mapping[str, Any]], *, limit: int = 12) -> list[st
             text = str(query).strip()
             if text and (text, "candidate_validation") not in queries:
                 queries.append((text, "candidate_validation"))
-    out = [f"Generated search queries: {len(queries)}"]
+    out = [
+        f"Generated search queries: {len(queries)}",
+        "generated_query_type_counts: " + _format_counts(_query_type_counts(rows, "generated_queries")),
+        "executed_query_type_counts: " + _format_counts(_query_type_counts(rows, "executed_queries")),
+    ]
     if not queries:
         out.append("- none")
         return out
@@ -466,7 +518,7 @@ def _rejected_validation_samples_section(rows: list[Mapping[str, Any]], *, limit
     for sample in samples[:limit]:
         out.append(
             f"- {sample.get('query_type') or 'unknown'} {sample.get('candidate_symbol') or 'SECTOR'} "
-            f"score={sample.get('score') or 0} rejected={sample.get('rejection_reason') or 'none'} "
+            f"score={sample.get('result_score') or sample.get('score') or 0} rejected={sample.get('rejection_reason') or 'none'} "
             f"title={sample.get('result_title') or 'unknown'}"
         )
     if len(samples) > limit:
@@ -481,13 +533,13 @@ def _why_not_promoted_section(rows: list[Mapping[str, Any]], *, limit: int = 10)
         return out
     top_rows = [
         row for row in rows
-        if row.get("why_not_promoted")
+        if _effective_why_not_promoted(row)
     ]
     for row in top_rows[:limit]:
         out.append(
             f"- {row.get('impact_category') or 'unknown'} external={row.get('external_asset') or 'unknown'} "
             f"stage={row.get('validation_stage') or 'unknown'} reasons="
-            + ";".join(str(item) for item in (row.get("why_not_promoted") or [])[:4])
+            + ";".join(str(item) for item in _effective_why_not_promoted(row)[:4])
         )
     return out
 
@@ -556,7 +608,7 @@ def _counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:
 def _reason_counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:
     out: dict[str, int] = {}
     for row in rows:
-        values = row.get(field) or []
+        values = _effective_why_not_promoted(row) if field == "why_not_promoted" else row.get(field) or []
         if isinstance(values, str):
             values = [values]
         for value in values:
@@ -583,6 +635,159 @@ def _asset_label(asset: Mapping[str, Any]) -> str:
         label = f"{label}/{coin_id}"
     source = str(asset.get("source") or "")
     return f"{label} ({source})" if source else label
+
+
+def _format_filter_summary(filters: Mapping[str, Any]) -> str:
+    if not filters:
+        return "none"
+    parts = []
+    for key in ("latest_run", "run_id", "since", "include_legacy", "limit"):
+        value = filters.get(key)
+        if value not in (None, ""):
+            parts.append(f"{key}={value}")
+    return ", ".join(parts) or "none"
+
+
+def _row_run_id(row: Mapping[str, Any]) -> str:
+    return str(row.get("run_id") or "").strip()
+
+
+def _latest_run_id(rows: Iterable[Mapping[str, Any]]) -> str | None:
+    for row in rows:
+        run_id = _row_run_id(row)
+        if run_id:
+            return run_id
+    return None
+
+
+def _filter_rows(
+    rows: list[dict[str, Any]],
+    *,
+    latest_run: bool,
+    latest_run_id: str | None,
+    run_id: str | None,
+    since: str | datetime | None,
+    include_legacy: bool,
+) -> list[dict[str, Any]]:
+    cutoff = _parse_datetime(since) if since is not None else None
+    target_run = str(run_id or "").strip()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if target_run and _row_run_id(row) != target_run:
+            continue
+        if latest_run and latest_run_id and _row_run_id(row) != latest_run_id:
+            continue
+        if cutoff is not None:
+            observed = _parse_datetime(row.get("observed_at") or row.get("created_at"))
+            if observed is None or observed < cutoff:
+                continue
+        if not include_legacy and _is_legacy_row(row):
+            continue
+        out.append(row)
+    return out
+
+
+def _is_legacy_row(row: Mapping[str, Any]) -> bool:
+    required = (
+        "validation_stage",
+        "hypothesis_score",
+        "external_entities",
+        "crypto_candidate_assets",
+    )
+    return (
+        str(row.get("schema_version") or "") != IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION
+        or any(field not in row for field in required)
+    )
+
+
+def _effective_why_not_promoted(row: Mapping[str, Any]) -> tuple[str, ...]:
+    values = row.get("why_not_promoted") or []
+    if isinstance(values, str):
+        raw = [values]
+    else:
+        raw = list(values)
+    if _is_legacy_row(row) and "validation_stage" not in row:
+        raw.append("legacy_schema_missing_stage")
+    return tuple(dict.fromkeys(str(value) for value in raw if str(value or "").strip()))
+
+
+def _query_type_counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:
+    out: dict[str, int] = {}
+    fallback_field = "search_query_details" if field == "generated_queries" else ""
+    for row in rows:
+        details = row.get(field) or (row.get(fallback_field) if fallback_field else None) or []
+        if not details and field == "generated_queries":
+            details = [{"query": query, "query_type": "candidate_validation"} for query in row.get("search_queries") or []]
+        for item in details:
+            if not isinstance(item, Mapping):
+                continue
+            qtype = str(item.get("query_type") or "candidate_validation")
+            out[qtype] = out.get(qtype, 0) + 1
+    return out
+
+
+_SUSPICIOUS_EXTERNAL_CANDIDATES = {
+    "openai",
+    "anthropic",
+    "spacex",
+    "space x",
+    "stripe",
+    "databricks",
+    "anduril",
+    "figma",
+}
+
+
+def _entity_audit_section(rows: Iterable[Mapping[str, Any]]) -> list[str]:
+    external_seen: set[str] = set()
+    crypto_seen: set[str] = set()
+    suspicious: list[str] = []
+    for row in rows:
+        external = str(row.get("external_asset") or "").strip()
+        if external:
+            external_seen.add(external)
+        for entity in row.get("external_entities") or []:
+            if isinstance(entity, Mapping):
+                name = str(entity.get("name") or "").strip()
+                if name:
+                    external_seen.add(name)
+        for asset in _candidate_asset_rows(row):
+            label = _asset_label(asset)
+            if label:
+                crypto_seen.add(label)
+            values = {
+                _clean_audit_value(asset.get("name")),
+                _clean_audit_value(asset.get("symbol")),
+                _clean_audit_value(asset.get("coin_id")),
+            }
+            if values & _SUSPICIOUS_EXTERNAL_CANDIDATES:
+                suspicious.append(label or str(asset))
+    line = (
+        "entity_audit: "
+        f"external_entities_seen={len(external_seen)} · "
+        f"crypto_candidates_seen={len(crypto_seen)} · "
+        f"suspicious_external_as_candidate={len(suspicious)}"
+    )
+    if suspicious:
+        line += " · examples=" + ", ".join(dict.fromkeys(suspicious[:5]))
+    return [line]
+
+
+def _candidate_asset_rows(row: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    out: list[Mapping[str, Any]] = []
+    for field in ("crypto_candidate_assets", "validated_candidate_assets", "suggested_candidate_assets", "rejected_candidate_assets"):
+        for asset in row.get(field) or []:
+            if isinstance(asset, Mapping):
+                out.append(asset)
+    if not out:
+        for symbol in row.get("candidate_symbols") or []:
+            if str(symbol or "").strip():
+                out.append({"symbol": str(symbol).strip().upper(), "source": "candidate_symbols"})
+    return out
+
+
+def _clean_audit_value(value: Any) -> str:
+    return " ".join(str(value or "").strip().casefold().replace("-", " ").split())
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

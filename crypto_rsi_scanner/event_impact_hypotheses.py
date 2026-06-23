@@ -92,6 +92,8 @@ class EventImpactHypothesis:
     required_validation_steps: tuple[str, ...] = ()
     search_queries: tuple[str, ...] = ()
     search_query_details: tuple[dict[str, Any], ...] = ()
+    generated_queries: tuple[dict[str, Any], ...] = ()
+    executed_queries: tuple[dict[str, Any], ...] = ()
     status: str = HypothesisStatus.HYPOTHESIS.value
     warnings: tuple[str, ...] = ()
     source_raw_ids: tuple[str, ...] = ()
@@ -410,7 +412,7 @@ def attach_hypothesis_search_samples(
 ) -> tuple[EventImpactHypothesis, ...]:
     """Attach capped accepted/rejected validation-search evidence samples."""
     samples_by_id: dict[str, list[dict[str, Any]]] = {}
-    for attr in ("rejected_result_events", "result_events"):
+    for attr in ("rejected_result_events",):
         for result in getattr(search_result, attr, ()) or ():
             query = getattr(result, "query", None)
             raw = getattr(result, "raw_event", None)
@@ -429,23 +431,33 @@ def attach_hypothesis_search_samples(
                 "source_url": str(getattr(raw, "source_url", "") or ""),
                 "candidate_symbol": str(getattr(query, "symbol", "") or ""),
                 "score": int(getattr(result, "result_score", 0) or 0),
+                "result_score": int(getattr(result, "result_score", 0) or 0),
                 "rejection_reason": _sample_rejection_reason(reasons),
                 "identity_reason": _first_reason_with(reasons, "identity"),
                 "catalyst_reason": _first_reason_with(reasons, "catalyst"),
             }
             samples_by_id.setdefault(hypothesis_id, []).append(sample)
+    executed_by_id = _executed_queries_by_hypothesis(search_result)
     out: list[EventImpactHypothesis] = []
     for hypothesis in hypotheses:
         samples = samples_by_id.get(hypothesis.hypothesis_id, [])
+        executed_queries = executed_by_id.get(hypothesis.hypothesis_id, ())
         if samples:
             merged = tuple(dict.fromkeys(
                 json.dumps(sample, sort_keys=True, separators=(",", ":"))
                 for sample in (*hypothesis.rejected_validation_samples, *samples)
             ))
             parsed = tuple(json.loads(item) for item in merged[: max(0, max_samples_per_hypothesis)])
-            out.append(replace(hypothesis, rejected_validation_samples=parsed))
+            out.append(replace(
+                hypothesis,
+                rejected_validation_samples=parsed,
+                executed_queries=_merge_query_details(hypothesis.executed_queries, executed_queries),
+            ))
         else:
-            out.append(hypothesis)
+            out.append(replace(
+                hypothesis,
+                executed_queries=_merge_query_details(hypothesis.executed_queries, executed_queries),
+            ) if executed_queries else hypothesis)
     out = list(_apply_candidate_discovery_results(out, search_result))
     return tuple(_with_promotion_diagnostics(item, search_result=search_result) for item in out)
 
@@ -818,6 +830,7 @@ def _hypothesis_from_rule(
         hypothesis,
         search_queries=tuple(str(item.get("query") or "") for item in query_details if item.get("query")),
         search_query_details=query_details,
+        generated_queries=query_details,
     )
     return _with_promotion_diagnostics(hypothesis)
 
@@ -1227,12 +1240,17 @@ def _default_search_query_details(hypothesis: EventImpactHypothesis) -> tuple[di
     for symbol in symbols[:8]:
         if category in {ImpactCategory.RWA_PREIPO_PROXY.value, ImpactCategory.TOKENIZED_STOCK_VENUE.value}:
             if external:
+                queries.append({"query": f"{symbol} {external} exposure", "query_type": "candidate_validation"})
+                queries.append({"query": f"{symbol} {external} pre-IPO", "query_type": "candidate_validation"})
                 queries.append({"query": f"{symbol} {external} pre-IPO exposure", "query_type": "candidate_validation"})
                 queries.append({"query": f"{symbol} tokenized stock {external}", "query_type": "candidate_validation"})
             queries.append({"query": f"{symbol} synthetic exposure crypto", "query_type": "candidate_validation"})
         elif category == ImpactCategory.AI_IPO_PROXY.value:
             target = external or "OpenAI"
+            queries.append({"query": f"{symbol} {target} exposure", "query_type": "candidate_validation"})
+            queries.append({"query": f"{symbol} {target} pre-IPO", "query_type": "candidate_validation"})
             queries.append({"query": f"{symbol} {target} pre-IPO exposure", "query_type": "candidate_validation"})
+            queries.append({"query": f"{symbol} tokenized stock {target}", "query_type": "candidate_validation"})
             queries.append({"query": f"{symbol} {target} perp", "query_type": "candidate_validation"})
         elif category == ImpactCategory.SPORTS_FAN_PROXY.value:
             queries.append({"query": f"{symbol} World Cup fan token", "query_type": "candidate_validation"})
@@ -1255,7 +1273,41 @@ def _default_search_query_details(hypothesis: EventImpactHypothesis) -> tuple[di
             queries.append({"query": f"{symbol} prediction market oracle", "query_type": "candidate_validation"})
         elif category == ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:
             queries.append({"query": f"{symbol} crypto catalyst", "query_type": "market_confirmation"})
+    if external and category in {
+        ImpactCategory.RWA_PREIPO_PROXY.value,
+        ImpactCategory.AI_IPO_PROXY.value,
+        ImpactCategory.TOKENIZED_STOCK_VENUE.value,
+        ImpactCategory.SPORTS_FAN_PROXY.value,
+        ImpactCategory.POLITICAL_MEME_PROXY.value,
+        ImpactCategory.PREDICTION_MARKET_INFRA.value,
+        ImpactCategory.PERP_VENUE_ATTENTION.value,
+    }:
+        queries.extend(_candidate_discovery_query_details(external, hypothesis.candidate_sectors, category))
     return _dedupe_query_details(queries)
+
+
+def _candidate_discovery_query_details(
+    external: str,
+    sectors: Iterable[str],
+    category: str,
+) -> list[dict[str, Any]]:
+    queries: list[dict[str, Any]] = []
+    for suffix in (
+        "crypto exposure",
+        "tokenized stock crypto",
+        "pre-IPO crypto",
+        "prediction market token",
+        "perp crypto",
+        "synthetic exposure crypto",
+        "crypto venue",
+    ):
+        queries.append({"query": f"{external} {suffix}", "query_type": "candidate_discovery"})
+    discovery_terms = tuple(sectors or ()) or (category,)
+    for term in discovery_terms[:4]:
+        clean = str(term).replace("_", " ").strip()
+        if clean:
+            queries.append({"query": f"{external} {clean} crypto", "query_type": "candidate_discovery"})
+    return queries
 
 
 def _dedupe_query_details(rows: Iterable[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
@@ -1269,6 +1321,37 @@ def _dedupe_query_details(rows: Iterable[Mapping[str, Any]]) -> tuple[dict[str, 
             "query_type": str(row.get("query_type") or "candidate_validation"),
         })
     return tuple(out.values())
+
+
+def _executed_queries_by_hypothesis(search_result: object) -> dict[str, tuple[dict[str, Any], ...]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    for query in getattr(search_result, "queries", ()) or ():
+        hypothesis_id = str(getattr(query, "anomaly_raw_id", "") or "")
+        if not hypothesis_id:
+            continue
+        out.setdefault(hypothesis_id, []).append({
+            "query": str(getattr(query, "query", "") or ""),
+            "query_type": str(getattr(query, "query_type", "") or "candidate_validation"),
+            "symbol": str(getattr(query, "symbol", "") or ""),
+            "rank": int(getattr(query, "rank", 0) or 0),
+            "score": int(getattr(query, "score", 0) or 0),
+            "score_reasons": tuple(str(item) for item in getattr(query, "score_reasons", ()) or ()),
+        })
+    return {key: _merge_query_details(tuple(value)) for key, value in out.items()}
+
+
+def _merge_query_details(*groups: Iterable[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
+    rows: dict[tuple[str, str], dict[str, Any]] = {}
+    for group in groups:
+        for item in group:
+            if not isinstance(item, Mapping):
+                continue
+            query = str(item.get("query") or "").strip()
+            if not query:
+                continue
+            qtype = str(item.get("query_type") or "candidate_validation")
+            rows.setdefault((query, qtype), {str(key): value for key, value in dict(item).items()})
+    return tuple(rows.values())
 
 
 def _external_from_category(category: str) -> str | None:

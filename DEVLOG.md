@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Make impact hypothesis reports latest-run diagnosable · Codex
+**Why:** `notify_llm` artifacts could mix old legacy rows with fresh hypothesis
+rows, making the report look like current runs had `validation_stage=unknown`
+and hiding why search evidence failed validation.
+**Changes:**
+- Added latest-run, run-id, since, and legacy-aware loading/report filters for
+  `event_impact_hypotheses.jsonl`, plus schema, query, entity, and historical
+  row summaries.
+- Stored generated vs executed hypothesis queries separately and widened
+  candidate-discovery query visibility while preserving candidate-specific
+  validation queries.
+- Persisted `result_score` in rejected validation samples, summarized rejected
+  evidence reasons/titles in the daily brief, and surfaced suspicious external
+  entities that appear as crypto candidates.
+- Added `event-alpha-notify-llm-deep-scheduled` for the bounded
+  `notify_llm_deep` profile and Make report variables `LATEST`, `RUN_ID`, and
+  `SINCE`.
+- Updated tests, `ROADMAP.md`, `DECISIONS.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md`.
+**Verify:** `python3 tests/test_indicators.py` (430/430 passed); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make event-llm-eval PYTHON=python3`
+(9/9 passed); `make event-llm-extract-eval PYTHON=python3` (7/7 passed);
+`make event-alpha-eval PYTHON=python3` (11/11 passed); `make verify
+PYTHON=python3`; `make event-impact-hypothesis-smoke PYTHON=python3`; `make
+event-impact-hypotheses-report PROFILE=notify_llm PYTHON=python3`; `make
+event-impact-hypotheses-report PROFILE=notify_llm LATEST=1 PYTHON=python3`.
+**Notes/risks:** Observability/reporting only. This does not change alert
+promotion, Telegram routing, paper/live writes, normal RSI signal rows, or the
+rule that `TRIGGERED_FADE` only comes from `event_fade.py` plus `proxy_fade`.
+
 ## 2026-06-23 — Make impact hypotheses promotion-auditable · Codex
 **Why:** The impact-hypothesis layer needed to turn sector/catalyst intelligence
 into useful RADAR candidates without letting discovery-only evidence look

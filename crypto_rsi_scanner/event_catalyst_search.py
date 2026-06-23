@@ -788,13 +788,18 @@ def generate_search_query_specs_for_hypothesis(hypothesis: object) -> tuple[Hypo
     for symbol in symbols[:8]:
         if external and category in {"rwa_preipo_proxy", "tokenized_stock_venue"}:
             out.extend((
+                HypothesisSearchQuerySpec(f"{symbol} {external} exposure"),
+                HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO"),
                 HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO exposure"),
                 HypothesisSearchQuerySpec(f"{symbol} tokenized stock {external}"),
                 HypothesisSearchQuerySpec(f"{symbol} {external} prediction market"),
             ))
         elif external and category == "ai_ipo_proxy":
             out.extend((
+                HypothesisSearchQuerySpec(f"{symbol} {external} exposure"),
+                HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO"),
                 HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO exposure"),
+                HypothesisSearchQuerySpec(f"{symbol} tokenized stock {external}"),
                 HypothesisSearchQuerySpec(f"{symbol} {external} perp"),
                 HypothesisSearchQuerySpec(f"{symbol} AI IPO proxy"),
             ))
@@ -821,18 +826,18 @@ def generate_search_query_specs_for_hypothesis(hypothesis: object) -> tuple[Hypo
         else:
             qtype = "market_confirmation" if category == "market_anomaly_unknown" else "candidate_validation"
             out.append(HypothesisSearchQuerySpec(f"{symbol} crypto catalyst", qtype))
-    if not out:
+    if external and category in {
+        "rwa_preipo_proxy",
+        "ai_ipo_proxy",
+        "tokenized_stock_venue",
+        "sports_fan_proxy",
+        "political_meme_proxy",
+        "prediction_market_infra",
+        "perp_venue_attention",
+    }:
+        out.extend(HypothesisSearchQuerySpec(query, "candidate_discovery") for query in _candidate_discovery_queries(external, sectors, category))
+    elif not out:
         discovery_terms: list[str] = []
-        if external:
-            discovery_terms.extend((
-                f"{external} crypto exposure",
-                f"{external} tokenized stock crypto",
-                f"{external} pre-IPO crypto",
-                f"{external} prediction market token",
-                f"{external} perp crypto",
-                f"{external} synthetic exposure crypto",
-                f"{external} crypto venue",
-            ))
         for sector in sectors[:4]:
             clean = sector.replace("_", " ")
             if external:
@@ -846,6 +851,26 @@ def generate_search_query_specs_for_hypothesis(hypothesis: object) -> tuple[Hypo
         if query:
             deduped.setdefault(query, HypothesisSearchQuerySpec(query, item.query_type))
     return tuple(deduped.values())
+
+
+def _candidate_discovery_queries(external: str, sectors: Iterable[str], category: str) -> tuple[str, ...]:
+    sector_rows = tuple(sectors)
+    discovery_terms: list[str] = [
+        f"{external} crypto exposure",
+        f"{external} tokenized stock crypto",
+        f"{external} pre-IPO crypto",
+        f"{external} prediction market token",
+        f"{external} perp crypto",
+        f"{external} synthetic exposure crypto",
+        f"{external} crypto venue",
+    ]
+    for sector in sector_rows[:4]:
+        clean = str(sector).replace("_", " ").strip()
+        if clean:
+            discovery_terms.append(f"{external} {clean} crypto")
+    if not sector_rows:
+        discovery_terms.append(f"{external} {category.replace('_', ' ')} crypto")
+    return tuple(discovery_terms)
 
 
 def generate_search_query_objects_for_anomaly(

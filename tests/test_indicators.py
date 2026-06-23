@@ -6605,7 +6605,12 @@ def test_event_impact_hypotheses_generate_seed_categories_and_queries():
     spacex = next(item for item in hypotheses if item.impact_category == "rwa_preipo_proxy")
     assert "tokenized_stock_venues" in spacex.candidate_sectors
     assert "VELVET" in spacex.candidate_symbols
+    assert any("VELVET SpaceX exposure" in query for query in spacex.search_queries)
     assert any("VELVET SpaceX pre-IPO exposure" in query for query in spacex.search_queries)
+    assert any(
+        detail["query_type"] == "candidate_discovery" and detail["query"] == "SpaceX crypto exposure"
+        for detail in spacex.search_query_details
+    )
     anomaly = next(item for item in hypotheses if item.impact_category == "market_anomaly_unknown")
     assert anomaly.status == "hypothesis"
     assert "TRIGGERED_FADE" not in event_impact_hypotheses.format_impact_hypothesis_report(hypotheses)
@@ -6725,8 +6730,12 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
     )
 
     queries = event_catalyst_search.generate_search_queries_for_hypothesis(hypothesis)
+    assert "VELVET SpaceX exposure" in queries
+    assert "VELVET SpaceX pre-IPO" in queries
     assert "VELVET SpaceX pre-IPO exposure" in queries
     assert "HYPE tokenized stock SpaceX" in queries
+    specs = event_catalyst_search.generate_search_query_specs_for_hypothesis(hypothesis)
+    assert any(spec.query_type == "candidate_discovery" and spec.query == "SpaceX crypto exposure" for spec in specs)
 
     good = RawDiscoveredEvent(
         raw_id="good",
@@ -6953,7 +6962,9 @@ def test_event_impact_hypothesis_external_entities_never_become_crypto_candidate
 
 
 def test_event_impact_hypothesis_store_reports_schema_and_promotion_diagnostics():
+    import json
     from datetime import datetime, timezone
+    import tempfile
     from pathlib import Path
     from crypto_rsi_scanner import event_impact_hypothesis_store
 
@@ -6963,6 +6974,7 @@ def test_event_impact_hypothesis_store_reports_schema_and_promotion_diagnostics(
             "row_type": "event_impact_hypothesis",
             "schema_version": event_impact_hypothesis_store.IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION,
             "observed_at": now.isoformat(),
+            "run_id": "run-new",
             "hypothesis_id": "current",
             "status": "validation_search_pending",
             "validation_stage": "candidate_assets_suggested",
@@ -6972,6 +6984,13 @@ def test_event_impact_hypothesis_store_reports_schema_and_promotion_diagnostics(
             "external_entities": [{"name": "OpenAI"}],
             "crypto_candidate_assets": [{"symbol": "VELVET", "coin_id": "velvet", "source": "candidate_discovery_search"}],
             "why_not_promoted": ["candidate_identity_not_validated", "catalyst_link_missing"],
+            "generated_queries": [
+                {"query": "OpenAI crypto exposure", "query_type": "candidate_discovery"},
+                {"query": "VELVET OpenAI exposure", "query_type": "candidate_validation"},
+            ],
+            "executed_queries": [
+                {"query": "OpenAI crypto exposure", "query_type": "candidate_discovery"},
+            ],
             "rejected_validation_samples": [{
                 "query": "OpenAI crypto exposure",
                 "query_type": "candidate_discovery",
@@ -6979,30 +6998,50 @@ def test_event_impact_hypothesis_store_reports_schema_and_promotion_diagnostics(
                 "source": "fixture",
                 "candidate_symbol": "SECTOR",
                 "score": 45,
+                "result_score": 45,
                 "rejection_reason": "result_identity_rejected",
             }],
         },
         {
             "row_type": "event_impact_hypothesis",
-            "observed_at": now.isoformat(),
+            "observed_at": "2026-06-17T12:00:00+00:00",
+            "run_id": "run-old",
             "hypothesis_id": "legacy",
             "status": "hypothesis",
             "impact_category": "rwa_preipo_proxy",
             "external_asset": "SpaceX",
+            "crypto_candidate_assets": [{"symbol": "OPENAI", "source": "legacy_bad_parse"}],
         },
     ]
-    result = event_impact_hypothesis_store.EventImpactHypothesisStoreReadResult(
-        path=Path("/tmp/event_impact_hypotheses.jsonl"),
-        rows_read=len(rows),
-        rows=rows,
-    )
-    report = event_impact_hypothesis_store.format_impact_hypotheses_store_report(result, now=now)
-    assert "schema_audit:" in report
-    assert "legacy_rows=1" in report
-    assert "missing_validation_stage=1" in report
-    assert "Why not promoted diagnostics:" in report
-    assert "candidate_identity_not_validated=1" in report
-    assert "Rejected validation evidence samples: 1" in report
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_impact_hypotheses.jsonl"
+        with path.open("w", encoding="utf-8") as fh:
+            for row in rows:
+                fh.write(json.dumps(row) + "\n")
+        all_rows = event_impact_hypothesis_store.load_impact_hypotheses(path)
+        report = event_impact_hypothesis_store.format_impact_hypotheses_store_report(all_rows, now=now)
+        assert "schema_audit:" in report
+        assert "latest_run_id: run-new" in report
+        assert "historical_rows_available: 1" in report
+        assert "legacy_rows=1" in report
+        assert "missing_validation_stage=1" in report
+        assert "legacy_schema_missing_stage=1" in report
+        assert "entity_audit:" in report
+        assert "suspicious_external_as_candidate=1" in report
+        assert "generated_query_type_counts: candidate_discovery=1, candidate_validation=1" in report
+        assert "executed_query_type_counts: candidate_discovery=1" in report
+        assert "Why not promoted diagnostics:" in report
+        assert "candidate_identity_not_validated=1" in report
+        assert "Rejected validation evidence samples: 1" in report
+        latest = event_impact_hypothesis_store.load_impact_hypotheses(path, latest_run=True, include_legacy=False)
+        assert latest.rows_read == 1
+        assert latest.rows[0]["hypothesis_id"] == "current"
+        assert all(row["hypothesis_id"] != "legacy" for row in latest.rows)
+        by_run = event_impact_hypothesis_store.load_impact_hypotheses(path, run_id="run-old", include_legacy=True)
+        assert by_run.rows_read == 1
+        assert by_run.rows[0]["hypothesis_id"] == "legacy"
+        since = event_impact_hypothesis_store.load_impact_hypotheses(path, since="2026-06-18T00:00:00+00:00")
+        assert since.rows_read == 1
 
 
 def test_event_source_enrichment_extracts_and_reuses_cache():
@@ -7541,6 +7580,53 @@ def test_event_impact_hypothesis_store_report_and_inbox_surface_review_fields():
         assert "high_conf_sector=1" in inbox
 
 
+def test_event_alpha_daily_brief_summarizes_rejected_hypothesis_samples():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_daily_brief
+
+    text = event_alpha_daily_brief.build_daily_brief(
+        run_rows=({
+            "run_id": "r1",
+            "profile": "notify_llm",
+            "artifact_namespace": "notify_llm",
+            "run_mode": "notification_burn_in",
+            "started_at": "2026-06-18T12:00:00+00:00",
+            "finished_at": "2026-06-18T12:01:00+00:00",
+            "impact_hypotheses": 1,
+            "hypotheses_validated": 0,
+            "hypothesis_promotions": 0,
+            "hypothesis_search_queries": 1,
+            "hypothesis_search_results": 0,
+        },),
+        hypothesis_rows=({
+            "row_type": "event_impact_hypothesis",
+            "schema_version": "event_impact_hypothesis_store_v1",
+            "profile": "notify_llm",
+            "artifact_namespace": "notify_llm",
+            "run_mode": "notification_burn_in",
+            "status": "rejected",
+            "validation_stage": "rejected",
+            "impact_category": "ai_ipo_proxy",
+            "external_asset": "OpenAI",
+            "hypothesis_score": 44.0,
+            "why_not_promoted": ["candidate_identity_not_validated"],
+            "external_entities": [{"name": "OpenAI"}],
+            "crypto_candidate_assets": [],
+            "rejected_validation_samples": [{
+                "result_title": "Generic OpenAI market recap",
+                "rejection_reason": "result_identity_rejected",
+            }],
+        },),
+        requested_profile="notify_llm",
+        artifact_namespace="notify_llm",
+        run_mode="notification_burn_in",
+        generated_at=datetime(2026, 6, 18, 12, 2, tzinfo=timezone.utc),
+    )
+    assert "Rejected validation evidence samples: 1" in text
+    assert "Rejected evidence reasons: result_identity_rejected=1" in text
+    assert "Generic OpenAI market recap" in text
+
+
 def test_event_impact_hypothesis_generation_uses_llm_suggested_assets_but_not_validation():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_impact_hypotheses
@@ -7779,13 +7865,14 @@ def test_event_impact_hypothesis_search_skip_reason_buckets_are_specific():
         ),
         now=now,
     )
-    assert result.rejected_result_count == 1
-    assert result.skip_reasons["result_catalyst_missing"] == 1
+    assert result.rejected_result_count >= 1
+    assert result.skip_reasons["result_catalyst_missing"] >= 1
     assert "result_catalyst_missing" in result.rejected_result_events[0].result_score_reasons
     sampled = event_impact_hypotheses.attach_hypothesis_search_samples((good,), result)[0]
     assert sampled.rejected_validation_samples
     assert sampled.rejected_validation_samples[0]["query_type"] == "candidate_validation"
     assert sampled.rejected_validation_samples[0]["rejection_reason"] == "result_catalyst_missing"
+    assert sampled.rejected_validation_samples[0]["result_score"] == 45
 
 
 def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
@@ -19680,6 +19767,7 @@ def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock(
     for target, profile in (
         ("event-alpha-notify-no-key-scheduled", "notify_no_key"),
         ("event-alpha-notify-llm-scheduled", "notify_llm"),
+        ("event-alpha-notify-llm-deep-scheduled", "notify_llm_deep"),
     ):
         out = subprocess.run(["make", "-n", target], cwd=root, capture_output=True, text=True, check=True).stdout
         assert f"--event-alpha-profile {profile}" in out

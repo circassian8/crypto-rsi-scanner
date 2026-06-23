@@ -229,6 +229,22 @@ def build_daily_brief(
         )
         if rejected_samples:
             lines.append(f"- Rejected validation evidence samples: {rejected_samples}")
+            reason_counts: dict[str, int] = {}
+            titles: list[str] = []
+            for row in hypotheses:
+                for sample in row.get("rejected_validation_samples") or []:
+                    if not isinstance(sample, Mapping):
+                        continue
+                    if bool(sample.get("accepted")) and not sample.get("rejection_reason"):
+                        continue
+                    reason = str(sample.get("rejection_reason") or "unknown")
+                    reason_counts[reason] = reason_counts.get(reason, 0) + 1
+                    title = str(sample.get("result_title") or "").strip()
+                    if title and title not in titles:
+                        titles.append(title)
+            lines.append("- Rejected evidence reasons: " + _format_counts(reason_counts))
+            if titles:
+                lines.append("- Rejected evidence examples: " + " | ".join(titles[:3]))
     elif latest and int(latest.get("impact_hypotheses") or 0) > 0:
         lines.append("- Stored rows: none loaded for this profile; inspect --event-impact-hypotheses-report.")
     lines.extend(["", "## Catalyst Search Skip Reasons"])

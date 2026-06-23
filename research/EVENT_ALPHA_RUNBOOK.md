@@ -92,6 +92,7 @@ research artifact:
 
 ```bash
 make event-impact-hypotheses-report PROFILE=notify_llm
+make event-impact-hypotheses-report PROFILE=notify_llm LATEST=1
 make event-impact-hypotheses-inbox PROFILE=notify_llm
 make event-impact-hypothesis-smoke
 ```
@@ -108,6 +109,19 @@ validation status, search queries, rejection reasons, rejected validation
 evidence samples, schema-audit fields, and `why_not_promoted` diagnostics.
 Suggested LLM/search assets are metadata only until deterministic
 resolver/search evidence validates identity.
+
+Use `LATEST=1` for daily diagnosis so the report focuses on the latest stored
+`run_id` while still printing total/latest/historical/legacy availability. Use
+`RUN_ID=<id>` for a specific cycle and `SINCE=<iso-time>` for a time window.
+Add `INCLUDE_LEGACY=1` only when intentionally reviewing old/missing-schema
+rows. Hypothesis reports now separate generated queries from executed queries
+and show query counts by `candidate_discovery`, `candidate_validation`, and
+`market_confirmation`. Rejected validation samples include the query,
+query-type, result title, provider/source, candidate symbol, result score, and
+identity/catalyst rejection reason. The entity audit flags suspicious cases
+where external catalysts such as OpenAI, Anthropic, SpaceX, Stripe,
+Databricks, Anduril, or Figma appear as crypto candidate assets; those are
+review diagnostics only, not promotion inputs.
 
 When an Event Alpha cycle has market anomalies but `catalyst_queries=0`, check
 the run ledger or daily brief `Catalyst Search Skip Reasons` section before
@@ -144,6 +158,17 @@ make event-alpha-notification-inbox PROFILE=notify_no_key
 make event-alpha-notify-fixture-smoke
 RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-telegram-recipient-check PROFILE=notify_no_key
 ```
+
+For deeper LLM notification burn-in, use the scheduled target only after the
+same guarded send checks:
+
+```bash
+make event-alpha-notify-llm-deep-scheduled
+```
+
+It uses the `notify_llm_deep` profile with bounded run/day LLM budgets, source
+enrichment, optional CryptoPanic when the key is present, run locks, and the
+same `RSI_EVENT_ALERTS_ENABLED=1` Telegram send guard.
 
 The checklist reports `READY_TO_PREVIEW`, `READY_TO_NOTIFY_NOW`, blockers,
 warnings, source readiness, provider backoff, cooldown meta keys, LLM budget,

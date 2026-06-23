@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-23 - Treat impact-hypothesis reports as run-scoped diagnostics
+**Status:** accepted
+**Decision:** Event Impact Hypothesis artifacts may contain historical and
+legacy rows, so operator reports must expose latest-run, run-id, since, and
+legacy-aware filters, plus schema gaps, generated/executed query type counts,
+rejected evidence samples, why-not-promoted diagnostics, and entity/candidate
+audits. These fields are observability only. They explain why hypotheses did or
+did not validate/promote, but they cannot promote rows, change routing, write
+normal RSI signal rows, open paper/live trades, or create `TRIGGERED_FADE`.
+**Why:** Without run-scoped diagnostics, old rows with missing fields can make
+fresh `notify_llm` runs look broken and hide provider/search failure modes.
+**Revisit when:** Hypothesis storage migrates to a versioned DB/table with
+native run indexes and automatic retention.
+
 ## 2026-06-23 - Send notify_no_key research notifications on every clean run
 **Status:** accepted
 **Decision:** The `notify_no_key` Event Alpha notification profile should send

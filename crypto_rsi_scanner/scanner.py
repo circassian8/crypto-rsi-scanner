@@ -3605,6 +3605,10 @@ def event_impact_hypotheses_report(
     *,
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
+    latest_run: bool = False,
+    run_id: str | None = None,
+    since: str | None = None,
+    include_legacy: bool = True,
 ) -> None:
     """Print stored Event Impact Hypothesis rows for a profile/namespace."""
     _setup_event_discovery_logging(verbose)
@@ -3614,7 +3618,14 @@ def event_impact_hypotheses_report(
         print(str(exc))
         return
     target_path = _event_alpha_report_path(path, context.impact_hypothesis_store_path)
-    result = event_impact_hypothesis_store.load_impact_hypotheses(target_path, limit=limit)
+    result = event_impact_hypothesis_store.load_impact_hypotheses(
+        target_path,
+        limit=limit,
+        latest_run=latest_run,
+        run_id=run_id,
+        since=since,
+        include_legacy=include_legacy,
+    )
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     print(_event_alpha_context_block(context))
     print(event_impact_hypothesis_store.format_impact_hypotheses_store_report(
@@ -7318,6 +7329,26 @@ def cli() -> None:
         help="Optional Event Impact Hypothesis JSONL path for --event-impact-hypotheses-report.",
     )
     parser.add_argument(
+        "--latest-run",
+        action="store_true",
+        help="For impact-hypothesis reports, show only rows from the latest stored run_id.",
+    )
+    parser.add_argument(
+        "--run-id",
+        default=None,
+        help="For impact-hypothesis reports, show only rows from this stored run_id.",
+    )
+    parser.add_argument(
+        "--since",
+        default=None,
+        help="For impact-hypothesis reports, show rows observed at or after this ISO timestamp.",
+    )
+    parser.add_argument(
+        "--include-legacy",
+        action="store_true",
+        help="For impact-hypothesis reports, include legacy/missing-schema rows in filtered output.",
+    )
+    parser.add_argument(
         "--event-alpha-run-ledger-path",
         default=None,
         help="Optional Event Alpha run ledger JSONL path for --event-alpha-runs-report.",
@@ -8086,6 +8117,10 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
+            latest_run=args.latest_run,
+            run_id=args.run_id,
+            since=args.since,
+            include_legacy=args.include_legacy or not (args.latest_run or args.run_id or args.since),
         )
         return
     if args.event_impact_hypotheses_inbox:
