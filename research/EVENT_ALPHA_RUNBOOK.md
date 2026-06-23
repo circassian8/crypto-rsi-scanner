@@ -38,10 +38,13 @@ for the same no-send flow against `notify_llm`.
 market enrichment, anomaly scanning, catalyst search, watchlist monitoring,
 router lanes, and auto-written research cards. `notify_llm` uses the same source
 set plus OpenAI extraction/advisory metadata, bounded full-source enrichment for
-LLM context, and conservative defaults: 10 calls/run, 50 calls/day, $1/day
-estimated cap, 10 enriched source rows/run, and a 168-hour cache TTL. Use
-`notify_llm_deep` only when you explicitly want a deeper review cycle: it keeps
-the same research-only send guards but raises the LLM/enrichment caps.
+LLM context, and bounded parallel OpenAI defaults: 100 calls/run, 500 calls/day,
+$15/day estimated cap, 12 concurrent LLM calls, 30s LLM HTTP timeouts, 10
+enriched source rows/run, a 168-hour cache TTL, and a 600s notification runtime
+budget. Use `notify_llm_deep` only when you explicitly want a deeper review
+cycle: it keeps the same research-only send guards but raises the LLM/enrichment
+caps to 250 calls/run, 1500 calls/day, 16 concurrent LLM calls, and 45s LLM
+timeouts.
 
 Notification lanes are independent: a daily digest cooldown does not block an
 instant escalation, and instant escalation cooldown does not block a
@@ -254,11 +257,15 @@ fake sender, fixture/test namespace, deterministic clock, and local artifact
 writes only. It must not require Telegram env, live providers, paper trading,
 normal RSI routing, or execution.
 
-Notification profiles use a conservative runtime budget and provider behavior:
-120 seconds max runtime, 5 second provider timeouts, one provider failure before
-skip/backoff, DNS fail-fast, and partial-result continuation. If the runtime
-budget is exhausted, the cycle records `notification_runtime_budget_exhausted`,
-preserves partial results, and still writes heartbeat/run-summary artifacts.
+Notification profiles use bounded runtime and provider behavior: no-key runs
+default to a 120 second max runtime, OpenAI-backed notification profiles default
+to a 600 second max runtime, live non-LLM provider calls use 5 second provider
+timeouts, one provider failure before skip/backoff, DNS fail-fast, and
+partial-result continuation. LLM calls have their own relationship/extraction
+HTTP timeouts and bounded parallelism (`RSI_EVENT_LLM_MAX_PARALLEL_CALLS`). If
+the runtime budget is exhausted, the cycle records
+`notification_runtime_budget_exhausted`, preserves partial results, and still
+writes heartbeat/run-summary artifacts.
 Live CoinGecko market enrichment is fail-soft in notification mode: DNS/network
 failures record `market_enrichment_live_fetch_failed`, update
 `coingecko:market_enrichment` provider health, continue anomaly/discovery with
@@ -469,8 +476,10 @@ make event-alpha-daily-llm-report PROFILE=full_llm_live
 ```
 
 LLM calls are capped by the profile budget defaults and the local budget ledger.
-Cache hits are reused. If rows are skipped, the run ledger and explain report
-show `llm_skipped_due_budget`.
+Cache hits are reused. Uncached calls run through a bounded thread pool, so one
+slow provider read does not block every lower-priority candidate. If rows are
+skipped, the run ledger and explain report show `llm_skipped_due_budget` or
+runtime-deadline warnings.
 
 The OpenAI-backed profiles have bounded defaults, but the owner machine may
 raise LLM depth through local `.env` budget overrides without editing profile
@@ -483,15 +492,20 @@ RSI_EVENT_LLM_MAX_CALLS_PER_RUN=200
 RSI_EVENT_LLM_MAX_CALLS_PER_DAY=1000
 RSI_EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY=25
 RSI_EVENT_LLM_ESTIMATED_COST_PER_CALL_USD=0.02
+RSI_EVENT_LLM_MAX_PARALLEL_CALLS=12
+RSI_EVENT_LLM_OPENAI_TIMEOUT=30
+RSI_EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT=30
+RSI_EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS=600
 RSI_EVENT_LLM_CACHE_TTL_HOURS=24
 ```
 
 `main.py --event-alpha-status --event-alpha-profile notify_llm` prints the
 effective relationship candidate cap, raw-event extraction cap, run/day call
-caps, estimated daily cost cap, cache TTL, and ledger path. These knobs only
-change how many LLM relationship/extraction attempts can run; they do not change
-alert scoring, send guards, normal RSI rows, paper/live writes, trading, or
-`TRIGGERED_FADE` eligibility.
+caps, parallelism, relationship/extraction timeouts, estimated daily cost cap,
+cache TTL, and ledger path. These knobs only change how many LLM
+relationship/extraction attempts can run and how long they can wait; they do not
+change alert scoring, send guards, normal RSI rows, paper/live writes, trading,
+or `TRIGGERED_FADE` eligibility.
 
 For an LLM burn-in loop that keeps sends off and adds source reliability:
 

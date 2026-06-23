@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +25,7 @@ from .event_llm_extraction_models import (
 )
 from .event_models import RawDiscoveredEvent
 from .event_resolver import clean_text, strip_publisher_suffix
-from .llm_providers.base import LLMExtractionProvider
+from .llm_providers.base import LLMExtractionProvider, LLMProviderResult
 
 log = logging.getLogger(__name__)
 
@@ -96,6 +97,7 @@ class EventLLMExtractorConfig:
     max_calls_per_run: int = 0
     max_calls_per_day: int = 0
     max_estimated_cost_usd_per_day: float = 0.0
+    max_parallel_calls: int = 1
     cache_ttl_hours: float = 0.0
     budget_ledger_path: Path | None = None
     estimated_cost_per_call_usd: float = 0.0
@@ -133,6 +135,8 @@ def analyze_raw_events(
     provider_name = str(getattr(provider, "name", cfg.provider))
     provider_model = getattr(provider, "model", cfg.model)
     calls_attempted = 0
+    row_slots: list[EventLLMExtractionReportRow | None] = [None] * len(selected)
+    pending: list[dict[str, Any]] = []
     budget = event_llm_budget.EventLLMBudgetRunTracker(
         cfg=event_llm_budget.EventLLMBudgetConfig(
             ledger_path=cfg.budget_ledger_path,
@@ -146,7 +150,7 @@ def analyze_raw_events(
         prompt_version=cfg.prompt_version,
         call_kind="extractor",
     )
-    for raw_event, priority in selected:
+    for idx, (raw_event, priority) in enumerate(selected):
         packet = build_raw_event_packet(raw_event, prompt_version=cfg.prompt_version)
         warnings: list[str] = []
         cache_key = _cache_key(packet, cfg, provider_name, provider_model)
@@ -156,6 +160,17 @@ def analyze_raw_events(
             raw = dict(cached["raw"])
             cache_status = "hit"
             budget.record_cache_hit()
+            row_slots[idx] = _extraction_report_row(
+                raw_event=raw_event,
+                priority=priority,
+                raw=raw,
+                packet=packet,
+                warnings=warnings,
+                cache_status=cache_status,
+                provider_name=provider_name,
+                provider_model=provider_model,
+                cfg=cfg,
+            )
         elif isinstance(cached, Mapping):
             budget.record_cache_miss()
             warnings.append(
@@ -163,70 +178,50 @@ def analyze_raw_events(
                 if not isinstance(cached.get("raw"), Mapping)
                 else "LLM extraction cache entry expired"
             )
-            if _budget_exhausted(calls_attempted, cfg) or not budget.can_attempt():
-                raw = None
-                cache_status = "skipped_budget"
-                budget.record_skipped()
-                warnings.append(budget.exhausted_warning())
-            elif _deadline_exhausted(cfg.deadline_at):
-                raw = None
-                cache_status = "skipped_runtime"
-                budget.record_skipped()
-                warnings.append(_deadline_warning())
-            else:
-                calls_attempted += 1
-                budget.record_attempt()
-                provider_result = provider.extract_raw_event(packet)
-                raw = provider_result.raw
-                if provider_result.warning:
-                    warnings.append(provider_result.warning)
-                if raw is not None and cfg.cache_path is not None:
-                    cache[cache_key] = _cache_entry(raw, packet, provider_name, provider_model, cfg)
-                    cache_changed = True
+            pending.append({
+                "idx": idx,
+                "raw_event": raw_event,
+                "priority": priority,
+                "packet": packet,
+                "cache_key": cache_key,
+                "warnings": warnings,
+            })
         else:
             budget.record_cache_miss()
-            if _budget_exhausted(calls_attempted, cfg) or not budget.can_attempt():
-                raw = None
-                cache_status = "skipped_budget"
-                budget.record_skipped()
-                warnings.append(budget.exhausted_warning())
-            elif _deadline_exhausted(cfg.deadline_at):
-                raw = None
-                cache_status = "skipped_runtime"
-                budget.record_skipped()
-                warnings.append(_deadline_warning())
-            else:
-                calls_attempted += 1
-                budget.record_attempt()
-                provider_result = provider.extract_raw_event(packet)
-                raw = provider_result.raw
-                if provider_result.warning:
-                    warnings.append(provider_result.warning)
-                if raw is not None and cfg.cache_path is not None:
-                    cache[cache_key] = _cache_entry(raw, packet, provider_name, provider_model, cfg)
-                    cache_changed = True
-        extraction: EventLLMRawEventExtraction | None = None
-        if raw is not None:
-            try:
-                extraction = validate_llm_extraction(
-                    raw,
-                    packet,
-                    provider_name=provider_name,
-                    model=provider_model,
-                    prompt_version=cfg.prompt_version,
-                    require_evidence_quotes=cfg.require_evidence_quotes,
-                )
-                warnings.extend(extraction.warnings)
-            except EventLLMExtractionValidationError as exc:
-                warnings.append(str(exc))
-        rows.append(EventLLMExtractionReportRow(
-            raw_event=raw_event,
-            extraction=extraction,
-            warnings=tuple(dict.fromkeys(warnings)),
-            extraction_priority_score=priority.score,
-            extraction_priority_reasons=priority.reason_codes,
+            pending.append({
+                "idx": idx,
+                "raw_event": raw_event,
+                "priority": priority,
+                "packet": packet,
+                "cache_key": cache_key,
+                "warnings": warnings,
+            })
+    for job, provider_result, cache_status in _run_extraction_provider_jobs(
+        pending,
+        provider,
+        cfg=cfg,
+        budget=budget,
+        calls_attempted_ref={"value": calls_attempted},
+    ):
+        raw = provider_result.raw
+        warnings = list(job["warnings"])
+        if provider_result.warning:
+            warnings.append(provider_result.warning)
+        if raw is not None and cfg.cache_path is not None:
+            cache[job["cache_key"]] = _cache_entry(raw, job["packet"], provider_name, provider_model, cfg)
+            cache_changed = True
+        row_slots[job["idx"]] = _extraction_report_row(
+            raw_event=job["raw_event"],
+            priority=job["priority"],
+            raw=raw,
+            packet=job["packet"],
+            warnings=warnings,
             cache_status=cache_status,
-        ))
+            provider_name=provider_name,
+            provider_model=provider_model,
+            cfg=cfg,
+        )
+    rows = [row for row in row_slots if row is not None]
     if cache_changed:
         _write_cache(cfg.cache_path, cache)
     budget_snapshot = budget.flush()
@@ -241,6 +236,115 @@ def analyze_raw_events(
             cache_status=last.cache_status,
         )
     return rows
+
+
+def _run_extraction_provider_jobs(
+    jobs: list[dict[str, Any]],
+    provider: LLMExtractionProvider,
+    *,
+    cfg: EventLLMExtractorConfig,
+    budget: event_llm_budget.EventLLMBudgetRunTracker,
+    calls_attempted_ref: dict[str, int],
+) -> list[tuple[dict[str, Any], LLMProviderResult, str]]:
+    """Run uncached extraction calls with bounded parallelism and ordered bookkeeping."""
+    if not jobs:
+        return []
+    max_workers = max(1, int(cfg.max_parallel_calls or 1))
+    results: list[tuple[dict[str, Any], LLMProviderResult, str]] = []
+    next_idx = 0
+
+    def skip_job(job: dict[str, Any], cache_status: str, warning: str) -> None:
+        budget.record_skipped()
+        results.append((job, LLMProviderResult(warning=warning), cache_status))
+
+    def next_submit_job() -> dict[str, Any] | None:
+        nonlocal next_idx
+        while next_idx < len(jobs):
+            job = jobs[next_idx]
+            next_idx += 1
+            if _budget_exhausted(calls_attempted_ref["value"], cfg) or not budget.can_attempt():
+                skip_job(job, "skipped_budget", budget.exhausted_warning())
+                continue
+            if _deadline_exhausted(cfg.deadline_at):
+                skip_job(job, "skipped_runtime", _deadline_warning())
+                continue
+            calls_attempted_ref["value"] += 1
+            budget.record_attempt()
+            return job
+        return None
+
+    if max_workers <= 1:
+        while True:
+            job = next_submit_job()
+            if job is None:
+                break
+            results.append((job, _extract_raw_event(provider, job["packet"]), "miss"))
+        return results
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(jobs))) as executor:
+        futures = {}
+
+        def fill_capacity() -> None:
+            while len(futures) < max_workers:
+                job = next_submit_job()
+                if job is None:
+                    break
+                futures[executor.submit(_extract_raw_event, provider, job["packet"])] = job
+
+        fill_capacity()
+        while futures:
+            for future in as_completed(list(futures)):
+                job = futures.pop(future)
+                try:
+                    provider_result = future.result()
+                except Exception as exc:  # noqa: BLE001 - providers should fail soft, but keep batch robust
+                    log.warning("LLM extraction provider job failed: %s", exc)
+                    provider_result = LLMProviderResult(warning=f"LLM extraction provider failed: {type(exc).__name__}")
+                results.append((job, provider_result, "miss"))
+                fill_capacity()
+                break
+    return results
+
+
+def _extract_raw_event(provider: LLMExtractionProvider, packet: Mapping[str, Any]) -> LLMProviderResult:
+    return provider.extract_raw_event(packet)
+
+
+def _extraction_report_row(
+    *,
+    raw_event: RawDiscoveredEvent,
+    priority: RawEventExtractionPriority,
+    raw: Mapping[str, Any] | None,
+    packet: Mapping[str, Any],
+    warnings: Iterable[str],
+    cache_status: str,
+    provider_name: str,
+    provider_model: object,
+    cfg: EventLLMExtractorConfig,
+) -> EventLLMExtractionReportRow:
+    warning_list = list(warnings)
+    extraction: EventLLMRawEventExtraction | None = None
+    if raw is not None:
+        try:
+            extraction = validate_llm_extraction(
+                raw,
+                packet,
+                provider_name=provider_name,
+                model=provider_model,
+                prompt_version=cfg.prompt_version,
+                require_evidence_quotes=cfg.require_evidence_quotes,
+            )
+            warning_list.extend(extraction.warnings)
+        except EventLLMExtractionValidationError as exc:
+            warning_list.append(str(exc))
+    return EventLLMExtractionReportRow(
+        raw_event=raw_event,
+        extraction=extraction,
+        warnings=tuple(dict.fromkeys(warning_list)),
+        extraction_priority_score=priority.score,
+        extraction_priority_reasons=priority.reason_codes,
+        cache_status=cache_status,
+    )
 
 
 def build_raw_event_packet(raw_event: RawDiscoveredEvent, *, prompt_version: str = "llm_raw_event_extraction_v1") -> dict[str, Any]:

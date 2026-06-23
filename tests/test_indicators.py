@@ -3817,6 +3817,75 @@ def test_event_llm_runtime_deadline_skips_uncached_provider_calls():
     assert all(any("runtime deadline exhausted" in warning for warning in row.warnings) for row in rows)
 
 
+def test_event_llm_relationship_calls_run_with_bounded_parallelism():
+    import threading
+    import time
+    from crypto_rsi_scanner import event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    result, alerts, _ = _llm_golden_alerts_and_rows(min_prefilter_score=0)
+
+    class SlowProvider:
+        name = "fixture"
+        model = "parallel-fixture"
+
+        def __init__(self):
+            self.active = 0
+            self.max_active = 0
+            self.calls = 0
+            self.lock = threading.Lock()
+
+        def analyze_relationship(self, packet):
+            with self.lock:
+                self.active += 1
+                self.calls += 1
+                self.max_active = max(self.max_active, self.active)
+            try:
+                time.sleep(0.05)
+                return LLMProviderResult(raw={
+                    "asset_role": "source_noise",
+                    "relationship_type": "publisher_suffix_false_positive",
+                    "recommended_alert_action": "store_only",
+                    "confidence": 0.86,
+                    "reason": "parallel fixture",
+                    "evidence_quotes": [],
+                    "external_catalyst": {
+                        "name": None,
+                        "catalyst_type": "unknown",
+                        "event_time": None,
+                        "confidence": 0.0,
+                        "evidence_quotes": [],
+                    },
+                    "source_quality": {
+                        "source_origin": None,
+                        "source_confidence": 0.5,
+                        "timing_quality": "unknown",
+                        "notes": "parallel fixture",
+                    },
+                    "warnings": [],
+                })
+            finally:
+                with self.lock:
+                    self.active -= 1
+
+    provider = SlowProvider()
+    rows = event_llm_analyzer.analyze_event_candidates(
+        result,
+        alerts,
+        provider,
+        cfg=event_llm_analyzer.EventLLMConfig(
+            min_prefilter_score=0,
+            max_candidates_per_run=4,
+            max_parallel_calls=4,
+            require_evidence_quotes=False,
+        ),
+    )
+    assert provider.calls == 4
+    assert provider.max_active > 1
+    assert len(rows) == 4
+    assert [row.cache_status for row in rows] == ["miss", "miss", "miss", "miss"]
+
+
 def test_event_llm_budget_ledger_persists_daily_caps_and_cost_limit():
     import json
     import tempfile
@@ -4532,6 +4601,77 @@ def test_event_llm_extractor_runtime_deadline_skips_uncached_provider_calls():
     assert any("runtime deadline exhausted" in warning for warning in rows[0].warnings)
 
 
+def test_event_llm_extractor_calls_run_with_bounded_parallelism():
+    import threading
+    import time
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_llm_extractor
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw_events = [
+        RawDiscoveredEvent(
+            raw_id=f"parallel-proxy-{idx}",
+            provider="news",
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://example.test/parallel-proxy-{idx}",
+            title=f"SpaceX pre-IPO exposure opens through PAR{idx} token",
+            body=f"PAR{idx} token offers synthetic exposure to SpaceX pre-IPO markets.",
+            raw_json={},
+            source_confidence=0.90,
+            content_hash=f"parallel-proxy-{idx}",
+        )
+        for idx in range(4)
+    ]
+
+    class SlowProvider:
+        name = "fixture"
+        model = "parallel-fixture"
+
+        def __init__(self):
+            self.active = 0
+            self.max_active = 0
+            self.calls = 0
+            self.lock = threading.Lock()
+
+        def extract_raw_event(self, packet):
+            with self.lock:
+                self.active += 1
+                self.calls += 1
+                self.max_active = max(self.max_active, self.active)
+            try:
+                time.sleep(0.05)
+                return LLMProviderResult(raw={
+                    "confidence": 0.80,
+                    "external_catalysts": [],
+                    "crypto_asset_mentions": [],
+                    "false_positive_terms": [],
+                    "event_date_hints": [],
+                    "suggested_followup_queries": [],
+                    "warnings": [],
+                })
+            finally:
+                with self.lock:
+                    self.active -= 1
+
+    provider = SlowProvider()
+    rows = event_llm_extractor.analyze_raw_events(
+        raw_events,
+        provider,
+        cfg=event_llm_extractor.EventLLMExtractorConfig(
+            max_events_per_run=4,
+            max_parallel_calls=4,
+            require_evidence_quotes=False,
+        ),
+    )
+    assert provider.calls == 4
+    assert provider.max_active > 1
+    assert len(rows) == 4
+    assert [row.cache_status for row in rows] == ["miss", "miss", "miss", "miss"]
+
+
 def test_event_llm_extractor_openai_missing_key_fails_soft():
     from crypto_rsi_scanner.llm_providers.openai_provider import OpenAILLMExtractionProvider
 
@@ -4760,6 +4900,7 @@ def test_event_llm_extract_scanner_report_uses_runtime_config():
         "EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES": config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES,
         "EVENT_LLM_EXTRACTOR_CACHE_PATH": config.EVENT_LLM_EXTRACTOR_CACHE_PATH,
         "EVENT_LLM_EXTRACTOR_PROMPT_VERSION": config.EVENT_LLM_EXTRACTOR_PROMPT_VERSION,
+        "EVENT_LLM_MAX_PARALLEL_CALLS": config.EVENT_LLM_MAX_PARALLEL_CALLS,
     }
     config.EVENT_DISCOVERY_EVENTS_PATH = path
     config.EVENT_DISCOVERY_ALIASES_PATH = _llm_golden_fixture_path()
@@ -4786,6 +4927,7 @@ def test_event_llm_extract_scanner_report_uses_runtime_config():
     config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES = True
     config.EVENT_LLM_EXTRACTOR_CACHE_PATH = None
     config.EVENT_LLM_EXTRACTOR_PROMPT_VERSION = "llm_raw_event_extraction_v1"
+    config.EVENT_LLM_MAX_PARALLEL_CALLS = 1
     try:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -8006,11 +8148,14 @@ def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
     assert "EVENT_SOURCE_ENRICHMENT_ENABLED" not in no_key.config_overrides
     assert llm.config_overrides["EVENT_SOURCE_ENRICHMENT_ENABLED"] is True
     assert llm.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 10
-    assert llm.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 10.0
-    assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] <= 10.0
+    assert llm.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 30.0
+    assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] >= 30.0
+    assert llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] >= 12
+    assert llm.config_overrides["EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS"] >= 600.0
     assert deep.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 20
     assert deep.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"]
-    assert deep.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 12.0
+    assert deep.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 45.0
+    assert deep.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] > llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"]
 
 
 def test_notify_no_key_profile_delivers_each_clean_run():
@@ -9211,8 +9356,10 @@ def test_event_alpha_notification_profiles_and_preflight_guards():
     assert llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] >= 500
     assert llm.config_overrides["EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY"] >= 15.0
     assert llm.config_overrides["EVENT_LLM_CACHE_TTL_HOURS"] == 168
-    assert llm.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 10.0
-    assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] <= 10.0
+    assert llm.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 30.0
+    assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] >= 30.0
+    assert llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] >= 12
+    assert llm.config_overrides["EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS"] >= 600.0
 
     ctx = event_alpha_artifacts.context_from_profile("notify_no_key", base_dir=Path("/tmp/event-alpha-test"))
     assert ctx.run_mode == "notification_burn_in"
@@ -10869,6 +11016,10 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         "RSI_EVENT_LLM_MAX_CALLS_PER_DAY",
         "RSI_EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY",
         "RSI_EVENT_LLM_ESTIMATED_COST_PER_CALL_USD",
+        "RSI_EVENT_LLM_MAX_PARALLEL_CALLS",
+        "RSI_EVENT_LLM_OPENAI_TIMEOUT",
+        "RSI_EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT",
+        "RSI_EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS",
         "RSI_EVENT_LLM_CACHE_TTL_HOURS",
     )
     original_env = {key: os.environ.get(key) for key in env_keys}
@@ -10878,7 +11029,8 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] > 0
         assert profile.config_overrides["EVENT_LLM_MAX_CANDIDATES_PER_RUN"] > 0
         assert profile.config_overrides["EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN"] > 0
-        assert profile.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 15.0
+        assert profile.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 30.0
+        assert profile.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] >= 12
         assert "LLM budget defaults" in event_alpha_profiles.format_profile_report(profile)
         assert "artifact policy:" in event_alpha_profiles.format_profile_report(profile)
         assert event_alpha_profiles.get_profile("research_send").config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "alertable"
@@ -10905,6 +11057,8 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         assert "LLM budget:" in profile_out.getvalue()
         assert "max_candidates=" in full_llm_out.getvalue()
         assert "max_extract_events=" in full_llm_out.getvalue()
+        assert "parallel=" in full_llm_out.getvalue()
+        assert "timeouts=" in full_llm_out.getvalue()
         assert "watchlist_monitor:" in profile_out.getvalue()
         assert "- READY project_blog_rss" in full_llm_out.getvalue()
         assert "- READY project_blog_rss" in send_out.getvalue()
@@ -10915,6 +11069,10 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         os.environ["RSI_EVENT_LLM_MAX_CALLS_PER_DAY"] = "444"
         os.environ["RSI_EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY"] = "55.5"
         os.environ["RSI_EVENT_LLM_ESTIMATED_COST_PER_CALL_USD"] = "0.06"
+        os.environ["RSI_EVENT_LLM_MAX_PARALLEL_CALLS"] = "7"
+        os.environ["RSI_EVENT_LLM_OPENAI_TIMEOUT"] = "41"
+        os.environ["RSI_EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] = "42"
+        os.environ["RSI_EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS"] = "543"
         os.environ["RSI_EVENT_LLM_CACHE_TTL_HOURS"] = "12"
         override_out = io.StringIO()
         with contextlib.redirect_stdout(override_out):
@@ -10924,6 +11082,8 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         assert "max_extract_events=222" in override_text
         assert "max_run=333 max_day=444" in override_text
         assert "max_cost_day=55.5" in override_text
+        assert "parallel=7" in override_text
+        assert "timeouts=41/42s" in override_text
         assert "cache_ttl_hours=12" in override_text
 
         bad_out = io.StringIO()

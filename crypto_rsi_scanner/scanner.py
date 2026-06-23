@@ -1348,6 +1348,7 @@ def _event_llm_config_from_runtime() -> event_llm_analyzer.EventLLMConfig:
         max_calls_per_run=config.EVENT_LLM_MAX_CALLS_PER_RUN,
         max_calls_per_day=config.EVENT_LLM_MAX_CALLS_PER_DAY,
         max_estimated_cost_usd_per_day=config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY,
+        max_parallel_calls=config.EVENT_LLM_MAX_PARALLEL_CALLS,
         cache_ttl_hours=config.EVENT_LLM_CACHE_TTL_HOURS,
         budget_ledger_path=config.EVENT_LLM_BUDGET_LEDGER_PATH,
         estimated_cost_per_call_usd=config.EVENT_LLM_ESTIMATED_COST_PER_CALL_USD,
@@ -1367,6 +1368,7 @@ def _event_llm_extractor_config_from_runtime() -> event_llm_extractor.EventLLMEx
         max_calls_per_run=config.EVENT_LLM_MAX_CALLS_PER_RUN,
         max_calls_per_day=config.EVENT_LLM_MAX_CALLS_PER_DAY,
         max_estimated_cost_usd_per_day=config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY,
+        max_parallel_calls=config.EVENT_LLM_MAX_PARALLEL_CALLS,
         cache_ttl_hours=config.EVENT_LLM_CACHE_TTL_HOURS,
         budget_ledger_path=config.EVENT_LLM_BUDGET_LEDGER_PATH,
         estimated_cost_per_call_usd=config.EVENT_LLM_ESTIMATED_COST_PER_CALL_USD,
@@ -1643,7 +1645,11 @@ _PROFILE_LOCAL_BUDGET_OVERRIDES: dict[str, type] = {
     "EVENT_LLM_MAX_CALLS_PER_DAY": int,
     "EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY": float,
     "EVENT_LLM_ESTIMATED_COST_PER_CALL_USD": float,
+    "EVENT_LLM_MAX_PARALLEL_CALLS": int,
     "EVENT_LLM_CACHE_TTL_HOURS": float,
+    "EVENT_LLM_OPENAI_TIMEOUT": float,
+    "EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT": float,
+    "EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS": float,
 }
 
 
@@ -3229,6 +3235,7 @@ def _event_alpha_llm_budget_status() -> str:
         f"max_candidates={config.EVENT_LLM_MAX_CANDIDATES_PER_RUN} "
         f"max_extract_events={config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN} "
         f"max_run={config.EVENT_LLM_MAX_CALLS_PER_RUN} max_day={config.EVENT_LLM_MAX_CALLS_PER_DAY} "
+        f"parallel={config.EVENT_LLM_MAX_PARALLEL_CALLS} "
         f"max_cost_day={config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY:g} "
         f"cache_ttl_hours={config.EVENT_LLM_CACHE_TTL_HOURS:g}"
     )
@@ -3510,7 +3517,9 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
             f"max_candidates={config.EVENT_LLM_MAX_CANDIDATES_PER_RUN} "
             f"max_extract_events={config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN} "
             f"max_run={config.EVENT_LLM_MAX_CALLS_PER_RUN} max_day={config.EVENT_LLM_MAX_CALLS_PER_DAY} "
+            f"parallel={config.EVENT_LLM_MAX_PARALLEL_CALLS} "
             f"max_cost_day={config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY:g} "
+            f"timeouts={config.EVENT_LLM_OPENAI_TIMEOUT:g}/{config.EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT:g}s "
             f"cache_ttl_hours={config.EVENT_LLM_CACHE_TTL_HOURS:g} "
             f"ledger={config.EVENT_LLM_BUDGET_LEDGER_PATH}"
         ),

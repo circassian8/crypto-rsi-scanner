@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-24 - Use bounded parallel LLM calls inside notification deadlines
+**Status:** accepted
+**Decision:** OpenAI-backed Event Alpha raw-event extraction and relationship
+analysis may run uncached provider calls concurrently through a bounded thread
+pool, controlled by `RSI_EVENT_LLM_MAX_PARALLEL_CALLS`. Per-request HTTP
+timeouts still apply, and the notification runtime deadline remains the outer
+wall-clock guard; cache hits remain local/free, and uncached calls are skipped
+once budget or runtime deadline is exhausted.
+**Why:** Sequential LLM requests let one slow socket/read timeout stall all
+later candidates. Bounded parallelism improves candidate coverage during daily
+notification runs without removing cost caps, daily call caps, runtime limits,
+or research-only safety boundaries.
+**Revisit when:** The project moves LLM work into an async/background queue with
+retryable job state, per-model token accounting, or adaptive provider failover.
+
 ## 2026-06-23 - Bound live LLM calls by notification runtime deadlines
 **Status:** accepted
 **Decision:** OpenAI-backed Event Alpha notification runs must pass the cycle's

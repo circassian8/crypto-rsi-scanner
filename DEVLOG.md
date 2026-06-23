@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-24 — Parallelize Event Alpha LLM calls for notification runs · Codex
+**Why:** Sequential OpenAI extraction/relationship calls made `notify_llm`
+runs vulnerable to one slow request delaying the whole batch. The owner is
+comfortable with a longer overall run if it produces better LLM coverage.
+**Changes:**
+- Added bounded parallel provider execution to raw-event LLM extraction and
+  relationship analysis while preserving cache hits, budget accounting,
+  runtime-deadline skips, and deterministic report row ordering.
+- Added `RSI_EVENT_LLM_MAX_PARALLEL_CALLS` config and local profile override
+  support, then raised OpenAI-backed Event Alpha profiles: `notify_llm` now uses
+  12 parallel LLM calls, 30s relationship/extraction HTTP timeouts, and a 600s
+  notification runtime budget; `notify_llm_deep` uses 16 parallel calls and
+  45s LLM timeouts.
+- Expanded Event Alpha status/profile reporting and `.env.example` docs to show
+  LLM parallelism, timeouts, and notification runtime caps.
+- Added regression coverage proving relationship analysis and raw-event
+  extraction actually run with bounded parallel overlap.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (435/435 passed); `make event-llm-eval
+PYTHON=python3`; `make event-llm-extract-eval PYTHON=python3`; `make
+event-alpha-eval PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Runtime/coverage improvement only. This does not change Event
+Alpha scoring, alert routing, Telegram send guards, normal RSI rows, paper/live
+writes, trading, or `TRIGGERED_FADE` eligibility.
+
 ## 2026-06-23 — Guard OpenAI LLM loops with notification runtime deadlines · Codex
 **Why:** A full `notify_llm` run showed the GDELT fetch cap was fixed, but slow
 OpenAI raw-event extraction calls could still keep running past the
