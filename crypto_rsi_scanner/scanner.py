@@ -1966,6 +1966,7 @@ def _write_event_impact_hypotheses_for_run(
     artifact_namespace: str | None,
 ) -> tuple[event_alpha_pipeline.EventAlphaPipelineResult, event_impact_hypothesis_store.EventImpactHypothesisStoreWriteResult]:
     store_cfg = _event_impact_hypothesis_store_config_from_runtime()
+    watchlist_rows = tuple(pipeline_result.watchlist_result.entries) if pipeline_result.watchlist_result else ()
     write_result = event_impact_hypothesis_store.write_impact_hypotheses(
         pipeline_result.impact_hypotheses,
         cfg=store_cfg,
@@ -1974,6 +1975,7 @@ def _write_event_impact_hypotheses_for_run(
         profile=profile,
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
+        watchlist_rows=watchlist_rows,
     )
     updated = replace(
         pipeline_result,
@@ -3621,6 +3623,27 @@ def event_impact_hypotheses_report(
     ))
 
 
+def event_impact_hypotheses_inbox(
+    path: str | None = None,
+    limit: int = 100,
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print stored Event Impact Hypothesis rows that need operator review."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    target_path = _event_alpha_report_path(path, context.impact_hypothesis_store_path)
+    result = event_impact_hypothesis_store.load_impact_hypotheses(target_path, limit=limit)
+    print(_event_alpha_context_block(context))
+    print(event_impact_hypothesis_store.format_impact_hypotheses_inbox(result))
+
+
 def event_impact_hypothesis_smoke(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Run an offline smoke proving sector hypothesis validation stays RADAR-only."""
     import tempfile
@@ -4894,6 +4917,7 @@ def event_alpha_export_burn_in_pack(
         feedback_rows=artifacts["feedback_rows"],
         missed_rows=artifacts["missed_rows"],
         notification_runs=event_alpha_notification_runs.load_notification_runs(config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH).rows,
+        hypothesis_rows=event_impact_hypothesis_store.load_impact_hypotheses(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH, limit=100).rows,
         watchlist_entries=artifacts["watchlist"].entries,
         router_result=router_result,
         provider_health_rows=artifacts["provider_rows"],
@@ -5183,6 +5207,7 @@ def event_alpha_daily_brief_report(
         feedback_rows=[record.__dict__ for record in feedback.records],
         missed_rows=missed_rows,
         notification_runs=event_alpha_notification_runs.load_notification_runs(context.notification_runs_path).rows,
+        hypothesis_rows=event_impact_hypothesis_store.load_impact_hypotheses(context.impact_hypothesis_store_path, limit=100).rows,
         watchlist_entries=watchlist.entries,
         router_result=router_result,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
@@ -7276,6 +7301,11 @@ def cli() -> None:
         help="Print stored research-only Event Impact Hypothesis rows for a profile/namespace.",
     )
     parser.add_argument(
+        "--event-impact-hypotheses-inbox",
+        action="store_true",
+        help="Print stored Event Impact Hypothesis rows needing operator review for a profile/namespace.",
+    )
+    parser.add_argument(
         "--event-impact-hypothesis-smoke",
         action="store_true",
         help="Run offline Event Impact Hypothesis smoke: SpaceX sector hypothesis validates VELVET RADAR only.",
@@ -8049,6 +8079,15 @@ def cli() -> None:
         return
     if args.event_impact_hypotheses_report:
         event_impact_hypotheses_report(
+            path=args.event_impact_hypothesis_store_path,
+            limit=args.event_alpha_run_limit,
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_impact_hypotheses_inbox:
+        event_impact_hypotheses_inbox(
             path=args.event_impact_hypothesis_store_path,
             limit=args.event_alpha_run_limit,
             verbose=args.verbose,

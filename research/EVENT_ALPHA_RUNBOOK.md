@@ -74,16 +74,21 @@ research artifact:
 
 ```bash
 make event-impact-hypotheses-report PROFILE=notify_llm
+make event-impact-hypotheses-inbox PROFILE=notify_llm
 make event-impact-hypothesis-smoke
 ```
 
 The store path defaults to
 `event_fade_cache/<profile>/event_impact_hypotheses.jsonl` and can be inspected
-with `main.py --event-impact-hypotheses-report --event-alpha-profile PROFILE`.
+with `main.py --event-impact-hypotheses-report --event-alpha-profile PROFILE`
+or the review-focused
+`main.py --event-impact-hypotheses-inbox --event-alpha-profile PROFILE`.
 Rows include candidate provenance (`taxonomy`, `llm_extraction`, and/or
-`deterministic_resolver`), suggested assets, validated assets, validation
-status, search queries, and rejection reasons. Suggested LLM assets are metadata
-only until deterministic resolver/search evidence validates identity.
+`deterministic_resolver`), suggested assets, validated assets, flattened
+`validated_symbol` / `validated_coin_id` fields, promoted watchlist keys,
+validation status, search queries, and rejection reasons. Suggested LLM assets
+are metadata only until deterministic resolver/search evidence validates
+identity.
 
 When an Event Alpha cycle has market anomalies but `catalyst_queries=0`, check
 the run ledger or daily brief `Catalyst Search Skip Reasons` section before

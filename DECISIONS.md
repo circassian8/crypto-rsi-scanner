@@ -21,11 +21,13 @@ decision, rationale, and revisit condition.
 **Decision:** Event Alpha impact hypotheses are persisted as profile-scoped
 JSONL research artifacts (`event_impact_hypotheses.jsonl`) with run/profile/
 namespace metadata, candidate provenance, validation status, search queries,
-and validation/rejection reasons. LLM-extracted assets may populate
-`suggested_candidate_assets` and drive validation-search metadata, but only
-deterministic resolver/search identity validation may populate token-level
-validated candidates. `notify_llm` may fetch bounded full-source text for LLM
-context; `notify_no_key` stays no-key/no-full-source enrichment by default.
+validation/rejection reasons, flattened validated symbol/coin-id fields, and
+promoted watchlist keys when validation links a hypothesis to a watchlist row.
+LLM-extracted assets may populate `suggested_candidate_assets` and drive
+validation-search metadata, but only deterministic resolver/search identity
+validation may populate token-level validated candidates. `notify_llm` may fetch
+bounded full-source text for LLM context; `notify_no_key` stays no-key/no-full-
+source enrichment by default.
 **Why:** Operators and external reviewers need to inspect why the radar formed
 an impact hypothesis and why it did or did not validate without confusing loose
 sector intelligence with alertable token evidence.

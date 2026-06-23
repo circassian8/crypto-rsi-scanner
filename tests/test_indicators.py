@@ -7108,6 +7108,110 @@ def test_event_impact_hypothesis_store_persists_profile_scoped_rows():
         assert "VELVET/velvet" in report
 
 
+def test_event_impact_hypothesis_store_report_and_inbox_surface_review_fields():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_impact_hypotheses, event_impact_hypothesis_store
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    pending = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:pending",
+        event_cluster_id="cluster:pending",
+        event_type="ipo_proxy",
+        external_asset="SpaceX",
+        impact_category=event_impact_hypotheses.ImpactCategory.RWA_PREIPO_PROXY.value,
+        candidate_sectors=("tokenized_stock_venues",),
+        candidate_symbols=("VELVET",),
+        candidate_source="taxonomy,llm_extraction",
+        confidence=0.84,
+        search_queries=("VELVET SpaceX pre-IPO exposure",),
+        status=event_impact_hypotheses.HypothesisStatus.VALIDATION_SEARCH_PENDING.value,
+        created_at="2026-06-17T00:00:00+00:00",
+    )
+    validated = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:validated",
+        event_cluster_id="cluster:validated",
+        event_type="ipo_proxy",
+        external_asset="SpaceX",
+        impact_category=event_impact_hypotheses.ImpactCategory.RWA_PREIPO_PROXY.value,
+        candidate_sectors=("tokenized_stock_venues",),
+        candidate_symbols=("VELVET",),
+        candidate_coin_ids=("velvet",),
+        validated_candidate_assets=({
+            "source": "deterministic_resolver",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "confidence": 0.92,
+        },),
+        candidate_source="deterministic_resolver",
+        hypothesis_scope=event_impact_hypotheses.HypothesisScope.TOKEN.value,
+        confidence=0.90,
+        search_queries=("VELVET SpaceX pre-IPO exposure",),
+        status=event_impact_hypotheses.HypothesisStatus.VALIDATED.value,
+        validation_reasons=("resolver_validated_candidate_asset",),
+    )
+    rejected = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:rejected",
+        event_cluster_id="cluster:rejected",
+        event_type="ipo_proxy",
+        external_asset="unknown",
+        impact_category=event_impact_hypotheses.ImpactCategory.MARKET_ANOMALY_UNKNOWN.value,
+        candidate_sectors=(),
+        candidate_symbols=("OPEN",),
+        candidate_source="llm_extraction",
+        confidence=0.55,
+        status=event_impact_hypotheses.HypothesisStatus.REJECTED.value,
+        rejection_reasons=("ambiguous identity",),
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "notify_llm" / "event_impact_hypotheses.jsonl"
+        write = event_impact_hypothesis_store.write_impact_hypotheses(
+            (pending, validated, rejected),
+            cfg=event_impact_hypothesis_store.EventImpactHypothesisStoreConfig(path=path),
+            now=now,
+            run_id="run-1",
+            profile="notify_llm",
+            run_mode="notification_burn_in",
+            artifact_namespace="notify_llm",
+            watchlist_rows=({
+                "relationship_type": "impact_hypothesis",
+                "state": "RADAR",
+                "event_id": "hyp:validated",
+                "key": "hypothesis|cluster:validated|rwa_preipo_proxy",
+            },),
+        )
+        assert write.success is True
+        read = event_impact_hypothesis_store.load_impact_hypotheses(path)
+        validated_row = next(row for row in read.rows if row["hypothesis_id"] == "hyp:validated")
+        pending_row = next(row for row in read.rows if row["hypothesis_id"] == "hyp:pending")
+        assert validated_row["validated_symbol"] == "VELVET"
+        assert validated_row["validated_coin_id"] == "velvet"
+        assert validated_row["promoted_watchlist_key"] == "hypothesis|cluster:validated|rwa_preipo_proxy"
+        assert pending_row["candidate_sources"] == ["taxonomy", "llm_extraction"]
+        report_now = datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc)
+        report = event_impact_hypothesis_store.format_impact_hypotheses_store_report(
+            read,
+            now=report_now,
+            stale_hours=12,
+        )
+        assert "Pending validation-search hypotheses" in report
+        assert "Validated hypotheses" in report
+        assert "Rejected hypotheses" in report
+        assert "Generated search queries" in report
+        assert "Promotions / promoted watchlist keys: 1" in report
+        assert "Stale hypotheses older than 12h: 1" in report
+        inbox = event_impact_hypothesis_store.format_impact_hypotheses_inbox(
+            read,
+            now=report_now,
+            stale_hours=12,
+        )
+        assert "needs_review:" in inbox
+        assert "pending=1" in inbox
+        assert "ambiguous_rejected=1" in inbox
+        assert "high_conf_sector=1" in inbox
+
+
 def test_event_impact_hypothesis_generation_uses_llm_suggested_assets_but_not_validation():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_impact_hypotheses

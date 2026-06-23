@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Polish Event Impact Hypothesis review artifacts · Codex
+**Why:** The hypothesis layer already persisted profile-scoped rows, but the
+review artifacts needed flatter validated-asset fields, explicit promotion keys,
+and a focused inbox so operators and Pro-model reviews can quickly separate
+pending, validated, rejected, and stale hypotheses.
+**Changes:**
+- Extended `event_impact_hypothesis_store.py` rows with
+  `candidate_sources`, `validated_symbol`, `validated_coin_id`, and
+  `promoted_watchlist_key`, and expanded the report with pending/validated/
+  rejected/query/promotion/stale sections.
+- Added `format_impact_hypotheses_inbox()`,
+  `main.py --event-impact-hypotheses-inbox`, and
+  `make event-impact-hypotheses-inbox`.
+- Updated Event Alpha daily briefs to summarize stored hypothesis rows directly
+  when available.
+- Added regression coverage for the new flattened fields, report sections, and
+  inbox review buckets.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (423/423 passed); `make event-llm-eval
+PYTHON=python3` (9/9 passed); `make event-llm-extract-eval PYTHON=python3`
+(7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11 passed);
+`make event-impact-hypothesis-smoke PYTHON=python3`; `make
+event-impact-hypotheses-report PROFILE=notify_llm PYTHON=python3`; `make
+event-impact-hypotheses-inbox PROFILE=notify_llm PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** Artifact/report-only change. No Event Alpha alert tiering,
+Telegram delivery, paper/live writes, normal RSI routing, event-fade eligibility,
+or `TRIGGERED_FADE` authority changed.
+
 ## 2026-06-23 — Persist Event Impact Hypotheses · Codex
 **Why:** The Event Impact Hypothesis layer was useful in console/run summaries,
 but the Pro-review workflow needs inspectable, profile-scoped artifact rows that

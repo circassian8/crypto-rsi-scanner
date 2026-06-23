@@ -35,6 +35,7 @@ def build_daily_brief(
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     missed_rows: Iterable[Mapping[str, Any]] = (),
     notification_runs: Iterable[Mapping[str, Any]] = (),
+    hypothesis_rows: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
@@ -75,6 +76,13 @@ def build_daily_brief(
     )
     missed = event_alpha_artifacts.filter_artifact_rows(
         missed_rows,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    hypotheses = event_alpha_artifacts.filter_artifact_rows(
+        [dict(row) for row in hypothesis_rows if isinstance(row, Mapping)],
         profile=requested_profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -172,6 +180,29 @@ def build_daily_brief(
             )
     else:
         lines.append("- No run row available.")
+    if hypotheses:
+        status_counts = _field_counts(hypotheses, "status")
+        category_counts = _field_counts(hypotheses, "impact_category")
+        lines.append("- Stored rows: " + str(len(hypotheses)))
+        lines.append("- Stored statuses: " + _format_counts(status_counts))
+        lines.append("- Stored categories: " + _format_counts(category_counts))
+        pending = [
+            row for row in hypotheses
+            if str(row.get("status") or "") in {"validation_search_pending", "hypothesis"}
+        ]
+        validated = [
+            row for row in hypotheses
+            if str(row.get("status") or "") in {"validation_evidence_found", "validated"}
+        ]
+        rejected = [
+            row for row in hypotheses
+            if str(row.get("status") or "") == "rejected" or row.get("rejection_reasons")
+        ]
+        lines.append("- Validated stored hypotheses: " + (_brief_hypothesis_labels(validated[:3]) or "none"))
+        lines.append("- Pending stored hypotheses: " + (_brief_hypothesis_labels(pending[:3]) or "none"))
+        lines.append("- Top rejected hypotheses: " + (_brief_hypothesis_labels(rejected[:3]) or "none"))
+    elif latest and int(latest.get("impact_hypotheses") or 0) > 0:
+        lines.append("- Stored rows: none loaded for this profile; inspect --event-impact-hypotheses-report.")
     lines.extend(["", "## Catalyst Search Skip Reasons"])
     if latest:
         skip_reasons = latest.get("catalyst_search_skip_reasons") or {}
@@ -392,6 +423,29 @@ def _suppression_lines(
     if not counts:
         return ["- None."]
     return [f"- {reason}: {count}" for reason, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:5]]
+
+
+def _field_counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        key = str(row.get(field) or "unknown")
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _format_counts(counts: Mapping[str, int]) -> str:
+    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
+
+
+def _brief_hypothesis_labels(rows: Iterable[Mapping[str, Any]]) -> str:
+    labels: list[str] = []
+    for row in rows:
+        labels.append(
+            f"{row.get('impact_category') or 'unknown'}"
+            f"/{row.get('external_asset') or 'unknown'}"
+            f"({row.get('status') or 'unknown'})"
+        )
+    return "; ".join(labels)
 
 
 def _float(value: object) -> float:
