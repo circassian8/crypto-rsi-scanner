@@ -643,6 +643,7 @@ def run_hypothesis_search(
     observed = _as_utc(now or datetime.now(timezone.utc))
     eligible = _eligible_hypotheses(hypotheses, cfg)
     queries = _queries_for_hypotheses(eligible, cfg)
+    hypothesis_by_id = {str(getattr(item, "hypothesis_id", "") or ""): item for item in tuple(hypotheses)}
     skip_reasons = _hypothesis_search_skip_reasons(tuple(hypotheses), eligible, queries, cfg)
     warnings: list[str] = []
     try:
@@ -671,6 +672,7 @@ def run_hypothesis_search(
 
     accepted_results: list[SearchResultEvent] = []
     rejected_results: list[SearchResultEvent] = list(provider_rejected)
+    result_skip_reasons: dict[str, int] = {}
     threshold = _confidence_threshold(cfg.min_result_confidence)
     seen_content: set[str] = set()
     for result in provider_events:
@@ -682,9 +684,22 @@ def run_hypothesis_search(
             reasons = list(score.reason_codes)
         else:
             seen_content.add(content_key)
+        hypothesis = hypothesis_by_id.get(result.query.anomaly_raw_id)
+        catalyst_ok = _result_mentions_hypothesis_catalyst(result.raw_event, hypothesis)
+        if not catalyst_ok:
+            reasons.append("result_catalyst_missing")
+            result_skip_reasons["result_catalyst_missing"] = result_skip_reasons.get("result_catalyst_missing", 0) + 1
+            rejected_results.append(replace(
+                result,
+                result_score=min(score.score, 45),
+                result_score_reasons=tuple(dict.fromkeys(reasons)),
+                accepted=False,
+            ))
+            continue
         identity_ok = result_mentions_anomaly_identity(result.raw_event, result.query, None)
         if cfg.require_validated_identity and not identity_ok:
-            reasons.append("hypothesis_identity_validation_required")
+            reasons.append("result_identity_rejected")
+            result_skip_reasons["result_identity_rejected"] = result_skip_reasons.get("result_identity_rejected", 0) + 1
             rejected_results.append(replace(
                 result,
                 result_score=min(score.score, 45),
@@ -702,6 +717,7 @@ def run_hypothesis_search(
         if scored.accepted:
             accepted_results.append(scored)
         else:
+            result_skip_reasons["result_score_below_threshold"] = result_skip_reasons.get("result_score_below_threshold", 0) + 1
             rejected_results.append(scored)
     return CatalystSearchRunResult(
         provider=provider_name,
@@ -715,7 +731,7 @@ def run_hypothesis_search(
         query_count=len(queries),
         result_count=len(accepted_results),
         rejected_count=len(rejected_results),
-        skip_reasons=skip_reasons,
+        skip_reasons=_merge_reason_counts(skip_reasons, result_skip_reasons),
     )
 
 
@@ -1234,6 +1250,7 @@ def _hypothesis_search_skip_reasons(
         reasons["profile_disabled"] = 1
         return reasons
     if not all_hypotheses:
+        reasons["no_hypotheses"] = 1
         return reasons
     if not eligible:
         low_confidence = 0
@@ -1253,15 +1270,65 @@ def _hypothesis_search_skip_reasons(
             elif not tuple(getattr(hypothesis, "candidate_symbols", ()) or ()):
                 missing_assets += 1
         if low_confidence:
-            reasons["low_hypothesis_confidence"] = low_confidence
+            reasons["low_confidence"] = low_confidence
         if missing_assets:
-            reasons["hypothesis_assets_missing"] = missing_assets
+            reasons["no_candidate_assets"] = missing_assets
         if already_validated:
             reasons["already_validated"] = already_validated
         return reasons
     if not queries:
-        reasons["hypothesis_queries_empty"] = len(eligible)
+        reasons["no_candidate_assets"] = len(eligible)
     return reasons
+
+
+def _result_mentions_hypothesis_catalyst(raw_event: RawDiscoveredEvent, hypothesis: object | None) -> bool:
+    """Return true when a hypothesis-search result still mentions the catalyst context."""
+    if hypothesis is None:
+        return True
+    text = clean_text(" ".join(str(part or "") for part in (
+        raw_event.title,
+        raw_event.body,
+        _event_payload_value(raw_event, "event_name"),
+        _event_payload_value(raw_event, "event_type"),
+        _event_payload_value(raw_event, "external_asset"),
+        _event_payload_value(raw_event, "description"),
+    )))
+    if not text:
+        return False
+    external = clean_text(getattr(hypothesis, "external_asset", "") or "")
+    if external and _text_contains_term(text, external):
+        return True
+    category = str(getattr(hypothesis, "impact_category", "") or "")
+    terms_by_category = {
+        "rwa_preipo_proxy": ("pre ipo", "pre-ipo", "spacex", "tokenized stock", "synthetic exposure"),
+        "ai_ipo_proxy": ("openai", "anthropic", "pre ipo", "pre-ipo", "tokenized stock", "synthetic exposure"),
+        "tokenized_stock_venue": ("tokenized stock", "stock token", "synthetic exposure", "pre ipo", "pre-ipo"),
+        "sports_fan_proxy": ("world cup", "champions league", "fan token", "sports", "fixture", "kickoff"),
+        "political_meme_proxy": ("election", "inauguration", "campaign", "debate", "political"),
+        "stablecoin_regulatory": ("genius act", "stablecoin", "reserve", "regulation", "regulatory"),
+        "prediction_market_infra": ("prediction market", "polymarket", "oracle", "resolution"),
+        "perp_venue_attention": ("perp", "perpetual", "futures listing"),
+        "unlock_supply_pressure": ("unlock", "vesting", "airdrop", "tge"),
+        "listing_liquidity_event": ("listing", "listed on", "binance", "coinbase", "bybit"),
+        "security_or_regulatory_shock": ("exploit", "hack", "lawsuit", "regulatory", "sec", "cftc"),
+        "market_anomaly_unknown": ("catalyst", "listing", "unlock", "airdrop", "exploit", "partnership"),
+    }.get(category, tuple(CATALYST_TERM_WEIGHTS))
+    return any(_text_contains_term(text, term) for term in terms_by_category)
+
+
+def _event_payload_value(raw_event: RawDiscoveredEvent, key: str) -> str:
+    payload = raw_event.raw_json if isinstance(raw_event.raw_json, Mapping) else {}
+    event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
+    return str(event_payload.get(key) or payload.get(key) or "")
+
+
+def _text_contains_term(text: str, term: str) -> bool:
+    source = clean_text(text)
+    needle = clean_text(term)
+    if not source or not needle:
+        return False
+    escaped = re.escape(needle).replace("\\ ", r"\s+")
+    return re.search(rf"(?<![a-z0-9]){escaped}(?![a-z0-9])", source) is not None
 
 
 def _annotate_hypothesis_search_result(

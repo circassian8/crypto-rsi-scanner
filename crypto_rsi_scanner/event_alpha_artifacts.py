@@ -11,8 +11,8 @@ from typing import Any, Iterable, Mapping
 
 RUN_MODES = ("test", "fixture", "replay", "burn_in", "notification_burn_in", "operational")
 NON_OPERATIONAL_RUN_MODES = {"test", "fixture", "replay"}
-LIVE_BURN_IN_PROFILES = {"no_key_live", "no_key_llm", "api_live", "full_llm_live"}
-NOTIFICATION_BURN_IN_PROFILES = {"notify_no_key", "notify_llm"}
+LIVE_BURN_IN_PROFILES = {"no_key_live", "no_key_llm", "api_live", "full_llm_live", "full_llm_deep"}
+NOTIFICATION_BURN_IN_PROFILES = {"notify_no_key", "notify_llm", "notify_llm_deep"}
 OPERATIONAL_PROFILES = {"research_send"}
 LEGACY_NAMESPACE = "legacy"
 SNAPSHOT_AVAILABLE = "available"
@@ -40,6 +40,7 @@ class EventAlphaArtifactContext:
     priors_path: Path
     provider_health_path: Path
     daily_brief_path: Path
+    impact_hypothesis_store_path: Path
     proposed_eval_cases_dir: Path
     research_cards_dir: Path
     llm_budget_ledger_path: Path
@@ -125,6 +126,11 @@ def context_from_profile(
         daily_brief_path=_path_override(
             "RSI_EVENT_ALPHA_DAILY_BRIEF_PATH",
             namespace_dir / "event_alpha_daily_brief.md",
+            data_dir=config.DATA_DIR,
+        ),
+        impact_hypothesis_store_path=_path_override(
+            "RSI_EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
+            namespace_dir / "event_impact_hypotheses.jsonl",
             data_dir=config.DATA_DIR,
         ),
         proposed_eval_cases_dir=_path_override(

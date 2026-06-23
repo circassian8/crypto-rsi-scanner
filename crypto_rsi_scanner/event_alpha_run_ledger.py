@@ -159,6 +159,9 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
         skip_reasons = row.get("catalyst_search_skip_reasons") or {}
         if isinstance(skip_reasons, Mapping) and skip_reasons:
             rows.append("  catalyst_search_skip_reasons: " + _format_reason_counts(skip_reasons))
+        hypothesis_skip_reasons = row.get("hypothesis_search_skip_reasons") or {}
+        if isinstance(hypothesis_skip_reasons, Mapping) and hypothesis_skip_reasons:
+            rows.append("  hypothesis_search_skip_reasons: " + _format_reason_counts(hypothesis_skip_reasons))
         lane_attempted = row.get("send_lane_items_attempted") or {}
         lane_delivered = row.get("send_lane_items_delivered") or {}
         if lane_attempted or lane_delivered:
@@ -175,6 +178,13 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"attempted={str(bool(row.get('snapshot_write_attempted'))).lower()} "
             f"success={str(bool(row.get('snapshot_write_success'))).lower()} "
             f"block={row.get('snapshot_write_block_reason') or 'none'}"
+        )
+        rows.append(
+            "  "
+            f"hypothesis_store={int(row.get('hypothesis_rows_written') or 0)} "
+            f"attempted={str(bool(row.get('hypothesis_write_attempted'))).lower()} "
+            f"success={str(bool(row.get('hypothesis_write_success'))).lower()} "
+            f"block={row.get('hypothesis_write_block_reason') or 'none'}"
         )
         if row.get("send_block_reason"):
             rows.append(f"  send_block: {row.get('send_block_reason')}")
@@ -259,6 +269,7 @@ def _run_record(
         "hypotheses_validated": _int(getattr(result, "hypotheses_validated", 0)),
         "hypothesis_search_queries": _int(getattr(result, "hypothesis_search_queries", 0)),
         "hypothesis_search_results": _int(getattr(result, "hypothesis_search_results", 0)),
+        "hypothesis_search_skip_reasons": _hypothesis_search_skip_reasons(result, warnings=warnings),
         "hypothesis_promotions": _int(getattr(result, "hypothesis_promotions", 0)),
         "candidates": _int(getattr(result, "candidates", 0)),
         "clusters": _int(getattr(result, "clusters", 0)),
@@ -287,6 +298,11 @@ def _run_record(
         "snapshot_write_success": bool(getattr(result, "snapshot_write_success", False)),
         "snapshot_rows_written": _int(getattr(result, "snapshot_rows_written", 0)),
         "snapshot_write_block_reason": getattr(result, "snapshot_write_block_reason", None),
+        "hypothesis_store_path": getattr(result, "hypothesis_store_path", None),
+        "hypothesis_write_attempted": bool(getattr(result, "hypothesis_write_attempted", False)),
+        "hypothesis_write_success": bool(getattr(result, "hypothesis_write_success", False)),
+        "hypothesis_rows_written": _int(getattr(result, "hypothesis_rows_written", 0)),
+        "hypothesis_write_block_reason": getattr(result, "hypothesis_write_block_reason", None),
         "research_cards_written": len(card_paths),
         "research_card_paths": card_paths,
         "provider_fetch_count": _int(getattr(catalyst, "provider_fetch_count", 0)),
@@ -396,6 +412,29 @@ def _catalyst_search_skip_reasons(
         out["provider_unavailable"] = out.get("provider_unavailable", 0) + 1
     if not out and _market_anomaly_count(discovery) > 0 and _int(getattr(result, "catalyst_queries", 0)) == 0:
         out["unknown"] = 1
+    return out
+
+
+def _hypothesis_search_skip_reasons(
+    result: Any,
+    *,
+    warnings: Iterable[str],
+) -> dict[str, int]:
+    raw = getattr(result, "hypothesis_search_skip_reasons", None)
+    if raw is None:
+        hypothesis = getattr(result, "hypothesis_search_result", None)
+        raw = getattr(hypothesis, "skip_reasons", None) if hypothesis is not None else None
+    out: dict[str, int] = {}
+    if isinstance(raw, Mapping):
+        for key, value in raw.items():
+            clean = str(key or "").strip()
+            if clean:
+                out[clean] = out.get(clean, 0) + max(1, _int(value))
+    warning_text = " ".join(str(item or "") for item in warnings).casefold()
+    if "hypothesis search skipped: no provider available" in warning_text and "provider_unavailable" not in out:
+        out["provider_unavailable"] = out.get("provider_unavailable", 0) + 1
+    if "hypothesis search provider failed" in warning_text and not {"provider_unavailable", "provider_backoff"} & set(out):
+        out["provider_unavailable"] = out.get("provider_unavailable", 0) + 1
     return out
 
 

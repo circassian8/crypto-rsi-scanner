@@ -25,6 +25,7 @@ class EventSourceEnrichmentConfig:
     cache_dir: Path | None = None
     timeout_seconds: float = 10.0
     max_chars: int = 12000
+    max_rows_per_run: int = 0
     min_source_confidence: float = 0.55
 
 

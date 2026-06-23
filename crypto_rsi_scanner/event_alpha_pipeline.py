@@ -112,6 +112,11 @@ class EventAlphaPipelineResult:
     snapshot_write_success: bool = False
     snapshot_rows_written: int = 0
     snapshot_write_block_reason: str | None = None
+    hypothesis_store_path: str | None = None
+    hypothesis_write_attempted: bool = False
+    hypothesis_write_success: bool = False
+    hypothesis_rows_written: int = 0
+    hypothesis_write_block_reason: str | None = None
 
     @property
     def raw_events(self) -> int:
@@ -132,6 +137,16 @@ class EventAlphaPipelineResult:
         return {
             str(key): int(value)
             for key, value in (self.catalyst_search_result.skip_reasons or {}).items()
+            if str(key)
+        }
+
+    @property
+    def hypothesis_search_skip_reasons(self) -> dict[str, int]:
+        if self.hypothesis_search_result is None:
+            return {}
+        return {
+            str(key): int(value)
+            for key, value in (self.hypothesis_search_result.skip_reasons or {}).items()
             if str(key)
         }
 
@@ -733,11 +748,15 @@ def _enrich_source_events(
     fetched = 0
     used_cache = 0
     selected = 0
+    max_rows = max(0, int(getattr(cfg, "max_rows_per_run", 0) or 0))
     for raw in raw_events:
         if not event_source_enrichment.should_enrich_source(
             raw,
             min_source_confidence=cfg.min_source_confidence,
         ):
+            enriched.append(raw)
+            continue
+        if max_rows and selected >= max_rows:
             enriched.append(raw)
             continue
         selected += 1
@@ -751,6 +770,8 @@ def _enrich_source_events(
         enriched.append(event_source_enrichment.annotate_raw_event_with_enrichment(result))
     if selected:
         warnings.append(f"source enrichment: selected={selected} fetched={fetched} cache_hits={used_cache}")
+    if max_rows and selected >= max_rows:
+        warnings.append(f"source enrichment: max_rows_per_run={max_rows}")
     return tuple(enriched)
 
 
@@ -780,6 +801,14 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
             + (
                 ", ".join(f"{key}={value}" for key, value in sorted(result.catalyst_search_skip_reasons.items()))
                 if result.catalyst_search_skip_reasons
+                else "none"
+            )
+        ),
+        (
+            "hypothesis_search_skip_reasons="
+            + (
+                ", ".join(f"{key}={value}" for key, value in sorted(result.hypothesis_search_skip_reasons.items()))
+                if result.hypothesis_search_skip_reasons
                 else "none"
             )
         ),

@@ -76,6 +76,7 @@ from . import event_alpha_daily_brief
 from . import event_alpha_eval_export
 from . import event_alpha_explain
 from . import event_alpha_health_guard
+from . import event_impact_hypothesis_store
 from . import event_alpha_missed
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
@@ -117,7 +118,7 @@ from . import event_watchlist
 from . import event_watchlist_enrichment
 from . import event_watchlist_market
 from . import event_watchlist_monitor
-from .event_models import EventDiscoveryResult, RawDiscoveredEvent
+from .event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
 from .llm_providers.fixture import FixtureLLMExtractionProvider, FixtureLLMRelationshipProvider
 from .llm_providers.openai_provider import OpenAILLMExtractionProvider, OpenAILLMRelationshipProvider
@@ -1371,6 +1372,12 @@ def _event_llm_extractor_config_from_runtime() -> event_llm_extractor.EventLLMEx
     )
 
 
+def _event_impact_hypothesis_store_config_from_runtime() -> event_impact_hypothesis_store.EventImpactHypothesisStoreConfig:
+    return event_impact_hypothesis_store.EventImpactHypothesisStoreConfig(
+        path=config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH,
+    )
+
+
 def _event_watchlist_config_from_runtime() -> event_watchlist.EventWatchlistConfig:
     return event_watchlist.EventWatchlistConfig(
         enabled=config.EVENT_WATCHLIST_ENABLED,
@@ -1533,6 +1540,7 @@ def _event_source_enrichment_config_from_runtime() -> event_source_enrichment.Ev
         cache_dir=config.EVENT_SOURCE_ENRICHMENT_CACHE_DIR,
         timeout_seconds=config.EVENT_SOURCE_ENRICHMENT_TIMEOUT_SECONDS,
         max_chars=config.EVENT_SOURCE_ENRICHMENT_MAX_CHARS,
+        max_rows_per_run=config.EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN,
         min_source_confidence=config.EVENT_SOURCE_ENRICHMENT_MIN_SOURCE_CONFIDENCE,
     )
 
@@ -1639,6 +1647,7 @@ def _apply_event_alpha_context_to_config(context: event_alpha_artifacts.EventAlp
     config.EVENT_ALPHA_PRIORS_PATH = context.priors_path
     config.EVENT_PROVIDER_HEALTH_PATH = context.provider_health_path
     config.EVENT_ALPHA_DAILY_BRIEF_PATH = context.daily_brief_path
+    config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH = context.impact_hypothesis_store_path
     config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR = context.proposed_eval_cases_dir
     config.EVENT_RESEARCH_CARDS_DIR = context.research_cards_dir
     config.EVENT_LLM_BUDGET_LEDGER_PATH = context.llm_budget_ledger_path
@@ -1682,6 +1691,7 @@ def resolve_event_alpha_artifact_context_for_report(
             priors_path=Path(config.EVENT_ALPHA_PRIORS_PATH),
             provider_health_path=Path(config.EVENT_PROVIDER_HEALTH_PATH),
             daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
+            impact_hypothesis_store_path=Path(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH),
             proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
             research_cards_dir=Path(config.EVENT_RESEARCH_CARDS_DIR),
             llm_budget_ledger_path=Path(config.EVENT_LLM_BUDGET_LEDGER_PATH),
@@ -1715,6 +1725,7 @@ def _event_alpha_context_block(context: event_alpha_artifacts.EventAlphaArtifact
         f"- notification_runs_path: {context.notification_runs_path}",
         f"- feedback_path: {context.feedback_path}",
         f"- provider_health_path: {context.provider_health_path}",
+        f"- impact_hypothesis_store_path: {context.impact_hypothesis_store_path}",
         f"- research_cards_dir: {context.research_cards_dir}",
     ])
 
@@ -1750,6 +1761,7 @@ def _event_alpha_report_context(
         priors_path=Path(config.EVENT_ALPHA_PRIORS_PATH),
         provider_health_path=Path(config.EVENT_PROVIDER_HEALTH_PATH),
         daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
+        impact_hypothesis_store_path=Path(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH),
         proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
         research_cards_dir=Path(config.EVENT_RESEARCH_CARDS_DIR),
         llm_budget_ledger_path=Path(config.EVENT_LLM_BUDGET_LEDGER_PATH),
@@ -1772,6 +1784,7 @@ def _normalize_profile_paths() -> None:
         "EVENT_ALPHA_OUTCOMES_PATH",
         "EVENT_PROVIDER_HEALTH_PATH",
         "EVENT_ALPHA_DAILY_BRIEF_PATH",
+        "EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
         "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
         "EVENT_RESEARCH_CARDS_DIR",
         "EVENT_LLM_BUDGET_LEDGER_PATH",
@@ -1943,6 +1956,36 @@ def event_alpha_radar_report(
     print(event_alerts.format_event_alert_report(alerts))
 
 
+def _write_event_impact_hypotheses_for_run(
+    pipeline_result: event_alpha_pipeline.EventAlphaPipelineResult,
+    *,
+    now: datetime,
+    run_id: str,
+    profile: str,
+    run_mode: str | None,
+    artifact_namespace: str | None,
+) -> tuple[event_alpha_pipeline.EventAlphaPipelineResult, event_impact_hypothesis_store.EventImpactHypothesisStoreWriteResult]:
+    store_cfg = _event_impact_hypothesis_store_config_from_runtime()
+    write_result = event_impact_hypothesis_store.write_impact_hypotheses(
+        pipeline_result.impact_hypotheses,
+        cfg=store_cfg,
+        now=now,
+        run_id=run_id,
+        profile=profile,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+    )
+    updated = replace(
+        pipeline_result,
+        hypothesis_store_path=str(store_cfg.path),
+        hypothesis_write_attempted=write_result.attempted,
+        hypothesis_write_success=write_result.success,
+        hypothesis_rows_written=write_result.rows_written,
+        hypothesis_write_block_reason=write_result.block_reason,
+    )
+    return updated, write_result
+
+
 def event_alpha_cycle(
     verbose: bool = False,
     with_llm: bool = False,
@@ -2026,6 +2069,14 @@ def event_alpha_cycle(
             clock_status=clock_status,
         ),
     )
+    pipeline_result, hypothesis_store_result = _write_event_impact_hypotheses_for_run(
+        pipeline_result,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+    )
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
         watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
@@ -2077,6 +2128,12 @@ def event_alpha_cycle(
     )
     print("")
     print(event_alpha_alert_store.format_alert_store_write_result(store_result))
+    print(
+        "Event impact hypotheses updated: "
+        f"{hypothesis_store_result.path} rows={hypothesis_store_result.rows_written} "
+        f"success={str(hypothesis_store_result.success).lower()}"
+        + (f" block={hypothesis_store_result.block_reason}" if hypothesis_store_result.block_reason else "")
+    )
     run_row = event_alpha_run_ledger.append_run_record(
         pipeline_result,
         cfg=_event_alpha_run_ledger_config_from_runtime(),
@@ -2458,6 +2515,14 @@ def _event_alpha_notify_cycle_body(
             or _notification_warnings_indicate_partial(pipeline_result.warnings)
         ),
     )
+    pipeline_result, hypothesis_store_result = _write_event_impact_hypotheses_for_run(
+        pipeline_result,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+    )
     card_write = None
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
@@ -2596,6 +2661,12 @@ def _event_alpha_notify_cycle_body(
     )
     print("")
     print(event_alpha_alert_store.format_alert_store_write_result(store_result))
+    print(
+        "Event impact hypotheses updated: "
+        f"{hypothesis_store_result.path} rows={hypothesis_store_result.rows_written} "
+        f"success={str(hypothesis_store_result.success).lower()}"
+        + (f" block={hypothesis_store_result.block_reason}" if hypothesis_store_result.block_reason else "")
+    )
     run_row = event_alpha_run_ledger.append_run_record(
         pipeline_result,
         cfg=_event_alpha_run_ledger_config_from_runtime(),
@@ -3401,6 +3472,13 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
             f"ledger={config.EVENT_LLM_BUDGET_LEDGER_PATH}"
         ),
         f"catalyst providers: {', '.join(config.EVENT_CATALYST_SEARCH_PROVIDERS) or 'none'}",
+        (
+            "source_enrichment: "
+            f"enabled={str(bool(config.EVENT_SOURCE_ENRICHMENT_ENABLED)).lower()} "
+            f"max_rows={config.EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN} "
+            f"timeout={config.EVENT_SOURCE_ENRICHMENT_TIMEOUT_SECONDS:g}s "
+            f"cache={config.EVENT_SOURCE_ENRICHMENT_CACHE_DIR}"
+        ),
         f"watchlist_state_path: {config.EVENT_WATCHLIST_STATE_PATH}",
         (
             "watchlist_monitor: "
@@ -3417,6 +3495,7 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
         ),
         f"alert_store_path: {config.EVENT_ALPHA_ALERT_STORE_PATH}",
         f"run_ledger_path: {config.EVENT_ALPHA_RUN_LEDGER_PATH}",
+        f"impact_hypothesis_store_path: {config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH}",
         (
             "health_guard: "
             f"max_run_age_hours={config.EVENT_ALPHA_MAX_RUN_AGE_HOURS:g} "
@@ -3515,6 +3594,132 @@ def event_alpha_runs_report(
     result = event_alpha_run_ledger.load_run_records(cfg.path, limit=limit)
     print(_event_alpha_context_block(context))
     print(event_alpha_run_ledger.format_run_ledger_report(result))
+
+
+def event_impact_hypotheses_report(
+    path: str | None = None,
+    limit: int = 100,
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print stored Event Impact Hypothesis rows for a profile/namespace."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    target_path = _event_alpha_report_path(path, context.impact_hypothesis_store_path)
+    result = event_impact_hypothesis_store.load_impact_hypotheses(target_path, limit=limit)
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    print(_event_alpha_context_block(context))
+    print(event_impact_hypothesis_store.format_impact_hypotheses_store_report(
+        result,
+        watchlist_rows=[entry.__dict__ for entry in watchlist.entries],
+    ))
+
+
+def event_impact_hypothesis_smoke(verbose: bool = False, event_now: str | datetime | None = None) -> None:
+    """Run an offline smoke proving sector hypothesis validation stays RADAR-only."""
+    import tempfile
+
+    _setup_event_discovery_logging(verbose)
+    now = _event_research_now(event_now) or datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="smoke-spacex-sector",
+        provider="fixture_rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/spacex-sector",
+        title="SpaceX pre-IPO exposure heats up",
+        body="Tokenized stock venues may see attention around SpaceX pre-IPO markets.",
+        raw_json={
+            "event": {
+                "event_id": "smoke-spacex-sector",
+                "event_name": "SpaceX pre-IPO exposure heats up",
+                "event_type": "ipo_proxy",
+                "event_time": "2026-06-20T13:30:00Z",
+                "event_time_confidence": 0.85,
+                "external_asset": "SpaceX",
+                "description": "Tokenized stock venues may see attention around SpaceX pre-IPO markets.",
+                "confidence": 0.88,
+            }
+        },
+        source_confidence=0.88,
+        content_hash="smoke-spacex-sector",
+    )
+    validation = RawDiscoveredEvent(
+        raw_id="smoke-velvet-validation",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/velvet-spacex",
+        title="VELVET opens SpaceX pre-IPO exposure",
+        body="Velvet Capital users can trade tokenized stock style exposure to SpaceX.",
+        raw_json={},
+        source_confidence=0.92,
+        content_hash="smoke-velvet-validation",
+    )
+    normalized = NormalizedEvent(
+        event_id="smoke-spacex-sector",
+        raw_ids=(raw.raw_id,),
+        event_name=raw.title,
+        event_type="ipo_proxy",
+        event_time=now,
+        event_time_confidence=0.85,
+        first_seen_time=now,
+        source=raw.provider,
+        source_urls=(raw.source_url,),
+        external_asset="SpaceX",
+        description=raw.body,
+        confidence=0.88,
+    )
+    discovery_result = EventDiscoveryResult(
+        raw_events=(raw,),
+        normalized_events=(normalized,),
+        links=(),
+        classifications=(),
+        candidates=(),
+    )
+    provider = event_catalyst_search.FixtureCatalystSearchProvider(
+        rows_by_query={"VELVET SpaceX pre-IPO exposure": (validation,)}
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        pipe = event_alpha_pipeline.run_event_alpha_pipeline(
+            discovery_result,
+            alert_cfg=event_alerts.EventAlertConfig(),
+            now=now,
+            hypothesis_search_provider=provider,
+            hypothesis_search_cfg=event_catalyst_search.EventImpactHypothesisSearchConfig(
+                enabled=True,
+                max_hypotheses=5,
+                max_queries_per_hypothesis=4,
+                min_confidence=0.50,
+                min_result_confidence=0.50,
+            ),
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(
+                enabled=True,
+                state_path=Path(tmp) / "watchlist.jsonl",
+            ),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=True,
+            route=True,
+        )
+    entries = tuple(pipe.watchlist_result.entries if pipe.watchlist_result else ())
+    velvet_radar = any(entry.symbol == "VELVET" and entry.state == event_watchlist.EventWatchlistState.RADAR.value for entry in entries)
+    triggered = any(entry.state == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value for entry in entries)
+    print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipe))
+    print("")
+    print("Event Impact Hypothesis smoke:")
+    print(f"- sector_hypotheses={len(pipe.impact_hypotheses)}")
+    print(f"- hypothesis_search_results={pipe.hypothesis_search_results}")
+    print(f"- velvet_radar={str(velvet_radar).lower()}")
+    print(f"- triggered_fade={str(triggered).lower()}")
+    print("- research_only=true")
+    if not velvet_radar or triggered:
+        raise SystemExit(1)
 
 
 def event_alpha_notification_runs_report(
@@ -7066,6 +7271,21 @@ def cli() -> None:
         help="Print recent research-only Event Alpha cycle run ledger rows.",
     )
     parser.add_argument(
+        "--event-impact-hypotheses-report",
+        action="store_true",
+        help="Print stored research-only Event Impact Hypothesis rows for a profile/namespace.",
+    )
+    parser.add_argument(
+        "--event-impact-hypothesis-smoke",
+        action="store_true",
+        help="Run offline Event Impact Hypothesis smoke: SpaceX sector hypothesis validates VELVET RADAR only.",
+    )
+    parser.add_argument(
+        "--event-impact-hypothesis-store-path",
+        default=None,
+        help="Optional Event Impact Hypothesis JSONL path for --event-impact-hypotheses-report.",
+    )
+    parser.add_argument(
         "--event-alpha-run-ledger-path",
         default=None,
         help="Optional Event Alpha run ledger JSONL path for --event-alpha-runs-report.",
@@ -7826,6 +8046,18 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
         )
+        return
+    if args.event_impact_hypotheses_report:
+        event_impact_hypotheses_report(
+            path=args.event_impact_hypothesis_store_path,
+            limit=args.event_alpha_run_limit,
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_impact_hypothesis_smoke:
+        event_impact_hypothesis_smoke(verbose=args.verbose, event_now=args.event_now)
         return
     if args.event_alpha_status:
         event_alpha_status(profile_name=args.event_alpha_profile, verbose=args.verbose)

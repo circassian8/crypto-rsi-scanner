@@ -37,8 +37,11 @@ for the same no-send flow against `notify_llm`.
 `notify_no_key` uses public RSS, GDELT, Polymarket, live CoinGecko universe,
 market enrichment, anomaly scanning, catalyst search, watchlist monitoring,
 router lanes, and auto-written research cards. `notify_llm` uses the same source
-set plus OpenAI extraction/advisory metadata with conservative defaults:
-10 calls/run, 50 calls/day, $1/day estimated cap, and a 168-hour cache TTL.
+set plus OpenAI extraction/advisory metadata, bounded full-source enrichment for
+LLM context, and conservative defaults: 10 calls/run, 50 calls/day, $1/day
+estimated cap, 10 enriched source rows/run, and a 168-hour cache TTL. Use
+`notify_llm_deep` only when you explicitly want a deeper review cycle: it keeps
+the same research-only send guards but raises the LLM/enrichment caps.
 
 Notification lanes are independent: a daily digest cooldown does not block an
 instant escalation, and instant escalation cooldown does not block a
@@ -66,12 +69,32 @@ Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`, paper/live rows, or
 `TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from `event_fade.py` plus
 the `proxy_fade` playbook.
 
+Each Event Alpha cycle also appends generated hypotheses to a profile-scoped
+research artifact:
+
+```bash
+make event-impact-hypotheses-report PROFILE=notify_llm
+make event-impact-hypothesis-smoke
+```
+
+The store path defaults to
+`event_fade_cache/<profile>/event_impact_hypotheses.jsonl` and can be inspected
+with `main.py --event-impact-hypotheses-report --event-alpha-profile PROFILE`.
+Rows include candidate provenance (`taxonomy`, `llm_extraction`, and/or
+`deterministic_resolver`), suggested assets, validated assets, validation
+status, search queries, and rejection reasons. Suggested LLM assets are metadata
+only until deterministic resolver/search evidence validates identity.
+
 When an Event Alpha cycle has market anomalies but `catalyst_queries=0`, check
 the run ledger or daily brief `Catalyst Search Skip Reasons` section before
 changing thresholds. Common reasons are `no_anomalies_over_threshold`,
 `anomaly_identity_missing`, `provider_backoff`, `provider_unavailable`,
 `runtime_budget_exhausted`, and `query_limit_zero`. These are diagnostics only:
 they explain missing validation evidence and do not make a row alertable.
+Hypothesis validation search has separate skip reasons, including
+`no_hypotheses`, `low_confidence`, `no_candidate_assets`,
+`provider_unavailable`, `provider_backoff`, `result_identity_rejected`,
+`result_catalyst_missing`, and `result_score_below_threshold`.
 RSS source intake also distinguishes one-feed `feed_failure` warnings from
 provider-level `provider_failure`; a single blocked RSS feed should not imply
 the entire public source bundle failed.

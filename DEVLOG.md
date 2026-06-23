@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Persist Event Impact Hypotheses · Codex
+**Why:** The Event Impact Hypothesis layer was useful in console/run summaries,
+but the Pro-review workflow needs inspectable, profile-scoped artifact rows that
+explain candidate provenance, validation status, search diagnostics, and
+watchlist promotion links.
+**Changes:**
+- Added `event_impact_hypothesis_store.py` and wired Event Alpha cycles and
+notification cycles to append `event_impact_hypotheses.jsonl` rows under the
+active artifact namespace.
+- Added hypothesis store/report plumbing, `--event-impact-hypotheses-report`,
+`make event-impact-hypotheses-report`, and an offline
+`--event-impact-hypothesis-smoke` / `make event-impact-hypothesis-smoke` path
+that validates SpaceX → VELVET RADAR while preserving no-trigger safety.
+- Extended impact hypotheses with `suggested_candidate_assets`,
+`validated_candidate_assets`, and `candidate_source`; LLM-extracted assets
+remain suggestions until deterministic validation confirms identity.
+- Split hypothesis-search skip reasons from market-anomaly catalyst-search
+reasons in pipeline reports, run-ledger rows/reports, and daily briefs.
+- Enabled bounded full-source enrichment only for `notify_llm`, added an
+opt-in `notify_llm_deep` profile, and left `notify_no_key` no-key/no-full-source
+by default.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`,
+`research/EVENT_ALPHA_RUNBOOK.md`, and Makefile help/targets.
+**Verify:** `python3 tests/test_indicators.py` (422/422 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make event-llm-eval
+PYTHON=python3` (9/9 passed); `make event-llm-extract-eval PYTHON=python3`
+(7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11 passed); `make
+event-impact-hypothesis-smoke PYTHON=python3`; `make
+event-impact-hypotheses-report PROFILE=notify_llm PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** Research artifacts only. Hypothesis rows do not create
+`WATCHLIST`, `HIGH_PRIORITY`, `TRIGGERED_FADE`, paper trades, live signal rows,
+normal RSI routing, or execution; `TRIGGERED_FADE` remains only from
+`event_fade.py` + `proxy_fade`.
+
 ## 2026-06-23 — Require zip handoff after commit/push · Codex
 **Why:** The human shares this project with a Pro model for review and wants a
 fresh source-plus-artifacts zip after every pushed change.

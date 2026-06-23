@@ -164,6 +164,12 @@ def build_daily_brief(
             lines.append("- Validated hypotheses: none yet.")
         if int(latest.get("impact_hypotheses") or 0) > int(latest.get("hypotheses_validated") or 0):
             lines.append("- Top rejected/pending hypotheses: see Event Alpha pipeline report and local watchlist HYPOTHESIS rows.")
+        hypothesis_skip = latest.get("hypothesis_search_skip_reasons") or {}
+        if isinstance(hypothesis_skip, Mapping) and hypothesis_skip:
+            lines.append(
+                "- Hypothesis validation skips: "
+                + ", ".join(f"{key}={int(value or 0)}" for key, value in sorted(hypothesis_skip.items()))
+            )
     else:
         lines.append("- No run row available.")
     lines.extend(["", "## Catalyst Search Skip Reasons"])

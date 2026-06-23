@@ -63,6 +63,9 @@ class EventImpactHypothesis:
     candidate_sectors: tuple[str, ...]
     candidate_symbols: tuple[str, ...]
     candidate_coin_ids: tuple[str, ...] = ()
+    suggested_candidate_assets: tuple[dict[str, Any], ...] = ()
+    validated_candidate_assets: tuple[dict[str, Any], ...] = ()
+    candidate_source: str = "taxonomy"
     hypothesis_scope: str = HypothesisScope.SECTOR.value
     direction_hint: str = "unknown"
     playbook_hint: str | None = None
@@ -213,7 +216,9 @@ def generate_impact_hypotheses(
         for row in extraction_rows
         if getattr(row, "raw_event", None) is not None
     }
-    sector_taxonomy = dict(taxonomy or load_impact_taxonomy(taxonomy_path))
+    suggested_assets_by_event = _suggested_assets_by_event(result.normalized_events, raw_by_id, extractions_by_raw)
+    validated_assets_by_event = _validated_assets_by_event(result)
+    sector_taxonomy = dict(load_impact_taxonomy(taxonomy_path) if taxonomy is None else taxonomy)
     out: list[EventImpactHypothesis] = []
 
     for event in result.normalized_events:
@@ -231,6 +236,8 @@ def generate_impact_hypotheses(
                 taxonomy=sector_taxonomy,
                 text=text,
                 now=observed,
+                suggested_assets=suggested_assets_by_event.get(event.event_id, ()),
+                validated_assets=validated_assets_by_event.get(event.event_id, ()),
             ))
 
     raw_event_ids = {event.event_id for event in result.normalized_events}
@@ -249,6 +256,8 @@ def generate_impact_hypotheses(
             taxonomy=sector_taxonomy,
             text=_raw_text(raw),
             now=observed,
+            suggested_assets=(),
+            validated_assets=(),
         ))
 
     return tuple(_dedupe_hypotheses(out))
@@ -283,6 +292,17 @@ def validate_hypotheses_with_raw_events(
                 hypothesis_scope=HypothesisScope.TOKEN.value,
                 candidate_symbols=tuple(dict.fromkeys(matched_symbols)) or hypothesis.candidate_symbols,
                 candidate_coin_ids=tuple(dict.fromkeys(matched_coin_ids)) or hypothesis.candidate_coin_ids,
+                validated_candidate_assets=_merge_asset_rows(
+                    hypothesis.validated_candidate_assets,
+                    tuple(
+                        {
+                            "source": "hypothesis_search",
+                            "symbol": symbol,
+                            "reason": reason,
+                        }
+                        for reason, symbol in zip(reasons, matched_symbols)
+                    ),
+                ),
                 validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
             ))
         elif rejections:
@@ -312,6 +332,10 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
     for item in items:
         counts[item.status] = counts.get(item.status, 0) + 1
     rows.append("statuses: " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items())))
+    categories: dict[str, int] = {}
+    for item in items:
+        categories[item.impact_category] = categories.get(item.impact_category, 0) + 1
+    rows.append("categories: " + ", ".join(f"{key}={value}" for key, value in sorted(categories.items())))
     rows.append("")
     for item in items[:20]:
         rows.append(
@@ -320,6 +344,17 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
         )
         rows.append(f"  sectors: {', '.join(item.candidate_sectors) or 'none'}")
         rows.append(f"  symbols: {', '.join(item.candidate_symbols) or 'none'}")
+        rows.append(f"  candidate_source={item.candidate_source}")
+        if item.suggested_candidate_assets:
+            rows.append(
+                "  suggested_assets: "
+                + ", ".join(_asset_label(asset) for asset in item.suggested_candidate_assets[:6])
+            )
+        if item.validated_candidate_assets:
+            rows.append(
+                "  validated_assets: "
+                + ", ".join(_asset_label(asset) for asset in item.validated_candidate_assets[:6])
+            )
         rows.append(
             f"  direction={item.direction_hint} playbook={item.playbook_hint or 'unknown'} "
             f"cluster={item.event_cluster_id or 'none'}"
@@ -346,12 +381,20 @@ def _hypothesis_from_rule(
     taxonomy: Mapping[str, Mapping[str, Any]],
     text: str,
     now: datetime,
+    suggested_assets: tuple[dict[str, Any], ...] = (),
+    validated_assets: tuple[dict[str, Any], ...] = (),
 ) -> EventImpactHypothesis:
     category = rule["category"]
     category_value = category.value if isinstance(category, ImpactCategory) else str(category)
     sectors = tuple(str(value) for value in rule.get("sectors", ()) if str(value))
-    symbols, coin_ids = _assets_from_taxonomy(sectors, taxonomy)
+    taxonomy_symbols, taxonomy_coin_ids = _assets_from_taxonomy(sectors, taxonomy)
+    suggestion_symbols, suggestion_coin_ids = _assets_from_asset_rows(suggested_assets)
+    validated_symbols, validated_coin_ids = _assets_from_asset_rows(validated_assets)
+    symbols = tuple(dict.fromkeys((*validated_symbols, *taxonomy_symbols, *suggestion_symbols)))
+    coin_ids = tuple(dict.fromkeys((*validated_coin_ids, *taxonomy_coin_ids, *suggestion_coin_ids)))
     scope = _hypothesis_scope(category_value, text)
+    if validated_assets:
+        scope = HypothesisScope.TOKEN.value
     confidence = _hypothesis_confidence(event, rule, text, raws, cluster)
     quotes = _evidence_quotes(text, (*rule.get("keywords", ()), *rule.get("secondary", ())))
     status = (
@@ -359,6 +402,9 @@ def _hypothesis_from_rule(
         if category != ImpactCategory.MARKET_ANOMALY_UNKNOWN and symbols
         else HypothesisStatus.HYPOTHESIS.value
     )
+    if validated_assets and category != ImpactCategory.MARKET_ANOMALY_UNKNOWN:
+        status = HypothesisStatus.VALIDATED.value
+    candidate_source = _candidate_source(taxonomy_symbols, suggested_assets, validated_assets)
     hypothesis = EventImpactHypothesis(
         hypothesis_id=_hypothesis_id(event, category_value, sectors, symbols),
         event_cluster_id=cluster.cluster_id if cluster else event_graph.cluster_id_for_event(event),
@@ -368,6 +414,9 @@ def _hypothesis_from_rule(
         candidate_sectors=sectors,
         candidate_symbols=symbols,
         candidate_coin_ids=coin_ids,
+        suggested_candidate_assets=suggested_assets,
+        validated_candidate_assets=validated_assets,
+        candidate_source=candidate_source,
         hypothesis_scope=scope,
         direction_hint=str(rule.get("direction") or "unknown"),
         playbook_hint=str(rule.get("playbook") or ""),
@@ -378,6 +427,9 @@ def _hypothesis_from_rule(
         warnings=_hypothesis_warnings(event, raws, category_value),
         source_raw_ids=tuple(raw.raw_id for raw in raws),
         source_event_ids=(event.event_id,),
+        validation_reasons=(
+            ("resolver_validated_candidate_asset",) if validated_assets else ()
+        ),
         created_at=now.isoformat(),
     )
     return replace(hypothesis, search_queries=_default_search_queries(hypothesis))
@@ -484,6 +536,135 @@ def _assets_from_taxonomy(
             if coin_id:
                 coin_ids.append(coin_id)
     return tuple(dict.fromkeys(symbols)), tuple(dict.fromkeys(coin_ids))
+
+
+def _suggested_assets_by_event(
+    events: Iterable[NormalizedEvent],
+    raw_by_id: Mapping[str, RawDiscoveredEvent],
+    extraction_rows: Mapping[str, EventLLMExtractionReportRow],
+) -> dict[str, tuple[dict[str, Any], ...]]:
+    out: dict[str, tuple[dict[str, Any], ...]] = {}
+    for event in events:
+        rows: list[dict[str, Any]] = []
+        for raw_id in event.raw_ids:
+            row = extraction_rows.get(raw_id)
+            extraction = row.extraction if row else None
+            if extraction is None:
+                continue
+            for mention in extraction.crypto_asset_mentions:
+                try:
+                    confidence = float(mention.confidence or 0.0)
+                except (TypeError, ValueError):
+                    confidence = 0.0
+                if confidence < 0.70:
+                    continue
+                if str(mention.mention_type or "") in {"publisher_or_source", "ordinary_word"}:
+                    continue
+                symbol = str(mention.symbol or "").strip().upper()
+                coin_id = str(mention.coin_id or "").strip()
+                name = str(mention.name or "").strip()
+                contract = str(mention.contract_address or "").strip()
+                if not any((symbol, coin_id, name, contract)):
+                    continue
+                rows.append({
+                    "source": "llm_extraction",
+                    "raw_id": raw_id,
+                    "name": name,
+                    "symbol": symbol,
+                    "coin_id": coin_id,
+                    "contract_address": contract,
+                    "mention_type": str(mention.mention_type or ""),
+                    "confidence": round(max(0.0, min(1.0, confidence)), 4),
+                    "evidence": " | ".join(quote.text for quote in mention.evidence_quotes[:3]),
+                    "validated": False,
+                })
+        if rows:
+            out[event.event_id] = _merge_asset_rows(tuple(rows))
+    return out
+
+
+def _validated_assets_by_event(result: EventDiscoveryResult) -> dict[str, tuple[dict[str, Any], ...]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    for candidate in result.candidates:
+        event = getattr(candidate, "event", None)
+        asset = getattr(candidate, "asset", None)
+        link = getattr(candidate, "link", None)
+        if event is None or asset is None:
+            continue
+        try:
+            link_confidence = float(getattr(link, "link_confidence", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            link_confidence = 0.0
+        symbol = str(getattr(asset, "symbol", "") or "").strip().upper()
+        coin_id = str(getattr(asset, "coin_id", "") or "").strip()
+        if not symbol and not coin_id:
+            continue
+        out.setdefault(event.event_id, []).append({
+            "source": "deterministic_resolver",
+            "name": str(getattr(asset, "name", "") or "").strip(),
+            "symbol": symbol,
+            "coin_id": coin_id,
+            "link_confidence": round(max(0.0, min(1.0, link_confidence)), 4),
+            "reason": str(getattr(link, "match_reason", "") or ""),
+            "evidence": " | ".join(str(value) for value in getattr(link, "evidence", ())[:3]),
+            "validated": True,
+        })
+    return {event_id: _merge_asset_rows(tuple(rows)) for event_id, rows in out.items()}
+
+
+def _assets_from_asset_rows(rows: Iterable[Mapping[str, Any]]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    symbols: list[str] = []
+    coin_ids: list[str] = []
+    for row in rows:
+        symbol = str(row.get("symbol") or "").strip().upper()
+        coin_id = str(row.get("coin_id") or "").strip()
+        if symbol:
+            symbols.append(symbol)
+        if coin_id:
+            coin_ids.append(coin_id)
+    return tuple(dict.fromkeys(symbols)), tuple(dict.fromkeys(coin_ids))
+
+
+def _merge_asset_rows(*groups: Iterable[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
+    by_key: dict[str, dict[str, Any]] = {}
+    for group in groups:
+        for row in group:
+            data = {str(key): value for key, value in dict(row).items() if value not in (None, "", [], {})}
+            symbol = str(data.get("symbol") or "").upper()
+            coin_id = str(data.get("coin_id") or "")
+            contract = str(data.get("contract_address") or "")
+            key = "|".join((symbol, coin_id, contract, str(data.get("source") or "")))
+            if not key.strip("|"):
+                continue
+            by_key.setdefault(key, data)
+    return tuple(by_key.values())
+
+
+def _candidate_source(
+    taxonomy_symbols: tuple[str, ...],
+    suggested_assets: tuple[dict[str, Any], ...],
+    validated_assets: tuple[dict[str, Any], ...],
+) -> str:
+    parts: list[str] = []
+    if taxonomy_symbols:
+        parts.append("taxonomy")
+    if suggested_assets:
+        parts.append("llm_extraction")
+    if validated_assets:
+        parts.append("deterministic_resolver")
+    return ",".join(parts) or "none"
+
+
+def _asset_label(asset: Mapping[str, Any]) -> str:
+    symbol = str(asset.get("symbol") or "").upper()
+    coin_id = str(asset.get("coin_id") or "")
+    source = str(asset.get("source") or "")
+    label = symbol or coin_id or str(asset.get("name") or "asset")
+    if coin_id and coin_id != label:
+        label = f"{label}/{coin_id}"
+    if source:
+        label = f"{label} ({source})"
+    return label
 
 
 def _default_search_queries(hypothesis: EventImpactHypothesis) -> tuple[str, ...]:

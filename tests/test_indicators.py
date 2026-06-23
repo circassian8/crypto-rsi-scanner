@@ -7055,6 +7055,235 @@ def test_event_alpha_pipeline_hypothesis_search_validates_before_token_watchlist
     assert all(entry.state != event_watchlist.EventWatchlistState.TRIGGERED_FADE.value for entry in entries)
 
 
+def test_event_impact_hypothesis_store_persists_profile_scoped_rows():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_impact_hypotheses, event_impact_hypothesis_store
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:test",
+        event_cluster_id="cluster:test",
+        event_type="ipo_proxy",
+        external_asset="SpaceX",
+        impact_category=event_impact_hypotheses.ImpactCategory.RWA_PREIPO_PROXY.value,
+        candidate_sectors=("tokenized_stock_venues",),
+        candidate_symbols=("VELVET",),
+        suggested_candidate_assets=({
+            "source": "llm_extraction",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "confidence": 0.91,
+        },),
+        candidate_source="llm_extraction",
+        confidence=0.82,
+        search_queries=("VELVET SpaceX pre-IPO exposure",),
+        status=event_impact_hypotheses.HypothesisStatus.VALIDATION_SEARCH_PENDING.value,
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "notify_llm" / "event_impact_hypotheses.jsonl"
+        write = event_impact_hypothesis_store.write_impact_hypotheses(
+            (hypothesis,),
+            cfg=event_impact_hypothesis_store.EventImpactHypothesisStoreConfig(path=path),
+            now=now,
+            run_id="run-1",
+            profile="notify_llm",
+            run_mode="notification_burn_in",
+            artifact_namespace="notify_llm",
+        )
+        assert write.success is True
+        assert write.rows_written == 1
+        read = event_impact_hypothesis_store.load_impact_hypotheses(path)
+        assert read.rows_read == 1
+        row = read.rows[0]
+        assert row["run_id"] == "run-1"
+        assert row["profile"] == "notify_llm"
+        assert row["artifact_namespace"] == "notify_llm"
+        assert row["candidate_source"] == "llm_extraction"
+        assert row["suggested_candidate_assets"][0]["symbol"] == "VELVET"
+        report = event_impact_hypothesis_store.format_impact_hypotheses_store_report(read)
+        assert "EVENT IMPACT HYPOTHESES REPORT" in report
+        assert "candidate_sources: llm_extraction=1" in report
+        assert "VELVET/velvet" in report
+
+
+def test_event_impact_hypothesis_generation_uses_llm_suggested_assets_but_not_validation():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_impact_hypotheses
+    from crypto_rsi_scanner.event_llm_extraction_models import (
+        EventLLMCryptoAssetMention,
+        EventLLMRawEventExtraction,
+    )
+    from crypto_rsi_scanner.event_llm_extractor import EventLLMExtractionReportRow
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="spacex-llm-mention",
+        provider="rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/spacex",
+        title="SpaceX pre-IPO exposure heats up",
+        body="New source says Velvet Capital is adjacent to SpaceX pre-IPO exposure.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="spacex-llm-mention",
+    )
+    event = NormalizedEvent(
+        event_id="spacex-llm-mention",
+        raw_ids=(raw.raw_id,),
+        event_name=raw.title,
+        event_type="ipo_proxy",
+        event_time=now,
+        event_time_confidence=0.85,
+        first_seen_time=now,
+        source=raw.provider,
+        source_urls=(raw.source_url,),
+        external_asset="SpaceX",
+        description=raw.body,
+        confidence=0.90,
+    )
+    extraction = EventLLMRawEventExtraction(
+        schema_version="event_llm_extraction_v1",
+        provider="fixture",
+        model="fixture",
+        prompt_version="test",
+        raw_id=raw.raw_id,
+        confidence=0.90,
+        external_catalysts=(),
+        crypto_asset_mentions=(
+            EventLLMCryptoAssetMention(
+                name="Velvet Capital",
+                symbol="VELVET",
+                coin_id="velvet",
+                contract_address=None,
+                mention_type="project_or_token",
+                confidence=0.92,
+            ),
+        ),
+    )
+    hypotheses = event_impact_hypotheses.generate_impact_hypotheses(
+        EventDiscoveryResult((raw,), (event,), (), (), ()),
+        extraction_rows=(EventLLMExtractionReportRow(raw_event=raw, extraction=extraction),),
+        now=now,
+        taxonomy={},
+    )
+    assert hypotheses
+    hypothesis = hypotheses[0]
+    assert "VELVET" in hypothesis.candidate_symbols
+    assert hypothesis.candidate_source == "llm_extraction"
+    assert hypothesis.suggested_candidate_assets[0]["symbol"] == "VELVET"
+    assert hypothesis.validated_candidate_assets == ()
+    assert hypothesis.status == event_impact_hypotheses.HypothesisStatus.VALIDATION_SEARCH_PENDING.value
+
+
+def test_event_impact_hypothesis_search_skip_reason_buckets_are_specific():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search, event_impact_hypotheses
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    empty_provider = event_catalyst_search.FixtureCatalystSearchProvider(rows_by_query={})
+    no_hypotheses = event_catalyst_search.run_hypothesis_search(
+        (),
+        empty_provider,
+        cfg=event_catalyst_search.EventImpactHypothesisSearchConfig(enabled=True),
+        now=now,
+    )
+    assert no_hypotheses.skip_reasons["no_hypotheses"] == 1
+
+    low_conf = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:low",
+        event_cluster_id=None,
+        event_type="ipo_proxy",
+        external_asset="SpaceX",
+        impact_category=event_impact_hypotheses.ImpactCategory.RWA_PREIPO_PROXY.value,
+        candidate_sectors=("tokenized_stock_venues",),
+        candidate_symbols=("VELVET",),
+        confidence=0.10,
+    )
+    low = event_catalyst_search.run_hypothesis_search(
+        (low_conf,),
+        empty_provider,
+        cfg=event_catalyst_search.EventImpactHypothesisSearchConfig(enabled=True, min_confidence=0.50),
+        now=now,
+    )
+    assert low.skip_reasons["low_confidence"] == 1
+
+    missing_assets = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:missing",
+        event_cluster_id=None,
+        event_type="ipo_proxy",
+        external_asset="SpaceX",
+        impact_category=event_impact_hypotheses.ImpactCategory.RWA_PREIPO_PROXY.value,
+        candidate_sectors=("tokenized_stock_venues",),
+        candidate_symbols=(),
+        confidence=0.90,
+    )
+    missing = event_catalyst_search.run_hypothesis_search(
+        (missing_assets,),
+        empty_provider,
+        cfg=event_catalyst_search.EventImpactHypothesisSearchConfig(enabled=True, min_confidence=0.50),
+        now=now,
+    )
+    assert missing.skip_reasons["no_candidate_assets"] == 1
+
+    stale_result = RawDiscoveredEvent(
+        raw_id="velvet-no-catalyst",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/velvet",
+        title="VELVET opens unrelated product",
+        body="Velvet Capital launches a generic crypto vault with no named catalyst reference.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="velvet-no-catalyst",
+    )
+    provider = event_catalyst_search.FixtureCatalystSearchProvider(
+        rows_by_query={"VELVET SpaceX pre-IPO exposure": (stale_result,)}
+    )
+    good = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:spacex",
+        event_cluster_id=None,
+        event_type="ipo_proxy",
+        external_asset="SpaceX",
+        impact_category=event_impact_hypotheses.ImpactCategory.RWA_PREIPO_PROXY.value,
+        candidate_sectors=("tokenized_stock_venues",),
+        candidate_symbols=("VELVET",),
+        confidence=0.90,
+    )
+    result = event_catalyst_search.run_hypothesis_search(
+        (good,),
+        provider,
+        cfg=event_catalyst_search.EventImpactHypothesisSearchConfig(
+            enabled=True,
+            min_confidence=0.50,
+            min_result_confidence=0.50,
+            require_validated_identity=True,
+        ),
+        now=now,
+    )
+    assert result.rejected_result_count == 1
+    assert result.skip_reasons["result_catalyst_missing"] == 1
+    assert "result_catalyst_missing" in result.rejected_result_events[0].result_score_reasons
+
+
+def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
+    from crypto_rsi_scanner import event_alpha_profiles
+
+    no_key = event_alpha_profiles.get_profile("notify_no_key")
+    llm = event_alpha_profiles.get_profile("notify_llm")
+    deep = event_alpha_profiles.get_profile("notify_llm_deep")
+    assert "EVENT_SOURCE_ENRICHMENT_ENABLED" not in no_key.config_overrides
+    assert llm.config_overrides["EVENT_SOURCE_ENRICHMENT_ENABLED"] is True
+    assert llm.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 10
+    assert deep.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 20
+    assert deep.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"]
+
+
 def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery():
     from datetime import datetime, timezone
     from pathlib import Path

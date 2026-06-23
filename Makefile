@@ -57,6 +57,7 @@ EVENT_WATCHLIST_STATE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_watchlist_state.j
 EVENT_ALPHA_ALERT_STORE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_alerts.jsonl
 EVENT_ALPHA_NOTIFICATION_RUNS_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_notification_runs.jsonl
 EVENT_ALPHA_RUN_LEDGER_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_runs.jsonl
+EVENT_IMPACT_HYPOTHESIS_STORE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_impact_hypotheses.jsonl
 EVENT_ALPHA_MISSED_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_missed.jsonl
 EVENT_ALPHA_PRIORS_OUT ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_priors.json
 EVENT_PROVIDER_HEALTH_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_provider_health.json
@@ -148,6 +149,8 @@ help:
 	@echo "  make event-alpha-send-test PROFILE=notify_no_key  Send one guarded research-only heartbeat"
 	@echo "  make event-alpha-telegram-recipient-check PROFILE=notify_no_key  Send guarded per-recipient Telegram diagnostic"
 	@echo "  make event-alpha-runs-report  Print Event Alpha cycle run ledger rows"
+	@echo "  make event-impact-hypotheses-report PROFILE=notify_llm  Print stored Event Impact Hypothesis rows"
+	@echo "  make event-impact-hypothesis-smoke  Run offline SpaceX -> VELVET hypothesis validation smoke"
 	@echo "  make event-alpha-status PROFILE=no_key_live  Print profile-aware Event Alpha readiness/status"
 	@echo "  make event-alpha-daily-report  Run no-key daily status/cycle/runs/router/alerts report"
 	@echo "  make event-alpha-daily-llm-report  Run full-LLM daily report profile without sending"
@@ -682,9 +685,20 @@ event-alpha-runs-report:
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(PYTHON) main.py --event-alpha-runs-report --event-alpha-profile $(PROFILE)
 
+.PHONY: event-impact-hypotheses-report event-impact-hypothesis-smoke
+event-impact-hypotheses-report:
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	RSI_EVENT_IMPACT_HYPOTHESIS_STORE_PATH=$(EVENT_IMPACT_HYPOTHESIS_STORE_PATH) \
+	$(PYTHON) main.py --event-impact-hypotheses-report --event-alpha-profile $(PROFILE)
+
+event-impact-hypothesis-smoke:
+	$(EVENT_FIXTURE_NOW_ENV) $(PYTHON) main.py --event-impact-hypothesis-smoke
+
 event-alpha-status:
 	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
 	RSI_EVENT_ALPHA_MISSED_PATH=$(EVENT_ALPHA_MISSED_PATH) \
+	RSI_EVENT_IMPACT_HYPOTHESIS_STORE_PATH=$(EVENT_IMPACT_HYPOTHESIS_STORE_PATH) \
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(PYTHON) main.py --event-alpha-status --event-alpha-profile $(PROFILE)

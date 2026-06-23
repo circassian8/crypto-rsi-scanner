@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-23 - Store impact hypotheses as audit artifacts, not alert eligibility
+**Status:** accepted
+**Decision:** Event Alpha impact hypotheses are persisted as profile-scoped
+JSONL research artifacts (`event_impact_hypotheses.jsonl`) with run/profile/
+namespace metadata, candidate provenance, validation status, search queries,
+and validation/rejection reasons. LLM-extracted assets may populate
+`suggested_candidate_assets` and drive validation-search metadata, but only
+deterministic resolver/search identity validation may populate token-level
+validated candidates. `notify_llm` may fetch bounded full-source text for LLM
+context; `notify_no_key` stays no-key/no-full-source enrichment by default.
+**Why:** Operators and external reviewers need to inspect why the radar formed
+an impact hypothesis and why it did or did not validate without confusing loose
+sector intelligence with alertable token evidence.
+**Revisit when:** Reviewed burn-in data shows persisted hypothesis provenance is
+insufficient for debugging missed opportunities or when a separate validated
+promotion policy is approved.
+
 ## 2026-06-23 - Keep impact matching exact and sector hypotheses non-token until validation
 **Status:** accepted
 **Decision:** Event Alpha impact hypotheses must use boundary/phrase-aware
