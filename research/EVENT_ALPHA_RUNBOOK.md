@@ -41,10 +41,12 @@ set plus OpenAI extraction/advisory metadata, bounded full-source enrichment for
 LLM context, and bounded parallel OpenAI defaults: 100 calls/run, 500 calls/day,
 $15/day estimated cap, 12 concurrent LLM calls, 30s LLM HTTP timeouts, 10
 enriched source rows/run, a 168-hour cache TTL, and a 600s notification runtime
-budget. Use `notify_llm_deep` only when you explicitly want a deeper review
-cycle: it keeps the same research-only send guards but raises the LLM/enrichment
-caps to 250 calls/run, 1500 calls/day, 16 concurrent LLM calls, and 45s LLM
-timeouts.
+budget. Like `notify_no_key`, `notify_llm` sends operator-visible output on
+every clean scheduled run; cooldown/content dedupe is disabled while the run
+lock and in-flight delivery guard remain active. Use `notify_llm_deep` only
+when you explicitly want a deeper review cycle: it keeps the same research-only
+send guards and per-run delivery behavior but raises the LLM/enrichment caps to
+250 calls/run, 1500 calls/day, 16 concurrent LLM calls, and 45s LLM timeouts.
 
 Notification lanes are independent: a daily digest cooldown does not block an
 instant escalation, and instant escalation cooldown does not block a

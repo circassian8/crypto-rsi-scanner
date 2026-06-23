@@ -8152,10 +8152,16 @@ def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
     assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] >= 30.0
     assert llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] >= 12
     assert llm.config_overrides["EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS"] >= 600.0
+    assert llm.config_overrides["EVENT_ALPHA_EXPLORATORY_DIGEST_COOLDOWN_HOURS"] == 0.0
+    assert llm.config_overrides["EVENT_ALPHA_NOTIFY_DAILY_DIGEST_COOLDOWN_HOURS"] == 0.0
+    assert llm.config_overrides["EVENT_ALPHA_NOTIFY_HEALTH_HEARTBEAT_COOLDOWN_HOURS"] == 0.0
+    assert llm.config_overrides["EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT"] is False
     assert deep.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 20
     assert deep.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"]
     assert deep.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] >= 45.0
     assert deep.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] > llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"]
+    assert deep.config_overrides["EVENT_ALPHA_EXPLORATORY_DIGEST_COOLDOWN_HOURS"] == 0.0
+    assert deep.config_overrides["EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT"] is False
 
 
 def test_notify_no_key_profile_delivers_each_clean_run():
@@ -9360,6 +9366,8 @@ def test_event_alpha_notification_profiles_and_preflight_guards():
     assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] >= 30.0
     assert llm.config_overrides["EVENT_LLM_MAX_PARALLEL_CALLS"] >= 12
     assert llm.config_overrides["EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS"] >= 600.0
+    assert llm.config_overrides["EVENT_ALPHA_EXPLORATORY_DIGEST_COOLDOWN_HOURS"] == 0.0
+    assert llm.config_overrides["EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT"] is False
 
     ctx = event_alpha_artifacts.context_from_profile("notify_no_key", base_dir=Path("/tmp/event-alpha-test"))
     assert ctx.run_mode == "notification_burn_in"
@@ -20093,8 +20101,8 @@ def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock(
         out = subprocess.run(["make", "-n", target], cwd=root, capture_output=True, text=True, check=True).stdout
         assert f"--event-alpha-profile {profile}" in out
         assert "RSI_EVENT_ALPHA_NOTIFY_LOCK_ENABLED=1" in out
-        expected_dedupe = "0" if profile == "notify_no_key" else "1"
-        assert f"RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT={expected_dedupe}" in out
+        assert "RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT=0" in out
+        assert "RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS=0" in out
         assert f"RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE={profile}" in out
         assert "RSI_EVENT_RESEARCH_NOW" not in out
         assert "--score" not in out

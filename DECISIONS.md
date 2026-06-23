@@ -16,6 +16,19 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-24 - Send OpenAI-backed notification profiles on every clean run
+**Status:** accepted
+**Decision:** `notify_llm` and `notify_llm_deep` should use the same
+operator-visible per-run delivery policy as `notify_no_key`: heartbeat,
+exploratory, daily digest, and instant lane cooldowns are zero, and scheduled
+content dedupe is disabled. The run lock, overlap guard, in-flight delivery
+guard, Telegram send guard, and research-only copy remain active.
+**Why:** The owner wants a Telegram notification every time the system runs.
+The LLM profiles are operational notification profiles, so a successful run
+should not be hidden by a prior exploratory digest cooldown.
+**Revisit when:** Telegram volume becomes too noisy or a separate schedule
+requires digest throttling for OpenAI-backed runs.
+
 ## 2026-06-24 - Use bounded parallel LLM calls inside notification deadlines
 **Status:** accepted
 **Decision:** OpenAI-backed Event Alpha raw-event extraction and relationship

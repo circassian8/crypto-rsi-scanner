@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-24 — Make LLM notification profiles send every clean run · Codex
+**Why:** The first post-parallelism `notify_llm` run completed successfully but
+Telegram delivery was held by a 24h exploratory-digest cooldown from the prior
+run. The owner wants operator-visible notifications every time the system runs.
+**Changes:**
+- Updated `notify_llm` and `notify_llm_deep` to mirror the per-run delivery
+  policy already used by `notify_no_key`: heartbeat/digest/exploratory
+  cooldowns are zero and content dedupe is disabled while run locks and
+  in-flight delivery safety remain active.
+- Updated the scheduled notification Make target so `notify_llm` and
+  `notify_llm_deep` use a zero content-dedupe window instead of the default 24h
+  dedupe.
+- Documented the per-run LLM notification policy in `.env.example` and the
+  Event Alpha runbook.
+- Added regression coverage for LLM profile cooldown/dedupe defaults and
+  scheduled Make target output.
+**Verify:** `python3 tests/test_indicators.py` (435/435 passed); `python3 -m
+compileall -q crypto_rsi_scanner tests`; `make event-alpha-eval PYTHON=python3`;
+`make verify PYTHON=python3`; `RSI_EVENT_ALERTS_ENABLED=1 make
+event-alpha-notify-llm-scheduled PYTHON=python3`.
+**Notes/risks:** Delivery-frequency policy only. This does not change Event
+Alpha scoring, alertability, normal RSI rows, paper/live writes, trading, or
+`TRIGGERED_FADE` eligibility.
+
 ## 2026-06-24 — Parallelize Event Alpha LLM calls for notification runs · Codex
 **Why:** Sequential OpenAI extraction/relationship calls made `notify_llm`
 runs vulnerable to one slow request delaying the whole batch. The owner is
