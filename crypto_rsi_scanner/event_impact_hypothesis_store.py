@@ -120,6 +120,7 @@ def format_impact_hypotheses_store_report(
 
     rows.append("categories: " + _format_counts(_counts(result.rows, "impact_category")))
     rows.append("statuses: " + _format_counts(_counts(result.rows, "status")))
+    rows.append("validation_stages: " + _format_counts(_counts(result.rows, "validation_stage")))
     rows.append("scopes: " + _format_counts(_counts(result.rows, "hypothesis_scope")))
     rows.append("candidate_sources: " + _format_counts(_counts(result.rows, "candidate_source")))
     rows.append(
@@ -163,6 +164,8 @@ def format_impact_hypotheses_store_report(
     ))
     rows.append("")
     rows.extend(_query_section(result.rows))
+    rows.append("")
+    rows.extend(_rejected_validation_samples_section(result.rows))
     rows.append("")
     rows.extend(_promotion_section(result.rows, promotion_ids))
     rows.append("")
@@ -325,13 +328,18 @@ def _compact_hypothesis_rows(
     out: list[str] = []
     for row in rows[:limit]:
         out.append(
-            f"- {row.get('status') or 'unknown'} conf={float(row.get('confidence') or 0):.2f} "
+            f"- {row.get('status') or 'unknown'} stage={row.get('validation_stage') or 'unknown'} "
+            f"score={float(row.get('hypothesis_score') or float(row.get('confidence') or 0) * 100):.1f} "
+            f"conf={float(row.get('confidence') or 0):.2f} "
             f"{row.get('impact_category') or 'unknown'} external={row.get('external_asset') or 'unknown'} "
             f"scope={row.get('hypothesis_scope') or 'unknown'}"
         )
-        candidates = row.get("validated_candidate_assets") or row.get("suggested_candidate_assets") or []
+        candidates = row.get("validated_candidate_assets") or row.get("crypto_candidate_assets") or row.get("suggested_candidate_assets") or []
         if candidates:
             out.append("  candidates: " + ", ".join(_asset_label(asset) for asset in candidates[:6]))
+        rejected_candidates = row.get("rejected_candidate_assets") or []
+        if rejected_candidates:
+            out.append("  rejected_candidates: " + ", ".join(_asset_label(asset) for asset in rejected_candidates[:4]))
         queries = row.get("search_queries") or []
         if queries:
             out.append("  queries: " + " | ".join(str(query) for query in queries[:3]))
@@ -354,17 +362,25 @@ def _format_hypothesis_row(
     promoted = "yes" if hypothesis_id in promotion_ids or row.get("promoted_watchlist_key") else "no"
     out = [
         (
-            f"- {row.get('status') or 'unknown'} conf={float(row.get('confidence') or 0):.2f} "
+            f"- {row.get('status') or 'unknown'} stage={row.get('validation_stage') or 'unknown'} "
+            f"score={float(row.get('hypothesis_score') or float(row.get('confidence') or 0) * 100):.1f} "
+            f"conf={float(row.get('confidence') or 0):.2f} "
             f"{row.get('impact_category') or 'unknown'} external={row.get('external_asset') or 'unknown'} "
             f"scope={row.get('hypothesis_scope') or 'unknown'} promoted={promoted}"
         )
     ]
-    candidates = row.get("validated_candidate_assets") or row.get("suggested_candidate_assets") or []
+    candidates = row.get("validated_candidate_assets") or row.get("crypto_candidate_assets") or row.get("suggested_candidate_assets") or []
     out.append(
         "  candidates: " + ", ".join(_asset_label(asset) for asset in candidates[:8])
         if candidates
         else "  candidates: none"
     )
+    external_entities = row.get("external_entities") or []
+    if external_entities:
+        out.append("  external_entities: " + ", ".join(str(entity.get("name") or "") for entity in external_entities[:6] if isinstance(entity, Mapping)))
+    rejected_candidates = row.get("rejected_candidate_assets") or []
+    if rejected_candidates:
+        out.append("  rejected_candidates: " + ", ".join(_asset_label(asset) for asset in rejected_candidates[:6]))
     out.append(f"  source={row.get('candidate_source') or 'unknown'} query_count={len(row.get('search_queries') or [])}")
     if row.get("validated_symbol") or row.get("validated_coin_id"):
         out.append(f"  validated_asset: {row.get('validated_symbol') or 'unknown'}/{row.get('validated_coin_id') or 'unknown'}")
@@ -380,19 +396,50 @@ def _format_hypothesis_row(
 
 
 def _query_section(rows: list[Mapping[str, Any]], *, limit: int = 12) -> list[str]:
-    queries: list[str] = []
+    queries: list[tuple[str, str]] = []
     for row in rows:
+        details = row.get("search_query_details") or []
+        if details:
+            for item in details:
+                if not isinstance(item, Mapping):
+                    continue
+                text = str(item.get("query") or "").strip()
+                qtype = str(item.get("query_type") or "candidate_validation")
+                if text and (text, qtype) not in queries:
+                    queries.append((text, qtype))
+            continue
         for query in row.get("search_queries") or []:
             text = str(query).strip()
-            if text and text not in queries:
-                queries.append(text)
+            if text and (text, "candidate_validation") not in queries:
+                queries.append((text, "candidate_validation"))
     out = [f"Generated search queries: {len(queries)}"]
     if not queries:
         out.append("- none")
         return out
-    out.extend(f"- {query}" for query in queries[:limit])
+    out.extend(f"- {qtype}: {query}" for query, qtype in queries[:limit])
     if len(queries) > limit:
         out.append(f"- +{len(queries) - limit} more")
+    return out
+
+
+def _rejected_validation_samples_section(rows: list[Mapping[str, Any]], *, limit: int = 12) -> list[str]:
+    samples: list[Mapping[str, Any]] = []
+    for row in rows:
+        for sample in row.get("rejected_validation_samples") or []:
+            if isinstance(sample, Mapping):
+                samples.append(sample)
+    out = [f"Rejected validation evidence samples: {len(samples)}"]
+    if not samples:
+        out.append("- none")
+        return out
+    for sample in samples[:limit]:
+        out.append(
+            f"- {sample.get('query_type') or 'unknown'} {sample.get('candidate_symbol') or 'SECTOR'} "
+            f"score={sample.get('score') or 0} rejected={sample.get('rejection_reason') or 'none'} "
+            f"title={sample.get('result_title') or 'unknown'}"
+        )
+    if len(samples) > limit:
+        out.append(f"- +{len(samples) - limit} more")
     return out
 
 

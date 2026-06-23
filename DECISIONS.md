@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-23 - Separate external catalysts from crypto candidate assets in impact hypotheses
+**Status:** accepted
+**Decision:** Event Alpha impact hypotheses must store external entities,
+crypto candidate assets, and rejected candidate assets separately. External
+companies or events such as OpenAI, Anthropic, SpaceX, Stripe, Databricks,
+Figma, elections, or sports fixtures are catalyst context, not crypto
+`candidate_symbols`. Sector-level hypotheses may generate
+`candidate_discovery` queries even without named assets, but token-level
+watchlist promotion requires catalyst-linked candidate validation
+(`catalyst_link_validated`, `market_confirmed`, or `promoted_to_radar`).
+Candidate-only evidence can reach `source_mentions_candidate`; identity-only
+evidence can reach `identity_validated`; catalyst-only evidence is rejection/no
+candidate validation. Reports may persist capped rejected validation samples for
+audit, but those samples cannot create alerts or triggers.
+**Why:** External catalyst intelligence is useful, but mixing external
+companies with crypto candidates makes the radar appear more certain than the
+evidence supports and can reintroduce false positives.
+**Revisit when:** A reviewed burn-in sample proves a category-specific policy
+can safely promote named assets before explicit catalyst-linked validation.
+
 ## 2026-06-23 - Store impact hypotheses as audit artifacts, not alert eligibility
 **Status:** accepted
 **Decision:** Event Alpha impact hypotheses are persisted as profile-scoped

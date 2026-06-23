@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -53,6 +53,18 @@ class HypothesisScope(str, Enum):
     INFRASTRUCTURE = "infrastructure"
 
 
+class ValidationStage(str, Enum):
+    SECTOR_HYPOTHESIS = "sector_hypothesis"
+    CANDIDATE_ASSETS_SUGGESTED = "candidate_assets_suggested"
+    VALIDATION_SEARCH_PENDING = "validation_search_pending"
+    SOURCE_MENTIONS_CANDIDATE = "source_mentions_candidate"
+    IDENTITY_VALIDATED = "identity_validated"
+    CATALYST_LINK_VALIDATED = "catalyst_link_validated"
+    MARKET_CONFIRMED = "market_confirmed"
+    PROMOTED_TO_RADAR = "promoted_to_radar"
+    REJECTED = "rejected"
+
+
 @dataclass(frozen=True)
 class EventImpactHypothesis:
     hypothesis_id: str
@@ -65,24 +77,62 @@ class EventImpactHypothesis:
     candidate_coin_ids: tuple[str, ...] = ()
     suggested_candidate_assets: tuple[dict[str, Any], ...] = ()
     validated_candidate_assets: tuple[dict[str, Any], ...] = ()
+    external_entities: tuple[dict[str, Any], ...] = ()
+    crypto_candidate_assets: tuple[dict[str, Any], ...] = ()
+    rejected_candidate_assets: tuple[dict[str, Any], ...] = ()
     candidate_source: str = "taxonomy"
     hypothesis_scope: str = HypothesisScope.SECTOR.value
     direction_hint: str = "unknown"
     playbook_hint: str | None = None
     confidence: float = 0.0
+    hypothesis_score: float = 0.0
+    score_components: Mapping[str, float] = field(default_factory=dict)
+    validation_stage: str = ValidationStage.SECTOR_HYPOTHESIS.value
     evidence_quotes: tuple[str, ...] = ()
     required_validation_steps: tuple[str, ...] = ()
     search_queries: tuple[str, ...] = ()
+    search_query_details: tuple[dict[str, Any], ...] = ()
     status: str = HypothesisStatus.HYPOTHESIS.value
     warnings: tuple[str, ...] = ()
     source_raw_ids: tuple[str, ...] = ()
     source_event_ids: tuple[str, ...] = ()
     validation_reasons: tuple[str, ...] = ()
     rejection_reasons: tuple[str, ...] = ()
+    rejected_validation_samples: tuple[dict[str, Any], ...] = ()
     created_at: str | None = None
 
 
 DEFAULT_TAXONOMY_PATH = Path("fixtures/event_discovery/event_impact_taxonomy.json")
+_EXTERNAL_ENTITY_ALIASES = {
+    "openai",
+    "anthropic",
+    "spacex",
+    "space x",
+    "stripe",
+    "databricks",
+    "anduril",
+    "figma",
+    "fannie mae",
+    "freddie mac",
+    "nvidia",
+    "tesla",
+}
+_GENERIC_NON_ASSET_TERMS = {
+    "hype",
+    "open",
+    "prime",
+    "cash",
+    "real",
+    "just",
+    "human",
+    "humanity",
+    "ai",
+}
+_PROMOTABLE_VALIDATION_STAGES = {
+    ValidationStage.CATALYST_LINK_VALIDATED.value,
+    ValidationStage.MARKET_CONFIRMED.value,
+    ValidationStage.PROMOTED_TO_RADAR.value,
+}
 
 _CATEGORY_RULES: tuple[dict[str, Any], ...] = (
     {
@@ -275,42 +325,124 @@ def validate_hypotheses_with_raw_events(
         rejections: list[str] = []
         matched_symbols: list[str] = []
         matched_coin_ids: list[str] = []
+        best_stage = hypothesis.validation_stage
         for raw in rows:
-            status, reason, symbol, coin_id = _validation_reason(raw, hypothesis)
+            detail = _validation_detail(raw, hypothesis)
+            status = str(detail.get("status") or "none")
+            reason = str(detail.get("reason") or "")
+            symbol = str(detail.get("symbol") or "") or None
+            coin_id = str(detail.get("coin_id") or "") or None
+            stage = str(detail.get("validation_stage") or "")
+            if stage:
+                best_stage = _max_validation_stage(best_stage, stage)
             if status == "accepted" and reason:
                 reasons.append(reason)
                 if symbol:
                     matched_symbols.append(symbol)
-                if coin_id:
-                    matched_coin_ids.append(coin_id)
+                matched_coin_ids.append(coin_id or "")
             elif reason:
                 rejections.append(reason)
-        if reasons:
+        if reasons and best_stage in _PROMOTABLE_VALIDATION_STAGES:
+            if _market_confirmation_score(rows) >= 70:
+                best_stage = ValidationStage.MARKET_CONFIRMED.value
+            merged_assets = tuple(
+                {
+                    "source": "hypothesis_search",
+                    "symbol": symbol,
+                    "coin_id": coin_id,
+                    "reason": reason,
+                    "validated": True,
+                }
+                for reason, symbol, coin_id in zip(reasons, matched_symbols, matched_coin_ids)
+            )
+            crypto_assets = _merge_asset_rows(hypothesis.crypto_candidate_assets, hypothesis.validated_candidate_assets, merged_assets)
+            symbols, coin_ids = _assets_from_asset_rows(crypto_assets)
+            components = dict(hypothesis.score_components or {})
+            components["validation_strength"] = 95.0
+            if best_stage == ValidationStage.MARKET_CONFIRMED.value:
+                components["market_confirmation"] = max(float(components.get("market_confirmation") or 0.0), 70.0)
+            score = _weighted_hypothesis_score(components, hypothesis.impact_category)
             out.append(replace(
                 hypothesis,
                 status=HypothesisStatus.VALIDATED.value,
+                validation_stage=best_stage,
                 hypothesis_scope=HypothesisScope.TOKEN.value,
-                candidate_symbols=tuple(dict.fromkeys(matched_symbols)) or hypothesis.candidate_symbols,
-                candidate_coin_ids=tuple(dict.fromkeys(matched_coin_ids)) or hypothesis.candidate_coin_ids,
-                validated_candidate_assets=_merge_asset_rows(
-                    hypothesis.validated_candidate_assets,
-                    tuple(
-                        {
-                            "source": "hypothesis_search",
-                            "symbol": symbol,
-                            "reason": reason,
-                        }
-                        for reason, symbol in zip(reasons, matched_symbols)
-                    ),
-                ),
+                candidate_symbols=symbols or tuple(dict.fromkeys(matched_symbols)) or hypothesis.candidate_symbols,
+                candidate_coin_ids=coin_ids or tuple(value for value in dict.fromkeys(matched_coin_ids) if value) or hypothesis.candidate_coin_ids,
+                validated_candidate_assets=_merge_asset_rows(hypothesis.validated_candidate_assets, merged_assets),
+                crypto_candidate_assets=crypto_assets,
+                hypothesis_score=round(score, 2),
+                confidence=max(0.0, min(1.0, round(score / 100.0, 4))),
+                score_components=components,
+                validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
+            ))
+        elif reasons:
+            components = dict(hypothesis.score_components or {})
+            components["validation_strength"] = max(float(components.get("validation_strength") or 0.0), 45.0)
+            score = _weighted_hypothesis_score(components, hypothesis.impact_category)
+            out.append(replace(
+                hypothesis,
+                status=HypothesisStatus.VALIDATION_EVIDENCE_FOUND.value,
+                validation_stage=best_stage,
+                hypothesis_score=round(score, 2),
+                confidence=max(0.0, min(1.0, round(score / 100.0, 4))),
+                score_components=components,
                 validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
             ))
         elif rejections:
             out.append(replace(
                 hypothesis,
                 status=HypothesisStatus.REJECTED.value,
+                validation_stage=ValidationStage.REJECTED.value,
                 rejection_reasons=tuple(dict.fromkeys((*hypothesis.rejection_reasons, *rejections))),
             ))
+        else:
+            out.append(hypothesis)
+    return tuple(out)
+
+
+def attach_hypothesis_search_samples(
+    hypotheses: Iterable[EventImpactHypothesis],
+    search_result: object,
+    *,
+    max_samples_per_hypothesis: int = 5,
+) -> tuple[EventImpactHypothesis, ...]:
+    """Attach capped accepted/rejected validation-search evidence samples."""
+    samples_by_id: dict[str, list[dict[str, Any]]] = {}
+    for attr in ("rejected_result_events", "result_events"):
+        for result in getattr(search_result, attr, ()) or ():
+            query = getattr(result, "query", None)
+            raw = getattr(result, "raw_event", None)
+            if query is None or raw is None:
+                continue
+            hypothesis_id = str(getattr(query, "anomaly_raw_id", "") or "")
+            if not hypothesis_id:
+                continue
+            reasons = tuple(str(value) for value in getattr(result, "result_score_reasons", ()) or ())
+            sample = {
+                "accepted": bool(getattr(result, "accepted", False)),
+                "query": str(getattr(query, "query", "") or ""),
+                "query_type": str(getattr(query, "query_type", "") or "candidate_validation"),
+                "result_title": str(getattr(raw, "title", "") or "")[:240],
+                "source": str(getattr(raw, "provider", "") or ""),
+                "source_url": str(getattr(raw, "source_url", "") or ""),
+                "candidate_symbol": str(getattr(query, "symbol", "") or ""),
+                "score": int(getattr(result, "result_score", 0) or 0),
+                "rejection_reason": _sample_rejection_reason(reasons),
+                "identity_reason": _first_reason_with(reasons, "identity"),
+                "catalyst_reason": _first_reason_with(reasons, "catalyst"),
+            }
+            samples_by_id.setdefault(hypothesis_id, []).append(sample)
+    out: list[EventImpactHypothesis] = []
+    for hypothesis in hypotheses:
+        samples = samples_by_id.get(hypothesis.hypothesis_id, [])
+        if samples:
+            merged = tuple(dict.fromkeys(
+                json.dumps(sample, sort_keys=True, separators=(",", ":"))
+                for sample in (*hypothesis.rejected_validation_samples, *samples)
+            ))
+            parsed = tuple(json.loads(item) for item in merged[: max(0, max_samples_per_hypothesis)])
+            out.append(replace(hypothesis, rejected_validation_samples=parsed))
         else:
             out.append(hypothesis)
     return tuple(out)
@@ -329,9 +461,12 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
         rows.append("No impact hypotheses.")
         return "\n".join(rows)
     counts: dict[str, int] = {}
+    stages: dict[str, int] = {}
     for item in items:
         counts[item.status] = counts.get(item.status, 0) + 1
+        stages[item.validation_stage] = stages.get(item.validation_stage, 0) + 1
     rows.append("statuses: " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items())))
+    rows.append("validation_stages: " + ", ".join(f"{key}={value}" for key, value in sorted(stages.items())))
     categories: dict[str, int] = {}
     for item in items:
         categories[item.impact_category] = categories.get(item.impact_category, 0) + 1
@@ -339,12 +474,27 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
     rows.append("")
     for item in items[:20]:
         rows.append(
-            f"{item.status:<26} conf={item.confidence:.2f} "
+            f"{item.status:<26} stage={item.validation_stage} score={item.hypothesis_score:.1f} conf={item.confidence:.2f} "
             f"{item.impact_category} external={item.external_asset or 'unknown'}"
         )
+        if item.external_entities:
+            rows.append(
+                "  external_entities: "
+                + ", ".join(str(entity.get("name") or "") for entity in item.external_entities[:6])
+            )
         rows.append(f"  sectors: {', '.join(item.candidate_sectors) or 'none'}")
         rows.append(f"  symbols: {', '.join(item.candidate_symbols) or 'none'}")
         rows.append(f"  candidate_source={item.candidate_source}")
+        if item.crypto_candidate_assets:
+            rows.append(
+                "  crypto_candidates: "
+                + ", ".join(_asset_label(asset) for asset in item.crypto_candidate_assets[:6])
+            )
+        if item.rejected_candidate_assets:
+            rows.append(
+                "  rejected_candidates: "
+                + ", ".join(_asset_label(asset) for asset in item.rejected_candidate_assets[:6])
+            )
         if item.suggested_candidate_assets:
             rows.append(
                 "  suggested_assets: "
@@ -362,11 +512,22 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
         if item.evidence_quotes:
             rows.append("  evidence: " + " | ".join(item.evidence_quotes[:3]))
         if item.search_queries:
-            rows.append("  queries: " + " | ".join(item.search_queries[:4]))
+            query_labels = [
+                f"{detail.get('query_type') or 'candidate_validation'}:{detail.get('query')}"
+                for detail in item.search_query_details[:4]
+            ] or list(item.search_queries[:4])
+            rows.append("  queries: " + " | ".join(query_labels))
         if item.validation_reasons:
             rows.append("  validated: " + "; ".join(item.validation_reasons[:3]))
         if item.rejection_reasons:
             rows.append("  rejected: " + "; ".join(item.rejection_reasons[:3]))
+        if item.rejected_validation_samples:
+            sample = item.rejected_validation_samples[0]
+            rows.append(
+                "  rejected_validation_sample: "
+                f"{sample.get('query_type') or 'unknown'} {sample.get('candidate_symbol') or 'SECTOR'} "
+                f"{sample.get('rejection_reason') or 'none'}"
+            )
         if item.warnings:
             rows.append("  warnings: " + "; ".join(item.warnings[:3]))
     return "\n".join(rows).rstrip()
@@ -387,24 +548,41 @@ def _hypothesis_from_rule(
     category = rule["category"]
     category_value = category.value if isinstance(category, ImpactCategory) else str(category)
     sectors = tuple(str(value) for value in rule.get("sectors", ()) if str(value))
-    taxonomy_symbols, taxonomy_coin_ids = _assets_from_taxonomy(sectors, taxonomy)
-    suggestion_symbols, suggestion_coin_ids = _assets_from_asset_rows(suggested_assets)
-    validated_symbols, validated_coin_ids = _assets_from_asset_rows(validated_assets)
-    symbols = tuple(dict.fromkeys((*validated_symbols, *taxonomy_symbols, *suggestion_symbols)))
-    coin_ids = tuple(dict.fromkeys((*validated_coin_ids, *taxonomy_coin_ids, *suggestion_coin_ids)))
+    external_entities = _external_entities_for_event(event, raws, text)
+    taxonomy_assets = _asset_rows_from_taxonomy(sectors, taxonomy)
+    accepted_suggested, rejected_suggested = _split_suggested_assets(
+        suggested_assets,
+        external_entities=external_entities,
+        text=text,
+    )
+    crypto_candidate_assets = _merge_asset_rows(taxonomy_assets, accepted_suggested, validated_assets)
+    symbols, coin_ids = _assets_from_asset_rows(crypto_candidate_assets)
+    taxonomy_symbols, _taxonomy_coin_ids = _assets_from_asset_rows(taxonomy_assets)
     scope = _hypothesis_scope(category_value, text)
     if validated_assets:
         scope = HypothesisScope.TOKEN.value
-    confidence = _hypothesis_confidence(event, rule, text, raws, cluster)
+    score_components = _hypothesis_score_components(
+        event,
+        rule,
+        text,
+        raws,
+        cluster,
+        crypto_candidate_assets=crypto_candidate_assets,
+        validated_assets=validated_assets,
+        suggested_assets=accepted_suggested,
+    )
+    hypothesis_score = _weighted_hypothesis_score(score_components, category_value)
+    confidence = max(0.0, min(1.0, round(hypothesis_score / 100.0, 4)))
     quotes = _evidence_quotes(text, (*rule.get("keywords", ()), *rule.get("secondary", ())))
+    validation_stage = _initial_validation_stage(category_value, crypto_candidate_assets, validated_assets)
     status = (
         HypothesisStatus.VALIDATION_SEARCH_PENDING.value
-        if category != ImpactCategory.MARKET_ANOMALY_UNKNOWN and symbols
+        if category != ImpactCategory.MARKET_ANOMALY_UNKNOWN and crypto_candidate_assets
         else HypothesisStatus.HYPOTHESIS.value
     )
     if validated_assets and category != ImpactCategory.MARKET_ANOMALY_UNKNOWN:
         status = HypothesisStatus.VALIDATED.value
-    candidate_source = _candidate_source(taxonomy_symbols, suggested_assets, validated_assets)
+    candidate_source = _candidate_source(taxonomy_symbols, accepted_suggested, validated_assets)
     hypothesis = EventImpactHypothesis(
         hypothesis_id=_hypothesis_id(event, category_value, sectors, symbols),
         event_cluster_id=cluster.cluster_id if cluster else event_graph.cluster_id_for_event(event),
@@ -414,13 +592,19 @@ def _hypothesis_from_rule(
         candidate_sectors=sectors,
         candidate_symbols=symbols,
         candidate_coin_ids=coin_ids,
-        suggested_candidate_assets=suggested_assets,
+        suggested_candidate_assets=accepted_suggested,
         validated_candidate_assets=validated_assets,
+        external_entities=external_entities,
+        crypto_candidate_assets=crypto_candidate_assets,
+        rejected_candidate_assets=rejected_suggested,
         candidate_source=candidate_source,
         hypothesis_scope=scope,
         direction_hint=str(rule.get("direction") or "unknown"),
         playbook_hint=str(rule.get("playbook") or ""),
         confidence=confidence,
+        hypothesis_score=round(hypothesis_score, 2),
+        score_components=score_components,
+        validation_stage=validation_stage,
         evidence_quotes=quotes,
         required_validation_steps=_validation_steps(category_value),
         status=status,
@@ -432,7 +616,12 @@ def _hypothesis_from_rule(
         ),
         created_at=now.isoformat(),
     )
-    return replace(hypothesis, search_queries=_default_search_queries(hypothesis))
+    query_details = _default_search_query_details(hypothesis)
+    return replace(
+        hypothesis,
+        search_queries=tuple(str(item.get("query") or "") for item in query_details if item.get("query")),
+        search_query_details=query_details,
+    )
 
 
 def _matched_rules(text: str, event: NormalizedEvent) -> tuple[Mapping[str, Any], ...]:
@@ -536,6 +725,147 @@ def _assets_from_taxonomy(
             if coin_id:
                 coin_ids.append(coin_id)
     return tuple(dict.fromkeys(symbols)), tuple(dict.fromkeys(coin_ids))
+
+
+def _asset_rows_from_taxonomy(
+    sector_names: Iterable[str],
+    taxonomy: Mapping[str, Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    rows: list[dict[str, Any]] = []
+    for sector in sector_names:
+        row = taxonomy.get(sector) or {}
+        for asset in row.get("assets") or ():
+            if not isinstance(asset, Mapping):
+                continue
+            symbol = str(asset.get("symbol") or "").strip().upper()
+            coin_id = str(asset.get("coin_id") or "").strip()
+            name = str(asset.get("name") or "").strip()
+            if not any((symbol, coin_id, name)):
+                continue
+            rows.append({
+                "source": "taxonomy",
+                "sector": str(sector),
+                "name": name,
+                "symbol": symbol,
+                "coin_id": coin_id,
+                "validated": False,
+            })
+    return _merge_asset_rows(tuple(rows))
+
+
+def _external_entities_for_event(
+    event: NormalizedEvent,
+    raws: tuple[RawDiscoveredEvent, ...],
+    text: str,
+) -> tuple[dict[str, Any], ...]:
+    rows: list[dict[str, Any]] = []
+    if event.external_asset:
+        rows.append({
+            "name": str(event.external_asset).strip(),
+            "source": "normalized_event",
+            "entity_type": str(event.event_type or "external_catalyst"),
+            "confidence": round(max(0.0, min(1.0, float(event.confidence or 0.0))), 4),
+        })
+    for raw in raws:
+        payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+        event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
+        raw_external = str(event_payload.get("external_asset") or payload.get("external_asset") or "").strip()
+        if raw_external:
+            rows.append({
+                "name": raw_external,
+                "source": raw.provider,
+                "entity_type": str(event_payload.get("event_type") or payload.get("event_type") or event.event_type or ""),
+                "confidence": round(max(0.0, min(1.0, float(raw.source_confidence or 0.0))), 4),
+            })
+    for alias in sorted(_EXTERNAL_ENTITY_ALIASES):
+        if _term_hit(text, alias):
+            rows.append({
+                "name": _display_external_entity(alias),
+                "source": "source_text",
+                "entity_type": "external_entity",
+                "confidence": 0.70,
+            })
+    by_name: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        key = clean_text(name)
+        existing = by_name.get(key)
+        if existing is None or float(row.get("confidence") or 0.0) > float(existing.get("confidence") or 0.0):
+            by_name[key] = row
+    return tuple(by_name.values())
+
+
+def _display_external_entity(value: str) -> str:
+    names = {
+        "openai": "OpenAI",
+        "anthropic": "Anthropic",
+        "spacex": "SpaceX",
+        "space x": "SpaceX",
+        "databricks": "Databricks",
+        "anduril": "Anduril",
+        "figma": "Figma",
+        "stripe": "Stripe",
+        "fannie mae": "Fannie Mae",
+        "freddie mac": "Freddie Mac",
+        "nvidia": "Nvidia",
+        "tesla": "Tesla",
+    }
+    return names.get(clean_text(value), str(value).strip())
+
+
+def _split_suggested_assets(
+    assets: Iterable[Mapping[str, Any]],
+    *,
+    external_entities: tuple[dict[str, Any], ...],
+    text: str,
+) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
+    accepted: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    external_terms = {
+        clean_text(value)
+        for row in external_entities
+        for value in (row.get("name"), row.get("symbol"), row.get("coin_id"))
+        if str(value or "").strip()
+    }
+    for asset in assets:
+        row = dict(asset)
+        reason = _candidate_rejection_reason(row, external_terms=external_terms, text=text)
+        if reason:
+            rejected.append({**row, "rejection_reason": reason, "validated": False})
+        else:
+            accepted.append(row)
+    return _merge_asset_rows(tuple(accepted)), _merge_asset_rows(tuple(rejected))
+
+
+def _candidate_rejection_reason(
+    row: Mapping[str, Any],
+    *,
+    external_terms: set[str],
+    text: str,
+) -> str | None:
+    values = {
+        clean_text(value)
+        for value in (row.get("name"), row.get("symbol"), row.get("coin_id"))
+        if str(value or "").strip()
+    }
+    if values & external_terms:
+        return "external_entity_not_crypto_candidate"
+    symbol = str(row.get("symbol") or "").strip().upper()
+    name = clean_text(row.get("name") or "")
+    coin_id = clean_text(row.get("coin_id") or "")
+    if symbol and symbol.casefold() in _GENERIC_NON_ASSET_TERMS:
+        strong_terms = {clean_text(value) for value in (name, coin_id) if value}
+        strong_terms.add(symbol.casefold() + "usdt")
+        strong_terms.add("$" + symbol.casefold())
+        if symbol == "HYPE":
+            strong_terms.add("hyperliquid")
+        if not any(_term_hit(text, term) for term in strong_terms if term and term != symbol.casefold()):
+            return "generic_symbol_without_project_identity"
+    if str(row.get("mention_type") or "") in {"publisher_or_source", "ordinary_word"}:
+        return "source_noise_not_candidate_asset"
+    return None
 
 
 def _suggested_assets_by_event(
@@ -668,40 +998,69 @@ def _asset_label(asset: Mapping[str, Any]) -> str:
 
 
 def _default_search_queries(hypothesis: EventImpactHypothesis) -> tuple[str, ...]:
-    queries: list[str] = []
+    return tuple(item["query"] for item in _default_search_query_details(hypothesis))
+
+
+def _default_search_query_details(hypothesis: EventImpactHypothesis) -> tuple[dict[str, Any], ...]:
+    queries: list[dict[str, Any]] = []
     external = hypothesis.external_asset or _external_from_category(hypothesis.impact_category)
     category = hypothesis.impact_category
-    symbols = hypothesis.candidate_symbols or ("crypto",)
+    symbols = hypothesis.candidate_symbols
+    if not symbols:
+        discovery_terms = tuple(hypothesis.candidate_sectors or ()) or (category,)
+        for term in discovery_terms[:4]:
+            clean = str(term).replace("_", " ").strip()
+            if external:
+                queries.append({"query": f"{clean} crypto assets {external}", "query_type": "candidate_discovery"})
+                queries.append({"query": f"{external} {clean} crypto catalyst", "query_type": "candidate_discovery"})
+            else:
+                queries.append({"query": f"{clean} crypto catalyst candidates", "query_type": "candidate_discovery"})
+        return _dedupe_query_details(queries)
     for symbol in symbols[:8]:
         if category in {ImpactCategory.RWA_PREIPO_PROXY.value, ImpactCategory.TOKENIZED_STOCK_VENUE.value}:
             if external:
-                queries.append(f"{symbol} {external} pre-IPO exposure")
-                queries.append(f"{symbol} tokenized stock {external}")
-            queries.append(f"{symbol} synthetic exposure crypto")
+                queries.append({"query": f"{symbol} {external} pre-IPO exposure", "query_type": "candidate_validation"})
+                queries.append({"query": f"{symbol} tokenized stock {external}", "query_type": "candidate_validation"})
+            queries.append({"query": f"{symbol} synthetic exposure crypto", "query_type": "candidate_validation"})
         elif category == ImpactCategory.AI_IPO_PROXY.value:
             target = external or "OpenAI"
-            queries.append(f"{symbol} {target} pre-IPO exposure")
-            queries.append(f"{symbol} {target} perp")
+            queries.append({"query": f"{symbol} {target} pre-IPO exposure", "query_type": "candidate_validation"})
+            queries.append({"query": f"{symbol} {target} perp", "query_type": "candidate_validation"})
         elif category == ImpactCategory.SPORTS_FAN_PROXY.value:
-            queries.append(f"{symbol} World Cup fan token")
-            queries.append(f"{symbol} sports event prediction market")
+            queries.append({"query": f"{symbol} World Cup fan token", "query_type": "candidate_validation"})
+            queries.append({"query": f"{symbol} sports event prediction market", "query_type": "candidate_validation"})
         elif category == ImpactCategory.STABLECOIN_REGULATORY.value:
-            queries.append(f"{symbol} GENIUS Act stablecoin")
-            queries.append(f"{symbol} stablecoin reserve regulation")
+            queries.append({"query": f"{symbol} GENIUS Act stablecoin", "query_type": "candidate_validation"})
+            queries.append({"query": f"{symbol} stablecoin reserve regulation", "query_type": "candidate_validation"})
         elif category == ImpactCategory.PERP_VENUE_ATTENTION.value:
-            queries.append(f"{symbol} perp listing")
-            queries.append(f"{symbol} futures listing")
+            queries.append({"query": f"{symbol} perp listing", "query_type": "candidate_validation"})
+            queries.append({"query": f"{symbol} futures listing", "query_type": "candidate_validation"})
         elif category == ImpactCategory.LISTING_LIQUIDITY_EVENT.value:
-            queries.append(f"{symbol} listing")
-            queries.append(f"{symbol} Binance listing")
+            queries.append({"query": f"{symbol} listing", "query_type": "candidate_validation"})
+            queries.append({"query": f"{symbol} Binance listing", "query_type": "candidate_validation"})
         elif category == ImpactCategory.UNLOCK_SUPPLY_PRESSURE.value:
-            queries.append(f"{symbol} unlock")
-            queries.append(f"{symbol} token vesting unlock")
+            queries.append({"query": f"{symbol} unlock", "query_type": "candidate_validation"})
+            queries.append({"query": f"{symbol} token vesting unlock", "query_type": "candidate_validation"})
         elif category == ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value:
-            queries.append(f"{symbol} exploit hack regulatory")
+            queries.append({"query": f"{symbol} exploit hack regulatory", "query_type": "candidate_validation"})
         elif category == ImpactCategory.PREDICTION_MARKET_INFRA.value:
-            queries.append(f"{symbol} prediction market oracle")
-    return tuple(dict.fromkeys(query for query in queries if query.strip()))
+            queries.append({"query": f"{symbol} prediction market oracle", "query_type": "candidate_validation"})
+        elif category == ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:
+            queries.append({"query": f"{symbol} crypto catalyst", "query_type": "market_confirmation"})
+    return _dedupe_query_details(queries)
+
+
+def _dedupe_query_details(rows: Iterable[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        query = str(row.get("query") or "").strip()
+        if not query:
+            continue
+        out.setdefault(query, {
+            "query": query,
+            "query_type": str(row.get("query_type") or "candidate_validation"),
+        })
+    return tuple(out.values())
 
 
 def _external_from_category(category: str) -> str | None:
@@ -713,28 +1072,104 @@ def _external_from_category(category: str) -> str | None:
 
 
 def _validation_reason(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> tuple[str, str | None, str | None, str | None]:
+    detail = _validation_detail(raw, hypothesis)
+    return (
+        str(detail.get("status") or "none"),
+        str(detail.get("reason") or "") or None,
+        str(detail.get("symbol") or "") or None,
+        str(detail.get("coin_id") or "") or None,
+    )
+
+
+def _validation_detail(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> dict[str, Any]:
     text = clean_text(_raw_text(raw))
     if not text:
-        return "none", None, None, None
-    if not _text_mentions_catalyst(text, hypothesis):
-        return (
-            "rejected",
-            "source mentions candidate context without the catalyst" if _text_mentions_candidate(text, hypothesis) else None,
-            None,
-            None,
-        )
+        return {"status": "none"}
+    mentions_candidate = _text_mentions_candidate(text, hypothesis)
+    mentions_catalyst = _text_mentions_catalyst(text, hypothesis)
     symbol_match = _identity_match_from_symbols(raw, hypothesis)
+    symbol, coin_id = _matched_symbol_and_coin_id(raw, hypothesis) if symbol_match.matched else (None, None)
+    if mentions_candidate and not symbol_match.matched and not mentions_catalyst:
+        return {
+            "status": "accepted",
+            "validation_stage": ValidationStage.SOURCE_MENTIONS_CANDIDATE.value,
+            "reason": "source_mentions_candidate_without_catalyst_link",
+            "symbol": None,
+            "coin_id": None,
+        }
+    if mentions_candidate and symbol_match.matched and not mentions_catalyst:
+        return {
+            "status": "accepted",
+            "validation_stage": ValidationStage.IDENTITY_VALIDATED.value,
+            "reason": f"{symbol_match.reason or 'identity_match'} validates candidate identity without catalyst link",
+            "symbol": symbol,
+            "coin_id": coin_id,
+        }
+    if mentions_catalyst and not mentions_candidate and not symbol_match.matched:
+        return {
+            "status": "rejected",
+            "validation_stage": ValidationStage.REJECTED.value,
+            "reason": "source_mentions_catalyst_without_candidate_asset",
+        }
+    if not mentions_catalyst:
+        if mentions_candidate:
+            return {
+                "status": "rejected",
+                "validation_stage": ValidationStage.REJECTED.value,
+                "reason": "source mentions candidate context without the catalyst",
+            }
+        return {"status": "none"}
     if not symbol_match.matched:
-        if _text_mentions_candidate(text, hypothesis):
-            return "rejected", symbol_match.reason or "candidate identity rejected", None, None
-        return "none", None, None, None
-    symbol, coin_id = _matched_symbol_and_coin_id(raw, hypothesis)
-    return (
-        "accepted",
-        f"{symbol_match.reason or 'identity_match'} links candidate to {hypothesis.external_asset or hypothesis.impact_category}",
-        symbol,
-        coin_id,
-    )
+        if mentions_candidate:
+            return {
+                "status": "rejected",
+                "validation_stage": ValidationStage.REJECTED.value,
+                "reason": symbol_match.reason or "candidate identity rejected",
+            }
+        return {"status": "none"}
+    return {
+        "status": "accepted",
+        "validation_stage": ValidationStage.CATALYST_LINK_VALIDATED.value,
+        "reason": f"{symbol_match.reason or 'identity_match'} links candidate to {hypothesis.external_asset or hypothesis.impact_category}",
+        "symbol": symbol,
+        "coin_id": coin_id,
+    }
+
+
+_VALIDATION_STAGE_RANK = {
+    ValidationStage.SECTOR_HYPOTHESIS.value: 0,
+    ValidationStage.CANDIDATE_ASSETS_SUGGESTED.value: 1,
+    ValidationStage.VALIDATION_SEARCH_PENDING.value: 2,
+    ValidationStage.SOURCE_MENTIONS_CANDIDATE.value: 3,
+    ValidationStage.IDENTITY_VALIDATED.value: 4,
+    ValidationStage.CATALYST_LINK_VALIDATED.value: 5,
+    ValidationStage.MARKET_CONFIRMED.value: 6,
+    ValidationStage.PROMOTED_TO_RADAR.value: 7,
+    ValidationStage.REJECTED.value: -1,
+}
+
+
+def _max_validation_stage(current: str, candidate: str) -> str:
+    if candidate == ValidationStage.REJECTED.value:
+        return current or candidate
+    if _VALIDATION_STAGE_RANK.get(candidate, 0) > _VALIDATION_STAGE_RANK.get(current, 0):
+        return candidate
+    return current
+
+
+def _sample_rejection_reason(reasons: Iterable[str]) -> str | None:
+    for reason in reasons:
+        if "rejected" in reason or "missing" in reason or "below_threshold" in reason or "penalty" in reason:
+            return reason
+    return None
+
+
+def _first_reason_with(reasons: Iterable[str], needle: str) -> str | None:
+    lowered = str(needle or "").casefold()
+    for reason in reasons:
+        if lowered and lowered in str(reason).casefold():
+            return reason
+    return None
 
 
 def _identity_match_from_symbols(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> event_identity.IdentityMatchResult:
@@ -809,6 +1244,105 @@ def _text_mentions_catalyst(text: str, hypothesis: EventImpactHypothesis) -> boo
 
 def _text_mentions_candidate(text: str, hypothesis: EventImpactHypothesis) -> bool:
     return _any_term_hit(text, hypothesis.candidate_symbols)
+
+
+def _hypothesis_score_components(
+    event: NormalizedEvent,
+    rule: Mapping[str, Any],
+    text: str,
+    raws: tuple[RawDiscoveredEvent, ...],
+    cluster: event_graph.EventCluster | None,
+    *,
+    crypto_candidate_assets: tuple[dict[str, Any], ...],
+    validated_assets: tuple[dict[str, Any], ...],
+    suggested_assets: tuple[dict[str, Any], ...],
+) -> dict[str, float]:
+    source_conf = max((float(raw.source_confidence or 0.0) for raw in raws), default=float(event.confidence or 0.0))
+    keyword_hits = sum(
+        1 for keyword in (*rule.get("keywords", ()), *rule.get("secondary", ()))
+        if _term_hit(text, str(keyword))
+    )
+    market_confirmation = _market_confirmation_score(raws)
+    components = {
+        "event_clarity": round(max(float(event.confidence or 0.0), source_conf) * 100, 2),
+        "source_quality": round(source_conf * 100, 2),
+        "catalyst_strength": round(min(100.0, 35.0 + keyword_hits * 12.0 + (15.0 if event.external_asset else 0.0)), 2),
+        "sector_relevance": 80.0 if rule.get("sectors") else 35.0,
+        "candidate_asset_strength": round(min(100.0, len(crypto_candidate_assets) * 18.0 + (35.0 if suggested_assets else 0.0)), 2),
+        "validation_strength": 95.0 if validated_assets else 0.0,
+        "market_confirmation": round(market_confirmation, 2),
+        "cluster_confidence": round(max(0.0, min(100.0, float(getattr(cluster, "cluster_confidence", 0) or 0))), 2),
+    }
+    if event.event_time is not None:
+        components["event_time_quality"] = round(max(0.0, min(100.0, float(event.event_time_confidence or 0.0) * 100)), 2)
+    if suggested_assets:
+        components["llm_candidate_confidence"] = round(max(float(row.get("confidence") or 0.0) for row in suggested_assets) * 100, 2)
+    return components
+
+
+def _weighted_hypothesis_score(components: Mapping[str, float], category: str) -> float:
+    weights = {
+        "event_clarity": 0.18,
+        "source_quality": 0.12,
+        "catalyst_strength": 0.18,
+        "sector_relevance": 0.10,
+        "candidate_asset_strength": 0.14,
+        "validation_strength": 0.16,
+        "market_confirmation": 0.08,
+        "cluster_confidence": 0.04,
+    }
+    score = 0.0
+    weight_sum = 0.0
+    for key, weight in weights.items():
+        score += max(0.0, min(100.0, float(components.get(key) or 0.0))) * weight
+        weight_sum += weight
+    if components.get("event_time_quality") is not None:
+        score += max(0.0, min(100.0, float(components.get("event_time_quality") or 0.0))) * 0.04
+        weight_sum += 0.04
+    if components.get("llm_candidate_confidence") is not None:
+        score += max(0.0, min(100.0, float(components.get("llm_candidate_confidence") or 0.0))) * 0.05
+        weight_sum += 0.05
+    final = score / max(0.01, weight_sum)
+    if category == ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:
+        final = min(final, 55.0)
+    return max(0.0, min(100.0, final))
+
+
+def _market_confirmation_score(raws: Iterable[RawDiscoveredEvent]) -> float:
+    best = 0.0
+    for raw in raws:
+        payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+        anomaly = payload.get("anomaly") if isinstance(payload.get("anomaly"), Mapping) else {}
+        market = payload.get("market") if isinstance(payload.get("market"), Mapping) else {}
+        candidates = (
+            ("anomaly_score", anomaly.get("score")),
+            ("market_move_volume", market.get("market_move_volume")),
+            ("volume_zscore_24h", market.get("volume_zscore_24h")),
+            ("return_24h", market.get("return_24h")),
+        )
+        for key, value in candidates:
+            try:
+                number = float(value or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if key != "anomaly_score" and abs(number) <= 3.0:
+                number *= 25.0
+            best = max(best, number)
+    return max(0.0, min(100.0, best))
+
+
+def _initial_validation_stage(
+    category: str,
+    crypto_candidate_assets: tuple[dict[str, Any], ...],
+    validated_assets: tuple[dict[str, Any], ...],
+) -> str:
+    if validated_assets and category != ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:
+        return ValidationStage.CATALYST_LINK_VALIDATED.value
+    if crypto_candidate_assets and category != ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:
+        return ValidationStage.VALIDATION_SEARCH_PENDING.value
+    if crypto_candidate_assets:
+        return ValidationStage.CANDIDATE_ASSETS_SUGGESTED.value
+    return ValidationStage.SECTOR_HYPOTHESIS.value
 
 
 def _hypothesis_confidence(

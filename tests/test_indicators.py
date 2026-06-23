@@ -6785,7 +6785,9 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
         assert second.entries[0].should_alert is True
         assert second.entries[0].state != event_watchlist.EventWatchlistState.TRIGGERED_FADE.value
     unchanged = event_impact_hypotheses.validate_hypotheses_with_raw_events([hypothesis], [catalyst_only])[0]
-    assert unchanged.status == "validation_search_pending"
+    assert unchanged.status == "rejected"
+    assert unchanged.validation_stage == event_impact_hypotheses.ValidationStage.REJECTED.value
+    assert "source_mentions_catalyst_without_candidate_asset" in unchanged.rejection_reasons
     rejected = event_impact_hypotheses.validate_hypotheses_with_raw_events([hypothesis], [url_only])[0]
     assert rejected.status != "validated"
 
@@ -6812,7 +6814,9 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
     )
     html = """
     <html><head><style>.x{}</style><script>ignore()</script></head>
-    <body><article><h1>SpaceX pre-IPO exposure</h1>
+    <body><nav>Home Markets Prices News Learn Newsletter</nav>
+    <div>BTC $104000 +2.1% ETH $2500 -1.0% SOL $150 +4.4%</div>
+    <article><h1>SpaceX pre-IPO exposure</h1>
     <p>Velvet Capital is named in the full article, but not the RSS summary.</p></article></body></html>
     """
     calls = {"count": 0}
@@ -6833,6 +6837,8 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
         second = event_source_enrichment.enrich_source_text(raw, cfg=cfg, fetch_fn=lambda *_: (_ for _ in ()).throw(RuntimeError("should not fetch")))
         assert first.fetched is True
         assert "Velvet Capital is named" in first.enriched_text
+        assert "Home Markets Prices" not in first.enriched_text
+        assert "BTC $104000" not in first.enriched_text
         assert second.used_cache is True
         assert "Velvet Capital is named" in second.enriched_text
         assert calls["count"] == 1
@@ -7390,6 +7396,85 @@ def test_event_impact_hypothesis_generation_uses_llm_suggested_assets_but_not_va
     assert hypothesis.status == event_impact_hypotheses.HypothesisStatus.VALIDATION_SEARCH_PENDING.value
 
 
+def test_event_impact_hypothesis_separates_external_entities_from_crypto_candidates():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_impact_hypotheses
+    from crypto_rsi_scanner.event_llm_extraction_models import (
+        EventLLMCryptoAssetMention,
+        EventLLMRawEventExtraction,
+    )
+    from crypto_rsi_scanner.event_llm_extractor import EventLLMExtractionReportRow
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="openai-llm-mention",
+        provider="rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/openai",
+        title="OpenAI pre-IPO proxy exposure heats up",
+        body="Velvet Capital is discussed as a venue for OpenAI pre-IPO exposure.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="openai-llm-mention",
+    )
+    event = NormalizedEvent(
+        event_id="openai-llm-mention",
+        raw_ids=(raw.raw_id,),
+        event_name=raw.title,
+        event_type="ipo_proxy",
+        event_time=now,
+        event_time_confidence=0.85,
+        first_seen_time=now,
+        source=raw.provider,
+        source_urls=(raw.source_url,),
+        external_asset="OpenAI",
+        description=raw.body,
+        confidence=0.90,
+    )
+    extraction = EventLLMRawEventExtraction(
+        schema_version="event_llm_extraction_v1",
+        provider="fixture",
+        model="fixture",
+        prompt_version="test",
+        raw_id=raw.raw_id,
+        confidence=0.90,
+        external_catalysts=(),
+        crypto_asset_mentions=(
+            EventLLMCryptoAssetMention(
+                name="OpenAI",
+                symbol="OPENAI",
+                coin_id="openai",
+                contract_address=None,
+                mention_type="project_or_token",
+                confidence=0.92,
+            ),
+            EventLLMCryptoAssetMention(
+                name="Velvet Capital",
+                symbol="VELVET",
+                coin_id="velvet",
+                contract_address=None,
+                mention_type="project_or_token",
+                confidence=0.88,
+            ),
+        ),
+    )
+    hypotheses = event_impact_hypotheses.generate_impact_hypotheses(
+        EventDiscoveryResult((raw,), (event,), (), (), ()),
+        extraction_rows=(EventLLMExtractionReportRow(raw_event=raw, extraction=extraction),),
+        now=now,
+        taxonomy={},
+    )
+    hypothesis = next(item for item in hypotheses if item.impact_category == "ai_ipo_proxy")
+    assert any(entity["name"] == "OpenAI" for entity in hypothesis.external_entities)
+    assert "OPENAI" not in hypothesis.candidate_symbols
+    assert "VELVET" in hypothesis.candidate_symbols
+    assert hypothesis.crypto_candidate_assets[0]["symbol"] == "VELVET"
+    assert hypothesis.rejected_candidate_assets[0]["rejection_reason"] == "external_entity_not_crypto_candidate"
+    assert hypothesis.validation_stage == event_impact_hypotheses.ValidationStage.VALIDATION_SEARCH_PENDING.value
+
+
 def test_event_impact_hypothesis_search_skip_reason_buckets_are_specific():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_catalyst_search, event_impact_hypotheses
@@ -7439,7 +7524,8 @@ def test_event_impact_hypothesis_search_skip_reason_buckets_are_specific():
         cfg=event_catalyst_search.EventImpactHypothesisSearchConfig(enabled=True, min_confidence=0.50),
         now=now,
     )
-    assert missing.skip_reasons["no_candidate_assets"] == 1
+    assert missing.query_count > 0
+    assert any(query.query_type == "candidate_discovery" for query in missing.queries)
 
     stale_result = RawDiscoveredEvent(
         raw_id="velvet-no-catalyst",
@@ -7480,6 +7566,10 @@ def test_event_impact_hypothesis_search_skip_reason_buckets_are_specific():
     assert result.rejected_result_count == 1
     assert result.skip_reasons["result_catalyst_missing"] == 1
     assert "result_catalyst_missing" in result.rejected_result_events[0].result_score_reasons
+    sampled = event_impact_hypotheses.attach_hypothesis_search_samples((good,), result)[0]
+    assert sampled.rejected_validation_samples
+    assert sampled.rejected_validation_samples[0]["query_type"] == "candidate_validation"
+    assert sampled.rejected_validation_samples[0]["rejection_reason"] == "result_catalyst_missing"
 
 
 def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():

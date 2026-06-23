@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Clean Event Impact Hypothesis semantics · Codex
+**Why:** Pro-model review flagged that external catalysts, candidate crypto
+assets, and validation-search outcomes were still too easy to blur together.
+That could make sector intelligence look like token-level evidence.
+**Changes:**
+- Split impact hypotheses into external entities, crypto candidate assets, and
+  rejected candidate assets so companies such as OpenAI/SpaceX stay out of
+  token `candidate_symbols`.
+- Added hypothesis scores, score components, typed validation stages, typed
+  search-query metadata, granular candidate/identity/catalyst validation, and
+  capped rejected validation evidence samples.
+- Allowed sector hypotheses to generate candidate-discovery queries while
+  keeping token-level RADAR promotion gated on catalyst-linked validation.
+- Updated hypothesis reports, stored artifacts, daily brief copy, and watchlist
+  score metadata to show scores/stages/entities/candidates/rejections.
+- Hardened source enrichment text extraction against ticker tape, nav/menu,
+  footer, and generic price-table noise.
+**Verify:** `python3 tests/test_indicators.py` (425/425 passed); `make
+event-llm-eval PYTHON=python3` (9/9 passed); `make event-llm-extract-eval
+PYTHON=python3` (7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11
+passed); `make verify PYTHON=python3`.
+**Notes/risks:** Research-only semantics. This does not change normal RSI
+alerts, paper/live writes, trading, event-fade eligibility, or the rule that
+`TRIGGERED_FADE` only comes from `event_fade.py` plus `proxy_fade`.
+
 ## 2026-06-23 — Harden notification provider failure handling · Codex
 **Why:** A fresh `notify_llm` run surfaced provider/runtime problems: GDELT was
 rate-limited, one public RSS feed returned 403, and live OpenAI calls could

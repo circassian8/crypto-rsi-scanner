@@ -135,6 +135,7 @@ class SearchQuery:
     query: str
     symbol: str
     rank: int
+    query_type: str = "candidate_validation"
     score: int = 0
     score_reasons: tuple[str, ...] = ()
     coin_id: str | None = None
@@ -768,50 +769,75 @@ def generate_search_queries_for_hypothesis(hypothesis: object) -> tuple[str, ...
     search depend on hypothesis generation. Results still need resolver and
     identity validation before they can promote anything beyond review evidence.
     """
+    return tuple(item.query for item in generate_search_query_specs_for_hypothesis(hypothesis))
+
+
+@dataclass(frozen=True)
+class HypothesisSearchQuerySpec:
+    query: str
+    query_type: str = "candidate_validation"
+
+
+def generate_search_query_specs_for_hypothesis(hypothesis: object) -> tuple[HypothesisSearchQuerySpec, ...]:
+    """Return typed validation/discovery query specs for an impact hypothesis."""
     category = str(getattr(hypothesis, "impact_category", "") or "")
     external = str(getattr(hypothesis, "external_asset", "") or "").strip()
     symbols = tuple(str(symbol).strip().upper() for symbol in getattr(hypothesis, "candidate_symbols", ()) or () if str(symbol).strip())
     sectors = tuple(str(sector) for sector in getattr(hypothesis, "candidate_sectors", ()) or ())
-    out: list[str] = []
+    out: list[HypothesisSearchQuerySpec] = []
     for symbol in symbols[:8]:
         if external and category in {"rwa_preipo_proxy", "tokenized_stock_venue"}:
             out.extend((
-                f"{symbol} {external} pre-IPO exposure",
-                f"{symbol} tokenized stock {external}",
-                f"{symbol} {external} prediction market",
+                HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO exposure"),
+                HypothesisSearchQuerySpec(f"{symbol} tokenized stock {external}"),
+                HypothesisSearchQuerySpec(f"{symbol} {external} prediction market"),
             ))
         elif external and category == "ai_ipo_proxy":
             out.extend((
-                f"{symbol} {external} pre-IPO exposure",
-                f"{symbol} {external} perp",
-                f"{symbol} AI IPO proxy",
+                HypothesisSearchQuerySpec(f"{symbol} {external} pre-IPO exposure"),
+                HypothesisSearchQuerySpec(f"{symbol} {external} perp"),
+                HypothesisSearchQuerySpec(f"{symbol} AI IPO proxy"),
             ))
         elif category == "sports_fan_proxy":
             out.extend((
-                f"{symbol} World Cup fan token",
-                f"{symbol} sports event prediction market",
+                HypothesisSearchQuerySpec(f"{symbol} World Cup fan token"),
+                HypothesisSearchQuerySpec(f"{symbol} sports event prediction market"),
             ))
         elif category == "stablecoin_regulatory":
             out.extend((
-                f"{symbol} GENIUS Act stablecoin",
-                f"{symbol} stablecoin reserve regulation",
+                HypothesisSearchQuerySpec(f"{symbol} GENIUS Act stablecoin"),
+                HypothesisSearchQuerySpec(f"{symbol} stablecoin reserve regulation"),
             ))
         elif category == "listing_liquidity_event":
-            out.extend((f"{symbol} listing", f"{symbol} Binance listing"))
+            out.extend((HypothesisSearchQuerySpec(f"{symbol} listing"), HypothesisSearchQuerySpec(f"{symbol} Binance listing")))
         elif category == "unlock_supply_pressure":
-            out.extend((f"{symbol} unlock", f"{symbol} token vesting unlock"))
+            out.extend((HypothesisSearchQuerySpec(f"{symbol} unlock"), HypothesisSearchQuerySpec(f"{symbol} token vesting unlock")))
         elif category == "perp_venue_attention":
-            out.extend((f"{symbol} perp listing", f"{symbol} futures listing"))
+            out.extend((HypothesisSearchQuerySpec(f"{symbol} perp listing"), HypothesisSearchQuerySpec(f"{symbol} futures listing")))
         elif category == "prediction_market_infra":
-            out.extend((f"{symbol} prediction market oracle", f"{symbol} polymarket infrastructure"))
+            out.extend((HypothesisSearchQuerySpec(f"{symbol} prediction market oracle"), HypothesisSearchQuerySpec(f"{symbol} polymarket infrastructure")))
         elif category == "security_or_regulatory_shock":
-            out.append(f"{symbol} exploit hack regulatory")
+            out.append(HypothesisSearchQuerySpec(f"{symbol} exploit hack regulatory"))
         else:
-            out.append(f"{symbol} crypto catalyst")
+            qtype = "market_confirmation" if category == "market_anomaly_unknown" else "candidate_validation"
+            out.append(HypothesisSearchQuerySpec(f"{symbol} crypto catalyst", qtype))
     if not out:
+        discovery_terms: list[str] = []
+        if external:
+            discovery_terms.append(f"{external} crypto assets")
+            discovery_terms.append(f"{external} crypto catalyst")
         for sector in sectors[:4]:
-            out.append(f"{sector.replace('_', ' ')} crypto catalyst")
-    return tuple(dict.fromkeys(query for query in out if query.strip()))
+            clean = sector.replace("_", " ")
+            discovery_terms.append(f"{clean} crypto catalyst")
+            if external:
+                discovery_terms.append(f"{external} {clean} crypto")
+        out.extend(HypothesisSearchQuerySpec(query, "candidate_discovery") for query in discovery_terms)
+    deduped: dict[str, HypothesisSearchQuerySpec] = {}
+    for item in out:
+        query = str(item.query or "").strip()
+        if query:
+            deduped.setdefault(query, HypothesisSearchQuerySpec(query, item.query_type))
+    return tuple(deduped.values())
 
 
 def generate_search_query_objects_for_anomaly(
@@ -831,6 +857,7 @@ def generate_search_query_objects_for_anomaly(
             query=query,
             symbol=symbol,
             rank=idx + 1,
+            query_type="market_confirmation",
             coin_id=identity.coin_id,
             project_name=identity.project_name,
             aliases=identity.aliases,
@@ -1037,14 +1064,14 @@ def format_catalyst_search_report(result: CatalystSearchRunResult | None) -> str
         rows.append("Queries:")
         for query in result.queries[:20]:
             reason_text = f" ({', '.join(query.score_reasons)})" if query.score_reasons else ""
-            rows.append(f"- {query.symbol} #{query.rank}: score={query.score} {query.query}{reason_text}")
+            rows.append(f"- {query.symbol} #{query.rank} {query.query_type}: score={query.score} {query.query}{reason_text}")
     if result.result_events:
         rows.append("")
         rows.append("Accepted result evidence:")
         for event in result.result_events[:20]:
             reason_text = f" ({', '.join(event.result_score_reasons)})" if event.result_score_reasons else ""
             rows.append(
-                f"- {event.query.symbol}: score={event.result_score} "
+                f"- {event.query.symbol} {event.query.query_type}: score={event.result_score} "
                 f"{event.raw_event.title} [{event.raw_event.provider}]{reason_text}"
             )
     if result.rejected_result_events:
@@ -1053,7 +1080,7 @@ def format_catalyst_search_report(result: CatalystSearchRunResult | None) -> str
         for event in result.rejected_result_events[:20]:
             reason_text = f" ({', '.join(event.result_score_reasons)})" if event.result_score_reasons else ""
             rows.append(
-                f"- {event.query.symbol}: score={event.result_score} "
+                f"- {event.query.symbol} {event.query.query_type}: score={event.result_score} "
                 f"{event.raw_event.title} [{event.raw_event.provider}]{reason_text}"
             )
     return "\n".join(rows).rstrip()
@@ -1168,7 +1195,10 @@ def _eligible_hypotheses(
             continue
         if confidence < cfg.min_confidence:
             continue
-        if not tuple(getattr(hypothesis, "candidate_symbols", ()) or ()):
+        if not tuple(getattr(hypothesis, "candidate_symbols", ()) or ()) and not (
+            str(getattr(hypothesis, "external_asset", "") or "").strip()
+            or tuple(getattr(hypothesis, "candidate_sectors", ()) or ())
+        ):
             continue
         candidates.append((confidence, str(getattr(hypothesis, "hypothesis_id", "") or ""), hypothesis))
     candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
@@ -1181,15 +1211,18 @@ def _queries_for_hypotheses(
 ) -> tuple[SearchQuery, ...]:
     out: list[SearchQuery] = []
     for hypothesis in hypotheses:
-        base_queries = generate_search_queries_for_hypothesis(hypothesis)[: max(0, cfg.max_queries_per_hypothesis)]
+        specs = generate_search_query_specs_for_hypothesis(hypothesis)[: max(0, cfg.max_queries_per_hypothesis)]
+        base_queries = tuple(spec.query for spec in specs)
         identity_by_query = _hypothesis_query_identities(hypothesis, base_queries)
-        for idx, query_text in enumerate(base_queries):
+        for idx, spec in enumerate(specs):
+            query_text = spec.query
             identity = identity_by_query.get(query_text) or _HypothesisIdentity(symbol="SECTOR")
             base = SearchQuery(
                 anomaly_raw_id=str(getattr(hypothesis, "hypothesis_id", "") or "hypothesis"),
                 query=query_text,
                 symbol=identity.symbol,
                 rank=idx + 1,
+                query_type=spec.query_type,
                 coin_id=identity.coin_id,
                 project_name=identity.project_name,
                 aliases=identity.aliases,
@@ -1344,6 +1377,7 @@ def _annotate_hypothesis_search_result(
                 "role": "validation_source_evidence",
                 "hypothesis_id": query.anomaly_raw_id,
                 "query": query.query,
+                "query_type": query.query_type,
                 "symbol": query.symbol,
                 "score": score,
                 "reasons": list(reasons),
@@ -1739,6 +1773,7 @@ def _annotate_search_source(
     search_payload.update({
         "provider": provider_name,
         "query": query.query,
+        "query_type": query.query_type,
         "symbol": query.symbol,
         "coin_id": query.coin_id,
         "project_name": query.project_name,

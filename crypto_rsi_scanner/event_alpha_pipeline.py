@@ -323,6 +323,10 @@ def run_event_alpha_pipeline(
                 now=observed,
             )
             warnings.extend(f"hypothesis search: {warning}" for warning in hypothesis_search_result.warnings)
+            impact_hypotheses = event_impact_hypotheses.attach_hypothesis_search_samples(
+                impact_hypotheses,
+                hypothesis_search_result,
+            )
             validation_raw = tuple(result.raw_event for result in hypothesis_search_result.result_events)
             impact_hypotheses = event_impact_hypotheses.validate_hypotheses_with_raw_events(
                 impact_hypotheses,

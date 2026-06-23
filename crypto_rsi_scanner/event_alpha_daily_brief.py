@@ -182,9 +182,11 @@ def build_daily_brief(
         lines.append("- No run row available.")
     if hypotheses:
         status_counts = _field_counts(hypotheses, "status")
+        stage_counts = _field_counts(hypotheses, "validation_stage")
         category_counts = _field_counts(hypotheses, "impact_category")
         lines.append("- Stored rows: " + str(len(hypotheses)))
         lines.append("- Stored statuses: " + _format_counts(status_counts))
+        lines.append("- Stored validation stages: " + _format_counts(stage_counts))
         lines.append("- Stored categories: " + _format_counts(category_counts))
         pending = [
             row for row in hypotheses
@@ -201,6 +203,15 @@ def build_daily_brief(
         lines.append("- Validated stored hypotheses: " + (_brief_hypothesis_labels(validated[:3]) or "none"))
         lines.append("- Pending stored hypotheses: " + (_brief_hypothesis_labels(pending[:3]) or "none"))
         lines.append("- Top rejected hypotheses: " + (_brief_hypothesis_labels(rejected[:3]) or "none"))
+        ranked = sorted(
+            hypotheses,
+            key=lambda row: _float(row.get("hypothesis_score") or _float(row.get("confidence")) * 100),
+            reverse=True,
+        )
+        lines.append("- Top hypothesis scores: " + (_brief_hypothesis_labels(ranked[:3]) or "none"))
+        rejected_samples = sum(len(row.get("rejected_validation_samples") or []) for row in hypotheses)
+        if rejected_samples:
+            lines.append(f"- Rejected validation evidence samples: {rejected_samples}")
     elif latest and int(latest.get("impact_hypotheses") or 0) > 0:
         lines.append("- Stored rows: none loaded for this profile; inspect --event-impact-hypotheses-report.")
     lines.extend(["", "## Catalyst Search Skip Reasons"])
@@ -440,10 +451,16 @@ def _format_counts(counts: Mapping[str, int]) -> str:
 def _brief_hypothesis_labels(rows: Iterable[Mapping[str, Any]]) -> str:
     labels: list[str] = []
     for row in rows:
+        candidates = row.get("validated_candidate_assets") or row.get("crypto_candidate_assets") or row.get("suggested_candidate_assets") or []
+        candidate_label = "none"
+        if candidates and isinstance(candidates[0], Mapping):
+            candidate_label = str(candidates[0].get("symbol") or candidates[0].get("coin_id") or "asset")
         labels.append(
             f"{row.get('impact_category') or 'unknown'}"
             f"/{row.get('external_asset') or 'unknown'}"
-            f"({row.get('status') or 'unknown'})"
+            f"/candidate={candidate_label}"
+            f"({row.get('validation_stage') or row.get('status') or 'unknown'}"
+            f",score={_float(row.get('hypothesis_score') or _float(row.get('confidence')) * 100):.0f})"
         )
     return "; ".join(labels)
 

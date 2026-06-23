@@ -60,11 +60,16 @@ controls are excluded by default unless
 
 Event Alpha can also write `HYPOTHESIS` watchlist rows. A hypothesis means the
 radar inferred that an external catalyst may affect a crypto sector or seed
-asset set, but direct candidate validation is incomplete. Example: a SpaceX
-pre-IPO article can produce a tokenized-stock-venue hypothesis with VELVET/HYPE/
-ASTER validation searches. These rows are exploratory/store-only by default and
-are not alertable. They may promote to `RADAR` only after identity-safe source
-evidence explicitly links a candidate asset to the catalyst or sector.
+asset set, but direct candidate validation is incomplete. External entities
+such as SpaceX/OpenAI/Stripe stay in `external_entities`; crypto candidates stay
+in `crypto_candidate_assets`; false positives stay in
+`rejected_candidate_assets`. Example: a SpaceX pre-IPO article can produce a
+tokenized-stock-venue hypothesis with VELVET/HYPE/ASTER validation searches.
+These rows are exploratory/store-only by default and are not alertable. They may
+promote to `RADAR` only after identity-safe source evidence explicitly links a
+candidate asset to the catalyst (`catalyst_link_validated`,
+`market_confirmed`, or `promoted_to_radar`). Candidate-only or identity-only
+evidence can improve review context but does not promote a token-level row.
 Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`, paper/live rows, or
 `TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from `event_fade.py` plus
 the `proxy_fade` playbook.

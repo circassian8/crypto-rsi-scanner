@@ -406,7 +406,9 @@ def _entry_from_hypothesis(
     cfg: EventWatchlistConfig,
 ) -> EventWatchlistEntry:
     status = str(getattr(hypothesis, "status", "") or "")
-    validated = status == "validated"
+    validation_stage = str(getattr(hypothesis, "validation_stage", "") or "")
+    promotable_stage = validation_stage in {"catalyst_link_validated", "market_confirmed", "promoted_to_radar"}
+    validated = status == "validated" and promotable_stage
     state = EventWatchlistState.RADAR if validated else EventWatchlistState.HYPOTHESIS
     previous_state = prior.state if prior else None
     rank = _state_rank(state)
@@ -415,8 +417,9 @@ def _entry_from_hypothesis(
     escalation = bool(validated and (previous_state is None or rank > previous_rank))
     observed_iso = observed.isoformat()
     first_seen = prior.first_seen_at if prior else observed_iso
+    hypothesis_score = _optional_float(getattr(hypothesis, "hypothesis_score", None))
     confidence = _optional_float(getattr(hypothesis, "confidence", None)) or 0.0
-    score = max(0, min(100, int(round(confidence * 100))))
+    score = max(0, min(100, int(round(hypothesis_score if hypothesis_score is not None else confidence * 100))))
     symbols = tuple(str(value) for value in getattr(hypothesis, "candidate_symbols", ()) or ())
     coin_ids = tuple(str(value) for value in getattr(hypothesis, "candidate_coin_ids", ()) or ())
     category = str(getattr(hypothesis, "impact_category", "") or "impact_hypothesis")
@@ -489,6 +492,11 @@ def _entry_from_hypothesis(
             "candidate_symbols": list(symbols[:12]),
             "candidate_coin_ids": list(coin_ids[:12]),
             "validation_evidence": 100 if validated else 0,
+            "validation_stage": validation_stage or "unknown",
+            "external_entities": list(getattr(hypothesis, "external_entities", ()) or ())[:8],
+            "crypto_candidate_assets": list(getattr(hypothesis, "crypto_candidate_assets", ()) or ())[:12],
+            "rejected_candidate_assets": list(getattr(hypothesis, "rejected_candidate_assets", ()) or ())[:8],
+            **dict(getattr(hypothesis, "score_components", {}) or {}),
         },
         alert_history=history,
         state_changed=state_changed,

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from dataclasses import replace
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterable
 from urllib.request import Request, urlopen
 
 from .event_models import RawDiscoveredEvent
@@ -129,7 +129,7 @@ def extract_html_text(source: str | bytes) -> str:
     data = re.sub(r"(?is)<(script|style|noscript).*?</\1>", " ", data)
     parser = _TextHTMLParser()
     parser.feed(data)
-    text = " ".join(parser.parts)
+    text = " ".join(_clean_text_parts(parser.parts))
     text = html.unescape(text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
@@ -163,3 +163,56 @@ class _TextHTMLParser(HTMLParser):
         text = str(data or "").strip()
         if text:
             self.parts.append(text)
+
+
+_NAV_OR_FOOTER_TEXT = {
+    "markets",
+    "prices",
+    "crypto prices",
+    "market cap",
+    "learn",
+    "news",
+    "newsletter",
+    "advertise",
+    "about",
+    "contact",
+    "privacy policy",
+    "terms of service",
+    "sign in",
+    "log in",
+    "subscribe",
+    "sponsored",
+}
+
+
+def _clean_text_parts(parts: Iterable[str]) -> list[str]:
+    cleaned: list[str] = []
+    for part in parts:
+        text = html.unescape(str(part or "")).strip()
+        if not text:
+            continue
+        if _is_source_noise_text(text):
+            continue
+        cleaned.append(text)
+    return cleaned
+
+
+def _is_source_noise_text(text: str) -> bool:
+    compact = re.sub(r"\s+", " ", text).strip()
+    lowered = compact.casefold()
+    if lowered in _NAV_OR_FOOTER_TEXT:
+        return True
+    if len(compact) <= 80 and (lowered.startswith("by ") or lowered.startswith("edited by ")):
+        return True
+    if len(compact) <= 120 and re.search(r"\b(home|markets|prices|news|learn|advertise|newsletter)\b", lowered):
+        nav_hits = sum(1 for token in ("home", "markets", "prices", "news", "learn", "advertise", "newsletter") if token in lowered)
+        if nav_hits >= 3:
+            return True
+    ticker_fragments = re.findall(r"\b[A-Z0-9]{2,12}(?:USDT|USD)?\b\s*(?:[$€£]?\d[\d,.]*|[+-]?\d+(?:\.\d+)?%)", compact)
+    if len(ticker_fragments) >= 3:
+        return True
+    if len(compact) <= 220 and compact.count("%") >= 3 and compact.count("$") >= 2:
+        return True
+    if len(compact) <= 220 and re.search(r"\bBTC\b.*\bETH\b.*\bSOL\b", compact):
+        return True
+    return False
