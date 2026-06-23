@@ -32,6 +32,11 @@ a clear message:
 - Commit on `main`, then `git push` after the commit. The human gave standing
   approval on 2026-06-16 to push after every commit. Ask again only before
   changing remotes, force-pushing, or pushing to a different branch.
+- After each successful commit + push, also provide a fresh project zip for
+  Pro-model review. Include the current source plus local research artifacts
+  such as `event_fade_cache/`, but never include secrets or machine-local noise
+  (`.env`, DBs, logs, `.venv`, `.git`, IDE files, caches). Prefer a clearly
+  named zip such as `crypto-rsi-scanner-source-with-artifacts.zip`.
 
 ## Collaboration files
 

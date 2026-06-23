@@ -17,6 +17,19 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Require zip handoff after commit/push · Codex
+**Why:** The human shares this project with a Pro model for review and wants a
+fresh source-plus-artifacts zip after every pushed change.
+**Changes:**
+- Updated `AGENTS.md` so Codex and Claude should provide a fresh project zip
+  after each successful commit + push.
+- Clarified that the zip should include current source plus local research
+  artifacts such as `event_fade_cache/`, while excluding secrets and
+  machine-local noise like `.env`, DBs, logs, `.venv`, `.git`, IDE files, and
+  caches.
+**Verify:** `make verify PYTHON=python3`.
+**Notes/risks:** Protocol-only change; no scanner logic changed.
+
 ## 2026-06-23 — Harden Event Alpha impact discovery · Codex
 **Why:** Impact hypotheses were useful, but broad substring rules and immediate
 sector-to-token watchlist identity could create misleading CHZ/HYPE/VELVET-style
