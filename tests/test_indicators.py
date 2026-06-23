@@ -3785,6 +3785,38 @@ def test_event_llm_budget_skips_lower_priority_rows_and_cache_hits_are_free():
         assert cached_provider.calls == 1
 
 
+def test_event_llm_runtime_deadline_skips_uncached_provider_calls():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_llm_analyzer
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMRelationshipProvider
+
+    result, alerts, _ = _llm_golden_alerts_and_rows(min_prefilter_score=0)
+
+    class CountingProvider(FixtureLLMRelationshipProvider):
+        def __init__(self, path):
+            super().__init__(path, required=True)
+            self.calls = 0
+
+        def analyze_relationship(self, packet):
+            self.calls += 1
+            return super().analyze_relationship(packet)
+
+    provider = CountingProvider(_llm_golden_fixture_path())
+    rows = event_llm_analyzer.analyze_event_candidates(
+        result,
+        alerts,
+        provider,
+        cfg=event_llm_analyzer.EventLLMConfig(
+            min_prefilter_score=0,
+            max_candidates_per_run=2,
+            deadline_at=datetime(2000, 1, 1, tzinfo=timezone.utc),
+        ),
+    )
+    assert provider.calls == 0
+    assert [row.cache_status for row in rows] == ["skipped_runtime", "skipped_runtime"]
+    assert all(any("runtime deadline exhausted" in warning for warning in row.warnings) for row in rows)
+
+
 def test_event_llm_budget_ledger_persists_daily_caps_and_cost_limit():
     import json
     import tempfile
@@ -4446,6 +4478,58 @@ def test_event_llm_extractor_prioritizes_high_value_raw_events_before_budget():
     assert [row.raw_event.raw_id for row in rows] == ["pump", "proxy"]
     assert all(row.extraction_priority_score > 0 for row in rows)
     assert any("catalyst_keywords" in ",".join(row.extraction_priority_reasons) for row in rows)
+
+
+def test_event_llm_extractor_runtime_deadline_skips_uncached_provider_calls():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_llm_extractor
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="deadline-proxy",
+        provider="news",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/deadline-proxy",
+        title="SpaceX pre-IPO exposure opens through DEADLINE token",
+        body="DEADLINE token offers synthetic exposure to SpaceX pre-IPO markets.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="deadline-proxy",
+    )
+
+    class Provider:
+        name = "fixture"
+
+        def __init__(self):
+            self.calls = 0
+
+        def extract_raw_event(self, packet):
+            self.calls += 1
+            return LLMProviderResult(raw={
+                "confidence": 0.80,
+                "external_catalysts": [],
+                "crypto_asset_mentions": [],
+                "false_positive_terms": [],
+                "event_date_hints": [],
+                "suggested_followup_queries": [],
+                "warnings": [],
+            })
+
+    provider = Provider()
+    rows = event_llm_extractor.analyze_raw_events(
+        [raw],
+        provider,
+        cfg=event_llm_extractor.EventLLMExtractorConfig(
+            max_events_per_run=1,
+            deadline_at=datetime(2000, 1, 1, tzinfo=timezone.utc),
+        ),
+    )
+    assert provider.calls == 0
+    assert rows[0].cache_status == "skipped_runtime"
+    assert any("runtime deadline exhausted" in warning for warning in rows[0].warnings)
 
 
 def test_event_llm_extractor_openai_missing_key_fails_soft():

@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-23 - Bound live LLM calls by notification runtime deadlines
+**Status:** accepted
+**Decision:** OpenAI-backed Event Alpha notification runs must pass the cycle's
+runtime deadline into raw-event extraction and relationship analysis. LLM cache
+hits may still be used after the deadline because they are local, but uncached
+provider calls must skip with explicit runtime-deadline warnings once the
+deadline is exhausted.
+**Why:** Per-run/day/cost budgets control spend, not wall-clock delivery
+reliability. A slow provider can otherwise keep a notification cycle inside the
+LLM loop after the outer runtime budget has expired, delaying or preventing
+heartbeat/exploratory delivery.
+**Revisit when:** LLM calls move to an asynchronous queue with resumable
+background processing and notification sends no longer wait on live model calls.
+
 ## 2026-06-23 - Let local LLM budget env vars override Event Alpha profile caps
 **Status:** accepted
 **Decision:** Event Alpha profiles still provide bounded defaults for OpenAI

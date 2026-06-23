@@ -58,6 +58,7 @@ class EventLLMConfig:
     cache_ttl_hours: float = 0.0
     budget_ledger_path: Path | None = None
     estimated_cost_per_call_usd: float = 0.0
+    deadline_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,11 @@ def analyze_event_candidates(
                 cache_status = "skipped_budget"
                 budget.record_skipped()
                 warnings.append(budget.exhausted_warning())
+            elif _deadline_exhausted(cfg.deadline_at):
+                raw = None
+                cache_status = "skipped_runtime"
+                budget.record_skipped()
+                warnings.append(_deadline_warning())
             else:
                 calls_attempted += 1
                 budget.record_attempt()
@@ -162,6 +168,11 @@ def analyze_event_candidates(
                 cache_status = "skipped_budget"
                 budget.record_skipped()
                 warnings.append(budget.exhausted_warning())
+            elif _deadline_exhausted(cfg.deadline_at):
+                raw = None
+                cache_status = "skipped_runtime"
+                budget.record_skipped()
+                warnings.append(_deadline_warning())
             else:
                 calls_attempted += 1
                 budget.record_attempt()
@@ -679,6 +690,17 @@ def _budget_exhausted(calls_attempted: int, cfg: EventLLMConfig) -> bool:
     if not caps:
         return False
     return calls_attempted >= min(caps)
+
+
+def _deadline_exhausted(deadline_at: datetime | None) -> bool:
+    if deadline_at is None:
+        return False
+    deadline = deadline_at.replace(tzinfo=timezone.utc) if deadline_at.tzinfo is None else deadline_at.astimezone(timezone.utc)
+    return datetime.now(timezone.utc) >= deadline
+
+
+def _deadline_warning() -> str:
+    return "LLM relationship analysis skipped: notification runtime deadline exhausted"
 
 
 def _cache_entry_fresh(cached: Mapping[str, Any], cfg: EventLLMConfig) -> bool:

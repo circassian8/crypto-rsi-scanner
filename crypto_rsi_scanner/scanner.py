@@ -2446,9 +2446,18 @@ def _event_alpha_notify_cycle_body(
             effective_with_llm = False
             pre_stage_warnings.append(llm_budget_warning)
         if effective_with_llm:
+            llm_deadline_at = (
+                started_at + timedelta(seconds=budget.max_seconds)
+                if budget.max_seconds > 0
+                else None
+            )
             extraction_cfg = _event_llm_extractor_config_from_runtime()
+            if llm_deadline_at is not None:
+                extraction_cfg = replace(extraction_cfg, deadline_at=llm_deadline_at)
             extraction_provider = _event_llm_extraction_provider(extraction_cfg)
             relationship_cfg = _event_llm_config_from_runtime()
+            if llm_deadline_at is not None:
+                relationship_cfg = replace(relationship_cfg, deadline_at=llm_deadline_at)
             relationship_provider = _event_llm_provider(relationship_cfg)
         alert_cfg = _event_alert_config_from_runtime()
         discovery_budget_warning = budget.warning_if_low("discovery")

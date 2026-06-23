@@ -17,6 +17,29 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Guard OpenAI LLM loops with notification runtime deadlines · Codex
+**Why:** A full `notify_llm` run showed the GDELT fetch cap was fixed, but slow
+OpenAI raw-event extraction calls could still keep running past the
+notification cycle's runtime budget because the deadline was only checked
+between pipeline stages.
+**Changes:**
+- Added runtime-deadline support to the raw-event LLM extractor and relationship
+  analyzer configs.
+- Taught both LLM loops to reuse cache hits but skip new uncached provider calls
+  once the notification runtime deadline is exhausted.
+- Wired the notification cycle's max-runtime deadline into OpenAI-backed LLM
+  extraction and relationship analysis.
+- Added regression coverage proving expired deadlines skip uncached provider
+  calls in both LLM paths.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (433/433 passed); `make event-llm-eval
+PYTHON=python3` (9/9 passed); `make event-llm-extract-eval PYTHON=python3`
+(7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11 passed); `make
+verify PYTHON=python3`.
+**Notes/risks:** Reliability guard only. This does not change Event Alpha
+scoring, source/provider selection, Telegram guard semantics, normal RSI rows,
+paper/live writes, trading, or `TRIGGERED_FADE` eligibility.
+
 ## 2026-06-23 — Cap live GDELT catalyst-search fetches per run · Codex
 **Why:** A live notification run exposed an operational hang: GDELT catalyst
 search fetched once per hypothesis/query and kept retrying through 429/timeouts,
