@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import sys
 from collections.abc import Callable, Iterable
 from dataclasses import replace
@@ -1628,10 +1629,37 @@ def _apply_event_alpha_profile(profile_name: str | None) -> event_alpha_profiles
         return None
     profile = event_alpha_profiles.get_profile(profile_name)
     for attr, value in profile.config_overrides.items():
+        value = _profile_override_value(attr, value)
         setattr(config, attr, value)
     _apply_event_alpha_artifact_context(profile.name)
     _normalize_profile_paths()
     return profile
+
+
+_PROFILE_LOCAL_BUDGET_OVERRIDES: dict[str, type] = {
+    "EVENT_LLM_MAX_CANDIDATES_PER_RUN": int,
+    "EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN": int,
+    "EVENT_LLM_MAX_CALLS_PER_RUN": int,
+    "EVENT_LLM_MAX_CALLS_PER_DAY": int,
+    "EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY": float,
+    "EVENT_LLM_ESTIMATED_COST_PER_CALL_USD": float,
+    "EVENT_LLM_CACHE_TTL_HOURS": float,
+}
+
+
+def _profile_override_value(attr: str, profile_value: Any) -> Any:
+    """Let local LLM budget env vars intentionally widen profile defaults."""
+    caster = _PROFILE_LOCAL_BUDGET_OVERRIDES.get(attr)
+    if caster is None:
+        return profile_value
+    raw = os.getenv(f"RSI_{attr}")
+    if raw is None or raw == "":
+        return profile_value
+    try:
+        return caster(raw)
+    except (TypeError, ValueError):
+        log.warning("Ignoring invalid local Event Alpha LLM budget override %s", f"RSI_{attr}")
+        return profile_value
 
 
 def _apply_event_alpha_context_to_config(context: event_alpha_artifacts.EventAlphaArtifactContext) -> None:
@@ -3189,6 +3217,8 @@ def event_alpha_export_notification_pack(
 def _event_alpha_llm_budget_status() -> str:
     return (
         f"provider={config.EVENT_LLM_PROVIDER}/{config.EVENT_LLM_EXTRACTOR_PROVIDER} "
+        f"max_candidates={config.EVENT_LLM_MAX_CANDIDATES_PER_RUN} "
+        f"max_extract_events={config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN} "
         f"max_run={config.EVENT_LLM_MAX_CALLS_PER_RUN} max_day={config.EVENT_LLM_MAX_CALLS_PER_DAY} "
         f"max_cost_day={config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY:g} "
         f"cache_ttl_hours={config.EVENT_LLM_CACHE_TTL_HOURS:g}"
@@ -3468,6 +3498,8 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
         ),
         (
             "LLM budget: "
+            f"max_candidates={config.EVENT_LLM_MAX_CANDIDATES_PER_RUN} "
+            f"max_extract_events={config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN} "
             f"max_run={config.EVENT_LLM_MAX_CALLS_PER_RUN} max_day={config.EVENT_LLM_MAX_CALLS_PER_DAY} "
             f"max_cost_day={config.EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY:g} "
             f"cache_ttl_hours={config.EVENT_LLM_CACHE_TTL_HOURS:g} "

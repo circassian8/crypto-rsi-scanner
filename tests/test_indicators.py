@@ -9083,9 +9083,11 @@ def test_event_alpha_notification_profiles_and_preflight_guards():
     assert llm.with_llm is True
     assert llm.config_overrides["EVENT_LLM_PROVIDER"] == "openai"
     assert llm.config_overrides["EVENT_LLM_EXTRACTOR_PROVIDER"] == "openai"
-    assert llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] <= 10
-    assert llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] <= 50
-    assert llm.config_overrides["EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY"] <= 1.0
+    assert llm.config_overrides["EVENT_LLM_MAX_CANDIDATES_PER_RUN"] >= 100
+    assert llm.config_overrides["EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN"] >= 200
+    assert llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] >= 100
+    assert llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] >= 500
+    assert llm.config_overrides["EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY"] >= 15.0
     assert llm.config_overrides["EVENT_LLM_CACHE_TTL_HOURS"] == 168
     assert llm.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 10.0
     assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] <= 10.0
@@ -10726,6 +10728,7 @@ def test_event_alpha_feedback_marks_watchlist_rows_and_missed_items():
 def test_event_alpha_status_profile_budget_and_unknown_profile():
     import contextlib
     import io
+    import os
     from crypto_rsi_scanner import config, event_alpha_profiles, scanner
 
     profile_keys = set()
@@ -10737,10 +10740,22 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         for name in profile_keys
         if hasattr(config, name)
     }
+    env_keys = (
+        "RSI_EVENT_LLM_MAX_CANDIDATES_PER_RUN",
+        "RSI_EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN",
+        "RSI_EVENT_LLM_MAX_CALLS_PER_RUN",
+        "RSI_EVENT_LLM_MAX_CALLS_PER_DAY",
+        "RSI_EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY",
+        "RSI_EVENT_LLM_ESTIMATED_COST_PER_CALL_USD",
+        "RSI_EVENT_LLM_CACHE_TTL_HOURS",
+    )
+    original_env = {key: os.environ.get(key) for key in env_keys}
     try:
         profile = event_alpha_profiles.get_profile("full_llm_live")
         assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > 0
         assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] > 0
+        assert profile.config_overrides["EVENT_LLM_MAX_CANDIDATES_PER_RUN"] > 0
+        assert profile.config_overrides["EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN"] > 0
         assert profile.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 15.0
         assert "LLM budget defaults" in event_alpha_profiles.format_profile_report(profile)
         assert "artifact policy:" in event_alpha_profiles.format_profile_report(profile)
@@ -10766,9 +10781,28 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         assert "profile: no_key_live" in profile_out.getvalue()
         assert default_out.getvalue() != profile_out.getvalue()
         assert "LLM budget:" in profile_out.getvalue()
+        assert "max_candidates=" in full_llm_out.getvalue()
+        assert "max_extract_events=" in full_llm_out.getvalue()
         assert "watchlist_monitor:" in profile_out.getvalue()
         assert "- READY project_blog_rss" in full_llm_out.getvalue()
         assert "- READY project_blog_rss" in send_out.getvalue()
+
+        os.environ["RSI_EVENT_LLM_MAX_CANDIDATES_PER_RUN"] = "111"
+        os.environ["RSI_EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN"] = "222"
+        os.environ["RSI_EVENT_LLM_MAX_CALLS_PER_RUN"] = "333"
+        os.environ["RSI_EVENT_LLM_MAX_CALLS_PER_DAY"] = "444"
+        os.environ["RSI_EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY"] = "55.5"
+        os.environ["RSI_EVENT_LLM_ESTIMATED_COST_PER_CALL_USD"] = "0.06"
+        os.environ["RSI_EVENT_LLM_CACHE_TTL_HOURS"] = "12"
+        override_out = io.StringIO()
+        with contextlib.redirect_stdout(override_out):
+            scanner.event_alpha_status(profile_name="notify_llm")
+        override_text = override_out.getvalue()
+        assert "max_candidates=111" in override_text
+        assert "max_extract_events=222" in override_text
+        assert "max_run=333 max_day=444" in override_text
+        assert "max_cost_day=55.5" in override_text
+        assert "cache_ttl_hours=12" in override_text
 
         bad_out = io.StringIO()
         with contextlib.redirect_stdout(bad_out):
@@ -10777,6 +10811,11 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
     finally:
         for name, value in original.items():
             setattr(config, name, value)
+        for key, value in original_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 def test_event_watchlist_monitor_detects_material_updates_without_new_source():

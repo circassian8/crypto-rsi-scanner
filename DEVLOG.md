@@ -17,6 +17,26 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Raise Event Alpha LLM budget controls · Codex
+**Why:** The OpenAI-backed Event Alpha notification profiles were too shallow
+for the owner's desired daily runs: `notify_llm` only allowed 10 calls per run
+and 50 per day, while local `.env` budget values were ignored by profile
+overrides.
+**Changes:**
+- Raised checked-in LLM profile defaults for `full_llm_live`, `notify_llm`, and
+  `notify_llm_deep`, including relationship candidates, raw-event extraction
+  events, per-run calls, per-day calls, and estimated daily cost caps.
+- Let local `RSI_EVENT_LLM_*` budget env vars override profile budget defaults
+  at runtime without changing non-budget profile semantics.
+- Expanded Event Alpha status/profile reporting and `.env.example` docs to show
+  candidate/extractor caps as well as call/day/cost/cache caps.
+- Added regression coverage proving local LLM budget env values win for
+  `notify_llm`.
+**Verify:** `python3 tests/test_indicators.py` (430/430 passed); `python3 -m compileall -q crypto_rsi_scanner tests`; `make event-llm-eval PYTHON=python3` (9/9 passed); `make event-llm-extract-eval PYTHON=python3` (7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11 passed); `make verify PYTHON=python3`; `python3 main.py --event-alpha-status --event-alpha-profile notify_llm`.
+**Notes/risks:** Budget controls only affect how much LLM analysis/extraction is
+attempted. This does not change alert scoring, Telegram safety guards, normal
+RSI alerts, paper/live writes, trading, or `TRIGGERED_FADE` eligibility.
+
 ## 2026-06-23 — Make impact hypothesis reports latest-run diagnosable · Codex
 **Why:** `notify_llm` artifacts could mix old legacy rows with fresh hypothesis
 rows, making the report look like current runs had `validation_stage=unknown`

@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-23 - Let local LLM budget env vars override Event Alpha profile caps
+**Status:** accepted
+**Decision:** Event Alpha profiles still provide bounded defaults for OpenAI
+relationship analysis and raw-event extraction, but local
+`RSI_EVENT_LLM_*` budget variables for candidate/event selection, per-run calls,
+per-day calls, estimated cost/day, estimated cost/call, and cache TTL may
+override those profile budget caps at runtime.
+**Why:** Operational LLM depth needs to be adjustable without code edits or
+profile rewrites. The owner explicitly wants substantially higher LLM budgets
+for daily notification runs, while preserving profile behavior for non-budget
+settings.
+**Revisit when:** Budget control moves to a dedicated operator config file or
+the project adds model-specific token/cost accounting instead of per-call
+estimates.
+
 ## 2026-06-23 - Treat impact-hypothesis reports as run-scoped diagnostics
 **Status:** accepted
 **Decision:** Event Impact Hypothesis artifacts may contain historical and

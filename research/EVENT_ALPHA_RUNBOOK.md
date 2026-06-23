@@ -472,6 +472,27 @@ LLM calls are capped by the profile budget defaults and the local budget ledger.
 Cache hits are reused. If rows are skipped, the run ledger and explain report
 show `llm_skipped_due_budget`.
 
+The OpenAI-backed profiles have bounded defaults, but the owner machine may
+raise LLM depth through local `.env` budget overrides without editing profile
+code:
+
+```bash
+RSI_EVENT_LLM_MAX_CANDIDATES_PER_RUN=200
+RSI_EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN=300
+RSI_EVENT_LLM_MAX_CALLS_PER_RUN=200
+RSI_EVENT_LLM_MAX_CALLS_PER_DAY=1000
+RSI_EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY=25
+RSI_EVENT_LLM_ESTIMATED_COST_PER_CALL_USD=0.02
+RSI_EVENT_LLM_CACHE_TTL_HOURS=24
+```
+
+`main.py --event-alpha-status --event-alpha-profile notify_llm` prints the
+effective relationship candidate cap, raw-event extraction cap, run/day call
+caps, estimated daily cost cap, cache TTL, and ledger path. These knobs only
+change how many LLM relationship/extraction attempts can run; they do not change
+alert scoring, send guards, normal RSI rows, paper/live writes, trading, or
+`TRIGGERED_FADE` eligibility.
+
 For an LLM burn-in loop that keeps sends off and adds source reliability:
 
 ```bash
