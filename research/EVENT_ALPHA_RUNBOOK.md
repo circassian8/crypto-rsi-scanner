@@ -66,6 +66,16 @@ Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`, paper/live rows, or
 `TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from `event_fade.py` plus
 the `proxy_fade` playbook.
 
+When an Event Alpha cycle has market anomalies but `catalyst_queries=0`, check
+the run ledger or daily brief `Catalyst Search Skip Reasons` section before
+changing thresholds. Common reasons are `no_anomalies_over_threshold`,
+`anomaly_identity_missing`, `provider_backoff`, `provider_unavailable`,
+`runtime_budget_exhausted`, and `query_limit_zero`. These are diagnostics only:
+they explain missing validation evidence and do not make a row alertable.
+RSS source intake also distinguishes one-feed `feed_failure` warnings from
+provider-level `provider_failure`; a single blocked RSS feed should not imply
+the entire public source bundle failed.
+
 Notification delivery state is scoped by profile namespace for `notify_no_key`,
 `notify_llm`, and `research_send`. Scoped keys look like
 `event_alpha_notify:notify_no_key:last_sent:daily_digest` and

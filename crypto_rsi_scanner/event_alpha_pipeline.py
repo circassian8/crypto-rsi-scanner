@@ -123,6 +123,16 @@ class EventAlphaPipelineResult:
         return len(self.catalyst_search_result.result_events) if self.catalyst_search_result else 0
 
     @property
+    def catalyst_search_skip_reasons(self) -> dict[str, int]:
+        if self.catalyst_search_result is None:
+            return {}
+        return {
+            str(key): int(value)
+            for key, value in (self.catalyst_search_result.skip_reasons or {}).items()
+            if str(key)
+        }
+
+    @property
     def anomaly_lifecycle_entries(self) -> int:
         return len(self.anomaly_lifecycle_result.entries) if self.anomaly_lifecycle_result else 0
 
@@ -476,6 +486,11 @@ def run_event_alpha_operating_cycle(
         if catalyst_search_cfg is not None and catalyst_search_cfg.enabled:
             if catalyst_search_provider is None:
                 warnings.append("catalyst search skipped: no provider available")
+                catalyst_search_result = event_catalyst_search.CatalystSearchRunResult(
+                    provider=catalyst_search_cfg.provider,
+                    warnings=("catalyst search skipped: no provider available",),
+                    skip_reasons={"provider_unavailable": 1},
+                )
             else:
                 catalyst_search_result = event_catalyst_search.run_catalyst_search(
                     transformed,
@@ -678,6 +693,14 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
             f"hypothesis_search_queries={result.hypothesis_search_queries} · "
             f"hypothesis_search_results={result.hypothesis_search_results} · "
             f"hypothesis_promotions={result.hypothesis_promotions}"
+        ),
+        (
+            "catalyst_search_skip_reasons="
+            + (
+                ", ".join(f"{key}={value}" for key, value in sorted(result.catalyst_search_skip_reasons.items()))
+                if result.catalyst_search_skip_reasons
+                else "none"
+            )
         ),
         (
             f"watchlist_entries={result.watchlist_entries} · "

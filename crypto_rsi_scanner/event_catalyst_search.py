@@ -12,7 +12,7 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Protocol
@@ -157,6 +157,7 @@ class CatalystSearchRunResult:
     query_count: int = 0
     result_count: int = 0
     rejected_count: int = 0
+    skip_reasons: Mapping[str, int] = field(default_factory=dict)
 
     @property
     def attached_result_count(self) -> int:
@@ -519,10 +520,16 @@ def run_catalyst_search(
     """Search for source evidence around market anomalies and attach results."""
     cfg = cfg or EventCatalystSearchConfig()
     if not cfg.enabled:
-        return CatalystSearchRunResult(provider=getattr(provider, "name", cfg.provider))
+        return CatalystSearchRunResult(
+            provider=getattr(provider, "name", cfg.provider),
+            skip_reasons={"profile_disabled": 1},
+        )
     observed = _as_utc(now or datetime.now(timezone.utc))
-    anomalies = _eligible_anomalies(raw_events, cfg)
+    raw_event_rows = tuple(raw_events)
+    all_anomalies = _market_anomaly_events(raw_event_rows)
+    anomalies = _eligible_anomalies(raw_event_rows, cfg)
     queries = _queries_for_anomalies(anomalies, cfg)
+    skip_reasons = _catalyst_search_skip_reasons(all_anomalies, anomalies, queries, cfg)
     anomaly_by_id = {raw.raw_id: raw for raw in anomalies}
     warnings: list[str] = []
     try:
@@ -534,12 +541,19 @@ def run_catalyst_search(
         warnings.extend(provider_result.warnings)
         provider_events = provider_result.result_events
         provider_rejected = list(provider_result.rejected_result_events)
+        skip_reasons = _merge_reason_counts(
+            skip_reasons,
+            getattr(provider_result, "skip_reasons", {}) or {},
+            _skip_reasons_from_warnings(provider_result.warnings),
+        )
     except Exception as exc:  # noqa: BLE001
+        provider_reason = "provider_backoff" if "backoff" in str(exc).casefold() else "provider_unavailable"
         return CatalystSearchRunResult(
             provider=getattr(provider, "name", cfg.provider),
             queries=queries,
             warnings=(f"catalyst search provider failed: {exc}",),
             query_count=len(queries),
+            skip_reasons=_merge_reason_counts(skip_reasons, {provider_reason: 1}),
         )
     accepted_results: list[SearchResultEvent] = []
     rejected_results: list[SearchResultEvent] = list(provider_rejected)
@@ -594,6 +608,7 @@ def run_catalyst_search(
         query_count=len(queries),
         result_count=len(accepted_results),
         rejected_count=len(rejected_results),
+        skip_reasons=skip_reasons,
     )
 
 
@@ -887,6 +902,11 @@ def format_catalyst_search_report(result: CatalystSearchRunResult | None) -> str
         f"result_count={result.result_count or len(result.result_events)} · "
         f"rejected_count={result.rejected_count or len(result.rejected_result_events)}"
     )
+    if result.skip_reasons:
+        rows.append(
+            "skip_reasons: "
+            + ", ".join(f"{key}={value}" for key, value in sorted(result.skip_reasons.items()))
+        )
     if result.warnings:
         rows.append("warnings: " + "; ".join(result.warnings))
     if result.queries:
@@ -932,6 +952,69 @@ def _eligible_anomalies(
             candidates.append((score, raw))
     candidates.sort(key=lambda item: (item[0], item[1].raw_id), reverse=True)
     return tuple(raw for _, raw in candidates[: max(0, cfg.max_anomalies)])
+
+
+def _market_anomaly_events(raw_events: Iterable[RawDiscoveredEvent]) -> tuple[RawDiscoveredEvent, ...]:
+    out: list[RawDiscoveredEvent] = []
+    for raw in raw_events:
+        payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+        if raw.provider == "market_anomaly" or isinstance(payload.get("anomaly"), Mapping):
+            out.append(raw)
+    return tuple(out)
+
+
+def _catalyst_search_skip_reasons(
+    market_anomalies: tuple[RawDiscoveredEvent, ...],
+    eligible_anomalies: tuple[RawDiscoveredEvent, ...],
+    queries: tuple[SearchQuery, ...],
+    cfg: EventCatalystSearchConfig,
+) -> dict[str, int]:
+    reasons: dict[str, int] = {}
+    if not cfg.enabled:
+        reasons["profile_disabled"] = 1
+        return reasons
+    if not market_anomalies:
+        return reasons
+    if not eligible_anomalies:
+        reasons["no_anomalies_over_threshold"] = len(market_anomalies)
+        return reasons
+    if cfg.max_queries_per_anomaly <= 0:
+        reasons["query_limit_zero"] = len(eligible_anomalies)
+        return reasons
+    if not queries:
+        missing_identity = sum(1 for anomaly in eligible_anomalies if not _identity_for_raw_event(anomaly).symbol)
+        reasons["anomaly_identity_missing" if missing_identity else "unknown"] = missing_identity or len(eligible_anomalies)
+    return reasons
+
+
+def _skip_reasons_from_warnings(warnings: Iterable[str]) -> dict[str, int]:
+    reasons: dict[str, int] = {}
+    for warning in warnings:
+        text = str(warning or "").casefold()
+        if not text:
+            continue
+        if "backoff" in text:
+            reasons["provider_backoff"] = reasons.get("provider_backoff", 0) + 1
+        elif any(token in text for token in ("unavailable", "timeout", "failed", "failure", "dns", "429")):
+            reasons["provider_unavailable"] = reasons.get("provider_unavailable", 0) + 1
+    return reasons
+
+
+def _merge_reason_counts(*items: Mapping[str, int] | None) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for mapping in items:
+        if not mapping:
+            continue
+        for key, value in mapping.items():
+            clean = str(key or "").strip()
+            if not clean:
+                continue
+            try:
+                count = int(value)
+            except (TypeError, ValueError):
+                count = 1
+            out[clean] = out.get(clean, 0) + max(1, count)
+    return out
 
 
 def _queries_for_anomalies(

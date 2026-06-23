@@ -166,6 +166,18 @@ def build_daily_brief(
             lines.append("- Top rejected/pending hypotheses: see Event Alpha pipeline report and local watchlist HYPOTHESIS rows.")
     else:
         lines.append("- No run row available.")
+    lines.extend(["", "## Catalyst Search Skip Reasons"])
+    if latest:
+        skip_reasons = latest.get("catalyst_search_skip_reasons") or {}
+        if isinstance(skip_reasons, Mapping) and skip_reasons:
+            for key, value in sorted(skip_reasons.items()):
+                lines.append(f"- {key}: {int(value or 0)}")
+        elif int(latest.get("market_anomalies") or 0) > 0 and int(latest.get("catalyst_queries") or 0) == 0:
+            lines.append("- unknown: market anomalies were present but no catalyst queries were generated.")
+        else:
+            lines.append("- None.")
+    else:
+        lines.append("- No run row available.")
     lines.extend(["", "## New Since Last Run"])
     lines.extend(_new_since_last_run_lines(runs))
     lines.extend(["", "## Watchlist Got Hotter"])

@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Harden Event Alpha source intake observability · Codex
+**Why:** The Event Alpha intelligence layer could generate hypotheses, but
+zero-query catalyst-search runs and RSS feed failures needed clearer
+operator-facing explanations so “no alertable candidates” can be debugged
+without weakening research-only safety gates.
+**Changes:**
+- Made live RSS feed handling distinguish per-feed `feed_failure` rows from
+  provider-level `provider_failure` rows. HTTP 403/404-style feed failures no
+  longer stop the remaining RSS feeds even when fail-fast is enabled; broad
+  provider/network failures can still stop the bundle when configured.
+- Added catalyst-search `skip_reasons` counters for disabled profiles,
+  provider unavailability/backoff, below-threshold anomalies, missing anomaly
+  identity, runtime budget exhaustion, zero query limits, and unknown
+  zero-query states.
+- Surfaced catalyst-search skip reasons in the Event Alpha pipeline report,
+  run ledger, run-ledger report, and daily brief.
+- Updated `notify_llm` to include CryptoPanic in the catalyst-search provider
+  bundle while leaving `notify_no_key` on no-key providers.
+- Added offline regression tests for RSS partial feed failure behavior and
+  catalyst-search skip-reason flow through ledger and brief artifacts.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (415/415 passed); `make event-llm-eval
+PYTHON=python3` (9/9 passed); `make event-llm-extract-eval PYTHON=python3`
+(7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11 passed);
+`make verify PYTHON=python3`.
+**Notes/risks:** Metadata-only hardening. This does not change Event Alpha
+alert tiering, event-fade eligibility, Telegram send guards, paper trades,
+normal RSI signal writes, or execution.
+
 ## 2026-06-23 — Add Event Alpha impact hypotheses · Codex
 **Why:** Live Event Alpha artifacts were safely producing mostly
 `RAW_EVIDENCE` / `STORE_ONLY` rows, but the radar lacked an intermediate layer

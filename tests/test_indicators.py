@@ -2705,6 +2705,51 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
         opener=failing_opener,
     ).fetch_events(start, end) == []
 
+    class StatusResponse(FakeResponse):
+        def __init__(self, body, status):
+            super().__init__(body)
+            self.status = status
+
+    mixed_seen = []
+
+    def mixed_opener(request, timeout):
+        mixed_seen.append(request.full_url)
+        if request.full_url.endswith("/missing"):
+            return StatusResponse("not found", 403)
+        return StatusResponse(rss, 200)
+
+    mixed = ProjectBlogRssProvider(
+        None,
+        live_enabled=True,
+        feed_urls=("https://example.test/missing", "https://example.test/rss"),
+        fail_fast_on_error=True,
+        opener=mixed_opener,
+        fetched_at=fetched_at,
+    )
+    mixed_events = mixed.fetch_events(start, end)
+    assert len(mixed_events) == 1
+    assert mixed_seen == ["https://example.test/missing", "https://example.test/rss"]
+    assert any("feed_failure" in warning for warning in mixed.last_warnings)
+    assert not any("skipped remaining feeds" in warning for warning in mixed.last_warnings)
+
+    dns_seen = []
+
+    def dns_opener(request, timeout):
+        dns_seen.append(request.full_url)
+        raise TimeoutError("dns lookup failed")
+
+    dns_failed = ProjectBlogRssProvider(
+        None,
+        live_enabled=True,
+        feed_urls=("https://example.test/rss", "https://example.test/atom"),
+        fail_fast_on_error=True,
+        opener=dns_opener,
+    )
+    assert dns_failed.fetch_events(start, end) == []
+    assert dns_seen == ["https://example.test/rss"]
+    assert any("provider_failure" in warning for warning in dns_failed.last_warnings)
+    assert any("skipped remaining feeds" in warning for warning in dns_failed.last_warnings)
+
 
 def test_event_discovery_news_external_asset_inference_handles_generic_ipo_entities():
     from datetime import datetime, timezone
@@ -5114,6 +5159,7 @@ def test_event_alpha_cycle_search_loop_uses_fixture_evidence_and_respects_limits
     assert len(search_result.result_events) == 1
     assert len(search_result.attached_raw_events) == 2
     assert search_result.attached_raw_events[1].raw_id == "pump-binance-listing-dynamic"
+    assert search_result.skip_reasons == {}
 
     asset = DiscoveredAsset(
         coin_id="pump-protocol",
@@ -5153,6 +5199,117 @@ def test_event_alpha_cycle_search_loop_uses_fixture_evidence_and_respects_limits
         event_playbooks.EventPlaybookType.LISTING_VOLATILITY.value
     )
     assert by_event["pump-binance-listing-dynamic"].tier != event_alerts.EventAlertTier.TRIGGERED_FADE
+
+
+def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_daily_brief,
+        event_alpha_pipeline,
+        event_alpha_run_ledger,
+        event_catalyst_search,
+        event_discovery,
+    )
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def anomaly(raw_id="market_anomaly:pump:2026-06-18", score=90.0, symbol="PUMP"):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="market_anomaly",
+            fetched_at=now,
+            published_at=now,
+            source_url=None,
+            title=f"{symbol} market anomaly",
+            body=None,
+            raw_json={
+                "symbol": symbol,
+                "market": {"symbol": symbol, "coin_id": "pump-protocol", "name": "Pump Protocol"},
+                "anomaly": {"score": score, "return_24h": 0.45},
+            },
+            source_confidence=0.70,
+            content_hash=raw_id,
+        )
+
+    low = anomaly(raw_id="market_anomaly:low:2026-06-18", score=25.0, symbol="LOW")
+    cfg = event_catalyst_search.EventCatalystSearchConfig(
+        enabled=True,
+        min_anomaly_score=60,
+        max_queries_per_anomaly=4,
+    )
+    low_result = event_catalyst_search.run_catalyst_search(
+        [low],
+        event_catalyst_search.FixtureCatalystSearchProvider({}),
+        cfg=cfg,
+        now=now,
+    )
+    assert low_result.queries == ()
+    assert low_result.skip_reasons["no_anomalies_over_threshold"] == 1
+
+    high = anomaly()
+
+    def loader(observed, raw_event_transform):
+        raw_events = (high,)
+        if raw_event_transform:
+            raw_events = tuple(raw_event_transform(raw_events))
+        return event_discovery.run_discovery(raw_events, [], now=observed)
+
+    no_provider = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=loader,
+        now=now,
+        catalyst_search_provider=None,
+        catalyst_search_cfg=cfg,
+        refresh_watchlist=False,
+        route=False,
+    )
+    assert no_provider.catalyst_search_skip_reasons["provider_unavailable"] == 1
+    assert no_provider.catalyst_queries == 0
+
+    class BackoffProvider:
+        name = "backoff"
+
+        def search(self, queries, *, max_results_per_query, now=None):
+            queries = tuple(queries)
+            return event_catalyst_search.CatalystSearchRunResult(
+                provider=self.name,
+                queries=queries,
+                warnings=("provider in backoff until later",),
+                query_count=len(queries),
+            )
+
+    backoff = event_catalyst_search.run_catalyst_search([high], BackoffProvider(), cfg=cfg, now=now)
+    assert backoff.queries
+    assert backoff.skip_reasons["provider_backoff"] == 1
+
+    with tempfile.TemporaryDirectory() as tmp:
+        row = event_alpha_run_ledger.append_run_record(
+            no_provider,
+            cfg=event_alpha_run_ledger.EventAlphaRunLedgerConfig(Path(tmp) / "runs.jsonl"),
+            profile="fixture",
+            started_at=now,
+            finished_at=now,
+            with_llm=False,
+            send_requested=False,
+        )
+        assert row["catalyst_search_skip_reasons"]["provider_unavailable"] == 1
+        runs_report = event_alpha_run_ledger.format_run_ledger_report(
+            event_alpha_run_ledger.EventAlphaRunLedgerReadResult(
+                path=Path(tmp) / "runs.jsonl",
+                rows_read=1,
+                rows=[row],
+            )
+        )
+        assert "catalyst_search_skip_reasons: provider_unavailable=1" in runs_report
+        brief = event_alpha_daily_brief.build_daily_brief(
+            run_rows=[row],
+            include_test_artifacts=True,
+            include_legacy_artifacts=True,
+        )
+        assert "## Catalyst Search Skip Reasons" in brief
+        assert "- provider_unavailable: 1" in brief
 
 
 def test_event_catalyst_search_proxy_evidence_still_requires_deterministic_validation():

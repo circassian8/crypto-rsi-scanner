@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from ..event_models import RawDiscoveredEvent
@@ -79,13 +80,14 @@ class ProjectBlogRssProvider:
                     body = response.read()
                 rows = _feed_rows(body, feed_url=feed_url, fetched_at=fetched_at)
             except Exception as exc:  # noqa: BLE001
-                warning = f"Project blog/RSS live feed fetch failed for {feed_url}: {exc}"
+                failure_kind = _feed_failure_kind(exc)
+                warning = f"{failure_kind} project_blog_rss feed_url={feed_url}: {exc}"
                 warnings.append(warning)
                 if self.required:
                     raise
                 log.warning(warning)
-                if self.fail_fast_on_error:
-                    warning = "Project blog/RSS fail-fast enabled; skipped remaining feeds after first failure"
+                if self.fail_fast_on_error and failure_kind == "provider_failure":
+                    warning = "provider_failure project_blog_rss fail-fast enabled; skipped remaining feeds after provider-level failure"
                     warnings.append(warning)
                     log.warning(warning)
                     break
@@ -179,3 +181,17 @@ def _atom_link(entry: ET.Element) -> str | None:
 def _local_name(tag: object) -> str:
     text = str(tag)
     return text.rsplit("}", 1)[-1] if "}" in text else text
+
+
+def _feed_failure_kind(exc: Exception) -> str:
+    """Classify one-feed failures separately from broad provider failures."""
+    if isinstance(exc, HTTPError):
+        return "feed_failure"
+    if isinstance(exc, (TimeoutError, URLError, OSError)):
+        return "provider_failure"
+    text = str(exc).lower()
+    if "http " in text or text.startswith("http"):
+        return "feed_failure"
+    if isinstance(exc, ET.ParseError):
+        return "feed_failure"
+    return "provider_failure"

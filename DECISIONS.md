@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-23 - Treat source/search failures as observability, not eligibility
+**Status:** accepted
+**Decision:** Event Alpha source-intake and catalyst-search failures should be
+recorded with explicit reason codes (`feed_failure`, `provider_failure`,
+`provider_unavailable`, `provider_backoff`, `no_anomalies_over_threshold`,
+`anomaly_identity_missing`, `runtime_budget_exhausted`, `query_limit_zero`,
+`unknown`) and surfaced in reports/briefs. These reason codes explain missing
+evidence or zero-query runs, but they do not promote rows, create watchlist
+eligibility, create `TRIGGERED_FADE`, write paper/live rows, or alter normal RSI
+routing.
+**Why:** Operators need to distinguish “nothing interesting found” from “search
+was skipped or blocked” without letting provider/error metadata become signal
+logic.
+**Revisit when:** Catalyst-search reliability data is sufficient to automate
+provider failover or budget allocation with a reviewed policy.
+
 ## 2026-06-23 - Keep impact hypotheses below alert eligibility until validated
 **Status:** accepted
 **Decision:** Event Alpha may generate impact hypotheses that infer which

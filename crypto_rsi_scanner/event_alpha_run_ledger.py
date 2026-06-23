@@ -156,6 +156,9 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"hypothesis_results={int(row.get('hypothesis_search_results') or 0)} "
             f"promotions={int(row.get('hypothesis_promotions') or 0)}"
         )
+        skip_reasons = row.get("catalyst_search_skip_reasons") or {}
+        if isinstance(skip_reasons, Mapping) and skip_reasons:
+            rows.append("  catalyst_search_skip_reasons: " + _format_reason_counts(skip_reasons))
         lane_attempted = row.get("send_lane_items_attempted") or {}
         lane_delivered = row.get("send_lane_items_delivered") or {}
         if lane_attempted or lane_delivered:
@@ -245,6 +248,11 @@ def _run_record(
         "catalyst_queries": _int(getattr(result, "catalyst_queries", 0)),
         "catalyst_results_accepted": _int(getattr(catalyst, "attached_result_count", 0)),
         "catalyst_results_rejected": _int(getattr(catalyst, "rejected_result_count", 0)),
+        "catalyst_search_skip_reasons": _catalyst_search_skip_reasons(
+            result,
+            warnings=warnings,
+            discovery=discovery,
+        ),
         "extraction_rows": len(extraction_rows),
         "extraction_hints_applied": _int(getattr(result, "extraction_hint_events", 0)),
         "impact_hypotheses": len(tuple(getattr(result, "impact_hypotheses", ()) or ())),
@@ -360,6 +368,43 @@ def _market_anomaly_count(discovery: Any) -> int:
         if isinstance(payload, Mapping) and isinstance(payload.get("anomaly"), Mapping):
             count += 1
     return count
+
+
+def _catalyst_search_skip_reasons(
+    result: Any,
+    *,
+    warnings: Iterable[str],
+    discovery: Any,
+) -> dict[str, int]:
+    raw = getattr(result, "catalyst_search_skip_reasons", None)
+    if raw is None:
+        catalyst = getattr(result, "catalyst_search_result", None)
+        raw = getattr(catalyst, "skip_reasons", None) if catalyst is not None else None
+    out: dict[str, int] = {}
+    if isinstance(raw, Mapping):
+        for key, value in raw.items():
+            clean = str(key or "").strip()
+            if not clean:
+                continue
+            out[clean] = out.get(clean, 0) + max(1, _int(value))
+    warning_text = " ".join(str(item or "") for item in warnings).casefold()
+    if "notification_runtime_budget_exhausted_before_catalyst_search" in warning_text:
+        out["runtime_budget_exhausted"] = out.get("runtime_budget_exhausted", 0) + 1
+    if ("provider_backoff" in warning_text or "backoff" in warning_text) and "provider_backoff" not in out:
+        out["provider_backoff"] = out.get("provider_backoff", 0) + 1
+    if "catalyst search skipped: no provider available" in warning_text and "provider_unavailable" not in out:
+        out["provider_unavailable"] = out.get("provider_unavailable", 0) + 1
+    if not out and _market_anomaly_count(discovery) > 0 and _int(getattr(result, "catalyst_queries", 0)) == 0:
+        out["unknown"] = 1
+    return out
+
+
+def _format_reason_counts(reasons: Mapping[str, Any]) -> str:
+    return ", ".join(
+        f"{key}={_int(value)}"
+        for key, value in sorted(reasons.items())
+        if str(key)
+    )
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
