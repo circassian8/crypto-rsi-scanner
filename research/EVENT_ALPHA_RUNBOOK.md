@@ -77,6 +77,12 @@ promote to `RADAR` only after identity-safe source evidence explicitly links a
 candidate asset to the catalyst (`catalyst_link_validated`,
 `market_confirmed`, or `promoted_to_radar`). Candidate-only or identity-only
 evidence can improve review context but does not promote a token-level row.
+Candidate-discovery search hits can suggest new crypto candidates when the
+source payload or quote-validated extraction names an asset, but those
+suggestions still need deterministic identity/catalyst validation before they
+can become token-level `RADAR` rows. Use the report's `why_not_promoted`
+section to separate discovery-only leads from identity/catalyst/market/score
+blockers.
 Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`, paper/live rows, or
 `TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from `event_fade.py` plus
 the `proxy_fade` playbook.
@@ -98,9 +104,10 @@ or the review-focused
 Rows include candidate provenance (`taxonomy`, `llm_extraction`, and/or
 `deterministic_resolver`), suggested assets, validated assets, flattened
 `validated_symbol` / `validated_coin_id` fields, promoted watchlist keys,
-validation status, search queries, and rejection reasons. Suggested LLM assets
-are metadata only until deterministic resolver/search evidence validates
-identity.
+validation status, search queries, rejection reasons, rejected validation
+evidence samples, schema-audit fields, and `why_not_promoted` diagnostics.
+Suggested LLM/search assets are metadata only until deterministic
+resolver/search evidence validates identity.
 
 When an Event Alpha cycle has market anomalies but `catalyst_queries=0`, check
 the run ledger or daily brief `Catalyst Search Skip Reasons` section before

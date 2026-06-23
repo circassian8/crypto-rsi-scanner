@@ -184,10 +184,22 @@ def build_daily_brief(
         status_counts = _field_counts(hypotheses, "status")
         stage_counts = _field_counts(hypotheses, "validation_stage")
         category_counts = _field_counts(hypotheses, "impact_category")
+        schema_counts = _field_counts(hypotheses, "schema_version")
+        why_counts = _multi_field_counts(hypotheses, "why_not_promoted")
+        legacy_count = sum(
+            1 for row in hypotheses
+            if not str(row.get("schema_version") or "").startswith("event_impact_hypothesis_store_")
+            or any(
+                field not in row
+                for field in ("validation_stage", "hypothesis_score", "external_entities", "crypto_candidate_assets")
+            )
+        )
         lines.append("- Stored rows: " + str(len(hypotheses)))
+        lines.append("- Stored schema versions: " + _format_counts(schema_counts) + f" (legacy={legacy_count})")
         lines.append("- Stored statuses: " + _format_counts(status_counts))
         lines.append("- Stored validation stages: " + _format_counts(stage_counts))
         lines.append("- Stored categories: " + _format_counts(category_counts))
+        lines.append("- Why not promoted: " + _format_counts(why_counts))
         pending = [
             row for row in hypotheses
             if str(row.get("status") or "") in {"validation_search_pending", "hypothesis"}
@@ -209,7 +221,12 @@ def build_daily_brief(
             reverse=True,
         )
         lines.append("- Top hypothesis scores: " + (_brief_hypothesis_labels(ranked[:3]) or "none"))
-        rejected_samples = sum(len(row.get("rejected_validation_samples") or []) for row in hypotheses)
+        rejected_samples = sum(
+            1
+            for row in hypotheses
+            for sample in (row.get("rejected_validation_samples") or [])
+            if isinstance(sample, Mapping) and (not bool(sample.get("accepted")) or sample.get("rejection_reason"))
+        )
         if rejected_samples:
             lines.append(f"- Rejected validation evidence samples: {rejected_samples}")
     elif latest and int(latest.get("impact_hypotheses") or 0) > 0:
@@ -441,6 +458,19 @@ def _field_counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, in
     for row in rows:
         key = str(row.get(field) or "unknown")
         counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _multi_field_counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        values = row.get(field) or []
+        if isinstance(values, str):
+            values = [values]
+        for value in values:
+            key = str(value or "").strip()
+            if key:
+                counts[key] = counts.get(key, 0) + 1
     return counts
 
 

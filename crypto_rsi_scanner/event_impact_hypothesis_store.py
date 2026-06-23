@@ -118,9 +118,11 @@ def format_impact_hypotheses_store_report(
         rows.extend(["", "No stored impact hypotheses found."])
         return "\n".join(rows)
 
+    rows.extend(_schema_audit_section(result.rows))
     rows.append("categories: " + _format_counts(_counts(result.rows, "impact_category")))
     rows.append("statuses: " + _format_counts(_counts(result.rows, "status")))
     rows.append("validation_stages: " + _format_counts(_counts(result.rows, "validation_stage")))
+    rows.append("why_not_promoted: " + _format_counts(_reason_counts(result.rows, "why_not_promoted")))
     rows.append("scopes: " + _format_counts(_counts(result.rows, "hypothesis_scope")))
     rows.append("candidate_sources: " + _format_counts(_counts(result.rows, "candidate_source")))
     rows.append(
@@ -166,6 +168,8 @@ def format_impact_hypotheses_store_report(
     rows.extend(_query_section(result.rows))
     rows.append("")
     rows.extend(_rejected_validation_samples_section(result.rows))
+    rows.append("")
+    rows.extend(_why_not_promoted_section(result.rows))
     rows.append("")
     rows.extend(_promotion_section(result.rows, promotion_ids))
     rows.append("")
@@ -390,9 +394,35 @@ def _format_hypothesis_row(
         out.append("  validated: " + "; ".join(str(item) for item in row["validation_reasons"][:3]))
     if include_rejections and row.get("rejection_reasons"):
         out.append("  rejected: " + "; ".join(str(item) for item in row["rejection_reasons"][:3]))
+    if row.get("why_not_promoted"):
+        out.append("  why_not_promoted: " + "; ".join(str(item) for item in row["why_not_promoted"][:4]))
     if row.get("warnings"):
         out.append("  warnings: " + "; ".join(str(item) for item in row["warnings"][:3]))
     return out
+
+
+def _schema_audit_section(rows: list[Mapping[str, Any]]) -> list[str]:
+    versions = _counts(rows, "schema_version")
+    required = (
+        "validation_stage",
+        "hypothesis_score",
+        "external_entities",
+        "crypto_candidate_assets",
+    )
+    missing = {
+        field: sum(1 for row in rows if field not in row)
+        for field in required
+    }
+    legacy = [
+        row for row in rows
+        if str(row.get("schema_version") or "") != IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION
+        or any(field not in row for field in required)
+    ]
+    return [
+        "schema_audit: "
+        f"versions={_format_counts(versions)} · legacy_rows={len(legacy)} · "
+        + " · ".join(f"missing_{field}={count}" for field, count in missing.items())
+    ]
 
 
 def _query_section(rows: list[Mapping[str, Any]], *, limit: int = 12) -> list[str]:
@@ -427,7 +457,8 @@ def _rejected_validation_samples_section(rows: list[Mapping[str, Any]], *, limit
     for row in rows:
         for sample in row.get("rejected_validation_samples") or []:
             if isinstance(sample, Mapping):
-                samples.append(sample)
+                if not bool(sample.get("accepted")) or sample.get("rejection_reason"):
+                    samples.append(sample)
     out = [f"Rejected validation evidence samples: {len(samples)}"]
     if not samples:
         out.append("- none")
@@ -440,6 +471,24 @@ def _rejected_validation_samples_section(rows: list[Mapping[str, Any]], *, limit
         )
     if len(samples) > limit:
         out.append(f"- +{len(samples) - limit} more")
+    return out
+
+
+def _why_not_promoted_section(rows: list[Mapping[str, Any]], *, limit: int = 10) -> list[str]:
+    counts = _reason_counts(rows, "why_not_promoted")
+    out = ["Why not promoted diagnostics: " + _format_counts(counts)]
+    if not counts:
+        return out
+    top_rows = [
+        row for row in rows
+        if row.get("why_not_promoted")
+    ]
+    for row in top_rows[:limit]:
+        out.append(
+            f"- {row.get('impact_category') or 'unknown'} external={row.get('external_asset') or 'unknown'} "
+            f"stage={row.get('validation_stage') or 'unknown'} reasons="
+            + ";".join(str(item) for item in (row.get("why_not_promoted") or [])[:4])
+        )
     return out
 
 
@@ -501,6 +550,19 @@ def _counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:
     for row in rows:
         key = str(row.get(field) or "unknown")
         out[key] = out.get(key, 0) + 1
+    return out
+
+
+def _reason_counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for row in rows:
+        values = row.get(field) or []
+        if isinstance(values, str):
+            values = [values]
+        for value in values:
+            key = str(value or "").strip()
+            if key:
+                out[key] = out.get(key, 0) + 1
     return out
 
 

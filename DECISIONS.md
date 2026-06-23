@@ -43,6 +43,10 @@ Figma, elections, or sports fixtures are catalyst context, not crypto
 `candidate_discovery` queries even without named assets, but token-level
 watchlist promotion requires catalyst-linked candidate validation
 (`catalyst_link_validated`, `market_confirmed`, or `promoted_to_radar`).
+Candidate-discovery results may suggest crypto candidates for later validation,
+but those suggestions stay below promotion until deterministic identity evidence
+and catalyst linkage validate the candidate. Reports should expose
+`why_not_promoted` reasons so discovery-only evidence is auditable.
 Candidate-only evidence can reach `source_mentions_candidate`; identity-only
 evidence can reach `identity_validated`; catalyst-only evidence is rejection/no
 candidate validation. Reports may persist capped rejected validation samples for
@@ -60,6 +64,10 @@ JSONL research artifacts (`event_impact_hypotheses.jsonl`) with run/profile/
 namespace metadata, candidate provenance, validation status, search queries,
 validation/rejection reasons, flattened validated symbol/coin-id fields, and
 promoted watchlist keys when validation links a hypothesis to a watchlist row.
+Rows also carry schema-auditable fields (`validation_stage`,
+`hypothesis_score`, `external_entities`, `crypto_candidate_assets`) plus
+diagnostic `why_not_promoted` reason codes so legacy/missing fields and blocked
+promotion causes are visible in reports/briefs.
 LLM-extracted assets may populate `suggested_candidate_assets` and drive
 validation-search metadata, but only deterministic resolver/search identity
 validation may populate token-level validated candidates. `notify_llm` may fetch

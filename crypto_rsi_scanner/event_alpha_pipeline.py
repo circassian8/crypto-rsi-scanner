@@ -327,7 +327,12 @@ def run_event_alpha_pipeline(
                 impact_hypotheses,
                 hypothesis_search_result,
             )
-            validation_raw = tuple(result.raw_event for result in hypothesis_search_result.result_events)
+            discovery_hint_raw = tuple(
+                result.raw_event
+                for result in hypothesis_search_result.rejected_result_events
+                if str(getattr(getattr(result, "query", None), "query_type", "") or "") == "candidate_discovery"
+            )
+            validation_raw = tuple(result.raw_event for result in hypothesis_search_result.result_events) + discovery_hint_raw
             impact_hypotheses = event_impact_hypotheses.validate_hypotheses_with_raw_events(
                 impact_hypotheses,
                 validation_raw,

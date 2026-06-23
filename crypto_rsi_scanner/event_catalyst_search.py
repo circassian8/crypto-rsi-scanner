@@ -824,13 +824,21 @@ def generate_search_query_specs_for_hypothesis(hypothesis: object) -> tuple[Hypo
     if not out:
         discovery_terms: list[str] = []
         if external:
-            discovery_terms.append(f"{external} crypto assets")
-            discovery_terms.append(f"{external} crypto catalyst")
+            discovery_terms.extend((
+                f"{external} crypto exposure",
+                f"{external} tokenized stock crypto",
+                f"{external} pre-IPO crypto",
+                f"{external} prediction market token",
+                f"{external} perp crypto",
+                f"{external} synthetic exposure crypto",
+                f"{external} crypto venue",
+            ))
         for sector in sectors[:4]:
             clean = sector.replace("_", " ")
-            discovery_terms.append(f"{clean} crypto catalyst")
             if external:
                 discovery_terms.append(f"{external} {clean} crypto")
+            else:
+                discovery_terms.append(f"{clean} crypto catalyst candidates")
         out.extend(HypothesisSearchQuerySpec(query, "candidate_discovery") for query in discovery_terms)
     deduped: dict[str, HypothesisSearchQuerySpec] = {}
     for item in out:

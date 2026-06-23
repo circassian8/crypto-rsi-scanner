@@ -6792,6 +6792,219 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
     assert rejected.status != "validated"
 
 
+def test_event_impact_candidate_discovery_suggests_then_requires_identity_validation():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search, event_impact_hypotheses
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp-openai-sector",
+        event_cluster_id="openai|ipo_proxy|2026-06-20",
+        event_type="ipo_proxy",
+        external_asset="OpenAI",
+        impact_category="ai_ipo_proxy",
+        candidate_sectors=("ai_tokens", "tokenized_stock_venues"),
+        candidate_symbols=(),
+        direction_hint="up_then_fade",
+        playbook_hint="ai_ipo_proxy",
+        confidence=0.86,
+        hypothesis_score=67.0,
+        search_query_details=(
+            {"query": "OpenAI crypto exposure", "query_type": "candidate_discovery"},
+        ),
+        search_queries=("OpenAI crypto exposure",),
+    )
+    query = event_catalyst_search.SearchQuery(
+        anomaly_raw_id=hypothesis.hypothesis_id,
+        query="OpenAI crypto exposure",
+        symbol="SECTOR",
+        rank=1,
+        query_type="candidate_discovery",
+    )
+    raw = RawDiscoveredEvent(
+        raw_id="velvet-openai-discovery",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/velvet-openai",
+        title="VELVET opens OpenAI pre-IPO crypto venue",
+        body="Velvet Capital users can trade tokenized stock style exposure to OpenAI.",
+        raw_json={
+            "asset": {
+                "symbol": "VELVET",
+                "coin_id": "velvet",
+                "name": "Velvet Capital",
+                "confidence": 0.90,
+            }
+        },
+        source_confidence=0.90,
+        content_hash="velvet-openai-discovery",
+    )
+    search_result = event_catalyst_search.CatalystSearchRunResult(
+        provider="fixture",
+        queries=(query,),
+        rejected_result_events=(
+            event_catalyst_search.SearchResultEvent(
+                query=query,
+                raw_event=raw,
+                result_score=45,
+                result_score_reasons=("result_identity_rejected",),
+                accepted=False,
+            ),
+        ),
+        rejected_count=1,
+    )
+    discovered = event_impact_hypotheses.attach_hypothesis_search_samples((hypothesis,), search_result)[0]
+    assert discovered.status == event_impact_hypotheses.HypothesisStatus.VALIDATION_SEARCH_PENDING.value
+    assert discovered.validation_stage == event_impact_hypotheses.ValidationStage.CANDIDATE_ASSETS_SUGGESTED.value
+    assert discovered.candidate_symbols == ("VELVET",)
+    assert discovered.crypto_candidate_assets[0]["source"] == "candidate_discovery_search"
+    assert "candidate_identity_not_validated" in discovered.why_not_promoted
+
+    validated = event_impact_hypotheses.validate_hypotheses_with_raw_events((discovered,), (raw,))[0]
+    assert validated.status == event_impact_hypotheses.HypothesisStatus.VALIDATED.value
+    assert validated.validation_stage == event_impact_hypotheses.ValidationStage.CATALYST_LINK_VALIDATED.value
+    assert validated.candidate_symbols == ("VELVET",)
+    assert validated.why_not_promoted == ()
+
+
+def test_event_impact_hypothesis_external_entities_never_become_crypto_candidates():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_impact_hypotheses
+    from crypto_rsi_scanner.event_llm_extraction_models import (
+        EventLLMCryptoAssetMention,
+        EventLLMRawEventExtraction,
+    )
+    from crypto_rsi_scanner.event_llm_extractor import EventLLMExtractionReportRow
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    names = ("OpenAI", "Anthropic", "SpaceX", "Stripe", "Databricks", "Anduril", "Figma", "Fannie Mae", "Freddie Mac")
+    body = " ".join(f"{name} pre-IPO exposure" for name in names)
+    raw = RawDiscoveredEvent(
+        raw_id="external-entities-only",
+        provider="rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/external-entities",
+        title="External pre-IPO proxy basket gets attention",
+        body=body,
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="external-entities-only",
+    )
+    event = NormalizedEvent(
+        event_id=raw.raw_id,
+        raw_ids=(raw.raw_id,),
+        event_name=raw.title,
+        event_type="ipo_proxy",
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=now,
+        source=raw.provider,
+        source_urls=(raw.source_url,),
+        external_asset="OpenAI",
+        description=body,
+        confidence=0.90,
+    )
+    extraction = EventLLMRawEventExtraction(
+        schema_version="event_llm_extraction_v1",
+        provider="fixture",
+        model="fixture",
+        prompt_version="test",
+        raw_id=raw.raw_id,
+        confidence=0.90,
+        external_catalysts=(),
+        crypto_asset_mentions=tuple(
+            EventLLMCryptoAssetMention(
+                name=name,
+                symbol=name.upper().replace(" ", ""),
+                coin_id=name.lower().replace(" ", "-"),
+                contract_address=None,
+                mention_type="project_or_token",
+                confidence=0.90,
+            )
+            for name in names
+        ),
+    )
+    hypotheses = event_impact_hypotheses.generate_impact_hypotheses(
+        EventDiscoveryResult((raw,), (event,), (), (), ()),
+        extraction_rows=(EventLLMExtractionReportRow(raw_event=raw, extraction=extraction),),
+        now=now,
+        taxonomy={},
+    )
+    candidate_symbols = {symbol for hypothesis in hypotheses for symbol in hypothesis.candidate_symbols}
+    crypto_symbols = {
+        str(asset.get("symbol") or "")
+        for hypothesis in hypotheses
+        for asset in hypothesis.crypto_candidate_assets
+    }
+    rejected_reasons = {
+        str(asset.get("rejection_reason") or "")
+        for hypothesis in hypotheses
+        for asset in hypothesis.rejected_candidate_assets
+    }
+    for name in names:
+        symbol = name.upper().replace(" ", "")
+        assert symbol not in candidate_symbols
+        assert symbol not in crypto_symbols
+    assert "external_entity_not_crypto_candidate" in rejected_reasons
+
+
+def test_event_impact_hypothesis_store_reports_schema_and_promotion_diagnostics():
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_impact_hypothesis_store
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    rows = [
+        {
+            "row_type": "event_impact_hypothesis",
+            "schema_version": event_impact_hypothesis_store.IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION,
+            "observed_at": now.isoformat(),
+            "hypothesis_id": "current",
+            "status": "validation_search_pending",
+            "validation_stage": "candidate_assets_suggested",
+            "hypothesis_score": 54.0,
+            "impact_category": "ai_ipo_proxy",
+            "external_asset": "OpenAI",
+            "external_entities": [{"name": "OpenAI"}],
+            "crypto_candidate_assets": [{"symbol": "VELVET", "coin_id": "velvet", "source": "candidate_discovery_search"}],
+            "why_not_promoted": ["candidate_identity_not_validated", "catalyst_link_missing"],
+            "rejected_validation_samples": [{
+                "query": "OpenAI crypto exposure",
+                "query_type": "candidate_discovery",
+                "result_title": "VELVET opens OpenAI venue",
+                "source": "fixture",
+                "candidate_symbol": "SECTOR",
+                "score": 45,
+                "rejection_reason": "result_identity_rejected",
+            }],
+        },
+        {
+            "row_type": "event_impact_hypothesis",
+            "observed_at": now.isoformat(),
+            "hypothesis_id": "legacy",
+            "status": "hypothesis",
+            "impact_category": "rwa_preipo_proxy",
+            "external_asset": "SpaceX",
+        },
+    ]
+    result = event_impact_hypothesis_store.EventImpactHypothesisStoreReadResult(
+        path=Path("/tmp/event_impact_hypotheses.jsonl"),
+        rows_read=len(rows),
+        rows=rows,
+    )
+    report = event_impact_hypothesis_store.format_impact_hypotheses_store_report(result, now=now)
+    assert "schema_audit:" in report
+    assert "legacy_rows=1" in report
+    assert "missing_validation_stage=1" in report
+    assert "Why not promoted diagnostics:" in report
+    assert "candidate_identity_not_validated=1" in report
+    assert "Rejected validation evidence samples: 1" in report
+
+
 def test_event_source_enrichment_extracts_and_reuses_cache():
     import tempfile
     from datetime import datetime, timezone
@@ -6817,7 +7030,8 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
     <body><nav>Home Markets Prices News Learn Newsletter</nav>
     <div>BTC $104000 +2.1% ETH $2500 -1.0% SOL $150 +4.4%</div>
     <article><h1>SpaceX pre-IPO exposure</h1>
-    <p>Velvet Capital is named in the full article, but not the RSS summary.</p></article></body></html>
+    <p>Velvet Capital is named in the full article, but not the RSS summary.</p>
+    <p>Hyperliquid HYPE token traders are watching the proxy venue.</p></article></body></html>
     """
     calls = {"count": 0}
 
@@ -6837,10 +7051,12 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
         second = event_source_enrichment.enrich_source_text(raw, cfg=cfg, fetch_fn=lambda *_: (_ for _ in ()).throw(RuntimeError("should not fetch")))
         assert first.fetched is True
         assert "Velvet Capital is named" in first.enriched_text
+        assert "Hyperliquid HYPE token traders" in first.enriched_text
         assert "Home Markets Prices" not in first.enriched_text
         assert "BTC $104000" not in first.enriched_text
         assert second.used_cache is True
         assert "Velvet Capital is named" in second.enriched_text
+        assert "Hyperliquid HYPE token traders" in second.enriched_text
         assert calls["count"] == 1
         annotated = event_source_enrichment.annotate_raw_event_with_enrichment(first)
         packet = event_llm_extractor.build_raw_event_packet(annotated)

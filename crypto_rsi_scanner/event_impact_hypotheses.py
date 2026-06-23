@@ -99,6 +99,7 @@ class EventImpactHypothesis:
     validation_reasons: tuple[str, ...] = ()
     rejection_reasons: tuple[str, ...] = ()
     rejected_validation_samples: tuple[dict[str, Any], ...] = ()
+    why_not_promoted: tuple[str, ...] = ()
     created_at: str | None = None
 
 
@@ -398,7 +399,7 @@ def validate_hypotheses_with_raw_events(
             ))
         else:
             out.append(hypothesis)
-    return tuple(out)
+    return tuple(_with_promotion_diagnostics(item) for item in out)
 
 
 def attach_hypothesis_search_samples(
@@ -445,7 +446,191 @@ def attach_hypothesis_search_samples(
             out.append(replace(hypothesis, rejected_validation_samples=parsed))
         else:
             out.append(hypothesis)
+    out = list(_apply_candidate_discovery_results(out, search_result))
+    return tuple(_with_promotion_diagnostics(item, search_result=search_result) for item in out)
+
+
+def _apply_candidate_discovery_results(
+    hypotheses: Iterable[EventImpactHypothesis],
+    search_result: object,
+) -> tuple[EventImpactHypothesis, ...]:
+    """Use candidate-discovery results as suggestions, never as validation."""
+    discovery_assets: dict[str, list[dict[str, Any]]] = {}
+    for attr in ("result_events", "rejected_result_events"):
+        for result in getattr(search_result, attr, ()) or ():
+            query = getattr(result, "query", None)
+            raw = getattr(result, "raw_event", None)
+            if query is None or raw is None:
+                continue
+            if str(getattr(query, "query_type", "") or "") != "candidate_discovery":
+                continue
+            hypothesis_id = str(getattr(query, "anomaly_raw_id", "") or "")
+            if not hypothesis_id:
+                continue
+            asset = _candidate_asset_from_discovery_raw(raw)
+            if asset:
+                discovery_assets.setdefault(hypothesis_id, []).append(asset)
+
+    out: list[EventImpactHypothesis] = []
+    for hypothesis in hypotheses:
+        assets = tuple(discovery_assets.get(hypothesis.hypothesis_id, ()))
+        if not assets:
+            out.append(hypothesis)
+            continue
+        accepted, rejected = _split_suggested_assets(
+            assets,
+            external_entities=hypothesis.external_entities,
+            text=" ".join((hypothesis.external_asset or "", *hypothesis.evidence_quotes)),
+        )
+        crypto_assets = _merge_asset_rows(hypothesis.crypto_candidate_assets, accepted)
+        symbols, coin_ids = _assets_from_asset_rows(crypto_assets)
+        components = dict(hypothesis.score_components or {})
+        if not components and float(hypothesis.hypothesis_score or 0.0) > 0.0:
+            base = max(0.0, min(100.0, float(hypothesis.hypothesis_score or 0.0)))
+            components.update({
+                "event_clarity": base,
+                "source_quality": base,
+                "catalyst_strength": base,
+                "sector_relevance": base,
+            })
+        if accepted:
+            components["candidate_asset_strength"] = max(
+                float(components.get("candidate_asset_strength") or 0.0),
+                min(100.0, 35.0 + len(accepted) * 14.0),
+            )
+        if rejected:
+            components["candidate_discovery_rejected"] = max(
+                float(components.get("candidate_discovery_rejected") or 0.0),
+                float(len(rejected)),
+            )
+        score = _weighted_hypothesis_score(components, hypothesis.impact_category)
+        stage = hypothesis.validation_stage
+        status = hypothesis.status
+        if accepted and stage in {
+            ValidationStage.SECTOR_HYPOTHESIS.value,
+            ValidationStage.CANDIDATE_ASSETS_SUGGESTED.value,
+        }:
+            stage = ValidationStage.CANDIDATE_ASSETS_SUGGESTED.value
+            status = HypothesisStatus.VALIDATION_SEARCH_PENDING.value
+        out.append(replace(
+            hypothesis,
+            candidate_symbols=symbols or hypothesis.candidate_symbols,
+            candidate_coin_ids=coin_ids or hypothesis.candidate_coin_ids,
+            suggested_candidate_assets=_merge_asset_rows(hypothesis.suggested_candidate_assets, accepted),
+            crypto_candidate_assets=crypto_assets,
+            rejected_candidate_assets=_merge_asset_rows(hypothesis.rejected_candidate_assets, rejected),
+            candidate_source=_append_candidate_source(hypothesis.candidate_source, "candidate_discovery_search") if accepted else hypothesis.candidate_source,
+            validation_stage=stage,
+            status=status,
+            score_components=components,
+            hypothesis_score=round(score, 2),
+            confidence=max(0.0, min(1.0, round(score / 100.0, 4))),
+        ))
     return tuple(out)
+
+
+def _candidate_asset_from_discovery_raw(raw: RawDiscoveredEvent) -> dict[str, Any] | None:
+    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    for key in ("candidate_asset", "asset", "market"):
+        asset = payload.get(key) if isinstance(payload.get(key), Mapping) else {}
+        row = _asset_row_from_mapping(asset, source="candidate_discovery_search", raw_id=raw.raw_id)
+        if row:
+            return row
+    extraction = payload.get("llm_extraction") if isinstance(payload.get("llm_extraction"), Mapping) else {}
+    mentions = extraction.get("crypto_asset_mentions") if isinstance(extraction.get("crypto_asset_mentions"), list) else []
+    for mention in mentions:
+        if not isinstance(mention, Mapping):
+            continue
+        try:
+            confidence = float(mention.get("confidence") or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        if confidence < 0.70:
+            continue
+        mention_type = clean_text(mention.get("mention_type"))
+        if mention_type in {"publisher or source", "publisher_or_source", "ordinary word", "ordinary_word", "false positive"}:
+            continue
+        row = _asset_row_from_mapping(mention, source="candidate_discovery_search", raw_id=raw.raw_id)
+        if row:
+            row["confidence"] = round(max(0.0, min(1.0, confidence)), 4)
+            return row
+    return None
+
+
+def _asset_row_from_mapping(
+    asset: Mapping[str, Any],
+    *,
+    source: str,
+    raw_id: str,
+) -> dict[str, Any] | None:
+    symbol = str(asset.get("symbol") or asset.get("asset_symbol") or "").strip().upper()
+    coin_id = str(asset.get("coin_id") or asset.get("id") or asset.get("asset_coin_id") or "").strip()
+    name = str(asset.get("name") or asset.get("project_name") or "").strip()
+    contract = str(asset.get("contract_address") or asset.get("address") or "").strip()
+    if not any((symbol, coin_id, name, contract)):
+        return None
+    try:
+        confidence = float(asset.get("confidence") or 0.75)
+    except (TypeError, ValueError):
+        confidence = 0.75
+    return {
+        "source": source,
+        "raw_id": raw_id,
+        "name": name,
+        "symbol": symbol,
+        "coin_id": coin_id,
+        "contract_address": contract,
+        "confidence": round(max(0.0, min(1.0, confidence)), 4),
+        "evidence": str(asset.get("evidence") or asset.get("evidence_quote") or ""),
+        "validated": False,
+    }
+
+
+def _append_candidate_source(current: str, addition: str) -> str:
+    parts = [part.strip() for part in str(current or "").replace("|", ",").split(",") if part.strip()]
+    if addition not in parts:
+        parts.append(addition)
+    return ",".join(parts) or addition
+
+
+def _with_promotion_diagnostics(
+    hypothesis: EventImpactHypothesis,
+    *,
+    search_result: object | None = None,
+) -> EventImpactHypothesis:
+    reasons: list[str] = []
+    if (
+        hypothesis.status == HypothesisStatus.VALIDATED.value
+        and hypothesis.validation_stage in _PROMOTABLE_VALIDATION_STAGES
+        and float(hypothesis.hypothesis_score or 0.0) >= 60.0
+    ):
+        return replace(hypothesis, why_not_promoted=())
+    if not hypothesis.crypto_candidate_assets and not hypothesis.validated_candidate_assets:
+        reasons.append("no_candidate_assets")
+    samples = tuple(sample for sample in hypothesis.rejected_validation_samples if isinstance(sample, Mapping))
+    if hypothesis.search_queries and not samples and not hypothesis.validation_reasons:
+        reasons.append("no_validation_search_results")
+    if samples and all(str(sample.get("query_type") or "") == "candidate_discovery" for sample in samples):
+        reasons.append("candidate_discovery_only")
+    if hypothesis.crypto_candidate_assets and not hypothesis.validated_candidate_assets and hypothesis.validation_stage not in _PROMOTABLE_VALIDATION_STAGES:
+        reasons.append("candidate_identity_not_validated")
+    if hypothesis.validation_stage not in _PROMOTABLE_VALIDATION_STAGES and hypothesis.impact_category != ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:
+        reasons.append("catalyst_link_missing")
+    if hypothesis.validation_stage in {
+        ValidationStage.CATALYST_LINK_VALIDATED.value,
+        ValidationStage.IDENTITY_VALIDATED.value,
+    } and float((hypothesis.score_components or {}).get("market_confirmation") or 0.0) < 40.0:
+        reasons.append("market_confirmation_missing")
+    warnings = tuple(str(item) for item in (*hypothesis.warnings, *(getattr(search_result, "warnings", ()) or ())) if str(item))
+    if any("backoff" in warning.casefold() for warning in warnings):
+        reasons.append("provider_backoff")
+    if any("budget" in warning.casefold() for warning in warnings):
+        reasons.append("llm_budget_exhausted")
+    if float(hypothesis.hypothesis_score or 0.0) < 60.0:
+        reasons.append("score_below_promotion_threshold")
+    if hypothesis.rejection_reasons and not reasons:
+        reasons.append("candidate_identity_not_validated")
+    return replace(hypothesis, why_not_promoted=tuple(dict.fromkeys(reasons)))
 
 
 def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis]) -> str:
@@ -467,6 +652,12 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
         stages[item.validation_stage] = stages.get(item.validation_stage, 0) + 1
     rows.append("statuses: " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items())))
     rows.append("validation_stages: " + ", ".join(f"{key}={value}" for key, value in sorted(stages.items())))
+    why_counts: dict[str, int] = {}
+    for item in items:
+        for reason in item.why_not_promoted:
+            why_counts[reason] = why_counts.get(reason, 0) + 1
+    if why_counts:
+        rows.append("why_not_promoted: " + ", ".join(f"{key}={value}" for key, value in sorted(why_counts.items())))
     categories: dict[str, int] = {}
     for item in items:
         categories[item.impact_category] = categories.get(item.impact_category, 0) + 1
@@ -521,13 +712,19 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
             rows.append("  validated: " + "; ".join(item.validation_reasons[:3]))
         if item.rejection_reasons:
             rows.append("  rejected: " + "; ".join(item.rejection_reasons[:3]))
-        if item.rejected_validation_samples:
-            sample = item.rejected_validation_samples[0]
+        rejected_samples = tuple(
+            sample for sample in item.rejected_validation_samples
+            if not bool(sample.get("accepted")) or sample.get("rejection_reason")
+        )
+        if rejected_samples:
+            sample = rejected_samples[0]
             rows.append(
                 "  rejected_validation_sample: "
                 f"{sample.get('query_type') or 'unknown'} {sample.get('candidate_symbol') or 'SECTOR'} "
                 f"{sample.get('rejection_reason') or 'none'}"
             )
+        if item.why_not_promoted:
+            rows.append("  why_not_promoted: " + "; ".join(item.why_not_promoted[:4]))
         if item.warnings:
             rows.append("  warnings: " + "; ".join(item.warnings[:3]))
     return "\n".join(rows).rstrip()
@@ -617,11 +814,12 @@ def _hypothesis_from_rule(
         created_at=now.isoformat(),
     )
     query_details = _default_search_query_details(hypothesis)
-    return replace(
+    hypothesis = replace(
         hypothesis,
         search_queries=tuple(str(item.get("query") or "") for item in query_details if item.get("query")),
         search_query_details=query_details,
     )
+    return _with_promotion_diagnostics(hypothesis)
 
 
 def _matched_rules(text: str, event: NormalizedEvent) -> tuple[Mapping[str, Any], ...]:
@@ -1007,12 +1205,22 @@ def _default_search_query_details(hypothesis: EventImpactHypothesis) -> tuple[di
     category = hypothesis.impact_category
     symbols = hypothesis.candidate_symbols
     if not symbols:
+        if external:
+            for suffix in (
+                "crypto exposure",
+                "tokenized stock crypto",
+                "pre-IPO crypto",
+                "prediction market token",
+                "perp crypto",
+                "synthetic exposure crypto",
+                "crypto venue",
+            ):
+                queries.append({"query": f"{external} {suffix}", "query_type": "candidate_discovery"})
         discovery_terms = tuple(hypothesis.candidate_sectors or ()) or (category,)
         for term in discovery_terms[:4]:
             clean = str(term).replace("_", " ").strip()
             if external:
-                queries.append({"query": f"{clean} crypto assets {external}", "query_type": "candidate_discovery"})
-                queries.append({"query": f"{external} {clean} crypto catalyst", "query_type": "candidate_discovery"})
+                queries.append({"query": f"{external} {clean} crypto", "query_type": "candidate_discovery"})
             else:
                 queries.append({"query": f"{clean} crypto catalyst candidates", "query_type": "candidate_discovery"})
         return _dedupe_query_details(queries)

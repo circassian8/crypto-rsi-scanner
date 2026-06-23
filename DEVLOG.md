@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Make impact hypotheses promotion-auditable · Codex
+**Why:** The impact-hypothesis layer needed to turn sector/catalyst intelligence
+into useful RADAR candidates without letting discovery-only evidence look
+validated. It also needed clearer artifact diagnostics for legacy rows, missing
+schema fields, rejected evidence, and why a hypothesis did not promote.
+**Changes:**
+- Added `why_not_promoted` diagnostics to impact hypotheses and surfaced reason
+  counts in local hypothesis reports and daily briefs.
+- Expanded candidate-discovery query templates for external catalysts and let
+  candidate-discovery search results suggest crypto assets while still requiring
+  deterministic identity+catalyst validation before token-level `RADAR`.
+- Added schema-audit reporting for stored hypothesis artifacts, including
+  legacy row counts and missing `validation_stage`, `hypothesis_score`,
+  `external_entities`, and `crypto_candidate_assets` fields.
+- Tightened rejected-validation sample display so accepted validation evidence
+  is not presented as rejected, and added regression coverage for external
+  entity filtering, candidate-discovery validation, schema diagnostics, and
+  source-enrichment cleanup preserving legitimate HYPE/Hyperliquid text.
+- Updated `DECISIONS.md`, `ROADMAP.md`, and `research/EVENT_ALPHA_RUNBOOK.md`.
+**Verify:** `python3 tests/test_indicators.py` (429/429 passed); `make
+event-llm-eval PYTHON=python3` (9/9 passed); `make event-llm-extract-eval
+PYTHON=python3` (7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11
+passed); `make event-impact-hypothesis-smoke PYTHON=python3`; `make
+event-impact-hypotheses-report PROFILE=notify_llm PYTHON=python3`; `make
+verify PYTHON=python3`.
+**Notes/risks:** Research-only semantics remain unchanged. Candidate-discovery
+hits are suggestions, not alerts; `TRIGGERED_FADE` still only comes from
+`event_fade.py` plus `proxy_fade`.
+
 ## 2026-06-23 — Make notify_no_key send every clean run · Codex
 **Why:** The owner wants Telegram visibility whenever the Event Alpha system
 runs, not only when a lane cooldown or content-dedupe window allows a digest.
