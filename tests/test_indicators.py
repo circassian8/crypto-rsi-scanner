@@ -5923,6 +5923,44 @@ def test_event_catalyst_search_provider_cache_fetches_broad_sources_once():
         assert result.query_count == 10
 
 
+def test_event_catalyst_search_gdelt_fetch_cap_prevents_repeated_live_failures():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    calls = {"count": 0}
+
+    def failing_opener(request, timeout):
+        del request, timeout
+        calls["count"] += 1
+        raise RuntimeError("HTTP 429")
+
+    queries = tuple(
+        event_catalyst_search.SearchQuery(
+            anomaly_raw_id=f"market_anomaly:pump:{idx}",
+            query=f"PUMP catalyst query {idx}",
+            symbol="PUMP",
+            rank=idx,
+            coin_id="pump-fun",
+            project_name="Pump.fun",
+            aliases=("Pump.fun",),
+        )
+        for idx in range(8)
+    )
+    provider = event_catalyst_search.GdeltCatalystSearchProvider(
+        live_enabled=True,
+        opener=failing_opener,
+        max_fetches_per_search=1,
+    )
+    result = provider.search(queries, max_results_per_query=1, now=now)
+    assert calls["count"] == 1
+    assert result.provider_fetch_count == 1
+    assert result.provider_cache_misses == 1
+    assert result.query_count == 8
+    assert any("GDELT live news fetch failed" in warning for warning in result.warnings)
+    assert any("fetch cap reached" in warning for warning in result.warnings)
+
+
 def test_event_anomaly_lifecycle_tracks_found_validated_and_expired_states():
     from datetime import datetime, timedelta, timezone
     from crypto_rsi_scanner import (

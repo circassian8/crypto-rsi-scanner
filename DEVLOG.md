@@ -17,6 +17,23 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Cap live GDELT catalyst-search fetches per run · Codex
+**Why:** A live notification run exposed an operational hang: GDELT catalyst
+search fetched once per hypothesis/query and kept retrying through 429/timeouts,
+making `notify_llm`/`notify_no_key` runs too slow to finish reliably.
+**Changes:**
+- Added a per-search fetch cap to event-provider catalyst search adapters and
+  set GDELT catalyst search to one live fetch per provider search before local
+  filtering/backoff takes over.
+- Propagated live provider `last_warnings` into catalyst-search results so the
+  provider health wrapper can record backoff immediately.
+- Added regression coverage proving repeated GDELT catalyst queries perform only
+  one live fetch when the provider is failing.
+**Verify:** `python3 tests/test_indicators.py` (431/431 passed); `python3 -m compileall -q crypto_rsi_scanner tests`; `make event-llm-eval PYTHON=python3` (9/9 passed); `make event-llm-extract-eval PYTHON=python3` (7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11 passed); `make verify PYTHON=python3`; `RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-no-key-scheduled PYTHON=python3` completed and delivered Telegram heartbeat + exploratory digest.
+**Notes/risks:** Research notification reliability only. This does not change
+alert scoring, watchlist promotion, normal RSI rows, paper/live writes, trading,
+or `TRIGGERED_FADE` eligibility.
+
 ## 2026-06-23 — Raise Event Alpha LLM budget controls · Codex
 **Why:** The OpenAI-backed Event Alpha notification profiles were too shallow
 for the owner's desired daily runs: `notify_llm` only allowed 10 calls per run

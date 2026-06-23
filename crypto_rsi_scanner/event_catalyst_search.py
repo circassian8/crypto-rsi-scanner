@@ -359,12 +359,14 @@ class EventProviderCatalystSearchProvider:
         lookback_hours: float = 168.0,
         horizon_days: float = 30.0,
         filter_by_query: bool = True,
+        max_fetches_per_search: int | None = None,
     ) -> None:
         self.event_provider_factory = event_provider_factory
         self.name = name
         self.lookback_hours = lookback_hours
         self.horizon_days = horizon_days
         self.filter_by_query = filter_by_query
+        self.max_fetches_per_search = max_fetches_per_search
 
     def search(
         self,
@@ -389,12 +391,19 @@ class EventProviderCatalystSearchProvider:
                 events = cache[cache_key]
                 cache_hits += 1
             else:
+                if self.max_fetches_per_search is not None and fetch_count >= self.max_fetches_per_search:
+                    warnings.append(
+                        f"{self.name} search fetch cap reached after {fetch_count} fetch(es)"
+                    )
+                    break
                 cache_misses += 1
                 fetch_count += 1
                 events = ()
                 try:
                     provider = self.event_provider_factory(query)
                     events = tuple(provider.fetch_events(start, end))  # type: ignore[attr-defined]
+                    provider_warnings = tuple(str(item) for item in getattr(provider, "last_warnings", ()) if str(item))
+                    warnings.extend(provider_warnings)
                 except Exception as exc:  # noqa: BLE001
                     warnings.append(f"{self.name} search failed for {query.query!r}: {exc}")
                 cache[cache_key] = events
@@ -444,7 +453,7 @@ class GdeltCatalystSearchProvider(EventProviderCatalystSearchProvider):
                 fetched_at=kwargs.get("fetched_at"),
             )
 
-        super().__init__(factory, name=self.name)
+        super().__init__(factory, name=self.name, max_fetches_per_search=int(kwargs.get("max_fetches_per_search") or 1))
 
 
 class ProjectRssCatalystSearchProvider(EventProviderCatalystSearchProvider):
