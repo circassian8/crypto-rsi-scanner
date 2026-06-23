@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Harden notification provider failure handling · Codex
+**Why:** A fresh `notify_llm` run surfaced provider/runtime problems: GDELT was
+rate-limited, one public RSS feed returned 403, and live OpenAI calls could
+consume too much notification-cycle runtime. The upstream rate limit should stay
+visible, but partial provider failures should not disable useful sources or hang
+the cycle.
+**Changes:**
+- Added explicit `RSI_EVENT_LLM_OPENAI_TIMEOUT` and
+  `RSI_EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT` config, wired through OpenAI
+  relationship/extraction providers, and set conservative caps in OpenAI-backed
+  Event Alpha profiles.
+- Adjusted event-provider health so multi-feed RSS `feed_failure` warnings are
+  still reported but do not trip provider backoff when the provider returned
+  useful rows from another feed.
+- Added regression coverage for RSS partial-feed provider health and OpenAI
+  timeout propagation.
+- Documented the new timeout knobs in `.env.example`.
+**Verify:** `python3 tests/test_indicators.py` (424/424 passed); `make
+event-llm-eval PYTHON=python3` (9/9 passed); `make event-llm-extract-eval
+PYTHON=python3` (7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11
+passed); `make verify PYTHON=python3`.
+**Notes/risks:** GDELT `429` remains an upstream rate-limit/backoff condition;
+this change does not suppress that warning or bypass provider health. Research
+notifications remain guarded and no trading, paper trades, normal RSI writes, or
+LLM-created `TRIGGERED_FADE` paths changed.
+
 ## 2026-06-23 — Polish Event Impact Hypothesis review artifacts · Codex
 **Why:** The hypothesis layer already persisted profile-scoped rows, but the
 review artifacts needed flatter validated-asset fields, explicit promotion keys,

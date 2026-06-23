@@ -5459,6 +5459,7 @@ def _event_llm_provider(llm_cfg: event_llm_analyzer.EventLLMConfig):
             api_key=config.OPENAI_API_KEY,
             model=llm_cfg.model,
             prompt_version=llm_cfg.prompt_version,
+            timeout=config.EVENT_LLM_OPENAI_TIMEOUT,
         )
     print(f"Unknown event LLM provider: {llm_cfg.provider}. Use fixture or openai.")
     return None
@@ -5479,6 +5480,7 @@ def _event_llm_extraction_provider(extractor_cfg: event_llm_extractor.EventLLMEx
             api_key=config.OPENAI_API_KEY,
             model=extractor_cfg.model,
             prompt_version=extractor_cfg.prompt_version,
+            timeout=config.EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT,
         )
     print(f"Unknown event LLM extractor provider: {extractor_cfg.provider}. Use fixture or openai.")
     return None

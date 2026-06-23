@@ -161,15 +161,25 @@ class HealthCheckedEventProvider:
             return []
         self.last_warnings = tuple(str(warning) for warning in getattr(self.provider, "last_warnings", ()) or ())
         if self.last_warnings:
-            record_provider_failure(
-                self.name,
-                self.last_warnings[0],
-                cfg=self.cfg,
-                now=observed,
-                provider_kind=self.provider_kind,
-                provider_service=self.provider_service,
-                provider_role=self.provider_role,
-            )
+            if _event_warnings_are_provider_failure(self.last_warnings, rows):
+                record_provider_failure(
+                    self.name,
+                    self.last_warnings[0],
+                    cfg=self.cfg,
+                    now=observed,
+                    provider_kind=self.provider_kind,
+                    provider_service=self.provider_service,
+                    provider_role=self.provider_role,
+                )
+            elif decision.reason != "provider_backoff_ignored_for_run":
+                record_provider_success(
+                    self.name,
+                    cfg=self.cfg,
+                    now=observed,
+                    provider_kind=self.provider_kind,
+                    provider_service=self.provider_service,
+                    provider_role=self.provider_role,
+                )
         elif decision.reason != "provider_backoff_ignored_for_run":
             record_provider_success(
                 self.name,
@@ -615,6 +625,25 @@ def _service_summary(rows: Mapping[str, Mapping[str, Any]]) -> dict[str, list[tu
         service = str(row.get("provider_service") or _service_from_name(str(row.get("provider") or key)))
         grouped.setdefault(service, []).append((key, row))
     return grouped
+
+
+def _event_warnings_are_provider_failure(warnings: Iterable[str], rows: Iterable[Any]) -> bool:
+    """Return true when event-provider warnings should trip provider backoff.
+
+    Multi-feed providers can produce useful rows while one upstream feed rejects
+    or serves malformed content. Keep those warnings visible, but only count
+    them as provider-level failures when nothing useful was returned or the
+    warning is explicitly provider-level.
+    """
+    warning_rows = tuple(str(warning or "").strip() for warning in warnings if str(warning or "").strip())
+    if not warning_rows:
+        return False
+    fetched_rows = tuple(rows)
+    if any(warning.startswith("provider_failure ") for warning in warning_rows):
+        return True
+    if fetched_rows and all(warning.startswith("feed_failure ") for warning in warning_rows):
+        return False
+    return True
 
 
 def _service_from_name(name: object) -> str:

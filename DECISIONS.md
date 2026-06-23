@@ -61,10 +61,15 @@ recorded with explicit reason codes (`feed_failure`, `provider_failure`,
 `unknown`) and surfaced in reports/briefs. These reason codes explain missing
 evidence or zero-query runs, but they do not promote rows, create watchlist
 eligibility, create `TRIGGERED_FADE`, write paper/live rows, or alter normal RSI
-routing.
+routing. Multi-feed RSS `feed_failure` rows are soft provider-health warnings
+when at least one configured feed still returns usable rows; provider-level
+failures and upstream rate limits such as GDELT `429` remain eligible for
+circuit-breaker backoff.
 **Why:** Operators need to distinguish “nothing interesting found” from “search
 was skipped or blocked” without letting provider/error metadata become signal
-logic.
+logic. A single public feed returning 403 should not disable the rest of an RSS
+bundle, but true provider/rate-limit failures should still protect daily runs
+from repeated stalls.
 **Revisit when:** Catalyst-search reliability data is sufficient to automate
 provider failover or budget allocation with a reviewed policy.
 

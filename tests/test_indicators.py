@@ -2732,6 +2732,32 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     assert any("feed_failure" in warning for warning in mixed.last_warnings)
     assert not any("skipped remaining feeds" in warning for warning in mixed.last_warnings)
 
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_provider_health
+
+    health_path = Path(tempfile.mkdtemp()) / "provider_health.json"
+    health_cfg = event_provider_health.EventProviderHealthConfig(
+        path=health_path,
+        max_consecutive_failures=1,
+        backoff_minutes=30,
+    )
+    wrapped_mixed = event_provider_health.HealthCheckedEventProvider(
+        ProjectBlogRssProvider(
+            None,
+            live_enabled=True,
+            feed_urls=("https://example.test/missing", "https://example.test/rss"),
+            fail_fast_on_error=True,
+            opener=mixed_opener,
+            fetched_at=fetched_at,
+        ),
+        cfg=health_cfg,
+    )
+    assert len(wrapped_mixed.fetch_events(start, end, now=fetched_at)) == 1
+    rows = event_provider_health.load_provider_health(health_path)
+    assert rows["rss:event_source"]["consecutive_failures"] == 0
+    assert rows["rss:event_source"]["disabled_until"] is None
+
     dns_seen = []
 
     def dns_opener(request, timeout):
@@ -3482,6 +3508,85 @@ def test_event_llm_openai_provider_missing_key_fails_soft():
     result = OpenAILLMRelationshipProvider(api_key="", model="test-model").analyze_relationship({})
     assert result.raw is None
     assert result.warning and "missing OPENAI_API_KEY" in result.warning
+
+
+def test_event_llm_openai_provider_uses_configured_timeout():
+    import json
+    from crypto_rsi_scanner.llm_providers.openai_provider import (
+        OpenAILLMExtractionProvider,
+        OpenAILLMRelationshipProvider,
+    )
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"output_text": json.dumps(self.payload)}).encode("utf-8")
+
+    seen: list[float] = []
+
+    def relationship_opener(request, timeout):
+        seen.append(timeout)
+        return FakeResponse({
+            "asset_role": "source_noise",
+            "relationship_type": "publisher_suffix_false_positive",
+            "recommended_alert_action": "store_only",
+            "confidence": 0.86,
+            "reason": "publisher name only",
+            "evidence_quotes": [],
+            "external_catalyst": {
+                "name": None,
+                "catalyst_type": "unknown",
+                "event_time": None,
+                "confidence": 0.0,
+                "evidence_quotes": [],
+            },
+            "source_quality": {
+                "source_origin": None,
+                "source_confidence": 0.5,
+                "timing_quality": "unknown",
+                "notes": "fixture",
+            },
+            "warnings": [],
+        })
+
+    def extraction_opener(request, timeout):
+        seen.append(timeout)
+        return FakeResponse({
+            "confidence": 0.80,
+            "external_catalysts": [],
+            "crypto_asset_mentions": [],
+            "false_positive_terms": [],
+            "event_date_hints": [],
+            "suggested_followup_queries": [],
+            "warnings": [],
+        })
+
+    relationship = OpenAILLMRelationshipProvider(
+        api_key="test-key",
+        model="test-model",
+        timeout=4.25,
+        opener=relationship_opener,
+    ).analyze_relationship({})
+    extraction = OpenAILLMExtractionProvider(
+        api_key="test-key",
+        model="test-model",
+        timeout=5.5,
+        opener=extraction_opener,
+    ).extract_raw_event({})
+
+    assert relationship.warning is None
+    assert extraction.warning is None
+    assert seen == [4.25, 5.5]
 
 
 def test_event_llm_shadow_report_formats_disagreements_and_warnings():
@@ -4566,6 +4671,7 @@ def test_event_llm_extract_scanner_report_uses_runtime_config():
         "EVENT_LLM_EXTRACTOR_MODE": config.EVENT_LLM_EXTRACTOR_MODE,
         "EVENT_LLM_EXTRACTOR_PROVIDER": config.EVENT_LLM_EXTRACTOR_PROVIDER,
         "EVENT_LLM_EXTRACTOR_MODEL": config.EVENT_LLM_EXTRACTOR_MODEL,
+        "EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT": config.EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT,
         "EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN": config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN,
         "EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES": config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES,
         "EVENT_LLM_EXTRACTOR_CACHE_PATH": config.EVENT_LLM_EXTRACTOR_CACHE_PATH,
@@ -4591,6 +4697,7 @@ def test_event_llm_extract_scanner_report_uses_runtime_config():
     config.EVENT_LLM_EXTRACTOR_MODE = "shadow"
     config.EVENT_LLM_EXTRACTOR_PROVIDER = "fixture"
     config.EVENT_LLM_EXTRACTOR_MODEL = None
+    config.EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT = 30.0
     config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN = 50
     config.EVENT_LLM_EXTRACTOR_REQUIRE_EVIDENCE_QUOTES = True
     config.EVENT_LLM_EXTRACTOR_CACHE_PATH = None
@@ -7384,8 +7491,11 @@ def test_notify_llm_profiles_enable_bounded_source_enrichment_only_for_llm():
     assert "EVENT_SOURCE_ENRICHMENT_ENABLED" not in no_key.config_overrides
     assert llm.config_overrides["EVENT_SOURCE_ENRICHMENT_ENABLED"] is True
     assert llm.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 10
+    assert llm.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 10.0
+    assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] <= 10.0
     assert deep.config_overrides["EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN"] == 20
     assert deep.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"]
+    assert deep.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 12.0
 
 
 def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery():
@@ -8569,6 +8679,8 @@ def test_event_alpha_notification_profiles_and_preflight_guards():
     assert llm.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] <= 50
     assert llm.config_overrides["EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY"] <= 1.0
     assert llm.config_overrides["EVENT_LLM_CACHE_TTL_HOURS"] == 168
+    assert llm.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 10.0
+    assert llm.config_overrides["EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT"] <= 10.0
 
     ctx = event_alpha_artifacts.context_from_profile("notify_no_key", base_dir=Path("/tmp/event-alpha-test"))
     assert ctx.run_mode == "notification_burn_in"
@@ -10221,6 +10333,7 @@ def test_event_alpha_status_profile_budget_and_unknown_profile():
         profile = event_alpha_profiles.get_profile("full_llm_live")
         assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_RUN"] > 0
         assert profile.config_overrides["EVENT_LLM_MAX_CALLS_PER_DAY"] > 0
+        assert profile.config_overrides["EVENT_LLM_OPENAI_TIMEOUT"] <= 15.0
         assert "LLM budget defaults" in event_alpha_profiles.format_profile_report(profile)
         assert "artifact policy:" in event_alpha_profiles.format_profile_report(profile)
         assert event_alpha_profiles.get_profile("research_send").config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "alertable"
@@ -13147,6 +13260,7 @@ def test_event_alert_scanner_report_with_llm_advisory_uses_runtime_config():
         "EVENT_LLM_MODE": config.EVENT_LLM_MODE,
         "EVENT_LLM_PROVIDER": config.EVENT_LLM_PROVIDER,
         "EVENT_LLM_MODEL": config.EVENT_LLM_MODEL,
+        "EVENT_LLM_OPENAI_TIMEOUT": config.EVENT_LLM_OPENAI_TIMEOUT,
         "EVENT_LLM_MAX_CANDIDATES_PER_RUN": config.EVENT_LLM_MAX_CANDIDATES_PER_RUN,
         "EVENT_LLM_MIN_PREFILTER_SCORE": config.EVENT_LLM_MIN_PREFILTER_SCORE,
         "EVENT_LLM_REQUIRE_EVIDENCE_QUOTES": config.EVENT_LLM_REQUIRE_EVIDENCE_QUOTES,
@@ -13174,6 +13288,7 @@ def test_event_alert_scanner_report_with_llm_advisory_uses_runtime_config():
     config.EVENT_LLM_MODE = "advisory"
     config.EVENT_LLM_PROVIDER = "fixture"
     config.EVENT_LLM_MODEL = None
+    config.EVENT_LLM_OPENAI_TIMEOUT = 30.0
     config.EVENT_LLM_MAX_CANDIDATES_PER_RUN = 50
     config.EVENT_LLM_MIN_PREFILTER_SCORE = 0
     config.EVENT_LLM_REQUIRE_EVIDENCE_QUOTES = True
