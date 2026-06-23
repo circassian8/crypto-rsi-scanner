@@ -235,6 +235,8 @@ def analyze_raw_events(
 def build_raw_event_packet(raw_event: RawDiscoveredEvent, *, prompt_version: str = "llm_raw_event_extraction_v1") -> dict[str, Any]:
     payload = raw_event.raw_json or {}
     event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
+    enrichment_payload = payload.get("source_enrichment") if isinstance(payload.get("source_enrichment"), Mapping) else {}
+    body = str(enrichment_payload.get("enriched_text") or raw_event.body or "")
     source_origin = _source_origin(raw_event.source_url) or raw_event.provider
     return {
         "schema_version": LLM_EXTRACTION_SCHEMA_VERSION,
@@ -247,7 +249,7 @@ def build_raw_event_packet(raw_event: RawDiscoveredEvent, *, prompt_version: str
         "fetched_at": _iso(raw_event.fetched_at),
         "title": raw_event.title,
         "clean_title": strip_publisher_suffix(raw_event.title),
-        "body": raw_event.body or "",
+        "body": body,
         "source_confidence": raw_event.source_confidence,
         "content_hash": raw_event.content_hash,
         "event_payload": {

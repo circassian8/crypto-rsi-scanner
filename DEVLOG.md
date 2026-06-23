@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-23 — Add Event Alpha impact hypotheses · Codex
+**Why:** Live Event Alpha artifacts were safely producing mostly
+`RAW_EVIDENCE` / `STORE_ONLY` rows, but the radar lacked an intermediate layer
+that says which sectors/assets an external catalyst might impact before direct
+asset validation exists.
+**Changes:**
+- Added `event_impact_hypotheses.py` with deterministic impact categories,
+  hypothesis statuses, taxonomy loading, search-query generation, identity-safe
+  validation, and a local report formatter.
+- Added the fixture taxonomy
+  `fixtures/event_discovery/event_impact_taxonomy.json` for tokenized-stock
+  venues, prediction markets, fan tokens, stablecoin/RWA, AI tokens, perp DEXes,
+  and oracle infrastructure.
+- Added `HYPOTHESIS` watchlist state plus hypothesis watchlist persistence;
+  unvalidated hypotheses are store-only/exploratory, while validated evidence
+  can promote a hypothesis row to `RADAR` without creating `TRIGGERED_FADE`.
+- Wired hypothesis counts/reporting into the Event Alpha pipeline, run ledger,
+  daily brief, router suppression, and exploratory Telegram digest copy.
+- Added `event_source_enrichment.py` for optional cached full-content source
+  enrichment and made LLM extraction packets use enriched source text when
+  present in raw event metadata.
+- Documented disabled-by-default impact taxonomy and source-enrichment env
+  knobs in `.env.example`.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (414/414 passed); `make event-llm-eval
+PYTHON=python3` (9/9 passed); `make event-llm-extract-eval PYTHON=python3`
+(7/7 passed); `make event-alpha-eval PYTHON=python3` (11/11 passed);
+`make verify PYTHON=python3`.
+**Notes/risks:** This is still research-only. Hypotheses are not trades, paper
+trades, normal RSI rows, or event-fade triggers. `TRIGGERED_FADE` remains
+reserved for `event_fade.py` plus the `proxy_fade` playbook.
+
 ## 2026-06-22 — Make exploratory Telegram digest readable · Codex
 **Why:** The Event Alpha exploratory Telegram digest was technically complete
 but hard to use: each row dumped internal IDs, card paths, feedback commands,

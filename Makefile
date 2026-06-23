@@ -120,6 +120,7 @@ help:
 	@echo "  make event-alpha-cycle-search  Run one fixture Event Alpha cycle with catalyst search"
 	@echo "  make event-alpha-cycle-search-llm  Run one fixture Event Alpha cycle with catalyst search and fixture LLM metadata"
 	@echo "  make event-alpha-cycle-send  Run one Event Alpha cycle with opt-in research digest send flag"
+	@echo "  Event Alpha cycles also emit impact_hypotheses/HYPOTHESIS watchlist rows; these are exploratory until identity-safe validation promotes them"
 	@echo "  make event-alpha-cycle-profile PROFILE=no_key_live  Run one Event Alpha cycle using an operational profile"
 	@echo "  make event-alpha-cycle-profile-send PROFILE=research_send  Run a profiled cycle with the explicit send flag"
 	@echo "  make event-alpha-notify-preview PROFILE=notify_no_key  Preview day-1 notification readiness, cooldowns, and provider backoff"

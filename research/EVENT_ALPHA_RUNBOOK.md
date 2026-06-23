@@ -55,6 +55,17 @@ rows, and has its own cooldown/dedupe state. Source-noise and ticker-collision
 controls are excluded by default unless
 `RSI_EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_CONTROLS=1`.
 
+Event Alpha can also write `HYPOTHESIS` watchlist rows. A hypothesis means the
+radar inferred that an external catalyst may affect a crypto sector or seed
+asset set, but direct candidate validation is incomplete. Example: a SpaceX
+pre-IPO article can produce a tokenized-stock-venue hypothesis with VELVET/HYPE/
+ASTER validation searches. These rows are exploratory/store-only by default and
+are not alertable. They may promote to `RADAR` only after identity-safe source
+evidence explicitly links a candidate asset to the catalyst or sector.
+Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`, paper/live rows, or
+`TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from `event_fade.py` plus
+the `proxy_fade` playbook.
+
 Notification delivery state is scoped by profile namespace for `notify_no_key`,
 `notify_llm`, and `research_send`. Scoped keys look like
 `event_alpha_notify:notify_no_key:last_sent:daily_digest` and

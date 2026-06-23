@@ -16,6 +16,7 @@ WATCHLIST_SCHEMA_VERSION = "event_watchlist_v1"
 
 class EventWatchlistState(str, Enum):
     RAW_EVIDENCE = "RAW_EVIDENCE"
+    HYPOTHESIS = "HYPOTHESIS"
     RADAR = "RADAR"
     WATCHLIST = "WATCHLIST"
     HIGH_PRIORITY = "HIGH_PRIORITY"
@@ -28,12 +29,13 @@ class EventWatchlistState(str, Enum):
 
 _STATE_RANK = {
     EventWatchlistState.RAW_EVIDENCE.value: 0,
-    EventWatchlistState.RADAR.value: 1,
-    EventWatchlistState.WATCHLIST.value: 2,
-    EventWatchlistState.HIGH_PRIORITY.value: 3,
-    EventWatchlistState.EVENT_PASSED.value: 4,
-    EventWatchlistState.ARMED.value: 5,
-    EventWatchlistState.TRIGGERED_FADE.value: 6,
+    EventWatchlistState.HYPOTHESIS.value: 1,
+    EventWatchlistState.RADAR.value: 2,
+    EventWatchlistState.WATCHLIST.value: 3,
+    EventWatchlistState.HIGH_PRIORITY.value: 4,
+    EventWatchlistState.EVENT_PASSED.value: 5,
+    EventWatchlistState.ARMED.value: 6,
+    EventWatchlistState.TRIGGERED_FADE.value: 7,
     EventWatchlistState.INVALIDATED.value: -1,
     EventWatchlistState.EXPIRED.value: -1,
 }
@@ -144,6 +146,37 @@ def refresh_watchlist(
     )
 
 
+def refresh_hypothesis_watchlist(
+    hypotheses: Iterable[object],
+    *,
+    cfg: EventWatchlistConfig,
+    now: datetime | None = None,
+) -> EventWatchlistRefreshResult:
+    """Append research-only impact hypotheses to watchlist state.
+
+    Plain hypotheses are not alertable. A validated hypothesis can move to
+    RADAR, but this still only routes as research metadata; it cannot create a
+    TRIGGERED_FADE or bypass normal candidate/playbook gates.
+    """
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    observed_iso = observed.isoformat()
+    state_path = cfg.state_path or Path("event_watchlist_state.jsonl")
+    previous = {entry.key: entry for entry in load_watchlist(state_path).entries}
+    entries = [
+        _entry_from_hypothesis(hypothesis, previous.get(hypothesis_watchlist_key(hypothesis)), observed, cfg)
+        for hypothesis in hypotheses
+    ]
+    rows_written = _append_entries(state_path, entries)
+    alert_entries = [entry for entry in entries if entry.should_alert]
+    return EventWatchlistRefreshResult(
+        state_path=state_path,
+        observed_at=observed_iso,
+        rows_written=rows_written,
+        entries=entries,
+        alert_entries=alert_entries,
+    )
+
+
 def load_watchlist(
     state_path: str | Path,
     *,
@@ -182,6 +215,15 @@ def watchlist_key(alert: event_alerts.EventAlertCandidate) -> str:
         cluster_id,
         candidate.asset.coin_id,
         playbook,
+    )
+    return "|".join(str(part) for part in parts)
+
+
+def hypothesis_watchlist_key(hypothesis: object) -> str:
+    parts = (
+        "hypothesis",
+        getattr(hypothesis, "event_cluster_id", None) or getattr(hypothesis, "hypothesis_id", "unknown"),
+        getattr(hypothesis, "impact_category", "unknown"),
     )
     return "|".join(str(part) for part in parts)
 
@@ -355,6 +397,105 @@ def _entry_from_alert(
         warnings=tuple(warnings),
     )
     return entry
+
+
+def _entry_from_hypothesis(
+    hypothesis: object,
+    prior: EventWatchlistEntry | None,
+    observed: datetime,
+    cfg: EventWatchlistConfig,
+) -> EventWatchlistEntry:
+    status = str(getattr(hypothesis, "status", "") or "")
+    validated = status == "validated"
+    state = EventWatchlistState.RADAR if validated else EventWatchlistState.HYPOTHESIS
+    previous_state = prior.state if prior else None
+    rank = _state_rank(state)
+    previous_rank = _state_rank(previous_state)
+    state_changed = previous_state is not None and previous_state != state.value
+    escalation = bool(validated and (previous_state is None or rank > previous_rank))
+    observed_iso = observed.isoformat()
+    first_seen = prior.first_seen_at if prior else observed_iso
+    confidence = _optional_float(getattr(hypothesis, "confidence", None)) or 0.0
+    score = max(0, min(100, int(round(confidence * 100))))
+    symbols = tuple(str(value) for value in getattr(hypothesis, "candidate_symbols", ()) or ())
+    coin_ids = tuple(str(value) for value in getattr(hypothesis, "candidate_coin_ids", ()) or ())
+    category = str(getattr(hypothesis, "impact_category", "") or "impact_hypothesis")
+    symbol = symbols[0] if symbols else "SECTOR"
+    coin_id = coin_ids[0] if coin_ids else category
+    playbook = str(getattr(hypothesis, "playbook_hint", "") or "impact_hypothesis")
+    event_name = f"{getattr(hypothesis, 'external_asset', None) or category} impact hypothesis"
+    reasons = ("hypothesis_validated",) if validated else ()
+    history = list(prior.alert_history if prior else [])
+    history.append({
+        "observed_at": observed_iso,
+        "state": state.value,
+        "tier": "RADAR_DIGEST" if validated else "STORE_ONLY",
+        "score": score,
+        "effective_playbook_type": playbook,
+        "material_change_reasons": list(reasons),
+        "should_alert": escalation,
+    })
+    history = history[-max(1, cfg.max_alert_history):]
+    warnings = tuple(dict.fromkeys(
+        str(value)
+        for value in (
+            *(prior.warnings if prior else ()),
+            *tuple(getattr(hypothesis, "warnings", ()) or ()),
+            *tuple(getattr(hypothesis, "rejection_reasons", ()) or ()),
+        )
+        if str(value)
+    ))
+    return EventWatchlistEntry(
+        schema_version=WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key=hypothesis_watchlist_key(hypothesis),
+        cluster_id=_optional_str(getattr(hypothesis, "event_cluster_id", None)),
+        event_id=str(getattr(hypothesis, "hypothesis_id", "") or hypothesis_watchlist_key(hypothesis)),
+        coin_id=coin_id,
+        symbol=symbol,
+        relationship_type="impact_hypothesis",
+        external_asset=_optional_str(getattr(hypothesis, "external_asset", None)),
+        event_time=None,
+        state=state.value,
+        previous_state=previous_state,
+        first_seen_at=first_seen,
+        last_seen_at=observed_iso,
+        first_radar_at=_transition_time(prior, "first_radar_at", state, EventWatchlistState.RADAR, observed_iso),
+        first_watchlisted_at=prior.first_watchlisted_at if prior else None,
+        first_high_priority_at=prior.first_high_priority_at if prior else None,
+        first_event_passed_at=prior.first_event_passed_at if prior else None,
+        first_armed_at=prior.first_armed_at if prior else None,
+        first_triggered_at=prior.first_triggered_at if prior else None,
+        first_invalidated_at=prior.first_invalidated_at if prior else None,
+        first_expired_at=prior.first_expired_at if prior else None,
+        source_count=len(tuple(getattr(hypothesis, "source_raw_ids", ()) or ())),
+        highest_score=max(prior.highest_score if prior else 0, score),
+        latest_score=score,
+        latest_tier="RADAR_DIGEST" if validated else "STORE_ONLY",
+        latest_event_name=event_name,
+        latest_source="impact_hypothesis",
+        latest_playbook_type=playbook,
+        latest_rule_playbook_type=playbook,
+        latest_effective_playbook_type=playbook,
+        latest_playbook_score=score,
+        latest_playbook_action="radar_digest" if validated else "store_only",
+        latest_market_snapshot={},
+        latest_score_components={
+            "hypothesis_confidence": score,
+            "candidate_symbol_count": len(symbols),
+            "validation_evidence": 100 if validated else 0,
+        },
+        alert_history=history,
+        state_changed=state_changed,
+        escalation=escalation,
+        score_jump=score - int(prior.latest_score if prior else score),
+        material_change_reasons=reasons,
+        should_alert=escalation,
+        suppressed_reason=None if escalation else (
+            "validated hypothesis promoted to RADAR" if validated else "impact hypothesis awaiting asset validation"
+        ),
+        warnings=warnings,
+    )
 
 
 def _material_change_reasons(

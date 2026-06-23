@@ -1,0 +1,86 @@
+{
+  "schema_version": "event_impact_taxonomy_v1",
+  "research_only": true,
+  "sectors": {
+    "tokenized_stock_venues": {
+      "description": "Crypto venues or tokens that may benefit from pre-IPO/tokenized equity attention.",
+      "assets": [
+        {"symbol": "VELVET", "coin_id": "velvet", "name": "Velvet Capital"},
+        {"symbol": "HYPE", "coin_id": "hyperliquid", "name": "Hyperliquid"},
+        {"symbol": "ASTER", "coin_id": "aster", "name": "Aster"}
+      ]
+    },
+    "prediction_markets": {
+      "description": "Prediction-market and event-market infrastructure candidates.",
+      "assets": [
+        {"symbol": "UMA", "coin_id": "uma", "name": "UMA"},
+        {"symbol": "GNO", "coin_id": "gnosis", "name": "Gnosis"}
+      ]
+    },
+    "fan_tokens": {
+      "description": "Sports/fan-token assets used as attention proxies.",
+      "assets": [
+        {"symbol": "CHZ", "coin_id": "chiliz", "name": "Chiliz"},
+        {"symbol": "ARG", "coin_id": "argentine-football-association-fan-token", "name": "Argentina Fan Token"},
+        {"symbol": "BAR", "coin_id": "fc-barcelona-fan-token", "name": "FC Barcelona Fan Token"},
+        {"symbol": "PSG", "coin_id": "paris-saint-germain-fan-token", "name": "PSG Fan Token"}
+      ]
+    },
+    "stablecoin_rwa": {
+      "description": "Stablecoin/RWA beneficiaries or controls for regulatory catalyst review.",
+      "assets": [
+        {"symbol": "ONDO", "coin_id": "ondo-finance", "name": "Ondo"},
+        {"symbol": "MKR", "coin_id": "maker", "name": "Maker"},
+        {"symbol": "ENA", "coin_id": "ethena", "name": "Ethena"}
+      ]
+    },
+    "ai_tokens": {
+      "description": "AI-sector crypto assets for AI IPO/proxy attention review.",
+      "assets": [
+        {"symbol": "FET", "coin_id": "fetch-ai", "name": "Fetch.ai"},
+        {"symbol": "TAO", "coin_id": "bittensor", "name": "Bittensor"},
+        {"symbol": "RNDR", "coin_id": "render-token", "name": "Render"}
+      ]
+    },
+    "perp_dex": {
+      "description": "Perp/trading venue assets for venue-attention research.",
+      "assets": [
+        {"symbol": "HYPE", "coin_id": "hyperliquid", "name": "Hyperliquid"},
+        {"symbol": "DYDX", "coin_id": "dydx-chain", "name": "dYdX"},
+        {"symbol": "GMX", "coin_id": "gmx", "name": "GMX"},
+        {"symbol": "ASTER", "coin_id": "aster", "name": "Aster"}
+      ]
+    },
+    "oracle_infra": {
+      "description": "Oracle/infrastructure assets that may power event or prediction markets.",
+      "assets": [
+        {"symbol": "LINK", "coin_id": "chainlink", "name": "Chainlink"},
+        {"symbol": "PYTH", "coin_id": "pyth-network", "name": "Pyth Network"}
+      ]
+    },
+    "direct_token_events": {
+      "description": "Direct token-event placeholders for listing, unlock, and supply-pressure controls.",
+      "assets": []
+    },
+    "political_meme_tokens": {
+      "description": "Political attention proxy controls.",
+      "assets": [
+        {"symbol": "TRUMP", "coin_id": "official-trump", "name": "Official Trump"}
+      ]
+    },
+    "infrastructure_tokens": {
+      "description": "General infrastructure/security event controls.",
+      "assets": [
+        {"symbol": "LINK", "coin_id": "chainlink", "name": "Chainlink"},
+        {"symbol": "PYTH", "coin_id": "pyth-network", "name": "Pyth Network"}
+      ]
+    },
+    "rwa_tokens": {
+      "description": "RWA-sector review controls.",
+      "assets": [
+        {"symbol": "ONDO", "coin_id": "ondo-finance", "name": "Ondo"},
+        {"symbol": "MPL", "coin_id": "maple", "name": "Maple"}
+      ]
+    }
+  }
+}

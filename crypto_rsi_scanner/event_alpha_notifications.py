@@ -982,6 +982,7 @@ def _exploratory_rank(entry: Any) -> tuple[float, list[str]]:
     cluster = _component_score(components, "cluster_confidence")
     freshness = _component_score(components, "novelty_freshness")
     catalyst = 20.0 if (entry.external_asset or entry.event_time) else _component_score(components, "catalyst_presence")
+    hypothesis = _component_score(components, "hypothesis_confidence")
     rank = (
         float(getattr(entry, "latest_score", 0) or 0)
         + 0.45 * market
@@ -990,8 +991,11 @@ def _exploratory_rank(entry: Any) -> tuple[float, list[str]]:
         + 0.20 * cluster
         + 0.15 * freshness
         + catalyst
+        + 0.30 * hypothesis
     )
     reasons: list[str] = []
+    if str(getattr(entry, "state", "") or "") == "HYPOTHESIS":
+        reasons.append("impact hypothesis awaiting validation")
     if market >= 25:
         reasons.append(f"market anomaly score {market:g}")
     if source_quality >= 40:
@@ -1000,6 +1004,8 @@ def _exploratory_rank(entry: Any) -> tuple[float, list[str]]:
         reasons.append(f"LLM/extraction confidence {extraction:g}")
     if catalyst:
         reasons.append("has catalyst/external-asset evidence")
+    if hypothesis >= 40:
+        reasons.append(f"hypothesis confidence {hypothesis:g}")
     if cluster >= 40:
         reasons.append(f"cluster confidence {cluster:g}")
     if freshness >= 40:
@@ -1012,7 +1018,10 @@ def _exploratory_rank(entry: Any) -> tuple[float, list[str]]:
 def _exploratory_verify_steps(entry: Any, reason: str) -> list[str]:
     playbook = str(entry.latest_playbook_type or entry.latest_effective_playbook_type or "").casefold()
     steps = []
-    if "market_anomaly" in playbook:
+    if str(getattr(entry, "state", "") or "") == "HYPOTHESIS":
+        steps.append("validate candidate asset link to catalyst")
+        steps.append("run targeted source search for candidate/catalyst")
+    elif "market_anomaly" in playbook:
         steps.append("find independent catalyst/source evidence for the move")
         steps.append("check whether the move is liquidity noise or organic volume")
     elif "direct" in playbook or "listing" in playbook or "unlock" in playbook:
@@ -1070,6 +1079,11 @@ def _human_playbook(value: object) -> str:
         "source_noise_control": "source/noise control",
         "ambiguous_control": "relationship unclear",
         "ambiguous": "relationship unclear",
+        "impact_hypothesis": "impact hypothesis",
+        "rwa_preipo_proxy": "RWA/pre-IPO proxy",
+        "ai_ipo_proxy": "AI IPO proxy",
+        "sports_fan_proxy": "sports/fan-token proxy",
+        "stablecoin_regulatory": "stablecoin regulatory",
     }
     return mapping.get(text, text.replace("_", " "))
 
@@ -1078,6 +1092,7 @@ def _human_state(value: object) -> str:
     text = str(value or "").strip()
     mapping = {
         "RAW_EVIDENCE": "raw evidence only",
+        "HYPOTHESIS": "impact hypothesis awaiting validation",
         "STORE_ONLY": "stored for research only",
         "RADAR": "radar",
         "WATCHLIST": "watchlist",
@@ -1098,6 +1113,7 @@ def _human_reason(value: object) -> str:
         "raw/store-only evidence, no alertable watchlist state": "not alertable yet",
         "raw, expired, or invalidated watchlist state is stored only.": "not alertable yet",
         "event alpha router is disabled; retaining watchlist row as research evidence only.": "router disabled",
+        "impact hypothesis awaiting asset validation": "not alertable yet",
     }
     if normalized in mapping:
         return mapping[normalized]
@@ -1161,6 +1177,10 @@ def _human_why(reasons: Iterable[str]) -> str:
         lower = text.casefold()
         if lower.startswith("market anomaly score"):
             output.append("unusual market move")
+        elif "impact hypothesis" in lower:
+            output.append("impact hypothesis")
+        elif lower.startswith("hypothesis confidence"):
+            output.append(text)
         elif lower.startswith("source quality"):
             output.append(text)
         elif lower.startswith("freshness"):
@@ -1185,6 +1205,10 @@ def _human_check_next(steps: Iterable[str]) -> str:
         lower = text.casefold()
         if "independent catalyst" in lower:
             output.append("find independent catalyst")
+        elif "candidate asset link" in lower:
+            output.append("validate asset-catalyst link")
+        elif "targeted source search" in lower:
+            output.append("run targeted source search")
         elif "liquidity noise" in lower or "organic volume" in lower:
             output.append("verify liquidity/organic volume")
         elif "direct event mechanics" in lower:
@@ -1214,6 +1238,8 @@ def _human_risk(entry: Any, decision: event_alpha_router.EventAlphaRouteDecision
     classifier = _component_score(components, "classifier")
     if "market_anomaly" in playbook:
         risks.append("no confirmed narrative")
+    if str(getattr(entry, "state", "") or "") == "HYPOTHESIS":
+        risks.append("asset impact not validated")
     if "ambiguous" in relationship or "ambiguous" in playbook:
         risks.append("relationship unclear")
     if classifier and classifier < 60:

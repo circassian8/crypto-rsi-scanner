@@ -6257,6 +6257,239 @@ def test_event_graph_accepts_direct_supply_and_derivatives_without_boosting_infr
     assert by_symbol["LINK"].score_components["cluster_confirmation"] == 0
 
 
+def test_event_impact_hypotheses_generate_seed_categories_and_queries():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_impact_hypotheses
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def raw(raw_id, title, body, *, provider="fixture", event_type="external_proxy_event", external="SpaceX"):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider=provider,
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body,
+            raw_json={
+                "event": {
+                    "event_id": raw_id,
+                    "event_name": title,
+                    "event_type": event_type,
+                    "event_time": "2026-06-20T13:30:00Z",
+                    "event_time_confidence": 0.9,
+                    "external_asset": external,
+                    "description": body,
+                    "confidence": 0.9,
+                }
+            },
+            source_confidence=0.9,
+            content_hash=raw_id,
+        )
+
+    def norm(raw_event, *, event_type="external_proxy_event", external="SpaceX"):
+        return NormalizedEvent(
+            event_id=raw_event.raw_id,
+            raw_ids=(raw_event.raw_id,),
+            event_name=raw_event.title,
+            event_type=event_type,
+            event_time=now,
+            event_time_confidence=0.9,
+            first_seen_time=now,
+            source=raw_event.provider,
+            source_urls=(raw_event.source_url,),
+            external_asset=external,
+            description=raw_event.body,
+            confidence=0.9,
+        )
+
+    rows = [
+        raw("spacex", "SpaceX pre-IPO exposure opens", "Tokenized stock venue launches SpaceX pre-IPO exposure."),
+        raw("openai", "OpenAI pre-IPO market opens", "Crypto traders discuss OpenAI pre-IPO proxy exposure.", external="OpenAI"),
+        raw("worldcup", "World Cup fan token prediction market", "CHZ-style fan tokens move before World Cup match.", event_type="sports_event", external="World Cup"),
+        raw("genius", "GENIUS Act stablecoin reserve bill", "Stablecoin reserve rules and money market funds move forward.", event_type="regulatory_event", external="GENIUS Act"),
+        RawDiscoveredEvent(
+            raw_id="anomaly",
+            provider="market_anomaly",
+            fetched_at=now,
+            published_at=now,
+            source_url=None,
+            title="PUMP market anomaly",
+            body="No dated external catalyst found.",
+            raw_json={"market": {"symbol": "PUMP", "coin_id": "pump"}, "anomaly": {"score": 90}},
+            source_confidence=0.7,
+            content_hash="anomaly",
+        ),
+    ]
+    result = EventDiscoveryResult(
+        raw_events=tuple(rows),
+        normalized_events=tuple(norm(row, event_type=row.raw_json["event"]["event_type"], external=row.raw_json["event"]["external_asset"]) for row in rows if row.provider != "market_anomaly"),
+        links=(),
+        classifications=(),
+        candidates=(),
+    )
+    hypotheses = event_impact_hypotheses.generate_impact_hypotheses(result, now=now)
+    categories = {item.impact_category for item in hypotheses}
+    assert "rwa_preipo_proxy" in categories
+    assert "tokenized_stock_venue" in categories
+    assert "ai_ipo_proxy" in categories
+    assert "sports_fan_proxy" in categories
+    assert "stablecoin_regulatory" in categories
+    assert "market_anomaly_unknown" in categories
+    spacex = next(item for item in hypotheses if item.impact_category == "rwa_preipo_proxy")
+    assert "tokenized_stock_venues" in spacex.candidate_sectors
+    assert "VELVET" in spacex.candidate_symbols
+    assert any("VELVET SpaceX pre-IPO exposure" in query for query in spacex.search_queries)
+    anomaly = next(item for item in hypotheses if item.impact_category == "market_anomaly_unknown")
+    assert anomaly.status == "hypothesis"
+    assert "TRIGGERED_FADE" not in event_impact_hypotheses.format_impact_hypothesis_report(hypotheses)
+
+
+def test_event_impact_hypothesis_validation_is_identity_safe():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search, event_impact_hypotheses
+    from crypto_rsi_scanner import event_watchlist
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from pathlib import Path
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp-test",
+        event_cluster_id="spacex|ipo_proxy|2026-06-20",
+        event_type="ipo_proxy",
+        external_asset="SpaceX",
+        impact_category="rwa_preipo_proxy",
+        candidate_sectors=("tokenized_stock_venues",),
+        candidate_symbols=("VELVET", "HYPE"),
+        candidate_coin_ids=("velvet", "hyperliquid"),
+        direction_hint="up_then_fade",
+        playbook_hint="rwa_preipo_proxy",
+        confidence=0.82,
+        search_queries=("VELVET SpaceX pre-IPO exposure",),
+        status="validation_search_pending",
+    )
+
+    queries = event_catalyst_search.generate_search_queries_for_hypothesis(hypothesis)
+    assert "VELVET SpaceX pre-IPO exposure" in queries
+    assert "HYPE tokenized stock SpaceX" in queries
+
+    good = RawDiscoveredEvent(
+        raw_id="good",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/velvet-spacex",
+        title="VELVET opens SpaceX pre-IPO exposure",
+        body="Velvet Capital users can trade tokenized stock style exposure to SpaceX.",
+        raw_json={},
+        source_confidence=0.9,
+        content_hash="good",
+    )
+    catalyst_only = RawDiscoveredEvent(
+        raw_id="catalyst-only",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/spacex",
+        title="SpaceX pre-IPO market attention rises",
+        body="No crypto token is named.",
+        raw_json={},
+        source_confidence=0.9,
+        content_hash="catalyst-only",
+    )
+    url_only = RawDiscoveredEvent(
+        raw_id="url-only",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/search?q=VELVET+SpaceX",
+        title="SpaceX pre-IPO market attention rises",
+        body="No crypto token is named.",
+        raw_json={},
+        source_confidence=0.9,
+        content_hash="url-only",
+    )
+
+    validated = event_impact_hypotheses.validate_hypotheses_with_raw_events([hypothesis], [good])[0]
+    assert validated.status == "validated"
+    assert any("identity_match" in reason for reason in validated.validation_reasons)
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = event_watchlist.EventWatchlistConfig(enabled=True, state_path=Path(tmp) / "watchlist.jsonl")
+        first = event_watchlist.refresh_hypothesis_watchlist([hypothesis], cfg=cfg, now=now)
+        second = event_watchlist.refresh_hypothesis_watchlist([validated], cfg=cfg, now=now)
+        assert first.entries[0].state == event_watchlist.EventWatchlistState.HYPOTHESIS.value
+        assert first.entries[0].should_alert is False
+        assert second.entries[0].state == event_watchlist.EventWatchlistState.RADAR.value
+        assert second.entries[0].should_alert is True
+        assert second.entries[0].state != event_watchlist.EventWatchlistState.TRIGGERED_FADE.value
+    unchanged = event_impact_hypotheses.validate_hypotheses_with_raw_events([hypothesis], [catalyst_only])[0]
+    assert unchanged.status == "validation_search_pending"
+    rejected = event_impact_hypotheses.validate_hypotheses_with_raw_events([hypothesis], [url_only])[0]
+    assert rejected.status != "validated"
+
+
+def test_event_source_enrichment_extracts_and_reuses_cache():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_llm_extractor, event_source_enrichment
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="article",
+        provider="rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/article",
+        title="SpaceX pre-IPO exposure",
+        body="Short RSS summary.",
+        raw_json={},
+        source_confidence=0.9,
+        content_hash="article",
+    )
+    html = """
+    <html><head><style>.x{}</style><script>ignore()</script></head>
+    <body><article><h1>SpaceX pre-IPO exposure</h1>
+    <p>Velvet Capital is named in the full article, but not the RSS summary.</p></article></body></html>
+    """
+    calls = {"count": 0}
+
+    def fetch(url, timeout):
+        calls["count"] += 1
+        assert url == "https://example.test/article"
+        assert timeout == 2
+        return html
+
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = event_source_enrichment.EventSourceEnrichmentConfig(
+            enabled=True,
+            cache_dir=Path(tmp),
+            timeout_seconds=2,
+        )
+        first = event_source_enrichment.enrich_source_text(raw, cfg=cfg, fetch_fn=fetch)
+        second = event_source_enrichment.enrich_source_text(raw, cfg=cfg, fetch_fn=lambda *_: (_ for _ in ()).throw(RuntimeError("should not fetch")))
+        assert first.fetched is True
+        assert "Velvet Capital is named" in first.enriched_text
+        assert second.used_cache is True
+        assert "Velvet Capital is named" in second.enriched_text
+        assert calls["count"] == 1
+        annotated = event_source_enrichment.annotate_raw_event_with_enrichment(first)
+        packet = event_llm_extractor.build_raw_event_packet(annotated)
+        assert "Velvet Capital is named" in packet["body"]
+
+    failed = event_source_enrichment.enrich_source_text(
+        raw,
+        cfg=event_source_enrichment.EventSourceEnrichmentConfig(enabled=True),
+        fetch_fn=lambda *_: (_ for _ in ()).throw(RuntimeError("network down")),
+    )
+    assert failed.warning == "source enrichment failed: RuntimeError"
+    assert "Short RSS summary" in failed.enriched_text
+
+
 def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
     import contextlib
     import io
@@ -6330,9 +6563,10 @@ def test_event_alpha_pipeline_runs_watchlist_and_router_cycle():
         assert pipe.candidates == 17
         assert pipe.clusters >= 1
         assert len(pipe.alerts) == 17
-        assert pipe.watchlist_entries == 17
+        assert pipe.watchlist_entries >= 17
+        assert len(pipe.impact_hypotheses) >= 1
         assert pipe.watchlist_escalations >= 1
-        assert pipe.routed == 17
+        assert pipe.routed >= 17
         assert pipe.alertable >= 1
         assert any(
             decision.route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
@@ -6362,6 +6596,109 @@ def test_event_alpha_pipeline_runs_watchlist_and_router_cycle():
         assert disabled.router_result is None
         assert "watchlist refresh skipped" in "; ".join(disabled.warnings)
         assert "router skipped" in "; ".join(disabled.warnings)
+
+
+def test_event_alpha_pipeline_writes_non_alertable_hypothesis_rows():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_notifications,
+        event_alpha_pipeline,
+        event_alpha_router,
+        event_alerts,
+        event_watchlist,
+    )
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="spacex-hypothesis",
+        provider="rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/spacex-hypothesis",
+        title="SpaceX pre-IPO exposure heats up",
+        body="Tokenized stock venues may see attention around SpaceX pre-IPO markets.",
+        raw_json={
+            "event": {
+                "event_id": "spacex-hypothesis",
+                "event_name": "SpaceX pre-IPO exposure heats up",
+                "event_type": "ipo_proxy",
+                "event_time": "2026-06-20T13:30:00Z",
+                "event_time_confidence": 0.85,
+                "external_asset": "SpaceX",
+                "description": "Tokenized stock venues may see attention around SpaceX pre-IPO markets.",
+                "confidence": 0.88,
+            }
+        },
+        source_confidence=0.88,
+        content_hash="spacex-hypothesis",
+    )
+    event = NormalizedEvent(
+        event_id="spacex-hypothesis",
+        raw_ids=(raw.raw_id,),
+        event_name=raw.title,
+        event_type="ipo_proxy",
+        event_time=now,
+        event_time_confidence=0.85,
+        first_seen_time=now,
+        source=raw.provider,
+        source_urls=(raw.source_url,),
+        external_asset="SpaceX",
+        description=raw.body,
+        confidence=0.88,
+    )
+    result = EventDiscoveryResult(
+        raw_events=(raw,),
+        normalized_events=(event,),
+        links=(),
+        classifications=(),
+        candidates=(),
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        pipe = event_alpha_pipeline.run_event_alpha_pipeline(
+            result,
+            alert_cfg=event_alerts.EventAlertConfig(),
+            now=now,
+            watchlist_cfg=event_watchlist.EventWatchlistConfig(
+                enabled=True,
+                state_path=Path(tmp) / "watchlist.jsonl",
+            ),
+            router_cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True),
+            refresh_watchlist=True,
+            route=True,
+        )
+        assert len(pipe.impact_hypotheses) >= 1
+        assert pipe.watchlist_entries >= 1
+        hypothesis_entries = [
+            entry for entry in pipe.watchlist_result.entries
+            if entry.state == event_watchlist.EventWatchlistState.HYPOTHESIS.value
+        ]
+        assert hypothesis_entries
+        assert all(entry.should_alert is False for entry in hypothesis_entries)
+        by_state = {decision.entry.state: decision for decision in pipe.router_result.decisions}
+        assert by_state[event_watchlist.EventWatchlistState.HYPOTHESIS.value].alertable is False
+        assert by_state[event_watchlist.EventWatchlistState.HYPOTHESIS.value].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
+        cfg = event_alpha_notifications.EventAlphaNotificationConfig(
+            enabled=True,
+            exploratory_digest_enabled=True,
+            exploratory_digest_include_controls=True,
+        )
+        plan = event_alpha_notifications.build_notification_plan(
+            pipe.router_result.decisions,
+            storage=_NotifyFakeStorage(),
+            cfg=cfg,
+            now=now,
+        )
+        digest = event_alpha_notifications.format_exploratory_telegram_digest(
+            plan.exploratory_items,
+            profile="notify_no_key",
+            cfg=cfg,
+        )
+        assert "impact hypothesis awaiting validation" in digest
+        assert "not alertable yet" in digest
 
 
 def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery():
@@ -6499,8 +6836,8 @@ def test_event_alpha_pipeline_operating_cycle_runs_extraction_before_discovery()
     assert advisory_pipe.extraction_hint_events == 1
     assert advisory_pipe.candidates == 1
     assert advisory_pipe.alerts[0].symbol == "STEALTH"
-    assert advisory_pipe.watchlist_entries == 1
-    assert advisory_pipe.routed == 1
+    assert advisory_pipe.watchlist_entries >= 1
+    assert advisory_pipe.routed >= 1
 
 
 def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
@@ -6802,9 +7139,10 @@ def test_event_alpha_cycle_scanner_runs_research_pipeline_with_fixture_anomalies
             assert "EVENT ALPHA PIPELINE REPORT" in text
             assert "raw_events=" in text
             assert "candidates=1" in text
-            assert "watchlist_entries=1" in text
-            assert "routed=1" in text
-            assert "routes: STORE_ONLY=1" in text
+            assert "impact_hypotheses=" in text
+            assert "watchlist_entries=" in text
+            assert "routed=" in text
+            assert "routes: STORE_ONLY" in text
             assert "market_anomaly_unknown" in text
             assert "run ledger updated" in text.lower()
             assert config.EVENT_WATCHLIST_STATE_PATH.exists()

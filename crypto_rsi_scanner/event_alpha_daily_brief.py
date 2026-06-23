@@ -150,6 +150,22 @@ def build_daily_brief(
     lines.extend(_provider_health_lines(provider_health_rows or {}))
     lines.extend(["", "## LLM Budget"])
     lines.extend(_llm_budget_lines(latest))
+    lines.extend(["", "## Impact Hypotheses"])
+    if latest:
+        lines.append(
+            f"- Generated/validated/promoted: {int(latest.get('impact_hypotheses') or 0)} / "
+            f"{int(latest.get('hypotheses_validated') or 0)} / {int(latest.get('hypothesis_promotions') or 0)}"
+        )
+        lines.append(
+            f"- Validation queries/results: {int(latest.get('hypothesis_search_queries') or 0)} / "
+            f"{int(latest.get('hypothesis_search_results') or 0)}"
+        )
+        if int(latest.get("hypotheses_validated") or 0) <= 0:
+            lines.append("- Validated hypotheses: none yet.")
+        if int(latest.get("impact_hypotheses") or 0) > int(latest.get("hypotheses_validated") or 0):
+            lines.append("- Top rejected/pending hypotheses: see Event Alpha pipeline report and local watchlist HYPOTHESIS rows.")
+    else:
+        lines.append("- No run row available.")
     lines.extend(["", "## New Since Last Run"])
     lines.extend(_new_since_last_run_lines(runs))
     lines.extend(["", "## Watchlist Got Hotter"])

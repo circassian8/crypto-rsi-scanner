@@ -15,6 +15,7 @@ from . import (
     event_anomaly_state,
     event_catalyst_search,
     event_graph,
+    event_impact_hypotheses,
     event_llm_analyzer,
     event_llm_extractor,
     event_watchlist,
@@ -65,6 +66,7 @@ class EventAlphaPipelineResult:
     watchlist_result: event_watchlist.EventWatchlistRefreshResult | None
     watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None
     router_result: event_alpha_router.EventAlphaRouterResult | None
+    impact_hypotheses: tuple[event_impact_hypotheses.EventImpactHypothesis, ...] = ()
     warnings: tuple[str, ...] = ()
     clock_status: dict[str, Any] = field(default_factory=dict)
     cycle_completed: bool = True
@@ -142,6 +144,37 @@ class EventAlphaPipelineResult:
     @property
     def clusters(self) -> int:
         return len(event_graph.build_event_clusters(self.discovery_result))
+
+    @property
+    def hypotheses_validated(self) -> int:
+        return len([
+            item for item in self.impact_hypotheses
+            if item.status == event_impact_hypotheses.HypothesisStatus.VALIDATED.value
+        ])
+
+    @property
+    def hypothesis_search_queries(self) -> int:
+        return len({query for item in self.impact_hypotheses for query in item.search_queries})
+
+    @property
+    def hypothesis_search_results(self) -> int:
+        return len([
+            item for item in self.impact_hypotheses
+            if item.status in {
+                event_impact_hypotheses.HypothesisStatus.VALIDATION_EVIDENCE_FOUND.value,
+                event_impact_hypotheses.HypothesisStatus.VALIDATED.value,
+            }
+        ])
+
+    @property
+    def hypothesis_promotions(self) -> int:
+        if self.watchlist_result is None:
+            return 0
+        return len([
+            entry for entry in self.watchlist_result.entries
+            if entry.relationship_type == "impact_hypothesis"
+            and entry.state == event_watchlist.EventWatchlistState.RADAR.value
+        ])
 
     @property
     def watchlist_entries(self) -> int:
@@ -225,6 +258,21 @@ def run_event_alpha_pipeline(
     if priors_cfg is not None:
         alerts = event_alpha_priors.apply_priors_to_alerts(alerts, cfg=priors_cfg, alert_cfg=alert_cfg)
 
+    clusters = event_graph.build_event_clusters(discovery_result)
+    impact_hypotheses = event_impact_hypotheses.generate_impact_hypotheses(
+        discovery_result,
+        raw_events=source_raw_events,
+        clusters=clusters,
+        extraction_rows=extraction_rows_list,
+        now=observed,
+    )
+    if catalyst_search_result is not None:
+        validation_raw = tuple(result.raw_event for result in catalyst_search_result.result_events)
+        impact_hypotheses = event_impact_hypotheses.validate_hypotheses_with_raw_events(
+            impact_hypotheses,
+            validation_raw,
+        )
+
     anomaly_lifecycle_result = (
         event_anomaly_state.build_anomaly_lifecycle(
             source_raw_events or discovery_result.raw_events,
@@ -243,6 +291,12 @@ def run_event_alpha_pipeline(
             warnings.append("watchlist refresh skipped: RSI_EVENT_WATCHLIST_ENABLED is not enabled")
         else:
             watchlist_result = event_watchlist.refresh_watchlist(alerts, cfg=watchlist_cfg, now=observed)
+            hypothesis_watchlist = event_watchlist.refresh_hypothesis_watchlist(
+                impact_hypotheses,
+                cfg=watchlist_cfg,
+                now=observed,
+            )
+            watchlist_result = _combine_watchlist_results(watchlist_result, hypothesis_watchlist)
 
     watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None = None
     if watchlist_monitor_enabled:
@@ -309,6 +363,7 @@ def run_event_alpha_pipeline(
         watchlist_result=watchlist_result,
         watchlist_monitor_result=watchlist_monitor_result,
         router_result=router_result,
+        impact_hypotheses=impact_hypotheses,
         warnings=tuple(dict.fromkeys(warnings)),
     )
 
@@ -539,6 +594,21 @@ def _with_send_result(
     )
 
 
+def _combine_watchlist_results(
+    primary: event_watchlist.EventWatchlistRefreshResult,
+    secondary: event_watchlist.EventWatchlistRefreshResult,
+) -> event_watchlist.EventWatchlistRefreshResult:
+    if primary.state_path != secondary.state_path:
+        return primary
+    return event_watchlist.EventWatchlistRefreshResult(
+        state_path=primary.state_path,
+        observed_at=primary.observed_at,
+        rows_written=primary.rows_written + secondary.rows_written,
+        entries=[*primary.entries, *secondary.entries],
+        alert_entries=[*primary.alert_entries, *secondary.alert_entries],
+    )
+
+
 def _normalize_send_result(
     raw_result: Any,
     decisions: list[event_alpha_router.EventAlphaRouteDecision],
@@ -603,6 +673,13 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
             f"candidates={result.candidates} · clusters={result.clusters} · alerts={len(result.alerts)}"
         ),
         (
+            f"impact_hypotheses={len(result.impact_hypotheses)} · "
+            f"hypotheses_validated={result.hypotheses_validated} · "
+            f"hypothesis_search_queries={result.hypothesis_search_queries} · "
+            f"hypothesis_search_results={result.hypothesis_search_results} · "
+            f"hypothesis_promotions={result.hypothesis_promotions}"
+        ),
+        (
             f"watchlist_entries={result.watchlist_entries} · "
             f"watchlist_escalations={result.watchlist_escalations} · "
             f"watchlist_monitor_active={result.watchlist_monitor_active_entries} · "
@@ -629,6 +706,9 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
     if result.anomaly_lifecycle_result is not None:
         lines.append("")
         lines.append(event_anomaly_state.format_anomaly_lifecycle_report(result.anomaly_lifecycle_result))
+    if result.impact_hypotheses:
+        lines.append("")
+        lines.append(event_impact_hypotheses.format_impact_hypothesis_report(result.impact_hypotheses))
     if result.watchlist_monitor_result is not None:
         lines.append("")
         lines.append(event_watchlist_monitor.format_watchlist_monitor_report(result.watchlist_monitor_result))

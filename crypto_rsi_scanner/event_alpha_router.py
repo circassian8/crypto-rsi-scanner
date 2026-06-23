@@ -507,6 +507,7 @@ def _parse_iso(value: object):
 def _is_raw_or_terminal(state: str) -> bool:
     return state in {
         event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+        event_watchlist.EventWatchlistState.HYPOTHESIS.value,
         event_watchlist.EventWatchlistState.INVALIDATED.value,
         event_watchlist.EventWatchlistState.EXPIRED.value,
     }

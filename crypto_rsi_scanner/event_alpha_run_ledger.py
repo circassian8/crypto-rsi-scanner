@@ -148,6 +148,14 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"send={int(row.get('send_items_delivered') or 0)}/{int(row.get('send_items_attempted') or 0)} "
             f"would_send={int(row.get('send_would_send_items') or 0)}"
         )
+        rows.append(
+            "  "
+            f"hypotheses={int(row.get('impact_hypotheses') or 0)} "
+            f"validated={int(row.get('hypotheses_validated') or 0)} "
+            f"hypothesis_queries={int(row.get('hypothesis_search_queries') or 0)} "
+            f"hypothesis_results={int(row.get('hypothesis_search_results') or 0)} "
+            f"promotions={int(row.get('hypothesis_promotions') or 0)}"
+        )
         lane_attempted = row.get("send_lane_items_attempted") or {}
         lane_delivered = row.get("send_lane_items_delivered") or {}
         if lane_attempted or lane_delivered:
@@ -239,6 +247,11 @@ def _run_record(
         "catalyst_results_rejected": _int(getattr(catalyst, "rejected_result_count", 0)),
         "extraction_rows": len(extraction_rows),
         "extraction_hints_applied": _int(getattr(result, "extraction_hint_events", 0)),
+        "impact_hypotheses": len(tuple(getattr(result, "impact_hypotheses", ()) or ())),
+        "hypotheses_validated": _int(getattr(result, "hypotheses_validated", 0)),
+        "hypothesis_search_queries": _int(getattr(result, "hypothesis_search_queries", 0)),
+        "hypothesis_search_results": _int(getattr(result, "hypothesis_search_results", 0)),
+        "hypothesis_promotions": _int(getattr(result, "hypothesis_promotions", 0)),
         "candidates": _int(getattr(result, "candidates", 0)),
         "clusters": _int(getattr(result, "clusters", 0)),
         "alerts": len(list(getattr(result, "alerts", ()) or ())),

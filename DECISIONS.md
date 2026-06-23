@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-23 - Keep impact hypotheses below alert eligibility until validated
+**Status:** accepted
+**Decision:** Event Alpha may generate impact hypotheses that infer which
+crypto sectors/assets an external catalyst could affect, persist them as
+`HYPOTHESIS` watchlist rows, show them in exploratory digests, and generate
+targeted validation searches. Unvalidated hypotheses are store-only research
+evidence and are not alertable. A hypothesis can promote to `RADAR` only after
+identity-safe source evidence explicitly links a candidate asset to the
+catalyst/sector. Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`,
+`TRIGGERED_FADE`, paper trades, normal RSI signal rows, or execution by
+themselves; `TRIGGERED_FADE` remains reserved for `event_fade.py` plus
+`proxy_fade`.
+**Why:** The radar needs to reason about external catalyst impact before exact
+asset validation exists, but promoting loose sector guesses into alerts would
+reintroduce false positives.
+**Revisit when:** A reviewed sample shows that validated hypotheses reliably
+lead to useful RADAR/WATCHLIST candidates and a separate promotion policy is
+approved.
+
 ## 2026-06-22 - Keep exploratory notification digest separate from alertable lanes
 **Status:** accepted
 **Decision:** Event Alpha may send a separate `exploratory_digest` during

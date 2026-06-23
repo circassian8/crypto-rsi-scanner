@@ -623,6 +623,59 @@ def generate_search_queries_for_anomaly(raw_market_anomaly_event: RawDiscoveredE
     return tuple(dict.fromkeys(query for query in queries if query.strip()))
 
 
+def generate_search_queries_for_hypothesis(hypothesis: object) -> tuple[str, ...]:
+    """Return targeted validation queries for an Event Alpha impact hypothesis.
+
+    The hypothesis object is intentionally duck-typed to avoid making catalyst
+    search depend on hypothesis generation. Results still need resolver and
+    identity validation before they can promote anything beyond review evidence.
+    """
+    category = str(getattr(hypothesis, "impact_category", "") or "")
+    external = str(getattr(hypothesis, "external_asset", "") or "").strip()
+    symbols = tuple(str(symbol).strip().upper() for symbol in getattr(hypothesis, "candidate_symbols", ()) or () if str(symbol).strip())
+    sectors = tuple(str(sector) for sector in getattr(hypothesis, "candidate_sectors", ()) or ())
+    out: list[str] = []
+    for symbol in symbols[:8]:
+        if external and category in {"rwa_preipo_proxy", "tokenized_stock_venue"}:
+            out.extend((
+                f"{symbol} {external} pre-IPO exposure",
+                f"{symbol} tokenized stock {external}",
+                f"{symbol} {external} prediction market",
+            ))
+        elif external and category == "ai_ipo_proxy":
+            out.extend((
+                f"{symbol} {external} pre-IPO exposure",
+                f"{symbol} {external} perp",
+                f"{symbol} AI IPO proxy",
+            ))
+        elif category == "sports_fan_proxy":
+            out.extend((
+                f"{symbol} World Cup fan token",
+                f"{symbol} sports event prediction market",
+            ))
+        elif category == "stablecoin_regulatory":
+            out.extend((
+                f"{symbol} GENIUS Act stablecoin",
+                f"{symbol} stablecoin reserve regulation",
+            ))
+        elif category == "listing_liquidity_event":
+            out.extend((f"{symbol} listing", f"{symbol} Binance listing"))
+        elif category == "unlock_supply_pressure":
+            out.extend((f"{symbol} unlock", f"{symbol} token vesting unlock"))
+        elif category == "perp_venue_attention":
+            out.extend((f"{symbol} perp listing", f"{symbol} futures listing"))
+        elif category == "prediction_market_infra":
+            out.extend((f"{symbol} prediction market oracle", f"{symbol} polymarket infrastructure"))
+        elif category == "security_or_regulatory_shock":
+            out.append(f"{symbol} exploit hack regulatory")
+        else:
+            out.append(f"{symbol} crypto catalyst")
+    if not out:
+        for sector in sectors[:4]:
+            out.append(f"{sector.replace('_', ' ')} crypto catalyst")
+    return tuple(dict.fromkeys(query for query in out if query.strip()))
+
+
 def generate_search_query_objects_for_anomaly(
     raw_market_anomaly_event: RawDiscoveredEvent,
     *,
