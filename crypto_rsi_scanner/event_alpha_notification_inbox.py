@@ -414,6 +414,7 @@ def _is_weak_validated_local_only(
         stage = str(alert.get("validation_stage") or components.get("validation_stage") or "")
         impact_path_strength = str(alert.get("impact_path_strength") or components.get("impact_path_strength") or "")
         impact_path_type = str(alert.get("impact_path_type") or components.get("impact_path_type") or "")
+        opportunity_level = str(alert.get("opportunity_level") or components.get("opportunity_level") or "")
         why_digest_ineligible = str(alert.get("why_digest_ineligible") or components.get("why_digest_ineligible") or "")
         reason_text = " ".join(str(value or "") for value in (
             alert.get("route_reason"),
@@ -424,6 +425,7 @@ def _is_weak_validated_local_only(
             stage == "catalyst_link_validated"
             or impact_path_strength in {"weak", "none"}
             or impact_path_type == "generic_cooccurrence_only"
+            or opportunity_level in {"local_only", "exploratory"}
             or bool(why_digest_ineligible)
             or "impact_path_not_validated" in reason_text
             or "weak_validated" in reason_text

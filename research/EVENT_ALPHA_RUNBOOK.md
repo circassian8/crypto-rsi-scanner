@@ -84,9 +84,13 @@ carry `impact_path_validated`, meaning the evidence explains why the event
 affects the token/protocol/venue/sector rather than merely mentioning both.
 Validated hypotheses also carry `impact_path_type`, `candidate_role`,
 `impact_path_strength`, `evidence_specificity_score`,
-`digest_eligible_by_impact_path`, and `opportunity_score_v2`. These fields are
-review/routing metadata only; they do not create trades, paper rows, normal RSI
-alerts, or `TRIGGERED_FADE`.
+`digest_eligible_by_impact_path`, and `opportunity_score_v2`. Newer rows also
+carry the final signal-quality layer: `market_confirmation_score` /
+`market_confirmation_level`, `evidence_quality_score`, `source_class`,
+`evidence_specificity`, `opportunity_score_final`, `opportunity_level`,
+`why_local_only`, `why_not_watchlist`, and `manual_verification_items`. These
+fields are review/routing metadata only; they do not create trades, paper rows,
+normal RSI alerts, or `TRIGGERED_FADE`.
 Candidate-only or identity-only evidence can improve review context but does
 not promote a token-level row. Candidate-discovery search hits can suggest new
 crypto candidates when the source payload or quote-validated extraction names an
@@ -109,9 +113,13 @@ identity, no source-noise/ticker-collision gate, a non-ambiguous playbook, a
 known external catalyst or explicit direct token-event evidence,
 `opportunity_score_v2` >=
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_OPPORTUNITY_SCORE` (65), and
-`impact_path_validated` or stronger validation stage. Strong impact paths can
-enter the capped digest if other gates pass; medium paths need market
-confirmation; generic co-occurrence is blocked by default via
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_FINAL_SCORE` (65), and
+`impact_path_validated` or stronger validation stage. When final opportunity
+metadata is present, `local_only` and `exploratory` stay local; only
+`validated_digest`, `watchlist`, or `high_priority` verdicts can pass the
+operator-facing digest gate. Strong impact paths can enter the capped digest if
+other gates pass; medium paths need market confirmation; generic co-occurrence
+is blocked by default via
 `RSI_EVENT_ALPHA_BLOCK_GENERIC_COOCCURRENCE_DIGEST=1`. Weak
 `catalyst_link_validated` or policy/macro/technology co-occurrence rows remain
 local-only when
@@ -124,7 +132,10 @@ technology articles that merely mention a token should stay local-only with
 `impact_path_not_digest_eligible:*` or `generic_cooccurrence_only`. Use
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT=0` or
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH=0` only for deliberate
-review experiments. Delivered validated-hypothesis digest items are written to
+review experiments. Use `opportunity_level`, `market_confirmation_level`, and
+`source_class/evidence_specificity` to decide whether the next manual action is
+source validation, market/liquidity verification, or feedback labeling.
+Delivered validated-hypothesis digest items are written to
 `event_alpha_alerts.jsonl` as research snapshots with `symbol`/`coin_id` plus
 validated identity fields so `make event-alpha-notification-inbox
 PROFILE=notify_llm` can show them as needing useful/junk feedback.

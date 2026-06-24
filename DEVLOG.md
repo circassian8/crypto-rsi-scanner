@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Add Event Alpha market/evidence verdict layer · Codex
+**Why:** Validated hypotheses needed a stronger attention filter than catalyst
+co-occurrence plus impact-path metadata. Operator-facing research digests should
+explain market confirmation, source/evidence quality, and final opportunity
+verdicts before asking for manual review.
+**Changes:**
+- Added pure `event_market_confirmation.py`, `event_evidence_quality.py`, and
+  `event_opportunity_verdict.py` for bounded market, evidence, and final
+  opportunity scoring.
+- Integrated the new quality layer into Event Impact Hypothesis validation so
+  accepted evidence now carries `market_confirmation_*`,
+  `evidence_quality_*`, and `opportunity_score_final` / `opportunity_level`
+  metadata beside the existing impact-path fields.
+- Updated validated-hypothesis routing to prefer final opportunity verdicts:
+  `local_only`/`exploratory` stay local, digest/watchlist levels can enter the
+  capped research digest, and high-priority verdicts route to the research
+  escalation lane without changing event-fade trigger rules.
+- Persisted and surfaced verdict metadata in watchlist rows, alert snapshots,
+  impact-hypothesis reports, daily briefs, notification inbox grouping, router
+  reports, and research cards.
+- Hardened candidate-discovery fallback extraction for explicit crypto project
+  mentions while preserving common-word/source-noise rejection reasons.
+**Verify:** `python3 tests/test_indicators.py` (442/442 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`; `make event-llm-eval
+PYTHON=python3`; `make event-llm-extract-eval PYTHON=python3`; `make
+event-alpha-eval PYTHON=python3`; `make verify PYTHON=python3`; manual `make
+event-impact-hypothesis-smoke PYTHON=python3`, `make
+event-impact-hypotheses-report PROFILE=notify_llm PYTHON=python3`, and `make
+event-alpha-notification-inbox PROFILE=notify_llm PYTHON=python3`.
+**Notes/risks:** Research-only. This does not add live trading, paper trades,
+normal RSI signal writes, or any LLM/provider-created `TRIGGERED_FADE`;
+`TRIGGERED_FADE` remains limited to deterministic `event_fade.py` plus
+`proxy_fade`.
+
 ## 2026-06-25 — Add Event Alpha impact-path validator and v2 digest gate · Codex
 **Why:** Recent Event Alpha outputs could still treat “candidate and catalyst
 mentioned together” as too similar to evidence that explains a real token,

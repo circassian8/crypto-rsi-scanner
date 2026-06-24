@@ -315,6 +315,27 @@ def build_daily_brief(
         decision for decision in local_validated_hypotheses
         if str((decision.entry.latest_score_components or {}).get("impact_path_type") or "") == "generic_cooccurrence_only"
     ]
+    strong_opportunity_hypotheses = [
+        decision for decision in decisions
+        if decision.entry.relationship_type == "impact_hypothesis"
+        and str((decision.entry.latest_score_components or {}).get("opportunity_level") or "") in {
+            "watchlist",
+            "high_priority",
+        }
+    ]
+    market_unconfirmed_hypotheses = [
+        decision for decision in local_validated_hypotheses
+        if str((decision.entry.latest_score_components or {}).get("market_confirmation_level") or "") in {
+            "",
+            "none",
+            "weak",
+        }
+        and str((decision.entry.latest_score_components or {}).get("opportunity_level") or "") in {
+            "local_only",
+            "exploratory",
+            "",
+        }
+    ]
     exploratory_sector_hypotheses = [
         entry for entry in entries
         if entry.relationship_type == "impact_hypothesis"
@@ -324,11 +345,14 @@ def build_daily_brief(
         row for row in hypotheses
         if str(row.get("status") or "") == "rejected" or row.get("why_not_promoted") or row.get("rejection_reasons")
     ]
+    lines.append("- Strong opportunity candidates: " + (_brief_decisions(strong_opportunity_hypotheses[:5]) or "none"))
     lines.append("- Impact-path validated digest candidates: " + (_brief_decisions(alertable_hypotheses[:5]) or _brief_decisions(impact_path_validated_hypotheses[:5]) or "none"))
+    lines.append("- Validated but market-unconfirmed: " + (_brief_decisions(market_unconfirmed_hypotheses[:5]) or "none"))
     lines.append("- Weak validated local-only hypotheses: " + (_brief_decisions(weak_local_hypotheses[:5]) or "none"))
     lines.append("- Generic co-occurrence blocked: " + (_brief_decisions(generic_blocked_hypotheses[:5]) or "none"))
     lines.append("- Sector hypotheses awaiting validation: " + (_brief_entries(exploratory_sector_hypotheses[:5]) or "none"))
     lines.append("- Rejected/why-not-promoted hypotheses: " + (_brief_hypothesis_labels(rejected_hypotheses[:5]) or "none"))
+    lines.append("- Market confirmation by playbook: " + _market_confirmation_by_playbook(decisions))
     exploratory = event_alpha_notifications.select_exploratory_candidates(
         decisions,
         cfg=event_alpha_notifications.EventAlphaNotificationConfig(
@@ -581,6 +605,8 @@ def _brief_decisions(rows: Iterable[event_alpha_router.EventAlphaRouteDecision])
         labels.append(
             f"{entry.symbol}/{entry.coin_id}"
             f"({entry.state},score={entry.latest_score},v2={_float(components.get('opportunity_score_v2')):.0f},"
+            f"final={_float(components.get('opportunity_score_final')):.0f},"
+            f"level={components.get('opportunity_level') or 'unknown'},"
             f"path={components.get('impact_path_type') or 'unknown'},role={components.get('candidate_role') or 'unknown'},"
             f"route={decision.route.value},reason={decision.reason})"
         )
@@ -598,6 +624,24 @@ def _brief_entries(rows: Iterable[event_watchlist.EventWatchlistEntry]) -> str:
             f"path={components.get('impact_path_type') or 'unknown'})"
         )
     return "; ".join(labels)
+
+
+def _market_confirmation_by_playbook(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
+    counts: dict[str, dict[str, int]] = {}
+    for decision in rows:
+        entry = decision.entry
+        if entry.relationship_type != "impact_hypothesis":
+            continue
+        components = entry.latest_score_components or {}
+        playbook = str(entry.latest_effective_playbook_type or entry.latest_playbook_type or "unknown")
+        level = str(components.get("market_confirmation_level") or "unknown")
+        counts.setdefault(playbook, {})[level] = counts.setdefault(playbook, {}).get(level, 0) + 1
+    if not counts:
+        return "none"
+    parts: list[str] = []
+    for playbook, levels in sorted(counts.items()):
+        parts.append(playbook + "[" + ",".join(f"{key}={value}" for key, value in sorted(levels.items())) + "]")
+    return "; ".join(parts)
 
 
 def _float(value: object) -> float:

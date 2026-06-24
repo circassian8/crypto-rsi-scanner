@@ -38,6 +38,7 @@ class EventAlphaRouterConfig:
     max_validated_hypothesis_digest_items: int = 5
     validated_hypothesis_min_score: float = 65.0
     validated_hypothesis_min_opportunity_score: float = 65.0
+    validated_hypothesis_min_final_score: float = 65.0
     validated_hypothesis_require_external_or_direct_event: bool = True
     validated_hypothesis_require_impact_path: bool = True
     weak_validated_local_only: bool = True
@@ -141,6 +142,17 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
             f"  playbook: {entry.latest_playbook_type or 'unknown'} "
             f"action={entry.latest_playbook_action or 'store_only'}"
         )
+        components = entry.latest_score_components or {}
+        if entry.relationship_type == "impact_hypothesis" and (
+            components.get("opportunity_level") or components.get("opportunity_score_final")
+        ):
+            rows.append(
+                "  opportunity: "
+                f"level={components.get('opportunity_level') or 'unknown'} "
+                f"score={components.get('opportunity_score_final') if components.get('opportunity_score_final') is not None else 'n/a'} "
+                f"market={components.get('market_confirmation_level') or 'unknown'} "
+                f"evidence={components.get('source_class') or 'unknown'}/{components.get('evidence_specificity') or 'unknown'}"
+            )
         rows.append(f"  route reason: {decision.reason}")
         rows.append(f"  lane: {decision.lane.value}")
         rows.append(f"  card: {decision.card_id}.md")
@@ -300,12 +312,19 @@ def _route_entry(
                 lane=EventAlphaRouteLane.LOCAL_ONLY,
                 warnings=tuple(warnings),
             )
+        route = _validated_hypothesis_route(entry)
         return EventAlphaRouteDecision(
             entry=entry,
-            route=EventAlphaRoute.RESEARCH_DIGEST,
-            alertable=cfg.daily_digest_enabled and cfg.validated_hypothesis_digest_enabled,
-            reason="Validated impact hypothesis promoted to RADAR.",
-            lane=EventAlphaRouteLane.DAILY_DIGEST,
+            route=route,
+            alertable=(
+                cfg.instant_enabled
+                if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+                else cfg.daily_digest_enabled and cfg.validated_hypothesis_digest_enabled
+            ),
+            reason=_validated_hypothesis_route_reason(entry),
+            lane=EventAlphaRouteLane.INSTANT_ESCALATION
+            if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+            else EventAlphaRouteLane.DAILY_DIGEST,
             warnings=tuple(warnings),
         )
 
@@ -563,6 +582,24 @@ def _looks_like_validated_hypothesis(entry: event_watchlist.EventWatchlistEntry)
     return True
 
 
+def _validated_hypothesis_route(entry: event_watchlist.EventWatchlistEntry) -> EventAlphaRoute:
+    level = str((entry.latest_score_components or {}).get("opportunity_level") or "").strip()
+    if level == "high_priority":
+        return EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+    return EventAlphaRoute.RESEARCH_DIGEST
+
+
+def _validated_hypothesis_route_reason(entry: event_watchlist.EventWatchlistEntry) -> str:
+    components = entry.latest_score_components or {}
+    level = str(components.get("opportunity_level") or "validated_digest").strip()
+    score = _hypothesis_opportunity_score_final(entry, components)
+    if level == "high_priority":
+        return f"Validated impact hypothesis reached high-priority opportunity verdict ({score:.0f})."
+    if level == "watchlist":
+        return f"Validated impact hypothesis reached watchlist opportunity verdict ({score:.0f})."
+    return f"Validated impact hypothesis reached digest opportunity verdict ({score:.0f})."
+
+
 def _validated_hypothesis_digest_block_reason(
     entry: event_watchlist.EventWatchlistEntry,
     cfg: EventAlphaRouterConfig,
@@ -613,6 +650,16 @@ def _validated_hypothesis_digest_block_reason(
             "opportunity_score_v2_below_threshold:"
             f"{opportunity_score:.0f}<{cfg.validated_hypothesis_min_opportunity_score:.0f}"
         )
+    final_score = _hypothesis_opportunity_score_final(entry, components)
+    if final_score < float(cfg.validated_hypothesis_min_final_score):
+        return (
+            "opportunity_score_final_below_threshold:"
+            f"{final_score:.0f}<{cfg.validated_hypothesis_min_final_score:.0f}"
+        )
+    opportunity_level = str(components.get("opportunity_level") or "").strip()
+    if opportunity_level in {"local_only", "exploratory"}:
+        reason = str(components.get("why_local_only") or components.get("why_not_watchlist") or opportunity_level)
+        return f"opportunity_level_not_digest_eligible:{reason}"
     path_type = str(components.get("impact_path_type") or "").strip()
     path_strength = str(components.get("impact_path_strength") or "").strip()
     digest_eligible = _boolish(components.get("digest_eligible_by_impact_path"))
@@ -675,6 +722,25 @@ def _hypothesis_opportunity_score_v2(
         entry.latest_score,
         components.get("hypothesis_score"),
         components.get("score"),
+    ):
+        try:
+            num = float(value or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if num > 0:
+            return num
+    return 0.0
+
+
+def _hypothesis_opportunity_score_final(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, object],
+) -> float:
+    for value in (
+        components.get("opportunity_score_final"),
+        components.get("opportunity_score_v2"),
+        entry.latest_score,
+        components.get("hypothesis_score"),
     ):
         try:
             num = float(value or 0.0)

@@ -173,6 +173,9 @@ def format_impact_hypotheses_store_report(
     rows.append("impact_path_types: " + _format_counts(_counts(result.rows, "impact_path_type")))
     rows.append("impact_path_strengths: " + _format_counts(_counts(result.rows, "impact_path_strength")))
     rows.append("candidate_roles: " + _format_counts(_counts(result.rows, "candidate_role")))
+    rows.append("opportunity_levels: " + _format_counts(_counts(result.rows, "opportunity_level")))
+    rows.append("market_confirmation_levels: " + _format_counts(_counts(result.rows, "market_confirmation_level")))
+    rows.append("source_classes: " + _format_counts(_counts(result.rows, "source_class")))
     rows.append("why_not_promoted: " + _format_counts(_reason_counts(result.rows, "why_not_promoted")))
     rows.extend(_entity_audit_section(result.rows))
     rows.append("scopes: " + _format_counts(_counts(result.rows, "hypothesis_scope")))
@@ -419,6 +422,19 @@ def _compact_hypothesis_rows(
                 f"strength={row.get('impact_path_strength') or 'unknown'} "
                 f"v2={row.get('opportunity_score_v2') if row.get('opportunity_score_v2') is not None else 'n/a'} "
                 f"digest_eligible={str(bool(row.get('digest_eligible_by_impact_path'))).lower()}"
+            )
+        if row.get("opportunity_level") or row.get("opportunity_score_final") is not None:
+            out.append(
+                "  verdict: "
+                f"level={row.get('opportunity_level') or 'unknown'} "
+                f"score={row.get('opportunity_score_final') if row.get('opportunity_score_final') is not None else 'n/a'} "
+                f"market={row.get('market_confirmation_level') or 'unknown'} "
+                f"evidence={row.get('source_class') or 'unknown'}/{row.get('evidence_specificity') or 'unknown'}"
+            )
+        if row.get("why_local_only") or row.get("why_not_watchlist"):
+            out.append(
+                f"  verdict_blocks: local={row.get('why_local_only') or 'none'} "
+                f"watchlist={row.get('why_not_watchlist') or 'none'}"
             )
         if include_rejections and row.get("rejection_reasons"):
             out.append("  rejected: " + "; ".join(str(item) for item in row["rejection_reasons"][:3]))

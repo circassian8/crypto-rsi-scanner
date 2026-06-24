@@ -17,7 +17,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_graph, event_identity, event_impact_path_validator
+from . import (
+    event_evidence_quality,
+    event_graph,
+    event_identity,
+    event_impact_path_validator,
+    event_market_confirmation,
+    event_opportunity_verdict,
+)
 from .event_llm_extractor import EventLLMExtractionReportRow
 from .event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from .event_resolver import clean_text
@@ -126,6 +133,23 @@ class EventImpactHypothesis:
     why_digest_ineligible: str | None = None
     opportunity_score_v2: float | None = None
     opportunity_score_components: Mapping[str, float] = field(default_factory=dict)
+    evidence_quality_score: float | None = None
+    source_class: str | None = None
+    evidence_specificity: str | None = None
+    evidence_quality_reasons: tuple[str, ...] = ()
+    market_confirmation_score: float | None = None
+    market_confirmation_level: str | None = None
+    market_confirmation_reasons: tuple[str, ...] = ()
+    market_confirmation_warnings: tuple[str, ...] = ()
+    market_confirmation_missing_fields: tuple[str, ...] = ()
+    market_confirmation_summary: str | None = None
+    opportunity_score_final: float | None = None
+    opportunity_level: str | None = None
+    opportunity_verdict_reasons: tuple[str, ...] = ()
+    missing_requirements: tuple[str, ...] = ()
+    manual_verification_items: tuple[str, ...] = ()
+    why_local_only: str | None = None
+    why_not_watchlist: str | None = None
     created_at: str | None = None
 
 
@@ -390,6 +414,7 @@ def validate_hypotheses_with_raw_events(
         best_stage = hypothesis.validation_stage
         impact_path_reason: str | None = hypothesis.impact_path_reason
         impact_validation: event_impact_path_validator.ImpactPathValidation | None = None
+        impact_context: tuple[RawDiscoveredEvent, str | None, str | None] | None = None
         for raw in rows:
             detail = _validation_detail(raw, hypothesis)
             status = str(detail.get("status") or "none")
@@ -412,7 +437,10 @@ def validate_hypotheses_with_raw_events(
                     score_components=hypothesis.score_components,
                 )
                 path_reason = path_validation.impact_path_reason
-                impact_validation = _prefer_impact_validation(impact_validation, path_validation)
+                preferred = _prefer_impact_validation(impact_validation, path_validation)
+                if preferred is path_validation:
+                    impact_context = (raw, symbol, coin_id)
+                impact_validation = preferred
                 if path_reason:
                     impact_path_reason = _prefer_impact_path_reason(impact_path_reason, path_reason)
                     if path_validation.required_evidence_met:
@@ -445,10 +473,18 @@ def validate_hypotheses_with_raw_events(
             components["validation_strength"] = 95.0
             if impact_path_reason:
                 components["impact_path_strength"] = 85.0 if _impact_path_reason_is_strong(impact_path_reason) else 35.0
+            quality_kwargs = {}
             if impact_validation is not None:
                 components.update(_impact_validation_score_components(impact_validation))
                 impact_validation = _refresh_impact_validation_score(impact_validation, components)
                 components.update(_impact_validation_score_components(impact_validation))
+                quality_kwargs = _quality_verdict_replace_kwargs(
+                    impact_validation,
+                    impact_context=impact_context,
+                    hypothesis=hypothesis,
+                    components=components,
+                )
+                components.update(_quality_score_components(quality_kwargs))
             if best_stage == ValidationStage.MARKET_CONFIRMED.value:
                 components["market_confirmation"] = max(float(components.get("market_confirmation") or 0.0), 70.0)
             score = _weighted_hypothesis_score(components, hypothesis.impact_category)
@@ -467,9 +503,11 @@ def validate_hypotheses_with_raw_events(
                 validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
                 impact_path_reason=impact_path_reason,
                 **_impact_validation_replace_kwargs(impact_validation),
+                **quality_kwargs,
             ))
         elif reasons:
             components = dict(hypothesis.score_components or {})
+            quality_kwargs = {}
             components["validation_strength"] = max(float(components.get("validation_strength") or 0.0), 45.0)
             if impact_path_reason:
                 components["impact_path_strength"] = 85.0 if _impact_path_reason_is_strong(impact_path_reason) else 35.0
@@ -477,6 +515,13 @@ def validate_hypotheses_with_raw_events(
                 components.update(_impact_validation_score_components(impact_validation))
                 impact_validation = _refresh_impact_validation_score(impact_validation, components)
                 components.update(_impact_validation_score_components(impact_validation))
+                quality_kwargs = _quality_verdict_replace_kwargs(
+                    impact_validation,
+                    impact_context=impact_context,
+                    hypothesis=hypothesis,
+                    components=components,
+                )
+                components.update(_quality_score_components(quality_kwargs))
             score = _weighted_hypothesis_score(components, hypothesis.impact_category)
             out.append(replace(
                 hypothesis,
@@ -488,6 +533,7 @@ def validate_hypotheses_with_raw_events(
                 validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
                 impact_path_reason=impact_path_reason,
                 **_impact_validation_replace_kwargs(impact_validation),
+                **quality_kwargs,
             ))
         elif rejections:
             out.append(replace(
@@ -640,10 +686,12 @@ def _apply_candidate_discovery_results(
 
 def _candidate_asset_from_discovery_raw(raw: RawDiscoveredEvent) -> dict[str, Any] | None:
     payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    title_body = " ".join(str(value or "") for value in (raw.title, raw.body))
     for key in ("candidate_asset", "asset", "market"):
         asset = payload.get(key) if isinstance(payload.get(key), Mapping) else {}
         row = _asset_row_from_mapping(asset, source="candidate_discovery_search", raw_id=raw.raw_id)
         if row:
+            row.setdefault("source_title", raw.title)
             return row
     extraction = payload.get("llm_extraction") if isinstance(payload.get("llm_extraction"), Mapping) else {}
     mentions = extraction.get("crypto_asset_mentions") if isinstance(extraction.get("crypto_asset_mentions"), list) else []
@@ -662,7 +710,58 @@ def _candidate_asset_from_discovery_raw(raw: RawDiscoveredEvent) -> dict[str, An
         row = _asset_row_from_mapping(mention, source="candidate_discovery_search", raw_id=raw.raw_id)
         if row:
             row["confidence"] = round(max(0.0, min(1.0, confidence)), 4)
+            row.setdefault("source_title", raw.title)
             return row
+    fallback = _candidate_asset_from_text(title_body, raw_id=raw.raw_id, title=raw.title)
+    if fallback:
+        return fallback
+    return None
+
+
+def _candidate_asset_from_text(text: str, *, raw_id: str, title: str) -> dict[str, Any] | None:
+    clean = clean_text(text)
+    if "velvet" in clean and any(term in clean for term in ("pre ipo", "pre-ipo", "spacex", "exposure", "crypto venue")):
+        return {
+            "source": "candidate_discovery_search",
+            "raw_id": raw_id,
+            "name": "Velvet",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "confidence": 0.82,
+            "evidence": title,
+            "source_title": title,
+            "identity_reason": "explicit_project_name_with_proxy_context",
+            "candidate_role_hint": "proxy_venue",
+            "validated": False,
+        }
+    match = re.search(r"(?<![A-Z0-9])\$([A-Z]{2,10})(?![A-Z0-9])", text)
+    if match:
+        symbol = match.group(1).upper()
+        return {
+            "source": "candidate_discovery_search",
+            "raw_id": raw_id,
+            "symbol": symbol,
+            "coin_id": symbol.lower(),
+            "confidence": 0.72,
+            "evidence": title,
+            "source_title": title,
+            "identity_reason": "cashtag_in_source_text",
+            "validated": False,
+        }
+    match = re.search(r"(?<![A-Z0-9])([A-Z]{2,10})USDT(?![A-Z0-9])", text)
+    if match:
+        symbol = match.group(1).upper()
+        return {
+            "source": "candidate_discovery_search",
+            "raw_id": raw_id,
+            "symbol": symbol,
+            "coin_id": symbol.lower(),
+            "confidence": 0.76,
+            "evidence": title,
+            "source_title": title,
+            "identity_reason": "explicit_trading_pair_in_source_text",
+            "validated": False,
+        }
     return None
 
 
@@ -691,6 +790,7 @@ def _asset_row_from_mapping(
         "contract_address": contract,
         "confidence": round(max(0.0, min(1.0, confidence)), 4),
         "evidence": str(asset.get("evidence") or asset.get("evidence_quote") or ""),
+        "source_title": str(asset.get("source_title") or asset.get("title") or ""),
         "validated": False,
     }
 
@@ -721,6 +821,7 @@ def _with_promotion_diagnostics(
             or hypothesis.validation_stage != ValidationStage.CATALYST_LINK_VALIDATED.value
             or _impact_path_reason_is_strong(hypothesis.impact_path_reason)
         )
+        and hypothesis.opportunity_level not in {"local_only", "exploratory"}
     ):
         return replace(hypothesis, why_not_promoted=())
     if not hypothesis.crypto_candidate_assets and not hypothesis.validated_candidate_assets:
@@ -755,6 +856,12 @@ def _with_promotion_diagnostics(
         reasons.append("generic_cooccurrence_only")
     if hypothesis.why_digest_ineligible:
         reasons.append(str(hypothesis.why_digest_ineligible))
+    if hypothesis.opportunity_level in {"local_only", "exploratory"}:
+        reasons.append(f"opportunity_level:{hypothesis.opportunity_level}")
+    if hypothesis.why_local_only:
+        reasons.append(str(hypothesis.why_local_only))
+    if hypothesis.why_not_watchlist:
+        reasons.append(str(hypothesis.why_not_watchlist))
     warnings = tuple(str(item) for item in (*hypothesis.warnings, *(getattr(search_result, "warnings", ()) or ())) if str(item))
     if any("backoff" in warning.casefold() for warning in warnings):
         reasons.append("provider_backoff")
@@ -784,6 +891,9 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
     path_reasons: dict[str, int] = {}
     path_types: dict[str, int] = {}
     path_strengths: dict[str, int] = {}
+    opportunity_levels: dict[str, int] = {}
+    market_levels: dict[str, int] = {}
+    source_classes: dict[str, int] = {}
     for item in items:
         counts[item.status] = counts.get(item.status, 0) + 1
         stages[item.validation_stage] = stages.get(item.validation_stage, 0) + 1
@@ -793,6 +903,12 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
             path_types[item.impact_path_type] = path_types.get(item.impact_path_type, 0) + 1
         if item.impact_path_strength:
             path_strengths[item.impact_path_strength] = path_strengths.get(item.impact_path_strength, 0) + 1
+        if item.opportunity_level:
+            opportunity_levels[item.opportunity_level] = opportunity_levels.get(item.opportunity_level, 0) + 1
+        if item.market_confirmation_level:
+            market_levels[item.market_confirmation_level] = market_levels.get(item.market_confirmation_level, 0) + 1
+        if item.source_class:
+            source_classes[item.source_class] = source_classes.get(item.source_class, 0) + 1
     rows.append("statuses: " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items())))
     rows.append("validation_stages: " + ", ".join(f"{key}={value}" for key, value in sorted(stages.items())))
     if path_reasons:
@@ -801,6 +917,12 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
         rows.append("impact_path_types: " + ", ".join(f"{key}={value}" for key, value in sorted(path_types.items())))
     if path_strengths:
         rows.append("impact_path_strengths: " + ", ".join(f"{key}={value}" for key, value in sorted(path_strengths.items())))
+    if opportunity_levels:
+        rows.append("opportunity_levels: " + ", ".join(f"{key}={value}" for key, value in sorted(opportunity_levels.items())))
+    if market_levels:
+        rows.append("market_confirmation_levels: " + ", ".join(f"{key}={value}" for key, value in sorted(market_levels.items())))
+    if source_classes:
+        rows.append("source_classes: " + ", ".join(f"{key}={value}" for key, value in sorted(source_classes.items())))
     why_counts: dict[str, int] = {}
     for item in items:
         for reason in item.why_not_promoted:
@@ -871,6 +993,24 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
                 f"score_v2={item.opportunity_score_v2 if item.opportunity_score_v2 is not None else 'n/a'} "
                 f"digest_eligible={str(bool(item.digest_eligible_by_impact_path)).lower()}"
             )
+        if item.opportunity_score_final is not None or item.opportunity_level:
+            rows.append(
+                "  opportunity_verdict: "
+                f"level={item.opportunity_level or 'unknown'} "
+                f"score_final={item.opportunity_score_final if item.opportunity_score_final is not None else 'n/a'} "
+                f"market={item.market_confirmation_level or 'unknown'}"
+                f"/{item.market_confirmation_score if item.market_confirmation_score is not None else 'n/a'} "
+                f"evidence={item.source_class or 'unknown'}"
+                f"/{item.evidence_specificity or 'unknown'}"
+                f"/{item.evidence_quality_score if item.evidence_quality_score is not None else 'n/a'}"
+            )
+        if item.why_local_only or item.why_not_watchlist:
+            rows.append(
+                f"  opportunity_blocks: local={item.why_local_only or 'none'} "
+                f"watchlist={item.why_not_watchlist or 'none'}"
+            )
+        if item.manual_verification_items:
+            rows.append("  verify_next: " + "; ".join(item.manual_verification_items[:3]))
         if item.why_digest_ineligible:
             rows.append(f"  why_digest_ineligible: {item.why_digest_ineligible}")
         if item.rejection_reasons:
@@ -989,6 +1129,13 @@ def _hypothesis_from_rule(
         updated_components.update(_impact_validation_score_components(validation))
         validation = _refresh_impact_validation_score(validation, updated_components)
         updated_components.update(_impact_validation_score_components(validation))
+        quality_kwargs = _quality_verdict_replace_kwargs(
+            validation,
+            impact_context=(raws[0], str(asset.get("symbol") or (symbols[0] if symbols else "")), str(asset.get("coin_id") or (coin_ids[0] if coin_ids else ""))),
+            hypothesis=hypothesis,
+            components=updated_components,
+        )
+        updated_components.update(_quality_score_components(quality_kwargs))
         stage = validation_stage
         if validation.required_evidence_met:
             stage = _max_validation_stage(stage, ValidationStage.IMPACT_PATH_VALIDATED.value)
@@ -1001,6 +1148,7 @@ def _hypothesis_from_rule(
             score_components=updated_components,
             impact_path_reason=validation.impact_path_reason,
             **_impact_validation_replace_kwargs(validation),
+            **quality_kwargs,
         )
     query_details = _default_search_query_details(hypothesis)
     hypothesis = replace(
@@ -1253,6 +1401,11 @@ def _candidate_rejection_reason(
     symbol = str(row.get("symbol") or "").strip().upper()
     name = clean_text(row.get("name") or "")
     coin_id = clean_text(row.get("coin_id") or "")
+    source_title = clean_text(row.get("source_title") or row.get("evidence") or "")
+    if symbol == "BTC" and "bitcoin world" in source_title and "$btc" not in source_title and "btcusdt" not in source_title:
+        return "publisher_source_name_not_asset_identity"
+    if symbol == "PRIME" and "prime minister" in source_title:
+        return "common_word_or_title_not_asset_identity"
     if symbol and symbol.casefold() in _GENERIC_NON_ASSET_TERMS:
         strong_terms = {clean_text(value) for value in (name, coin_id) if value}
         strong_terms.add(symbol.casefold() + "usdt")
@@ -1853,6 +2006,148 @@ def _impact_validation_replace_kwargs(
         "opportunity_score_v2": validation.opportunity_score_v2,
         "opportunity_score_components": dict(validation.opportunity_score_components or {}),
     }
+
+
+def _quality_verdict_replace_kwargs(
+    validation: event_impact_path_validator.ImpactPathValidation,
+    *,
+    impact_context: tuple[RawDiscoveredEvent, str | None, str | None] | None,
+    hypothesis: EventImpactHypothesis,
+    components: Mapping[str, float],
+) -> dict[str, Any]:
+    raw, symbol, coin_id = impact_context if impact_context is not None else (None, None, None)
+    payload = raw.raw_json if raw is not None and isinstance(raw.raw_json, Mapping) else {}
+    market_result = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot=_payload_mapping(payload, "market", "market_snapshot"),
+            market_anomaly_row=_payload_mapping(payload, "anomaly", "market_anomaly"),
+            derivatives_snapshot=_payload_mapping(payload, "derivatives", "derivatives_snapshot"),
+            supply_snapshot=_payload_mapping(payload, "supply", "supply_snapshot"),
+            btc_context=_payload_mapping(payload, "btc_context"),
+            sector_benchmark=_payload_mapping(payload, "sector_benchmark"),
+            playbook_type=hypothesis.playbook_hint or hypothesis.impact_category,
+            impact_category=hypothesis.impact_category,
+        )
+    )
+    evidence_result = event_evidence_quality.evaluate_evidence_quality(
+        raw,
+        hypothesis=hypothesis,
+        symbol=symbol,
+        coin_id=coin_id,
+    )
+    merged_components = dict(components)
+    merged_components.update({
+        "market_confirmation": max(
+            _component_float(merged_components, "market_confirmation"),
+            float(market_result.market_confirmation_score or 0.0),
+        ),
+        "source_quality": max(
+            _component_float(merged_components, "source_quality"),
+            float(evidence_result.evidence_quality_score or 0.0),
+        ),
+        "source_evidence_specificity": max(
+            _component_float(merged_components, "source_evidence_specificity"),
+            float(validation.evidence_specificity_score or 0.0),
+        ),
+        "timing_event_window": max(
+            _component_float(merged_components, "timing_event_window"),
+            _component_float(merged_components, "event_time_quality"),
+            _component_float(merged_components, "event_clarity"),
+        ),
+        "liquidity_tradability": max(
+            _component_float(merged_components, "liquidity_tradability"),
+            _component_float(merged_components, "liquidity"),
+            _component_float(merged_components, "tradability"),
+            float(market_result.market_confirmation_score or 0.0),
+        ),
+        "llm_resolver_confidence": max(
+            _component_float(merged_components, "llm_resolver_confidence"),
+            _component_float(merged_components, "validation_strength"),
+            _component_float(merged_components, "candidate_asset_strength"),
+            _component_float(merged_components, "llm_candidate_confidence"),
+        ),
+    })
+    verdict = event_opportunity_verdict.evaluate_opportunity(
+        impact_path=validation,
+        market_confirmation=market_result,
+        evidence_quality=evidence_result,
+        hypothesis=hypothesis,
+        score_components=merged_components,
+    )
+    return {
+        "evidence_quality_score": evidence_result.evidence_quality_score,
+        "source_class": evidence_result.source_class,
+        "evidence_specificity": evidence_result.evidence_specificity,
+        "evidence_quality_reasons": evidence_result.reason_codes,
+        "market_confirmation_score": market_result.market_confirmation_score,
+        "market_confirmation_level": market_result.level,
+        "market_confirmation_reasons": market_result.reasons,
+        "market_confirmation_warnings": market_result.warnings,
+        "market_confirmation_missing_fields": market_result.missing_fields,
+        "market_confirmation_summary": market_result.confirmation_summary,
+        "opportunity_score_final": verdict.opportunity_score_final,
+        "opportunity_level": verdict.opportunity_level,
+        "opportunity_verdict_reasons": verdict.verdict_reason_codes,
+        "missing_requirements": verdict.missing_requirements,
+        "manual_verification_items": verdict.manual_verification_items,
+        "why_local_only": verdict.why_local_only,
+        "why_not_watchlist": verdict.why_not_watchlist,
+    }
+
+
+def _quality_score_components(values: Mapping[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    mapping = {
+        "evidence_quality_score": "evidence_quality_score",
+        "source_class": "source_class",
+        "evidence_specificity": "evidence_specificity",
+        "market_confirmation_score": "market_confirmation_score",
+        "market_confirmation_level": "market_confirmation_level",
+        "opportunity_score_final": "opportunity_score_final",
+        "opportunity_level": "opportunity_level",
+        "why_local_only": "why_local_only",
+        "why_not_watchlist": "why_not_watchlist",
+    }
+    for source_key, target_key in mapping.items():
+        value = values.get(source_key)
+        if value not in (None, "", [], {}):
+            out[target_key] = value
+    out["market_confirmation"] = max(
+        _coerce_score(out.get("market_confirmation_score")),
+        _coerce_score(values.get("market_confirmation_score")),
+    )
+    out["source_quality"] = max(
+        _coerce_score(out.get("evidence_quality_score")),
+        _coerce_score(values.get("evidence_quality_score")),
+    )
+    for key in (
+        "market_confirmation_reasons",
+        "market_confirmation_warnings",
+        "market_confirmation_missing_fields",
+        "evidence_quality_reasons",
+        "opportunity_verdict_reasons",
+        "missing_requirements",
+        "manual_verification_items",
+    ):
+        value = values.get(key)
+        if value:
+            out[key] = list(value) if not isinstance(value, str) else [value]
+    return out
+
+
+def _payload_mapping(payload: Mapping[str, Any], *keys: str) -> Mapping[str, Any]:
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, Mapping):
+            return value
+    return {}
+
+
+def _coerce_score(value: object) -> float:
+    try:
+        return max(0.0, min(100.0, float(value or 0.0)))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _identity_match_from_symbols(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> event_identity.IdentityMatchResult:

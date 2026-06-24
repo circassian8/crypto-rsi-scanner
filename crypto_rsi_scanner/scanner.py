@@ -1474,6 +1474,7 @@ def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRo
         max_validated_hypothesis_digest_items=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_MAX_ITEMS,
         validated_hypothesis_min_score=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MIN_SCORE,
         validated_hypothesis_min_opportunity_score=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_OPPORTUNITY_SCORE,
+        validated_hypothesis_min_final_score=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_FINAL_SCORE,
         validated_hypothesis_require_external_or_direct_event=(
             config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT
         ),
@@ -5459,6 +5460,12 @@ def _router_config_from_profile(profile_name: str | None) -> event_alpha_router.
             overrides.get(
                 "EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_OPPORTUNITY_SCORE",
                 current.validated_hypothesis_min_opportunity_score,
+            )
+        ),
+        validated_hypothesis_min_final_score=float(
+            overrides.get(
+                "EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_FINAL_SCORE",
+                current.validated_hypothesis_min_final_score,
             )
         ),
         validated_hypothesis_require_external_or_direct_event=bool(

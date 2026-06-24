@@ -608,6 +608,23 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     evidence_specificity = components.get("evidence_specificity_score")
     why_digest_ineligible = components.get("why_digest_ineligible") or "none"
     digest_eligible = components.get("digest_eligible_by_impact_path")
+    evidence_quality_score = components.get("evidence_quality_score")
+    source_class = components.get("source_class") or "unknown"
+    evidence_specificity_class = components.get("evidence_specificity") or "unknown"
+    market_confirmation_score = components.get("market_confirmation_score")
+    market_confirmation_level = components.get("market_confirmation_level") or "unknown"
+    market_confirmation_summary = components.get("market_confirmation_summary") or "none"
+    opportunity_score_final = components.get("opportunity_score_final")
+    opportunity_level = components.get("opportunity_level") or "unknown"
+    verdict_reasons = components.get("opportunity_verdict_reasons") or []
+    missing_requirements = components.get("missing_requirements") or []
+    manual_verification_items = components.get("manual_verification_items") or []
+    if isinstance(verdict_reasons, str):
+        verdict_reasons = [verdict_reasons]
+    if isinstance(missing_requirements, str):
+        missing_requirements = [missing_requirements]
+    if isinstance(manual_verification_items, str):
+        manual_verification_items = [manual_verification_items]
     why_not_promoted = components.get("why_not_promoted") or []
     if isinstance(why_not_promoted, str):
         why_not_promoted = [why_not_promoted]
@@ -622,15 +639,28 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Impact path strength: {impact_path_strength}",
         f"- Impact path reason: {impact_path_reason}",
         f"- Opportunity score v2: {opportunity_score_v2 if opportunity_score_v2 is not None else 'n/a'}",
+        f"- Final opportunity verdict: {opportunity_level} / {opportunity_score_final if opportunity_score_final is not None else 'n/a'}",
         f"- Source/evidence specificity: {evidence_specificity if evidence_specificity is not None else 'n/a'}",
+        f"- Evidence quality: {source_class}/{evidence_specificity_class} / {evidence_quality_score if evidence_quality_score is not None else 'n/a'}",
+        f"- Market confirmation: {market_confirmation_level} / {market_confirmation_score if market_confirmation_score is not None else 'n/a'}",
+        f"- Market summary: {market_confirmation_summary}",
         f"- Impact path digest eligible: {str(bool(digest_eligible)).lower() if digest_eligible is not None else 'unknown'}",
         f"- Missing evidence / gate failure: {why_digest_ineligible}",
+        f"- Opportunity verdict reasons: {'; '.join(str(item) for item in verdict_reasons[:4]) if verdict_reasons else 'none'}",
+        f"- Missing requirements: {'; '.join(str(item) for item in missing_requirements[:4]) if missing_requirements else 'none'}",
         f"- Quality gate: {gate_line}",
         f"- Local-only due to weak co-occurrence: {str('impact_path_not_validated' in gate_line or 'weak_validated_local_only' in gate_line or why_digest_ineligible != 'none').lower()}",
         f"- Why promoted/local-only: {entry.suppressed_reason or 'validated impact hypothesis promoted to RADAR'}",
         "- Safety label: catalyst link validated, but this is not a calibrated strategy or trade signal.",
         "- Why it may be wrong: validation may be source-thin, asset link may be narrative-only, and the catalyst impact may not move this token.",
-        "- What to verify manually: independent catalyst source, asset identity, liquidity/organic volume, and whether the catalyst actually affects this token.",
+        "- What to verify manually: "
+        + (
+            "; ".join(str(item) for item in manual_verification_items[:4])
+            if manual_verification_items
+            else "independent catalyst source, asset identity, liquidity/organic volume, and whether the catalyst actually affects this token."
+        ),
+        "- What would upgrade this candidate: stronger source specificity, moderate/strong market confirmation, and clearer catalyst timing.",
+        "- What would downgrade this candidate: source-noise evidence, missing market reaction, weak liquidity, or no explained token impact path.",
     ]
     if validation_reasons:
         lines.append("- Validation evidence: " + "; ".join(str(item) for item in validation_reasons[:4]))

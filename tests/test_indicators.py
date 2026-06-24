@@ -7175,16 +7175,16 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
 
     now = datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
 
-    def raw(raw_id, title, body):
+    def raw(raw_id, title, body, market=None, provider="fixture_search"):
         return RawDiscoveredEvent(
             raw_id=raw_id,
-            provider="fixture_search",
+            provider=provider,
             fetched_at=now,
             published_at=now,
             source_url=f"https://example.test/{raw_id}",
             title=title,
             body=body,
-            raw_json={},
+            raw_json={"market": market or {}} if market is not None else {},
             source_confidence=0.9,
             content_hash=raw_id,
         )
@@ -7210,30 +7210,48 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
     cases = [
         (
             hypothesis("hyp:rune", "RUNE", "thorchain", "security_or_regulatory_shock", "THORChain"),
-            raw("rune", "THORChain exploit investigation", "THORChain RUNE faces an exploit and security incident after an attack."),
+            raw(
+                "rune",
+                "THORChain exploit investigation",
+                "THORChain RUNE faces an exploit and security incident after an attack.",
+                market={"return_24h": 0.32, "volume_zscore_24h": 3.4, "volume_to_market_cap": 0.28},
+            ),
             "exploit_security_event",
             "impact_path_validated",
             "exploit_security_event",
             "direct_subject",
             "strong",
+            "watchlist",
         ),
         (
             hypothesis("hyp:zec", "ZEC", "zcash", "listing_liquidity_event", "Nasdaq"),
-            raw("zec", "Zcash miner Nasdaq listing opens", "Zcash ZEC miner completes a Nasdaq listing and public market access changes."),
+            raw(
+                "zec",
+                "Zcash miner Nasdaq listing opens",
+                "Zcash ZEC miner completes a Nasdaq listing and public market access changes.",
+                market={"return_72h": 0.54, "volume_zscore_24h": 2.5},
+            ),
             "listing_liquidity_event",
             "impact_path_validated",
             "listing_liquidity_event",
             "direct_subject",
             "strong",
+            "watchlist",
         ),
         (
             hypothesis("hyp:chz", "CHZ", "chiliz", "sports_fan_proxy", "World Cup"),
-            raw("chz", "World Cup fan token demand", "CHZ fan token demand rises into a World Cup fixture and team kickoff."),
+            raw(
+                "chz",
+                "World Cup fan token demand",
+                "CHZ fan token demand rises into a World Cup fixture and team kickoff.",
+                market={"return_24h": 0.27, "volume_zscore_24h": 3.1, "relative_strength_vs_btc": 0.20},
+            ),
             "fan_token_event",
             "impact_path_validated",
             "fan_token_attention",
             "proxy_instrument",
             "strong",
+            "watchlist",
         ),
         (
             hypothesis("hyp:btc", "BTC", "bitcoin", "security_or_regulatory_shock", "unknown"),
@@ -7243,6 +7261,7 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
             "technology_risk",
             "macro_affected_asset",
             "weak",
+            "local_only",
         ),
         (
             hypothesis("hyp:cftc", "BTC", "bitcoin", "security_or_regulatory_shock", "CFTC"),
@@ -7252,6 +7271,7 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
             "market_structure_policy",
             "macro_affected_asset",
             "weak",
+            "local_only",
         ),
         (
             hypothesis("hyp:re", "RE", "real", "political_meme_proxy", "Trump"),
@@ -7261,9 +7281,10 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
             "technology_risk",
             "macro_affected_asset",
             "weak",
+            "local_only",
         ),
     ]
-    for hypothesis, source, reason, stage, path_type, role, strength in cases:
+    for hypothesis, source, reason, stage, path_type, role, strength, expected_level in cases:
         validated = event_impact_hypotheses.validate_hypotheses_with_raw_events((hypothesis,), (source,))[0]
         assert validated.status == event_impact_hypotheses.HypothesisStatus.VALIDATED.value
         assert validated.impact_path_reason == reason
@@ -7273,11 +7294,144 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
         assert validated.impact_path_strength == strength
         assert validated.opportunity_score_v2 is not None
         assert "impact_path_strength" in validated.opportunity_score_components
+        assert validated.evidence_quality_score is not None
+        assert validated.source_class
+        assert validated.evidence_specificity
+        assert validated.market_confirmation_level
+        assert validated.opportunity_score_final is not None
+        assert validated.opportunity_level == expected_level
+        assert validated.manual_verification_items
         if strength == "weak":
             assert validated.digest_eligible_by_impact_path is False
             assert validated.why_digest_ineligible
+            assert validated.why_local_only or validated.why_not_watchlist
         else:
             assert validated.digest_eligible_by_impact_path is True
+
+
+def test_event_market_evidence_and_opportunity_verdict_quality_layers():
+    from crypto_rsi_scanner import (
+        event_evidence_quality,
+        event_impact_path_validator,
+        event_market_confirmation,
+        event_opportunity_verdict,
+    )
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 6, 25, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="velvet",
+        provider="cryptopanic",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://cryptopanic.com/news/velvet",
+        title="VELVET offers SpaceX pre-IPO exposure",
+        body="Velvet lets users trade tokenized SpaceX pre-IPO exposure through a crypto venue.",
+        raw_json={
+            "currencies": ["VELVET"],
+            "market": {"return_24h": 0.38, "volume_zscore_24h": 3.2, "volume_to_market_cap": 0.31},
+        },
+        source_confidence=0.88,
+        content_hash="velvet",
+    )
+    hypothesis = SimpleNamespace(
+        impact_category="rwa_preipo_proxy",
+        external_asset="SpaceX",
+        playbook_hint="rwa_preipo_proxy",
+        score_components={"validation_strength": 90, "event_clarity": 80},
+    )
+    market = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot=raw.raw_json["market"],
+            playbook_type="rwa_preipo_proxy",
+        )
+    )
+    evidence = event_evidence_quality.evaluate_evidence_quality(raw, hypothesis=hypothesis, symbol="VELVET", coin_id="velvet")
+    path = event_impact_path_validator.validate_impact_path(raw, hypothesis, symbol="VELVET", coin_id="velvet")
+    verdict = event_opportunity_verdict.evaluate_opportunity(
+        impact_path=path,
+        market_confirmation=market,
+        evidence_quality=evidence,
+        hypothesis=hypothesis,
+        score_components=hypothesis.score_components,
+    )
+    assert market.level == "strong"
+    assert "price_momentum" in market.reasons
+    assert "volume_expansion" in market.reasons
+    assert evidence.source_class == "cryptopanic_tagged"
+    assert evidence.evidence_specificity == "direct_token_mechanism"
+    assert verdict.opportunity_level in {"watchlist", "high_priority"}
+    assert verdict.watchlist_eligible is True
+
+    weak_market = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(playbook_type="market_anomaly_unknown")
+    )
+    assert weak_market.level == "none"
+    assert "insufficient_data" in weak_market.reasons
+    low_quality = event_evidence_quality.evaluate_evidence_quality(
+        RawDiscoveredEvent(
+            raw_id="poly",
+            provider="polymarket",
+            fetched_at=now,
+            published_at=now,
+            source_url="https://polymarket.com/event/will-spacex-ipo",
+            title="Will SpaceX IPO this year?",
+            body="Prediction market context only; no token impact path is explained.",
+            raw_json={},
+            source_confidence=0.5,
+            content_hash="poly",
+        ),
+        hypothesis=SimpleNamespace(impact_category="rwa_preipo_proxy"),
+        symbol="VELVET",
+        coin_id="velvet",
+    )
+    assert low_quality.source_class == "prediction_market"
+    assert low_quality.evidence_quality_score <= 55
+
+
+def test_event_candidate_discovery_rejects_common_word_false_positives():
+    from crypto_rsi_scanner import event_impact_hypotheses
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 6, 25, 12, 0, tzinfo=timezone.utc)
+
+    def raw(raw_id, title, body):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="fixture_search",
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body,
+            raw_json={},
+            source_confidence=0.75,
+            content_hash=raw_id,
+        )
+
+    velvet = event_impact_hypotheses._candidate_asset_from_discovery_raw(
+        raw("velvet", "OpenAI pre-IPO crypto venue Velvet", "Velvet offers crypto exposure to private AI shares.")
+    )
+    assert velvet
+    accepted, rejected = event_impact_hypotheses._split_suggested_assets(
+        (velvet,),
+        external_entities=(),
+        text="OpenAI pre-IPO crypto venue Velvet",
+    )
+    assert accepted and accepted[0]["symbol"] == "VELVET"
+    assert not rejected
+
+    for title, symbol, reason in (
+        ("IPO hype returns to crypto markets", "HYPE", "generic_symbol_without_project_identity"),
+        ("Prime minister talks crypto policy", "PRIME", "common_word_or_title_not_asset_identity"),
+        ("Bitcoin World covers SpaceX prediction market", "BTC", "publisher_source_name_not_asset_identity"),
+    ):
+        row = {"symbol": symbol, "coin_id": symbol.lower(), "source_title": title, "source": "candidate_discovery_search"}
+        accepted, rejected = event_impact_hypotheses._split_suggested_assets((row,), external_entities=(), text=title)
+        assert not accepted
+        assert rejected[0]["rejection_reason"] == reason
 
 
 def test_event_impact_hypothesis_watchlist_uses_validated_asset_not_first_candidate():
@@ -9688,10 +9842,14 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
         impact_path_strength="strong",
         candidate_role="direct_subject",
         opportunity_score_v2=None,
+        opportunity_score_final=None,
+        opportunity_level="validated_digest",
+        market_confirmation_level="moderate",
         digest_eligible_by_impact_path=True,
     ):
         impact_path_type = impact_path_type or impact_path_reason
         opportunity_score_v2 = opportunity_score_v2 if opportunity_score_v2 is not None else score
+        opportunity_score_final = opportunity_score_final if opportunity_score_final is not None else opportunity_score_v2
         evidence = evidence or (f"{symbol} {symbol.lower()} exploit catalyst link",)
         return event_watchlist.EventWatchlistEntry(
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -9729,6 +9887,15 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
                 "evidence_specificity_score": 88,
                 "digest_eligible_by_impact_path": digest_eligible_by_impact_path,
                 "opportunity_score_v2": opportunity_score_v2,
+                "opportunity_score_final": opportunity_score_final,
+                "opportunity_level": opportunity_level,
+                "market_confirmation_score": 50,
+                "market_confirmation_level": market_confirmation_level,
+                "evidence_quality_score": 82,
+                "source_class": "crypto_news",
+                "evidence_specificity": "direct_token_mechanism",
+                "opportunity_verdict_reasons": ["direct_token_event_with_strong_evidence"],
+                "manual_verification_items": ["verify independent source"],
                 "opportunity_score_components": {
                     "impact_path_strength": 95 if impact_path_strength == "strong" else 35,
                     "source_evidence_specificity": 88,
@@ -9822,7 +9989,7 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
     assert by_symbol["RUNE"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
     assert by_symbol["RUNE"].lane == event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST
     assert by_symbol["RUNE"].alertable is True
-    assert by_symbol["RUNE"].reason == "Validated impact hypothesis promoted to RADAR."
+    assert "digest opportunity verdict" in by_symbol["RUNE"].reason
     assert by_symbol["ZEC"].route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE
     assert by_symbol["ZEC"].alertable is False
     assert by_symbol["ZEC"].reason == "Validated impact hypothesis digest cap reached for this run."
@@ -9866,6 +10033,9 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
     assert card.found is True
     assert "## Impact Hypothesis Context" in card.markdown
     assert "Validated asset: RUNE/rune" in card.markdown
+    assert "Final opportunity verdict" in card.markdown
+    assert "Evidence quality" in card.markdown
+    assert "Market confirmation" in card.markdown
     assert "Impact path reason: exploit_security_event" in card.markdown
     assert "Quality gate: passed" in card.markdown
     assert "not a calibrated strategy or trade signal" in card.markdown

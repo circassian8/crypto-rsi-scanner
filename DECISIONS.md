@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-25 - Event Alpha digests require final opportunity verdicts
+**Status:** accepted
+**Decision:** Validated Event Alpha hypotheses must carry a final opportunity
+verdict before operator-facing digest promotion when that metadata is
+available. The verdict combines impact-path strength, market confirmation,
+source/evidence quality, timing, liquidity/tradability, and resolver/LLM
+confidence. `local_only` and `exploratory` verdicts stay local even if a
+catalyst link exists. `validated_digest` and `watchlist` verdicts may enter the
+capped research digest, and `high_priority` verdicts may use the research
+escalation lane. This verdict cannot create `TRIGGERED_FADE`, paper trades,
+normal RSI signal rows, live DB writes, or execution.
+**Why:** Impact-path validation answers “could this catalyst affect this
+asset?” but not “is this worth operator attention today?” Market confirmation
+and source quality need to be first-class gates so broad co-occurrence and weak
+evidence stay local.
+**Revisit when:** Reviewed Event Alpha feedback/outcomes show the final
+verdict weights are too conservative or too permissive for a specific playbook.
+
 ## 2026-06-25 - Validated hypothesis digests require an explained impact path and v2 score
 **Status:** accepted
 **Decision:** Event Impact Hypothesis validation must classify the source's
