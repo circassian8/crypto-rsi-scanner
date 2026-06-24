@@ -305,7 +305,15 @@ def build_daily_brief(
     ]
     weak_local_hypotheses = [
         decision for decision in local_validated_hypotheses
-        if str((decision.entry.latest_score_components or {}).get("validation_stage") or "") == "catalyst_link_validated"
+        if (
+            str((decision.entry.latest_score_components or {}).get("validation_stage") or "") == "catalyst_link_validated"
+            or str((decision.entry.latest_score_components or {}).get("impact_path_strength") or "") in {"weak", "none"}
+            or bool((decision.entry.latest_score_components or {}).get("why_digest_ineligible"))
+        )
+    ]
+    generic_blocked_hypotheses = [
+        decision for decision in local_validated_hypotheses
+        if str((decision.entry.latest_score_components or {}).get("impact_path_type") or "") == "generic_cooccurrence_only"
     ]
     exploratory_sector_hypotheses = [
         entry for entry in entries
@@ -318,6 +326,7 @@ def build_daily_brief(
     ]
     lines.append("- Impact-path validated digest candidates: " + (_brief_decisions(alertable_hypotheses[:5]) or _brief_decisions(impact_path_validated_hypotheses[:5]) or "none"))
     lines.append("- Weak validated local-only hypotheses: " + (_brief_decisions(weak_local_hypotheses[:5]) or "none"))
+    lines.append("- Generic co-occurrence blocked: " + (_brief_decisions(generic_blocked_hypotheses[:5]) or "none"))
     lines.append("- Sector hypotheses awaiting validation: " + (_brief_entries(exploratory_sector_hypotheses[:5]) or "none"))
     lines.append("- Rejected/why-not-promoted hypotheses: " + (_brief_hypothesis_labels(rejected_hypotheses[:5]) or "none"))
     exploratory = event_alpha_notifications.select_exploratory_candidates(
@@ -556,7 +565,10 @@ def _brief_hypothesis_labels(rows: Iterable[Mapping[str, Any]]) -> str:
             f"/{row.get('external_asset') or 'unknown'}"
             f"/candidate={candidate_label}"
             f"({row.get('validation_stage') or row.get('status') or 'unknown'}"
-            f",score={_float(row.get('hypothesis_score') or _float(row.get('confidence')) * 100):.0f})"
+            f",score={_float(row.get('hypothesis_score') or _float(row.get('confidence')) * 100):.0f}"
+            f",v2={_float(row.get('opportunity_score_v2')):.0f}"
+            f",path={row.get('impact_path_type') or 'unknown'}"
+            f",role={row.get('candidate_role') or 'unknown'})"
         )
     return "; ".join(labels)
 
@@ -565,9 +577,12 @@ def _brief_decisions(rows: Iterable[event_alpha_router.EventAlphaRouteDecision])
     labels = []
     for decision in rows:
         entry = decision.entry
+        components = entry.latest_score_components or {}
         labels.append(
             f"{entry.symbol}/{entry.coin_id}"
-            f"({entry.state},score={entry.latest_score},route={decision.route.value},reason={decision.reason})"
+            f"({entry.state},score={entry.latest_score},v2={_float(components.get('opportunity_score_v2')):.0f},"
+            f"path={components.get('impact_path_type') or 'unknown'},role={components.get('candidate_role') or 'unknown'},"
+            f"route={decision.route.value},reason={decision.reason})"
         )
     return "; ".join(labels)
 
@@ -578,7 +593,9 @@ def _brief_entries(rows: Iterable[event_watchlist.EventWatchlistEntry]) -> str:
         components = entry.latest_score_components or {}
         labels.append(
             f"{entry.symbol}/{entry.coin_id}"
-            f"({components.get('impact_category') or entry.latest_playbook_type or 'unknown'},score={entry.latest_score})"
+            f"({components.get('impact_category') or entry.latest_playbook_type or 'unknown'},"
+            f"score={entry.latest_score},v2={_float(components.get('opportunity_score_v2')):.0f},"
+            f"path={components.get('impact_path_type') or 'unknown'})"
         )
     return "; ".join(labels)
 

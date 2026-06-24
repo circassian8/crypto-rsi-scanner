@@ -82,6 +82,11 @@ promote to token-level `RADAR` only after identity-safe source evidence
 explicitly links a candidate asset to the catalyst. The strongest promoted rows
 carry `impact_path_validated`, meaning the evidence explains why the event
 affects the token/protocol/venue/sector rather than merely mentioning both.
+Validated hypotheses also carry `impact_path_type`, `candidate_role`,
+`impact_path_strength`, `evidence_specificity_score`,
+`digest_eligible_by_impact_path`, and `opportunity_score_v2`. These fields are
+review/routing metadata only; they do not create trades, paper rows, normal RSI
+alerts, or `TRIGGERED_FADE`.
 Candidate-only or identity-only evidence can improve review context but does
 not promote a token-level row. Candidate-discovery search hits can suggest new
 crypto candidates when the source payload or quote-validated extraction names an
@@ -101,16 +106,22 @@ paper/live rows, or `TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from
 Digest routing is quality-gated. Defaults require score >=
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MIN_SCORE` (65), a validated token
 identity, no source-noise/ticker-collision gate, a non-ambiguous playbook, a
-known external catalyst or explicit direct token-event evidence, and
-`impact_path_validated` or stronger validation stage. Weak
-`catalyst_link_validated` rows remain local-only when
+known external catalyst or explicit direct token-event evidence,
+`opportunity_score_v2` >=
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_OPPORTUNITY_SCORE` (65), and
+`impact_path_validated` or stronger validation stage. Strong impact paths can
+enter the capped digest if other gates pass; medium paths need market
+confirmation; generic co-occurrence is blocked by default via
+`RSI_EVENT_ALPHA_BLOCK_GENERIC_COOCCURRENCE_DIGEST=1`. Weak
+`catalyst_link_validated` or policy/macro/technology co-occurrence rows remain
+local-only when
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH=1` and
 `RSI_EVENT_ALPHA_WEAK_VALIDATED_LOCAL_ONLY=1`. Examples that can pass the
 impact-path gate include direct token events, venue value-capture events,
 fan-token event demand, unlock/supply events, listing/liquidity events, and
 security/exploit shocks tied to the token. Generic policy, macro, or broad
 technology articles that merely mention a token should stay local-only with
-`impact_path_not_validated:*`. Use
+`impact_path_not_digest_eligible:*` or `generic_cooccurrence_only`. Use
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT=0` or
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH=0` only for deliberate
 review experiments. Delivered validated-hypothesis digest items are written to

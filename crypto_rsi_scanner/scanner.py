@@ -1473,11 +1473,14 @@ def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRo
         validated_hypothesis_digest_enabled=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED,
         max_validated_hypothesis_digest_items=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_MAX_ITEMS,
         validated_hypothesis_min_score=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MIN_SCORE,
+        validated_hypothesis_min_opportunity_score=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_OPPORTUNITY_SCORE,
         validated_hypothesis_require_external_or_direct_event=(
             config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT
         ),
         validated_hypothesis_require_impact_path=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH,
         weak_validated_local_only=config.EVENT_ALPHA_WEAK_VALIDATED_LOCAL_ONLY,
+        allow_weak_path_with_market_confirmation=config.EVENT_ALPHA_ALLOW_WEAK_PATH_WITH_MARKET_CONFIRMATION,
+        block_generic_cooccurrence_digest=config.EVENT_ALPHA_BLOCK_GENERIC_COOCCURRENCE_DIGEST,
         max_high_priority_per_day=config.EVENT_ALPHA_ROUTER_MAX_HIGH_PRIORITY_PER_DAY,
         per_key_cooldown_hours=config.EVENT_ALPHA_ROUTER_PER_KEY_COOLDOWN_HOURS,
         alert_on_score_jump=config.EVENT_ALPHA_ROUTER_ALERT_ON_SCORE_JUMP,
@@ -5452,6 +5455,12 @@ def _router_config_from_profile(profile_name: str | None) -> event_alpha_router.
                 current.validated_hypothesis_min_score,
             )
         ),
+        validated_hypothesis_min_opportunity_score=float(
+            overrides.get(
+                "EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_OPPORTUNITY_SCORE",
+                current.validated_hypothesis_min_opportunity_score,
+            )
+        ),
         validated_hypothesis_require_external_or_direct_event=bool(
             overrides.get(
                 "EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT",
@@ -5468,6 +5477,18 @@ def _router_config_from_profile(profile_name: str | None) -> event_alpha_router.
             overrides.get(
                 "EVENT_ALPHA_WEAK_VALIDATED_LOCAL_ONLY",
                 current.weak_validated_local_only,
+            )
+        ),
+        allow_weak_path_with_market_confirmation=bool(
+            overrides.get(
+                "EVENT_ALPHA_ALLOW_WEAK_PATH_WITH_MARKET_CONFIRMATION",
+                current.allow_weak_path_with_market_confirmation,
+            )
+        ),
+        block_generic_cooccurrence_digest=bool(
+            overrides.get(
+                "EVENT_ALPHA_BLOCK_GENERIC_COOCCURRENCE_DIGEST",
+                current.block_generic_cooccurrence_digest,
             )
         ),
         max_high_priority_per_day=int(

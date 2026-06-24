@@ -170,6 +170,9 @@ def format_impact_hypotheses_store_report(
     rows.append("statuses: " + _format_counts(_counts(result.rows, "status")))
     rows.append("validation_stages: " + _format_counts(_counts(result.rows, "validation_stage")))
     rows.append("impact_path_reasons: " + _format_counts(_counts(result.rows, "impact_path_reason")))
+    rows.append("impact_path_types: " + _format_counts(_counts(result.rows, "impact_path_type")))
+    rows.append("impact_path_strengths: " + _format_counts(_counts(result.rows, "impact_path_strength")))
+    rows.append("candidate_roles: " + _format_counts(_counts(result.rows, "candidate_role")))
     rows.append("why_not_promoted: " + _format_counts(_reason_counts(result.rows, "why_not_promoted")))
     rows.extend(_entity_audit_section(result.rows))
     rows.append("scopes: " + _format_counts(_counts(result.rows, "hypothesis_scope")))
@@ -408,6 +411,15 @@ def _compact_hypothesis_rows(
             out.append("  validated: " + "; ".join(str(item) for item in row["validation_reasons"][:3]))
         if row.get("impact_path_reason"):
             out.append(f"  impact_path_reason: {row.get('impact_path_reason')}")
+        if row.get("impact_path_type") or row.get("opportunity_score_v2") is not None:
+            out.append(
+                "  impact_path: "
+                f"type={row.get('impact_path_type') or 'unknown'} "
+                f"role={row.get('candidate_role') or 'unknown'} "
+                f"strength={row.get('impact_path_strength') or 'unknown'} "
+                f"v2={row.get('opportunity_score_v2') if row.get('opportunity_score_v2') is not None else 'n/a'} "
+                f"digest_eligible={str(bool(row.get('digest_eligible_by_impact_path'))).lower()}"
+            )
         if include_rejections and row.get("rejection_reasons"):
             out.append("  rejected: " + "; ".join(str(item) for item in row["rejection_reasons"][:3]))
     if len(rows) > limit:
@@ -455,6 +467,17 @@ def _format_hypothesis_row(
         out.append("  validated: " + "; ".join(str(item) for item in row["validation_reasons"][:3]))
     if row.get("impact_path_reason"):
         out.append(f"  impact_path_reason: {row.get('impact_path_reason')}")
+    if row.get("impact_path_type") or row.get("opportunity_score_v2") is not None:
+        out.append(
+            "  impact_path: "
+            f"type={row.get('impact_path_type') or 'unknown'} "
+            f"role={row.get('candidate_role') or 'unknown'} "
+            f"strength={row.get('impact_path_strength') or 'unknown'} "
+            f"specificity={row.get('evidence_specificity_score') if row.get('evidence_specificity_score') is not None else 'n/a'} "
+            f"v2={row.get('opportunity_score_v2') if row.get('opportunity_score_v2') is not None else 'n/a'}"
+        )
+    if row.get("why_digest_ineligible"):
+        out.append(f"  why_digest_ineligible: {row.get('why_digest_ineligible')}")
     if include_rejections and row.get("rejection_reasons"):
         out.append("  rejected: " + "; ".join(str(item) for item in row["rejection_reasons"][:3]))
     if row.get("why_not_promoted"):

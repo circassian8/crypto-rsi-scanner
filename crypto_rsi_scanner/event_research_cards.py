@@ -601,6 +601,13 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     gate_block = event_alpha_router.validated_hypothesis_digest_block_reason(entry)
     gate_line = "passed for capped research digest" if gate_block is None else f"local-only: {gate_block}"
     impact_path_reason = components.get("impact_path_reason") or "unknown"
+    impact_path_type = components.get("impact_path_type") or "unknown"
+    candidate_role = components.get("candidate_role") or "unknown"
+    impact_path_strength = components.get("impact_path_strength") or "unknown"
+    opportunity_score_v2 = components.get("opportunity_score_v2")
+    evidence_specificity = components.get("evidence_specificity_score")
+    why_digest_ineligible = components.get("why_digest_ineligible") or "none"
+    digest_eligible = components.get("digest_eligible_by_impact_path")
     why_not_promoted = components.get("why_not_promoted") or []
     if isinstance(why_not_promoted, str):
         why_not_promoted = [why_not_promoted]
@@ -610,9 +617,16 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Candidate source: {entry.latest_source or 'impact_hypothesis'}",
         f"- Candidate symbols considered: {', '.join(str(item) for item in candidate_symbols[:8]) if candidate_symbols else 'none'}",
         f"- Playbook: {entry.latest_playbook_type or 'impact_hypothesis'}",
+        f"- Impact path type: {impact_path_type}",
+        f"- Candidate role: {candidate_role}",
+        f"- Impact path strength: {impact_path_strength}",
         f"- Impact path reason: {impact_path_reason}",
+        f"- Opportunity score v2: {opportunity_score_v2 if opportunity_score_v2 is not None else 'n/a'}",
+        f"- Source/evidence specificity: {evidence_specificity if evidence_specificity is not None else 'n/a'}",
+        f"- Impact path digest eligible: {str(bool(digest_eligible)).lower() if digest_eligible is not None else 'unknown'}",
+        f"- Missing evidence / gate failure: {why_digest_ineligible}",
         f"- Quality gate: {gate_line}",
-        f"- Local-only due to weak co-occurrence: {str('impact_path_not_validated' in gate_line or 'weak_validated_local_only' in gate_line).lower()}",
+        f"- Local-only due to weak co-occurrence: {str('impact_path_not_validated' in gate_line or 'weak_validated_local_only' in gate_line or why_digest_ineligible != 'none').lower()}",
         f"- Why promoted/local-only: {entry.suppressed_reason or 'validated impact hypothesis promoted to RADAR'}",
         "- Safety label: catalyst link validated, but this is not a calibrated strategy or trade signal.",
         "- Why it may be wrong: validation may be source-thin, asset link may be narrative-only, and the catalyst impact may not move this token.",

@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Add Event Alpha impact-path validator and v2 digest gate · Codex
+**Why:** Recent Event Alpha outputs could still treat “candidate and catalyst
+mentioned together” as too similar to evidence that explains a real token,
+venue, protocol, or sector impact path. The radar needed stricter quality
+metadata before validated hypotheses enter research digests.
+**Changes:**
+- Added pure `event_impact_path_validator.py` with impact path type, candidate
+  role, strength, evidence-specificity scoring, digest eligibility, and
+  `opportunity_score_v2` components.
+- Routed accepted Event Impact Hypothesis evidence through the new validator so
+  RUNE/ZEC/CHZ/VELVET-style rows carry strong/medium path metadata while broad
+  BTC quantum/CFTC/policy co-occurrence stays weak/local-only.
+- Tightened validated-hypothesis digest routing with
+  `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_OPPORTUNITY_SCORE`,
+  `RSI_EVENT_ALPHA_ALLOW_WEAK_PATH_WITH_MARKET_CONFIRMATION`, and
+  `RSI_EVENT_ALPHA_BLOCK_GENERIC_COOCCURRENCE_DIGEST`.
+- Persisted the new impact path fields through watchlist rows, alert snapshots,
+  hypothesis store reports, daily briefs, notification inbox classification,
+  and research cards.
+**Verify:** `python3 tests/test_indicators.py` (440/440 passed); `make
+event-llm-eval PYTHON=python3`; `make event-llm-extract-eval PYTHON=python3`;
+`make event-alpha-eval PYTHON=python3`; `make verify PYTHON=python3`; manual
+`make event-impact-hypothesis-smoke PYTHON=python3`, `make
+event-impact-hypotheses-report PROFILE=notify_llm PYTHON=python3`, and `make
+event-alpha-notification-inbox PROFILE=notify_llm PYTHON=python3`.
+**Notes/risks:** Research-only. This does not change normal RSI alerts, paper/
+live writes, trading, or the invariant that `TRIGGERED_FADE` only comes from
+deterministic `event_fade.py` plus `proxy_fade`.
+
 ## 2026-06-24 — Tighten validated hypothesis quality and identity artifacts · Codex
 **Why:** Latest `notify_llm` artifacts showed useful validated hypotheses, but
 some alert snapshots lacked plain `symbol`/`coin_id`, candidate-discovery

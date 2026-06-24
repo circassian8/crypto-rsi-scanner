@@ -17,7 +17,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_graph, event_identity
+from . import event_graph, event_identity, event_impact_path_validator
 from .event_llm_extractor import EventLLMExtractionReportRow
 from .event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from .event_resolver import clean_text
@@ -116,6 +116,16 @@ class EventImpactHypothesis:
     rejected_validation_samples: tuple[dict[str, Any], ...] = ()
     why_not_promoted: tuple[str, ...] = ()
     impact_path_reason: str | None = None
+    impact_path_type: str | None = None
+    impact_path_strength: str | None = None
+    candidate_role: str | None = None
+    evidence_specificity_score: float | None = None
+    required_evidence_met: bool | None = None
+    market_confirmation_required: bool | None = None
+    digest_eligible_by_impact_path: bool | None = None
+    why_digest_ineligible: str | None = None
+    opportunity_score_v2: float | None = None
+    opportunity_score_components: Mapping[str, float] = field(default_factory=dict)
     created_at: str | None = None
 
 
@@ -379,6 +389,7 @@ def validate_hypotheses_with_raw_events(
         matched_coin_ids: list[str] = []
         best_stage = hypothesis.validation_stage
         impact_path_reason: str | None = hypothesis.impact_path_reason
+        impact_validation: event_impact_path_validator.ImpactPathValidation | None = None
         for raw in rows:
             detail = _validation_detail(raw, hypothesis)
             status = str(detail.get("status") or "none")
@@ -393,10 +404,18 @@ def validate_hypotheses_with_raw_events(
                 if symbol:
                     matched_symbols.append(symbol)
                 matched_coin_ids.append(coin_id or "")
-                path_reason = _impact_path_reason(raw, hypothesis, symbol=symbol, coin_id=coin_id)
+                path_validation = event_impact_path_validator.validate_impact_path(
+                    raw,
+                    hypothesis,
+                    symbol=symbol,
+                    coin_id=coin_id,
+                    score_components=hypothesis.score_components,
+                )
+                path_reason = path_validation.impact_path_reason
+                impact_validation = _prefer_impact_validation(impact_validation, path_validation)
                 if path_reason:
                     impact_path_reason = _prefer_impact_path_reason(impact_path_reason, path_reason)
-                    if _impact_path_reason_is_strong(path_reason):
+                    if path_validation.required_evidence_met:
                         best_stage = _max_validation_stage(best_stage, ValidationStage.IMPACT_PATH_VALIDATED.value)
             elif reason:
                 rejections.append(reason)
@@ -426,6 +445,10 @@ def validate_hypotheses_with_raw_events(
             components["validation_strength"] = 95.0
             if impact_path_reason:
                 components["impact_path_strength"] = 85.0 if _impact_path_reason_is_strong(impact_path_reason) else 35.0
+            if impact_validation is not None:
+                components.update(_impact_validation_score_components(impact_validation))
+                impact_validation = _refresh_impact_validation_score(impact_validation, components)
+                components.update(_impact_validation_score_components(impact_validation))
             if best_stage == ValidationStage.MARKET_CONFIRMED.value:
                 components["market_confirmation"] = max(float(components.get("market_confirmation") or 0.0), 70.0)
             score = _weighted_hypothesis_score(components, hypothesis.impact_category)
@@ -443,12 +466,17 @@ def validate_hypotheses_with_raw_events(
                 score_components=components,
                 validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
                 impact_path_reason=impact_path_reason,
+                **_impact_validation_replace_kwargs(impact_validation),
             ))
         elif reasons:
             components = dict(hypothesis.score_components or {})
             components["validation_strength"] = max(float(components.get("validation_strength") or 0.0), 45.0)
             if impact_path_reason:
                 components["impact_path_strength"] = 85.0 if _impact_path_reason_is_strong(impact_path_reason) else 35.0
+            if impact_validation is not None:
+                components.update(_impact_validation_score_components(impact_validation))
+                impact_validation = _refresh_impact_validation_score(impact_validation, components)
+                components.update(_impact_validation_score_components(impact_validation))
             score = _weighted_hypothesis_score(components, hypothesis.impact_category)
             out.append(replace(
                 hypothesis,
@@ -459,6 +487,7 @@ def validate_hypotheses_with_raw_events(
                 score_components=components,
                 validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
                 impact_path_reason=impact_path_reason,
+                **_impact_validation_replace_kwargs(impact_validation),
             ))
         elif rejections:
             out.append(replace(
@@ -679,12 +708,17 @@ def _with_promotion_diagnostics(
     search_result: object | None = None,
 ) -> EventImpactHypothesis:
     reasons: list[str] = []
+    path_digest_eligible = bool(getattr(hypothesis, "digest_eligible_by_impact_path", False))
+    path_strength = str(getattr(hypothesis, "impact_path_strength", "") or "")
+    path_type = str(getattr(hypothesis, "impact_path_type", "") or "")
     if (
         hypothesis.status == HypothesisStatus.VALIDATED.value
         and hypothesis.validation_stage in _PROMOTABLE_VALIDATION_STAGES
         and float(hypothesis.hypothesis_score or 0.0) >= 60.0
         and (
-            hypothesis.validation_stage != ValidationStage.CATALYST_LINK_VALIDATED.value
+            path_digest_eligible
+            or path_strength == "strong"
+            or hypothesis.validation_stage != ValidationStage.CATALYST_LINK_VALIDATED.value
             or _impact_path_reason_is_strong(hypothesis.impact_path_reason)
         )
     ):
@@ -708,10 +742,19 @@ def _with_promotion_diagnostics(
     if (
         hypothesis.status == HypothesisStatus.VALIDATED.value
         and hypothesis.validation_stage == ValidationStage.CATALYST_LINK_VALIDATED.value
+        and not path_digest_eligible
         and not _impact_path_reason_is_strong(hypothesis.impact_path_reason)
     ):
-        reason = hypothesis.impact_path_reason or ImpactPathReason.NO_VALUE_CAPTURE_EXPLAINED.value
+        reason = (
+            hypothesis.why_digest_ineligible
+            or hypothesis.impact_path_reason
+            or ImpactPathReason.NO_VALUE_CAPTURE_EXPLAINED.value
+        )
         reasons.append(f"impact_path_not_validated:{reason}")
+    if path_type == "generic_cooccurrence_only":
+        reasons.append("generic_cooccurrence_only")
+    if hypothesis.why_digest_ineligible:
+        reasons.append(str(hypothesis.why_digest_ineligible))
     warnings = tuple(str(item) for item in (*hypothesis.warnings, *(getattr(search_result, "warnings", ()) or ())) if str(item))
     if any("backoff" in warning.casefold() for warning in warnings):
         reasons.append("provider_backoff")
@@ -739,15 +782,25 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
     counts: dict[str, int] = {}
     stages: dict[str, int] = {}
     path_reasons: dict[str, int] = {}
+    path_types: dict[str, int] = {}
+    path_strengths: dict[str, int] = {}
     for item in items:
         counts[item.status] = counts.get(item.status, 0) + 1
         stages[item.validation_stage] = stages.get(item.validation_stage, 0) + 1
         if item.impact_path_reason:
             path_reasons[item.impact_path_reason] = path_reasons.get(item.impact_path_reason, 0) + 1
+        if item.impact_path_type:
+            path_types[item.impact_path_type] = path_types.get(item.impact_path_type, 0) + 1
+        if item.impact_path_strength:
+            path_strengths[item.impact_path_strength] = path_strengths.get(item.impact_path_strength, 0) + 1
     rows.append("statuses: " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items())))
     rows.append("validation_stages: " + ", ".join(f"{key}={value}" for key, value in sorted(stages.items())))
     if path_reasons:
         rows.append("impact_path_reasons: " + ", ".join(f"{key}={value}" for key, value in sorted(path_reasons.items())))
+    if path_types:
+        rows.append("impact_path_types: " + ", ".join(f"{key}={value}" for key, value in sorted(path_types.items())))
+    if path_strengths:
+        rows.append("impact_path_strengths: " + ", ".join(f"{key}={value}" for key, value in sorted(path_strengths.items())))
     why_counts: dict[str, int] = {}
     for item in items:
         for reason in item.why_not_promoted:
@@ -808,6 +861,18 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
             rows.append("  validated: " + "; ".join(item.validation_reasons[:3]))
         if item.impact_path_reason:
             rows.append(f"  impact_path_reason: {item.impact_path_reason}")
+        if item.impact_path_type or item.impact_path_strength or item.opportunity_score_v2 is not None:
+            rows.append(
+                "  impact_path: "
+                f"type={item.impact_path_type or 'unknown'} "
+                f"role={item.candidate_role or 'unknown'} "
+                f"strength={item.impact_path_strength or 'unknown'} "
+                f"specificity={item.evidence_specificity_score if item.evidence_specificity_score is not None else 'n/a'} "
+                f"score_v2={item.opportunity_score_v2 if item.opportunity_score_v2 is not None else 'n/a'} "
+                f"digest_eligible={str(bool(item.digest_eligible_by_impact_path)).lower()}"
+            )
+        if item.why_digest_ineligible:
+            rows.append(f"  why_digest_ineligible: {item.why_digest_ineligible}")
         if item.rejection_reasons:
             rows.append("  rejected: " + "; ".join(item.rejection_reasons[:3]))
         rejected_samples = tuple(
@@ -911,6 +976,32 @@ def _hypothesis_from_rule(
         ),
         created_at=now.isoformat(),
     )
+    if validated_assets and raws:
+        asset = validated_assets[0]
+        validation = event_impact_path_validator.validate_impact_path(
+            raws[0],
+            hypothesis,
+            symbol=str(asset.get("symbol") or (symbols[0] if symbols else "")),
+            coin_id=str(asset.get("coin_id") or (coin_ids[0] if coin_ids else "")),
+            score_components=score_components,
+        )
+        updated_components = dict(score_components)
+        updated_components.update(_impact_validation_score_components(validation))
+        validation = _refresh_impact_validation_score(validation, updated_components)
+        updated_components.update(_impact_validation_score_components(validation))
+        stage = validation_stage
+        if validation.required_evidence_met:
+            stage = _max_validation_stage(stage, ValidationStage.IMPACT_PATH_VALIDATED.value)
+        score = _weighted_hypothesis_score(updated_components, category_value)
+        hypothesis = replace(
+            hypothesis,
+            validation_stage=stage,
+            hypothesis_score=round(score, 2),
+            confidence=max(0.0, min(1.0, round(score / 100.0, 4))),
+            score_components=updated_components,
+            impact_path_reason=validation.impact_path_reason,
+            **_impact_validation_replace_kwargs(validation),
+        )
     query_details = _default_search_query_details(hypothesis)
     hypothesis = replace(
         hypothesis,
@@ -1657,6 +1748,111 @@ def _prefer_impact_path_reason(current: str | None, candidate: str | None) -> st
     if _impact_path_reason_is_strong(candidate) and not _impact_path_reason_is_strong(current):
         return candidate
     return current
+
+
+def _prefer_impact_validation(
+    current: event_impact_path_validator.ImpactPathValidation | None,
+    candidate: event_impact_path_validator.ImpactPathValidation | None,
+) -> event_impact_path_validator.ImpactPathValidation | None:
+    if candidate is None:
+        return current
+    if current is None:
+        return candidate
+    strength_rank = {
+        "none": 0,
+        "weak": 1,
+        "medium": 2,
+        "strong": 3,
+    }
+    candidate_key = (
+        strength_rank.get(candidate.impact_path_strength, 0),
+        float(candidate.opportunity_score_v2 or 0.0),
+        float(candidate.evidence_specificity_score or 0.0),
+    )
+    current_key = (
+        strength_rank.get(current.impact_path_strength, 0),
+        float(current.opportunity_score_v2 or 0.0),
+        float(current.evidence_specificity_score or 0.0),
+    )
+    return candidate if candidate_key > current_key else current
+
+
+def _impact_validation_score_components(
+    validation: event_impact_path_validator.ImpactPathValidation,
+) -> dict[str, float]:
+    components = dict(validation.opportunity_score_components or {})
+    components["impact_path_strength"] = max(
+        float(components.get("impact_path_strength") or 0.0),
+        {
+            "strong": 95.0,
+            "medium": 68.0,
+            "weak": 35.0,
+            "none": 0.0,
+        }.get(validation.impact_path_strength, 0.0),
+    )
+    components["evidence_specificity"] = float(validation.evidence_specificity_score or 0.0)
+    components["opportunity_score_v2"] = float(validation.opportunity_score_v2 or 0.0)
+    return components
+
+
+def _refresh_impact_validation_score(
+    validation: event_impact_path_validator.ImpactPathValidation,
+    components: Mapping[str, float],
+) -> event_impact_path_validator.ImpactPathValidation:
+    opportunity = dict(validation.opportunity_score_components or {})
+    opportunity["market_confirmation"] = max(
+        float(opportunity.get("market_confirmation") or 0.0),
+        _component_float(components, "market_confirmation"),
+    )
+    opportunity["timing_event_window"] = max(
+        float(opportunity.get("timing_event_window") or 0.0),
+        _component_float(components, "event_time_quality"),
+        _component_float(components, "event_clarity"),
+    )
+    opportunity["liquidity_tradability"] = max(
+        float(opportunity.get("liquidity_tradability") or 0.0),
+        _component_float(components, "liquidity"),
+        _component_float(components, "tradability"),
+        _component_float(components, "market_confirmation"),
+    )
+    opportunity["llm_resolver_confidence"] = max(
+        float(opportunity.get("llm_resolver_confidence") or 0.0),
+        _component_float(components, "validation_strength"),
+        _component_float(components, "llm_candidate_confidence"),
+        _component_float(components, "candidate_asset_strength"),
+    )
+    score = event_impact_path_validator.calculate_opportunity_score_v2(opportunity)
+    return replace(
+        validation,
+        opportunity_score_v2=round(score, 2),
+        opportunity_score_components={key: round(value, 2) for key, value in opportunity.items()},
+    )
+
+
+def _component_float(components: Mapping[str, float], key: str) -> float:
+    try:
+        return max(0.0, min(100.0, float(components.get(key) or 0.0)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _impact_validation_replace_kwargs(
+    validation: event_impact_path_validator.ImpactPathValidation | None,
+) -> dict[str, Any]:
+    if validation is None:
+        return {}
+    return {
+        "impact_path_type": validation.impact_path_type,
+        "impact_path_strength": validation.impact_path_strength,
+        "candidate_role": validation.candidate_role,
+        "evidence_specificity_score": validation.evidence_specificity_score,
+        "required_evidence_met": validation.required_evidence_met,
+        "market_confirmation_required": validation.market_confirmation_required,
+        "digest_eligible_by_impact_path": validation.digest_eligible_by_impact_path,
+        "why_digest_ineligible": validation.why_digest_ineligible,
+        "opportunity_score_v2": validation.opportunity_score_v2,
+        "opportunity_score_components": dict(validation.opportunity_score_components or {}),
+    }
 
 
 def _identity_match_from_symbols(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> event_identity.IdentityMatchResult:

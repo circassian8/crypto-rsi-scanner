@@ -412,12 +412,23 @@ def _is_weak_validated_local_only(
             return False
         components = alert.get("score_components") if isinstance(alert.get("score_components"), Mapping) else {}
         stage = str(alert.get("validation_stage") or components.get("validation_stage") or "")
+        impact_path_strength = str(alert.get("impact_path_strength") or components.get("impact_path_strength") or "")
+        impact_path_type = str(alert.get("impact_path_type") or components.get("impact_path_type") or "")
+        why_digest_ineligible = str(alert.get("why_digest_ineligible") or components.get("why_digest_ineligible") or "")
         reason_text = " ".join(str(value or "") for value in (
             alert.get("route_reason"),
             alert.get("reason"),
             *((alert.get("quality_warnings") or []) if isinstance(alert.get("quality_warnings"), list) else []),
         )).casefold()
-        return stage == "catalyst_link_validated" or "impact_path_not_validated" in reason_text or "weak_validated" in reason_text
+        return (
+            stage == "catalyst_link_validated"
+            or impact_path_strength in {"weak", "none"}
+            or impact_path_type == "generic_cooccurrence_only"
+            or bool(why_digest_ineligible)
+            or "impact_path_not_validated" in reason_text
+            or "weak_validated" in reason_text
+            or "generic_cooccurrence" in reason_text
+        )
     return False
 
 

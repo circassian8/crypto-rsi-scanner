@@ -37,9 +37,12 @@ class EventAlphaRouterConfig:
     validated_hypothesis_digest_enabled: bool = False
     max_validated_hypothesis_digest_items: int = 5
     validated_hypothesis_min_score: float = 65.0
+    validated_hypothesis_min_opportunity_score: float = 65.0
     validated_hypothesis_require_external_or_direct_event: bool = True
     validated_hypothesis_require_impact_path: bool = True
     weak_validated_local_only: bool = True
+    allow_weak_path_with_market_confirmation: bool = True
+    block_generic_cooccurrence_digest: bool = True
     max_high_priority_per_day: int = 3
     per_key_cooldown_hours: float = 12.0
     alert_on_score_jump: bool = True
@@ -604,7 +607,35 @@ def _validated_hypothesis_digest_block_reason(
     score = _hypothesis_score(entry, components)
     if score < float(cfg.validated_hypothesis_min_score):
         return f"score_below_threshold:{score:.0f}<{cfg.validated_hypothesis_min_score:.0f}"
+    opportunity_score = _hypothesis_opportunity_score_v2(entry, components)
+    if opportunity_score < float(cfg.validated_hypothesis_min_opportunity_score):
+        return (
+            "opportunity_score_v2_below_threshold:"
+            f"{opportunity_score:.0f}<{cfg.validated_hypothesis_min_opportunity_score:.0f}"
+        )
+    path_type = str(components.get("impact_path_type") or "").strip()
+    path_strength = str(components.get("impact_path_strength") or "").strip()
+    digest_eligible = _boolish(components.get("digest_eligible_by_impact_path"))
+    why_digest_ineligible = str(components.get("why_digest_ineligible") or "").strip()
+    if cfg.block_generic_cooccurrence_digest and path_type == "generic_cooccurrence_only":
+        return "generic_cooccurrence_only"
     if cfg.validated_hypothesis_require_impact_path:
+        if path_strength:
+            market_score = _market_confirmation_component(components)
+            if path_strength == "strong" and (digest_eligible is not False):
+                pass
+            elif path_strength == "medium" and cfg.allow_weak_path_with_market_confirmation and market_score >= 40.0:
+                pass
+            elif (
+                path_strength == "weak"
+                and cfg.allow_weak_path_with_market_confirmation
+                and market_score >= 75.0
+                and path_type not in {"generic_cooccurrence_only", "macro_attention_only", "technology_risk", "market_structure_policy"}
+            ):
+                pass
+            else:
+                reason = why_digest_ineligible or components.get("impact_path_reason") or path_strength
+                return f"impact_path_not_digest_eligible:{reason}"
         if stage not in {"impact_path_validated", "market_confirmed", "promoted_to_radar"}:
             direct_override_score = max(75.0, float(cfg.validated_hypothesis_min_score) + 10.0)
             if not (_has_clear_direct_token_event(entry, components) and score >= direct_override_score):
@@ -633,6 +664,55 @@ def _hypothesis_score(entry: event_watchlist.EventWatchlistEntry, components: Ma
         if num > 0:
             return num
     return 0.0
+
+
+def _hypothesis_opportunity_score_v2(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, object],
+) -> float:
+    for value in (
+        components.get("opportunity_score_v2"),
+        entry.latest_score,
+        components.get("hypothesis_score"),
+        components.get("score"),
+    ):
+        try:
+            num = float(value or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if num > 0:
+            return num
+    return 0.0
+
+
+def _market_confirmation_component(components: Mapping[str, object]) -> float:
+    for value in (
+        components.get("market_confirmation"),
+        (components.get("opportunity_score_components") or {}).get("market_confirmation")
+        if isinstance(components.get("opportunity_score_components"), Mapping)
+        else None,
+        components.get("market_move_volume"),
+    ):
+        if value in (None, ""):
+            continue
+        try:
+            return max(0.0, min(100.0, float(value or 0.0)))
+        except (TypeError, ValueError):
+            continue
+    return 0.0
+
+
+def _boolish(value: object) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().casefold()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+    return None
 
 
 def _missing_external(value: object) -> bool:

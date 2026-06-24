@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-25 - Validated hypothesis digests require an explained impact path and v2 score
+**Status:** accepted
+**Decision:** Event Impact Hypothesis validation must classify the source's
+impact path before a validated token-level `RADAR` hypothesis can enter the
+capped daily research digest. The validator stores `impact_path_type`,
+`candidate_role`, `impact_path_strength`, evidence specificity,
+`digest_eligible_by_impact_path`, and `opportunity_score_v2`. Digest routing
+requires validated token identity, catalyst-link validation or stronger, no
+source-noise/ticker collision, a non-ambiguous playbook, old minimum score,
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_OPPORTUNITY_SCORE`, and a strong
+impact path or medium path with market confirmation. Generic co-occurrence is
+blocked by default with `RSI_EVENT_ALPHA_BLOCK_GENERIC_COOCCURRENCE_DIGEST=1`.
+Weak policy, macro, and broad technology rows remain local-only unless a future
+reviewed sample justifies a different gate.
+**Why:** “Token and catalyst appear in the same article” is not enough signal
+quality for operator-facing research digests. The system must distinguish a
+real value/liquidity/supply/security/proxy path from broad market commentary
+before asking for feedback on a digest candidate.
+**Revisit when:** Reviewed Event Alpha outcomes show that a currently weak
+path class has repeatable usefulness after source quality, identity, and market
+confirmation controls.
+
 ## 2026-06-24 - Validated impact hypotheses may enter capped daily research digest
 **Status:** accepted
 **Decision:** Token-level Event Impact Hypothesis rows must use validated asset

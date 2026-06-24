@@ -7213,43 +7213,71 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
             raw("rune", "THORChain exploit investigation", "THORChain RUNE faces an exploit and security incident after an attack."),
             "exploit_security_event",
             "impact_path_validated",
+            "exploit_security_event",
+            "direct_subject",
+            "strong",
         ),
         (
             hypothesis("hyp:zec", "ZEC", "zcash", "listing_liquidity_event", "Nasdaq"),
             raw("zec", "Zcash miner Nasdaq listing opens", "Zcash ZEC miner completes a Nasdaq listing and public market access changes."),
             "listing_liquidity_event",
             "impact_path_validated",
+            "listing_liquidity_event",
+            "direct_subject",
+            "strong",
         ),
         (
             hypothesis("hyp:chz", "CHZ", "chiliz", "sports_fan_proxy", "World Cup"),
             raw("chz", "World Cup fan token demand", "CHZ fan token demand rises into a World Cup fixture and team kickoff."),
             "fan_token_event",
             "impact_path_validated",
+            "fan_token_attention",
+            "proxy_instrument",
+            "strong",
         ),
         (
             hypothesis("hyp:btc", "BTC", "bitcoin", "security_or_regulatory_shock", "unknown"),
             raw("btc", "Bitcoin quantum policy debate", "Bitcoin quantum-computing policy debate and Trump comments hit broad crypto headlines."),
             "generic_policy_only",
             "catalyst_link_validated",
+            "technology_risk",
+            "macro_affected_asset",
+            "weak",
         ),
         (
             hypothesis("hyp:cftc", "BTC", "bitcoin", "security_or_regulatory_shock", "CFTC"),
             raw("cftc", "CFTC chair talks perps", "The CFTC chair discussed perps generally while Bitcoin appeared in broader market coverage."),
             "generic_policy_only",
             "catalyst_link_validated",
+            "market_structure_policy",
+            "macro_affected_asset",
+            "weak",
         ),
         (
             hypothesis("hyp:re", "RE", "real", "political_meme_proxy", "Trump"),
             raw("re", "Trump quantum cryptography order", "Trump quantum cryptography policy mentions RE token relation only as weak market co-occurrence."),
             "generic_policy_only",
             "catalyst_link_validated",
+            "technology_risk",
+            "macro_affected_asset",
+            "weak",
         ),
     ]
-    for hypothesis, source, reason, stage in cases:
+    for hypothesis, source, reason, stage, path_type, role, strength in cases:
         validated = event_impact_hypotheses.validate_hypotheses_with_raw_events((hypothesis,), (source,))[0]
         assert validated.status == event_impact_hypotheses.HypothesisStatus.VALIDATED.value
         assert validated.impact_path_reason == reason
         assert validated.validation_stage == stage
+        assert validated.impact_path_type == path_type
+        assert validated.candidate_role == role
+        assert validated.impact_path_strength == strength
+        assert validated.opportunity_score_v2 is not None
+        assert "impact_path_strength" in validated.opportunity_score_components
+        if strength == "weak":
+            assert validated.digest_eligible_by_impact_path is False
+            assert validated.why_digest_ineligible
+        else:
+            assert validated.digest_eligible_by_impact_path is True
 
 
 def test_event_impact_hypothesis_watchlist_uses_validated_asset_not_first_candidate():
@@ -7295,6 +7323,13 @@ def test_event_impact_hypothesis_watchlist_uses_validated_asset_not_first_candid
             validation_reasons=("identity_match links candidate to catalyst",) if validated_asset else (),
             evidence_quotes=(f"{validated_asset.get('coin_id', '')} {validated_asset.get('symbol', '')} exploit catalyst link",) if validated_asset else (),
             impact_path_reason=impact_path_reason if validated_asset else None,
+            impact_path_type=impact_path_reason if validated_asset else None,
+            impact_path_strength="strong" if validated_asset else None,
+            candidate_role="direct_subject" if validated_asset else None,
+            evidence_specificity_score=88.0 if validated_asset else None,
+            digest_eligible_by_impact_path=True if validated_asset else None,
+            opportunity_score_v2=82.0 if validated_asset else None,
+            opportunity_score_components={"impact_path_strength": 95.0, "source_evidence_specificity": 88.0} if validated_asset else {},
         )
 
     rune = hypothesis(
@@ -7343,6 +7378,11 @@ def test_event_impact_hypothesis_watchlist_uses_validated_asset_not_first_candid
     assert by_event["hyp:rune"].latest_score_components["impact_category"] == "security_or_regulatory_shock"
     assert by_event["hyp:rune"].latest_score_components["validation_stage"] == "impact_path_validated"
     assert by_event["hyp:rune"].latest_score_components["impact_path_reason"] == "exploit_security_event"
+    assert by_event["hyp:rune"].latest_score_components["impact_path_type"] == "exploit_security_event"
+    assert by_event["hyp:rune"].latest_score_components["impact_path_strength"] == "strong"
+    assert by_event["hyp:rune"].latest_score_components["candidate_role"] == "direct_subject"
+    assert by_event["hyp:rune"].latest_score_components["opportunity_score_v2"] == 82.0
+    assert by_event["hyp:rune"].latest_score_components["digest_eligible_by_impact_path"] is True
     assert by_event["hyp:rune"].latest_score_components["hypothesis_score"] == 78
     assert by_event["hyp:rune"].latest_score_components["score"] == 78
     assert by_event["hyp:rune"].latest_score_components["validated_symbol"] == "RUNE"
@@ -9644,7 +9684,14 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
         evidence=None,
         validation_stage="impact_path_validated",
         impact_path_reason="exploit_security_event",
+        impact_path_type=None,
+        impact_path_strength="strong",
+        candidate_role="direct_subject",
+        opportunity_score_v2=None,
+        digest_eligible_by_impact_path=True,
     ):
+        impact_path_type = impact_path_type or impact_path_reason
+        opportunity_score_v2 = opportunity_score_v2 if opportunity_score_v2 is not None else score
         evidence = evidence or (f"{symbol} {symbol.lower()} exploit catalyst link",)
         return event_watchlist.EventWatchlistEntry(
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -9676,6 +9723,17 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
                 "impact_category": impact_category,
                 "validation_stage": validation_stage,
                 "impact_path_reason": impact_path_reason,
+                "impact_path_type": impact_path_type,
+                "impact_path_strength": impact_path_strength,
+                "candidate_role": candidate_role,
+                "evidence_specificity_score": 88,
+                "digest_eligible_by_impact_path": digest_eligible_by_impact_path,
+                "opportunity_score_v2": opportunity_score_v2,
+                "opportunity_score_components": {
+                    "impact_path_strength": 95 if impact_path_strength == "strong" else 35,
+                    "source_evidence_specificity": 88,
+                    "market_confirmation": 50,
+                },
                 "hypothesis_score": score,
                 "score": score,
                 "playbook_type": playbook,
@@ -9740,6 +9798,11 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
                 evidence=("Bitcoin quantum-computing policy debate drew Trump comments.",),
                 validation_stage="catalyst_link_validated",
                 impact_path_reason="generic_policy_only",
+                impact_path_type="technology_risk",
+                impact_path_strength="weak",
+                candidate_role="macro_affected_asset",
+                opportunity_score_v2=76,
+                digest_eligible_by_impact_path=False,
             ),
             entry("LOW", 50, evidence=("LOW token exploit catalyst link.",)),
             proxy_entry("VELVET", 72),
@@ -9765,7 +9828,7 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
     assert by_symbol["ZEC"].reason == "Validated impact hypothesis digest cap reached for this run."
     assert by_symbol["BTC"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
     assert by_symbol["BTC"].alertable is False
-    assert "impact_path_not_validated" in by_symbol["BTC"].reason
+    assert "impact_path_not_digest_eligible" in by_symbol["BTC"].reason
     assert by_symbol["LOW"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
     assert by_symbol["LOW"].alertable is False
     assert "score_below_threshold" in by_symbol["LOW"].reason
