@@ -1476,6 +1476,8 @@ def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRo
         validated_hypothesis_require_external_or_direct_event=(
             config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT
         ),
+        validated_hypothesis_require_impact_path=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH,
+        weak_validated_local_only=config.EVENT_ALPHA_WEAK_VALIDATED_LOCAL_ONLY,
         max_high_priority_per_day=config.EVENT_ALPHA_ROUTER_MAX_HIGH_PRIORITY_PER_DAY,
         per_key_cooldown_hours=config.EVENT_ALPHA_ROUTER_PER_KEY_COOLDOWN_HOURS,
         alert_on_score_jump=config.EVENT_ALPHA_ROUTER_ALERT_ON_SCORE_JUMP,
@@ -1540,6 +1542,9 @@ def _event_impact_hypothesis_search_config_from_runtime(
         min_confidence=config.EVENT_IMPACT_HYPOTHESIS_MIN_CONFIDENCE,
         min_result_confidence=config.EVENT_IMPACT_HYPOTHESIS_MIN_RESULT_CONFIDENCE,
         require_validated_identity=config.EVENT_IMPACT_HYPOTHESIS_REQUIRE_VALIDATED_IDENTITY,
+        candidate_discovery_enabled=config.EVENT_IMPACT_HYPOTHESIS_CANDIDATE_DISCOVERY_ENABLED,
+        max_candidate_discovery_queries=config.EVENT_IMPACT_HYPOTHESIS_MAX_DISCOVERY_QUERIES,
+        max_candidate_discovery_results=config.EVENT_IMPACT_HYPOTHESIS_MAX_DISCOVERY_RESULTS,
     )
 
 
@@ -5451,6 +5456,18 @@ def _router_config_from_profile(profile_name: str | None) -> event_alpha_router.
             overrides.get(
                 "EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT",
                 current.validated_hypothesis_require_external_or_direct_event,
+            )
+        ),
+        validated_hypothesis_require_impact_path=bool(
+            overrides.get(
+                "EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH",
+                current.validated_hypothesis_require_impact_path,
+            )
+        ),
+        weak_validated_local_only=bool(
+            overrides.get(
+                "EVENT_ALPHA_WEAK_VALIDATED_LOCAL_ONLY",
+                current.weak_validated_local_only,
             )
         ),
         max_high_priority_per_day=int(

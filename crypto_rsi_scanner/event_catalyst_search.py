@@ -121,6 +121,9 @@ class EventImpactHypothesisSearchConfig:
     min_confidence: float = 0.55
     min_result_confidence: float = 0.50
     require_validated_identity: bool = True
+    candidate_discovery_enabled: bool = True
+    max_candidate_discovery_queries: int = 10
+    max_candidate_discovery_results: int = 5
 
 
 @dataclass(frozen=True)
@@ -695,6 +698,7 @@ def run_hypothesis_search(
         else:
             seen_content.add(content_key)
         hypothesis = hypothesis_by_id.get(result.query.anomaly_raw_id)
+        query_type = str(getattr(result.query, "query_type", "") or "candidate_validation")
         catalyst_ok = _result_mentions_hypothesis_catalyst(result.raw_event, hypothesis)
         if not catalyst_ok:
             reasons.append("result_catalyst_missing")
@@ -707,7 +711,19 @@ def run_hypothesis_search(
             ))
             continue
         identity_ok = result_mentions_anomaly_identity(result.raw_event, result.query, None)
-        if cfg.require_validated_identity and not identity_ok:
+        if query_type == "candidate_discovery":
+            asset_ok = _candidate_discovery_asset_present(result.raw_event)
+            if not asset_ok:
+                reasons.append("candidate_discovery_asset_missing")
+                result_skip_reasons["candidate_discovery_asset_missing"] = result_skip_reasons.get("candidate_discovery_asset_missing", 0) + 1
+                rejected_results.append(replace(
+                    result,
+                    result_score=min(score.score, 45),
+                    result_score_reasons=tuple(dict.fromkeys(reasons)),
+                    accepted=False,
+                ))
+                continue
+        elif cfg.require_validated_identity and not identity_ok:
             reasons.append("result_identity_rejected")
             result_skip_reasons["result_identity_rejected"] = result_skip_reasons.get("result_identity_rejected", 0) + 1
             rejected_results.append(replace(
@@ -967,6 +983,10 @@ def score_search_result(
     }
     common_word_rejected = identity_reason == "common_word_identity_rejected"
     rejected_identity = identity_reason in rejected_identity_reasons
+    candidate_discovery_asset = (
+        str(getattr(query, "query_type", "") or "") == "candidate_discovery"
+        and _candidate_discovery_asset_present(raw_event)
+    )
     if identity_reason and not rejected_identity:
         score += {
             "identity_match_strong": 26,
@@ -979,6 +999,9 @@ def score_search_result(
             "identity_quote_validated": 20,
         }.get(identity_reason, 18)
         reasons.append(identity_reason)
+    elif candidate_discovery_asset:
+        score += 18
+        reasons.append("candidate_discovery_asset_hint")
     elif query.symbol in {"BTC", "ETH"} and _looks_generic_major_market_article(text):
         score -= 25
         reasons.append("generic_major_market_penalty")
@@ -1022,7 +1045,7 @@ def score_search_result(
     elif identity_reason in {"identity_url_only_rejected", "identity_source_origin_rejected"}:
         score = min(score, 40)
         reasons.append(identity_reason)
-    elif identity_missing:
+    elif identity_missing and not candidate_discovery_asset:
         score = min(score, 45)
         reasons.append("identity_missing_cap")
     return CatalystSearchScore(max(0, min(100, int(round(score)))), tuple(dict.fromkeys(reasons)))
@@ -1252,8 +1275,17 @@ def _queries_for_hypotheses(
     cfg: EventImpactHypothesisSearchConfig,
 ) -> tuple[SearchQuery, ...]:
     out: list[SearchQuery] = []
+    discovery_count = 0
     for hypothesis in hypotheses:
-        specs = generate_search_query_specs_for_hypothesis(hypothesis)[: max(0, cfg.max_queries_per_hypothesis)]
+        all_specs = generate_search_query_specs_for_hypothesis(hypothesis)
+        validation_specs = [spec for spec in all_specs if spec.query_type != "candidate_discovery"]
+        discovery_specs = [spec for spec in all_specs if spec.query_type == "candidate_discovery"]
+        specs = validation_specs[: max(0, cfg.max_queries_per_hypothesis)]
+        if cfg.candidate_discovery_enabled and discovery_count < max(0, cfg.max_candidate_discovery_queries):
+            room = max(0, cfg.max_candidate_discovery_queries - discovery_count)
+            selected = discovery_specs[:room]
+            specs = [*specs, *selected]
+            discovery_count += len(selected)
         base_queries = tuple(spec.query for spec in specs)
         identity_by_query = _hypothesis_query_identities(hypothesis, base_queries)
         for idx, spec in enumerate(specs):
@@ -1312,6 +1344,33 @@ def _hypothesis_query_identities(hypothesis: object, query_texts: Iterable[str])
                 )
                 break
     return out
+
+
+def _candidate_discovery_asset_present(raw_event: RawDiscoveredEvent) -> bool:
+    payload = raw_event.raw_json if isinstance(raw_event.raw_json, Mapping) else {}
+    for key in ("candidate_asset", "asset", "market"):
+        value = payload.get(key)
+        if not isinstance(value, Mapping):
+            continue
+        if any(str(value.get(field) or "").strip() for field in ("symbol", "asset_symbol", "coin_id", "id", "name", "project_name", "contract_address", "address")):
+            return True
+    extraction = payload.get("llm_extraction") if isinstance(payload.get("llm_extraction"), Mapping) else {}
+    mentions = extraction.get("crypto_asset_mentions") if isinstance(extraction.get("crypto_asset_mentions"), list) else []
+    for mention in mentions:
+        if not isinstance(mention, Mapping):
+            continue
+        mention_type = clean_text(mention.get("mention_type"))
+        if mention_type in {"publisher or source", "publisher_or_source", "ordinary word", "ordinary_word", "false positive"}:
+            continue
+        try:
+            confidence = float(mention.get("confidence") or 0.0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        if confidence < 0.70:
+            continue
+        if any(str(mention.get(field) or "").strip() for field in ("symbol", "coin_id", "name", "contract_address")):
+            return True
+    return False
 
 
 def _hypothesis_search_skip_reasons(

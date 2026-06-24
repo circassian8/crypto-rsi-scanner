@@ -806,6 +806,14 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
             f"hypothesis_promotions={result.hypothesis_promotions}"
         ),
         (
+            "hypothesis_search_query_types="
+            + (
+                _query_type_summary(result.hypothesis_search_result.queries)
+                if result.hypothesis_search_result is not None
+                else "none"
+            )
+        ),
+        (
             "catalyst_search_skip_reasons="
             + (
                 ", ".join(f"{key}={value}" for key, value in sorted(result.catalyst_search_skip_reasons.items()))
@@ -906,6 +914,16 @@ def _route_summary(result: event_alpha_router.EventAlphaRouterResult) -> str:
     if not counts:
         return "routes: none"
     return "routes: " + ", ".join(f"{route}={count}" for route, count in sorted(counts.items()))
+
+
+def _query_type_summary(queries: Iterable[object]) -> str:
+    counts: dict[str, int] = {}
+    for query in queries:
+        query_type = str(getattr(query, "query_type", "") or "candidate_validation")
+        counts[query_type] = counts.get(query_type, 0) + 1
+    if not counts:
+        return "none"
+    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
 
 
 def _llm_budget_warnings(rows: Iterable[object], *, label: str) -> list[str]:

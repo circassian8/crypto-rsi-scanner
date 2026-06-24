@@ -407,7 +407,12 @@ def _entry_from_hypothesis(
 ) -> EventWatchlistEntry:
     status = str(getattr(hypothesis, "status", "") or "")
     validation_stage = str(getattr(hypothesis, "validation_stage", "") or "")
-    promotable_stage = validation_stage in {"catalyst_link_validated", "market_confirmed", "promoted_to_radar"}
+    promotable_stage = validation_stage in {
+        "catalyst_link_validated",
+        "impact_path_validated",
+        "market_confirmed",
+        "promoted_to_radar",
+    }
     validated = status == "validated" and promotable_stage
     state = EventWatchlistState.RADAR if validated else EventWatchlistState.HYPOTHESIS
     previous_state = prior.state if prior else None
@@ -494,6 +499,7 @@ def _entry_from_hypothesis(
             "hypothesis_id": str(getattr(hypothesis, "hypothesis_id", "") or ""),
             "impact_category": category,
             "validation_stage": validation_stage or "unknown",
+            "impact_path_reason": _optional_str(getattr(hypothesis, "impact_path_reason", None)),
             "hypothesis_score": score,
             "score": score,
             "playbook_type": playbook,

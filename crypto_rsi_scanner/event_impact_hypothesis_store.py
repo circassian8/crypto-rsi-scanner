@@ -169,6 +169,7 @@ def format_impact_hypotheses_store_report(
     rows.append("categories: " + _format_counts(_counts(result.rows, "impact_category")))
     rows.append("statuses: " + _format_counts(_counts(result.rows, "status")))
     rows.append("validation_stages: " + _format_counts(_counts(result.rows, "validation_stage")))
+    rows.append("impact_path_reasons: " + _format_counts(_counts(result.rows, "impact_path_reason")))
     rows.append("why_not_promoted: " + _format_counts(_reason_counts(result.rows, "why_not_promoted")))
     rows.extend(_entity_audit_section(result.rows))
     rows.append("scopes: " + _format_counts(_counts(result.rows, "hypothesis_scope")))
@@ -405,6 +406,8 @@ def _compact_hypothesis_rows(
             out.append("  queries: " + " | ".join(str(query) for query in queries[:3]))
         if row.get("validation_reasons"):
             out.append("  validated: " + "; ".join(str(item) for item in row["validation_reasons"][:3]))
+        if row.get("impact_path_reason"):
+            out.append(f"  impact_path_reason: {row.get('impact_path_reason')}")
         if include_rejections and row.get("rejection_reasons"):
             out.append("  rejected: " + "; ".join(str(item) for item in row["rejection_reasons"][:3]))
     if len(rows) > limit:
@@ -450,6 +453,8 @@ def _format_hypothesis_row(
         out.append("  route_eligibility: linked_watchlist_candidate; router_quality_gate_decides_digest")
     if row.get("validation_reasons"):
         out.append("  validated: " + "; ".join(str(item) for item in row["validation_reasons"][:3]))
+    if row.get("impact_path_reason"):
+        out.append(f"  impact_path_reason: {row.get('impact_path_reason')}")
     if include_rejections and row.get("rejection_reasons"):
         out.append("  rejected: " + "; ".join(str(item) for item in row["rejection_reasons"][:3]))
     if row.get("why_not_promoted"):

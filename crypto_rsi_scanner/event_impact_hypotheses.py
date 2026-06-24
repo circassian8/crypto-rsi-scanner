@@ -60,9 +60,22 @@ class ValidationStage(str, Enum):
     SOURCE_MENTIONS_CANDIDATE = "source_mentions_candidate"
     IDENTITY_VALIDATED = "identity_validated"
     CATALYST_LINK_VALIDATED = "catalyst_link_validated"
+    IMPACT_PATH_VALIDATED = "impact_path_validated"
     MARKET_CONFIRMED = "market_confirmed"
     PROMOTED_TO_RADAR = "promoted_to_radar"
     REJECTED = "rejected"
+
+
+class ImpactPathReason(str, Enum):
+    DIRECT_TOKEN_EVENT = "direct_token_event"
+    VENUE_VALUE_CAPTURE = "venue_value_capture"
+    FAN_TOKEN_EVENT = "fan_token_event"
+    UNLOCK_SUPPLY_EVENT = "unlock_supply_event"
+    LISTING_LIQUIDITY_EVENT = "listing_liquidity_event"
+    EXPLOIT_SECURITY_EVENT = "exploit_security_event"
+    WEAK_COOCCURRENCE_ONLY = "weak_cooccurrence_only"
+    GENERIC_POLICY_ONLY = "generic_policy_only"
+    NO_VALUE_CAPTURE_EXPLAINED = "no_value_capture_explained"
 
 
 @dataclass(frozen=True)
@@ -102,6 +115,7 @@ class EventImpactHypothesis:
     rejection_reasons: tuple[str, ...] = ()
     rejected_validation_samples: tuple[dict[str, Any], ...] = ()
     why_not_promoted: tuple[str, ...] = ()
+    impact_path_reason: str | None = None
     created_at: str | None = None
 
 
@@ -133,6 +147,7 @@ _GENERIC_NON_ASSET_TERMS = {
 }
 _PROMOTABLE_VALIDATION_STAGES = {
     ValidationStage.CATALYST_LINK_VALIDATED.value,
+    ValidationStage.IMPACT_PATH_VALIDATED.value,
     ValidationStage.MARKET_CONFIRMED.value,
     ValidationStage.PROMOTED_TO_RADAR.value,
 }
@@ -363,6 +378,7 @@ def validate_hypotheses_with_raw_events(
         matched_symbols: list[str] = []
         matched_coin_ids: list[str] = []
         best_stage = hypothesis.validation_stage
+        impact_path_reason: str | None = hypothesis.impact_path_reason
         for raw in rows:
             detail = _validation_detail(raw, hypothesis)
             status = str(detail.get("status") or "none")
@@ -377,10 +393,22 @@ def validate_hypotheses_with_raw_events(
                 if symbol:
                     matched_symbols.append(symbol)
                 matched_coin_ids.append(coin_id or "")
+                path_reason = _impact_path_reason(raw, hypothesis, symbol=symbol, coin_id=coin_id)
+                if path_reason:
+                    impact_path_reason = _prefer_impact_path_reason(impact_path_reason, path_reason)
+                    if _impact_path_reason_is_strong(path_reason):
+                        best_stage = _max_validation_stage(best_stage, ValidationStage.IMPACT_PATH_VALIDATED.value)
             elif reason:
                 rejections.append(reason)
         if reasons and best_stage in _PROMOTABLE_VALIDATION_STAGES:
-            if _market_confirmation_score(rows) >= 70:
+            if (
+                _market_confirmation_score(rows) >= 70
+                and best_stage in {
+                    ValidationStage.IMPACT_PATH_VALIDATED.value,
+                    ValidationStage.MARKET_CONFIRMED.value,
+                    ValidationStage.PROMOTED_TO_RADAR.value,
+                }
+            ):
                 best_stage = ValidationStage.MARKET_CONFIRMED.value
             merged_assets = tuple(
                 {
@@ -396,6 +424,8 @@ def validate_hypotheses_with_raw_events(
             symbols, coin_ids = _assets_from_asset_rows(crypto_assets)
             components = dict(hypothesis.score_components or {})
             components["validation_strength"] = 95.0
+            if impact_path_reason:
+                components["impact_path_strength"] = 85.0 if _impact_path_reason_is_strong(impact_path_reason) else 35.0
             if best_stage == ValidationStage.MARKET_CONFIRMED.value:
                 components["market_confirmation"] = max(float(components.get("market_confirmation") or 0.0), 70.0)
             score = _weighted_hypothesis_score(components, hypothesis.impact_category)
@@ -412,10 +442,13 @@ def validate_hypotheses_with_raw_events(
                 confidence=max(0.0, min(1.0, round(score / 100.0, 4))),
                 score_components=components,
                 validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
+                impact_path_reason=impact_path_reason,
             ))
         elif reasons:
             components = dict(hypothesis.score_components or {})
             components["validation_strength"] = max(float(components.get("validation_strength") or 0.0), 45.0)
+            if impact_path_reason:
+                components["impact_path_strength"] = 85.0 if _impact_path_reason_is_strong(impact_path_reason) else 35.0
             score = _weighted_hypothesis_score(components, hypothesis.impact_category)
             out.append(replace(
                 hypothesis,
@@ -425,6 +458,7 @@ def validate_hypotheses_with_raw_events(
                 confidence=max(0.0, min(1.0, round(score / 100.0, 4))),
                 score_components=components,
                 validation_reasons=tuple(dict.fromkeys((*hypothesis.validation_reasons, *reasons))),
+                impact_path_reason=impact_path_reason,
             ))
         elif rejections:
             out.append(replace(
@@ -649,6 +683,10 @@ def _with_promotion_diagnostics(
         hypothesis.status == HypothesisStatus.VALIDATED.value
         and hypothesis.validation_stage in _PROMOTABLE_VALIDATION_STAGES
         and float(hypothesis.hypothesis_score or 0.0) >= 60.0
+        and (
+            hypothesis.validation_stage != ValidationStage.CATALYST_LINK_VALIDATED.value
+            or _impact_path_reason_is_strong(hypothesis.impact_path_reason)
+        )
     ):
         return replace(hypothesis, why_not_promoted=())
     if not hypothesis.crypto_candidate_assets and not hypothesis.validated_candidate_assets:
@@ -667,6 +705,13 @@ def _with_promotion_diagnostics(
         ValidationStage.IDENTITY_VALIDATED.value,
     } and float((hypothesis.score_components or {}).get("market_confirmation") or 0.0) < 40.0:
         reasons.append("market_confirmation_missing")
+    if (
+        hypothesis.status == HypothesisStatus.VALIDATED.value
+        and hypothesis.validation_stage == ValidationStage.CATALYST_LINK_VALIDATED.value
+        and not _impact_path_reason_is_strong(hypothesis.impact_path_reason)
+    ):
+        reason = hypothesis.impact_path_reason or ImpactPathReason.NO_VALUE_CAPTURE_EXPLAINED.value
+        reasons.append(f"impact_path_not_validated:{reason}")
     warnings = tuple(str(item) for item in (*hypothesis.warnings, *(getattr(search_result, "warnings", ()) or ())) if str(item))
     if any("backoff" in warning.casefold() for warning in warnings):
         reasons.append("provider_backoff")
@@ -693,11 +738,16 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
         return "\n".join(rows)
     counts: dict[str, int] = {}
     stages: dict[str, int] = {}
+    path_reasons: dict[str, int] = {}
     for item in items:
         counts[item.status] = counts.get(item.status, 0) + 1
         stages[item.validation_stage] = stages.get(item.validation_stage, 0) + 1
+        if item.impact_path_reason:
+            path_reasons[item.impact_path_reason] = path_reasons.get(item.impact_path_reason, 0) + 1
     rows.append("statuses: " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items())))
     rows.append("validation_stages: " + ", ".join(f"{key}={value}" for key, value in sorted(stages.items())))
+    if path_reasons:
+        rows.append("impact_path_reasons: " + ", ".join(f"{key}={value}" for key, value in sorted(path_reasons.items())))
     why_counts: dict[str, int] = {}
     for item in items:
         for reason in item.why_not_promoted:
@@ -756,6 +806,8 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
             rows.append("  queries: " + " | ".join(query_labels))
         if item.validation_reasons:
             rows.append("  validated: " + "; ".join(item.validation_reasons[:3]))
+        if item.impact_path_reason:
+            rows.append(f"  impact_path_reason: {item.impact_path_reason}")
         if item.rejection_reasons:
             rows.append("  rejected: " + "; ".join(item.rejection_reasons[:3]))
         rejected_samples = tuple(
@@ -1485,8 +1537,9 @@ _VALIDATION_STAGE_RANK = {
     ValidationStage.SOURCE_MENTIONS_CANDIDATE.value: 3,
     ValidationStage.IDENTITY_VALIDATED.value: 4,
     ValidationStage.CATALYST_LINK_VALIDATED.value: 5,
-    ValidationStage.MARKET_CONFIRMED.value: 6,
-    ValidationStage.PROMOTED_TO_RADAR.value: 7,
+    ValidationStage.IMPACT_PATH_VALIDATED.value: 6,
+    ValidationStage.MARKET_CONFIRMED.value: 7,
+    ValidationStage.PROMOTED_TO_RADAR.value: 8,
     ValidationStage.REJECTED.value: -1,
 }
 
@@ -1512,6 +1565,98 @@ def _first_reason_with(reasons: Iterable[str], needle: str) -> str | None:
         if lowered and lowered in str(reason).casefold():
             return reason
     return None
+
+
+def _impact_path_reason(
+    raw: RawDiscoveredEvent,
+    hypothesis: EventImpactHypothesis,
+    *,
+    symbol: str | None,
+    coin_id: str | None,
+) -> str | None:
+    """Classify whether source evidence explains why the catalyst affects the asset."""
+    text = clean_text(_raw_text(raw))
+    if not text:
+        return None
+    category = str(hypothesis.impact_category or "")
+    if _generic_policy_without_asset_path(text):
+        return ImpactPathReason.GENERIC_POLICY_ONLY.value
+    if not _asset_path_terms_present(text, symbol=symbol, coin_id=coin_id):
+        return ImpactPathReason.WEAK_COOCCURRENCE_ONLY.value
+    if category in {
+        ImpactCategory.RWA_PREIPO_PROXY.value,
+        ImpactCategory.AI_IPO_PROXY.value,
+        ImpactCategory.TOKENIZED_STOCK_VENUE.value,
+    }:
+        if _any_term_hit(text, ("exposure", "tokenized stock", "stock token", "synthetic exposure", "pre ipo", "pre-ipo", "trade")):
+            return ImpactPathReason.VENUE_VALUE_CAPTURE.value
+    if category == ImpactCategory.SPORTS_FAN_PROXY.value:
+        if _any_term_hit(text, ("fan token", "world cup", "fixture", "kickoff", "team demand", "sports event")):
+            return ImpactPathReason.FAN_TOKEN_EVENT.value
+    if category == ImpactCategory.UNLOCK_SUPPLY_PRESSURE.value:
+        if _any_term_hit(text, ("unlock", "vesting", "airdrop", "tge", "emission", "claim")):
+            return ImpactPathReason.UNLOCK_SUPPLY_EVENT.value
+    if category in {ImpactCategory.LISTING_LIQUIDITY_EVENT.value, ImpactCategory.PERP_VENUE_ATTENTION.value}:
+        if _any_term_hit(text, ("listing", "listed on", "nasdaq", "public listing", "merger", "trading pair", "perp", "futures")):
+            return ImpactPathReason.LISTING_LIQUIDITY_EVENT.value
+    if category == ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value:
+        if _any_term_hit(text, ("exploit", "hack", "security incident", "attack", "breach", "resumes trading", "halted trading")):
+            return ImpactPathReason.EXPLOIT_SECURITY_EVENT.value
+        if _any_term_hit(text, ("lawsuit", "sec", "cftc", "regulatory", "regulation", "probe", "charges", "investigation")):
+            return ImpactPathReason.DIRECT_TOKEN_EVENT.value
+        return ImpactPathReason.GENERIC_POLICY_ONLY.value
+    if category in {
+        ImpactCategory.STABLECOIN_REGULATORY.value,
+        ImpactCategory.PREDICTION_MARKET_INFRA.value,
+        ImpactCategory.POLITICAL_MEME_PROXY.value,
+    }:
+        if _any_term_hit(text, ("reserve", "settlement", "oracle", "infrastructure", "prediction market", "meme token", "candidate token")):
+            return ImpactPathReason.DIRECT_TOKEN_EVENT.value
+    return ImpactPathReason.NO_VALUE_CAPTURE_EXPLAINED.value
+
+
+def _asset_path_terms_present(text: str, *, symbol: str | None, coin_id: str | None) -> bool:
+    terms = [symbol, coin_id, str(coin_id or "").replace("-", " ")]
+    return any(_term_hit(text, term) for term in terms if str(term or "").strip())
+
+
+def _generic_policy_without_asset_path(text: str) -> bool:
+    policy = _any_term_hit(text, ("policy", "cftc", "regulatory", "regulation", "chair", "order", "government", "quantum"))
+    broad = _any_term_hit(text, ("generally", "broad", "industry", "market", "crypto headlines", "technology risk", "quantum computing"))
+    direct = _any_term_hit(text, (
+        "exploit",
+        "hack",
+        "listing",
+        "listed on",
+        "unlock",
+        "airdrop",
+        "tge",
+        "fan token",
+        "tokenized stock",
+        "synthetic exposure",
+    ))
+    return policy and broad and not direct
+
+
+def _impact_path_reason_is_strong(reason: str | None) -> bool:
+    return str(reason or "") in {
+        ImpactPathReason.DIRECT_TOKEN_EVENT.value,
+        ImpactPathReason.VENUE_VALUE_CAPTURE.value,
+        ImpactPathReason.FAN_TOKEN_EVENT.value,
+        ImpactPathReason.UNLOCK_SUPPLY_EVENT.value,
+        ImpactPathReason.LISTING_LIQUIDITY_EVENT.value,
+        ImpactPathReason.EXPLOIT_SECURITY_EVENT.value,
+    }
+
+
+def _prefer_impact_path_reason(current: str | None, candidate: str | None) -> str | None:
+    if not candidate:
+        return current
+    if not current:
+        return candidate
+    if _impact_path_reason_is_strong(candidate) and not _impact_path_reason_is_strong(current):
+        return candidate
+    return current
 
 
 def _identity_match_from_symbols(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> event_identity.IdentityMatchResult:
@@ -1699,6 +1844,9 @@ def _weighted_hypothesis_score(components: Mapping[str, float], category: str) -
     if components.get("event_time_quality") is not None:
         score += max(0.0, min(100.0, float(components.get("event_time_quality") or 0.0))) * 0.04
         weight_sum += 0.04
+    if components.get("impact_path_strength") is not None:
+        score += max(0.0, min(100.0, float(components.get("impact_path_strength") or 0.0))) * 0.08
+        weight_sum += 0.08
     if components.get("llm_candidate_confidence") is not None:
         score += max(0.0, min(100.0, float(components.get("llm_candidate_confidence") or 0.0))) * 0.05
         weight_sum += 0.05

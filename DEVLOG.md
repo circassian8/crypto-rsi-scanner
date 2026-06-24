@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-24 — Tighten validated hypothesis quality and identity artifacts · Codex
+**Why:** Latest `notify_llm` artifacts showed useful validated hypotheses, but
+some alert snapshots lacked plain `symbol`/`coin_id`, candidate-discovery
+queries were visible without bounded execution, and weak catalyst/token
+co-occurrence could still look digest-worthy without a clear impact path.
+**Changes:**
+- Added the `impact_path_validated` validation stage plus explicit
+  `impact_path_reason` diagnostics so RUNE/ZEC/CHZ/VELVET-style rows can pass
+  only when evidence explains the token/protocol/venue impact path, while broad
+  BTC quantum/CFTC/policy co-occurrence stays local-only by default.
+- Tightened validated-hypothesis digest routing with
+  `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH` and
+  `RSI_EVENT_ALPHA_WEAK_VALIDATED_LOCAL_ONLY`; weak validated rows remain
+  reviewable in local briefs/inbox/cards with `why_not_promoted` reasons.
+- Executed bounded `candidate_discovery` hypothesis-search queries in LLM
+  profiles, kept `notify_no_key` limited, and exposed query/result type counts
+  in the run ledger and daily brief.
+- Persisted plain `symbol`/`coin_id` from validated identity in Event Alpha
+  alert snapshots, added a missing-identity warning, and carried
+  `impact_path_reason` through watchlist rows, snapshots, cards, reports, and
+  inbox output.
+- Fixed an anomaly catalyst-search regression where a hypothesis-only config
+  reference could be misreported as provider unavailable.
+**Verify:** `python3 tests/test_indicators.py` (440/440 passed); `make
+event-llm-eval PYTHON=python3`; `make event-llm-extract-eval PYTHON=python3`;
+`make event-alpha-eval PYTHON=python3`; `make verify PYTHON=python3`; manual
+`make event-impact-hypothesis-smoke PYTHON=python3`, `make
+event-impact-hypotheses-report PROFILE=notify_llm PYTHON=python3`, and `make
+event-alpha-notification-inbox PROFILE=notify_llm PYTHON=python3`.
+**Notes/risks:** Research-only. This does not add live trading, paper trades,
+normal RSI signal writes, or any LLM/provider-created `TRIGGERED_FADE`;
+`TRIGGERED_FADE` remains limited to deterministic `event_fade.py` plus
+`proxy_fade`.
+
 ## 2026-06-24 — Gate and persist validated impact hypothesis digests · Codex
 **Why:** `notify_llm` could deliver validated impact-hypothesis digest items
 without writing corresponding alert snapshots, so the notification inbox had no

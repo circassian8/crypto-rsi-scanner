@@ -78,16 +78,18 @@ in `crypto_candidate_assets`; false positives stay in
 `rejected_candidate_assets`. Example: a SpaceX pre-IPO article can produce a
 tokenized-stock-venue hypothesis with VELVET/HYPE/ASTER validation searches.
 These rows are exploratory/store-only by default and are not alertable. They may
-promote to `RADAR` only after identity-safe source evidence explicitly links a
-candidate asset to the catalyst (`catalyst_link_validated`,
-`market_confirmed`, or `promoted_to_radar`). Candidate-only or identity-only
-evidence can improve review context but does not promote a token-level row.
-Candidate-discovery search hits can suggest new crypto candidates when the
-source payload or quote-validated extraction names an asset, but those
-suggestions still need deterministic identity/catalyst validation before they
-can become token-level `RADAR` rows. Use the report's `why_not_promoted`
-section to separate discovery-only leads from identity/catalyst/market/score
-blockers.
+promote to token-level `RADAR` only after identity-safe source evidence
+explicitly links a candidate asset to the catalyst. The strongest promoted rows
+carry `impact_path_validated`, meaning the evidence explains why the event
+affects the token/protocol/venue/sector rather than merely mentioning both.
+Candidate-only or identity-only evidence can improve review context but does
+not promote a token-level row. Candidate-discovery search hits can suggest new
+crypto candidates when the source payload or quote-validated extraction names an
+asset, but those suggestions still need deterministic identity/catalyst
+validation before they can become token-level `RADAR` rows. Use the report's
+`impact_path_reason` and `why_not_promoted` sections to separate real value-
+capture paths from discovery-only leads, weak co-occurrence, identity blockers,
+catalyst blockers, market blockers, and score blockers.
 Validated token-level `RADAR` hypotheses can enter a capped daily research
 digest in notification profiles when
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED=1`. The message/card must
@@ -98,15 +100,23 @@ paper/live rows, or `TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from
 
 Digest routing is quality-gated. Defaults require score >=
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MIN_SCORE` (65), a validated token
-identity, `catalyst_link_validated` or stronger validation stage, no
-source-noise/ticker-collision gate, a non-ambiguous playbook, and either a
-known external catalyst or explicit direct token-event evidence (exploit,
-listing, unlock, airdrop, or TGE text tied to the token). Use
-`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT=0` only
-for deliberate review experiments. Delivered validated-hypothesis digest items
-are written to `event_alpha_alerts.jsonl` as research snapshots so
-`make event-alpha-notification-inbox PROFILE=notify_llm` can show them as
-needing useful/junk feedback.
+identity, no source-noise/ticker-collision gate, a non-ambiguous playbook, a
+known external catalyst or explicit direct token-event evidence, and
+`impact_path_validated` or stronger validation stage. Weak
+`catalyst_link_validated` rows remain local-only when
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH=1` and
+`RSI_EVENT_ALPHA_WEAK_VALIDATED_LOCAL_ONLY=1`. Examples that can pass the
+impact-path gate include direct token events, venue value-capture events,
+fan-token event demand, unlock/supply events, listing/liquidity events, and
+security/exploit shocks tied to the token. Generic policy, macro, or broad
+technology articles that merely mention a token should stay local-only with
+`impact_path_not_validated:*`. Use
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_EXTERNAL_OR_DIRECT_EVENT=0` or
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH=0` only for deliberate
+review experiments. Delivered validated-hypothesis digest items are written to
+`event_alpha_alerts.jsonl` as research snapshots with `symbol`/`coin_id` plus
+validated identity fields so `make event-alpha-notification-inbox
+PROFILE=notify_llm` can show them as needing useful/junk feedback.
 
 Each Event Alpha cycle also appends generated hypotheses to a profile-scoped
 research artifact:
@@ -138,7 +148,9 @@ a time window.
 Add `INCLUDE_LEGACY=1` only when intentionally reviewing old/missing-schema
 rows. Hypothesis reports now separate generated queries from executed queries
 and show query counts by `candidate_discovery`, `candidate_validation`, and
-`market_confirmation`. Rejected validation samples include the query,
+`market_confirmation`. `notify_llm` and `notify_llm_deep` can execute a bounded
+number of candidate-discovery searches per cycle; `notify_no_key` keeps them
+disabled/limited by profile. Rejected validation samples include the query,
 query-type, result title, provider/source, candidate symbol, result score, and
 identity/catalyst rejection reason. The entity audit flags suspicious cases
 where external catalysts such as OpenAI, Anthropic, SpaceX, Stripe,

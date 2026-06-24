@@ -168,6 +168,14 @@ def build_daily_brief(
             f"- Validation queries/results: {int(latest.get('hypothesis_search_queries') or 0)} / "
             f"{int(latest.get('hypothesis_search_results') or 0)}"
         )
+        query_types = latest.get("hypothesis_search_queries_by_type") or {}
+        result_types = latest.get("hypothesis_search_results_by_type") or {}
+        if isinstance(query_types, Mapping) or isinstance(result_types, Mapping):
+            lines.append(
+                "- Validation query types: "
+                f"queries={_format_counts(query_types if isinstance(query_types, Mapping) else {})}; "
+                f"results={_format_counts(result_types if isinstance(result_types, Mapping) else {})}"
+            )
         if int(latest.get("hypotheses_validated") or 0) <= 0:
             lines.append("- Validated hypotheses: none yet.")
         if int(latest.get("impact_hypotheses") or 0) > int(latest.get("hypotheses_validated") or 0):
@@ -275,6 +283,17 @@ def build_daily_brief(
         decision for decision in decisions
         if decision.entry.relationship_type == "impact_hypothesis" and decision.alertable
     ]
+    impact_path_validated_hypotheses = [
+        decision for decision in decisions
+        if (
+            decision.entry.relationship_type == "impact_hypothesis"
+            and str((decision.entry.latest_score_components or {}).get("validation_stage") or "") in {
+                "impact_path_validated",
+                "market_confirmed",
+                "promoted_to_radar",
+            }
+        )
+    ]
     local_validated_hypotheses = [
         decision for decision in decisions
         if (
@@ -283,6 +302,10 @@ def build_daily_brief(
             and decision.entry.state == event_watchlist.EventWatchlistState.RADAR.value
             and decision.entry.symbol.upper() != "SECTOR"
         )
+    ]
+    weak_local_hypotheses = [
+        decision for decision in local_validated_hypotheses
+        if str((decision.entry.latest_score_components or {}).get("validation_stage") or "") == "catalyst_link_validated"
     ]
     exploratory_sector_hypotheses = [
         entry for entry in entries
@@ -293,9 +316,9 @@ def build_daily_brief(
         row for row in hypotheses
         if str(row.get("status") or "") == "rejected" or row.get("why_not_promoted") or row.get("rejection_reasons")
     ]
-    lines.append("- Alertable validated hypotheses: " + (_brief_decisions(alertable_hypotheses[:5]) or "none"))
-    lines.append("- Local-only validated hypotheses: " + (_brief_decisions(local_validated_hypotheses[:5]) or "none"))
-    lines.append("- Exploratory sector hypotheses: " + (_brief_entries(exploratory_sector_hypotheses[:5]) or "none"))
+    lines.append("- Impact-path validated digest candidates: " + (_brief_decisions(alertable_hypotheses[:5]) or _brief_decisions(impact_path_validated_hypotheses[:5]) or "none"))
+    lines.append("- Weak validated local-only hypotheses: " + (_brief_decisions(weak_local_hypotheses[:5]) or "none"))
+    lines.append("- Sector hypotheses awaiting validation: " + (_brief_entries(exploratory_sector_hypotheses[:5]) or "none"))
     lines.append("- Rejected/why-not-promoted hypotheses: " + (_brief_hypothesis_labels(rejected_hypotheses[:5]) or "none"))
     exploratory = event_alpha_notifications.select_exploratory_candidates(
         decisions,

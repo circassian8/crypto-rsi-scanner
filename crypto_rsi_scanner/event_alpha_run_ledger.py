@@ -156,6 +156,14 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"hypothesis_results={int(row.get('hypothesis_search_results') or 0)} "
             f"promotions={int(row.get('hypothesis_promotions') or 0)}"
         )
+        query_types = row.get("hypothesis_search_queries_by_type") or {}
+        result_types = row.get("hypothesis_search_results_by_type") or {}
+        if query_types or result_types:
+            rows.append(
+                "  hypothesis_query_types: "
+                f"queries={_format_reason_counts(query_types)} "
+                f"results={_format_reason_counts(result_types)}"
+            )
         skip_reasons = row.get("catalyst_search_skip_reasons") or {}
         if isinstance(skip_reasons, Mapping) and skip_reasons:
             rows.append("  catalyst_search_skip_reasons: " + _format_reason_counts(skip_reasons))
@@ -269,6 +277,8 @@ def _run_record(
         "hypotheses_validated": _int(getattr(result, "hypotheses_validated", 0)),
         "hypothesis_search_queries": _int(getattr(result, "hypothesis_search_queries", 0)),
         "hypothesis_search_results": _int(getattr(result, "hypothesis_search_results", 0)),
+        "hypothesis_search_queries_by_type": _query_type_counts(getattr(result, "hypothesis_search_result", None), "queries"),
+        "hypothesis_search_results_by_type": _query_type_counts(getattr(result, "hypothesis_search_result", None), "result_events"),
         "hypothesis_search_skip_reasons": _hypothesis_search_skip_reasons(result, warnings=warnings),
         "hypothesis_promotions": _int(getattr(result, "hypothesis_promotions", 0)),
         "candidates": _int(getattr(result, "candidates", 0)),
@@ -371,6 +381,18 @@ def _llm_stats(rows: Iterable[object]) -> dict[str, int]:
         if any("budget exhausted" in str(warning) for warning in warnings):
             stats["skipped_due_budget"] += 1
     return stats
+
+
+def _query_type_counts(container: Any, attr: str) -> dict[str, int]:
+    if container is None:
+        return {}
+    rows = getattr(container, attr, ()) or ()
+    out: dict[str, int] = {}
+    for row in rows:
+        query = row if attr == "queries" else getattr(row, "query", None)
+        query_type = str(getattr(query, "query_type", "") or "candidate_validation")
+        out[query_type] = out.get(query_type, 0) + 1
+    return out
 
 
 def _market_anomaly_count(discovery: Any) -> int:

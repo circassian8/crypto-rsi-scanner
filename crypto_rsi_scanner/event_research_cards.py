@@ -600,6 +600,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         validation_reasons = [validation_reasons]
     gate_block = event_alpha_router.validated_hypothesis_digest_block_reason(entry)
     gate_line = "passed for capped research digest" if gate_block is None else f"local-only: {gate_block}"
+    impact_path_reason = components.get("impact_path_reason") or "unknown"
     why_not_promoted = components.get("why_not_promoted") or []
     if isinstance(why_not_promoted, str):
         why_not_promoted = [why_not_promoted]
@@ -609,7 +610,9 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Candidate source: {entry.latest_source or 'impact_hypothesis'}",
         f"- Candidate symbols considered: {', '.join(str(item) for item in candidate_symbols[:8]) if candidate_symbols else 'none'}",
         f"- Playbook: {entry.latest_playbook_type or 'impact_hypothesis'}",
+        f"- Impact path reason: {impact_path_reason}",
         f"- Quality gate: {gate_line}",
+        f"- Local-only due to weak co-occurrence: {str('impact_path_not_validated' in gate_line or 'weak_validated_local_only' in gate_line).lower()}",
         f"- Why promoted/local-only: {entry.suppressed_reason or 'validated impact hypothesis promoted to RADAR'}",
         "- Safety label: catalyst link validated, but this is not a calibrated strategy or trade signal.",
         "- Why it may be wrong: validation may be source-thin, asset link may be narrative-only, and the catalyst impact may not move this token.",

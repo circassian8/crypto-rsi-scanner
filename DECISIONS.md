@@ -25,14 +25,23 @@ with a warning. A validated token-level `RADAR` hypothesis may enter a capped
 daily research digest in notification profiles when
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_ENABLED=1`, but only after the
 validated-hypothesis digest quality gate passes: validated token identity,
-`catalyst_link_validated` or stronger stage, no source-noise/ticker-collision
-gate, score at least
+`impact_path_validated` or stronger stage by default, no
+source-noise/ticker-collision gate, score at least
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MIN_SCORE`, non-ambiguous playbook,
 and either a known external catalyst or explicit direct token-event evidence.
+Weak `catalyst_link_validated` rows that only show catalyst/token co-occurrence
+remain local-only when
+`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH=1` and
+`RSI_EVENT_ALPHA_WEAK_VALIDATED_LOCAL_ONLY=1`. Bounded
+`candidate_discovery` searches may suggest missing crypto candidates, but those
+suggestions still require deterministic identity/catalyst validation and cannot
+create alertability or `TRIGGERED_FADE`.
 The message/card must label it as a research-only validated impact hypothesis,
 not a trade signal or calibrated strategy. Delivered digest decisions are
 persisted as Event Alpha alert snapshots so the notification inbox can request
-useful/junk feedback without treating them as live signals.
+useful/junk feedback without treating them as live signals; snapshots should
+persist `symbol`/`coin_id` from validated identity when the route item does not
+already have plain asset fields.
 **Why:** Validated hypotheses are useful operator intelligence only if they
 name the asset that was actually validated. Making them visible in the daily
 research digest helps review them without promoting loose sector hypotheses or

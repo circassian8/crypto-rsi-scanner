@@ -15,6 +15,8 @@ from . import event_alpha_notifications, event_alpha_router, event_watchlist
 class EventAlphaNotificationInboxItem:
     alert_id: str
     alert_key: str
+    symbol: str
+    coin_id: str
     run_id: str
     tier: str
     playbook: str
@@ -45,6 +47,7 @@ class EventAlphaNotificationInboxResult:
     partial_delivered_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     would_send_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     would_send_blocked_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
+    weak_validated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
     exploratory_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
     triggered_fade_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
@@ -108,6 +111,10 @@ def build_notification_inbox(
         item for item in items
         if item.blocked_by_guard and not item.reviewed
     )
+    weak_validated_local_only = tuple(
+        item for item in items
+        if _is_weak_validated_local_only(item, alerts) and not item.reviewed
+    )
     high_priority_unreviewed = tuple(
         item for item in items
         if not item.reviewed and _is_high_priority(item)
@@ -138,6 +145,7 @@ def build_notification_inbox(
         partial_delivered_without_feedback=partial_delivered_without_feedback,
         would_send_without_feedback=would_send_without_feedback,
         would_send_blocked_without_feedback=would_send_blocked_without_feedback,
+        weak_validated_local_only=weak_validated_local_only,
         exploratory_without_feedback=exploratory_without_feedback,
         high_priority_unreviewed=high_priority_unreviewed,
         triggered_fade_unreviewed=triggered_fade_unreviewed,
@@ -183,6 +191,7 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
     )
     _append_item_section(lines, "would-send notifications without feedback", result.would_send_without_feedback, profile=result.profile)
     _append_item_section(lines, "would-send blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
+    _append_item_section(lines, "weak validated local-only hypotheses for optional review", result.weak_validated_local_only, profile=result.profile)
     _append_item_section(lines, "exploratory digest items needing review", result.exploratory_without_feedback, profile=result.profile)
     _append_item_section(lines, "high-priority cards not reviewed", result.high_priority_unreviewed, profile=result.profile)
     _append_item_section(lines, "triggered-fade cards not reviewed", result.triggered_fade_unreviewed, profile=result.profile)
@@ -208,7 +217,8 @@ def _append_item_section(
         return
     for item in rows[:20]:
         lines.append(
-            f"- alert_id={item.alert_id} tier={item.tier} playbook={item.playbook} "
+            f"- {item.symbol or 'UNKNOWN'}/{item.coin_id or 'unknown'} alert_id={item.alert_id} "
+            f"tier={item.tier} playbook={item.playbook} "
             f"sent={_yes_no(item.sent)} would_send={_yes_no(item.would_send)} "
             f"delivery_state={item.delivery_state or 'none'}"
         )
@@ -272,6 +282,8 @@ def _inbox_item(
     return EventAlphaNotificationInboxItem(
         alert_id=alert_id,
         alert_key=alert_key,
+        symbol=str(alert.get("symbol") or alert.get("asset_symbol") or alert.get("validated_symbol") or "UNKNOWN"),
+        coin_id=str(alert.get("coin_id") or alert.get("asset_coin_id") or alert.get("validated_coin_id") or "unknown"),
         run_id=run_id,
         tier=str(alert.get("tier") or "UNKNOWN"),
         playbook=str(alert.get("playbook_type") or alert.get("effective_playbook_type") or "unknown"),
@@ -312,6 +324,8 @@ def _exploratory_items(
             items.append(EventAlphaNotificationInboxItem(
                 alert_id=alert_id,
                 alert_key=key,
+                symbol=str(getattr(entry, "symbol", "") or "UNKNOWN"),
+                coin_id=str(getattr(entry, "coin_id", "") or "unknown"),
                 run_id=str(row.get("run_id") or ""),
                 tier=str(getattr(entry, "latest_tier", "") or "EXPLORATORY"),
                 playbook=str(getattr(entry, "latest_playbook_type", "") or "exploratory"),
@@ -383,6 +397,30 @@ def _is_triggered_fade(item: EventAlphaNotificationInboxItem) -> bool:
     return item.tier == "TRIGGERED_FADE" or item.playbook == "proxy_fade" or "TRIGGERED_FADE" in item.reason.upper()
 
 
+def _is_weak_validated_local_only(
+    item: EventAlphaNotificationInboxItem,
+    alerts: Iterable[Mapping[str, Any]],
+) -> bool:
+    for alert in alerts:
+        alert_key = str(alert.get("alert_key") or "")
+        alert_id = str(alert.get("alert_id") or (f"ea:{alert_key}" if alert_key else ""))
+        if item.alert_id not in {alert_id, f"ea:{alert_key}"} and item.alert_key != alert_key:
+            continue
+        if str(alert.get("relationship_type") or "") != "impact_hypothesis":
+            return False
+        if bool(alert.get("route_alertable")):
+            return False
+        components = alert.get("score_components") if isinstance(alert.get("score_components"), Mapping) else {}
+        stage = str(alert.get("validation_stage") or components.get("validation_stage") or "")
+        reason_text = " ".join(str(value or "") for value in (
+            alert.get("route_reason"),
+            alert.get("reason"),
+            *((alert.get("quality_warnings") or []) if isinstance(alert.get("quality_warnings"), list) else []),
+        )).casefold()
+        return stage == "catalyst_link_validated" or "impact_path_not_validated" in reason_text or "weak_validated" in reason_text
+    return False
+
+
 def _reviewed_ids(rows: Iterable[Mapping[str, Any]]) -> set[str]:
     ids: set[str] = set()
     for row in rows:
@@ -399,7 +437,7 @@ def _reviewed_ids(rows: Iterable[Mapping[str, Any]]) -> set[str]:
 
 def _alert_ids(alert: Mapping[str, Any], alert_id: str, alert_key: str, card_id: str) -> set[str]:
     ids = {value for value in (alert_id, alert_key, card_id) if value}
-    for field in ("event_id", "asset_coin_id", "asset_symbol", "snapshot_id"):
+    for field in ("event_id", "coin_id", "symbol", "asset_coin_id", "asset_symbol", "validated_coin_id", "validated_symbol", "snapshot_id"):
         value = str(alert.get(field) or "").strip()
         if value:
             ids.add(value)

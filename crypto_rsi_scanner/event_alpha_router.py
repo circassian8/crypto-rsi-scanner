@@ -38,6 +38,8 @@ class EventAlphaRouterConfig:
     max_validated_hypothesis_digest_items: int = 5
     validated_hypothesis_min_score: float = 65.0
     validated_hypothesis_require_external_or_direct_event: bool = True
+    validated_hypothesis_require_impact_path: bool = True
+    weak_validated_local_only: bool = True
     max_high_priority_per_day: int = 3
     per_key_cooldown_hours: float = 12.0
     alert_on_score_jump: bool = True
@@ -546,7 +548,12 @@ def _looks_like_validated_hypothesis(entry: event_watchlist.EventWatchlistEntry)
     if (entry.symbol or "").upper() == "SECTOR":
         return False
     components = entry.latest_score_components or {}
-    if str(components.get("validation_stage") or "") not in {"catalyst_link_validated", "market_confirmed", "promoted_to_radar"}:
+    if str(components.get("validation_stage") or "") not in {
+        "catalyst_link_validated",
+        "impact_path_validated",
+        "market_confirmed",
+        "promoted_to_radar",
+    }:
         return False
     if not (components.get("validated_symbol") or components.get("validated_coin_id") or components.get("validated_asset")):
         return False
@@ -565,7 +572,7 @@ def _validated_hypothesis_digest_block_reason(
         return "missing_validated_token_identity"
     components = dict(entry.latest_score_components or {})
     stage = str(components.get("validation_stage") or "").strip()
-    if stage not in {"catalyst_link_validated", "market_confirmed", "promoted_to_radar"}:
+    if stage not in {"catalyst_link_validated", "impact_path_validated", "market_confirmed", "promoted_to_radar"}:
         return "catalyst_link_not_validated"
     if not (components.get("validated_symbol") or components.get("validated_coin_id") or components.get("validated_asset")):
         return "missing_validated_token_identity"
@@ -597,6 +604,15 @@ def _validated_hypothesis_digest_block_reason(
     score = _hypothesis_score(entry, components)
     if score < float(cfg.validated_hypothesis_min_score):
         return f"score_below_threshold:{score:.0f}<{cfg.validated_hypothesis_min_score:.0f}"
+    if cfg.validated_hypothesis_require_impact_path:
+        if stage not in {"impact_path_validated", "market_confirmed", "promoted_to_radar"}:
+            direct_override_score = max(75.0, float(cfg.validated_hypothesis_min_score) + 10.0)
+            if not (_has_clear_direct_token_event(entry, components) and score >= direct_override_score):
+                reason = str(components.get("impact_path_reason") or "no_value_capture_explained")
+                return f"impact_path_not_validated:{reason}"
+            if cfg.weak_validated_local_only:
+                reason = str(components.get("impact_path_reason") or "weak_cooccurrence_only")
+                return f"weak_validated_local_only:{reason}"
     if cfg.validated_hypothesis_require_external_or_direct_event and _missing_external(entry.external_asset):
         if not _has_clear_direct_token_event(entry, components):
             return "missing_external_asset_or_clear_direct_token_event"

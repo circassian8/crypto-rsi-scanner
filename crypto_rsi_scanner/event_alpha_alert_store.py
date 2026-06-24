@@ -331,6 +331,8 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "event_type": candidate.event.event_type,
         "event_time": candidate.event.event_time.isoformat() if candidate.event.event_time else None,
         "external_asset": candidate.event.external_asset,
+        "coin_id": candidate.asset.coin_id,
+        "symbol": candidate.asset.symbol,
         "asset_coin_id": candidate.asset.coin_id,
         "asset_symbol": candidate.asset.symbol,
         "asset_name": candidate.asset.name,
@@ -393,6 +395,11 @@ def _snapshot_from_route_decision(
     validated_asset = components.get("validated_asset") if isinstance(components.get("validated_asset"), Mapping) else {}
     validated_symbol = components.get("validated_symbol") or validated_asset.get("symbol") or entry.symbol
     validated_coin_id = components.get("validated_coin_id") or validated_asset.get("coin_id") or entry.coin_id
+    symbol = entry.symbol or validated_symbol
+    coin_id = entry.coin_id or validated_coin_id
+    warnings = list(entry.warnings)
+    if not symbol and not validated_symbol:
+        warnings.append("validated_hypothesis_snapshot_missing_identity")
     return {
         "schema_version": ALERT_STORE_SCHEMA_VERSION,
         "row_type": "event_alpha_alert_snapshot",
@@ -405,8 +412,10 @@ def _snapshot_from_route_decision(
         "event_type": components.get("event_type") or "impact_hypothesis",
         "event_time": entry.event_time,
         "external_asset": entry.external_asset,
-        "asset_coin_id": entry.coin_id,
-        "asset_symbol": entry.symbol,
+        "coin_id": coin_id,
+        "symbol": symbol,
+        "asset_coin_id": coin_id,
+        "asset_symbol": symbol,
         "asset_name": validated_asset.get("name") if isinstance(validated_asset, Mapping) else None,
         "relationship_type": entry.relationship_type,
         "asset_role": components.get("asset_role"),
@@ -439,10 +448,12 @@ def _snapshot_from_route_decision(
         "route_reason": decision.reason,
         "impact_category": components.get("impact_category") or playbook,
         "validation_stage": components.get("validation_stage"),
+        "impact_path_reason": components.get("impact_path_reason"),
         "hypothesis_id": components.get("hypothesis_id") or entry.event_id,
         "hypothesis_score": components.get("hypothesis_score") or entry.latest_score,
         "validated_symbol": validated_symbol,
         "validated_coin_id": validated_coin_id,
+        "quality_warnings": tuple(dict.fromkeys(warnings)),
         "research_card_path": None,
         "delivered_status": None,
         "feedback_status": "pending",
