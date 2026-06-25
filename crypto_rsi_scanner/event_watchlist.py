@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alerts, event_fade, event_graph
+from . import event_alerts, event_alpha_quality_fields, event_fade, event_graph
 
 WATCHLIST_SCHEMA_VERSION = "event_watchlist_v1"
 
@@ -89,6 +89,20 @@ class EventWatchlistEntry:
     latest_llm_confidence: float | None = None
     latest_market_snapshot: dict[str, Any] = field(default_factory=dict)
     latest_score_components: dict[str, Any] = field(default_factory=dict)
+    impact_path_type: str | None = None
+    impact_path_strength: str | None = None
+    candidate_role: str | None = None
+    evidence_quality_score: float | None = None
+    source_class: str | None = None
+    evidence_specificity: str | None = None
+    market_confirmation_score: float | None = None
+    market_confirmation_level: str | None = None
+    opportunity_score_final: float | None = None
+    opportunity_level: str | None = None
+    opportunity_verdict_reasons: list[str] = field(default_factory=list)
+    why_local_only: str | None = None
+    why_not_watchlist: str | None = None
+    manual_verification_items: list[str] = field(default_factory=list)
     alert_history: list[dict[str, Any]] = field(default_factory=list)
     state_changed: bool = False
     escalation: bool = False
@@ -308,6 +322,7 @@ def _entry_from_alert(
     if alert.rejected_reason:
         warnings.append(alert.rejected_reason)
     warnings = list(dict.fromkeys(warnings))
+    quality = event_alpha_quality_fields.ensure_quality_fields({}, components=alert.score_components)
     entry = EventWatchlistEntry(
         schema_version=WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
@@ -383,6 +398,20 @@ def _entry_from_alert(
         latest_llm_confidence=alert.llm_confidence,
         latest_market_snapshot=_market_snapshot(alert),
         latest_score_components=dict(alert.score_components),
+        impact_path_type=_optional_str(quality.get("impact_path_type")),
+        impact_path_strength=_optional_str(quality.get("impact_path_strength")),
+        candidate_role=_optional_str(quality.get("candidate_role")),
+        evidence_quality_score=_optional_float(quality.get("evidence_quality_score")),
+        source_class=_optional_str(quality.get("source_class")),
+        evidence_specificity=_optional_str(quality.get("evidence_specificity")),
+        market_confirmation_score=_optional_float(quality.get("market_confirmation_score")),
+        market_confirmation_level=_optional_str(quality.get("market_confirmation_level")),
+        opportunity_score_final=_optional_float(quality.get("opportunity_score_final")),
+        opportunity_level=_optional_str(quality.get("opportunity_level")),
+        opportunity_verdict_reasons=list(quality.get("opportunity_verdict_reasons") or []),
+        why_local_only=_optional_str(quality.get("why_local_only")),
+        why_not_watchlist=_optional_str(quality.get("why_not_watchlist")),
+        manual_verification_items=list(quality.get("manual_verification_items") or []),
         alert_history=history,
         state_changed=state_changed,
         escalation=escalation,
@@ -460,6 +489,25 @@ def _entry_from_hypothesis(
         )
         if str(value)
     ))
+    hypothesis_quality = event_alpha_quality_fields.ensure_quality_fields(
+        {},
+        components={
+            "impact_path_type": _optional_str(getattr(hypothesis, "impact_path_type", None)),
+            "impact_path_strength": _optional_str(getattr(hypothesis, "impact_path_strength", None)),
+            "candidate_role": _optional_str(getattr(hypothesis, "candidate_role", None)),
+            "evidence_quality_score": _optional_float(getattr(hypothesis, "evidence_quality_score", None)),
+            "source_class": _optional_str(getattr(hypothesis, "source_class", None)),
+            "evidence_specificity": _optional_str(getattr(hypothesis, "evidence_specificity", None)),
+            "market_confirmation_score": _optional_float(getattr(hypothesis, "market_confirmation_score", None)),
+            "market_confirmation_level": _optional_str(getattr(hypothesis, "market_confirmation_level", None)),
+            "opportunity_score_final": _optional_float(getattr(hypothesis, "opportunity_score_final", None)),
+            "opportunity_level": _optional_str(getattr(hypothesis, "opportunity_level", None)),
+            "opportunity_verdict_reasons": list(getattr(hypothesis, "opportunity_verdict_reasons", ()) or ())[:8],
+            "why_local_only": _optional_str(getattr(hypothesis, "why_local_only", None)),
+            "why_not_watchlist": _optional_str(getattr(hypothesis, "why_not_watchlist", None)),
+            "manual_verification_items": list(getattr(hypothesis, "manual_verification_items", ()) or ())[:8],
+        },
+    )
     return EventWatchlistEntry(
         schema_version=WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
@@ -552,6 +600,20 @@ def _entry_from_hypothesis(
             "rejected_candidate_assets": list(getattr(hypothesis, "rejected_candidate_assets", ()) or ())[:8],
             **dict(getattr(hypothesis, "score_components", {}) or {}),
         },
+        impact_path_type=_optional_str(hypothesis_quality.get("impact_path_type")),
+        impact_path_strength=_optional_str(hypothesis_quality.get("impact_path_strength")),
+        candidate_role=_optional_str(hypothesis_quality.get("candidate_role")),
+        evidence_quality_score=_optional_float(hypothesis_quality.get("evidence_quality_score")),
+        source_class=_optional_str(hypothesis_quality.get("source_class")),
+        evidence_specificity=_optional_str(hypothesis_quality.get("evidence_specificity")),
+        market_confirmation_score=_optional_float(hypothesis_quality.get("market_confirmation_score")),
+        market_confirmation_level=_optional_str(hypothesis_quality.get("market_confirmation_level")),
+        opportunity_score_final=_optional_float(hypothesis_quality.get("opportunity_score_final")),
+        opportunity_level=_optional_str(hypothesis_quality.get("opportunity_level")),
+        opportunity_verdict_reasons=list(hypothesis_quality.get("opportunity_verdict_reasons") or []),
+        why_local_only=_optional_str(hypothesis_quality.get("why_local_only")),
+        why_not_watchlist=_optional_str(hypothesis_quality.get("why_not_watchlist")),
+        manual_verification_items=list(hypothesis_quality.get("manual_verification_items") or []),
         alert_history=history,
         state_changed=state_changed,
         escalation=escalation,
@@ -929,6 +991,8 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             state = EventWatchlistState.RAW_EVIDENCE.value
         first_seen = str(row.get("first_seen_at") or row.get("last_seen_at") or "")
         last_seen = str(row.get("last_seen_at") or first_seen)
+        components = dict(row.get("latest_score_components") or {})
+        quality = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
         return EventWatchlistEntry(
             schema_version=str(row.get("schema_version") or WATCHLIST_SCHEMA_VERSION),
             row_type="event_watchlist_state",
@@ -968,7 +1032,21 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             latest_llm_asset_role=_optional_str(row.get("latest_llm_asset_role")),
             latest_llm_confidence=_optional_float(row.get("latest_llm_confidence")),
             latest_market_snapshot=dict(row.get("latest_market_snapshot") or {}),
-            latest_score_components=dict(row.get("latest_score_components") or {}),
+            latest_score_components=components,
+            impact_path_type=_optional_str(quality.get("impact_path_type")),
+            impact_path_strength=_optional_str(quality.get("impact_path_strength")),
+            candidate_role=_optional_str(quality.get("candidate_role")),
+            evidence_quality_score=_optional_float(quality.get("evidence_quality_score")),
+            source_class=_optional_str(quality.get("source_class")),
+            evidence_specificity=_optional_str(quality.get("evidence_specificity")),
+            market_confirmation_score=_optional_float(quality.get("market_confirmation_score")),
+            market_confirmation_level=_optional_str(quality.get("market_confirmation_level")),
+            opportunity_score_final=_optional_float(quality.get("opportunity_score_final")),
+            opportunity_level=_optional_str(quality.get("opportunity_level")),
+            opportunity_verdict_reasons=list(quality.get("opportunity_verdict_reasons") or []),
+            why_local_only=_optional_str(quality.get("why_local_only")),
+            why_not_watchlist=_optional_str(quality.get("why_not_watchlist")),
+            manual_verification_items=list(quality.get("manual_verification_items") or []),
             alert_history=list(row.get("alert_history") or []),
             state_changed=bool(row.get("state_changed")),
             escalation=bool(row.get("escalation")),

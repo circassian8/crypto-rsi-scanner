@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Operationalize Event Alpha signal-quality loop · Codex
+**Why:** New live artifacts could still be hard to inspect because quality
+fields, candidate-funnel diagnostics, and threshold effects were spread across
+several reports. The system needed one artifact-quality loop for daily review
+without changing alert/trading behavior.
+**Changes:**
+- Added shared quality-field enforcement for new hypothesis, watchlist, and
+  alert snapshot artifacts, plus artifact-doctor counters for missing quality
+  metadata and strict-mode escalation.
+- Added `event_alpha_quality_review.py`, `event_alpha_policy_simulator.py`, and
+  `event_alpha_signal_quality_export.py` with CLI/Make targets for quality
+  review, threshold simulation, and proposed benchmark-case export.
+- Extended opportunity audit, daily brief, research cards, and candidate
+  discovery funnel reporting with explicit quality summaries, upgrade paths,
+  downgrade risks, delivery/feedback context, and conversion counts.
+- Added `make event-alpha-quality-loop` / `make event-alpha-quality-loop-llm`
+  to run the offline benchmark, quality review, policy simulation, inbox,
+  impact-hypothesis report, and daily brief without sending notifications.
+**Verify:** `python3 tests/test_indicators.py` (451/451 passed); `make
+event-llm-eval PYTHON=python3`; `make event-llm-extract-eval PYTHON=python3`;
+`make event-alpha-eval PYTHON=python3`; `make event-alpha-signal-quality-eval
+PYTHON=python3`; manual `make event-alpha-quality-loop PROFILE=notify_llm
+PYTHON=python3` and `make event-opportunity-audit PROFILE=notify_llm
+TARGET=<existing alert id> PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Research-only. This does not add live trading, paper trades,
+normal RSI signal writes, or any LLM/provider-created `TRIGGERED_FADE`.
+
 ## 2026-06-25 — Add Event Alpha signal-quality workbench · Codex
 **Why:** Event Alpha needed an offline benchmark and operator audit layer that
 answers why a candidate is or is not worth attention, instead of relying on

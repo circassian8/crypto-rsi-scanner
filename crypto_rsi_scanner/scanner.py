@@ -98,7 +98,10 @@ from . import event_alpha_retention
 from . import event_alpha_run_ledger
 from . import event_alpha_run_lock
 from . import event_alpha_router
+from . import event_alpha_policy_simulator
+from . import event_alpha_quality_review
 from . import event_alpha_signal_quality
+from . import event_alpha_signal_quality_export
 from . import event_alpha_scheduler
 from . import event_alpha_tuning
 from . import event_alpha_telegram_recipient_check
@@ -2909,6 +2912,8 @@ def event_alpha_notify_go_no_go(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
+        hypothesis_rows=artifacts["hypotheses"].rows,
+        watchlist_rows=artifacts["watchlist"].entries,
         card_paths=[str(path) for path in _research_card_markdown_paths(context.research_cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -3313,6 +3318,8 @@ def event_alpha_notification_checklist_report(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
+        hypothesis_rows=artifacts["hypotheses"].rows,
+        watchlist_rows=artifacts["watchlist"].entries,
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -4167,6 +4174,110 @@ def event_opportunity_audit_report(
     ))
 
 
+def _event_alpha_quality_artifacts(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> dict[str, Any]:
+    hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
+        context.impact_hypothesis_store_path,
+        limit=500,
+        latest_run=True,
+        include_legacy=True,
+    )
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=True)
+    feedback = event_feedback.load_feedback(context.feedback_path)
+    missed = event_alpha_missed.load_missed_rows(context.missed_path)
+    routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    return {
+        "hypotheses": hypotheses,
+        "watchlist": watchlist,
+        "alerts": alerts,
+        "feedback_rows": [record.__dict__ for record in feedback.records],
+        "missed_rows": missed,
+        "router": routed,
+    }
+
+
+def event_alpha_quality_review_report(
+    *,
+    verbose: bool = False,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print signal-quality distribution and gap review for local artifacts."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifacts = _event_alpha_quality_artifacts(context)
+    result = event_alpha_quality_review.build_quality_review(
+        profile=context.profile,
+        hypothesis_rows=artifacts["hypotheses"].rows,
+        watchlist_entries=artifacts["watchlist"].entries,
+        alert_rows=artifacts["alerts"].rows,
+    )
+    print(_event_alpha_context_block(context))
+    print(event_alpha_quality_review.format_quality_review(result))
+
+
+def event_alpha_policy_simulate_report(
+    *,
+    verbose: bool = False,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print threshold/policy simulation from local artifacts only."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifacts = _event_alpha_quality_artifacts(context)
+    rows: list[dict[str, Any]] = []
+    rows.extend(dict(row) for row in artifacts["hypotheses"].rows)
+    rows.extend(_watchlist_entry_dict(entry) for entry in artifacts["watchlist"].entries)
+    rows.extend(dict(row) for row in artifacts["alerts"].rows)
+    result = event_alpha_policy_simulator.simulate_policy(rows, profile=context.profile)
+    print(_event_alpha_context_block(context))
+    print(event_alpha_policy_simulator.format_policy_simulation(result))
+
+
+def event_alpha_export_signal_quality_cases(
+    *,
+    verbose: bool = False,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    out_path: str | None = None,
+) -> None:
+    """Export proposed signal-quality benchmark cases from local artifacts."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifacts = _event_alpha_quality_artifacts(context)
+    target = Path(out_path).expanduser() if out_path else context.namespace_dir / "proposed_signal_quality_cases.json"
+    result = event_alpha_signal_quality_export.export_signal_quality_cases(
+        target,
+        alert_rows=artifacts["alerts"].rows,
+        feedback_rows=artifacts["feedback_rows"],
+        missed_rows=artifacts["missed_rows"],
+        hypothesis_rows=artifacts["hypotheses"].rows,
+    )
+    print(_event_alpha_context_block(context))
+    print(event_alpha_signal_quality_export.format_signal_quality_export_result(result))
+
+
+def _watchlist_entry_dict(entry: event_watchlist.EventWatchlistEntry) -> dict[str, Any]:
+    row = dict(getattr(entry, "__dict__", {}) or {})
+    row["latest_score_components"] = dict(entry.latest_score_components or {})
+    return row
+
+
 def event_feedback_mark(
     target: str,
     label: str | None,
@@ -4670,6 +4781,12 @@ def _event_alpha_local_artifacts(*, run_limit: int = 500, latest_alerts: bool = 
     provider_rows = event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH)
     budget_rows = event_alpha_burn_in.load_llm_budget_rows(config.EVENT_LLM_BUDGET_LEDGER_PATH)
     watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
+    hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
+        config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH,
+        limit=500,
+        latest_run=True,
+        include_legacy=True,
+    )
     feedback_rows = [record.__dict__ for record in feedback.records]
     outcome_rows = [row for row in alerts.rows if any(row.get(field) not in (None, "") for field in (
         "primary_horizon_return",
@@ -4693,6 +4810,7 @@ def _event_alpha_local_artifacts(*, run_limit: int = 500, latest_alerts: bool = 
         "provider_rows": provider_rows,
         "budget_rows": budget_rows,
         "watchlist": watchlist,
+        "hypotheses": hypotheses,
         "outcome_rows": outcome_rows,
     }
 
@@ -4910,6 +5028,8 @@ def event_alpha_artifact_doctor_report(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
+        hypothesis_rows=artifacts["hypotheses"].rows,
+        watchlist_rows=artifacts["watchlist"].entries,
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -5027,6 +5147,8 @@ def event_alpha_export_burn_in_pack(
         alert_rows=artifacts["alerts"].rows,
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
+        hypothesis_rows=artifacts["hypotheses"].rows,
+        watchlist_rows=artifacts["watchlist"].entries,
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -7592,6 +7714,26 @@ def cli() -> None:
         help="Explain one Event Alpha opportunity decision path from local artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-quality-review",
+        action="store_true",
+        help="Print latest Event Alpha signal-quality review from local artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-policy-simulate",
+        action="store_true",
+        help="Simulate Event Alpha quality threshold policies from local artifacts without writing state.",
+    )
+    parser.add_argument(
+        "--event-alpha-export-signal-quality-cases",
+        action="store_true",
+        help="Export proposed signal-quality benchmark cases from local artifacts.",
+    )
+    parser.add_argument(
+        "--event-alpha-signal-quality-export-path",
+        default=None,
+        help="Optional output path for --event-alpha-export-signal-quality-cases.",
+    )
+    parser.add_argument(
         "--event-alpha-missed-report",
         action="store_true",
         help="Print missed-opportunity diagnostics from market rows and Event Alpha artifacts.",
@@ -8379,6 +8521,28 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_quality_review:
+        event_alpha_quality_review_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_policy_simulate:
+        event_alpha_policy_simulate_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_export_signal_quality_cases:
+        event_alpha_export_signal_quality_cases(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            out_path=args.event_alpha_signal_quality_export_path,
         )
         return
     if args.event_alpha_missed_report:

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_artifacts
+from . import event_alpha_artifacts, event_alpha_quality_fields
 from . import event_alpha_notification_delivery as _delivery
 
 
@@ -30,6 +30,10 @@ class EventAlphaArtifactDoctorResult:
     delivery_rows: int = 0
     deliveries_partial_delivered: int = 0
     deliveries_failed: int = 0
+    quality_fields_missing_count: int = 0
+    hypothesis_rows_missing_opportunity_verdict: int = 0
+    watchlist_rows_missing_quality_fields: int = 0
+    alert_rows_missing_quality_fields: int = 0
     strict: bool = False
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
@@ -41,6 +45,8 @@ def diagnose_artifacts(
     alert_rows: Iterable[Mapping[str, Any]] = (),
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
+    hypothesis_rows: Iterable[Mapping[str, Any] | object] = (),
+    watchlist_rows: Iterable[Mapping[str, Any] | object] = (),
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
@@ -57,6 +63,8 @@ def diagnose_artifacts(
     raw_alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
     raw_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
     raw_outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
+    raw_hypotheses = [_row(row) for row in hypothesis_rows]
+    raw_watchlist = [_row(row) for row in watchlist_rows]
     raw_legacy = sum(
         1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
         if event_alpha_artifacts.is_legacy_row(row)
@@ -84,6 +92,20 @@ def diagnose_artifacts(
     )
     outcomes = event_alpha_artifacts.filter_artifact_rows(
         raw_outcomes,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    hypotheses = event_alpha_artifacts.filter_artifact_rows(
+        raw_hypotheses,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    watchlist = event_alpha_artifacts.filter_artifact_rows(
+        raw_watchlist,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -195,6 +217,26 @@ def diagnose_artifacts(
         warnings.append(
             f"notification deliveries failed: {delivery_summary.failed} failed delivery row(s) for this profile/namespace"
         )
+    quality = _quality_missing_summary(
+        hypotheses=hypotheses,
+        watchlist=watchlist,
+        alerts=alerts,
+    )
+    if quality["quality_fields_missing_count"]:
+        legacy_note = (
+            f"legacy_quality_missing: {quality['legacy_quality_missing']} row(s)"
+            if quality["legacy_quality_missing"]
+            else ""
+        )
+        message = (
+            "quality fields missing: "
+            f"total={quality['quality_fields_missing_count']} "
+            f"hypotheses_missing_verdict={quality['hypothesis_rows_missing_opportunity_verdict']} "
+            f"watchlist_missing={quality['watchlist_rows_missing_quality_fields']} "
+            f"alerts_missing={quality['alert_rows_missing_quality_fields']}"
+            + (f" · {legacy_note}" if legacy_note else "")
+        )
+        (blockers if strict else warnings).append(message)
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
     return EventAlphaArtifactDoctorResult(
         status=status,
@@ -218,10 +260,58 @@ def diagnose_artifacts(
         delivery_rows=delivery_summary.rows,
         deliveries_partial_delivered=delivery_summary.partial_delivered,
         deliveries_failed=delivery_summary.failed,
+        quality_fields_missing_count=quality["quality_fields_missing_count"],
+        hypothesis_rows_missing_opportunity_verdict=quality["hypothesis_rows_missing_opportunity_verdict"],
+        watchlist_rows_missing_quality_fields=quality["watchlist_rows_missing_quality_fields"],
+        alert_rows_missing_quality_fields=quality["alert_rows_missing_quality_fields"],
         strict=bool(strict),
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
     )
+
+
+def _row(value: Mapping[str, Any] | object) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if is_dataclass(value):
+        return asdict(value)
+    return dict(getattr(value, "__dict__", {}) or {})
+
+
+def _quality_missing_summary(
+    *,
+    hypotheses: Iterable[Mapping[str, Any]],
+    watchlist: Iterable[Mapping[str, Any]],
+    alerts: Iterable[Mapping[str, Any]],
+) -> dict[str, int]:
+    hypothesis_rows = [dict(row) for row in hypotheses if dict(row).get("row_type") in {"event_impact_hypothesis", ""}]
+    watchlist_rows = [dict(row) for row in watchlist if dict(row).get("row_type") in {"event_watchlist_state", ""}]
+    alert_rows = [dict(row) for row in alerts if dict(row).get("row_type") in {"event_alpha_alert_snapshot", ""}]
+    hypothesis_missing_verdict = sum(
+        1
+        for row in hypothesis_rows
+        if "opportunity_level" not in row or "opportunity_score_final" not in row
+    )
+    watchlist_missing = sum(1 for row in watchlist_rows if event_alpha_quality_fields.missing_quality_fields(row, components_key="latest_score_components"))
+    alert_missing = sum(1 for row in alert_rows if event_alpha_quality_fields.missing_quality_fields(row, components_key="score_components"))
+    all_rows = [*hypothesis_rows, *watchlist_rows, *alert_rows]
+    missing_rows = [
+        row
+        for row in all_rows
+        if event_alpha_quality_fields.missing_quality_fields(
+            row,
+            components_key="latest_score_components" if row.get("row_type") == "event_watchlist_state" else "score_components",
+        )
+    ]
+    legacy_missing = sum(1 for row in missing_rows if not event_alpha_quality_fields.has_any_quality_field(row))
+    return {
+        "quality_fields_missing_count": len(missing_rows),
+        "hypothesis_rows_missing_opportunity_verdict": hypothesis_missing_verdict,
+        "watchlist_rows_missing_quality_fields": watchlist_missing,
+        "alert_rows_missing_quality_fields": alert_missing,
+        "legacy_quality_missing": legacy_missing,
+        "non_legacy_quality_missing": max(0, len(missing_rows) - legacy_missing),
+    }
 
 
 def _record_snapshot_availability_issue(
@@ -288,6 +378,13 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         (
             "notification deliveries: "
             f"rows={result.delivery_rows} partial={result.deliveries_partial_delivered} failed={result.deliveries_failed}"
+        ),
+        (
+            "quality fields: "
+            f"missing_total={result.quality_fields_missing_count} "
+            f"hypotheses_missing_verdict={result.hypothesis_rows_missing_opportunity_verdict} "
+            f"watchlist_missing={result.watchlist_rows_missing_quality_fields} "
+            f"alerts_missing={result.alert_rows_missing_quality_fields}"
         ),
         "",
         "blockers:",

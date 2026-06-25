@@ -633,6 +633,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Validated asset: {validated_symbol or 'unknown'}/{validated_coin_id or 'unknown'}",
         f"- Original sector hypothesis: {', '.join(str(item) for item in (components.get('candidate_sectors') or [])[:6]) or components.get('hypothesis_scope') or 'unknown'}",
         f"- Candidate source: {entry.latest_source or 'impact_hypothesis'}",
+        f"- Candidate Discovery Origin: {components.get('candidate_source') or components.get('source') or entry.latest_source or 'impact_hypothesis'}",
         f"- Candidate symbols considered: {', '.join(str(item) for item in candidate_symbols[:8]) if candidate_symbols else 'none'}",
         f"- Playbook: {entry.latest_playbook_type or 'impact_hypothesis'}",
         f"- Impact path type: {impact_path_type}",

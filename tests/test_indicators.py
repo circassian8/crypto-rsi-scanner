@@ -21080,6 +21080,214 @@ def test_event_watchlist_validated_hypothesis_market_confirmation_promotes_state
     assert entry.state != event_watchlist.EventWatchlistState.TRIGGERED_FADE.value
 
 
+def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import (
+        event_alpha_alert_store,
+        event_alpha_artifact_doctor,
+        event_alpha_router,
+        event_impact_hypothesis_store,
+        event_watchlist,
+    )
+
+    hypothesis = SimpleNamespace(
+        hypothesis_id="h-velvet-quality",
+        event_cluster_id="spacex|ipo|2026-06-20",
+        status="validated",
+        validation_stage="impact_path_validated",
+        hypothesis_score=86,
+        confidence=0.86,
+        candidate_symbols=("VELVET",),
+        candidate_coin_ids=("velvet",),
+        validated_symbol="VELVET",
+        validated_coin_id="velvet",
+        candidate_sectors=("tokenized_stock_venues",),
+        source_raw_ids=("r1",),
+        impact_category="rwa_preipo_proxy",
+        hypothesis_scope="token",
+        playbook_hint="proxy_attention",
+        external_asset="SpaceX",
+        impact_path_type="venue_value_capture",
+        impact_path_strength="strong",
+        candidate_role="proxy_venue",
+        evidence_quality_score=82,
+        source_class="primary",
+        evidence_specificity="direct_value_capture",
+        market_confirmation_score=75,
+        market_confirmation_level="strong",
+        opportunity_score_final=88,
+        opportunity_level="high_priority",
+        opportunity_verdict_reasons=("strong_market_confirmation",),
+        why_local_only=None,
+        why_not_watchlist=None,
+        manual_verification_items=("verify liquidity",),
+        score_components={"event_clarity": 80},
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        watch = event_watchlist.refresh_hypothesis_watchlist(
+            [hypothesis],
+            cfg=event_watchlist.EventWatchlistConfig(enabled=True, state_path=base / "watch.jsonl"),
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+        )
+        entry = watch.entries[0]
+        assert entry.opportunity_level == "high_priority"
+        assert entry.market_confirmation_level == "strong"
+        store = event_impact_hypothesis_store.write_impact_hypotheses(
+            [hypothesis],
+            cfg=event_impact_hypothesis_store.EventImpactHypothesisStoreConfig(path=base / "hypotheses.jsonl"),
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+            watchlist_rows=watch.entries,
+        )
+        rows = event_impact_hypothesis_store.load_impact_hypotheses(store.path).rows
+        assert rows[0]["opportunity_level"] == "high_priority"
+        decision = event_alpha_router.EventAlphaRouteDecision(
+            entry=entry,
+            route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH,
+            alertable=True,
+            reason="quality escalation",
+            lane=event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION,
+        )
+        snap = event_alpha_alert_store.write_alert_snapshots(
+            [],
+            router_result=SimpleNamespace(decisions=[decision]),
+            cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(path=base / "alerts.jsonl"),
+            now=datetime(2026, 6, 20, 12, 1, tzinfo=timezone.utc),
+        )
+        alert_rows = event_alpha_alert_store.load_alert_snapshots(snap.path).rows
+        assert alert_rows[0]["opportunity_level"] == "high_priority"
+        assert alert_rows[0]["manual_verification_items"] == ["verify liquidity"]
+        legacy = {"row_type": "event_watchlist_state", "key": "legacy", "event_id": "legacy", "coin_id": "old", "symbol": "OLD", "relationship_type": "impact_hypothesis"}
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "r1", "alertable": 0}],
+            hypothesis_rows=rows,
+            watchlist_rows=[entry, legacy],
+            alert_rows=alert_rows,
+            include_legacy_artifacts=True,
+            strict=False,
+        )
+        assert doctor.quality_fields_missing_count >= 1
+        assert doctor.status in {"OK", "WARN"}
+        strict = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "r1", "alertable": 0}],
+            watchlist_rows=[legacy],
+            include_legacy_artifacts=True,
+            strict=True,
+        )
+        assert strict.status == "BLOCKED"
+
+
+def test_event_alpha_quality_review_policy_simulation_and_export():
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_policy_simulator,
+        event_alpha_quality_review,
+        event_alpha_signal_quality_export,
+    )
+
+    rows = [
+        {
+            "alert_key": "velvet",
+            "symbol": "VELVET",
+            "opportunity_level": "high_priority",
+            "opportunity_score_final": 88,
+            "impact_path_type": "venue_value_capture",
+            "impact_path_strength": "strong",
+            "candidate_role": "proxy_venue",
+            "market_confirmation_level": "strong",
+            "market_confirmation_score": 75,
+            "evidence_quality_score": 82,
+            "source_class": "primary",
+            "evidence_specificity": "direct_value_capture",
+            "manual_verification_items": ["verify liquidity"],
+        },
+        {
+            "alert_key": "btc-policy",
+            "symbol": "BTC",
+            "opportunity_level": "local_only",
+            "opportunity_score_final": 45,
+            "impact_path_type": "generic_cooccurrence_only",
+            "impact_path_strength": "weak",
+            "candidate_role": "generic_mention",
+            "market_confirmation_level": "none",
+            "market_confirmation_score": 0,
+            "evidence_quality_score": 35,
+            "source_class": "secondary",
+            "evidence_specificity": "weak_cooccurrence",
+            "why_local_only": "generic_cooccurrence_only",
+        },
+        {
+            "alert_key": "openai-velvet",
+            "symbol": "VELVET",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 66,
+            "impact_path_type": "venue_value_capture",
+            "impact_path_strength": "medium",
+            "candidate_role": "proxy_venue",
+            "market_confirmation_level": "weak",
+            "market_confirmation_score": 25,
+            "evidence_quality_score": 70,
+            "source_class": "independent",
+            "evidence_specificity": "direct_value_capture",
+        },
+    ]
+    review = event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=rows)
+    report = event_alpha_quality_review.format_quality_review(review)
+    assert "Strong opportunities" in report
+    assert "VELVET" in report
+    assert "Weak co-occurrence / local-only" in report
+    assert "Validated but market-unconfirmed" in report
+    sim = event_alpha_policy_simulator.simulate_policy(rows, profile="fixture")
+    text = event_alpha_policy_simulator.format_policy_simulation(sim)
+    assert "score_50" in text
+    high_counts = [row["alertable_count"] for row in sim.scenarios if row["opportunity_threshold"] == 80]
+    low_counts = [row["alertable_count"] for row in sim.scenarios if row["opportunity_threshold"] == 50]
+    assert max(low_counts) >= max(high_counts)
+    assert "warning_weak_or_generic_alertable" not in text
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "proposed.json"
+        result = event_alpha_signal_quality_export.export_signal_quality_cases(
+            out,
+            alert_rows=rows,
+            feedback_rows=[{"key": "velvet", "label": "useful"}, {"key": "btc-policy", "label": "junk"}],
+            missed_rows=[{"symbol": "MISS", "return_pct": 150, "failure_stage": "no_source_event"}],
+        )
+        payload = json.loads(out.read_text())
+        assert result.cases_written >= 3
+        assert any(case["reason_to_add_case"] == "useful_feedback_positive_case" for case in payload["cases"])
+        assert any(case["reason_to_add_case"] == "junk_feedback_negative_case" for case in payload["cases"])
+        assert any(case["reason_to_add_case"] == "missed_opportunity_recall_case" for case in payload["cases"])
+        assert "OPENAI_API_KEY" not in out.read_text()
+
+
+def test_event_alpha_quality_make_targets_exist_and_do_not_send():
+    from pathlib import Path
+
+    text = Path("Makefile").read_text()
+    for target in (
+        "event-alpha-quality-review",
+        "event-alpha-policy-simulate",
+        "event-alpha-export-signal-quality-cases",
+        "event-alpha-quality-loop",
+        "event-alpha-quality-loop-llm",
+    ):
+        assert f"{target}:" in text
+    loop = text.split("event-alpha-quality-loop:", 1)[1].split("event-alpha-quality-loop-llm:", 1)[0]
+    assert "event-alpha-signal-quality-eval" in loop
+    assert "event-alpha-quality-review" in loop
+    assert "event-alpha-policy-simulate" in loop
+    assert "event-alpha-notification-inbox" in loop
+    assert "event-impact-hypotheses-report" in loop
+    assert "event-alpha-daily-brief" in loop
+    assert "event-alpha-cycle-send" not in loop
+    assert "event-alert-send" not in loop
+
+
 def test_feedback_and_calibration_include_signal_quality_fields():
     import tempfile
     from datetime import datetime, timezone

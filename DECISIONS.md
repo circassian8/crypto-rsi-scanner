@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-25 - Event Alpha quality loops are artifact review, not promotion
+**Status:** accepted
+**Decision:** The Event Alpha quality review, policy simulation, artifact
+doctor quality checks, proposed signal-quality case export, and
+`event-alpha-quality-loop` Make targets are review tooling only. They may
+enforce artifact completeness, explain missing evidence, simulate thresholds,
+and export proposed fixture cases, but they must not mutate canonical
+signal-quality fixtures automatically, send Telegram notifications, alter
+router scoring, write normal RSI signal rows, open paper/live trades, or create
+`TRIGGERED_FADE`.
+**Why:** The owner needs a daily operational workbench for real artifacts while
+the system is still in research burn-in. Review and simulation are useful only
+if they cannot silently become production signal changes.
+**Revisit when:** A human-reviewed dataset and outcomes justify a separate
+approved change to promote a specific policy from simulation into routing.
+
 ## 2026-06-25 - Event Alpha signal quality is diagnostic and visibility-scoped
 **Status:** accepted
 **Decision:** Event Alpha signal-quality evaluation, opportunity audits,

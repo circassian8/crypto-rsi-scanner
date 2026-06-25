@@ -356,6 +356,16 @@ def build_daily_brief(
     lines.append("- Market confirmation by playbook: " + _market_confirmation_by_playbook(decisions))
     lines.append("- Top upgrade candidates: " + (_upgrade_candidate_line(decisions) or "none"))
     lines.append("- Top downgrade risks: " + (_downgrade_risk_line(decisions) or "none"))
+    lines.extend(["", "## Signal Quality Summary"])
+    lines.append("- Opportunity Verdict Distribution: " + _quality_decision_counts(decisions, "opportunity_level"))
+    lines.append("- Impact Path Distribution: " + _quality_decision_counts(decisions, "impact_path_type"))
+    lines.append("- Candidate Role Distribution: " + _quality_decision_counts(decisions, "candidate_role"))
+    lines.append("- Evidence Specificity Distribution: " + _quality_decision_counts(decisions, "evidence_specificity"))
+    lines.append("- Market Confirmation Distribution: " + _quality_decision_counts(decisions, "market_confirmation_level"))
+    lines.append("- Top Upgrade Candidates: " + (_upgrade_candidate_line(decisions) or "none"))
+    lines.append("- Top Downgrade Risks: " + (_downgrade_risk_line(decisions) or "none"))
+    lines.append("- Candidate Discovery Funnel: " + _candidate_discovery_funnel_line(hypotheses))
+    lines.append("- Feedback by Impact Path: " + _feedback_by_impact_path(alerts, feedback))
     exploratory = event_alpha_notifications.select_exploratory_candidates(
         decisions,
         cfg=event_alpha_notifications.EventAlphaNotificationConfig(
@@ -645,6 +655,51 @@ def _market_confirmation_by_playbook(rows: Iterable[event_alpha_router.EventAlph
     for playbook, levels in sorted(counts.items()):
         parts.append(playbook + "[" + ",".join(f"{key}={value}" for key, value in sorted(levels.items())) + "]")
     return "; ".join(parts)
+
+
+def _quality_decision_counts(rows: Iterable[event_alpha_router.EventAlphaRouteDecision], key: str) -> str:
+    counts: dict[str, int] = {}
+    for decision in rows:
+        if decision.entry.relationship_type != "impact_hypothesis":
+            continue
+        components = decision.entry.latest_score_components or {}
+        value = str(components.get(key) or "unknown")
+        counts[value] = counts.get(value, 0) + 1
+    return _format_counts(counts)
+
+
+def _candidate_discovery_funnel_line(rows: Iterable[Mapping[str, Any]]) -> str:
+    generated = executed = accepted = rejected = validated = promoted = 0
+    for row in rows:
+        generated += len(row.get("generated_queries") or [])
+        executed += len(row.get("executed_queries") or [])
+        accepted += len(row.get("crypto_candidate_assets") or [])
+        rejected += len(row.get("rejected_candidate_assets") or [])
+        if str(row.get("validation_stage") or "") in {"catalyst_link_validated", "impact_path_validated", "market_confirmed", "promoted_to_radar"}:
+            validated += 1
+        if str(row.get("opportunity_level") or "") in {"validated_digest", "watchlist", "high_priority"}:
+            promoted += 1
+    if not any((generated, executed, accepted, rejected, validated, promoted)):
+        return "none"
+    return (
+        f"generated={generated}, executed={executed}, accepted={accepted}, "
+        f"rejected={rejected}, validated={validated}, promoted={promoted}"
+    )
+
+
+def _feedback_by_impact_path(alerts: Iterable[Mapping[str, Any]], feedback: Iterable[Mapping[str, Any]]) -> str:
+    path_by_key: dict[str, str] = {}
+    for row in alerts:
+        key = str(row.get("alert_key") or row.get("alert_id") or "")
+        if key:
+            path_by_key[key] = str(row.get("impact_path_type") or "unknown")
+    counts: dict[str, int] = {}
+    for row in feedback:
+        key = str(row.get("key") or row.get("alert_key") or row.get("alert_id") or "")
+        path = str(row.get("impact_path_type") or path_by_key.get(key) or "unknown")
+        label = str(row.get("label") or row.get("feedback") or "feedback")
+        counts[f"{path}:{label}"] = counts.get(f"{path}:{label}", 0) + 1
+    return _format_counts(counts)
 
 
 def _upgrade_candidate_line(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:

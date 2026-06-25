@@ -203,6 +203,41 @@ market confirmation, final opportunity verdict, router decision, missing
 evidence, upgrade requirements, downgrade risks, and a feedback command. It is
 diagnostic only and cannot make a candidate alertable or trigger a fade.
 
+Use the quality-loop targets after live or fixture notification cycles to
+inspect real artifacts:
+
+```bash
+make event-alpha-quality-review PROFILE=notify_llm
+make event-alpha-policy-simulate PROFILE=notify_llm
+make event-alpha-export-signal-quality-cases PROFILE=notify_llm
+make event-alpha-quality-loop PROFILE=notify_llm
+```
+
+`event-alpha-quality-review` groups current artifacts by opportunity level,
+impact path, candidate role, evidence specificity, market confirmation, and
+candidate-discovery funnel conversion. `event-alpha-policy-simulate` compares
+threshold policies such as score 50/60/70/80, market-confirmation required or
+not, impact-path validation required or not, and evidence-quality floors. It
+prints gained/lost candidates and warnings when weak/generic rows would become
+alertable. `event-alpha-export-signal-quality-cases` writes proposed benchmark
+cases to the active profile namespace, usually
+`event_fade_cache/<profile>/proposed_signal_quality_cases.json`, from delivered
+alerts, local-only weak rows, feedback, missed opportunities, and rejected
+candidate examples. It does not modify
+`fixtures/event_discovery/event_alpha_signal_quality_cases.json`; a human must
+review proposed cases before promoting them into the canonical eval.
+
+`event-alpha-quality-loop` runs only local reports:
+
+1. `event-alpha-signal-quality-eval`
+2. `event-alpha-quality-review`
+3. `event-alpha-policy-simulate`
+4. `event-alpha-notification-inbox`
+5. `event-impact-hypotheses-report`
+6. `event-alpha-daily-brief`
+
+It intentionally does not run any send target.
+
 The report defaults to the latest stored `run_id` while still printing
 total/latest/historical/legacy availability. Use `ALL_HISTORY=1` for the older
 full-history view, `RUN_ID=<id>` for a specific cycle, and `SINCE=<iso-time>` for

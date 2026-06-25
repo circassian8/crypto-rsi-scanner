@@ -13,6 +13,7 @@ from . import (
     event_alerts,
     event_alpha_notification_delivery,
     event_alpha_outcomes,
+    event_alpha_quality_fields,
     event_alpha_router,
     event_graph,
     event_playbooks,
@@ -326,6 +327,7 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
     effective_playbook = alert.effective_playbook_type or alert.playbook_type or candidate.classification.relationship_type
     alert_key = f"{cluster_id}|{candidate.asset.coin_id}|{effective_playbook}"
     observed_iso = observed.isoformat()
+    quality = event_alpha_quality_fields.ensure_quality_fields({}, components=alert.score_components)
     return {
         "schema_version": ALERT_STORE_SCHEMA_VERSION,
         "row_type": "event_alpha_alert_snapshot",
@@ -379,6 +381,7 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "return_7d_at_alert": market.return_7d if market else None,
         "volume_zscore_24h": market.volume_zscore_24h if market else None,
         "market_anomaly_bucket": _market_anomaly_bucket(alert.score_components.get("market_move_volume", 0)),
+        **quality,
         "btc_regime": _btc_regime(candidate),
         "signal_type": signal.signal_type.value if signal else None,
         "fade_state": signal.state.value if signal else None,
@@ -407,6 +410,7 @@ def _snapshot_from_route_decision(
     warnings = list(entry.warnings)
     if not symbol and not validated_symbol:
         warnings.append("validated_hypothesis_snapshot_missing_identity")
+    quality = event_alpha_quality_fields.ensure_quality_fields({}, components=components)
     return {
         "schema_version": ALERT_STORE_SCHEMA_VERSION,
         "row_type": "event_alpha_alert_snapshot",
@@ -475,6 +479,7 @@ def _snapshot_from_route_decision(
         "why_local_only": components.get("why_local_only"),
         "why_not_watchlist": components.get("why_not_watchlist"),
         "manual_verification_items": components.get("manual_verification_items") or (),
+        **quality,
         "hypothesis_id": components.get("hypothesis_id") or entry.event_id,
         "hypothesis_score": components.get("hypothesis_score") or entry.latest_score,
         "validated_symbol": validated_symbol,

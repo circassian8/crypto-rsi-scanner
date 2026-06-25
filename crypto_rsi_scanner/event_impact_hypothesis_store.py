@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from . import event_alpha_quality_fields
+
 
 IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION = "event_impact_hypothesis_store_v1"
 
@@ -326,7 +328,10 @@ def _row_from_hypothesis(
         "validated_symbol": str(validated_asset.get("symbol") or "") or None,
         "validated_coin_id": str(validated_asset.get("coin_id") or "") or None,
     })
-    return data
+    return event_alpha_quality_fields.ensure_quality_fields(
+        data,
+        components=data.get("score_components") if isinstance(data.get("score_components"), Mapping) else {},
+    )
 
 
 def _promoted_hypothesis_ids(watchlist_rows: Iterable[Mapping[str, Any]]) -> set[str]:
