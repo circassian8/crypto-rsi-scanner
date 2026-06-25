@@ -21207,6 +21207,8 @@ def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing()
         )
         rows = event_impact_hypothesis_store.load_impact_hypotheses(store.path).rows
         assert rows[0]["opportunity_level"] == "high_priority"
+        assert rows[0]["upgrade_requirements"]
+        assert rows[0]["downgrade_warnings"]
         decision = event_alpha_router.EventAlphaRouteDecision(
             entry=entry,
             route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH,
@@ -21223,7 +21225,19 @@ def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing()
         alert_rows = event_alpha_alert_store.load_alert_snapshots(snap.path).rows
         assert alert_rows[0]["opportunity_level"] == "high_priority"
         assert alert_rows[0]["manual_verification_items"] == ["verify liquidity"]
+        assert alert_rows[0]["upgrade_requirements"]
+        assert alert_rows[0]["downgrade_warnings"]
         legacy = {"row_type": "event_watchlist_state", "key": "legacy", "event_id": "legacy", "coin_id": "old", "symbol": "OLD", "relationship_type": "impact_hypothesis"}
+        fresh_missing = {
+            "row_type": "event_watchlist_state",
+            "key": "fresh-missing",
+            "event_id": "fresh",
+            "coin_id": "fresh",
+            "symbol": "FRESH",
+            "relationship_type": "impact_hypothesis",
+            "run_mode": "test",
+            "artifact_namespace": "quality_validation",
+        }
         doctor = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "r1", "alertable": 0}],
             hypothesis_rows=rows,
@@ -21233,6 +21247,8 @@ def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing()
             strict=False,
         )
         assert doctor.quality_fields_missing_count >= 1
+        assert doctor.legacy_quality_missing_rows >= 1
+        assert doctor.fresh_watchlist_rows_missing_top_level_quality == 0
         assert doctor.status in {"OK", "WARN"}
         strict = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "r1", "alertable": 0}],
@@ -21240,7 +21256,15 @@ def test_event_alpha_quality_fields_enforced_and_doctor_reports_legacy_missing()
             include_legacy_artifacts=True,
             strict=True,
         )
-        assert strict.status == "BLOCKED"
+        assert strict.status in {"OK", "WARN"}
+        strict_fresh = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "r1", "alertable": 0}],
+            watchlist_rows=[fresh_missing],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert strict_fresh.status == "BLOCKED"
+        assert strict_fresh.fresh_watchlist_rows_missing_top_level_quality == 1
 
 
 def test_event_alpha_quality_review_policy_simulation_and_export():
@@ -21302,14 +21326,17 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
     review = event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=rows)
     report = event_alpha_quality_review.format_quality_review(review)
     assert "Strong opportunities" in report
+    assert "quality_coverage:" in report
+    assert "candidate_discovery_funnel:" in report
     assert "VELVET" in report
     assert "Weak co-occurrence / local-only" in report
     assert "Validated but market-unconfirmed" in report
     sim = event_alpha_policy_simulator.simulate_policy(rows, profile="fixture")
     text = event_alpha_policy_simulator.format_policy_simulation(sim)
-    assert "score_50" in text
-    high_counts = [row["alertable_count"] for row in sim.scenarios if row["opportunity_threshold"] == 80]
-    low_counts = [row["alertable_count"] for row in sim.scenarios if row["opportunity_threshold"] == 50]
+    assert "lower_opportunity_threshold" in text
+    assert "high_quality_only" in text
+    high_counts = [row["alertable_count"] for row in sim.scenarios if row["scenario"] == "high_quality_only"]
+    low_counts = [row["alertable_count"] for row in sim.scenarios if row["scenario"] == "lower_opportunity_threshold"]
     assert max(low_counts) >= max(high_counts)
     assert "warning_weak_or_generic_alertable" not in text
     with tempfile.TemporaryDirectory() as tmp:
@@ -21335,6 +21362,7 @@ def test_event_alpha_quality_make_targets_exist_and_do_not_send():
     for target in (
         "event-alpha-quality-review",
         "event-alpha-policy-simulate",
+        "event-alpha-quality-validation-cycle",
         "event-alpha-export-signal-quality-cases",
         "event-alpha-quality-loop",
         "event-alpha-quality-loop-llm",

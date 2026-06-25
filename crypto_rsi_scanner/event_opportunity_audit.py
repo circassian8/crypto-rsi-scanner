@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_router, event_opportunity_verdict, event_watchlist
+from . import event_alpha_quality_fields, event_alpha_router, event_opportunity_verdict, event_watchlist
 
 
 def format_opportunity_audit(
@@ -42,6 +42,7 @@ def format_opportunity_audit(
         f"target: {clean}",
         f"profile: {profile or 'default'}",
         f"matched_source: {match['source']}",
+        f"quality_field_source: {_quality_source(row)}",
         "",
         "## Candidate summary",
         f"- symbol/coin: {_value(row, 'symbol', components.get('validated_symbol'), default='SECTOR')}/{_value(row, 'coin_id', components.get('validated_coin_id'), default='unknown')}",
@@ -194,11 +195,25 @@ def _row(value: Mapping[str, Any] | object) -> dict[str, Any]:
 
 def _components(row: Mapping[str, Any]) -> dict[str, Any]:
     components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
+    if not components and isinstance(row.get("score_components"), Mapping):
+        components = row.get("score_components")
     out = dict(components)
     for key, value in row.items():
-        if key not in out and value not in (None, "", [], {}):
+        if key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS:
+            if value not in (None, "", [], {}):
+                out[key] = value
+        elif key not in out and value not in (None, "", [], {}):
             out[key] = value
-    return out
+    return event_alpha_quality_fields.ensure_quality_fields(out)
+
+
+def _quality_source(row: Mapping[str, Any]) -> str:
+    source = event_alpha_quality_fields.quality_source(row, components_key="latest_score_components")
+    if source == "nested_score_components":
+        return "nested_score_components"
+    if source in {"partial_quality_fields", "recomputed"}:
+        return "recomputed" if source == "recomputed" else "partial_top_level_recomputed"
+    return source
 
 
 def _value(row: Mapping[str, Any], *keys: Any, default: str = "unknown") -> str:

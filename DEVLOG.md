@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Canonicalize Event Alpha top-level quality artifacts · Codex
+**Why:** Fresh quality-validation rows could still carry `None` or empty
+top-level signal-quality fields while nested `score_components` made artifact
+doctor look healthy. That made Pro-model review and operator audits harder than
+they should be.
+**Changes:**
+- Hardened `event_alpha_quality_fields.ensure_quality_fields` so every new
+  hypothesis/watchlist/alert row gets canonical top-level quality fields,
+  including conservative local-only defaults plus `upgrade_requirements` and
+  `downgrade_warnings`.
+- Added strict top-level quality coverage counters to artifact doctor:
+  fresh hypothesis/watchlist/alert missing counts are blockers in strict mode,
+  while legacy gaps remain warnings.
+- Extended quality review, opportunity audit, and policy simulation to prefer
+  top-level quality fields, show quality source/coverage, named policy
+  scenarios, candidate-discovery funnel details, and weak/generic alertability
+  warnings.
+- Expanded the signal-quality fixture suite to 21 cases, including explicit
+  political meme proxy, CryptoPanic-tagged catalyst, candidate-discovery,
+  source URL false positive, and Hyperliquid/HYPE identity cases. Added a
+  narrow political meme impact-path rule for explicitly named meme-token event
+  mechanics.
+- Made `make event-alpha-quality-validation-cycle` clear only the isolated
+  `quality_validation` namespace before running and run strict artifact doctor.
+**Verify:** `python3 tests/test_indicators.py` (452/452), `python3 main.py
+--event-alpha-signal-quality-eval` (21/21), and `make
+event-alpha-quality-validation-cycle PYTHON=python3` (strict doctor OK) pass.
+Full verification listed in the final Codex handoff for this prompt.
+**Notes/risks:** Research-only. No Telegram sends, paper trades, normal RSI
+signal rows, execution, or LLM/provider-created `TRIGGERED_FADE` behavior
+changed; `TRIGGERED_FADE` remains deterministic `event_fade.py` + `proxy_fade`.
+
 ## 2026-06-25 — Validate signal-quality layer + persist upgrade/downgrade paths · Claude
 **Why:** Validate the new Event Alpha signal-quality layer against *fresh*
 artifacts (uploaded artifacts were stale) and patch only real integration gaps.

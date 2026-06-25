@@ -405,10 +405,11 @@ event-alpha-quality-review:
 # research cards, and daily brief under event_fade_cache/quality_validation/.
 event-alpha-quality-validation-cycle: PROFILE = quality_validation
 event-alpha-quality-validation-cycle:
+	@if [ "$(PROFILE)" = "quality_validation" ]; then rm -rf event_fade_cache/$(PROFILE); fi
 	$(EVENT_FIXTURE_NOW_ENV) $(PYTHON) main.py --event-alpha-cycle --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-quality-review --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE)
-	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts
+	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict
 	@echo "Validation artifacts under event_fade_cache/$(PROFILE)/. Inspect with:"
 	@echo "  make event-impact-hypotheses-report PROFILE=$(PROFILE)"
 	@echo "  make event-opportunity-audit TARGET=<symbol|hypothesis_id|alert_id> PROFILE=$(PROFILE)"

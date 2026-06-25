@@ -34,6 +34,10 @@ class EventAlphaArtifactDoctorResult:
     hypothesis_rows_missing_opportunity_verdict: int = 0
     watchlist_rows_missing_quality_fields: int = 0
     alert_rows_missing_quality_fields: int = 0
+    fresh_hypothesis_rows_missing_top_level_quality: int = 0
+    fresh_watchlist_rows_missing_top_level_quality: int = 0
+    fresh_alert_rows_missing_top_level_quality: int = 0
+    legacy_quality_missing_rows: int = 0
     strict: bool = False
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
@@ -222,21 +226,27 @@ def diagnose_artifacts(
         watchlist=watchlist,
         alerts=alerts,
     )
+    fresh_missing = (
+        quality["fresh_hypothesis_rows_missing_top_level_quality"]
+        + quality["fresh_watchlist_rows_missing_top_level_quality"]
+        + quality["fresh_alert_rows_missing_top_level_quality"]
+    )
     if quality["quality_fields_missing_count"]:
-        legacy_note = (
-            f"legacy_quality_missing: {quality['legacy_quality_missing']} row(s)"
-            if quality["legacy_quality_missing"]
-            else ""
-        )
         message = (
             "quality fields missing: "
             f"total={quality['quality_fields_missing_count']} "
             f"hypotheses_missing_verdict={quality['hypothesis_rows_missing_opportunity_verdict']} "
             f"watchlist_missing={quality['watchlist_rows_missing_quality_fields']} "
             f"alerts_missing={quality['alert_rows_missing_quality_fields']}"
-            + (f" · {legacy_note}" if legacy_note else "")
+            f" fresh_hypotheses_missing_top_level={quality['fresh_hypothesis_rows_missing_top_level_quality']} "
+            f"fresh_watchlist_missing_top_level={quality['fresh_watchlist_rows_missing_top_level_quality']} "
+            f"fresh_alerts_missing_top_level={quality['fresh_alert_rows_missing_top_level_quality']} "
+            f"legacy_quality_missing={quality['legacy_quality_missing_rows']}"
         )
-        (blockers if strict else warnings).append(message)
+        if fresh_missing:
+            (blockers if strict else warnings).append(message)
+        else:
+            warnings.append(message)
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
     return EventAlphaArtifactDoctorResult(
         status=status,
@@ -264,6 +274,10 @@ def diagnose_artifacts(
         hypothesis_rows_missing_opportunity_verdict=quality["hypothesis_rows_missing_opportunity_verdict"],
         watchlist_rows_missing_quality_fields=quality["watchlist_rows_missing_quality_fields"],
         alert_rows_missing_quality_fields=quality["alert_rows_missing_quality_fields"],
+        fresh_hypothesis_rows_missing_top_level_quality=quality["fresh_hypothesis_rows_missing_top_level_quality"],
+        fresh_watchlist_rows_missing_top_level_quality=quality["fresh_watchlist_rows_missing_top_level_quality"],
+        fresh_alert_rows_missing_top_level_quality=quality["fresh_alert_rows_missing_top_level_quality"],
+        legacy_quality_missing_rows=quality["legacy_quality_missing_rows"],
         strict=bool(strict),
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
@@ -290,26 +304,45 @@ def _quality_missing_summary(
     hypothesis_missing_verdict = sum(
         1
         for row in hypothesis_rows
-        if "opportunity_level" not in row or "opportunity_score_final" not in row
+        if event_alpha_quality_fields.is_missing_quality_value(row.get("opportunity_level"))
+        or event_alpha_quality_fields.is_missing_quality_value(row.get("opportunity_score_final"))
     )
-    watchlist_missing = sum(1 for row in watchlist_rows if event_alpha_quality_fields.missing_quality_fields(row, components_key="latest_score_components"))
-    alert_missing = sum(1 for row in alert_rows if event_alpha_quality_fields.missing_quality_fields(row, components_key="score_components"))
+    watchlist_missing = sum(1 for row in watchlist_rows if event_alpha_quality_fields.missing_top_level_quality_fields(row))
+    alert_missing = sum(1 for row in alert_rows if event_alpha_quality_fields.missing_top_level_quality_fields(row))
     all_rows = [*hypothesis_rows, *watchlist_rows, *alert_rows]
     missing_rows = [
         row
         for row in all_rows
-        if event_alpha_quality_fields.missing_quality_fields(
-            row,
-            components_key="latest_score_components" if row.get("row_type") == "event_watchlist_state" else "score_components",
-        )
+        if event_alpha_quality_fields.missing_top_level_quality_fields(row)
     ]
-    legacy_missing = sum(1 for row in missing_rows if not event_alpha_quality_fields.has_any_quality_field(row))
+    legacy_missing = sum(1 for row in missing_rows if event_alpha_artifacts.is_legacy_row(row))
+    fresh_hypothesis_missing = sum(
+        1
+        for row in hypothesis_rows
+        if event_alpha_quality_fields.missing_top_level_quality_fields(row)
+        and not event_alpha_artifacts.is_legacy_row(row)
+    )
+    fresh_watchlist_missing = sum(
+        1
+        for row in watchlist_rows
+        if event_alpha_quality_fields.missing_top_level_quality_fields(row)
+        and not event_alpha_artifacts.is_legacy_row(row)
+    )
+    fresh_alert_missing = sum(
+        1
+        for row in alert_rows
+        if event_alpha_quality_fields.missing_top_level_quality_fields(row)
+        and not event_alpha_artifacts.is_legacy_row(row)
+    )
     return {
         "quality_fields_missing_count": len(missing_rows),
         "hypothesis_rows_missing_opportunity_verdict": hypothesis_missing_verdict,
         "watchlist_rows_missing_quality_fields": watchlist_missing,
         "alert_rows_missing_quality_fields": alert_missing,
-        "legacy_quality_missing": legacy_missing,
+        "fresh_hypothesis_rows_missing_top_level_quality": fresh_hypothesis_missing,
+        "fresh_watchlist_rows_missing_top_level_quality": fresh_watchlist_missing,
+        "fresh_alert_rows_missing_top_level_quality": fresh_alert_missing,
+        "legacy_quality_missing_rows": legacy_missing,
         "non_legacy_quality_missing": max(0, len(missing_rows) - legacy_missing),
     }
 
@@ -384,7 +417,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"missing_total={result.quality_fields_missing_count} "
             f"hypotheses_missing_verdict={result.hypothesis_rows_missing_opportunity_verdict} "
             f"watchlist_missing={result.watchlist_rows_missing_quality_fields} "
-            f"alerts_missing={result.alert_rows_missing_quality_fields}"
+            f"alerts_missing={result.alert_rows_missing_quality_fields} "
+            f"fresh_hypotheses_missing_top_level={result.fresh_hypothesis_rows_missing_top_level_quality} "
+            f"fresh_watchlist_missing_top_level={result.fresh_watchlist_rows_missing_top_level_quality} "
+            f"fresh_alerts_missing_top_level={result.fresh_alert_rows_missing_top_level_quality} "
+            f"legacy_quality_missing={result.legacy_quality_missing_rows}"
         ),
         "",
         "blockers:",

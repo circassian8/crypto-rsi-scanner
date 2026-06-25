@@ -400,6 +400,127 @@
         "watchlist_eligible": false,
         "identity_rejection_reason": "common_phrase_not_asset_identity"
       }
+    },
+    {
+      "case_id": "trump_token_event_market_confirmed",
+      "title": "TRUMP token tied to Trump event with market confirmation",
+      "impact_category": "political_meme_proxy",
+      "external_asset": "Trump event",
+      "candidate_symbol": "TRUMP",
+      "candidate_coin_id": "official-trump",
+      "raw_event": {
+        "raw_id": "sq_trump_event",
+        "provider": "fixture_crypto_news",
+        "source_url": "https://crypto.example/trump-token-event",
+        "title": "TRUMP token rallies before Trump campaign event",
+        "body": "Official Trump TRUMP token offers meme exposure to an election event and dated Trump campaign catalyst. TRUMP token demand and trading volume rose as traders used it as the explicit political meme proxy.",
+        "source_confidence": 0.84
+      },
+      "market_snapshot": {"return_24h": 46, "return_72h": 121, "volume_zscore_24h": 4.4, "volume_to_market_cap": 0.41},
+      "score_components": {"event_clarity": 76, "event_time_quality": 70},
+      "expected": {
+        "candidate_role": "proxy_instrument",
+        "market_confirmation_level": ["moderate", "strong"],
+        "opportunity_level": ["watchlist", "high_priority"],
+        "route_tier": ["WATCHLIST", "HIGH_PRIORITY"],
+        "watchlist_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "cryptopanic_tagged_source_boost",
+      "title": "CryptoPanic tagged token source with exploit catalyst",
+      "impact_category": "security_or_regulatory_shock",
+      "external_asset": "Solana exploit response",
+      "candidate_symbol": "SOL",
+      "candidate_coin_id": "solana",
+      "raw_event": {
+        "raw_id": "sq_cryptopanic_sol",
+        "provider": "cryptopanic",
+        "source_url": "https://cryptopanic.example/news/sol-catalyst",
+        "title": "SOL tagged catalyst: Solana validators react to exploit response",
+        "body": "CryptoPanic tagged SOL because Solana validators and the SOL token were directly discussed in an exploit and hack response article.",
+        "raw_json": {"currencies": [{"code": "SOL", "title": "Solana"}]},
+        "source_confidence": 0.78
+      },
+      "market_snapshot": {"return_24h": 14, "return_72h": 36, "volume_zscore_24h": 2.8, "volume_to_market_cap": 0.14},
+      "score_components": {"event_clarity": 72, "event_time_quality": 62},
+      "expected": {
+        "candidate_role": "direct_subject",
+        "evidence_specificity": "direct_token_mechanism",
+        "opportunity_level": ["validated_digest", "watchlist", "high_priority"],
+        "digest_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "source_nav_ticker_url_only_rejected",
+      "title": "Source navigation URL query must not validate token",
+      "impact_category": "market_anomaly_unknown",
+      "candidate_symbol": "PUMP",
+      "candidate_coin_id": "pump",
+      "raw_event": {
+        "raw_id": "sq_url_only_pump",
+        "provider": "fixture_search",
+        "source_url": "https://search.example/results?q=PUMPUSDT",
+        "title": "Market update mentions unrelated catalysts",
+        "body": "The article body does not mention PUMP, PUMPUSDT, or any Pump token identity.",
+        "source_confidence": 0.45
+      },
+      "expected": {
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "watchlist_eligible": false
+      }
+    },
+    {
+      "case_id": "candidate_discovery_body_velvet",
+      "title": "Candidate discovery finds VELVET in article body",
+      "impact_category": "rwa_preipo_proxy",
+      "external_asset": "OpenAI",
+      "candidate_symbol": "VELVET",
+      "candidate_coin_id": "velvet",
+      "raw_event": {
+        "raw_id": "sq_candidate_body_velvet",
+        "provider": "fixture_candidate_discovery",
+        "source_url": "https://news.example/openai-velvet",
+        "title": "OpenAI pre-IPO crypto exposure launches",
+        "body": "Velvet Capital VELVET is listed as the crypto venue offering tokenized OpenAI pre-IPO exposure to traders.",
+        "source_confidence": 0.82
+      },
+      "market_snapshot": {"return_24h": 26, "return_72h": 73, "volume_zscore_24h": 3.1, "volume_to_market_cap": 0.21},
+      "score_components": {"event_clarity": 78, "event_time_quality": 70},
+      "expected": {
+        "candidate_role": "proxy_venue",
+        "evidence_specificity": "direct_token_mechanism",
+        "opportunity_level": ["validated_digest", "watchlist", "high_priority"],
+        "digest_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "hyperliquid_hype_accepted",
+      "title": "Hyperliquid HYPE accepted when explicitly named",
+      "impact_category": "listing_liquidity_event",
+      "candidate_symbol": "HYPE",
+      "candidate_coin_id": "hyperliquid",
+      "raw_event": {
+        "raw_id": "sq_hyperliquid_hype",
+        "provider": "fixture_crypto_news",
+        "source_url": "https://crypto.example/hyperliquid-hype",
+        "title": "Hyperliquid HYPE token gets new market access",
+        "body": "Hyperliquid and its $HYPE token are explicitly named as the beneficiary of a new listing and trading pair with exchange market access.",
+        "source_confidence": 0.86
+      },
+      "market_snapshot": {"return_24h": 21, "return_72h": 58, "volume_zscore_24h": 3.5, "volume_to_market_cap": 0.24},
+      "score_components": {"event_clarity": 80, "event_time_quality": 68},
+      "expected": {
+        "identity_rejection_reason": null,
+        "candidate_role": "direct_subject",
+        "opportunity_level": ["validated_digest", "watchlist", "high_priority"],
+        "digest_eligible": true,
+        "triggered_fade": false
+      }
     }
   ]
 }

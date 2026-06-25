@@ -240,6 +240,16 @@ def _classify_path(
                 "fan_token_event",
             )
 
+    if category == "political_meme_proxy" and asset_present:
+        if _any_term_hit(text, ("meme exposure", "political meme proxy", "election event", "campaign event", "inauguration")):
+            strength = ImpactPathStrength.STRONG.value if specificity >= 70 or market_confirmation >= 40 else ImpactPathStrength.MEDIUM.value
+            return (
+                ImpactPathType.PROXY_ATTENTION.value,
+                CandidateRole.PROXY_INSTRUMENT.value,
+                strength,
+                "political_meme_event",
+            )
+
     if category == "unlock_supply_pressure" and _any_term_hit(text, ("unlock", "vesting", "airdrop", "tge", "emission", "claim")):
         return (
             ImpactPathType.UNLOCK_SUPPLY_EVENT.value,

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_quality_fields, event_opportunity_verdict, event_watchlist
+from . import event_alpha_artifacts, event_alpha_quality_fields, event_opportunity_verdict, event_watchlist
 
 
 @dataclass(frozen=True)
@@ -42,12 +42,16 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
         "=" * 76,
         f"profile: {result.profile or 'default'}",
         f"candidates: {len(rows)}",
+        "fresh_vs_legacy: " + _fresh_legacy_summary(rows),
+        "quality_coverage: " + _quality_coverage_summary(rows),
+        "latest_run: " + _latest_run_summary(rows),
         "opportunity_levels: " + _format_counts(_counts(rows, "opportunity_level")),
         "impact_path_types: " + _format_counts(_counts(rows, "impact_path_type")),
         "candidate_roles: " + _format_counts(_counts(rows, "candidate_role")),
         "evidence_specificity: " + _format_counts(_counts(rows, "evidence_specificity")),
         "market_confirmation_levels: " + _format_counts(_counts(rows, "market_confirmation_level")),
         "candidate_discovery_funnel: " + _format_counts(result.candidate_discovery_funnel),
+        "quality_note: unknown/insufficient_data rows are conservative local-only verdicts or legacy rows, not hidden promotions.",
         "",
         "Strong opportunities:",
     ]
@@ -81,10 +85,16 @@ def _normalize_rows(rows: Iterable[Mapping[str, Any]], *, source: str) -> list[d
         if not isinstance(row, Mapping):
             continue
         data = dict(row)
+        components_key = "latest_score_components" if source == "watchlist" else "score_components"
+        quality_source = event_alpha_quality_fields.quality_source(data, components_key=components_key)
+        top_missing = event_alpha_quality_fields.missing_top_level_quality_fields(data)
         components = event_alpha_quality_fields.quality_components(data)
         data.update(event_alpha_quality_fields.ensure_quality_fields(data, components=components))
         data["_review_source"] = source
         data["_components"] = components
+        data["_quality_source"] = quality_source
+        data["_top_level_missing_fields"] = list(top_missing)
+        data["_legacy_quality_row"] = event_alpha_artifacts.is_legacy_row(data)
         out.append(data)
     return out
 
@@ -131,12 +141,15 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         "queries_generated": 0,
         "queries_executed": 0,
         "source_results_fetched": 0,
+        "source_results_accepted": 0,
+        "source_results_rejected": 0,
         "asset_terms_extracted": 0,
         "resolver_accepted": 0,
         "resolver_rejected": 0,
         "candidates_added": 0,
         "candidates_validated": 0,
         "candidates_promoted": 0,
+        "false_positive_rejections": 0,
     }
     for row in rows:
         generated = row.get("generated_queries") or []
@@ -145,16 +158,58 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         rejected = row.get("rejected_candidate_assets") or row.get("_components", {}).get("rejected_candidate_assets") or []
         out["queries_generated"] += len(generated) if isinstance(generated, list) else 0
         out["queries_executed"] += len(executed) if isinstance(executed, list) else 0
-        out["source_results_fetched"] += len(row.get("rejected_validation_samples") or [])
+        rejected_samples = row.get("rejected_validation_samples") or []
+        accepted_samples = row.get("accepted_validation_samples") or row.get("validation_samples") or []
+        out["source_results_fetched"] += len(rejected_samples) + len(accepted_samples) if isinstance(rejected_samples, list) and isinstance(accepted_samples, list) else 0
+        out["source_results_accepted"] += len(accepted_samples) if isinstance(accepted_samples, list) else 0
+        out["source_results_rejected"] += len(rejected_samples) if isinstance(rejected_samples, list) else 0
         out["asset_terms_extracted"] += len(crypto) + len(rejected) if isinstance(crypto, list) and isinstance(rejected, list) else 0
         out["resolver_accepted"] += sum(1 for item in crypto if isinstance(item, Mapping) and bool(item.get("accepted", item.get("validated", False))))
         out["resolver_rejected"] += len(rejected) if isinstance(rejected, list) else 0
+        out["false_positive_rejections"] += sum(1 for item in rejected if isinstance(item, Mapping) and _rejection_is_false_positive(item))
+        for item in rejected:
+            if not isinstance(item, Mapping):
+                continue
+            reason = str(item.get("reason") or item.get("rejection_reason") or item.get("identity_reason") or "unknown_rejection")
+            if reason:
+                out[f"rejected_{reason}"] = out.get(f"rejected_{reason}", 0) + 1
         out["candidates_added"] += len(crypto) if isinstance(crypto, list) else 0
         if str(row.get("validation_stage") or "") in {"catalyst_link_validated", "impact_path_validated", "market_confirmed", "promoted_to_radar"}:
             out["candidates_validated"] += 1
         if str(row.get("opportunity_level") or "") in {"validated_digest", "watchlist", "high_priority"}:
             out["candidates_promoted"] += 1
     return out
+
+
+def _rejection_is_false_positive(item: Mapping[str, Any]) -> bool:
+    text = " ".join(str(value or "") for value in item.values()).casefold()
+    return any(term in text for term in ("false_positive", "source_noise", "ticker", "word_collision", "url_only", "publisher"))
+
+
+def _fresh_legacy_summary(rows: list[dict[str, Any]]) -> str:
+    fresh = sum(1 for row in rows if not row.get("_legacy_quality_row"))
+    legacy = len(rows) - fresh
+    return f"fresh={fresh}, legacy_or_unscoped={legacy}"
+
+
+def _quality_coverage_summary(rows: list[dict[str, Any]]) -> str:
+    full = sum(1 for row in rows if not row.get("_top_level_missing_fields"))
+    nested = sum(1 for row in rows if row.get("_quality_source") == "nested_score_components")
+    partial = sum(1 for row in rows if row.get("_quality_source") == "partial_quality_fields")
+    recomputed = sum(1 for row in rows if row.get("_quality_source") == "recomputed")
+    return (
+        f"full_top_level={full}, nested_only={nested}, "
+        f"partial_top_level={partial}, recomputed_or_missing={recomputed}"
+    )
+
+
+def _latest_run_summary(rows: list[dict[str, Any]]) -> str:
+    run_ids = [str(row.get("run_id") or "") for row in rows if str(row.get("run_id") or "")]
+    if not run_ids:
+        return "none"
+    latest = sorted(run_ids)[-1]
+    latest_rows = sum(1 for row in rows if str(row.get("run_id") or "") == latest)
+    return f"{latest} rows={latest_rows}"
 
 
 def _strong_opportunities(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

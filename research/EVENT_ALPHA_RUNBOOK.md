@@ -213,11 +213,13 @@ make event-alpha-quality-validation-cycle
 ```
 
 It uses the `quality_validation` fixture profile (offline, no Telegram sends, no
-live providers, fixture clock), writes the run ledger, impact hypotheses,
-watchlist, alert snapshots (if any), research cards, and daily brief under
-`event_fade_cache/quality_validation/`, then prints the quality review and
-artifact doctor (whose `quality fields: missing_total=...` counters confirm
-field coverage). Hypothesis rows now persist `upgrade_requirements` /
+live providers, fixture clock). The Make target clears only the isolated
+`event_fade_cache/quality_validation/` namespace first, then writes the run
+ledger, impact hypotheses, watchlist, alert snapshots (if any), research cards,
+and daily brief. It prints the quality review and runs artifact doctor in strict
+mode. The doctor checks top-level canonical quality fields directly with fresh
+hypothesis/watchlist/alert counters; nested `score_components` no longer hide
+missing top-level verdicts. Hypothesis rows now persist `upgrade_requirements` /
 `downgrade_warnings` alongside the other quality fields. Inspect individual rows
 with `make event-impact-hypotheses-report PROFILE=quality_validation` or
 `make event-opportunity-audit TARGET=<...> PROFILE=quality_validation`. The whole
@@ -235,12 +237,14 @@ make event-alpha-quality-loop PROFILE=notify_llm
 ```
 
 `event-alpha-quality-review` groups current artifacts by opportunity level,
-impact path, candidate role, evidence specificity, market confirmation, and
-candidate-discovery funnel conversion. `event-alpha-policy-simulate` compares
-threshold policies such as score 50/60/70/80, market-confirmation required or
-not, impact-path validation required or not, and evidence-quality floors. It
-prints gained/lost candidates and warnings when weak/generic rows would become
-alertable. `event-alpha-export-signal-quality-cases` writes proposed benchmark
+impact path, candidate role, evidence specificity, market confirmation,
+candidate-discovery funnel conversion, and quality-field source/coverage
+(`top_level`, nested legacy components, or recomputed defaults).
+`event-alpha-policy-simulate` compares named policies: current,
+lower opportunity threshold, require market confirmation, require impact-path
+validation, high-quality-only, and weak-macro-with-strong-market-confirmation.
+It prints gained/lost candidates and warnings when weak/generic rows would
+become alertable. `event-alpha-export-signal-quality-cases` writes proposed benchmark
 cases to the active profile namespace, usually
 `event_fade_cache/<profile>/proposed_signal_quality_cases.json`, from delivered
 alerts, local-only weak rows, feedback, missed opportunities, and rejected

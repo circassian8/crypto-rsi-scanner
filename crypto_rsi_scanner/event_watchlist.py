@@ -103,6 +103,8 @@ class EventWatchlistEntry:
     why_local_only: str | None = None
     why_not_watchlist: str | None = None
     manual_verification_items: list[str] = field(default_factory=list)
+    upgrade_requirements: list[str] = field(default_factory=list)
+    downgrade_warnings: list[str] = field(default_factory=list)
     alert_history: list[dict[str, Any]] = field(default_factory=list)
     state_changed: bool = False
     escalation: bool = False
@@ -412,6 +414,8 @@ def _entry_from_alert(
         why_local_only=_optional_str(quality.get("why_local_only")),
         why_not_watchlist=_optional_str(quality.get("why_not_watchlist")),
         manual_verification_items=list(quality.get("manual_verification_items") or []),
+        upgrade_requirements=list(quality.get("upgrade_requirements") or []),
+        downgrade_warnings=list(quality.get("downgrade_warnings") or []),
         alert_history=history,
         state_changed=state_changed,
         escalation=escalation,
@@ -573,6 +577,8 @@ def _entry_from_hypothesis(
             "opportunity_verdict_reasons": list(getattr(hypothesis, "opportunity_verdict_reasons", ()) or ())[:8],
             "missing_requirements": list(getattr(hypothesis, "missing_requirements", ()) or ())[:8],
             "manual_verification_items": list(getattr(hypothesis, "manual_verification_items", ()) or ())[:8],
+            "upgrade_requirements": list(getattr(hypothesis, "upgrade_requirements", ()) or ())[:8],
+            "downgrade_warnings": list(getattr(hypothesis, "downgrade_warnings", ()) or ())[:8],
             "why_local_only": _optional_str(getattr(hypothesis, "why_local_only", None)),
             "why_not_watchlist": _optional_str(getattr(hypothesis, "why_not_watchlist", None)),
             "hypothesis_score": score,
@@ -614,6 +620,8 @@ def _entry_from_hypothesis(
         why_local_only=_optional_str(hypothesis_quality.get("why_local_only")),
         why_not_watchlist=_optional_str(hypothesis_quality.get("why_not_watchlist")),
         manual_verification_items=list(hypothesis_quality.get("manual_verification_items") or []),
+        upgrade_requirements=list(hypothesis_quality.get("upgrade_requirements") or []),
+        downgrade_warnings=list(hypothesis_quality.get("downgrade_warnings") or []),
         alert_history=history,
         state_changed=state_changed,
         escalation=escalation,
@@ -1047,6 +1055,8 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             why_local_only=_optional_str(quality.get("why_local_only")),
             why_not_watchlist=_optional_str(quality.get("why_not_watchlist")),
             manual_verification_items=list(quality.get("manual_verification_items") or []),
+            upgrade_requirements=list(quality.get("upgrade_requirements") or []),
+            downgrade_warnings=list(quality.get("downgrade_warnings") or []),
             alert_history=list(row.get("alert_history") or []),
             state_changed=bool(row.get("state_changed")),
             escalation=bool(row.get("escalation")),

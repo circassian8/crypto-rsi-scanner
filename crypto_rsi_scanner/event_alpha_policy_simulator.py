@@ -26,18 +26,56 @@ class EventAlphaPolicySimulationResult:
 
 
 DEFAULT_SCENARIOS: tuple[EventAlphaPolicyScenario, ...] = tuple(
-    EventAlphaPolicyScenario(
-        name=f"score_{score}_market_{market}_impact_{impact}_evidence_{evidence}",
-        opportunity_threshold=float(score),
-        require_market_confirmation=market,
-        require_impact_path_validated=impact,
-        allow_weak_macro_with_market=False,
-        evidence_quality_minimum=float(evidence),
-    )
-    for score in (50, 60, 70, 80)
-    for market in (False, True)
-    for impact in (False, True)
-    for evidence in (40, 60, 80)
+    [
+        EventAlphaPolicyScenario(
+            name="current",
+            opportunity_threshold=65.0,
+            require_market_confirmation=False,
+            require_impact_path_validated=False,
+            allow_weak_macro_with_market=False,
+            evidence_quality_minimum=60.0,
+        ),
+        EventAlphaPolicyScenario(
+            name="lower_opportunity_threshold",
+            opportunity_threshold=55.0,
+            require_market_confirmation=False,
+            require_impact_path_validated=False,
+            allow_weak_macro_with_market=False,
+            evidence_quality_minimum=55.0,
+        ),
+        EventAlphaPolicyScenario(
+            name="require_market_confirmation",
+            opportunity_threshold=65.0,
+            require_market_confirmation=True,
+            require_impact_path_validated=False,
+            allow_weak_macro_with_market=False,
+            evidence_quality_minimum=60.0,
+        ),
+        EventAlphaPolicyScenario(
+            name="require_impact_path_validated",
+            opportunity_threshold=65.0,
+            require_market_confirmation=False,
+            require_impact_path_validated=True,
+            allow_weak_macro_with_market=False,
+            evidence_quality_minimum=60.0,
+        ),
+        EventAlphaPolicyScenario(
+            name="high_quality_only",
+            opportunity_threshold=75.0,
+            require_market_confirmation=True,
+            require_impact_path_validated=True,
+            allow_weak_macro_with_market=False,
+            evidence_quality_minimum=75.0,
+        ),
+        EventAlphaPolicyScenario(
+            name="allow_weak_macro_with_market_confirmation",
+            opportunity_threshold=65.0,
+            require_market_confirmation=True,
+            require_impact_path_validated=False,
+            allow_weak_macro_with_market=True,
+            evidence_quality_minimum=65.0,
+        ),
+    ]
 )
 
 
@@ -102,7 +140,8 @@ def format_policy_simulation(result: EventAlphaPolicySimulationResult) -> str:
 
 def _normalize(row: Mapping[str, Any]) -> dict[str, Any]:
     data = dict(row)
-    data.update(event_alpha_quality_fields.ensure_quality_fields(data, components=event_alpha_quality_fields.quality_components(data)))
+    components = event_alpha_quality_fields.quality_components(data)
+    data.update(event_alpha_quality_fields.ensure_quality_fields(data, components=components))
     return data
 
 
@@ -118,13 +157,20 @@ def _baseline_alertable(row: Mapping[str, Any]) -> bool:
 
 
 def _passes(row: Mapping[str, Any], scenario: EventAlphaPolicyScenario) -> bool:
-    if _is_weak_or_generic(row) and not scenario.allow_weak_macro_with_market:
+    generic = str(row.get("impact_path_type") or "") == "generic_cooccurrence_only"
+    weak = _is_weak_or_generic(row)
+    if generic:
+        return False
+    if weak and not scenario.allow_weak_macro_with_market:
         return False
     if float(row.get("opportunity_score_final") or row.get("opportunity_score_v2") or row.get("latest_score") or 0) < scenario.opportunity_threshold:
         return False
     if float(row.get("evidence_quality_score") or 0) < scenario.evidence_quality_minimum:
         return False
-    if scenario.require_market_confirmation and str(row.get("market_confirmation_level") or "") not in {"moderate", "strong"}:
+    market_level = str(row.get("market_confirmation_level") or "")
+    if scenario.require_market_confirmation and market_level not in {"moderate", "strong"}:
+        return False
+    if weak and scenario.allow_weak_macro_with_market and market_level not in {"strong"}:
         return False
     if scenario.require_impact_path_validated:
         if str(row.get("validation_stage") or "") not in {"impact_path_validated", "market_confirmed", "promoted_to_radar"}:

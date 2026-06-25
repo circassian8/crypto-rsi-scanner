@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-25 - Event Alpha quality fields must be canonical at top level
+**Status:** accepted
+**Decision:** Fresh Event Alpha hypothesis, watchlist, and alert snapshot rows
+must carry the canonical signal-quality fields at the artifact row's top level:
+impact path, candidate role, evidence quality, source class, market
+confirmation, final opportunity score/level, verdict reasons,
+local-only/watchlist blockers, manual verification items, and
+upgrade/downgrade diagnostics. Nested `score_components` may preserve raw
+inputs, but they must not be the only place fresh rows store quality verdicts.
+If context is missing, writers must store conservative explicit
+`insufficient_data` / `local_only` defaults and explain what needs validation.
+Artifact doctor strict mode blocks fresh rows missing top-level quality fields;
+legacy gaps are review warnings unless a future strict-legacy policy is added.
+**Why:** Operator review, Pro-model analysis, artifact doctor, policy
+simulation, and opportunity audits need one stable field contract. Letting
+nested components mask top-level `None` values made quality artifacts appear
+healthy while row-level consumers saw blank verdicts.
+**Revisit when:** The artifact schema is versioned to a new canonical contract
+and all readers/writers migrate together.
+
 ## 2026-06-25 - Event Alpha quality loops are artifact review, not promotion
 **Status:** accepted
 **Decision:** The Event Alpha quality review, policy simulation, artifact
