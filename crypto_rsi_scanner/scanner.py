@@ -100,6 +100,7 @@ from . import event_alpha_run_lock
 from . import event_alpha_router
 from . import event_alpha_policy_simulator
 from . import event_alpha_quality_review
+from . import event_alpha_quality_coverage
 from . import event_alpha_signal_quality
 from . import event_alpha_signal_quality_export
 from . import event_alpha_scheduler
@@ -3707,9 +3708,11 @@ def event_impact_hypotheses_report(
     )
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     print(_event_alpha_context_block(context))
+    stale_warning = _event_alpha_stale_quality_warning(context)
     print(event_impact_hypothesis_store.format_impact_hypotheses_store_report(
         result,
         watchlist_rows=[entry.__dict__ for entry in watchlist.entries],
+        stale_quality_warning=stale_warning,
     ))
 
 
@@ -4198,6 +4201,68 @@ def _event_alpha_quality_artifacts(
     }
 
 
+def _event_alpha_raw_quality_rows(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> dict[str, list[dict[str, Any]]]:
+    return {
+        "runs": event_alpha_quality_coverage.read_jsonl_rows(
+            context.run_ledger_path,
+            row_type="event_alpha_run",
+        ),
+        "hypotheses": event_alpha_quality_coverage.read_jsonl_rows(
+            context.impact_hypothesis_store_path,
+            row_type="event_impact_hypothesis",
+        ),
+        "watchlist": event_alpha_quality_coverage.read_jsonl_rows(
+            context.watchlist_state_path,
+            row_type="event_watchlist_state",
+        ),
+        "alerts": event_alpha_quality_coverage.read_jsonl_rows(
+            context.alert_store_path,
+            row_type="event_alpha_alert_snapshot",
+        ),
+    }
+
+
+def _event_alpha_reference_quality_rows(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> list[dict[str, Any]]:
+    namespace_dir = context.base_dir / "quality_validation"
+    reference = event_alpha_artifacts.EventAlphaArtifactContext(
+        profile="quality_validation",
+        run_mode="test",
+        artifact_namespace="quality_validation",
+        base_dir=context.base_dir,
+        namespace_dir=namespace_dir,
+        run_ledger_path=namespace_dir / "event_alpha_runs.jsonl",
+        alert_store_path=namespace_dir / "event_alpha_alerts.jsonl",
+        notification_runs_path=namespace_dir / "event_alpha_notification_runs.jsonl",
+        watchlist_state_path=namespace_dir / "event_watchlist_state.jsonl",
+        feedback_path=namespace_dir / "event_alpha_feedback.jsonl",
+        missed_path=namespace_dir / "event_alpha_missed.jsonl",
+        priors_path=namespace_dir / "event_alpha_priors.json",
+        provider_health_path=namespace_dir / "event_provider_health.json",
+        daily_brief_path=namespace_dir / "event_alpha_daily_brief.md",
+        impact_hypothesis_store_path=namespace_dir / "event_impact_hypotheses.jsonl",
+        proposed_eval_cases_dir=namespace_dir / "proposed_eval_cases",
+        research_cards_dir=namespace_dir / "research_cards",
+        llm_budget_ledger_path=namespace_dir / "event_llm_budget.json",
+        outcomes_path=namespace_dir / "event_alpha_outcomes.jsonl",
+    )
+    rows = _event_alpha_raw_quality_rows(reference)
+    return [*rows["hypotheses"], *rows["watchlist"], *rows["alerts"]]
+
+
+def _event_alpha_stale_quality_warning(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+) -> str | None:
+    rows = _event_alpha_raw_quality_rows(context)
+    return event_alpha_quality_coverage.stale_quality_artifact_warning(
+        [*rows["hypotheses"], *rows["watchlist"], *rows["alerts"]],
+        reference_rows=_event_alpha_reference_quality_rows(context),
+    )
+
+
 def event_alpha_quality_review_report(
     *,
     verbose: bool = False,
@@ -4217,9 +4282,41 @@ def event_alpha_quality_review_report(
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_entries=artifacts["watchlist"].entries,
         alert_rows=artifacts["alerts"].rows,
+        stale_warning=_event_alpha_stale_quality_warning(context),
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_quality_review.format_quality_review(result))
+
+
+def event_alpha_quality_coverage_report(
+    *,
+    verbose: bool = False,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    include_legacy_artifacts: bool = False,
+) -> None:
+    """Print fresh-run top-level quality-field coverage from raw artifacts."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    rows = _event_alpha_raw_quality_rows(context)
+    result = event_alpha_quality_coverage.build_latest_run_quality_coverage(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_rows=rows["runs"],
+        hypothesis_rows=rows["hypotheses"],
+        watchlist_rows=rows["watchlist"],
+        alert_rows=rows["alerts"],
+        reference_quality_rows=_event_alpha_reference_quality_rows(context),
+        include_legacy=include_legacy_artifacts,
+    )
+    print(_event_alpha_context_block(context))
+    print(event_alpha_quality_coverage.format_quality_coverage_report(result))
+    if result.status == "BLOCKED":
+        raise SystemExit(1)
 
 
 def event_alpha_policy_simulate_report(
@@ -7719,6 +7816,11 @@ def cli() -> None:
         help="Print latest Event Alpha signal-quality review from local artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-quality-coverage-report",
+        action="store_true",
+        help="Strictly check latest-run Event Alpha artifact rows for top-level signal-quality fields.",
+    )
+    parser.add_argument(
         "--event-alpha-policy-simulate",
         action="store_true",
         help="Simulate Event Alpha quality threshold policies from local artifacts without writing state.",
@@ -8528,6 +8630,14 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_quality_coverage_report:
+        event_alpha_quality_coverage_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
         )
         return
     if args.event_alpha_policy_simulate:

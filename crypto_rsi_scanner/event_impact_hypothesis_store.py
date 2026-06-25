@@ -148,6 +148,7 @@ def format_impact_hypotheses_store_report(
     watchlist_rows: Iterable[Mapping[str, Any]] = (),
     now: datetime | None = None,
     stale_hours: float = 24.0,
+    stale_quality_warning: str | None = None,
 ) -> str:
     """Return an operator-readable report for the hypothesis artifact."""
     rows = [
@@ -167,6 +168,8 @@ def format_impact_hypotheses_store_report(
         rows.extend(["", "No stored impact hypotheses matched the current report filters."])
         return "\n".join(rows)
 
+    if stale_quality_warning:
+        rows.append("stale_artifact_warning: " + stale_quality_warning)
     rows.extend(_schema_audit_section(result.rows))
     rows.append("categories: " + _format_counts(_counts(result.rows, "impact_category")))
     rows.append("statuses: " + _format_counts(_counts(result.rows, "status")))

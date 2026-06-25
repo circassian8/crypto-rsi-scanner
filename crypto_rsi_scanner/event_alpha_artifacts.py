@@ -12,7 +12,7 @@ from typing import Any, Iterable, Mapping
 RUN_MODES = ("test", "fixture", "replay", "burn_in", "notification_burn_in", "operational")
 NON_OPERATIONAL_RUN_MODES = {"test", "fixture", "replay"}
 LIVE_BURN_IN_PROFILES = {"no_key_live", "no_key_llm", "api_live", "full_llm_live", "full_llm_deep"}
-NOTIFICATION_BURN_IN_PROFILES = {"notify_no_key", "notify_llm", "notify_llm_deep"}
+NOTIFICATION_BURN_IN_PROFILES = {"notify_no_key", "notify_llm", "notify_llm_deep", "notify_llm_quality"}
 OPERATIONAL_PROFILES = {"research_send"}
 LEGACY_NAMESPACE = "legacy"
 SNAPSHOT_AVAILABLE = "available"

@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Add fresh Event Alpha quality coverage profile · Codex
+**Why:** Existing `notify_llm` artifacts can contain stale pre-quality-layer
+rows, so live-style quality validation needed an isolated profile plus a
+strict report that reads raw artifacts instead of compatibility loaders.
+**Changes:**
+- Added the `notify_llm_quality` Event Alpha profile and no-send scheduled
+  target, writing fresh live-style artifacts under
+  `event_fade_cache/notify_llm_quality/` without passing the Telegram send flag.
+- Added `event_alpha_quality_coverage.py`,
+  `main.py --event-alpha-quality-coverage-report`, and
+  `make event-alpha-quality-coverage-report` to check latest-run hypothesis,
+  watchlist, and alert-snapshot rows for the canonical top-level quality
+  fields.
+- Added stale-artifact warnings to quality review and impact-hypothesis reports
+  when a namespace has missing quality fields while the `quality_validation`
+  namespace is clean.
+- Updated scheduler awareness, Makefile help, tests, and runbook/decision docs.
+**Verify:** `python3 tests/test_indicators.py` passed (455/455) during the
+implementation pass. Full eval/verification and fresh `notify_llm_quality`
+smoke are listed in the final Codex handoff for this prompt.
+**Notes/risks:** Research-only. The new scheduled quality target does not pass
+`--event-alert-send`; no normal RSI rows, paper/live trades, execution, or
+LLM/provider-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-25 — Canonicalize Event Alpha top-level quality artifacts · Codex
 **Why:** Fresh quality-validation rows could still carry `None` or empty
 top-level signal-quality fields while nested `score_components` made artifact

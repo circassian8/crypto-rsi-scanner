@@ -581,3 +581,37 @@ _PROFILES: dict[str, EventAlphaProfile] = {
         notification_burn_in=True,
     ),
 }
+
+
+_PROFILES["notify_llm_quality"] = EventAlphaProfile(
+    name="notify_llm_quality",
+    description=(
+        "Fresh live-style Event Alpha quality-validation run using notify_llm "
+        "sources, OpenAI/fixture fail-soft LLM metadata, and isolated quality "
+        "artifacts. Scheduled target does not request sends."
+    ),
+    config_overrides={
+        **_PROFILES["notify_llm"].config_overrides,
+        "EVENT_ALPHA_RUN_MODE": "notification_burn_in",
+        "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
+        "EVENT_SOURCE_ENRICHMENT_ENABLED": True,
+        "EVENT_IMPACT_HYPOTHESIS_SEARCH_ENABLED": True,
+        "EVENT_IMPACT_HYPOTHESIS_CANDIDATE_DISCOVERY_ENABLED": True,
+        "EVENT_ALPHA_NOTIFICATION_QUALITY_MODE": "validated_digest",
+        "EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH": True,
+        "EVENT_ALPHA_WEAK_VALIDATED_LOCAL_ONLY": True,
+        "EVENT_ALPHA_BLOCK_GENERIC_COOCCURRENCE_DIGEST": True,
+    },
+    with_llm=True,
+    snapshot_policy="alertable",
+    card_auto_write=True,
+    card_write_tiers=("HIGH_PRIORITY_WATCH", "TRIGGERED_FADE", "WATCHLIST"),
+    watchlist_monitor_enabled=True,
+    targeted_market_source="cycle",
+    send_lane_policy="quality_validation_no_send",
+    send_guard=(
+        "quality scheduled target does not pass --event-alert-send; actual delivery "
+        "still requires an explicit send command plus RSI_EVENT_ALERTS_ENABLED=1"
+    ),
+    notification_burn_in=True,
+)

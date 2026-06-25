@@ -96,6 +96,8 @@ def format_scheduler_status(result: EventAlphaSchedulerStatusResult) -> str:
 
 
 def scheduled_command(profile: str | None) -> str:
+    if profile == "notify_llm_quality":
+        return "make event-alpha-notify-llm-quality-scheduled"
     if profile == "notify_llm":
         return "make event-alpha-notify-llm-scheduled"
     return "make event-alpha-notify-no-key-scheduled"
@@ -103,7 +105,7 @@ def scheduled_command(profile: str | None) -> str:
 
 def generate_launchd_plist(*, profile: str, repo_path: str | Path, python_path: str | Path | None = None) -> str:
     """Return a dry-run launchd plist with no embedded secrets."""
-    target = "event-alpha-notify-llm-scheduled" if profile == "notify_llm" else "event-alpha-notify-no-key-scheduled"
+    target = scheduled_command(profile).replace("make ", "", 1)
     label = f"com.nasrenkaraf.crypto-rsi-scanner.event-alpha.{profile or 'notify_no_key'}"
     cwd = Path(repo_path).expanduser()
     python = Path(python_path).expanduser() if python_path else cwd / ".venv/bin/python"

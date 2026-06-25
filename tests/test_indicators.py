@@ -21361,6 +21361,7 @@ def test_event_alpha_quality_make_targets_exist_and_do_not_send():
     text = Path("Makefile").read_text()
     for target in (
         "event-alpha-quality-review",
+        "event-alpha-quality-coverage-report",
         "event-alpha-policy-simulate",
         "event-alpha-quality-validation-cycle",
         "event-alpha-export-signal-quality-cases",
@@ -21377,6 +21378,164 @@ def test_event_alpha_quality_make_targets_exist_and_do_not_send():
     assert "event-alpha-daily-brief" in loop
     assert "event-alpha-cycle-send" not in loop
     assert "event-alert-send" not in loop
+
+
+def test_notify_llm_quality_profile_and_make_target_are_no_send():
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_artifacts, event_alpha_profiles
+
+    profile = event_alpha_profiles.get_profile("notify_llm_quality")
+    assert profile.with_llm is True
+    assert profile.send is False
+    assert profile.notification_burn_in is True
+    assert profile.snapshot_policy == "alertable"
+    assert profile.config_overrides["EVENT_SOURCE_ENRICHMENT_ENABLED"] is True
+    assert profile.config_overrides["EVENT_IMPACT_HYPOTHESIS_SEARCH_ENABLED"] is True
+    assert profile.config_overrides["EVENT_IMPACT_HYPOTHESIS_CANDIDATE_DISCOVERY_ENABLED"] is True
+    assert profile.config_overrides["EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH"] is True
+
+    ctx = event_alpha_artifacts.context_from_profile(
+        "notify_llm_quality",
+        base_dir=Path("/tmp/event-alpha-test"),
+    )
+    assert ctx.run_mode == "notification_burn_in"
+    assert ctx.artifact_namespace == "notify_llm_quality"
+    assert str(ctx.namespace_dir).endswith("notify_llm_quality")
+
+    text = Path("Makefile").read_text(encoding="utf-8")
+    assert "event-alpha-notify-llm-quality-scheduled:" in text
+    target = text.split("\nevent-alpha-notify-llm-quality-scheduled:", 1)[1].split(
+        "\nevent-alpha-provider-health-report:", 1
+    )[0]
+    assert "--event-alpha-notify-cycle" in target
+    assert "--event-alpha-profile $(PROFILE)" in target
+    assert "--event-alert-send" not in target
+    assert "EVENT_FIXTURE_NOW_ENV" not in target
+
+
+def test_event_alpha_quality_coverage_checks_latest_raw_rows_only():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_quality_coverage, event_alpha_quality_fields
+
+    started = datetime(2026, 6, 25, 12, 0, tzinfo=timezone.utc)
+    finished = datetime(2026, 6, 25, 12, 2, tzinfo=timezone.utc)
+    run = {
+        "row_type": "event_alpha_run",
+        "run_id": "run-quality",
+        "profile": "notify_llm_quality",
+        "started_at": started.isoformat(),
+        "finished_at": finished.isoformat(),
+        "success": True,
+    }
+    full = event_alpha_quality_fields.ensure_quality_fields({
+        "run_id": "run-quality",
+        "profile": "notify_llm_quality",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "notify_llm_quality",
+    })
+    hypothesis = {**full, "row_type": "event_impact_hypothesis", "hypothesis_id": "hyp:velvet"}
+    alert = {**full, "row_type": "event_alpha_alert_snapshot", "alert_key": "alert:velvet"}
+    watch = event_alpha_quality_fields.ensure_quality_fields({
+        "row_type": "event_watchlist_state",
+        "key": "watch:velvet",
+        "last_seen_at": "2026-06-25T12:01:00+00:00",
+    })
+    old_missing = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "old-run",
+        "profile": "notify_llm_quality",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "notify_llm_quality",
+        "alert_key": "old-missing",
+    }
+    result = event_alpha_quality_coverage.build_latest_run_quality_coverage(
+        profile="notify_llm_quality",
+        artifact_namespace="notify_llm_quality",
+        run_rows=[run],
+        hypothesis_rows=[hypothesis],
+        watchlist_rows=[watch],
+        alert_rows=[alert, old_missing],
+    )
+    assert result.status == "OK"
+    assert result.run_id == "run-quality"
+    assert {bucket.row_type: bucket.rows for bucket in result.buckets} == {
+        "hypothesis": 1,
+        "watchlist": 1,
+        "alert_snapshot": 1,
+    }
+    assert all(not bucket.missing_rows for bucket in result.buckets)
+
+    bad_alert = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "run-quality",
+        "profile": "notify_llm_quality",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "notify_llm_quality",
+        "alert_key": "bad-alert",
+    }
+    blocked = event_alpha_quality_coverage.build_latest_run_quality_coverage(
+        profile="notify_llm_quality",
+        artifact_namespace="notify_llm_quality",
+        run_rows=[run],
+        hypothesis_rows=[hypothesis],
+        watchlist_rows=[watch],
+        alert_rows=[bad_alert],
+    )
+    assert blocked.status == "BLOCKED"
+    report = event_alpha_quality_coverage.format_quality_coverage_report(blocked)
+    assert "bad-alert" in report
+    assert "missing=" in report
+
+
+def test_event_alpha_quality_stale_warning_uses_quality_validation_reference():
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_quality_coverage,
+        event_alpha_quality_fields,
+        event_alpha_quality_review,
+        event_impact_hypothesis_store,
+    )
+
+    stale_row = {
+        "row_type": "event_impact_hypothesis",
+        "run_id": "run-old",
+        "profile": "notify_llm",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "notify_llm",
+        "hypothesis_id": "hyp:old",
+    }
+    reference = event_alpha_quality_fields.ensure_quality_fields({
+        "row_type": "event_impact_hypothesis",
+        "run_id": "run-ref",
+        "profile": "quality_validation",
+        "run_mode": "test",
+        "artifact_namespace": "quality_validation",
+        "hypothesis_id": "hyp:ref",
+    })
+    warning = event_alpha_quality_coverage.stale_quality_artifact_warning(
+        [stale_row],
+        reference_rows=[reference],
+    )
+    assert warning == event_alpha_quality_coverage.STALE_QUALITY_ARTIFACT_WARNING
+
+    review = event_alpha_quality_review.build_quality_review(
+        profile="notify_llm",
+        hypothesis_rows=[stale_row],
+        stale_warning=warning,
+    )
+    assert "stale_artifact_warning: " + warning in event_alpha_quality_review.format_quality_review(review)
+
+    loaded = event_impact_hypothesis_store.EventImpactHypothesisStoreReadResult(
+        path=Path("hypotheses.jsonl"),
+        rows_read=1,
+        rows=[stale_row],
+        total_rows_read=1,
+    )
+    text = event_impact_hypothesis_store.format_impact_hypotheses_store_report(
+        loaded,
+        stale_quality_warning=warning,
+    )
+    assert "stale_artifact_warning: " + warning in text
 
 
 def test_feedback_and_calibration_include_signal_quality_fields():

@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-25 - Fresh quality validation needs raw artifact coverage
+**Status:** accepted
+**Decision:** Live-style Event Alpha quality validation should use an isolated
+`notify_llm_quality` profile/namespace and a raw-artifact coverage report that
+checks the latest run's hypothesis, watchlist, and alert snapshot rows for
+canonical top-level quality fields. Compatibility loaders may still fill missing
+fields for backward-compatible reads, but they do not prove that fresh rows on
+disk are complete. Namespaces with missing quality fields while
+`quality_validation` is clean should warn that they may contain pre-quality-layer
+artifacts and should be rerun.
+**Why:** Operator review and Pro-model handoff need to distinguish stale
+artifact gaps from current writer behavior. A loader-repaired report can make
+old rows look healthy and hide the exact integration regressions this quality
+layer is supposed to prevent.
+**Revisit when:** All pre-quality-layer namespaces have been retired or the
+artifact schema is versioned with an explicit migration marker.
+
 ## 2026-06-25 - Event Alpha quality fields must be canonical at top level
 **Status:** accepted
 **Decision:** Fresh Event Alpha hypothesis, watchlist, and alert snapshot rows

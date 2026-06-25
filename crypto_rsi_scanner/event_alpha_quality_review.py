@@ -13,6 +13,7 @@ class EventAlphaQualityReviewResult:
     profile: str | None
     rows: tuple[dict[str, Any], ...]
     candidate_discovery_funnel: dict[str, int]
+    stale_warning: str | None = None
 
 
 def build_quality_review(
@@ -21,6 +22,7 @@ def build_quality_review(
     hypothesis_rows: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry | Mapping[str, Any]] = (),
     alert_rows: Iterable[Mapping[str, Any]] = (),
+    stale_warning: str | None = None,
 ) -> EventAlphaQualityReviewResult:
     rows = [
         *_normalize_rows(hypothesis_rows, source="hypothesis"),
@@ -31,6 +33,7 @@ def build_quality_review(
         profile=profile,
         rows=tuple(rows),
         candidate_discovery_funnel=_candidate_discovery_funnel(rows),
+        stale_warning=stale_warning,
     )
 
 
@@ -55,6 +58,8 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
         "",
         "Strong opportunities:",
     ]
+    if result.stale_warning:
+        lines.append("stale_artifact_warning: " + result.stale_warning)
     lines.extend(_candidate_lines(_strong_opportunities(rows), limit=8))
     lines.extend(["", "Validated but market-unconfirmed:"])
     lines.extend(_candidate_lines(_market_unconfirmed(rows), limit=8))

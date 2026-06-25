@@ -48,6 +48,23 @@ when you explicitly want a deeper review cycle: it keeps the same research-only
 send guards and per-run delivery behavior but raises the LLM/enrichment caps to
 250 calls/run, 1500 calls/day, 16 concurrent LLM calls, and 45s LLM timeouts.
 
+Use `notify_llm_quality` when the task is to prove current signal-quality
+artifact writers rather than deliver Telegram notifications. It uses the
+`notify_llm` source/LLM/quality settings, writes under
+`event_fade_cache/notify_llm_quality/`, uses wall-clock time, and has a
+dedicated scheduled target that does **not** pass `--event-alert-send`:
+
+```bash
+make event-alpha-notify-llm-quality-scheduled
+make event-alpha-quality-coverage-report PROFILE=notify_llm_quality
+make event-alpha-artifact-doctor PROFILE=notify_llm_quality STRICT=1
+```
+
+The coverage report reads raw JSONL rows for the latest run and checks that
+hypothesis, watchlist, and alert-snapshot artifacts carry the canonical
+top-level quality fields. A failing coverage report means the fresh writer path
+needs patching; it is not a trading or notification promotion signal.
+
 Notification lanes are independent: a daily digest cooldown does not block an
 instant escalation, and instant escalation cooldown does not block a
 deterministic proxy-fade `TRIGGERED_FADE`. Triggered-fade notifications dedupe
@@ -231,6 +248,7 @@ inspect real artifacts:
 
 ```bash
 make event-alpha-quality-review PROFILE=notify_llm
+make event-alpha-quality-coverage-report PROFILE=notify_llm_quality
 make event-alpha-policy-simulate PROFILE=notify_llm
 make event-alpha-export-signal-quality-cases PROFILE=notify_llm
 make event-alpha-quality-loop PROFILE=notify_llm
@@ -240,6 +258,11 @@ make event-alpha-quality-loop PROFILE=notify_llm
 impact path, candidate role, evidence specificity, market confirmation,
 candidate-discovery funnel conversion, and quality-field source/coverage
 (`top_level`, nested legacy components, or recomputed defaults).
+`event-alpha-quality-coverage-report` is stricter: it reads raw artifact rows
+from the latest run only and exits non-zero if any fresh row is missing a
+canonical top-level quality field. It also warns when a namespace appears to
+contain pre-quality-layer artifacts while the isolated `quality_validation`
+namespace is clean.
 `event-alpha-policy-simulate` compares named policies: current,
 lower opportunity threshold, require market confirmation, require impact-path
 validation, high-quality-only, and weak-macro-with-strong-market-confirmation.
