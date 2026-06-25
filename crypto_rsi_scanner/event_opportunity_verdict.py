@@ -32,6 +32,13 @@ class OpportunityVerdict:
     score_components: Mapping[str, float] | None = None
 
 
+@dataclass(frozen=True)
+class OpportunityUpgradePath:
+    upgrade_requirements: tuple[str, ...]
+    downgrade_warnings: tuple[str, ...]
+    summary: str
+
+
 def evaluate_opportunity(
     *,
     impact_path: event_impact_path_validator.ImpactPathValidation | None,
@@ -229,6 +236,123 @@ def _hard_local_reason(
     if "ticker_collision" in text or "word_collision" in text:
         return "ticker_collision_hard_gate"
     return None
+
+
+def explain_upgrade_path(
+    *,
+    verdict: OpportunityVerdict | Mapping[str, Any] | None = None,
+    impact_path: event_impact_path_validator.ImpactPathValidation | Mapping[str, Any] | None = None,
+    market_confirmation: event_market_confirmation.EventMarketConfirmationResult | Mapping[str, Any] | None = None,
+    evidence_quality: event_evidence_quality.EvidenceQualityResult | Mapping[str, Any] | None = None,
+    components: Mapping[str, Any] | None = None,
+) -> OpportunityUpgradePath:
+    """Explain how a research candidate could improve or invalidate.
+
+    The output is diagnostic text only. It does not mutate thresholds, routes,
+    alerts, paper rows, live storage, or event-fade eligibility.
+    """
+    data = dict(components or {})
+    data.update(_object_mapping("verdict", verdict))
+    data.update(_object_mapping("impact_path", impact_path))
+    data.update(_object_mapping("market", market_confirmation))
+    data.update(_object_mapping("evidence", evidence_quality))
+
+    level = str(data.get("opportunity_level") or data.get("verdict_opportunity_level") or "")
+    path_type = str(data.get("impact_path_type") or data.get("impact_path_impact_path_type") or "")
+    path_strength = str(data.get("impact_path_strength") or data.get("impact_path_impact_path_strength") or "")
+    role = str(data.get("candidate_role") or data.get("impact_path_candidate_role") or "")
+    evidence_specificity = str(data.get("evidence_specificity") or data.get("evidence_evidence_specificity") or "")
+    source_class = str(data.get("source_class") or data.get("evidence_source_class") or "")
+    market_level = str(data.get("market_confirmation_level") or data.get("level") or data.get("market_level") or "")
+    market_score = _score(data.get("market_confirmation_score"), data.get("market_market_confirmation_score"), data.get("market_confirmation"))
+    evidence_score = _score(data.get("evidence_quality_score"), data.get("evidence_evidence_quality_score"), data.get("source_quality"))
+    timing_score = _score(data.get("timing_event_window"), data.get("event_time_quality"), data.get("event_clarity"))
+    derivatives_score = _score(data.get("derivatives_crowding"), data.get("derivatives"), data.get("oi_expansion"))
+    supply_score = _score(data.get("supply_pressure"), data.get("unlock_pressure"))
+    text = " ".join(str(value or "") for value in (level, path_type, path_strength, role, evidence_specificity, source_class, data)).casefold()
+
+    upgrades: list[str] = []
+    downgrades: list[str] = []
+    if "source_noise" in text:
+        upgrades.append("blocked_by_source_noise")
+        downgrades.append("source_low_quality")
+    if "ticker_collision" in text or "word_collision" in text:
+        upgrades.append("needs_identity_validation")
+        downgrades.append("token_identity_ambiguous")
+    if "generic_cooccurrence" in text:
+        upgrades.append("blocked_by_generic_cooccurrence")
+        upgrades.append("needs_direct_token_mechanism")
+        downgrades.append("no_value_capture")
+    if path_strength not in {"strong", "medium"}:
+        upgrades.append("needs_direct_token_mechanism")
+    if role in {"generic_mention", "macro_affected_asset", ""} and path_type in {
+        "technology_risk",
+        "market_structure_policy",
+        "macro_attention_only",
+        "generic_cooccurrence_only",
+        "",
+    }:
+        upgrades.append("needs_catalyst_link")
+    if market_score < 50 or market_level in {"", "none", "weak"}:
+        upgrades.append("needs_market_confirmation")
+        downgrades.append("market_reaction_absent")
+    if evidence_score < 65:
+        upgrades.append("needs_higher_quality_source")
+        downgrades.append("source_low_quality")
+    if timing_score < 40:
+        upgrades.append("needs_event_time")
+    if any(term in text for term in ("proxy", "perp", "listing", "venue")) and derivatives_score < 40:
+        upgrades.append("needs_derivatives_confirmation")
+    if any(term in text for term in ("unlock", "supply", "airdrop", "tge")) and supply_score < 40:
+        upgrades.append("needs_supply_confirmation")
+    if _score(data.get("opportunity_score_final"), data.get("verdict_opportunity_score_final")) < 65:
+        upgrades.append("blocked_by_low_score")
+    if any(term in text for term in ("stale", "expired")):
+        downgrades.append("event_stale")
+    if any(term in text for term in ("disputed", "conflict", "contradict")):
+        downgrades.append("catalyst_disputed")
+        downgrades.append("conflicting_evidence")
+    if _score(data.get("liquidity_tradability"), data.get("liquidity"), data.get("tradability")) < 25:
+        downgrades.append("liquidity_too_thin")
+    if not upgrades and level in {"watchlist", "high_priority"}:
+        upgrades.append("monitor_for_stronger_market_confirmation")
+    if not downgrades:
+        downgrades.append("conflicting_evidence")
+    upgrades = list(dict.fromkeys(upgrades))
+    downgrades = list(dict.fromkeys(downgrades))
+    summary = (
+        "upgrade=" + ", ".join(upgrades[:4])
+        + " · downgrade=" + ", ".join(downgrades[:4])
+    )
+    return OpportunityUpgradePath(
+        upgrade_requirements=tuple(upgrades),
+        downgrade_warnings=tuple(downgrades),
+        summary=summary,
+    )
+
+
+def _object_mapping(prefix: str, value: object | Mapping[str, Any] | None) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, Mapping):
+        return dict(value)
+    out: dict[str, Any] = {}
+    for key in (
+        "opportunity_score_final",
+        "opportunity_level",
+        "impact_path_type",
+        "impact_path_strength",
+        "candidate_role",
+        "market_confirmation_score",
+        "level",
+        "evidence_quality_score",
+        "source_class",
+        "evidence_specificity",
+    ):
+        if hasattr(value, key):
+            out[key] = getattr(value, key)
+            out[f"{prefix}_{key}"] = getattr(value, key)
+    return out
 
 
 def _path_strength_score(strength: str) -> float:

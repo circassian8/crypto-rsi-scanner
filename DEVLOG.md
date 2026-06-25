@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Add Event Alpha signal-quality workbench · Codex
+**Why:** Event Alpha needed an offline benchmark and operator audit layer that
+answers why a candidate is or is not worth attention, instead of relying on
+isolated scoring fields scattered across reports.
+**Changes:**
+- Added `event_alpha_signal_quality.py` and
+  `fixtures/event_discovery/event_alpha_signal_quality_cases.json` with a
+  16-case offline benchmark covering proxy exposure, direct token events,
+  policy/macro weak co-occurrence, market anomalies, listings/unlocks, and
+  common source-noise/word-collision false positives.
+- Added `event_opportunity_audit.py`, `--event-opportunity-audit`, and the
+  `make event-opportunity-audit` target for candidate-level evidence-chain,
+  impact-path, market-confirmation, opportunity-verdict, routing, upgrade, and
+  downgrade diagnostics.
+- Extended `event_opportunity_verdict.py`, research cards, daily briefs,
+  watchlist promotion, router material-change handling, hypothesis reports,
+  feedback, and calibration reports with explicit upgrade/downgrade reasoning
+  and signal-quality cohorts.
+- Added `RSI_EVENT_ALPHA_NOTIFICATION_QUALITY_MODE` so notification profiles
+  default to `validated_digest` visibility while keeping exploratory output
+  available only when deliberately requested.
+**Verify:** `python3 tests/test_indicators.py` (448/448 passed);
+`make event-llm-eval PYTHON=python3`; `make event-llm-extract-eval
+PYTHON=python3`; `make event-alpha-eval PYTHON=python3`; `make
+event-alpha-signal-quality-eval PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Research-only. This changes diagnostics, visibility filters,
+and watchlist/router metadata for validated hypotheses; it does not add live
+trading, paper trades, normal RSI signal writes, or any LLM/provider-created
+`TRIGGERED_FADE`.
+
 ## 2026-06-25 — Add Event Alpha market/evidence verdict layer · Codex
 **Why:** Validated hypotheses needed a stronger attention filter than catalyst
 co-occurrence plus impact-path metadata. Operator-facing research digests should

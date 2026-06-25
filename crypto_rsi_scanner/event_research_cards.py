@@ -9,7 +9,7 @@ import re
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
-from . import event_alpha_router, event_graph, event_watchlist, event_watchlist_monitor
+from . import event_alpha_router, event_graph, event_opportunity_verdict, event_watchlist, event_watchlist_monitor
 
 
 @dataclass(frozen=True)
@@ -628,6 +628,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     why_not_promoted = components.get("why_not_promoted") or []
     if isinstance(why_not_promoted, str):
         why_not_promoted = [why_not_promoted]
+    upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
     lines = [
         f"- Validated asset: {validated_symbol or 'unknown'}/{validated_coin_id or 'unknown'}",
         f"- Original sector hypothesis: {', '.join(str(item) for item in (components.get('candidate_sectors') or [])[:6]) or components.get('hypothesis_scope') or 'unknown'}",
@@ -659,8 +660,8 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
             if manual_verification_items
             else "independent catalyst source, asset identity, liquidity/organic volume, and whether the catalyst actually affects this token."
         ),
-        "- What would upgrade this candidate: stronger source specificity, moderate/strong market confirmation, and clearer catalyst timing.",
-        "- What would downgrade this candidate: source-noise evidence, missing market reaction, weak liquidity, or no explained token impact path.",
+        "- What would upgrade this candidate: " + "; ".join(upgrade.upgrade_requirements[:6]),
+        "- What would invalidate this candidate: " + "; ".join(upgrade.downgrade_warnings[:6]),
     ]
     if validation_reasons:
         lines.append("- Validation evidence: " + "; ".join(str(item) for item in validation_reasons[:4]))

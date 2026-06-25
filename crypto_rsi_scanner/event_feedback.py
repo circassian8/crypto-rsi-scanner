@@ -52,6 +52,13 @@ class EventFeedbackRecord:
     playbook_type: str | None = None
     latest_score: int | None = None
     watchlist_last_seen_at: str | None = None
+    source_class: str | None = None
+    source_domain: str | None = None
+    evidence_specificity: str | None = None
+    impact_path_type: str | None = None
+    candidate_role: str | None = None
+    opportunity_level: str | None = None
+    market_confirmation_level: str | None = None
 
 
 @dataclass(frozen=True)
@@ -232,6 +239,7 @@ def _record_from_entry(
             notes=_optional_str(notes),
             route=route,
         )
+    components = dict(entry.latest_score_components or {})
     return EventFeedbackRecord(
         schema_version=FEEDBACK_SCHEMA_VERSION,
         row_type="event_alpha_feedback",
@@ -253,6 +261,13 @@ def _record_from_entry(
         playbook_type=entry.latest_playbook_type,
         latest_score=entry.latest_score,
         watchlist_last_seen_at=entry.last_seen_at,
+        source_class=_optional_str(components.get("source_class")),
+        source_domain=_optional_str(components.get("source_domain")),
+        evidence_specificity=_optional_str(components.get("evidence_specificity")),
+        impact_path_type=_optional_str(components.get("impact_path_type")),
+        candidate_role=_optional_str(components.get("candidate_role")),
+        opportunity_level=_optional_str(components.get("opportunity_level")),
+        market_confirmation_level=_optional_str(components.get("market_confirmation_level")),
     )
 
 
@@ -295,6 +310,13 @@ def _record_from_row(row: Mapping[str, Any]) -> EventFeedbackRecord | None:
             playbook_type=_optional_str(row.get("playbook_type")),
             latest_score=_optional_int(row.get("latest_score")),
             watchlist_last_seen_at=_optional_str(row.get("watchlist_last_seen_at")),
+            source_class=_optional_str(row.get("source_class")),
+            source_domain=_optional_str(row.get("source_domain")),
+            evidence_specificity=_optional_str(row.get("evidence_specificity")),
+            impact_path_type=_optional_str(row.get("impact_path_type")),
+            candidate_role=_optional_str(row.get("candidate_role")),
+            opportunity_level=_optional_str(row.get("opportunity_level")),
+            market_confirmation_level=_optional_str(row.get("market_confirmation_level")),
         )
     except (TypeError, ValueError):
         return None

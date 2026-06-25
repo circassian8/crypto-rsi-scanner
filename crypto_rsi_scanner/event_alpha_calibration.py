@@ -38,6 +38,11 @@ def format_calibration_report(
         ("feedback by tier", "tier"),
         ("LLM role usefulness", "llm_asset_role"),
         ("cluster confidence bucket", "cluster_confidence_bucket"),
+        ("feedback by impact path type", "impact_path_type"),
+        ("feedback by candidate role", "candidate_role"),
+        ("feedback by evidence specificity", "evidence_specificity"),
+        ("feedback by market confirmation level", "market_confirmation_level"),
+        ("feedback by opportunity level", "opportunity_level"),
     ):
         line = _feedback_line(title, merged, field)
         if line:
@@ -144,17 +149,31 @@ def _merge_feedback(
         if key:
             feedback_by_key[key] = row
     out: list[dict[str, Any]] = []
+    matched_feedback_keys: set[str] = set()
     for row in alert_rows:
         merged = dict(row)
         key = str(row.get("alert_key") or row.get("key") or "").strip()
         feedback = feedback_by_key.get(key)
         if feedback:
+            matched_feedback_keys.add(key)
             merged["feedback_label"] = feedback.get("label")
             merged["feedback_notes"] = feedback.get("notes")
+            for key in (
+                "impact_path_type",
+                "candidate_role",
+                "evidence_specificity",
+                "market_confirmation_level",
+                "opportunity_level",
+                "source_class",
+                "source_domain",
+            ):
+                if not merged.get(key) and feedback.get(key):
+                    merged[key] = feedback.get(key)
         merged["cluster_confidence_bucket"] = _cluster_bucket(row)
         out.append(merged)
     for row in feedback_rows:
-        if str(row.get("key") or "").strip():
+        key = str(row.get("key") or "").strip()
+        if key and key in matched_feedback_keys:
             continue
         out.append({
             "playbook_type": row.get("playbook_type") or "unmatched",
@@ -162,6 +181,11 @@ def _merge_feedback(
             "tier": row.get("route") or "feedback",
             "feedback_label": row.get("label"),
             "llm_asset_role": row.get("llm_asset_role"),
+            "impact_path_type": row.get("impact_path_type"),
+            "candidate_role": row.get("candidate_role"),
+            "evidence_specificity": row.get("evidence_specificity"),
+            "market_confirmation_level": row.get("market_confirmation_level"),
+            "opportunity_level": row.get("opportunity_level"),
             "cluster_confidence_bucket": "unknown",
         })
     return out

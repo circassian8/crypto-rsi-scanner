@@ -456,6 +456,15 @@ def _material_change_allowed(
         return True, None
     allowed = False
     blocked: list[str] = []
+    if reasons & {
+        "initial_validated_hypothesis",
+        "hypothesis_validated",
+        "impact_path_confirmed",
+        "market_confirmation_upgraded",
+        "evidence_quality_upgraded",
+        "opportunity_score_upgraded",
+    }:
+        allowed = True
     if "score_jump" in reasons:
         if cfg.alert_on_score_jump and entry.score_jump >= cfg.score_jump_threshold:
             allowed = True

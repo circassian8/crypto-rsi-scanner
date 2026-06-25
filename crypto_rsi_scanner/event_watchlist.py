@@ -414,12 +414,6 @@ def _entry_from_hypothesis(
         "promoted_to_radar",
     }
     validated = status == "validated" and promotable_stage
-    state = EventWatchlistState.RADAR if validated else EventWatchlistState.HYPOTHESIS
-    previous_state = prior.state if prior else None
-    rank = _state_rank(state)
-    previous_rank = _state_rank(previous_state)
-    state_changed = previous_state is not None and previous_state != state.value
-    escalation = bool(validated and (previous_state is None or rank > previous_rank))
     observed_iso = observed.isoformat()
     first_seen = prior.first_seen_at if prior else observed_iso
     hypothesis_score = _optional_float(getattr(hypothesis, "hypothesis_score", None))
@@ -437,13 +431,19 @@ def _entry_from_hypothesis(
         token_level=validated and scope == "token",
     )
     playbook = str(getattr(hypothesis, "playbook_hint", "") or "impact_hypothesis")
+    state = _state_from_hypothesis(hypothesis, validated=validated, token_level=symbol != "SECTOR")
+    previous_state = prior.state if prior else None
+    rank = _state_rank(state)
+    previous_rank = _state_rank(previous_state)
+    state_changed = previous_state is not None and previous_state != state.value
+    escalation = bool(validated and (previous_state is None or rank > previous_rank))
     event_name = f"{getattr(hypothesis, 'external_asset', None) or category} {scope} impact hypothesis"
-    reasons = ("hypothesis_validated",) if validated else ()
+    reasons = _hypothesis_material_change_reasons(hypothesis, prior, state, validated=validated)
     history = list(prior.alert_history if prior else [])
     history.append({
         "observed_at": observed_iso,
         "state": state.value,
-        "tier": "RADAR_DIGEST" if validated else "STORE_ONLY",
+        "tier": _tier_for_hypothesis_state(state, validated=validated),
         "score": score,
         "effective_playbook_type": playbook,
         "material_change_reasons": list(reasons),
@@ -476,8 +476,8 @@ def _entry_from_hypothesis(
         first_seen_at=first_seen,
         last_seen_at=observed_iso,
         first_radar_at=_transition_time(prior, "first_radar_at", state, EventWatchlistState.RADAR, observed_iso),
-        first_watchlisted_at=prior.first_watchlisted_at if prior else None,
-        first_high_priority_at=prior.first_high_priority_at if prior else None,
+        first_watchlisted_at=_transition_time(prior, "first_watchlisted_at", state, EventWatchlistState.WATCHLIST, observed_iso),
+        first_high_priority_at=_transition_time(prior, "first_high_priority_at", state, EventWatchlistState.HIGH_PRIORITY, observed_iso),
         first_event_passed_at=prior.first_event_passed_at if prior else None,
         first_armed_at=prior.first_armed_at if prior else None,
         first_triggered_at=prior.first_triggered_at if prior else None,
@@ -486,14 +486,14 @@ def _entry_from_hypothesis(
         source_count=len(tuple(getattr(hypothesis, "source_raw_ids", ()) or ())),
         highest_score=max(prior.highest_score if prior else 0, score),
         latest_score=score,
-        latest_tier="RADAR_DIGEST" if validated else "STORE_ONLY",
+        latest_tier=_tier_for_hypothesis_state(state, validated=validated),
         latest_event_name=event_name,
         latest_source="impact_hypothesis",
         latest_playbook_type=playbook,
         latest_rule_playbook_type=playbook,
         latest_effective_playbook_type=playbook,
         latest_playbook_score=score,
-        latest_playbook_action="radar_digest" if validated else "store_only",
+        latest_playbook_action=_action_for_hypothesis_state(state, validated=validated),
         latest_market_snapshot={},
         latest_score_components={
             "hypothesis_id": str(getattr(hypothesis, "hypothesis_id", "") or ""),
@@ -559,10 +559,106 @@ def _entry_from_hypothesis(
         material_change_reasons=reasons,
         should_alert=escalation,
         suppressed_reason=None if escalation else (
-            "validated hypothesis promoted to RADAR" if validated else "impact hypothesis awaiting asset validation"
+            f"validated hypothesis retained at {state.value}" if validated else "impact hypothesis awaiting validation"
         ),
         warnings=warnings,
     )
+
+
+def _state_from_hypothesis(
+    hypothesis: object,
+    *,
+    validated: bool,
+    token_level: bool,
+) -> EventWatchlistState:
+    if not validated:
+        return EventWatchlistState.HYPOTHESIS
+    if not token_level:
+        return EventWatchlistState.RADAR
+    level = str(getattr(hypothesis, "opportunity_level", "") or "")
+    market_level = str(getattr(hypothesis, "market_confirmation_level", "") or "")
+    score = _optional_float(getattr(hypothesis, "opportunity_score_final", None))
+    if score is None:
+        score = _optional_float(getattr(hypothesis, "hypothesis_score", None)) or 0.0
+    evidence = _optional_float(getattr(hypothesis, "evidence_quality_score", None)) or 0.0
+    timing = _score_component_float(hypothesis, "timing_event_window", "event_clarity")
+    derivatives = _score_component_float(hypothesis, "derivatives_crowding")
+    if level == "high_priority" or score >= 88 or (market_level == "strong" and (timing >= 70 or derivatives >= 50)):
+        return EventWatchlistState.HIGH_PRIORITY
+    if level == "watchlist" or score >= 78 or (market_level in {"moderate", "strong"} and evidence >= 60):
+        return EventWatchlistState.WATCHLIST
+    return EventWatchlistState.RADAR
+
+
+def _hypothesis_material_change_reasons(
+    hypothesis: object,
+    prior: EventWatchlistEntry | None,
+    state: EventWatchlistState,
+    *,
+    validated: bool,
+) -> tuple[str, ...]:
+    if not validated:
+        return ()
+    reasons: list[str] = ["impact_path_confirmed"]
+    if prior is None:
+        reasons.append("initial_validated_hypothesis")
+    components = prior.latest_score_components if prior else {}
+    market = str(getattr(hypothesis, "market_confirmation_level", "") or "")
+    previous_market = str(components.get("market_confirmation_level") or "")
+    if market in {"moderate", "strong"} and market != previous_market:
+        reasons.append("market_confirmation_upgraded")
+    evidence = _optional_float(getattr(hypothesis, "evidence_quality_score", None)) or 0.0
+    previous_evidence = _optional_float(components.get("evidence_quality_score")) or 0.0
+    if evidence >= 65 and evidence > previous_evidence:
+        reasons.append("evidence_quality_upgraded")
+    level = str(getattr(hypothesis, "opportunity_level", "") or "")
+    previous_level = str(components.get("opportunity_level") or "")
+    if level in {"validated_digest", "watchlist", "high_priority"} and level != previous_level:
+        reasons.append("opportunity_score_upgraded")
+    if state == EventWatchlistState.RADAR and market in {"", "none", "weak"}:
+        reasons.append("market_reaction_absent_downgrade")
+    warnings = tuple(str(value).lower() for value in (
+        *tuple(getattr(hypothesis, "warnings", ()) or ()),
+        *tuple(getattr(hypothesis, "why_not_promoted", ()) or ()),
+    ))
+    if any("stale" in warning for warning in warnings):
+        reasons.append("event_stale_downgrade")
+    return tuple(dict.fromkeys(reasons))
+
+
+def _tier_for_hypothesis_state(state: EventWatchlistState, *, validated: bool) -> str:
+    if not validated:
+        return "STORE_ONLY"
+    if state == EventWatchlistState.HIGH_PRIORITY:
+        return "HIGH_PRIORITY_WATCH"
+    if state == EventWatchlistState.WATCHLIST:
+        return "WATCHLIST"
+    if state == EventWatchlistState.RADAR:
+        return "RADAR_DIGEST"
+    return "STORE_ONLY"
+
+
+def _action_for_hypothesis_state(state: EventWatchlistState, *, validated: bool) -> str:
+    if not validated:
+        return "store_only"
+    if state == EventWatchlistState.HIGH_PRIORITY:
+        return "high_priority_watch"
+    if state == EventWatchlistState.WATCHLIST:
+        return "watchlist"
+    if state == EventWatchlistState.RADAR:
+        return "radar_digest"
+    return "store_only"
+
+
+def _score_component_float(hypothesis: object, *keys: str) -> float:
+    components = getattr(hypothesis, "score_components", {}) or {}
+    if not isinstance(components, Mapping):
+        return 0.0
+    for key in keys:
+        value = _optional_float(components.get(key))
+        if value is not None:
+            return value
+    return 0.0
 
 
 def _hypothesis_watchlist_asset(

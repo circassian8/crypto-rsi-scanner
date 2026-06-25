@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-25 - Event Alpha signal quality is diagnostic and visibility-scoped
+**Status:** accepted
+**Decision:** Event Alpha signal-quality evaluation, opportunity audits,
+upgrade/downgrade explanations, and
+`RSI_EVENT_ALPHA_NOTIFICATION_QUALITY_MODE` are research workbench features.
+They may explain candidates, group feedback/calibration cohorts, promote
+validated hypothesis watchlist state for review metadata, and filter which
+research notification lanes are visible to the operator. They must not alter
+normal RSI alerts, write live signal/paper rows, open trades, or create
+`TRIGGERED_FADE`; deterministic `event_fade.py` plus `proxy_fade` remains the
+only `TRIGGERED_FADE` source.
+**Why:** The radar needs a practical way to suppress low-quality exploratory
+noise and audit candidate evidence without turning diagnostic scores into
+execution or calibrated signal authority.
+**Revisit when:** A reviewed Event Alpha sample plus outcomes show a
+signal-quality cohort has stable enough edge to justify a separately approved
+promotion path.
+
 ## 2026-06-25 - Event Alpha digests require final opportunity verdicts
 **Status:** accepted
 **Decision:** Validated Event Alpha hypotheses must carry a final opportunity

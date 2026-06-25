@@ -98,6 +98,7 @@ from . import event_alpha_retention
 from . import event_alpha_run_ledger
 from . import event_alpha_run_lock
 from . import event_alpha_router
+from . import event_alpha_signal_quality
 from . import event_alpha_scheduler
 from . import event_alpha_tuning
 from . import event_alpha_telegram_recipient_check
@@ -109,6 +110,7 @@ from . import event_clock
 from . import event_feedback
 from . import event_llm_analyzer
 from . import event_llm_extractor
+from . import event_opportunity_audit
 from . import event_provider_health
 from . import event_provider_status
 from . import event_price_history
@@ -1514,6 +1516,7 @@ def _event_alpha_notification_config_from_runtime(
         exploratory_digest_include_rejection_reasons=config.EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_REJECTION_REASONS,
         exploratory_digest_include_raw_evidence=config.EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_RAW_EVIDENCE,
         exploratory_digest_include_controls=config.EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_CONTROLS,
+        quality_mode=config.EVENT_ALPHA_NOTIFICATION_QUALITY_MODE,
     )
 
 
@@ -4115,6 +4118,53 @@ def event_alpha_router_report(verbose: bool = False, profile_name: str | None = 
     if profile:
         report = report + f"\n\nprofile_applied: {profile.name}"
     print(report)
+
+
+def event_alpha_signal_quality_eval(
+    path: str | None = None,
+    verbose: bool = False,
+) -> None:
+    """Run the offline curated Event Alpha signal-quality benchmark."""
+    _setup_event_discovery_logging(verbose)
+    result = event_alpha_signal_quality.evaluate_signal_quality_cases(
+        path or event_alpha_signal_quality.DEFAULT_SIGNAL_QUALITY_CASES_PATH
+    )
+    print(event_alpha_signal_quality.format_signal_quality_eval(result))
+    if result.failed_cases:
+        raise SystemExit(1)
+
+
+def event_opportunity_audit_report(
+    target: str,
+    *,
+    verbose: bool = False,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print a single-candidate decision audit from local Event Alpha artifacts."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
+        context.impact_hypothesis_store_path,
+        limit=500,
+        include_legacy=True,
+    )
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=True)
+    routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    print(_event_alpha_context_block(context))
+    print(event_opportunity_audit.format_opportunity_audit(
+        target,
+        hypotheses=hypotheses.rows,
+        watchlist_entries=watchlist.entries,
+        alert_rows=alerts.rows,
+        route_decisions=routed.decisions,
+        profile=context.profile,
+    ))
 
 
 def event_feedback_mark(
@@ -7527,6 +7577,21 @@ def cli() -> None:
         help="Print research-only Event Alpha Radar route decisions from watchlist state.",
     )
     parser.add_argument(
+        "--event-alpha-signal-quality-eval",
+        action="store_true",
+        help="Run the offline curated Event Alpha signal-quality benchmark.",
+    )
+    parser.add_argument(
+        "--event-alpha-signal-quality-cases-path",
+        default=None,
+        help="Optional JSON fixture path for --event-alpha-signal-quality-eval.",
+    )
+    parser.add_argument(
+        "--event-opportunity-audit",
+        metavar="TARGET",
+        help="Explain one Event Alpha opportunity decision path from local artifacts.",
+    )
+    parser.add_argument(
         "--event-alpha-missed-report",
         action="store_true",
         help="Print missed-opportunity diagnostics from market rows and Event Alpha artifacts.",
@@ -8301,6 +8366,20 @@ def cli() -> None:
         return
     if args.event_alpha_router_report:
         event_alpha_router_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        return
+    if args.event_alpha_signal_quality_eval:
+        event_alpha_signal_quality_eval(
+            path=args.event_alpha_signal_quality_cases_path,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_opportunity_audit:
+        event_opportunity_audit_report(
+            args.event_opportunity_audit,
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
         return
     if args.event_alpha_missed_report:
         event_alpha_missed_report(

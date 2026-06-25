@@ -140,6 +140,20 @@ Delivered validated-hypothesis digest items are written to
 validated identity fields so `make event-alpha-notification-inbox
 PROFILE=notify_llm` can show them as needing useful/junk feedback.
 
+Notification visibility is separately controlled by
+`RSI_EVENT_ALPHA_NOTIFICATION_QUALITY_MODE`:
+
+- `validated_digest` (default): send validated digest, high-priority, and
+  triggered-fade research lanes; keep exploratory-only rows local.
+- `high_quality_only`: send only high-priority and triggered-fade research
+  lanes.
+- `exploratory_only`: enable the exploratory digest lane for deliberate burn-in
+  review.
+
+This setting filters operator visibility only. It does not change router
+scoring, normal RSI alerts, paper/live writes, trading, or `TRIGGERED_FADE`
+eligibility.
+
 Each Event Alpha cycle also appends generated hypotheses to a profile-scoped
 research artifact:
 
@@ -162,6 +176,32 @@ validation status, search queries, rejection reasons, rejected validation
 evidence samples, schema-audit fields, and `why_not_promoted` diagnostics.
 Suggested LLM/search assets are metadata only until deterministic
 resolver/search evidence validates identity.
+
+## Signal-Quality Workbench
+
+Run the offline signal-quality benchmark after changing impact-path, market
+confirmation, evidence-quality, opportunity-verdict, notification-quality, or
+validated-hypothesis routing code:
+
+```bash
+make event-alpha-signal-quality-eval
+```
+
+The fixture covers positive proxy/direct cases, weak co-occurrence controls,
+market anomalies without catalysts, token unlock/listing cases, and known
+source-noise/word-collision failures. It is offline and research-only.
+
+To inspect one candidate from the current artifacts, use:
+
+```bash
+make event-opportunity-audit TARGET=SYMBOL PROFILE=notify_llm
+```
+
+`TARGET` can be a symbol, coin id, alert id, card id, event id, or route key.
+The audit report prints the evidence chain, identity status, impact path,
+market confirmation, final opportunity verdict, router decision, missing
+evidence, upgrade requirements, downgrade risks, and a feedback command. It is
+diagnostic only and cannot make a candidate alertable or trigger a fade.
 
 The report defaults to the latest stored `run_id` while still printing
 total/latest/historical/legacy availability. Use `ALL_HISTORY=1` for the older

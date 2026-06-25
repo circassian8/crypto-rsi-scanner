@@ -8112,6 +8112,7 @@ def test_event_alpha_pipeline_writes_non_alertable_hypothesis_rows():
             enabled=True,
             exploratory_digest_enabled=True,
             exploratory_digest_include_controls=True,
+            quality_mode="exploratory_only",
         )
         plan = event_alpha_notifications.build_notification_plan(
             pipe.router_result.decisions,
@@ -20819,6 +20820,7 @@ def test_event_alpha_exploratory_digest_surfaces_suppressed_rows_without_alertin
             enabled=False,
             exploratory_digest_enabled=True,
             exploratory_digest_max_items=5,
+            quality_mode="exploratory_only",
         )
         plan = notif.build_notification_plan(decisions, storage=storage, cfg=cfg, now=now)
         assert plan.decision_count == 0
@@ -20881,6 +20883,7 @@ def test_event_alpha_exploratory_digest_excludes_controls_and_has_own_cooldown()
         exploratory_digest_enabled=True,
         exploratory_digest_cooldown_hours=24,
         daily_digest_cooldown_hours=24,
+        quality_mode="exploratory_only",
     )
     notif.record_lane_sent(storage, notif.LANE_DAILY_DIGEST, item_count=1, now=now, cfg=cfg)
     good = _notify_suppressed_decision("GOOD", score=60)
@@ -20906,6 +20909,7 @@ def test_event_alpha_exploratory_digest_excludes_controls_and_has_own_cooldown()
         enabled=True,
         exploratory_digest_enabled=True,
         exploratory_digest_include_controls=True,
+        quality_mode="exploratory_only",
     )
     with_controls = notif.build_notification_plan([noise], storage=_NotifyFakeStorage(), cfg=include_controls, now=now)
     assert with_controls.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 1
@@ -20924,6 +20928,7 @@ def test_event_alpha_exploratory_digest_truncates_compact_numbered_blocks():
         enabled=True,
         exploratory_digest_enabled=True,
         exploratory_digest_max_items=12,
+        quality_mode="exploratory_only",
     )
     plan = notif.build_notification_plan(decisions, storage=_NotifyFakeStorage(), cfg=cfg, now=now)
     text = notif.format_exploratory_telegram_digest(plan.exploratory_items, profile="notify_no_key", cfg=cfg)
@@ -20932,6 +20937,191 @@ def test_event_alpha_exploratory_digest_truncates_compact_numbered_blocks():
     assert "9. <b>" not in text
     assert "+4 more in local notification inbox." in text
     assert len(text) <= 3900
+
+
+def test_event_alpha_notification_quality_modes_filter_lanes():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router
+
+    now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+    storage = _NotifyFakeStorage()
+    daily = _notify_route_decision("RAD", event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST, event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST)
+    high = _notify_route_decision("HOT", event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION, event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH)
+    triggered = _notify_route_decision("FADE", event_alpha_router.EventAlphaRouteLane.TRIGGERED_FADE, event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH)
+    exploratory = _notify_suppressed_decision("RAW", score=80)
+
+    validated = notif.build_notification_plan(
+        [daily, high, triggered, exploratory],
+        storage=storage,
+        cfg=notif.EventAlphaNotificationConfig(enabled=True, exploratory_digest_enabled=True, quality_mode="validated_digest", daily_digest_cooldown_hours=0, instant_escalation_cooldown_hours=0),
+        now=now,
+    )
+    assert validated.lane_counts[notif.LANE_DAILY_DIGEST] == 1
+    assert validated.lane_counts[notif.LANE_INSTANT_ESCALATION] == 1
+    assert validated.lane_counts[notif.LANE_TRIGGERED_FADE] == 1
+    assert validated.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 0
+
+    high_only = notif.build_notification_plan(
+        [daily, high, triggered, exploratory],
+        storage=_NotifyFakeStorage(),
+        cfg=notif.EventAlphaNotificationConfig(enabled=True, exploratory_digest_enabled=True, quality_mode="high_quality_only", daily_digest_cooldown_hours=0, instant_escalation_cooldown_hours=0),
+        now=now,
+    )
+    assert high_only.lane_counts[notif.LANE_DAILY_DIGEST] == 0
+    assert high_only.lane_counts[notif.LANE_INSTANT_ESCALATION] == 1
+    assert high_only.lane_counts[notif.LANE_TRIGGERED_FADE] == 1
+    assert high_only.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 0
+
+    exploratory_only = notif.build_notification_plan(
+        [daily, high, triggered, exploratory],
+        storage=_NotifyFakeStorage(),
+        cfg=notif.EventAlphaNotificationConfig(enabled=True, exploratory_digest_enabled=True, quality_mode="exploratory_only", daily_digest_cooldown_hours=0, instant_escalation_cooldown_hours=0),
+        now=now,
+    )
+    assert exploratory_only.lane_counts[notif.LANE_DAILY_DIGEST] == 0
+    assert exploratory_only.lane_counts[notif.LANE_INSTANT_ESCALATION] == 0
+    assert exploratory_only.lane_counts[notif.LANE_TRIGGERED_FADE] == 1
+    assert exploratory_only.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 1
+
+
+def test_event_alpha_signal_quality_fixture_passes_and_reports_stage_failure():
+    import json
+    import tempfile
+    from crypto_rsi_scanner import event_alpha_signal_quality as quality
+
+    result = quality.evaluate_signal_quality_cases()
+    assert result.failed_cases == 0
+    assert result.total_cases >= 13
+    text = quality.format_signal_quality_eval(result)
+    assert "failures_by_stage: none" in text
+
+    cases = list(quality.load_signal_quality_cases())
+    cases[0] = {**cases[0], "expected": {**dict(cases[0]["expected"]), "route_tier": "STORE_ONLY"}}
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "bad_cases.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"cases": cases[:1]}, fh)
+        bad = quality.evaluate_signal_quality_cases(path)
+    assert bad.failed_cases == 1
+    assert "routing" in bad.case_results[0].stage_failures
+    assert any("route_tier" in diff for diff in bad.case_results[0].diffs)
+
+
+def test_event_opportunity_upgrade_path_and_audit_sections():
+    from crypto_rsi_scanner import event_opportunity_audit, event_opportunity_verdict
+
+    weak = event_opportunity_verdict.explain_upgrade_path(components={
+        "impact_path_type": "generic_cooccurrence_only",
+        "candidate_role": "generic_mention",
+        "market_confirmation_level": "weak",
+        "market_confirmation_score": 20,
+        "evidence_quality_score": 35,
+        "opportunity_score_final": 42,
+    })
+    assert "blocked_by_generic_cooccurrence" in weak.upgrade_requirements
+    assert "needs_market_confirmation" in weak.upgrade_requirements
+    assert "no_value_capture" in weak.downgrade_warnings
+
+    from crypto_rsi_scanner import event_alpha_router
+    decision = _notify_route_decision(
+        "VELVET",
+        event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+        event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+    )
+    report = event_opportunity_audit.format_opportunity_audit("VELVET", route_decisions=[decision], profile="fixture")
+    assert "EVENT OPPORTUNITY AUDIT" in report
+    assert "## What would upgrade this candidate" in report
+    assert "## What would downgrade / invalidate this candidate" in report
+    assert "No secrets, Telegram sends, trades" in report
+
+
+def test_event_watchlist_validated_hypothesis_market_confirmation_promotes_state():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_watchlist
+
+    hypothesis = SimpleNamespace(
+        hypothesis_id="h-velvet",
+        event_cluster_id="spacex|ipo|2026-06-20",
+        status="validated",
+        validation_stage="impact_path_validated",
+        hypothesis_score=82,
+        confidence=0.82,
+        candidate_symbols=("VELVET",),
+        candidate_coin_ids=("velvet",),
+        validated_symbol="VELVET",
+        validated_coin_id="velvet",
+        candidate_sectors=("tokenized_stock_venues",),
+        source_raw_ids=("r1", "r2"),
+        impact_category="rwa_preipo_proxy",
+        hypothesis_scope="token",
+        playbook_hint="proxy_attention",
+        external_asset="SpaceX",
+        opportunity_level="watchlist",
+        market_confirmation_level="moderate",
+        market_confirmation_score=62,
+        evidence_quality_score=78,
+        impact_path_type="proxy_exposure",
+        impact_path_strength="strong",
+        candidate_role="proxy_venue",
+        score_components={"event_clarity": 80, "derivatives_crowding": 20},
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        result = event_watchlist.refresh_hypothesis_watchlist(
+            [hypothesis],
+            cfg=event_watchlist.EventWatchlistConfig(enabled=True, state_path=__import__("pathlib").Path(tmp) / "watch.jsonl"),
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+        )
+    entry = result.entries[0]
+    assert entry.state == event_watchlist.EventWatchlistState.WATCHLIST.value
+    assert entry.latest_tier == "WATCHLIST"
+    assert "market_confirmation_upgraded" in entry.material_change_reasons
+    assert entry.should_alert
+    assert entry.state != event_watchlist.EventWatchlistState.TRIGGERED_FADE.value
+
+
+def test_feedback_and_calibration_include_signal_quality_fields():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_calibration, event_feedback
+
+    entry = _test_watchlist_entry(
+        state="WATCHLIST",
+        symbol="VELVET",
+        coin_id="velvet",
+    )
+    entry = __import__("dataclasses").replace(entry, latest_score_components={
+        "impact_path_type": "proxy_exposure",
+        "candidate_role": "proxy_venue",
+        "evidence_specificity": "source_explains_mechanism",
+        "market_confirmation_level": "moderate",
+        "opportunity_level": "watchlist",
+        "source_class": "crypto_native",
+    })
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = event_feedback.EventFeedbackConfig(path=__import__("pathlib").Path(tmp) / "feedback.jsonl")
+        record = event_feedback.mark_feedback(
+            entry.key,
+            "useful",
+            watchlist_entries=[entry],
+            cfg=cfg,
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+        )
+        loaded = event_feedback.load_feedback(cfg.path)
+    assert record.impact_path_type == "proxy_exposure"
+    report = event_alpha_calibration.format_calibration_report([], feedback_rows=[r.__dict__ for r in loaded.records])
+    assert "feedback by impact path type: proxy_exposure: useful=1" in report
+    assert "feedback by candidate role: proxy_venue: useful=1" in report
+
+
+def test_event_alpha_signal_quality_make_targets_exist():
+    from pathlib import Path
+
+    text = Path("Makefile").read_text(encoding="utf-8")
+    assert "event-alpha-signal-quality-eval:" in text
+    assert "--event-alpha-signal-quality-eval" in text
+    assert "event-opportunity-audit:" in text
+    assert "--event-opportunity-audit" in text
 
 
 def test_event_alpha_delivery_report_groups_by_state_and_redacts_secrets():

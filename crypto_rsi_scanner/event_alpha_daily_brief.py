@@ -15,6 +15,7 @@ from . import (
     event_alpha_explain,
     event_alpha_run_ledger,
     event_alpha_router,
+    event_opportunity_verdict,
     event_research_cards,
     event_source_reliability,
     event_watchlist,
@@ -353,6 +354,8 @@ def build_daily_brief(
     lines.append("- Sector hypotheses awaiting validation: " + (_brief_entries(exploratory_sector_hypotheses[:5]) or "none"))
     lines.append("- Rejected/why-not-promoted hypotheses: " + (_brief_hypothesis_labels(rejected_hypotheses[:5]) or "none"))
     lines.append("- Market confirmation by playbook: " + _market_confirmation_by_playbook(decisions))
+    lines.append("- Top upgrade candidates: " + (_upgrade_candidate_line(decisions) or "none"))
+    lines.append("- Top downgrade risks: " + (_downgrade_risk_line(decisions) or "none"))
     exploratory = event_alpha_notifications.select_exploratory_candidates(
         decisions,
         cfg=event_alpha_notifications.EventAlphaNotificationConfig(
@@ -642,6 +645,44 @@ def _market_confirmation_by_playbook(rows: Iterable[event_alpha_router.EventAlph
     for playbook, levels in sorted(counts.items()):
         parts.append(playbook + "[" + ",".join(f"{key}={value}" for key, value in sorted(levels.items())) + "]")
     return "; ".join(parts)
+
+
+def _upgrade_candidate_line(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
+    labels: list[str] = []
+    for decision in sorted(rows, key=lambda item: item.entry.latest_score, reverse=True):
+        entry = decision.entry
+        if decision.alertable or entry.relationship_type != "impact_hypothesis":
+            continue
+        components = entry.latest_score_components or {}
+        upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
+        if not upgrade.upgrade_requirements:
+            continue
+        labels.append(
+            f"{entry.symbol}/{entry.coin_id}: "
+            + "; ".join(upgrade.upgrade_requirements[:2])
+        )
+        if len(labels) >= 5:
+            break
+    return " | ".join(labels)
+
+
+def _downgrade_risk_line(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
+    labels: list[str] = []
+    for decision in sorted(rows, key=lambda item: item.entry.latest_score, reverse=True):
+        entry = decision.entry
+        if not decision.alertable and entry.state not in {"WATCHLIST", "HIGH_PRIORITY"}:
+            continue
+        components = entry.latest_score_components or {}
+        upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
+        if not upgrade.downgrade_warnings:
+            continue
+        labels.append(
+            f"{entry.symbol}/{entry.coin_id}: "
+            + "; ".join(upgrade.downgrade_warnings[:2])
+        )
+        if len(labels) >= 5:
+            break
+    return " | ".join(labels)
 
 
 def _float(value: object) -> float:

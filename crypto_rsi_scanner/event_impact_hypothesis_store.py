@@ -193,6 +193,9 @@ def format_impact_hypotheses_store_report(
         + " · executed_by_type="
         + _format_counts(_query_type_counts(result.rows, "executed_queries"))
     )
+    funnel = _candidate_discovery_funnel_line(result.rows)
+    if funnel:
+        rows.append(funnel)
     promotion_ids = _promoted_hypothesis_ids(watchlist_rows)
     rows.append(f"watchlist promotions linked: {len(promotion_ids)}")
     rows.append(
@@ -360,6 +363,43 @@ def _candidate_sources(value: Any) -> list[str]:
     else:
         raw = str(value or "").replace("|", ",").split(",")
     return [item.strip() for item in raw if item.strip()]
+
+
+def _candidate_discovery_funnel_line(rows: Iterable[Mapping[str, Any]]) -> str:
+    data = list(rows)
+    executed = sum(
+        1
+        for row in data
+        for query in row.get("executed_queries") or ()
+        if isinstance(query, Mapping) and str(query.get("query_type") or "") == "candidate_discovery"
+    )
+    accepted = sum(
+        1
+        for row in data
+        for asset in row.get("crypto_candidate_assets") or ()
+        if isinstance(asset, Mapping) and str(asset.get("source") or "").startswith("candidate_discovery")
+    )
+    rejected = sum(
+        1
+        for row in data
+        for asset in row.get("rejected_candidate_assets") or ()
+        if isinstance(asset, Mapping) and str(asset.get("source") or "").startswith("candidate_discovery")
+    )
+    validated = sum(
+        1 for row in data
+        if str(row.get("status") or "") == "validated" and row.get("validated_candidate_assets")
+    )
+    promoted = sum(
+        1 for row in data
+        if str(row.get("opportunity_level") or "") in {"validated_digest", "watchlist", "high_priority"}
+    )
+    if not any((executed, accepted, rejected, validated, promoted)):
+        return ""
+    return (
+        "candidate_discovery_funnel: "
+        f"executed_queries={executed}, resolver_accepted={accepted}, "
+        f"resolver_rejected={rejected}, validated={validated}, promoted={promoted}"
+    )
 
 
 def _first_mapping(value: Any) -> Mapping[str, Any]:

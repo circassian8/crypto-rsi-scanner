@@ -1,0 +1,405 @@
+{
+  "cases": [
+    {
+      "case_id": "velvet_spacex_preipo_exposure",
+      "title": "VELVET offers SpaceX pre-IPO exposure",
+      "impact_category": "rwa_preipo_proxy",
+      "external_asset": "SpaceX",
+      "candidate_symbol": "VELVET",
+      "candidate_coin_id": "velvet",
+      "raw_event": {
+        "raw_id": "sq_velvet_spacex",
+        "provider": "fixture_project_blog",
+        "source_url": "https://velvet.example/blog/spacex-pre-ipo",
+        "title": "Velvet lets users trade SpaceX pre-IPO exposure",
+        "body": "Velvet users can trade tokenized stock-style SpaceX pre-IPO exposure through its crypto venue before the IPO window.",
+        "source_confidence": 0.94
+      },
+      "market_snapshot": {"return_24h": 38, "return_72h": 94, "volume_zscore_24h": 4.2, "volume_to_market_cap": 0.36},
+      "score_components": {"event_clarity": 82, "event_time_quality": 70},
+      "expected": {
+        "impact_path_type": ["venue_value_capture", "proxy_attention"],
+        "candidate_role": "proxy_venue",
+        "evidence_specificity": "direct_token_mechanism",
+        "market_confirmation_level": ["moderate", "strong"],
+        "opportunity_level": ["watchlist", "high_priority"],
+        "route_tier": ["WATCHLIST", "HIGH_PRIORITY"],
+        "digest_eligible": true,
+        "watchlist_eligible": true,
+        "high_priority_eligible": true,
+        "triggered_fade": false,
+        "reason_codes": "contains:proxy_market_attention_confirmed"
+      }
+    },
+    {
+      "case_id": "rune_thorchain_exploit",
+      "title": "RUNE affected by THORChain exploit and trading halt",
+      "impact_category": "security_or_regulatory_shock",
+      "external_asset": "THORChain",
+      "candidate_symbol": "RUNE",
+      "candidate_coin_id": "thorchain",
+      "raw_event": {
+        "raw_id": "sq_rune_exploit",
+        "provider": "fixture_crypto_news",
+        "source_url": "https://coindesk.example/thorchain-rune-exploit",
+        "title": "THORChain RUNE trading resumes after exploit response",
+        "body": "RUNE was the direct subject of a THORChain exploit, trading halt, and resumes trading update affecting token risk.",
+        "source_confidence": 0.9
+      },
+      "market_snapshot": {"return_24h": -31, "return_72h": -57, "volume_zscore_24h": 5.0, "volume_to_market_cap": 0.28},
+      "score_components": {"event_clarity": 84, "event_time_quality": 76},
+      "expected": {
+        "impact_path_type": "exploit_security_event",
+        "candidate_role": "direct_subject",
+        "evidence_specificity": "direct_token_mechanism",
+        "market_confirmation_level": ["moderate", "strong"],
+        "opportunity_level": ["watchlist", "high_priority"],
+        "route_tier": ["WATCHLIST", "HIGH_PRIORITY"],
+        "digest_eligible": true,
+        "watchlist_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "zec_miner_nasdaq_listing",
+      "title": "ZEC miner Nasdaq listing",
+      "impact_category": "listing_liquidity_event",
+      "external_asset": "Fortitude",
+      "candidate_symbol": "ZEC",
+      "candidate_coin_id": "zcash",
+      "raw_event": {
+        "raw_id": "sq_zec_listing",
+        "provider": "fixture_crypto_news",
+        "source_url": "https://decrypt.example/zcash-miner-nasdaq",
+        "title": "Zcash miner Fortitude gets Nasdaq listing via merger",
+        "body": "The ZEC mining company listing and merger gives Zcash ecosystem liquidity and public market attention.",
+        "source_confidence": 0.86
+      },
+      "market_snapshot": {"return_24h": 18, "return_72h": 55, "volume_zscore_24h": 3.2, "volume_to_market_cap": 0.22},
+      "score_components": {"event_clarity": 78, "event_time_quality": 70},
+      "expected": {
+        "impact_path_type": "listing_liquidity_event",
+        "candidate_role": "direct_subject",
+        "evidence_specificity": "direct_token_mechanism",
+        "market_confirmation_level": ["weak", "moderate", "strong"],
+        "opportunity_level": ["validated_digest", "watchlist", "high_priority"],
+        "route_tier": ["RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY"],
+        "digest_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "chz_world_cup_fan_token",
+      "title": "CHZ fan-token attention into World Cup",
+      "impact_category": "sports_fan_proxy",
+      "external_asset": "World Cup",
+      "candidate_symbol": "CHZ",
+      "candidate_coin_id": "chiliz",
+      "raw_event": {
+        "raw_id": "sq_chz_world_cup",
+        "provider": "fixture_crypto_news",
+        "source_url": "https://sportscrypto.example/chz-world-cup",
+        "title": "CHZ fan token demand rises before World Cup fixtures",
+        "body": "Chiliz CHZ and fan token demand are tied to World Cup match attention and team fixture speculation.",
+        "source_confidence": 0.83
+      },
+      "market_snapshot": {"return_24h": 22, "return_72h": 61, "volume_zscore_24h": 3.6, "volume_to_market_cap": 0.24},
+      "score_components": {"event_clarity": 74, "event_time_quality": 70},
+      "expected": {
+        "impact_path_type": "fan_token_attention",
+        "candidate_role": "proxy_instrument",
+        "market_confirmation_level": ["moderate", "strong"],
+        "opportunity_level": ["watchlist", "high_priority"],
+        "route_tier": ["WATCHLIST", "HIGH_PRIORITY"],
+        "digest_eligible": true,
+        "watchlist_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "btc_quantum_policy",
+      "title": "BTC broad quantum policy article",
+      "impact_category": "security_or_regulatory_shock",
+      "external_asset": "Quantum computing",
+      "candidate_symbol": "BTC",
+      "candidate_coin_id": "bitcoin",
+      "raw_event": {
+        "raw_id": "sq_btc_quantum",
+        "provider": "fixture_broad_news",
+        "source_url": "https://policy.example/quantum-computing-bitcoin",
+        "title": "Quantum computing is often seen as a risk to Bitcoin as policy debate grows",
+        "body": "The policy article discusses quantum computing and cryptography broadly without explaining a specific Bitcoin value-capture path or token mechanism.",
+        "source_confidence": 0.62
+      },
+      "market_snapshot": {"return_24h": 0.02, "volume_zscore_24h": 0.4, "volume_to_market_cap": 0.03},
+      "score_components": {"event_clarity": 45, "event_time_quality": 25},
+      "expected": {
+        "impact_path_type": "technology_risk",
+        "candidate_role": "macro_affected_asset",
+        "market_confirmation_level": "none",
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "digest_eligible": false,
+        "watchlist_eligible": false,
+        "reason_codes": "contains:weak_macro_requires_strong_market_confirmation"
+      }
+    },
+    {
+      "case_id": "btc_cftc_perps_policy",
+      "title": "BTC generic CFTC perps policy",
+      "impact_category": "security_or_regulatory_shock",
+      "external_asset": "CFTC",
+      "candidate_symbol": "BTC",
+      "candidate_coin_id": "bitcoin",
+      "raw_event": {
+        "raw_id": "sq_btc_cftc",
+        "provider": "fixture_broad_news",
+        "source_url": "https://policy.example/cftc-perps",
+        "title": "CFTC chair says perp trading may not suit all regulated assets",
+        "body": "The article mentions BTC as market context but gives no specific Bitcoin catalyst, venue, or token impact path.",
+        "source_confidence": 0.58
+      },
+      "market_snapshot": {"return_24h": 0.01, "volume_zscore_24h": 0.1},
+      "score_components": {"event_clarity": 42, "event_time_quality": 20},
+      "expected": {
+        "impact_path_type": "market_structure_policy",
+        "candidate_role": "macro_affected_asset",
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "digest_eligible": false,
+        "watchlist_eligible": false
+      }
+    },
+    {
+      "case_id": "polymarket_political_no_crypto_path",
+      "title": "Political event with no crypto value path",
+      "impact_category": "political_meme_proxy",
+      "external_asset": "Election",
+      "raw_event": {
+        "raw_id": "sq_poly_no_crypto",
+        "provider": "fixture_polymarket",
+        "source_url": "https://polymarket.example/election",
+        "title": "Will the candidate win the election?",
+        "body": "Prediction market resolves an election outcome but names no crypto token, venue token, or value-capture path.",
+        "source_confidence": 0.7
+      },
+      "score_components": {"event_clarity": 65, "event_time_quality": 60},
+      "expected": {
+        "impact_path_type": "generic_cooccurrence_only",
+        "candidate_role": "generic_mention",
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "digest_eligible": false,
+        "watchlist_eligible": false
+      }
+    },
+    {
+      "case_id": "openai_preipo_no_token",
+      "title": "OpenAI pre-IPO article without token",
+      "impact_category": "ai_ipo_proxy",
+      "external_asset": "OpenAI",
+      "raw_event": {
+        "raw_id": "sq_openai_no_token",
+        "provider": "fixture_broad_news",
+        "source_url": "https://ipo.example/openai",
+        "title": "OpenAI pre-IPO demand rises across private markets",
+        "body": "The article discusses OpenAI pre-IPO demand but names no crypto asset, token, or trading product.",
+        "source_confidence": 0.68
+      },
+      "score_components": {"event_clarity": 70, "event_time_quality": 60},
+      "expected": {
+        "impact_path_type": "generic_cooccurrence_only",
+        "candidate_role": "generic_mention",
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "digest_eligible": false,
+        "watchlist_eligible": false,
+        "reason_codes": "contains:candidate_discovery_pending"
+      }
+    },
+    {
+      "case_id": "openai_velvet_exposure",
+      "title": "OpenAI pre-IPO with VELVET exposure",
+      "impact_category": "ai_ipo_proxy",
+      "external_asset": "OpenAI",
+      "candidate_symbol": "VELVET",
+      "candidate_coin_id": "velvet",
+      "raw_event": {
+        "raw_id": "sq_openai_velvet",
+        "provider": "fixture_project_blog",
+        "source_url": "https://velvet.example/openai",
+        "title": "Velvet offers OpenAI pre-IPO exposure to crypto users",
+        "body": "VELVET holders and Velvet users can trade synthetic OpenAI pre-IPO exposure through the venue.",
+        "source_confidence": 0.9
+      },
+      "market_snapshot": {"return_24h": 16, "return_72h": 48, "volume_zscore_24h": 2.8, "volume_to_market_cap": 0.19},
+      "score_components": {"event_clarity": 80, "event_time_quality": 68},
+      "expected": {
+        "impact_path_type": ["venue_value_capture", "proxy_attention"],
+        "candidate_role": "proxy_venue",
+        "opportunity_level": ["validated_digest", "watchlist"],
+        "route_tier": ["RADAR_DIGEST", "WATCHLIST"],
+        "digest_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "market_anomaly_no_catalyst",
+      "title": "Market anomaly without catalyst",
+      "impact_category": "market_anomaly_unknown",
+      "candidate_symbol": "PUMP",
+      "candidate_coin_id": "pump",
+      "raw_event": {
+        "raw_id": "sq_pump_anomaly",
+        "provider": "fixture_market_anomaly",
+        "source_url": "https://markets.example/top-gainers",
+        "title": "PUMP rises on unusual market anomaly",
+        "body": "PUMPUSDT has a large move but no independent catalyst source or event evidence has been found.",
+        "source_confidence": 0.5
+      },
+      "market_snapshot": {"return_24h": 85, "return_72h": 140, "volume_zscore_24h": 5.0, "volume_to_market_cap": 0.44, "anomaly_score": 90},
+      "score_components": {"event_clarity": 10, "event_time_quality": 0},
+      "expected": {
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "digest_eligible": false,
+        "watchlist_eligible": false,
+        "reason_codes": "contains:market_anomaly_without_confirmed_catalyst"
+      }
+    },
+    {
+      "case_id": "token_unlock_fixture",
+      "title": "Token unlock supply pressure",
+      "impact_category": "unlock_supply_pressure",
+      "candidate_symbol": "UNLOCK",
+      "candidate_coin_id": "unlock-token",
+      "raw_event": {
+        "raw_id": "sq_unlock",
+        "provider": "fixture_tokenomist",
+        "source_url": "https://tokenomist.example/unlock",
+        "title": "UNLOCK token has 18% supply unlock next week",
+        "body": "UNLOCK vesting and supply unlock event increases circulating supply and potential sell pressure.",
+        "source_confidence": 0.9
+      },
+      "market_snapshot": {"return_24h": -12, "volume_zscore_24h": 2.7, "volume_to_market_cap": 0.21},
+      "supply_snapshot": {"supply_pressure": 82},
+      "score_components": {"event_clarity": 90, "event_time_quality": 86},
+      "expected": {
+        "impact_path_type": "unlock_supply_event",
+        "candidate_role": "direct_subject",
+        "opportunity_level": ["validated_digest", "watchlist", "high_priority"],
+        "route_tier": ["RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY"],
+        "digest_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "binance_perp_listing_fixture",
+      "title": "Binance perp listing with derivatives heat",
+      "impact_category": "listing_liquidity_event",
+      "candidate_symbol": "PERP",
+      "candidate_coin_id": "perp-token",
+      "raw_event": {
+        "raw_id": "sq_perp_listing",
+        "provider": "fixture_binance",
+        "source_url": "https://binance.example/perp-listing",
+        "title": "Binance lists PERPUSDT perpetual futures pair",
+        "body": "PERP is listed on Binance futures with a new trading pair and derivatives market attention.",
+        "source_confidence": 0.95
+      },
+      "market_snapshot": {"return_24h": 28, "return_72h": 66, "volume_zscore_24h": 4.8, "volume_to_market_cap": 0.39},
+      "derivatives_snapshot": {"derivatives_crowding": 78, "open_interest_24h_change_pct": 55, "funding_rate_8h": 0.08},
+      "score_components": {"event_clarity": 92, "event_time_quality": 88},
+      "expected": {
+        "impact_path_type": "listing_liquidity_event",
+        "candidate_role": "direct_subject",
+        "market_confirmation_level": "strong",
+        "opportunity_level": ["watchlist", "high_priority"],
+        "route_tier": ["WATCHLIST", "HIGH_PRIORITY"],
+        "watchlist_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "false_positive_ipo_hype",
+      "title": "IPO hype must not validate HYPE",
+      "impact_category": "ai_ipo_proxy",
+      "external_asset": "OpenAI",
+      "candidate_symbol": "HYPE",
+      "candidate_coin_id": "hype",
+      "raw_event": {
+        "raw_id": "sq_false_hype",
+        "provider": "fixture_broad_news",
+        "source_url": "https://news.example/ipo-hype",
+        "title": "IPO hype builds around OpenAI",
+        "body": "IPO hype is rising, but no named crypto project token or crypto market is mentioned.",
+        "source_confidence": 0.6
+      },
+      "expected": {
+        "route_tier": "STORE_ONLY",
+        "watchlist_eligible": false,
+        "identity_rejection_reason": "generic_symbol_without_project_identity"
+      }
+    },
+    {
+      "case_id": "false_positive_prime_minister",
+      "title": "Prime Minister must not validate PRIME",
+      "impact_category": "political_meme_proxy",
+      "candidate_symbol": "PRIME",
+      "candidate_coin_id": "prime",
+      "raw_event": {
+        "raw_id": "sq_false_prime",
+        "provider": "fixture_broad_news",
+        "source_url": "https://news.example/prime-minister",
+        "title": "Prime Minister calls election",
+        "body": "The prime minister announced a vote; no PRIME token is named.",
+        "source_confidence": 0.55
+      },
+      "expected": {
+        "route_tier": "STORE_ONLY",
+        "watchlist_eligible": false,
+        "identity_rejection_reason": "common_word_or_title_not_asset_identity"
+      }
+    },
+    {
+      "case_id": "false_positive_bitcoin_world",
+      "title": "Bitcoin World publisher must not validate BTC",
+      "impact_category": "rwa_preipo_proxy",
+      "candidate_symbol": "BTC",
+      "candidate_coin_id": "bitcoin",
+      "raw_event": {
+        "raw_id": "sq_false_btc_publisher",
+        "provider": "fixture_news",
+        "source_url": "https://bitcoinworld.example/spacex",
+        "title": "SpaceX pre-IPO market opens - Bitcoin World",
+        "body": "Bitcoin World is the publisher name; no Bitcoin asset is part of the story.",
+        "source_confidence": 0.55
+      },
+      "expected": {
+        "route_tier": "STORE_ONLY",
+        "watchlist_eligible": false,
+        "identity_rejection_reason": "publisher_source_name_not_asset_identity"
+      }
+    },
+    {
+      "case_id": "false_positive_ripple_effects",
+      "title": "Ripple effects must not validate XRP",
+      "impact_category": "rwa_preipo_proxy",
+      "candidate_symbol": "XRP",
+      "candidate_coin_id": "xrp",
+      "raw_event": {
+        "raw_id": "sq_false_xrp_phrase",
+        "provider": "fixture_news",
+        "source_url": "https://news.example/ripple-effects",
+        "title": "Ripple effects from SpaceX IPO hype spread through markets",
+        "body": "The phrase ripple effects is ordinary language; no Ripple token is part of the story.",
+        "source_confidence": 0.55
+      },
+      "expected": {
+        "route_tier": "STORE_ONLY",
+        "watchlist_eligible": false,
+        "identity_rejection_reason": "common_phrase_not_asset_identity"
+      }
+    }
+  ]
+}

@@ -624,6 +624,19 @@ def _apply_candidate_discovery_results(
                 continue
             asset = _candidate_asset_from_discovery_raw(raw)
             if asset:
+                reasons = tuple(str(value) for value in getattr(result, "result_score_reasons", ()) or ())
+                asset = {
+                    **asset,
+                    "discovery_query": str(getattr(query, "query", "") or ""),
+                    "query_type": "candidate_discovery",
+                    "result_score": int(getattr(result, "result_score", 0) or 0),
+                    "result_score_reasons": reasons[:8],
+                    "source_url": str(getattr(raw, "source_url", "") or ""),
+                    "discovered_terms": tuple(_candidate_discovered_terms(asset, raw)),
+                    "funnel_stage": "candidate_discovery_result",
+                    "converted_to_candidate": False,
+                    "converted_to_radar": False,
+                }
                 discovery_assets.setdefault(hypothesis_id, []).append(asset)
 
     out: list[EventImpactHypothesis] = []
@@ -637,6 +650,25 @@ def _apply_candidate_discovery_results(
             external_entities=hypothesis.external_entities,
             text=" ".join((hypothesis.external_asset or "", *hypothesis.evidence_quotes)),
         )
+        accepted = tuple({
+            **asset,
+            "accepted": True,
+            "rejected": False,
+            "resolver_result": "accepted",
+            "funnel_stage": "resolver_accepted_candidate",
+            "converted_to_candidate": True,
+            "converted_to_radar": False,
+        } for asset in accepted)
+        rejected = tuple({
+            **asset,
+            "accepted": False,
+            "rejected": True,
+            "resolver_result": "rejected",
+            "funnel_stage": "resolver_rejected_candidate",
+            "converted_to_candidate": False,
+            "converted_to_radar": False,
+            "rejection_reason": asset.get("rejection_reason") or asset.get("identity_rejection_reason") or "identity_validation_failed",
+        } for asset in rejected)
         crypto_assets = _merge_asset_rows(hypothesis.crypto_candidate_assets, accepted)
         symbols, coin_ids = _assets_from_asset_rows(crypto_assets)
         components = dict(hypothesis.score_components or {})
@@ -716,6 +748,18 @@ def _candidate_asset_from_discovery_raw(raw: RawDiscoveredEvent) -> dict[str, An
     if fallback:
         return fallback
     return None
+
+
+def _candidate_discovered_terms(asset: Mapping[str, Any], raw: RawDiscoveredEvent) -> tuple[str, ...]:
+    terms: list[str] = []
+    for key in ("symbol", "coin_id", "name", "contract_address"):
+        value = str(asset.get(key) or "").strip()
+        if value:
+            terms.append(value)
+    title = str(getattr(raw, "title", "") or "")
+    if title:
+        terms.append(title[:120])
+    return tuple(dict.fromkeys(terms))
 
 
 def _candidate_asset_from_text(text: str, *, raw_id: str, title: str) -> dict[str, Any] | None:
@@ -923,6 +967,7 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
         rows.append("market_confirmation_levels: " + ", ".join(f"{key}={value}" for key, value in sorted(market_levels.items())))
     if source_classes:
         rows.append("source_classes: " + ", ".join(f"{key}={value}" for key, value in sorted(source_classes.items())))
+    rows.extend(_candidate_discovery_funnel_lines(items))
     why_counts: dict[str, int] = {}
     for item in items:
         for reason in item.why_not_promoted:
@@ -1031,6 +1076,51 @@ def format_impact_hypothesis_report(hypotheses: Iterable[EventImpactHypothesis])
         if item.warnings:
             rows.append("  warnings: " + "; ".join(item.warnings[:3]))
     return "\n".join(rows).rstrip()
+
+
+def _candidate_discovery_funnel_lines(items: Iterable[EventImpactHypothesis]) -> list[str]:
+    rows = list(items)
+    executed = sum(
+        1
+        for item in rows
+        for query in item.executed_queries
+        if str(query.get("query_type") or "") == "candidate_discovery"
+    )
+    discovered = sum(
+        len(tuple(item.crypto_candidate_assets or ())) + len(tuple(item.rejected_candidate_assets or ()))
+        for item in rows
+    )
+    accepted = sum(
+        1
+        for item in rows
+        for asset in item.crypto_candidate_assets
+        if isinstance(asset, Mapping) and str(asset.get("source") or "").startswith("candidate_discovery")
+    )
+    rejected = sum(
+        1
+        for item in rows
+        for asset in item.rejected_candidate_assets
+        if isinstance(asset, Mapping) and str(asset.get("source") or "").startswith("candidate_discovery")
+    )
+    validated = sum(
+        1
+        for item in rows
+        if item.status == HypothesisStatus.VALIDATED.value and item.validated_candidate_assets
+    )
+    promoted = sum(
+        1
+        for item in rows
+        if item.status == HypothesisStatus.VALIDATED.value
+        and item.opportunity_level in {"validated_digest", "watchlist", "high_priority"}
+    )
+    if not any((executed, discovered, accepted, rejected, validated, promoted)):
+        return []
+    return [
+        "candidate_discovery_funnel: "
+        f"executed_queries={executed}, discovered_terms={discovered}, "
+        f"resolver_accepted={accepted}, resolver_rejected={rejected}, "
+        f"validated={validated}, promoted={promoted}"
+    ]
 
 
 def _hypothesis_from_rule(

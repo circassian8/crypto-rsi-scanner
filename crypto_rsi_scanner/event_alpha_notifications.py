@@ -70,6 +70,7 @@ class EventAlphaNotificationConfig:
     exploratory_digest_include_rejection_reasons: bool = True
     exploratory_digest_include_raw_evidence: bool = True
     exploratory_digest_include_controls: bool = False
+    quality_mode: str = "validated_digest"
 
 
 @dataclass(frozen=True)
@@ -122,7 +123,11 @@ def build_notification_plan(
     """Return lane-specific due decisions without mutating storage."""
     observed = _as_utc(now or datetime.now(timezone.utc))
     all_decisions = list(decisions)
-    alertable = [decision for decision in all_decisions if decision.alertable]
+    quality_mode = _quality_mode(cfg.quality_mode)
+    alertable = _filter_alertable_by_quality_mode(
+        [decision for decision in all_decisions if decision.alertable],
+        quality_mode,
+    )
     by_lane: dict[str, list[event_alpha_router.EventAlphaRouteDecision]] = {lane: [] for lane in LANES}
     blocked: dict[str, str] = {}
 
@@ -170,7 +175,7 @@ def build_notification_plan(
             blocked[LANE_TRIGGERED_FADE] = f"{blocked_count} triggered fade item(s) already sent"
 
     exploratory_items: tuple[EventAlphaExploratoryDigestItem, ...] = ()
-    if cfg.exploratory_digest_enabled:
+    if cfg.exploratory_digest_enabled and quality_mode == "exploratory_only":
         selected = select_exploratory_candidates(all_decisions, cfg=cfg, now=observed)
         if selected:
             due, reason = lane_due(storage, LANE_EXPLORATORY_DIGEST, cfg=cfg, now=observed)
@@ -250,6 +255,48 @@ def select_exploratory_candidates(
         reverse=True,
     )
     return tuple(items[: max(0, int(cfg.exploratory_digest_max_items or 0))])
+
+
+def _quality_mode(value: str | None) -> str:
+    mode = str(value or "validated_digest").strip().lower()
+    if mode in {"exploratory_only", "validated_digest", "high_quality_only"}:
+        return mode
+    return "validated_digest"
+
+
+def _filter_alertable_by_quality_mode(
+    decisions: list[event_alpha_router.EventAlphaRouteDecision],
+    mode: str,
+) -> list[event_alpha_router.EventAlphaRouteDecision]:
+    """Apply notification-level quality gates without changing routing decisions."""
+    if mode == "exploratory_only":
+        return [
+            decision for decision in decisions
+            if _route_value(decision) in {"", event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value}
+        ]
+    if mode == "high_quality_only":
+        return [
+            decision for decision in decisions
+            if _route_value(decision) in {
+                "",
+                event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+                event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value,
+            }
+        ]
+    return [
+        decision for decision in decisions
+        if _route_value(decision) in {
+            "",
+            event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value,
+        }
+    ]
+
+
+def _route_value(decision: object) -> str:
+    route = getattr(decision, "route", "")
+    return str(getattr(route, "value", route) or "")
 
 
 def format_exploratory_telegram_digest(
@@ -1114,6 +1161,7 @@ def _human_reason(value: object) -> str:
         "raw, expired, or invalidated watchlist state is stored only.": "not alertable yet",
         "event alpha router is disabled; retaining watchlist row as research evidence only.": "router disabled",
         "impact hypothesis awaiting asset validation": "not alertable yet",
+        "impact hypothesis awaiting validation": "not alertable yet",
     }
     if normalized in mapping:
         return mapping[normalized]
