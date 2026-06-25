@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import event_alpha_notification_delivery as delivery
+from . import event_alpha_quality_fields
 from . import event_alpha_notifications, event_alpha_router, event_watchlist
 
 
@@ -27,6 +28,9 @@ class EventAlphaNotificationInboxItem:
     delivery_state: str
     reviewed: bool
     reason: str
+    final_route_after_quality_gate: str = ""
+    quality_gate_block_reason: str = ""
+    alertable_after_quality_gate: bool = True
 
 
 @dataclass(frozen=True)
@@ -48,6 +52,7 @@ class EventAlphaNotificationInboxResult:
     would_send_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     would_send_blocked_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     weak_validated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
+    quality_gated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
     exploratory_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
     triggered_fade_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
@@ -95,33 +100,37 @@ def build_notification_inbox(
         )
         for row in alerts
     ]
+    quality_gated_local_only = tuple(
+        item for item in items
+        if not item.alertable_after_quality_gate and bool(item.quality_gate_block_reason) and not item.reviewed
+    )
     partial_delivered_without_feedback = tuple(
         item for item in items
-        if item.delivery_state == delivery.STATE_PARTIAL_DELIVERED and not item.reviewed
+        if item.delivery_state == delivery.STATE_PARTIAL_DELIVERED and item.alertable_after_quality_gate and not item.reviewed
     )
     sent_without_feedback = tuple(
         item for item in items
-        if item.sent and item.delivery_state != delivery.STATE_PARTIAL_DELIVERED and not item.reviewed
+        if item.sent and item.alertable_after_quality_gate and item.delivery_state != delivery.STATE_PARTIAL_DELIVERED and not item.reviewed
     )
     would_send_without_feedback = tuple(
         item for item in items
-        if item.would_send and not item.sent and not item.blocked_by_guard and not item.reviewed
+        if item.would_send and item.alertable_after_quality_gate and not item.sent and not item.blocked_by_guard and not item.reviewed
     )
     would_send_blocked_without_feedback = tuple(
         item for item in items
-        if item.blocked_by_guard and not item.reviewed
+        if item.blocked_by_guard and item.alertable_after_quality_gate and not item.reviewed
     )
     weak_validated_local_only = tuple(
         item for item in items
-        if _is_weak_validated_local_only(item, alerts) and not item.reviewed
+        if not item.quality_gate_block_reason and _is_weak_validated_local_only(item, alerts) and not item.reviewed
     )
     high_priority_unreviewed = tuple(
         item for item in items
-        if not item.reviewed and _is_high_priority(item)
+        if item.alertable_after_quality_gate and not item.reviewed and _is_high_priority(item)
     )
     triggered_fade_unreviewed = tuple(
         item for item in items
-        if not item.reviewed and _is_triggered_fade(item)
+        if item.alertable_after_quality_gate and not item.reviewed and _is_triggered_fade(item)
     )
     exploratory_without_feedback = tuple(
         item for item in _exploratory_items(deliveries, watch_by_alert, reviewed_ids, card_paths)
@@ -146,6 +155,7 @@ def build_notification_inbox(
         would_send_without_feedback=would_send_without_feedback,
         would_send_blocked_without_feedback=would_send_blocked_without_feedback,
         weak_validated_local_only=weak_validated_local_only,
+        quality_gated_local_only=quality_gated_local_only,
         exploratory_without_feedback=exploratory_without_feedback,
         high_priority_unreviewed=high_priority_unreviewed,
         triggered_fade_unreviewed=triggered_fade_unreviewed,
@@ -191,6 +201,7 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
     )
     _append_item_section(lines, "would-send notifications without feedback", result.would_send_without_feedback, profile=result.profile)
     _append_item_section(lines, "would-send blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
+    _append_item_section(lines, "quality-gated local-only candidates for optional review", result.quality_gated_local_only, profile=result.profile)
     _append_item_section(lines, "weak validated local-only hypotheses for optional review", result.weak_validated_local_only, profile=result.profile)
     _append_item_section(lines, "exploratory digest items needing review", result.exploratory_without_feedback, profile=result.profile)
     _append_item_section(lines, "high-priority cards not reviewed", result.high_priority_unreviewed, profile=result.profile)
@@ -224,6 +235,11 @@ def _append_item_section(
         )
         lines.append(f"  card: {item.card_path or 'not_written'}")
         lines.append(f"  run_id: {item.run_id or 'unknown'}")
+        if item.quality_gate_block_reason:
+            lines.append(
+                f"  quality_gate: final={item.final_route_after_quality_gate or 'unknown'} "
+                f"block={item.quality_gate_block_reason}"
+            )
         lines.append(f"  reason: {item.reason}")
         lines.append(f"  feedback_useful: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{item.alert_id}'")
         lines.append(f"  feedback_junk: make event-feedback-junk PROFILE={profile} FEEDBACK_TARGET='{item.alert_id}'")
@@ -264,7 +280,8 @@ def _inbox_item(
     alert_id = str(alert.get("alert_id") or (f"ea:{alert_key}" if alert_key else alert.get("snapshot_id") or "unknown"))
     card_id = str(alert.get("card_id") or "")
     card_path = _path_for_card(alert_id, alert_key, card_id, card_paths)
-    lane = _lane_for_alert(alert)
+    final_route, quality_block, alertable_after_quality = _quality_gate_for_alert(alert)
+    lane = _lane_for_alert(alert, final_route=final_route)
     due = _lane_count(run, "lane_counts_due", lane)
     run_id = str(alert.get("run_id") or (run or {}).get("run_id") or "")
     delivery_state = str(alert.get("delivered_status") or alert.get("delivery_state") or delivery_state_by_run.get(run_id) or "")
@@ -277,6 +294,10 @@ def _inbox_item(
     would_send = bool(due or (run and _int(run.get("would_send_count")) > 0))
     if suppressed:
         would_send = False
+    if not alertable_after_quality:
+        sent = False
+        would_send = False
+        blocked_by_guard = False
     ids = _alert_ids(alert, alert_id, alert_key, card_id)
     reviewed = bool(ids & reviewed_ids)
     return EventAlphaNotificationInboxItem(
@@ -294,6 +315,9 @@ def _inbox_item(
         delivery_state=delivery_state,
         reviewed=reviewed,
         reason=str(alert.get("route_reason") or alert.get("reason") or (run or {}).get("block_reason") or "review pending"),
+        final_route_after_quality_gate=final_route,
+        quality_gate_block_reason=quality_block or "",
+        alertable_after_quality_gate=alertable_after_quality,
     )
 
 
@@ -378,8 +402,27 @@ def _guard_blocked(row: Mapping[str, Any] | None) -> bool:
     return "disabled" in reason or "guard" in reason or "research_only" in reason
 
 
-def _lane_for_alert(alert: Mapping[str, Any]) -> str:
-    route = str(alert.get("route") or "").upper()
+def _quality_gate_for_alert(alert: Mapping[str, Any]) -> tuple[str, str | None, bool]:
+    components = alert.get("score_components") if isinstance(alert.get("score_components"), Mapping) else {}
+    has_quality = event_alpha_quality_fields.has_any_quality_field(alert, components_key="score_components")
+    final_route, block = event_alpha_router.quality_gate_route_for_row(
+        alert,
+        components=components,
+        require_quality=False,
+    )
+    if has_quality or alert.get("final_route_after_quality_gate") or alert.get("alertable_after_quality_gate") is not None:
+        return final_route, block, event_alpha_router.route_value_is_alertable(final_route)
+    route = str(alert.get("route") or final_route or "")
+    route_alertable_raw = alert.get("route_alertable")
+    if route_alertable_raw is None:
+        alertable = event_alpha_router.route_value_is_alertable(route)
+    else:
+        alertable = bool(route_alertable_raw) and event_alpha_router.route_value_is_alertable(route)
+    return route, block, alertable
+
+
+def _lane_for_alert(alert: Mapping[str, Any], *, final_route: str | None = None) -> str:
+    route = str(final_route or alert.get("final_route_after_quality_gate") or alert.get("route") or "").upper()
     tier = str(alert.get("tier") or "").upper()
     playbook = str(alert.get("playbook_type") or "").lower()
     if "TRIGGERED_FADE" in route or "TRIGGERED_FADE" in tier or playbook == "proxy_fade":

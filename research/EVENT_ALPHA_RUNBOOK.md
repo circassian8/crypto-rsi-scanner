@@ -138,7 +138,11 @@ operator-facing digest gate. The router enforces this verdict after the older
 watchlist/playbook route request is built: blocked rows keep
 `requested_route_before_quality_gate`, `final_route_after_quality_gate`, and
 `quality_gate_block_reason` in route decisions, alert snapshots, daily briefs,
-quality review, and research cards so the downgrade is auditable. Strong impact
+quality review, and research cards so the downgrade is auditable. Alert
+snapshots, notification plans, routed Telegram copy, and inbox queues use the
+final route/lane/tier/alertable flag as authoritative; requested pre-gate fields
+are audit-only. Quality-gated local-only rows belong in optional local review
+sections, not delivered or would-send digest queues. Strong impact
 paths can enter the capped digest if
 other gates pass; medium paths need market confirmation; generic co-occurrence
 is blocked by default via

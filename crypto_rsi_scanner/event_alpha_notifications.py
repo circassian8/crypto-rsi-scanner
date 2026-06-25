@@ -125,7 +125,7 @@ def build_notification_plan(
     all_decisions = list(decisions)
     quality_mode = _quality_mode(cfg.quality_mode)
     alertable = _filter_alertable_by_quality_mode(
-        [decision for decision in all_decisions if decision.alertable],
+        [decision for decision in all_decisions if event_alpha_router.alertable_after_quality_gate(decision)],
         quality_mode,
     )
     by_lane: dict[str, list[event_alpha_router.EventAlphaRouteDecision]] = {lane: [] for lane in LANES}
@@ -295,8 +295,7 @@ def _filter_alertable_by_quality_mode(
 
 
 def _route_value(decision: object) -> str:
-    route = getattr(decision, "route", "")
-    return str(getattr(route, "value", route) or "")
+    return event_alpha_router.final_route_value(decision)
 
 
 def format_exploratory_telegram_digest(
@@ -1452,19 +1451,12 @@ def format_preview(
 
 
 def _lane_for_decision(decision: event_alpha_router.EventAlphaRouteDecision) -> str:
-    lane = decision.lane
-    if lane == event_alpha_router.EventAlphaRouteLane.TRIGGERED_FADE:
+    final_lane = event_alpha_router.final_lane_value(decision)
+    if final_lane == event_alpha_router.EventAlphaRouteLane.TRIGGERED_FADE.value:
         return LANE_TRIGGERED_FADE
-    if lane == event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION:
+    if final_lane == event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION.value:
         return LANE_INSTANT_ESCALATION
-    if lane == event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST:
-        return LANE_DAILY_DIGEST
-    route = getattr(decision, "route", None)
-    if route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH:
-        return LANE_TRIGGERED_FADE
-    if route == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH:
-        return LANE_INSTANT_ESCALATION
-    if route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST:
+    if final_lane == event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST.value:
         return LANE_DAILY_DIGEST
     return LANE_DAILY_DIGEST
 

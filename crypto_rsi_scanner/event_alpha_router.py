@@ -86,7 +86,125 @@ class EventAlphaRouterResult:
 
     @property
     def alertable_decisions(self) -> list[EventAlphaRouteDecision]:
-        return [decision for decision in self.decisions if decision.alertable]
+        return [decision for decision in self.decisions if alertable_after_quality_gate(decision)]
+
+
+ALERTABLE_ROUTE_VALUES = {
+    EventAlphaRoute.RESEARCH_DIGEST.value,
+    EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+    EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value,
+}
+
+
+def route_value_is_alertable(route_value: object) -> bool:
+    return str(getattr(route_value, "value", route_value) or "") in ALERTABLE_ROUTE_VALUES
+
+
+def lane_value_for_route_value(route_value: object) -> str:
+    route = str(getattr(route_value, "value", route_value) or "")
+    if route == EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value:
+        return EventAlphaRouteLane.TRIGGERED_FADE.value
+    if route == EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value:
+        return EventAlphaRouteLane.INSTANT_ESCALATION.value
+    if route == EventAlphaRoute.RESEARCH_DIGEST.value:
+        return EventAlphaRouteLane.DAILY_DIGEST.value
+    return EventAlphaRouteLane.LOCAL_ONLY.value
+
+
+def final_route_value(decision: object) -> str:
+    explicit = getattr(decision, "final_route_after_quality_gate", None)
+    if explicit:
+        return str(explicit)
+    route = getattr(decision, "route", None)
+    route_value = str(getattr(route, "value", route) or "")
+    if route_value:
+        return route_value
+    lane = getattr(decision, "lane", None)
+    lane_value = str(getattr(lane, "value", lane) or "")
+    if lane_value == EventAlphaRouteLane.TRIGGERED_FADE.value:
+        return EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value
+    if lane_value == EventAlphaRouteLane.INSTANT_ESCALATION.value:
+        return EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+    if lane_value == EventAlphaRouteLane.DAILY_DIGEST.value:
+        return EventAlphaRoute.RESEARCH_DIGEST.value
+    return EventAlphaRoute.STORE_ONLY.value
+
+
+def final_lane_value(decision: object) -> str:
+    return lane_value_for_route_value(final_route_value(decision))
+
+
+def alertable_after_quality_gate(decision: object) -> bool:
+    return bool(getattr(decision, "alertable", False)) and route_value_is_alertable(final_route_value(decision))
+
+
+def quality_gate_route_for_row(
+    row: Mapping[str, object],
+    *,
+    components: Mapping[str, object] | None = None,
+    requested_route: str | None = None,
+    require_quality: bool = False,
+) -> tuple[str, str | None]:
+    """Return the final quality-gated route for persisted artifact rows.
+
+    This is intentionally conservative for modern rows carrying quality fields,
+    while preserving legacy rows that lack quality metadata unless callers opt in
+    to recomputing missing-quality defaults.
+    """
+    data = dict(row or {})
+    nested = components
+    if nested is None:
+        raw_nested = data.get("score_components")
+        if not isinstance(raw_nested, Mapping):
+            raw_nested = data.get("latest_score_components")
+        nested = raw_nested if isinstance(raw_nested, Mapping) else {}
+    has_quality = event_alpha_quality_fields.has_any_quality_field(data, components_key="score_components")
+    if not has_quality and not require_quality:
+        final = str(
+            data.get("final_route_after_quality_gate")
+            or requested_route
+            or data.get("route")
+            or EventAlphaRoute.STORE_ONLY.value
+        )
+        return final, _optional_str(data.get("quality_gate_block_reason"))
+    requested = str(
+        requested_route
+        or data.get("requested_route_before_quality_gate")
+        or data.get("route")
+        or data.get("final_route_after_quality_gate")
+        or EventAlphaRoute.STORE_ONLY.value
+    )
+    if requested == EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value:
+        return requested, None
+    quality = event_alpha_quality_fields.ensure_quality_fields(data, components=nested)
+    level = str(quality.get("opportunity_level") or "").strip()
+    block = _quality_gate_block_reason(quality)
+    if block:
+        if level == event_opportunity_verdict.OpportunityLevel.EXPLORATORY.value:
+            return EventAlphaRoute.LOCAL_REPORT.value, block
+        return EventAlphaRoute.STORE_ONLY.value, block
+    if (
+        requested == EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+        and level in {
+            event_opportunity_verdict.OpportunityLevel.VALIDATED_DIGEST.value,
+            event_opportunity_verdict.OpportunityLevel.WATCHLIST.value,
+        }
+    ):
+        return (
+            EventAlphaRoute.RESEARCH_DIGEST.value,
+            f"opportunity_level_caps_high_priority:{level}",
+        )
+    return requested, _optional_str(data.get("quality_gate_block_reason"))
+
+
+def alertable_after_quality_gate_for_row(
+    row: Mapping[str, object],
+    *,
+    components: Mapping[str, object] | None = None,
+    require_quality: bool = False,
+) -> bool:
+    final, _ = quality_gate_route_for_row(row, components=components, require_quality=require_quality)
+    return route_value_is_alertable(final)
 
 
 def route_watchlist(
@@ -193,7 +311,7 @@ def format_routed_telegram_digest(
     card_path_by_alert_id: Mapping[str, object] | None = None,
 ) -> str:
     """Render router-approved Event Alpha escalations for Telegram."""
-    keep = [decision for decision in decisions if decision.alertable]
+    keep = [decision for decision in decisions if alertable_after_quality_gate(decision)]
     card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
     lines = [
         "<b>Event Alpha routed research alerts</b>",
@@ -212,7 +330,7 @@ def format_routed_telegram_digest(
         is_validated_hypothesis = _is_validated_hypothesis_digest_entry(entry)
         lines.append("")
         lines.append(
-            f"<b>{_esc(decision.route.value)}</b> score={entry.latest_score} "
+            f"<b>{_esc(final_route_value(decision))}</b> score={entry.latest_score} "
             f"<b>{_esc(entry.symbol)}</b>"
         )
         if is_validated_hypothesis:
@@ -1104,6 +1222,12 @@ def _float_or_none(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _optional_str(value: object) -> str | None:
+    if value in (None, "", [], {}, ()):
+        return None
+    return str(value)
 
 
 _NON_FADE_RESEARCH_PLAYBOOKS = {

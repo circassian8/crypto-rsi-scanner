@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Make Event Alpha quality verdicts final at snapshot and notification boundaries · Codex
+**Why:** A row with a final `local_only` / `insufficient_data` verdict could be
+downgraded in the daily brief while stale pre-gate route fields still made it
+look like a would-send research digest in alert snapshots and the notification
+inbox. The final quality route has to be authoritative at every operator-facing
+boundary, not just in the router report.
+**Changes:**
+- Added shared final-route helpers so Event Alpha route decisions, notification
+  plans, routed Telegram copy, and alertable-decision lists read
+  `final_route_after_quality_gate` instead of trusting pre-gate route state.
+- Alert snapshots now persist final `route`, `lane`, `tier`, `route_alertable`,
+  and `alertable_after_quality_gate`; the original requested route/tier remain
+  for audit. Quality-gated local/store-only rows no longer count as alertable
+  snapshots.
+- Notification inbox now has a separate quality-gated local-only review section
+  and excludes those rows from delivered/would-send/high-priority review queues.
+- Quality review and artifact doctor distinguish corrected quality downgrades
+  from real stale-route conflicts, while candidate-discovery funnel labels now
+  separate resolver attempts, candidate terms, and validated additions.
+**Verify:** `python3 tests/test_indicators.py` passed (456/456). Full eval and
+verification targets are listed in the final Codex handoff for this prompt.
+**Notes/risks:** Research-only. No normal RSI rows, paper/live trades,
+execution, alert scoring promotion, provider/LLM promotion, or
+LLM/provider-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-25 — Make Event Alpha routing obey quality verdicts · Codex
 **Why:** Fresh `notify_llm_quality` artifacts could contain a final
 `local_only` / `insufficient_data` opportunity verdict while the legacy

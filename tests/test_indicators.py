@@ -10268,6 +10268,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
         event_alpha_alert_store,
         event_alpha_artifact_doctor,
         event_alpha_daily_brief,
+        event_alpha_notification_inbox,
         event_alpha_quality_review,
         event_alpha_router,
         event_playbooks,
@@ -10413,11 +10414,32 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert btc_snapshot["requested_route_before_quality_gate"] == "RESEARCH_DIGEST"
     assert btc_snapshot["final_route_after_quality_gate"] == "STORE_ONLY"
     assert btc_snapshot["quality_gate_block_reason"] == "impact_path_type_insufficient_data"
+    assert btc_snapshot["route"] == "STORE_ONLY"
+    assert btc_snapshot["lane"] == "LOCAL_ONLY"
+    assert btc_snapshot["tier"] == "STORE_ONLY"
+    assert btc_snapshot["requested_tier_before_quality_gate"] == "WATCHLIST"
+    assert btc_snapshot["route_alertable"] is False
+    assert btc_snapshot["alertable_after_quality_gate"] is False
+    inbox = event_alpha_notification_inbox.build_notification_inbox(
+        notification_runs=[{"run_id": "r1", "would_send_count": 1, "lane_counts_due": {"daily_digest": 1}}],
+        alert_rows=rows,
+        feedback_rows=[],
+        research_cards_dir=Path(tmp) / "cards",
+        profile="fixture",
+        artifact_namespace="fixture",
+        notification_runs_path=Path(tmp) / "runs.jsonl",
+        alert_store_path=out,
+        feedback_path=Path(tmp) / "feedback.jsonl",
+    )
+    assert "BTC" in {item.symbol for item in inbox.quality_gated_local_only}
+    assert "BTC" not in {item.symbol for item in inbox.would_send_without_feedback}
+    inbox_text = event_alpha_notification_inbox.format_notification_inbox(inbox)
+    assert "quality-gated local-only candidates" in inbox_text
     review = event_alpha_quality_review.format_quality_review(
         event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=rows)
     )
     assert "Quality Gate Conflicts" in review
-    assert "BTC" in review
+    assert "Quality Gate Conflicts:\n- none" in review
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": len(rows)}],
         alert_rows=rows,
@@ -10428,6 +10450,9 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     legacy_conflict["run_id"] = "r1"
     legacy_conflict["route_alertable"] = True
     legacy_conflict["route"] = "RESEARCH_DIGEST"
+    legacy_conflict["tier"] = "WATCHLIST"
+    legacy_conflict.pop("alertable_after_quality_gate", None)
+    legacy_conflict.pop("final_route_after_quality_gate", None)
     doctor_conflict = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
         alert_rows=[legacy_conflict],
@@ -10435,6 +10460,11 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     )
     assert doctor_conflict.alertable_route_conflicts_with_opportunity_level == 1
     assert "alertable_route_conflicts_with_opportunity_level=1" in event_alpha_artifact_doctor.format_artifact_doctor_report(doctor_conflict)
+    legacy_review = event_alpha_quality_review.format_quality_review(
+        event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=[legacy_conflict])
+    )
+    assert "Quality Gate Conflicts" in legacy_review
+    assert "BTC" in legacy_review
 
     daily = event_alpha_daily_brief.build_daily_brief(router_result=routed, watchlist_entries=[btc, zero, digest, watch, high, trigger])
     assert "## Quality Gate Downgrades" in daily
@@ -21306,6 +21336,7 @@ def test_event_alpha_exploratory_digest_truncates_compact_numbered_blocks():
 
 
 def test_event_alpha_notification_quality_modes_filter_lanes():
+    from dataclasses import replace
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router
 
@@ -21348,6 +21379,20 @@ def test_event_alpha_notification_quality_modes_filter_lanes():
     assert exploratory_only.lane_counts[notif.LANE_INSTANT_ESCALATION] == 0
     assert exploratory_only.lane_counts[notif.LANE_TRIGGERED_FADE] == 1
     assert exploratory_only.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 1
+
+    quality_blocked = replace(
+        daily,
+        final_route_after_quality_gate=event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        quality_gate_block_reason="impact_path_type_insufficient_data",
+    )
+    quality_blocked_plan = notif.build_notification_plan(
+        [quality_blocked],
+        storage=_NotifyFakeStorage(),
+        cfg=notif.EventAlphaNotificationConfig(enabled=True, quality_mode="validated_digest", daily_digest_cooldown_hours=0),
+        now=now,
+    )
+    assert quality_blocked_plan.would_send_count == 0
+    assert quality_blocked_plan.lane_counts[notif.LANE_DAILY_DIGEST] == 0
 
 
 def test_event_alpha_signal_quality_fixture_passes_and_reports_stage_failure():

@@ -416,6 +416,10 @@ def _snapshot_from_route_decision(
         if getattr(entry, key, None) not in (None, "", [], {}, ())
     }
     quality = event_alpha_quality_fields.ensure_quality_fields(entry_quality, components=components)
+    final_route = event_alpha_router.final_route_value(decision)
+    final_lane = event_alpha_router.final_lane_value(decision)
+    alertable_after_quality = event_alpha_router.alertable_after_quality_gate(decision)
+    tier = entry.latest_tier if alertable_after_quality else event_alerts.EventAlertTier.STORE_ONLY.value
     return {
         "schema_version": ALERT_STORE_SCHEMA_VERSION,
         "row_type": "event_alpha_alert_snapshot",
@@ -437,7 +441,8 @@ def _snapshot_from_route_decision(
         "asset_role": components.get("asset_role"),
         "source": entry.latest_source,
         "source_count": entry.source_count,
-        "tier": entry.latest_tier,
+        "tier": tier,
+        "requested_tier_before_quality_gate": entry.latest_tier,
         "opportunity_score": entry.latest_score,
         "opportunity_score_v2": components.get("opportunity_score_v2"),
         "opportunity_score_components": components.get("opportunity_score_components") or {},
@@ -458,14 +463,15 @@ def _snapshot_from_route_decision(
         "signal_type": components.get("signal_type"),
         "fade_state": components.get("fade_state"),
         "state": entry.state,
-        "route": decision.route.value,
-        "lane": decision.lane.value,
+        "route": final_route,
+        "lane": final_lane,
         "requested_route_before_quality_gate": decision.requested_route_before_quality_gate or decision.route.value,
-        "final_route_after_quality_gate": decision.final_route_after_quality_gate or decision.route.value,
+        "final_route_after_quality_gate": final_route,
         "quality_gate_block_reason": decision.quality_gate_block_reason,
         "alert_id": decision.alert_id,
         "card_id": decision.card_id,
-        "route_alertable": bool(decision.alertable),
+        "route_alertable": alertable_after_quality,
+        "alertable_after_quality_gate": alertable_after_quality,
         "route_reason": decision.reason,
         "impact_category": components.get("impact_category") or playbook,
         "validation_stage": components.get("validation_stage"),
@@ -532,6 +538,9 @@ def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]
         if not key:
             continue
         route = getattr(decision, "route", "")
+        final_route = event_alpha_router.final_route_value(decision)
+        final_lane = event_alpha_router.final_lane_value(decision)
+        alertable_after_quality = event_alpha_router.alertable_after_quality_gate(decision)
         components = getattr(entry, "latest_score_components", None)
         if not isinstance(components, Mapping):
             components = {}
@@ -544,18 +553,18 @@ def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]
         out[key] = {
             "alert_id": getattr(decision, "alert_id", f"ea:{key}"),
             "card_id": getattr(decision, "card_id", ""),
-            "route": getattr(route, "value", str(route)),
-            "lane": getattr(getattr(decision, "lane", ""), "value", str(getattr(decision, "lane", ""))),
+            "route": final_route,
+            "lane": final_lane,
             "requested_route_before_quality_gate": getattr(decision, "requested_route_before_quality_gate", None)
             or getattr(route, "value", str(route)),
-            "final_route_after_quality_gate": getattr(decision, "final_route_after_quality_gate", None)
-            or getattr(route, "value", str(route)),
+            "final_route_after_quality_gate": final_route,
             "quality_gate_block_reason": getattr(decision, "quality_gate_block_reason", None),
             "opportunity_level": getattr(decision, "opportunity_level", None) or quality.get("opportunity_level"),
             "opportunity_score_final": getattr(decision, "opportunity_score_final", None)
             if getattr(decision, "opportunity_score_final", None) is not None
             else quality.get("opportunity_score_final"),
-            "route_alertable": bool(getattr(decision, "alertable", False)),
+            "route_alertable": alertable_after_quality,
+            "alertable_after_quality_gate": alertable_after_quality,
             "route_reason": str(getattr(decision, "reason", "") or ""),
         }
     return out
@@ -582,7 +591,11 @@ def _with_route_context(row: dict[str, Any], route_context: Mapping[str, Mapping
     if not context:
         return row
     out = dict(row)
+    if "requested_tier_before_quality_gate" not in out:
+        out["requested_tier_before_quality_gate"] = out.get("tier")
     out.update(context)
+    if not bool(out.get("alertable_after_quality_gate", out.get("route_alertable"))):
+        out["tier"] = event_alerts.EventAlertTier.STORE_ONLY.value
     return out
 
 
@@ -669,7 +682,12 @@ def _filter_snapshot_rows(
             return []
         return [
             row for row in rows
-            if bool(route_context.get(str(row.get("alert_key") or ""), {}).get("route_alertable"))
+            if bool(
+                route_context.get(str(row.get("alert_key") or ""), {}).get(
+                    "alertable_after_quality_gate",
+                    route_context.get(str(row.get("alert_key") or ""), {}).get("route_alertable"),
+                )
+            )
         ]
     if mode == "sampled_controls":
         limit = max(0, int(sampled_controls_limit))

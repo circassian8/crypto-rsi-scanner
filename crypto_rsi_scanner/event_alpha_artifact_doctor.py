@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_artifacts, event_alpha_quality_fields
+from . import event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router
 from . import event_alpha_notification_delivery as _delivery
 
 
@@ -368,12 +368,20 @@ def _alertable_quality_route_conflicts(alerts: Iterable[Mapping[str, Any]]) -> i
 
 
 def _row_has_alertable_quality_conflict(row: Mapping[str, Any]) -> bool:
-    data = event_alpha_quality_fields.ensure_quality_fields(row, components=row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {})
+    components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+    data = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
+    final_route, _ = event_alpha_router.quality_gate_route_for_row(row, components=components, require_quality=False)
     route_alertable = bool(row.get("route_alertable"))
     route = str(row.get("route") or "")
-    if not route_alertable and route not in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH"}:
+    persisted_alertable = route_alertable or event_alpha_router.route_value_is_alertable(route)
+    final_alertable = event_alpha_router.route_value_is_alertable(final_route)
+    if persisted_alertable and not final_alertable:
+        return True
+    if event_alpha_router.route_value_is_alertable(route) and route != final_route:
+        return True
+    if not final_alertable and not persisted_alertable:
         return False
-    if route == "TRIGGERED_FADE_RESEARCH":
+    if final_route == "TRIGGERED_FADE_RESEARCH":
         return False
     level = str(data.get("opportunity_level") or "")
     if level in {"local_only", "exploratory", ""}:

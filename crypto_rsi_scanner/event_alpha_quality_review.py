@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_artifacts, event_alpha_quality_fields, event_opportunity_verdict, event_watchlist
+from . import event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_opportunity_verdict, event_watchlist
 
 
 @dataclass(frozen=True)
@@ -162,6 +162,9 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         "candidates_added": 0,
         "candidates_validated": 0,
         "candidates_promoted": 0,
+        "resolver_attempted": 0,
+        "candidate_terms_added": 0,
+        "resolver_validated_candidates_added": 0,
         "false_positive_rejections": 0,
     }
     for row in rows:
@@ -187,6 +190,7 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         out["asset_terms_extracted"] += len(all_terms)
         out["resolver_accepted"] += accepted
         out["resolver_rejected"] += rejected_count
+        out["resolver_attempted"] += accepted + rejected_count
         out["false_positive_rejections"] += sum(1 for item in rejected if isinstance(item, Mapping) and _rejection_is_false_positive(item))
         for item in rejected:
             if not isinstance(item, Mapping):
@@ -195,9 +199,11 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
             if reason:
                 out[f"rejected_{reason}"] = out.get(f"rejected_{reason}", 0) + 1
         out["candidates_added"] += candidate_like
+        out["candidate_terms_added"] += candidate_like
         if str(row.get("validation_stage") or "") in {"catalyst_link_validated", "impact_path_validated", "market_confirmed", "promoted_to_radar"}:
             out["candidates_validated"] += 1
             out["context_validated_candidates"] += 1
+            out["resolver_validated_candidates_added"] += 1
         if str(row.get("opportunity_level") or "") in {"validated_digest", "watchlist", "high_priority"}:
             out["candidates_promoted"] += 1
             out["promoted_candidates"] += 1
@@ -309,15 +315,27 @@ def _quality_gate_conflict_lines(rows: list[dict[str, Any]], *, limit: int) -> l
 
 
 def _quality_gate_conflict(row: Mapping[str, Any]) -> bool:
-    if row.get("quality_gate_block_reason"):
-        return True
-    route_alertable = bool(row.get("route_alertable"))
+    components = row.get("_components") if isinstance(row.get("_components"), Mapping) else row.get("score_components")
+    if not isinstance(components, Mapping):
+        components = {}
+    final_route, block = event_alpha_router.quality_gate_route_for_row(row, components=components, require_quality=False)
+    persisted_alertable = bool(row.get("route_alertable"))
+    final_alertable = event_alpha_router.route_value_is_alertable(final_route)
     route = str(row.get("route") or "")
-    if not route_alertable and route not in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH"}:
+    persisted_route_alertable = event_alpha_router.route_value_is_alertable(route)
+    if (persisted_alertable or persisted_route_alertable) and not final_alertable:
+        return True
+    if persisted_route_alertable and route != final_route:
+        return True
+    if not final_alertable and final_route not in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH"}:
         return False
-    if route == "TRIGGERED_FADE_RESEARCH":
+    if final_route == "TRIGGERED_FADE_RESEARCH":
         return False
-    return _quality_gate_conflict_reason(row) != "none"
+    if not final_alertable and route not in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH"}:
+        return False
+    if block and str(block).startswith("opportunity_level_caps_high_priority"):
+        return False
+    return bool(block) or _quality_gate_conflict_reason(row) != "none"
 
 
 def _quality_gate_conflict_reason(row: Mapping[str, Any]) -> str:
