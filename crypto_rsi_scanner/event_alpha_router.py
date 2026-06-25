@@ -694,12 +694,43 @@ def _quality_gate_block_reason(quality: Mapping[str, object]) -> str | None:
     if str(quality.get("candidate_role") or "") == "unknown_with_reason":
         return "candidate_role_unknown_with_reason"
     if level == event_opportunity_verdict.OpportunityLevel.LOCAL_ONLY.value:
-        return str(quality.get("why_local_only") or "opportunity_level_local_only")
+        return _normalize_quality_gate_block_reason(
+            str(quality.get("why_local_only") or "opportunity_level_local_only"),
+            quality,
+        )
     if level == event_opportunity_verdict.OpportunityLevel.EXPLORATORY.value:
-        return str(quality.get("why_not_watchlist") or "opportunity_level_exploratory")
+        return _normalize_quality_gate_block_reason(
+            str(quality.get("why_not_watchlist") or "opportunity_level_exploratory"),
+            quality,
+        )
     if not level:
         return "opportunity_level_missing"
     return None
+
+
+def _normalize_quality_gate_block_reason(reason: str, quality: Mapping[str, object]) -> str:
+    if reason.strip().casefold() != "strong_market_confirmation":
+        if reason.strip().casefold() == "impact_path":
+            return "impact_path_not_strong_enough"
+        if reason.strip().casefold() == "explained_token_impact_path":
+            return "missing_direct_impact_path"
+        return reason
+    impact = str(quality.get("impact_path_type") or "").strip()
+    strength = str(quality.get("impact_path_strength") or "").strip()
+    role = str(quality.get("candidate_role") or "").strip()
+    market_level = str(quality.get("market_confirmation_level") or "").strip()
+    market_score = _float_or_none(quality.get("market_confirmation_score"))
+    market_is_strong = market_level in {"strong", "confirmed"} or (market_score is not None and market_score >= 75)
+    weak_context = (
+        strength not in {"strong", "medium"}
+        or impact in {"generic_cooccurrence_only", "macro_attention_only", "technology_risk", "market_structure_policy", "unknown", ""}
+        or role in {"generic_mention", "macro_affected_asset", "unknown_with_reason", ""}
+    )
+    if market_is_strong and weak_context:
+        return "weak_impact_path_despite_market_confirmation"
+    if market_is_strong:
+        return "impact_path_not_strong_enough"
+    return "needs_strong_market_confirmation"
 
 
 def _quality_for_entry(entry: event_watchlist.EventWatchlistEntry) -> dict[str, object]:

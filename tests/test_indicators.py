@@ -10283,6 +10283,10 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
         event_alpha_notification_inbox,
         event_alpha_quality_review,
         event_alpha_router,
+        event_evidence_quality,
+        event_impact_path_validator,
+        event_market_confirmation,
+        event_opportunity_verdict,
         event_playbooks,
         event_research_cards,
         event_watchlist,
@@ -10307,6 +10311,52 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
             "upgrade_requirements": ["needs confirmed impact path"] if level in {"local_only", "exploratory"} else [],
             "downgrade_warnings": ["insufficient_data"] if path == "insufficient_data" else [],
         }
+
+    positive_market_block = quality(
+        "local_only",
+        35,
+        path="proxy_attention",
+        role="proxy_instrument",
+        source="crypto_news",
+        specificity="token_and_catalyst",
+    )
+    positive_market_block["why_local_only"] = "strong_market_confirmation"
+    positive_market_block["impact_path_strength"] = "weak"
+    positive_market_block["market_confirmation_level"] = "strong"
+    positive_market_block["market_confirmation_score"] = 90
+    _, normalized_block = event_watchlist.quality_cap_watchlist_state(
+        event_watchlist.EventWatchlistState.WATCHLIST.value,
+        positive_market_block,
+    )
+    assert normalized_block == "weak_impact_path_despite_market_confirmation"
+    verdict = event_opportunity_verdict.evaluate_opportunity(
+        impact_path=event_impact_path_validator.ImpactPathValidation(
+            impact_path_type=event_impact_path_validator.ImpactPathType.TECHNOLOGY_RISK.value,
+            impact_path_strength=event_impact_path_validator.ImpactPathStrength.WEAK.value,
+            candidate_role=event_impact_path_validator.CandidateRole.MACRO_AFFECTED_ASSET.value,
+            evidence_specificity_score=50,
+            required_evidence_met=False,
+            market_confirmation_required=True,
+            digest_eligible_by_impact_path=False,
+            why_digest_ineligible="technology_risk",
+            impact_path_reason="generic_policy_only",
+            opportunity_score_v2=45,
+        ),
+        market_confirmation=event_market_confirmation.EventMarketConfirmationResult(
+            market_confirmation_score=82,
+            level=event_market_confirmation.MarketConfirmationLevel.STRONG.value,
+            reasons=("price_momentum",),
+        ),
+        evidence_quality=event_evidence_quality.EvidenceQualityResult(
+            evidence_quality_score=72,
+            source_class=event_evidence_quality.SourceClass.CRYPTO_NEWS.value,
+            evidence_specificity=event_evidence_quality.EvidenceSpecificity.GENERIC_CONTEXT.value,
+        ),
+    )
+    assert verdict.why_local_only != "strong_market_confirmation"
+    assert verdict.why_not_watchlist != "strong_market_confirmation"
+    assert "weak_impact_path_despite_market_confirmation" in verdict.missing_requirements
+    assert verdict.score_components and verdict.score_components["market_confirmation"] > 0
 
     def entry(symbol, *, state, playbook, q, event_name=None):
         return event_watchlist.EventWatchlistEntry(
@@ -21743,8 +21793,14 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
             "evidence_specificity": "direct_value_capture",
             "manual_verification_items": ["verify liquidity"],
             "validation_stage": "impact_path_validated",
-            "crypto_candidate_assets": [{"symbol": "VELVET", "coin_id": "velvet", "accepted": True}],
-            "rejected_candidate_assets": [{"symbol": "HYPE", "reason": "generic_symbol_word_collision"}],
+            "crypto_candidate_assets": [
+                {"symbol": "VELVET", "coin_id": "velvet", "accepted": True},
+                {"symbol": "LINK", "coin_id": "chainlink", "source": "taxonomy", "validated": False},
+            ],
+            "rejected_candidate_assets": [
+                {"symbol": "HYPE", "reason": "generic_symbol_word_collision"},
+                {"symbol": "NAV", "source": "navigation", "mention_type": "source_navigation"},
+            ],
             "row_type": "event_alpha_alert_snapshot",
             "route": "HIGH_PRIORITY_RESEARCH",
             "final_route_after_quality_gate": "HIGH_PRIORITY_RESEARCH",
@@ -21825,13 +21881,16 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
     ]
     review = event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=rows)
     report = event_alpha_quality_review.format_quality_review(review)
-    assert review.candidate_discovery_funnel["raw_terms_extracted"] == 2
+    assert review.candidate_discovery_funnel["raw_terms_extracted"] == 4
     assert review.candidate_discovery_funnel["candidate_like_terms"] == 1
-    assert review.candidate_discovery_funnel["resolver_attempted"] == 2
+    assert review.candidate_discovery_funnel["resolver_attempted"] == 3
     assert review.candidate_discovery_funnel["resolver_accepted_candidates"] == 1
+    assert review.candidate_discovery_funnel["resolver_rejected_terms"] == 2
     assert review.candidate_discovery_funnel["context_validated_candidates"] >= 1
     assert review.candidate_discovery_funnel["promoted_candidates"] >= 1
     assert "candidates_added" not in review.candidate_discovery_funnel
+    assert "candidate_terms_added" not in review.candidate_discovery_funnel
+    assert "raw_candidate_terms_added" in review.candidate_discovery_funnel
     assert "Strong opportunities" in report
     assert "quality_coverage:" in report
     assert "candidate_discovery_funnel:" in report

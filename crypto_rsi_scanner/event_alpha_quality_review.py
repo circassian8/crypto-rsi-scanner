@@ -191,7 +191,8 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         "candidates_validated": 0,
         "candidates_promoted": 0,
         "resolver_attempted": 0,
-        "candidate_terms_added": 0,
+        "raw_candidate_terms_added": 0,
+        "legacy_candidate_terms_added": 0,
         "resolver_validated_candidates_added": 0,
         "false_positive_rejections": 0,
     }
@@ -226,7 +227,8 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
             reason = str(item.get("reason") or item.get("rejection_reason") or item.get("identity_reason") or "unknown_rejection")
             if reason:
                 out[f"rejected_{reason}"] = out.get(f"rejected_{reason}", 0) + 1
-        out["candidate_terms_added"] += candidate_like
+        out["raw_candidate_terms_added"] += len(all_terms)
+        out["legacy_candidate_terms_added"] += candidate_like
         if str(row.get("validation_stage") or "") in {"catalyst_link_validated", "impact_path_validated", "market_confirmed", "promoted_to_radar"}:
             out["candidates_validated"] += 1
             out["context_validated_candidates"] += 1
@@ -241,8 +243,15 @@ def _candidate_like_term(item: Mapping[str, Any]) -> bool:
     symbol = str(item.get("symbol") or "").strip()
     coin_id = str(item.get("coin_id") or "").strip()
     name = str(item.get("name") or item.get("project_name") or "").strip()
+    source = str(item.get("source") or "").strip().casefold()
+    mention_type = str(item.get("mention_type") or item.get("type") or "").strip().casefold()
     reason = str(item.get("reason") or item.get("rejection_reason") or item.get("identity_reason") or "").casefold()
+    accepted = bool(item.get("accepted") or item.get("validated"))
     if any(token in reason for token in ("source_noise", "publisher", "word_collision", "url_only", "generic_symbol")):
+        return False
+    if any(token in mention_type for token in ("source_noise", "publisher", "navigation", "nav", "word_collision")):
+        return False
+    if source in {"taxonomy", "source_origin", "publisher", "nav", "navigation"} and not accepted:
         return False
     return bool(symbol or coin_id or name)
 

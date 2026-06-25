@@ -177,7 +177,11 @@ appears under `Quality-Capped Watchlist Rows` with the requested/final state and
 block reason. Valid `watchlist` / `high_priority` rows can still remain active,
 and validated watchlist-quality rows can progress through event lifecycle states
 such as `EVENT_PASSED` and `ARMED`. `TRIGGERED_FADE` remains unchanged and can
-only come from deterministic `event_fade.py` plus `proxy_fade`.
+only come from deterministic `event_fade.py` plus `proxy_fade`. Block reasons
+should name the missing evidence or blocker (`needs_strong_market_confirmation`,
+`weak_impact_path_despite_market_confirmation`, `missing_direct_impact_path`,
+etc.); positive evidence such as strong market confirmation belongs in score
+components, not as the reason a row stayed local-only.
 
 Notification visibility is separately controlled by
 `RSI_EVENT_ALPHA_NOTIFICATION_QUALITY_MODE`:
@@ -287,7 +291,10 @@ context validated, promoted), and a deterministic tuning section with
 near-threshold upgrade candidates, repeated weak co-occurrence patterns,
 local-only source classes, useful impact paths, common missing evidence, and
 next experiments. Treat this as review guidance only; it does not tune live
-thresholds.
+thresholds. `raw_terms_extracted` is deliberately broad; `candidate_like_terms`
+means terms that passed candidate-likeness filters and excludes taxonomy seed
+rows, source/publisher/navigation terms, and obvious word-collision rejects
+unless a resolver/validator accepted them.
 `event-alpha-quality-coverage-report` is stricter: it reads raw artifact rows
 from the latest run only and exits non-zero if any fresh row is missing a
 canonical top-level quality field. It also warns when a namespace appears to

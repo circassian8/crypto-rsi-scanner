@@ -115,7 +115,7 @@ def evaluate_opportunity(
     if weak_macro and market_score < 75:
         reasons.append("weak_macro_requires_strong_market_confirmation")
         score = min(score, 54.0)
-        missing.append("strong_market_confirmation")
+        missing.append("needs_strong_market_confirmation")
         verify.append("verify abnormal market reaction, not just policy/macro co-occurrence")
 
     direct_event = path_type in {
@@ -148,7 +148,7 @@ def evaluate_opportunity(
         missing.append("higher_quality_source")
         verify.append("find official, structured, or crypto-native evidence linking token and catalyst")
     if path_strength not in {"strong", "medium"}:
-        missing.append("impact_path")
+        missing.append(_impact_path_missing_reason(path_type, role, market_score))
     if timing_score < 40:
         missing.append("event_window_or_timing")
         verify.append("confirm the event date/window and whether the catalyst has passed")
@@ -236,6 +236,27 @@ def _hard_local_reason(
     if "ticker_collision" in text or "word_collision" in text:
         return "ticker_collision_hard_gate"
     return None
+
+
+def _impact_path_missing_reason(path_type: str, role: str, market_score: float) -> str:
+    """Return a blocker that says what is missing, not positive evidence."""
+    weak_context = path_type in {
+        event_impact_path_validator.ImpactPathType.MACRO_ATTENTION_ONLY.value,
+        event_impact_path_validator.ImpactPathType.TECHNOLOGY_RISK.value,
+        event_impact_path_validator.ImpactPathType.MARKET_STRUCTURE_POLICY.value,
+        event_impact_path_validator.ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value,
+        event_impact_path_validator.ImpactPathType.UNKNOWN.value,
+        "",
+    } or role in {
+        event_impact_path_validator.CandidateRole.GENERIC_MENTION.value,
+        event_impact_path_validator.CandidateRole.MACRO_AFFECTED_ASSET.value,
+        "",
+    }
+    if market_score >= 75:
+        return "weak_impact_path_despite_market_confirmation" if weak_context else "impact_path_not_strong_enough"
+    if weak_context:
+        return "missing_direct_impact_path"
+    return "impact_path_not_strong_enough"
 
 
 def explain_upgrade_path(

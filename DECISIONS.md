@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-25 - Event Alpha block reasons must name missing evidence
+**Status:** accepted
+**Decision:** Event Alpha `why_local_only`, `why_not_watchlist`,
+`quality_gate_block_reason`, and `quality_state_block_reason` fields should
+name the blocker or missing evidence, not positive evidence that happened to be
+present. For example, strong market confirmation must remain positive score
+context; it must not appear as the reason a row is local-only. Weak or
+local-only rows should instead use reasons such as
+`needs_strong_market_confirmation`, `weak_impact_path_despite_market_confirmation`,
+`missing_direct_impact_path`, or `impact_path_not_strong_enough`. Legacy
+artifacts with positive-sounding reasons may be normalized at read/report time
+without rewriting the JSONL artifact.
+**Why:** Operators and Pro-model reviews need to see what is missing before a
+candidate can upgrade. Reusing positive evidence as a block reason makes the
+quality gate look contradictory and obscures the manual verification path.
+**Revisit when:** The artifact schema is migrated and old local-only reason
+fields are retired.
+
 ## 2026-06-25 - Event Alpha quality verdicts must cap lifecycle state
 **Status:** accepted
 **Decision:** Event Alpha final signal-quality / opportunity verdicts are

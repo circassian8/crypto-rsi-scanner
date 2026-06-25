@@ -1158,7 +1158,10 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
         state_quality_capped = bool(row.get("state_quality_capped"))
         if not row.get("final_state_after_quality_gate"):
             state_quality_capped = requested_state != final_state
-        quality_state_block = _optional_str(row.get("quality_state_block_reason")) or computed_block
+        quality_state_block = _normalize_quality_state_block_reason(
+            _optional_str(row.get("quality_state_block_reason")) or computed_block,
+            quality,
+        )
         return EventWatchlistEntry(
             schema_version=str(row.get("schema_version") or WATCHLIST_SCHEMA_VERSION),
             row_type="event_watchlist_state",
@@ -1356,10 +1359,46 @@ def _quality_state_block_reason(
     if "ticker_collision" in text or "word_collision" in text or "ticker_word_collision" in text:
         return "ticker_collision_hard_gate"
     if level == "local_only":
-        return str(quality.get("why_local_only") or "opportunity_level_local_only")
+        return _normalize_quality_state_block_reason(
+            str(quality.get("why_local_only") or "opportunity_level_local_only"),
+            quality,
+        )
     if level == "exploratory":
-        return str(quality.get("why_not_watchlist") or "opportunity_level_exploratory")
+        return _normalize_quality_state_block_reason(
+            str(quality.get("why_not_watchlist") or "opportunity_level_exploratory"),
+            quality,
+        )
     return None
+
+
+def _normalize_quality_state_block_reason(reason: str | None, quality: Mapping[str, Any]) -> str | None:
+    """Keep block reasons actionable, especially for legacy artifacts."""
+    if not reason:
+        return None
+    value = str(reason)
+    normalized = value.strip().casefold()
+    if normalized == "strong_market_confirmation":
+        impact = str(quality.get("impact_path_type") or "").strip()
+        strength = str(quality.get("impact_path_strength") or "").strip()
+        role = str(quality.get("candidate_role") or "").strip()
+        market_level = str(quality.get("market_confirmation_level") or "").strip()
+        market_score = _optional_float(quality.get("market_confirmation_score"))
+        market_is_strong = market_level in {"strong", "confirmed"} or (market_score is not None and market_score >= 75)
+        weak_context = (
+            strength not in {"strong", "medium"}
+            or impact in {"generic_cooccurrence_only", "macro_attention_only", "technology_risk", "market_structure_policy", "unknown", ""}
+            or role in {"generic_mention", "macro_affected_asset", "unknown_with_reason", ""}
+        )
+        if market_is_strong and weak_context:
+            return "weak_impact_path_despite_market_confirmation"
+        if market_is_strong:
+            return "impact_path_not_strong_enough"
+        return "needs_strong_market_confirmation"
+    if normalized == "impact_path":
+        return "impact_path_not_strong_enough"
+    if normalized == "explained_token_impact_path":
+        return "missing_direct_impact_path"
+    return value
 
 
 def _optional_str(value: Any) -> str | None:

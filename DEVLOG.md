@@ -17,6 +17,32 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Clean Event Alpha state-cap reasons and candidate funnel counts · Codex
+**Why:** The lifecycle cap was in place, but some legacy/local-only rows could
+still display positive-sounding block reasons such as `strong_market_confirmation`,
+and candidate-discovery reports could make raw/taxonomy terms look like
+candidate-like assets.
+**Changes:**
+- Normalized quality/state gate block reasons so positive evidence stays in
+  score components and blockers say what is missing (`needs_strong_market_confirmation`,
+  `weak_impact_path_despite_market_confirmation`, `missing_direct_impact_path`,
+  or `impact_path_not_strong_enough`).
+- Updated opportunity verdict generation so new local/exploratory verdicts no
+  longer use `strong_market_confirmation` as a missing requirement.
+- Tightened candidate-discovery funnel reporting so taxonomy/source/navigation
+  terms are counted as raw terms but not `candidate_like_terms` unless they are
+  actually accepted/validated; legacy raw-term counters are explicitly labeled.
+- Added regression coverage for reason normalization, market confirmation as
+  positive evidence, and raw/taxonomy/generic-HYPE funnel accounting.
+**Verify:** `python3 tests/test_indicators.py` passed (456/456);
+`make event-llm-eval PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`,
+`make event-alpha-eval PYTHON=python3`, `make event-alpha-signal-quality-eval PYTHON=python3`,
+and `make event-alpha-quality-validation-cycle PYTHON=python3` passed before
+this log entry. Full `make verify PYTHON=python3` is run at handoff.
+**Notes/risks:** Research-only reporting/metadata cleanup. No normal RSI rows,
+paper/live trades, execution, route promotion, or `TRIGGERED_FADE` creation
+changed.
+
 ## 2026-06-25 — Make Event Alpha quality verdicts authoritative over lifecycle state · Codex
 **Why:** The daily brief could still show a stale BTC/World Cup/Bitcoin World
 row as active `WATCHLIST` even after the final quality verdict downgraded it to
