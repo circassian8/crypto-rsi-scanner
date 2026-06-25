@@ -5,7 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_opportunity_verdict, event_watchlist
+from . import (
+    event_alpha_alert_store,
+    event_alpha_artifacts,
+    event_alpha_quality_fields,
+    event_alpha_router,
+    event_opportunity_verdict,
+    event_watchlist,
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +60,7 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
         "candidate_roles: " + _format_counts(_counts(rows, "candidate_role")),
         "evidence_specificity: " + _format_counts(_counts(rows, "evidence_specificity")),
         "market_confirmation_levels: " + _format_counts(_counts(rows, "market_confirmation_level")),
+        "snapshot_quality_classifications: " + _format_counts(_counts(rows, "_snapshot_quality_classification")),
         "candidate_discovery_funnel: " + _format_counts(result.candidate_discovery_funnel),
         "quality_note: unknown/insufficient_data rows are conservative local-only verdicts or legacy rows, not hidden promotions.",
         "",
@@ -77,6 +85,8 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
     lines.extend(_upgrade_lines(rows, limit=6))
     lines.extend(["", "Top downgrade risks:"])
     lines.extend(_downgrade_lines(rows, limit=6))
+    lines.extend(["", "Quality Tuning Suggestions:"])
+    lines.extend(_tuning_suggestion_lines(rows, result.candidate_discovery_funnel))
     lines.extend(["", "Gaps:"])
     lines.append("- missing market confirmation: " + _format_count_list(_missing(rows, "market_confirmation_level", {"", "unknown", "none"})))
     lines.append("- missing direct impact path: " + _format_count_list(_missing(rows, "impact_path_strength", {"", "unknown", "none", "weak"})))
@@ -102,6 +112,11 @@ def _normalize_rows(rows: Iterable[Mapping[str, Any]], *, source: str) -> list[d
         data["_quality_source"] = quality_source
         data["_top_level_missing_fields"] = list(top_missing)
         data["_legacy_quality_row"] = event_alpha_artifacts.is_legacy_row(data)
+        data["_snapshot_quality_classification"] = (
+            event_alpha_alert_store.classify_alert_snapshot(data)
+            if source == "alert_snapshot"
+            else "not_alert_snapshot"
+        )
         out.append(data)
     return out
 
@@ -159,7 +174,6 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         "asset_terms_extracted": 0,
         "resolver_accepted": 0,
         "resolver_rejected": 0,
-        "candidates_added": 0,
         "candidates_validated": 0,
         "candidates_promoted": 0,
         "resolver_attempted": 0,
@@ -198,7 +212,6 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
             reason = str(item.get("reason") or item.get("rejection_reason") or item.get("identity_reason") or "unknown_rejection")
             if reason:
                 out[f"rejected_{reason}"] = out.get(f"rejected_{reason}", 0) + 1
-        out["candidates_added"] += candidate_like
         out["candidate_terms_added"] += candidate_like
         if str(row.get("validation_stage") or "") in {"catalyst_link_validated", "impact_path_validated", "market_confirmed", "promoted_to_radar"}:
             out["candidates_validated"] += 1
@@ -315,6 +328,14 @@ def _quality_gate_conflict_lines(rows: list[dict[str, Any]], *, limit: int) -> l
 
 
 def _quality_gate_conflict(row: Mapping[str, Any]) -> bool:
+    classification = str(row.get("_snapshot_quality_classification") or "")
+    if classification == event_alpha_alert_store.SNAPSHOT_LEGACY_CONFLICT:
+        return True
+    if classification in {
+        event_alpha_alert_store.SNAPSHOT_CURRENT_CLEAN,
+        event_alpha_alert_store.SNAPSHOT_QUALITY_GATED_LOCAL,
+    }:
+        return False
     components = row.get("_components") if isinstance(row.get("_components"), Mapping) else row.get("score_components")
     if not isinstance(components, Mapping):
         components = {}
@@ -418,6 +439,87 @@ def _source_quality_blocked(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _format_count_list(rows: list[dict[str, Any]]) -> str:
     return str(len(rows)) + (" (" + ", ".join(_label(row) for row in rows[:5]) + ")" if rows else "")
+
+
+def _tuning_suggestion_lines(rows: list[dict[str, Any]], funnel: Mapping[str, int]) -> list[str]:
+    lines: list[str] = []
+    digest_candidates = _closest_to_threshold(rows, threshold=65.0, allowed_levels={"exploratory", "local_only"})
+    watch_candidates = _closest_to_threshold(rows, threshold=75.0, allowed_levels={"validated_digest", "exploratory"})
+    lines.append("- closest_to_digest_threshold: " + _threshold_labels(digest_candidates))
+    lines.append("- closest_to_watchlist_threshold: " + _threshold_labels(watch_candidates))
+    weak_patterns = _counts(
+        [
+            row for row in rows
+            if str(row.get("impact_path_type") or "") in {"generic_cooccurrence_only", "insufficient_data"}
+            or str(row.get("impact_path_strength") or "") in {"weak", "none"}
+        ],
+        "impact_path_type",
+    )
+    lines.append("- repeated_weak_cooccurrence_patterns: " + _format_counts(weak_patterns))
+    local_sources = _counts(
+        [row for row in rows if str(row.get("opportunity_level") or "") in {"local_only", "exploratory"}],
+        "source_class",
+    )
+    lines.append("- sources_producing_local_only_rows: " + _format_counts(local_sources))
+    impact_paths = _counts(
+        [row for row in rows if str(row.get("opportunity_level") or "") in {"validated_digest", "watchlist", "high_priority"}],
+        "impact_path_type",
+    )
+    lines.append("- impact_paths_producing_alertable_rows: " + _format_counts(impact_paths))
+    blockers = _common_blockers(rows)
+    lines.append("- most_common_missing_evidence: " + _format_counts(blockers))
+    lines.append(
+        "- candidate_discovery_experiment: "
+        f"raw_terms={funnel.get('raw_terms_extracted', 0)} "
+        f"candidate_like={funnel.get('candidate_like_terms', 0)} "
+        f"resolver_accepted={funnel.get('resolver_accepted_candidates', 0)} "
+        f"context_validated={funnel.get('context_validated_candidates', 0)} "
+        f"promoted={funnel.get('promoted_candidates', 0)}"
+    )
+    lines.append("- next_experiments: inspect near-threshold rows, add source-specific negative fixtures, and tune only after feedback/outcome labels.")
+    return lines
+
+
+def _closest_to_threshold(
+    rows: list[dict[str, Any]],
+    *,
+    threshold: float,
+    allowed_levels: set[str],
+    limit: int = 5,
+) -> list[tuple[float, dict[str, Any]]]:
+    candidates: list[tuple[float, dict[str, Any]]] = []
+    for row in rows:
+        level = str(row.get("opportunity_level") or "")
+        if level not in allowed_levels:
+            continue
+        try:
+            score = float(row.get("opportunity_score_final") or row.get("latest_score") or 0.0)
+        except (TypeError, ValueError):
+            score = 0.0
+        if score <= 0:
+            continue
+        candidates.append((abs(threshold - score), row))
+    return sorted(candidates, key=lambda item: (item[0], _label(item[1])))[:limit]
+
+
+def _threshold_labels(rows: list[tuple[float, dict[str, Any]]]) -> str:
+    if not rows:
+        return "none"
+    return ", ".join(
+        f"{_label(row)}({float(row.get('opportunity_score_final') or row.get('latest_score') or 0):.0f})"
+        for _distance, row in rows
+    )
+
+
+def _common_blockers(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        upgrade = event_opportunity_verdict.explain_upgrade_path(components=row.get("_components") or row)
+        for value in (*upgrade.upgrade_requirements, *upgrade.downgrade_warnings):
+            key = str(value or "").strip()
+            if key:
+                counts[key] = counts.get(key, 0) + 1
+    return counts
 
 
 def _label(row: Mapping[str, Any]) -> str:

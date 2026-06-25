@@ -267,6 +267,14 @@ make event-alpha-quality-loop PROFILE=notify_llm
 impact path, candidate role, evidence specificity, market confirmation,
 candidate-discovery funnel conversion, and quality-field source/coverage
 (`top_level`, nested legacy components, or recomputed defaults).
+It also reports snapshot quality classifications, quality-gate conflicts,
+candidate-discovery funnel stages (`raw_terms_extracted`,
+`candidate_like_terms`, `resolver_attempted`, resolver accepted/rejected,
+context validated, promoted), and a deterministic tuning section with
+near-threshold upgrade candidates, repeated weak co-occurrence patterns,
+local-only source classes, useful impact paths, common missing evidence, and
+next experiments. Treat this as review guidance only; it does not tune live
+thresholds.
 `event-alpha-quality-coverage-report` is stricter: it reads raw artifact rows
 from the latest run only and exits non-zero if any fresh row is missing a
 canonical top-level quality field. It also warns when a namespace appears to
@@ -275,8 +283,10 @@ namespace is clean.
 `event-alpha-policy-simulate` compares named policies: current,
 lower opportunity threshold, require market confirmation, require impact-path
 validation, high-quality-only, and weak-macro-with-strong-market-confirmation.
-It prints gained/lost candidates and warnings when weak/generic rows would
-become alertable. `event-alpha-export-signal-quality-cases` writes proposed benchmark
+It uses `final_route_after_quality_gate` by default, excludes legacy quality
+conflicts unless explicitly included, and prints gained/lost candidates plus
+warnings when weak/generic rows would become alertable.
+`event-alpha-export-signal-quality-cases` writes proposed benchmark
 cases to the active profile namespace, usually
 `event_fade_cache/<profile>/proposed_signal_quality_cases.json`, from delivered
 alerts, local-only weak rows, feedback, missed opportunities, and rejected
@@ -614,9 +624,13 @@ STRICT=1 make event-alpha-artifact-doctor PROFILE=no_key_live
 The doctor checks run-ledger to alert-snapshot lineage, missing matching
 snapshot rows for alertable runs, external snapshot paths, orphan alerts,
 mixed namespaces, provider health, budget rows, feedback/outcome IDs, and card
-coverage. Strict mode escalates migration-tolerant warnings such as legacy
-snapshot mismatches, mixed namespaces, missing live provider health, and unknown
-feedback/outcome IDs into blockers.
+coverage. Fresh alert snapshots must carry
+`final_route_after_quality_gate`, `final_tier_after_quality_gate`,
+`alertable_after_quality_gate`, and a consistent quality verdict. Strict mode
+blocks fresh/current rows whose final route is alertable while the opportunity
+verdict is local-only, zero-score, or insufficient-data. Legacy quality-route
+conflicts are warnings by default; use `STRICT_LEGACY=1` only for a deliberate
+migration audit that should fail on old pre-quality rows.
 
 For migration review only, include legacy/default rows explicitly:
 

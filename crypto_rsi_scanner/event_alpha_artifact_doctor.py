@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router
 from . import event_alpha_notification_delivery as _delivery
 
 
@@ -39,6 +39,11 @@ class EventAlphaArtifactDoctorResult:
     fresh_alert_rows_missing_top_level_quality: int = 0
     legacy_quality_missing_rows: int = 0
     alertable_route_conflicts_with_opportunity_level: int = 0
+    fresh_quality_route_conflict_rows: int = 0
+    legacy_quality_conflict_rows: int = 0
+    alert_rows_missing_final_route: int = 0
+    fresh_alert_rows_missing_final_route: int = 0
+    strict_legacy: bool = False
     strict: bool = False
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
@@ -62,6 +67,7 @@ def diagnose_artifacts(
     include_legacy_artifacts: bool = False,
     inspected_alert_store_path: str | Path | None = None,
     strict: bool = False,
+    strict_legacy: bool = False,
 ) -> EventAlphaArtifactDoctorResult:
     """Diagnose cross-artifact lineage, mode, and profile/namespace cleanliness."""
     raw_runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
@@ -250,9 +256,20 @@ def diagnose_artifacts(
             warnings.append(message)
     route_conflict_alerts = _latest_run_rows(alerts, runs)
     route_conflicts = _alertable_quality_route_conflicts(route_conflict_alerts)
+    fresh_route_conflicts = _quality_route_conflicts(route_conflict_alerts, legacy=False)
+    legacy_route_conflicts = _quality_route_conflicts(route_conflict_alerts, legacy=True)
+    missing_final_route = _missing_final_route_rows(route_conflict_alerts)
+    fresh_missing_final_route = _missing_final_route_rows(route_conflict_alerts, legacy=False)
     if route_conflicts:
         message = f"alertable_route_conflicts_with_opportunity_level={route_conflicts}"
-        (blockers if strict else warnings).append(message)
+        warnings.append(message)
+    if fresh_route_conflicts and strict:
+        blockers.append(f"fresh_quality_route_conflict_rows={fresh_route_conflicts}")
+    if legacy_route_conflicts:
+        message = f"legacy_quality_conflict_rows={legacy_route_conflicts}"
+        (blockers if strict and strict_legacy else warnings).append(message)
+    if fresh_missing_final_route and strict:
+        blockers.append(f"fresh_alert_rows_missing_final_route={fresh_missing_final_route}")
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
     return EventAlphaArtifactDoctorResult(
         status=status,
@@ -285,6 +302,11 @@ def diagnose_artifacts(
         fresh_alert_rows_missing_top_level_quality=quality["fresh_alert_rows_missing_top_level_quality"],
         legacy_quality_missing_rows=quality["legacy_quality_missing_rows"],
         alertable_route_conflicts_with_opportunity_level=route_conflicts,
+        fresh_quality_route_conflict_rows=fresh_route_conflicts,
+        legacy_quality_conflict_rows=legacy_route_conflicts,
+        alert_rows_missing_final_route=missing_final_route,
+        fresh_alert_rows_missing_final_route=fresh_missing_final_route,
+        strict_legacy=bool(strict_legacy),
         strict=bool(strict),
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
@@ -367,6 +389,32 @@ def _alertable_quality_route_conflicts(alerts: Iterable[Mapping[str, Any]]) -> i
     return sum(1 for row in alerts if _row_has_alertable_quality_conflict(row))
 
 
+def _quality_route_conflicts(alerts: Iterable[Mapping[str, Any]], *, legacy: bool) -> int:
+    count = 0
+    for row in alerts:
+        is_legacy = event_alpha_artifacts.is_legacy_row(row)
+        if legacy != is_legacy:
+            continue
+        classification = event_alpha_alert_store.classify_alert_snapshot(row)
+        if classification == event_alpha_alert_store.SNAPSHOT_LEGACY_CONFLICT or _row_has_alertable_quality_conflict(row):
+            count += 1
+    return count
+
+
+def _missing_final_route_rows(alerts: Iterable[Mapping[str, Any]], *, legacy: bool | None = None) -> int:
+    count = 0
+    for row in alerts:
+        if legacy is not None and event_alpha_artifacts.is_legacy_row(row) != legacy:
+            continue
+        classification = event_alpha_alert_store.classify_alert_snapshot(row)
+        if classification in {
+            event_alpha_alert_store.SNAPSHOT_MISSING_FINAL_ROUTE,
+            event_alpha_alert_store.SNAPSHOT_STALE_PRE_QUALITY_GATE,
+        }:
+            count += 1
+    return count
+
+
 def _row_has_alertable_quality_conflict(row: Mapping[str, Any]) -> bool:
     components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
     data = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
@@ -442,6 +490,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         f"profile: {result.profile or 'any'}",
         f"namespace: {result.artifact_namespace or 'any'}",
         f"strict: {str(result.strict).lower()}",
+        f"strict_legacy: {str(result.strict_legacy).lower()}",
         (
             "rows: "
             f"runs={result.run_rows} alerts={result.alert_rows} "
@@ -477,7 +526,14 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"fresh_alerts_missing_top_level={result.fresh_alert_rows_missing_top_level_quality} "
             f"legacy_quality_missing={result.legacy_quality_missing_rows}"
         ),
-        f"quality gate conflicts: alertable_route_conflicts_with_opportunity_level={result.alertable_route_conflicts_with_opportunity_level}",
+        (
+            "quality gate conflicts: "
+            f"alertable_route_conflicts_with_opportunity_level={result.alertable_route_conflicts_with_opportunity_level} "
+            f"fresh_quality_route_conflict_rows={result.fresh_quality_route_conflict_rows} "
+            f"legacy_quality_conflict_rows={result.legacy_quality_conflict_rows} "
+            f"alert_rows_missing_final_route={result.alert_rows_missing_final_route} "
+            f"fresh_alert_rows_missing_final_route={result.fresh_alert_rows_missing_final_route}"
+        ),
         "",
         "blockers:",
     ]

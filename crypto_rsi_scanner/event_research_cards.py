@@ -73,12 +73,12 @@ def render_research_card(
         f"- Playbook: {playbook}",
     ]
     if decision is not None:
-        lines.append(f"- Route: {decision.route.value} ({decision.reason})")
+        lines.append(f"- Route: {event_alpha_router.final_route_value(decision)} ({decision.reason})")
         if decision.quality_gate_block_reason or decision.requested_route_before_quality_gate:
             lines.append(
                 "- Quality gate: "
                 f"{decision.requested_route_before_quality_gate or decision.route.value} -> "
-                f"{decision.final_route_after_quality_gate or decision.route.value}"
+                f"{event_alpha_router.final_route_value(decision)}"
                 + (
                     f" ({decision.quality_gate_block_reason})"
                     if decision.quality_gate_block_reason
@@ -326,7 +326,7 @@ def _selected_entries(
             selected_by_key[entry.key] = entry
     if include_all_alertable:
         for decision in decisions:
-            if decision.alertable:
+            if event_alpha_router.alertable_after_quality_gate(decision):
                 selected_by_key[decision.entry.key] = decision.entry
     return sorted(
         selected_by_key.values(),
@@ -702,6 +702,8 @@ def _quality_gate_lines(
         if decision is not None
         else components.get("final_route_after_quality_gate")
     ) or components.get("route") or "unknown"
+    final_tier = components.get("final_tier_after_quality_gate") or components.get("tier") or "unknown"
+    classification = components.get("snapshot_quality_classification") or "unknown"
     block = (
         getattr(decision, "quality_gate_block_reason", None)
         if decision is not None
@@ -723,6 +725,8 @@ def _quality_gate_lines(
     return [
         f"- Requested route: {requested}",
         f"- Final route: {final}",
+        f"- Final tier: {final_tier}",
+        f"- Snapshot classification: {classification}",
         f"- Result: {'allowed' if allowed else 'blocked/downgraded'}",
         f"- Block reason: {block}",
         f"- Opportunity verdict: {opportunity_level} / {opportunity_score}",

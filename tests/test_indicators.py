@@ -9340,6 +9340,15 @@ def test_event_alpha_alert_store_snapshot_policy_filters_rows():
             now=now,
         )
         assert all_result.rows_written == len(alerts)
+        all_rows = [
+            json.loads(line)
+            for line in all_path.read_text(encoding="utf-8").splitlines()
+        ]
+        final_store_only_count = sum(
+            1 for row in all_rows
+            if row["final_tier_after_quality_gate"] == event_alerts.EventAlertTier.STORE_ONLY.value
+        )
+        final_non_store_count = len(all_rows) - final_store_only_count
 
         non_store_path = root / "non-store.jsonl"
         non_store_result = event_alpha_alert_store.write_alert_snapshots(
@@ -9347,9 +9356,9 @@ def test_event_alpha_alert_store_snapshot_policy_filters_rows():
             cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(path=non_store_path, snapshot_policy="non_store"),
             now=now,
         )
-        assert non_store_result.rows_written == non_store_count
+        assert non_store_result.rows_written == final_non_store_count
         assert all(
-            json.loads(line)["tier"] != event_alerts.EventAlertTier.STORE_ONLY.value
+            json.loads(line)["final_tier_after_quality_gate"] != event_alerts.EventAlertTier.STORE_ONLY.value
             for line in non_store_path.read_text(encoding="utf-8").splitlines()
         )
 
@@ -9363,12 +9372,15 @@ def test_event_alpha_alert_store_snapshot_policy_filters_rows():
             ),
             now=now,
         )
-        assert sampled_result.rows_written == non_store_count + 2
+        assert sampled_result.rows_written == final_non_store_count + 2
         sampled_rows = [
             json.loads(line)
             for line in sampled_path.read_text(encoding="utf-8").splitlines()
         ]
-        assert sum(1 for row in sampled_rows if row["tier"] == event_alerts.EventAlertTier.STORE_ONLY.value) == 2
+        assert sum(
+            1 for row in sampled_rows
+            if row["final_tier_after_quality_gate"] == event_alerts.EventAlertTier.STORE_ONLY.value
+        ) == 2
 
 
 def test_event_alpha_alert_store_scanner_report_and_outcome_fill_commands():
@@ -10413,13 +10425,24 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     btc_snapshot = next(row for row in rows if row.get("symbol") == "BTC")
     assert btc_snapshot["requested_route_before_quality_gate"] == "RESEARCH_DIGEST"
     assert btc_snapshot["final_route_after_quality_gate"] == "STORE_ONLY"
+    assert btc_snapshot["final_tier_after_quality_gate"] == "STORE_ONLY"
     assert btc_snapshot["quality_gate_block_reason"] == "impact_path_type_insufficient_data"
     assert btc_snapshot["route"] == "STORE_ONLY"
     assert btc_snapshot["lane"] == "LOCAL_ONLY"
     assert btc_snapshot["tier"] == "STORE_ONLY"
+    assert btc_snapshot["snapshot_quality_classification"] == "quality_gated_local"
     assert btc_snapshot["requested_tier_before_quality_gate"] == "WATCHLIST"
     assert btc_snapshot["route_alertable"] is False
     assert btc_snapshot["alertable_after_quality_gate"] is False
+    snapshots_by_symbol = {row.get("symbol"): row for row in rows}
+    assert snapshots_by_symbol["DIG"]["final_route_after_quality_gate"] == "RESEARCH_DIGEST"
+    assert snapshots_by_symbol["DIG"]["final_tier_after_quality_gate"] == "RADAR_DIGEST"
+    assert snapshots_by_symbol["WATCH"]["final_route_after_quality_gate"] == "RESEARCH_DIGEST"
+    assert snapshots_by_symbol["WATCH"]["final_tier_after_quality_gate"] == "WATCHLIST"
+    assert snapshots_by_symbol["HIGH"]["final_route_after_quality_gate"] == "HIGH_PRIORITY_RESEARCH"
+    assert snapshots_by_symbol["HIGH"]["final_tier_after_quality_gate"] == "HIGH_PRIORITY_WATCH"
+    assert snapshots_by_symbol["FADE"]["final_route_after_quality_gate"] == "TRIGGERED_FADE_RESEARCH"
+    assert snapshots_by_symbol["FADE"]["final_tier_after_quality_gate"] == "TRIGGERED_FADE"
     inbox = event_alpha_notification_inbox.build_notification_inbox(
         notification_runs=[{"run_id": "r1", "would_send_count": 1, "lane_counts_due": {"daily_digest": 1}}],
         alert_rows=rows,
@@ -10453,22 +10476,76 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     legacy_conflict["tier"] = "WATCHLIST"
     legacy_conflict.pop("alertable_after_quality_gate", None)
     legacy_conflict.pop("final_route_after_quality_gate", None)
+    legacy_conflict.pop("final_tier_after_quality_gate", None)
+    legacy_conflict.pop("snapshot_quality_classification", None)
+    assert event_alpha_alert_store.classify_alert_snapshot(legacy_conflict) == "legacy_conflict"
     doctor_conflict = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
         alert_rows=[legacy_conflict],
         include_legacy_artifacts=True,
+        strict=True,
     )
     assert doctor_conflict.alertable_route_conflicts_with_opportunity_level == 1
+    assert doctor_conflict.status == "WARN"
     assert "alertable_route_conflicts_with_opportunity_level=1" in event_alpha_artifact_doctor.format_artifact_doctor_report(doctor_conflict)
+    doctor_conflict_strict_legacy = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
+        alert_rows=[legacy_conflict],
+        include_legacy_artifacts=True,
+        strict=True,
+        strict_legacy=True,
+    )
+    assert doctor_conflict_strict_legacy.status == "BLOCKED"
     legacy_review = event_alpha_quality_review.format_quality_review(
         event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=[legacy_conflict])
     )
     assert "Quality Gate Conflicts" in legacy_review
     assert "BTC" in legacy_review
+    legacy_inbox = event_alpha_notification_inbox.build_notification_inbox(
+        notification_runs=[{"run_id": "r1", "would_send_count": 1, "lane_counts_due": {"daily_digest": 1}}],
+        alert_rows=[legacy_conflict],
+        feedback_rows=[],
+        research_cards_dir=Path(tmp) / "cards",
+        profile="fixture",
+        artifact_namespace="fixture",
+        notification_runs_path=Path(tmp) / "runs.jsonl",
+        alert_store_path=out,
+        feedback_path=Path(tmp) / "feedback.jsonl",
+    )
+    assert "BTC" in {item.symbol for item in legacy_inbox.legacy_quality_conflicts}
+    assert "BTC" not in {item.symbol for item in legacy_inbox.would_send_without_feedback}
+    assert "legacy quality conflicts" in event_alpha_notification_inbox.format_notification_inbox(legacy_inbox)
+    fresh_conflict = dict(btc_snapshot)
+    fresh_conflict["run_mode"] = "burn_in"
+    fresh_conflict["artifact_namespace"] = "notify_llm_quality"
+    fresh_conflict["final_route_after_quality_gate"] = "RESEARCH_DIGEST"
+    fresh_conflict["route"] = "RESEARCH_DIGEST"
+    fresh_conflict["route_alertable"] = True
+    assert event_alpha_alert_store.classify_alert_snapshot(fresh_conflict) == "legacy_conflict"
+    doctor_fresh_conflict = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
+        alert_rows=[fresh_conflict],
+        include_legacy_artifacts=True,
+        strict=True,
+    )
+    assert doctor_fresh_conflict.status == "BLOCKED"
+    fresh_missing_final = dict(btc_snapshot)
+    fresh_missing_final["run_mode"] = "burn_in"
+    fresh_missing_final["artifact_namespace"] = "notify_llm_quality"
+    fresh_missing_final.pop("final_route_after_quality_gate", None)
+    assert event_alpha_alert_store.classify_alert_snapshot(fresh_missing_final) in {"legacy_conflict", "stale_pre_quality_gate"}
+    doctor_missing_final = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
+        alert_rows=[fresh_missing_final],
+        include_legacy_artifacts=True,
+        strict=True,
+    )
+    assert doctor_missing_final.status == "BLOCKED"
 
     daily = event_alpha_daily_brief.build_daily_brief(router_result=routed, watchlist_entries=[btc, zero, digest, watch, high, trigger])
     assert "## Quality Gate Downgrades" in daily
     assert "BTC/btc:RESEARCH_DIGEST->STORE_ONLY" in daily
+    assert "## Legacy Quality Conflicts" in daily
     card = event_research_cards.render_research_card(
         "BTC",
         watchlist_entries=[btc],
@@ -10478,6 +10555,8 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert "## Quality Gate Result" in card.markdown
     assert "Requested route: RESEARCH_DIGEST" in card.markdown
     assert "Final route: STORE_ONLY" in card.markdown
+    assert "Final tier: STORE_ONLY" in card.markdown
+    assert "Snapshot classification: quality_gated_local" in card.markdown
     assert "impact_path_type_insufficient_data" in card.markdown
 
 
@@ -21640,6 +21719,13 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
             "source_class": "primary",
             "evidence_specificity": "direct_value_capture",
             "manual_verification_items": ["verify liquidity"],
+            "validation_stage": "impact_path_validated",
+            "crypto_candidate_assets": [{"symbol": "VELVET", "coin_id": "velvet", "accepted": True}],
+            "rejected_candidate_assets": [{"symbol": "HYPE", "reason": "generic_symbol_word_collision"}],
+            "row_type": "event_alpha_alert_snapshot",
+            "route": "HIGH_PRIORITY_RESEARCH",
+            "final_route_after_quality_gate": "HIGH_PRIORITY_RESEARCH",
+            "alertable_after_quality_gate": True,
         },
         {
             "alert_key": "btc-policy",
@@ -21655,6 +21741,10 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
             "source_class": "secondary",
             "evidence_specificity": "weak_cooccurrence",
             "why_local_only": "generic_cooccurrence_only",
+            "row_type": "event_alpha_alert_snapshot",
+            "route": "STORE_ONLY",
+            "final_route_after_quality_gate": "STORE_ONLY",
+            "alertable_after_quality_gate": False,
         },
         {
             "alert_key": "openai-velvet",
@@ -21669,13 +21759,61 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
             "evidence_quality_score": 70,
             "source_class": "independent",
             "evidence_specificity": "direct_value_capture",
+            "row_type": "event_alpha_alert_snapshot",
+            "route": "RESEARCH_DIGEST",
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "alertable_after_quality_gate": True,
+        },
+        {
+            "alert_key": "near-threshold",
+            "symbol": "NEAR",
+            "opportunity_level": "exploratory",
+            "opportunity_score_final": 58,
+            "impact_path_type": "venue_value_capture",
+            "impact_path_strength": "medium",
+            "candidate_role": "proxy_venue",
+            "market_confirmation_level": "weak",
+            "market_confirmation_score": 25,
+            "evidence_quality_score": 58,
+            "source_class": "independent",
+            "evidence_specificity": "direct_value_capture",
+            "row_type": "event_alpha_alert_snapshot",
+            "route": "STORE_ONLY",
+            "final_route_after_quality_gate": "STORE_ONLY",
+            "alertable_after_quality_gate": False,
+        },
+        {
+            "alert_key": "legacy-btc-conflict",
+            "symbol": "BTC",
+            "opportunity_level": "local_only",
+            "opportunity_score_final": 0,
+            "impact_path_type": "insufficient_data",
+            "impact_path_strength": "none",
+            "candidate_role": "unknown_with_reason",
+            "market_confirmation_level": "none",
+            "market_confirmation_score": 0,
+            "evidence_quality_score": 0,
+            "source_class": "insufficient_data",
+            "evidence_specificity": "insufficient_data",
+            "row_type": "event_alpha_alert_snapshot",
+            "route": "RESEARCH_DIGEST",
+            "route_alertable": True,
         },
     ]
     review = event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=rows)
     report = event_alpha_quality_review.format_quality_review(review)
+    assert review.candidate_discovery_funnel["raw_terms_extracted"] == 2
+    assert review.candidate_discovery_funnel["candidate_like_terms"] == 1
+    assert review.candidate_discovery_funnel["resolver_attempted"] == 2
+    assert review.candidate_discovery_funnel["resolver_accepted_candidates"] == 1
+    assert review.candidate_discovery_funnel["context_validated_candidates"] >= 1
+    assert review.candidate_discovery_funnel["promoted_candidates"] >= 1
+    assert "candidates_added" not in review.candidate_discovery_funnel
     assert "Strong opportunities" in report
     assert "quality_coverage:" in report
     assert "candidate_discovery_funnel:" in report
+    assert "Quality Tuning Suggestions" in report
+    assert "closest_to_digest_threshold" in report
     assert "VELVET" in report
     assert "Weak co-occurrence / local-only" in report
     assert "Validated but market-unconfirmed" in report
@@ -21683,9 +21821,12 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
     text = event_alpha_policy_simulator.format_policy_simulation(sim)
     assert "lower_opportunity_threshold" in text
     assert "high_quality_only" in text
+    assert "legacy_conflicts_excluded: 1" in text
+    assert "near-threshold" in text
     high_counts = [row["alertable_count"] for row in sim.scenarios if row["scenario"] == "high_quality_only"]
     low_counts = [row["alertable_count"] for row in sim.scenarios if row["scenario"] == "lower_opportunity_threshold"]
     assert max(low_counts) >= max(high_counts)
+    assert "near-threshold" in next(row for row in sim.scenarios if row["scenario"] == "lower_opportunity_threshold")["gained"]
     assert "warning_weak_or_generic_alertable" not in text
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "proposed.json"

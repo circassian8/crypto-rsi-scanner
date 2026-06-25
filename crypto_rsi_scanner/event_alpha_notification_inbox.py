@@ -7,9 +7,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from . import event_alpha_alert_store
 from . import event_alpha_notification_delivery as delivery
 from . import event_alpha_quality_fields
 from . import event_alpha_notifications, event_alpha_router, event_watchlist
+
+_INBOX_LEGACY_CONFLICT_CLASSIFICATIONS = {
+    event_alpha_alert_store.SNAPSHOT_LEGACY_CONFLICT,
+    event_alpha_alert_store.SNAPSHOT_STALE_PRE_QUALITY_GATE,
+}
 
 
 @dataclass(frozen=True)
@@ -29,8 +35,10 @@ class EventAlphaNotificationInboxItem:
     reviewed: bool
     reason: str
     final_route_after_quality_gate: str = ""
+    final_tier_after_quality_gate: str = ""
     quality_gate_block_reason: str = ""
     alertable_after_quality_gate: bool = True
+    snapshot_quality_classification: str = ""
 
 
 @dataclass(frozen=True)
@@ -53,6 +61,7 @@ class EventAlphaNotificationInboxResult:
     would_send_blocked_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     weak_validated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
     quality_gated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
+    legacy_quality_conflicts: tuple[EventAlphaNotificationInboxItem, ...]
     exploratory_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
     high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
     triggered_fade_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
@@ -75,6 +84,7 @@ def build_notification_inbox(
     outcomes_path: str | Path | None = None,
     notification_delivery_rows: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
+    include_legacy_conflicts: bool = False,
 ) -> EventAlphaNotificationInboxResult:
     """Join notification, alert, card, and feedback artifacts into review queues."""
     runs = [dict(row) for row in notification_runs if isinstance(row, Mapping)]
@@ -102,23 +112,40 @@ def build_notification_inbox(
     ]
     quality_gated_local_only = tuple(
         item for item in items
-        if not item.alertable_after_quality_gate and bool(item.quality_gate_block_reason) and not item.reviewed
+        if item.snapshot_quality_classification == event_alpha_alert_store.SNAPSHOT_QUALITY_GATED_LOCAL
+        and not item.reviewed
+    )
+    legacy_quality_conflicts = tuple(
+        item for item in items
+        if item.snapshot_quality_classification in _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS
+        and not item.reviewed
     )
     partial_delivered_without_feedback = tuple(
         item for item in items
-        if item.delivery_state == delivery.STATE_PARTIAL_DELIVERED and item.alertable_after_quality_gate and not item.reviewed
+        if item.delivery_state == delivery.STATE_PARTIAL_DELIVERED
+        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+        and not item.reviewed
     )
     sent_without_feedback = tuple(
         item for item in items
-        if item.sent and item.alertable_after_quality_gate and item.delivery_state != delivery.STATE_PARTIAL_DELIVERED and not item.reviewed
+        if item.sent
+        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+        and item.delivery_state != delivery.STATE_PARTIAL_DELIVERED
+        and not item.reviewed
     )
     would_send_without_feedback = tuple(
         item for item in items
-        if item.would_send and item.alertable_after_quality_gate and not item.sent and not item.blocked_by_guard and not item.reviewed
+        if item.would_send
+        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+        and not item.sent
+        and not item.blocked_by_guard
+        and not item.reviewed
     )
     would_send_blocked_without_feedback = tuple(
         item for item in items
-        if item.blocked_by_guard and item.alertable_after_quality_gate and not item.reviewed
+        if item.blocked_by_guard
+        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+        and not item.reviewed
     )
     weak_validated_local_only = tuple(
         item for item in items
@@ -126,11 +153,13 @@ def build_notification_inbox(
     )
     high_priority_unreviewed = tuple(
         item for item in items
-        if item.alertable_after_quality_gate and not item.reviewed and _is_high_priority(item)
+        if _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+        and not item.reviewed and _is_high_priority(item)
     )
     triggered_fade_unreviewed = tuple(
         item for item in items
-        if item.alertable_after_quality_gate and not item.reviewed and _is_triggered_fade(item)
+        if _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+        and not item.reviewed and _is_triggered_fade(item)
     )
     exploratory_without_feedback = tuple(
         item for item in _exploratory_items(deliveries, watch_by_alert, reviewed_ids, card_paths)
@@ -156,6 +185,7 @@ def build_notification_inbox(
         would_send_blocked_without_feedback=would_send_blocked_without_feedback,
         weak_validated_local_only=weak_validated_local_only,
         quality_gated_local_only=quality_gated_local_only,
+        legacy_quality_conflicts=legacy_quality_conflicts,
         exploratory_without_feedback=exploratory_without_feedback,
         high_priority_unreviewed=high_priority_unreviewed,
         triggered_fade_unreviewed=triggered_fade_unreviewed,
@@ -202,6 +232,7 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
     _append_item_section(lines, "would-send notifications without feedback", result.would_send_without_feedback, profile=result.profile)
     _append_item_section(lines, "would-send blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
     _append_item_section(lines, "quality-gated local-only candidates for optional review", result.quality_gated_local_only, profile=result.profile)
+    _append_item_section(lines, "legacy quality conflicts for migration review", result.legacy_quality_conflicts, profile=result.profile)
     _append_item_section(lines, "weak validated local-only hypotheses for optional review", result.weak_validated_local_only, profile=result.profile)
     _append_item_section(lines, "exploratory digest items needing review", result.exploratory_without_feedback, profile=result.profile)
     _append_item_section(lines, "high-priority cards not reviewed", result.high_priority_unreviewed, profile=result.profile)
@@ -238,8 +269,11 @@ def _append_item_section(
         if item.quality_gate_block_reason:
             lines.append(
                 f"  quality_gate: final={item.final_route_after_quality_gate or 'unknown'} "
+                f"tier={item.final_tier_after_quality_gate or item.tier or 'unknown'} "
                 f"block={item.quality_gate_block_reason}"
             )
+        if item.snapshot_quality_classification:
+            lines.append(f"  snapshot_classification: {item.snapshot_quality_classification}")
         lines.append(f"  reason: {item.reason}")
         lines.append(f"  feedback_useful: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{item.alert_id}'")
         lines.append(f"  feedback_junk: make event-feedback-junk PROFILE={profile} FEEDBACK_TARGET='{item.alert_id}'")
@@ -281,6 +315,9 @@ def _inbox_item(
     card_id = str(alert.get("card_id") or "")
     card_path = _path_for_card(alert_id, alert_key, card_id, card_paths)
     final_route, quality_block, alertable_after_quality = _quality_gate_for_alert(alert)
+    classification = str(alert.get("snapshot_quality_classification") or event_alpha_alert_store.classify_alert_snapshot(alert))
+    if classification in _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS:
+        alertable_after_quality = False
     lane = _lane_for_alert(alert, final_route=final_route)
     due = _lane_count(run, "lane_counts_due", lane)
     run_id = str(alert.get("run_id") or (run or {}).get("run_id") or "")
@@ -316,8 +353,10 @@ def _inbox_item(
         reviewed=reviewed,
         reason=str(alert.get("route_reason") or alert.get("reason") or (run or {}).get("block_reason") or "review pending"),
         final_route_after_quality_gate=final_route,
+        final_tier_after_quality_gate=str(alert.get("final_tier_after_quality_gate") or alert.get("tier") or ""),
         quality_gate_block_reason=quality_block or "",
         alertable_after_quality_gate=alertable_after_quality,
+        snapshot_quality_classification=classification,
     )
 
 
@@ -419,6 +458,16 @@ def _quality_gate_for_alert(alert: Mapping[str, Any]) -> tuple[str, str | None, 
     else:
         alertable = bool(route_alertable_raw) and event_alpha_router.route_value_is_alertable(route)
     return route, block, alertable
+
+
+def _countable_alertable(
+    item: EventAlphaNotificationInboxItem,
+    *,
+    include_legacy_conflicts: bool,
+) -> bool:
+    if item.snapshot_quality_classification in _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS:
+        return bool(include_legacy_conflicts and item.alertable_after_quality_gate)
+    return bool(item.alertable_after_quality_gate)
 
 
 def _lane_for_alert(alert: Mapping[str, Any], *, final_route: str | None = None) -> str:

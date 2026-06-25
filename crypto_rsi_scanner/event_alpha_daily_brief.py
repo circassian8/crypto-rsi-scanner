@@ -9,6 +9,7 @@ from typing import Any, Iterable, Mapping
 
 from . import (
     event_alpha_calibration,
+    event_alpha_alert_store,
     event_alpha_artifacts,
     event_alpha_notifications,
     event_alpha_notification_runs,
@@ -91,7 +92,7 @@ def build_daily_brief(
     )
     entries = list(watchlist_entries)
     decisions = list(router_result.decisions if router_result else ())
-    alertable = list(router_result.alertable_decisions if router_result else ())
+    alertable = [decision for decision in list(router_result.alertable_decisions if router_result else ()) if event_alpha_router.alertable_after_quality_gate(decision)]
     latest = event_alpha_run_ledger.latest_run(runs, requested_profile) or {}
     selected_profile = str(latest.get("profile") or "default") if latest else "none"
     requested = str(requested_profile or "latest").strip() or "latest"
@@ -276,13 +277,13 @@ def build_daily_brief(
     if alertable:
         for decision in alertable[:10]:
             entry = decision.entry
-            lines.append(f"- {decision.route.value}: {entry.symbol}/{entry.coin_id} state={entry.state} score={entry.latest_score} reason={decision.reason}")
+            lines.append(f"- {event_alpha_router.final_route_value(decision)}: {entry.symbol}/{entry.coin_id} state={entry.state} score={entry.latest_score} reason={decision.reason}")
     else:
         lines.append("- None.")
     lines.extend(["", "## Validated Impact Hypothesis Routing"])
     alertable_hypotheses = [
         decision for decision in decisions
-        if decision.entry.relationship_type == "impact_hypothesis" and decision.alertable
+        if decision.entry.relationship_type == "impact_hypothesis" and event_alpha_router.alertable_after_quality_gate(decision)
     ]
     impact_path_validated_hypotheses = [
         decision for decision in decisions
@@ -299,7 +300,7 @@ def build_daily_brief(
         decision for decision in decisions
         if (
             decision.entry.relationship_type == "impact_hypothesis"
-            and not decision.alertable
+            and not event_alpha_router.alertable_after_quality_gate(decision)
             and decision.entry.state == event_watchlist.EventWatchlistState.RADAR.value
             and decision.entry.symbol.upper() != "SECTOR"
         )
@@ -371,6 +372,9 @@ def build_daily_brief(
     lines.append("- Downgraded items: " + (_brief_decisions(downgraded[:5]) or "none"))
     lines.append("- Top blocked route attempts: " + (_blocked_route_attempts_line(downgraded) or "none"))
     lines.append("- Reason counts: " + _quality_gate_reason_counts(downgraded))
+    lines.extend(["", "## Legacy Quality Conflicts"])
+    conflicts = _legacy_quality_conflicts(alerts)
+    lines.extend(_legacy_quality_conflict_lines(conflicts[:8]))
     exploratory = event_alpha_notifications.select_exploratory_candidates(
         decisions,
         cfg=event_alpha_notifications.EventAlphaNotificationConfig(
@@ -559,7 +563,7 @@ def _suppression_lines(
 ) -> list[str]:
     counts: dict[str, int] = {}
     for decision in decisions:
-        if decision.alertable:
+        if event_alpha_router.alertable_after_quality_gate(decision):
             continue
         counts[decision.reason] = counts.get(decision.reason, 0) + 1
     for entry in entries:
@@ -620,13 +624,14 @@ def _brief_decisions(rows: Iterable[event_alpha_router.EventAlphaRouteDecision])
     for decision in rows:
         entry = decision.entry
         components = entry.latest_score_components or {}
+        final_route = event_alpha_router.final_route_value(decision)
         labels.append(
             f"{entry.symbol}/{entry.coin_id}"
             f"({entry.state},score={entry.latest_score},v2={_float(components.get('opportunity_score_v2')):.0f},"
             f"final={_float(components.get('opportunity_score_final')):.0f},"
             f"level={components.get('opportunity_level') or 'unknown'},"
             f"path={components.get('impact_path_type') or 'unknown'},role={components.get('candidate_role') or 'unknown'},"
-            f"route={decision.route.value},reason={decision.reason})"
+            f"route={final_route},requested={decision.requested_route_before_quality_gate or decision.route.value},reason={decision.reason})"
         )
     return "; ".join(labels)
 
@@ -708,6 +713,36 @@ def _quality_gate_reason_counts(rows: Iterable[event_alpha_router.EventAlphaRout
     return _format_counts(counts)
 
 
+def _legacy_quality_conflicts(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    out = []
+    for row in rows:
+        classification = str(
+            row.get("snapshot_quality_classification")
+            or event_alpha_alert_store.classify_alert_snapshot(row)
+        )
+        if classification in event_alpha_alert_store.LEGACY_CONFLICT_CLASSIFICATIONS:
+            out.append(row)
+    return out
+
+
+def _legacy_quality_conflict_lines(rows: Iterable[Mapping[str, Any]]) -> list[str]:
+    items = list(rows)
+    if not items:
+        return ["- none"]
+    lines: list[str] = []
+    for row in items:
+        label = row.get("symbol") or row.get("validated_symbol") or row.get("coin_id") or row.get("alert_key") or "candidate"
+        classification = str(row.get("snapshot_quality_classification") or event_alpha_alert_store.classify_alert_snapshot(row))
+        lines.append(
+            f"- {label}: classification={classification} "
+            f"legacy_route={row.get('route') or 'unknown'} "
+            f"final={row.get('final_route_after_quality_gate') or 'missing'} "
+            f"level={row.get('opportunity_level') or 'unknown'} "
+            f"score={row.get('opportunity_score_final') if row.get('opportunity_score_final') is not None else 'n/a'}"
+        )
+    return lines
+
+
 def _candidate_discovery_funnel_line(rows: Iterable[Mapping[str, Any]]) -> str:
     generated = executed = raw_terms = candidate_like = accepted = rejected = validated = promoted = 0
     for row in rows:
@@ -725,10 +760,12 @@ def _candidate_discovery_funnel_line(rows: Iterable[Mapping[str, Any]]) -> str:
             promoted += 1
     if not any((generated, executed, raw_terms, candidate_like, accepted, rejected, validated, promoted)):
         return "none"
+    resolver_attempted = accepted + rejected
     return (
         f"generated={generated}, executed={executed}, raw_terms_extracted={raw_terms}, "
         f"candidate_like_terms={candidate_like}, resolver_accepted_candidates={accepted}, "
-        f"resolver_rejected_terms={rejected}, context_validated_candidates={validated}, "
+        f"resolver_attempted={resolver_attempted}, resolver_rejected_terms={rejected}, "
+        f"context_validated_candidates={validated}, "
         f"promoted_candidates={promoted}"
     )
 
@@ -762,7 +799,7 @@ def _upgrade_candidate_line(rows: Iterable[event_alpha_router.EventAlphaRouteDec
     labels: list[str] = []
     for decision in sorted(rows, key=lambda item: item.entry.latest_score, reverse=True):
         entry = decision.entry
-        if decision.alertable or entry.relationship_type != "impact_hypothesis":
+        if event_alpha_router.alertable_after_quality_gate(decision) or entry.relationship_type != "impact_hypothesis":
             continue
         components = entry.latest_score_components or {}
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
@@ -781,7 +818,7 @@ def _downgrade_risk_line(rows: Iterable[event_alpha_router.EventAlphaRouteDecisi
     labels: list[str] = []
     for decision in sorted(rows, key=lambda item: item.entry.latest_score, reverse=True):
         entry = decision.entry
-        if not decision.alertable and entry.state not in {"WATCHLIST", "HIGH_PRIORITY"}:
+        if not event_alpha_router.alertable_after_quality_gate(decision) and entry.state not in {"WATCHLIST", "HIGH_PRIORITY"}:
             continue
         components = entry.latest_score_components or {}
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)

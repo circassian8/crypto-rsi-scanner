@@ -21,6 +21,18 @@ from . import (
 
 ALERT_STORE_SCHEMA_VERSION = "event_alpha_alert_snapshot_v1"
 
+SNAPSHOT_CURRENT_CLEAN = "current_clean"
+SNAPSHOT_QUALITY_GATED_LOCAL = "quality_gated_local"
+SNAPSHOT_LEGACY_CONFLICT = "legacy_conflict"
+SNAPSHOT_MISSING_FINAL_ROUTE = "missing_final_route"
+SNAPSHOT_STALE_PRE_QUALITY_GATE = "stale_pre_quality_gate"
+
+LEGACY_CONFLICT_CLASSIFICATIONS = {
+    SNAPSHOT_LEGACY_CONFLICT,
+    SNAPSHOT_MISSING_FINAL_ROUTE,
+    SNAPSHOT_STALE_PRE_QUALITY_GATE,
+}
+
 
 @dataclass(frozen=True)
 class EventAlphaAlertStoreConfig:
@@ -243,7 +255,9 @@ def format_alert_snapshot_report(
         ("by playbook", "playbook_type"),
         ("by expected direction", "expected_direction"),
         ("by tier", "tier"),
-        ("by route", "route"),
+        ("by final route", "final_route_after_quality_gate"),
+        ("by legacy route", "route"),
+        ("by snapshot quality classification", "snapshot_quality_classification"),
         ("by delivered status", "delivered_status"),
         ("by feedback status", "feedback_status"),
         ("by impact path type", "impact_path_type"),
@@ -269,7 +283,8 @@ def format_alert_snapshot_report(
     out.append("")
     for row in sorted(rows, key=lambda item: str(item.get("observed_at") or ""), reverse=True)[:20]:
         out.append(
-            f"{row.get('tier', 'UNKNOWN'):<20} score={int(row.get('opportunity_score') or 0):>3} "
+            f"{row.get('final_tier_after_quality_gate') or row.get('tier', 'UNKNOWN'):<20} "
+            f"score={int(row.get('opportunity_score') or 0):>3} "
             f"{row.get('asset_symbol', 'UNKNOWN')}/{row.get('asset_coin_id', 'unknown')} "
             f"playbook={row.get('playbook_type') or 'unknown'}"
         )
@@ -291,7 +306,9 @@ def format_alert_snapshot_report(
             )
         if row.get("route") or row.get("delivered_status") or row.get("research_card_path"):
             out.append(
-                f"  route: {row.get('route') or 'none'} lane={row.get('lane') or 'none'} "
+                f"  route: final={row.get('final_route_after_quality_gate') or row.get('route') or 'none'} "
+                f"legacy={row.get('route') or 'none'} lane={row.get('lane') or 'none'} "
+                f"class={row.get('snapshot_quality_classification') or classify_alert_snapshot(row)} "
                 f"delivered={row.get('delivered_status') or 'unknown'} feedback={row.get('feedback_status') or 'pending'}"
             )
             if row.get("research_card_path"):
@@ -328,7 +345,8 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
     alert_key = f"{cluster_id}|{candidate.asset.coin_id}|{effective_playbook}"
     observed_iso = observed.isoformat()
     quality = event_alpha_quality_fields.ensure_quality_fields({}, components=alert.score_components)
-    return {
+    requested_route = _route_for_tier_value(alert.tier.value)
+    row = {
         "schema_version": ALERT_STORE_SCHEMA_VERSION,
         "row_type": "event_alpha_alert_snapshot",
         "snapshot_id": f"{observed_iso}|{alert_key}",
@@ -350,6 +368,8 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "source": candidate.event.source,
         "source_count": len(candidate.event.raw_ids),
         "tier": alert.tier.value,
+        "requested_tier_before_quality_gate": alert.tier.value,
+        "requested_route_before_quality_gate": requested_route,
         "opportunity_score": alert.opportunity_score,
         "score_before_priors": alert.score_before_priors,
         "score_after_priors": alert.score_after_priors,
@@ -382,6 +402,8 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "volume_zscore_24h": market.volume_zscore_24h if market else None,
         "market_anomaly_bucket": _market_anomaly_bucket(alert.score_components.get("market_move_volume", 0)),
         **quality,
+        "route": requested_route,
+        "lane": event_alpha_router.lane_value_for_route_value(requested_route),
         "btc_regime": _btc_regime(candidate),
         "signal_type": signal.signal_type.value if signal else None,
         "fade_state": signal.state.value if signal else None,
@@ -391,6 +413,7 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "delivered_status": None,
         "feedback_status": "pending",
     }
+    return _with_canonical_quality_route(row)
 
 
 def _snapshot_from_route_decision(
@@ -420,7 +443,7 @@ def _snapshot_from_route_decision(
     final_lane = event_alpha_router.final_lane_value(decision)
     alertable_after_quality = event_alpha_router.alertable_after_quality_gate(decision)
     tier = entry.latest_tier if alertable_after_quality else event_alerts.EventAlertTier.STORE_ONLY.value
-    return {
+    row = {
         "schema_version": ALERT_STORE_SCHEMA_VERSION,
         "row_type": "event_alpha_alert_snapshot",
         "snapshot_id": f"{observed_iso}|{alert_key}",
@@ -467,6 +490,7 @@ def _snapshot_from_route_decision(
         "lane": final_lane,
         "requested_route_before_quality_gate": decision.requested_route_before_quality_gate or decision.route.value,
         "final_route_after_quality_gate": final_route,
+        "final_tier_after_quality_gate": _tier_for_final_route(final_route, entry.latest_tier, quality),
         "quality_gate_block_reason": decision.quality_gate_block_reason,
         "alert_id": decision.alert_id,
         "card_id": decision.card_id,
@@ -506,6 +530,7 @@ def _snapshot_from_route_decision(
         "verify": components.get("what_to_verify") or [],
         "rejected_reason": None,
     }
+    return _with_snapshot_quality_classification(row)
 
 
 def _with_artifact_context(
@@ -558,6 +583,11 @@ def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]
             "requested_route_before_quality_gate": getattr(decision, "requested_route_before_quality_gate", None)
             or getattr(route, "value", str(route)),
             "final_route_after_quality_gate": final_route,
+            "final_tier_after_quality_gate": _tier_for_final_route(
+                final_route,
+                getattr(entry, "latest_tier", None),
+                quality,
+            ),
             "quality_gate_block_reason": getattr(decision, "quality_gate_block_reason", None),
             "opportunity_level": getattr(decision, "opportunity_level", None) or quality.get("opportunity_level"),
             "opportunity_score_final": getattr(decision, "opportunity_score_final", None)
@@ -589,14 +619,111 @@ def _route_decisions_for_snapshots(router_result: Any | None) -> tuple[event_alp
 def _with_route_context(row: dict[str, Any], route_context: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     context = route_context.get(str(row.get("alert_key") or ""))
     if not context:
-        return row
+        return _with_snapshot_quality_classification(row)
     out = dict(row)
     if "requested_tier_before_quality_gate" not in out:
         out["requested_tier_before_quality_gate"] = out.get("tier")
     out.update(context)
     if not bool(out.get("alertable_after_quality_gate", out.get("route_alertable"))):
         out["tier"] = event_alerts.EventAlertTier.STORE_ONLY.value
+    elif out.get("final_tier_after_quality_gate"):
+        out["tier"] = out["final_tier_after_quality_gate"]
+    return _with_snapshot_quality_classification(out)
+
+
+def classify_alert_snapshot(row: Mapping[str, Any]) -> str:
+    """Classify snapshot route/quality consistency for reports and migrations."""
+    components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+    has_quality = event_alpha_quality_fields.has_any_quality_field(row, components_key="score_components")
+    final_present = bool(row.get("final_route_after_quality_gate"))
+    final_route, block = event_alpha_router.quality_gate_route_for_row(
+        row,
+        components=components,
+        require_quality=has_quality,
+    )
+    persisted_final = str(row.get("final_route_after_quality_gate") or "")
+    persisted_route = str(row.get("route") or "")
+    persisted_alertable = bool(row.get("route_alertable")) or event_alpha_router.route_value_is_alertable(persisted_route)
+    final_alertable = event_alpha_router.route_value_is_alertable(final_route)
+    persisted_final_alertable = event_alpha_router.route_value_is_alertable(persisted_final)
+    if not final_present:
+        if persisted_alertable and not final_alertable:
+            return SNAPSHOT_LEGACY_CONFLICT
+        return SNAPSHOT_STALE_PRE_QUALITY_GATE if has_quality else SNAPSHOT_MISSING_FINAL_ROUTE
+    if (persisted_alertable or persisted_final_alertable) and not final_alertable:
+        return SNAPSHOT_LEGACY_CONFLICT
+    if persisted_final and persisted_final != final_route and persisted_final_alertable:
+        return SNAPSHOT_LEGACY_CONFLICT
+    if block and not final_alertable:
+        return SNAPSHOT_QUALITY_GATED_LOCAL
+    return SNAPSHOT_CURRENT_CLEAN
+
+
+def _with_snapshot_quality_classification(row: dict[str, Any]) -> dict[str, Any]:
+    out = dict(row)
+    out["snapshot_quality_classification"] = classify_alert_snapshot(out)
     return out
+
+
+def _with_canonical_quality_route(row: dict[str, Any]) -> dict[str, Any]:
+    out = dict(row)
+    components = out.get("score_components") if isinstance(out.get("score_components"), Mapping) else {}
+    requested_route = str(
+        out.get("requested_route_before_quality_gate")
+        or out.get("route")
+        or _route_for_tier_value(out.get("requested_tier_before_quality_gate") or out.get("tier"))
+    )
+    out["requested_route_before_quality_gate"] = requested_route
+    out.setdefault("requested_tier_before_quality_gate", out.get("tier"))
+    has_quality = event_alpha_quality_fields.has_any_quality_field(out, components_key="score_components")
+    final_route, block = event_alpha_router.quality_gate_route_for_row(
+        out,
+        components=components,
+        requested_route=requested_route,
+        require_quality=has_quality,
+    )
+    final_tier = _tier_for_final_route(final_route, out.get("requested_tier_before_quality_gate") or out.get("tier"), out)
+    out["final_route_after_quality_gate"] = final_route
+    out["final_tier_after_quality_gate"] = final_tier
+    out["quality_gate_block_reason"] = block or out.get("quality_gate_block_reason")
+    out["alertable_after_quality_gate"] = event_alpha_router.route_value_is_alertable(final_route)
+    out["route_alertable"] = out["alertable_after_quality_gate"]
+    out["route"] = final_route
+    out["lane"] = event_alpha_router.lane_value_for_route_value(final_route)
+    out["tier"] = final_tier
+    return _with_snapshot_quality_classification(out)
+
+
+def _route_for_tier_value(tier: object) -> str:
+    value = str(getattr(tier, "value", tier) or "").upper()
+    if value == event_alerts.EventAlertTier.TRIGGERED_FADE.value:
+        return event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value
+    if value == event_alerts.EventAlertTier.HIGH_PRIORITY_WATCH.value:
+        return event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+    if value in {event_alerts.EventAlertTier.WATCHLIST.value, event_alerts.EventAlertTier.RADAR_DIGEST.value}:
+        return event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
+    return event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+
+
+def _tier_for_final_route(
+    final_route: object,
+    requested_tier: object,
+    quality: Mapping[str, Any] | None = None,
+) -> str:
+    route = str(getattr(final_route, "value", final_route) or "").upper()
+    requested = str(getattr(requested_tier, "value", requested_tier) or "").upper()
+    if route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value:
+        return event_alerts.EventAlertTier.TRIGGERED_FADE.value
+    if route == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value:
+        return event_alerts.EventAlertTier.HIGH_PRIORITY_WATCH.value
+    if route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value:
+        if requested in {event_alerts.EventAlertTier.WATCHLIST.value, event_alerts.EventAlertTier.RADAR_DIGEST.value}:
+            return requested
+        level = str((quality or {}).get("opportunity_level") or "").strip()
+        if level == "watchlist":
+            return event_alerts.EventAlertTier.WATCHLIST.value
+        return event_alerts.EventAlertTier.RADAR_DIGEST.value
+    return event_alerts.EventAlertTier.STORE_ONLY.value
 
 
 def _delivery_context_by_alert_id(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:

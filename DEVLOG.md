@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Canonicalize Event Alpha quality artifact truth · Codex
+**Why:** Fresh alert snapshots can be quality-gated correctly while older
+pre-quality fields still make raw rows look alertable to downstream reports.
+Operator review, Pro-model handoff, and policy simulation need one canonical
+post-quality route/tier contract.
+**Changes:**
+- Alert snapshots now always carry requested route/tier, final
+  route/tier-after-quality-gate, alertable-after-quality-gate, block reason,
+  and a snapshot-quality classification (`current_clean`,
+  `quality_gated_local`, `legacy_conflict`, `missing_final_route`, or
+  `stale_pre_quality_gate`).
+- Snapshot reports, notification inbox, daily brief, research cards, artifact
+  doctor, quality review, and policy simulation now use the final route by
+  default while preserving requested/legacy route fields for audit.
+- Legacy quality-route conflicts are quarantined from delivered/would-send
+  feedback queues by default; fresh conflicts and fresh missing final routes
+  block strict artifact doctor checks, with an explicit strict-legacy option
+  for migration audits.
+- Candidate-discovery funnel reporting now separates raw terms, candidate-like
+  terms, resolver attempts/accepted/rejected terms, context-validated
+  candidates, and promoted candidates; quality review adds deterministic tuning
+  suggestions for near-threshold rows, weak co-occurrence patterns, source
+  blockers, and next experiments.
+**Verify:** `python3 tests/test_indicators.py` passed (456/456) and
+`python3 -m compileall -q crypto_rsi_scanner tests` passed. Full eval,
+quality-validation, manual smoke, and `make verify` results are in the final
+handoff for this prompt.
+**Notes/risks:** Research-only. No normal RSI rows, paper/live trades,
+execution, alert-scoring promotion, provider/LLM promotion, or
+LLM/provider-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-25 — Make Event Alpha quality verdicts final at snapshot and notification boundaries · Codex
 **Why:** A row with a final `local_only` / `insufficient_data` verdict could be
 downgraded in the daily brief while stale pre-gate route fields still made it

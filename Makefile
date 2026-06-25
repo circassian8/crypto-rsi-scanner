@@ -87,6 +87,7 @@ EVENT_ALPHA_NOTIFICATION_PACK ?= event_alpha_notification_pack.zip
 EVENT_ALPHA_LAUNCHD_OUT ?= research/generated_$(PROFILE).plist
 EVENT_ALPHA_INCLUDE_LEGACY_ARG = $(if $(filter 1 true yes,$(INCLUDE_LEGACY)),--event-alpha-include-legacy-artifacts,)
 EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG = $(if $(filter 1 true yes,$(STRICT)),--event-alpha-artifact-doctor-strict,)
+EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG = $(if $(filter 1 true yes,$(STRICT_LEGACY)),--event-alpha-artifact-doctor-strict-legacy,)
 EVENT_ALPHA_IGNORE_BACKOFF_ARG = $(if $(filter 1 true yes,$(IGNORE_BACKOFF)),--ignore-provider-backoff,)
 EVENT_ALPHA_PROVIDER_SELECTOR_ARGS = $(if $(strip $(PROVIDER_KEY)),--provider-key $(PROVIDER_KEY),) $(if $(strip $(PROVIDER_SERVICE)),--service $(PROVIDER_SERVICE),) $(if $(strip $(PROVIDER_ROLE)),--role $(PROVIDER_ROLE),) $(if $(filter 1 true yes,$(PROVIDER_ALL)),--all,)
 EVENT_ALPHA_NOTIFY_EVERY_RUN_PROFILES = notify_no_key notify_llm notify_llm_deep notify_llm_quality
@@ -186,7 +187,7 @@ help:
 	@echo "  make event-alpha-burn-in-checklist  Score readiness for research-send burn-in promotion"
 	@echo "  make event-alpha-v1-readiness  Print v1 readiness gates for scheduled burn-in, research-send, and full LLM"
 	@echo "  make event-alpha-health-guard PROFILE=no_key_live  Check run freshness, provider health, snapshots, and budget status"
-	@echo "  make event-alpha-artifact-doctor PROFILE=no_key_live STRICT=1  Diagnose artifact namespace, lineage, and snapshot consistency"
+	@echo "  make event-alpha-artifact-doctor PROFILE=no_key_live STRICT=1  Diagnose fresh artifact lineage and quality-route consistency"
 	@echo "  INCLUDE_LEGACY=1 may be added to burn-in/readiness/doctor targets for migration review"
 	@echo "  make event-alpha-tuning-worksheet  Print weekly tuning suggestions without applying changes"
 	@echo "  make event-alpha-export-burn-in-pack  Write clean burn-in review zip"
@@ -1022,7 +1023,7 @@ event-alpha-artifact-doctor:
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_ALPHA_FEEDBACK_PATH=$(EVENT_ALPHA_PROFILE_DIR)/event_alpha_feedback.jsonl \
 	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
-	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG)
+	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG)
 
 event-alpha-tuning-worksheet:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \

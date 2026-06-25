@@ -5101,6 +5101,7 @@ def event_alpha_artifact_doctor_report(
     include_test_artifacts: bool = False,
     include_legacy_artifacts: bool = False,
     strict: bool = False,
+    strict_legacy: bool = False,
 ) -> None:
     """Print artifact lineage/namespace diagnostics for Event Alpha."""
     _setup_event_discovery_logging(verbose)
@@ -5137,6 +5138,7 @@ def event_alpha_artifact_doctor_report(
         include_legacy_artifacts=include_legacy_artifacts,
         inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
         strict=strict or bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
+        strict_legacy=strict_legacy,
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_artifact_doctor.format_artifact_doctor_report(result))
@@ -8112,7 +8114,12 @@ def cli() -> None:
     parser.add_argument(
         "--event-alpha-artifact-doctor-strict",
         action="store_true",
-        help="Escalate legacy snapshot mismatches, mixed namespaces, and unknown IDs to artifact-doctor blockers.",
+        help="Escalate fresh/current artifact mismatches, mixed namespaces, and unknown IDs to artifact-doctor blockers.",
+    )
+    parser.add_argument(
+        "--event-alpha-artifact-doctor-strict-legacy",
+        action="store_true",
+        help="With strict artifact doctor, also escalate legacy quality-route conflicts to blockers.",
     )
     parser.add_argument(
         "--event-alpha-profile-report",
@@ -8726,6 +8733,7 @@ def cli() -> None:
             include_test_artifacts=args.event_alpha_include_test_artifacts,
             include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
             strict=args.event_alpha_artifact_doctor_strict,
+            strict_legacy=args.event_alpha_artifact_doctor_strict_legacy,
         )
         return
     if args.event_alpha_tuning_worksheet:

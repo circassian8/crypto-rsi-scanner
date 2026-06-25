@@ -26,8 +26,14 @@ even if the older watchlist/playbook path requested digest, watchlist,
 high-priority, or instant routing. Alert snapshots, notification plans, routed
 Telegram copy, inbox queues, and artifact doctors must treat the final route as
 authoritative; requested pre-gate route/tier fields are audit metadata only.
+Alert snapshots must persist both requested route/tier and final route/tier
+after quality gate, plus alertable-after-quality-gate, block reason, and a
+snapshot quality classification. Reports use final route/tier by default.
 Quality-gated local/store-only rows may appear in explicit local-only review
-sections, but they must not be counted as delivered or would-send digest items.
+sections, and legacy conflicts may appear in migration-review sections, but
+they must not be counted as delivered or would-send digest items by default.
+Fresh/current rows with alertable final routes that contradict `local_only`,
+zero-score, or insufficient-data quality fields are artifact-doctor blockers.
 The only exception is an already-deterministic `TRIGGERED_FADE_RESEARCH` route
 from `event_fade.py` plus the `proxy_fade` playbook; LLMs, providers,
 hypotheses, and quality metadata still cannot create `TRIGGERED_FADE`.
