@@ -166,6 +166,19 @@ Delivered validated-hypothesis digest items are written to
 validated identity fields so `make event-alpha-notification-inbox
 PROFILE=notify_llm` can show them as needing useful/junk feedback.
 
+Lifecycle state is quality-gated too. Watchlist rows carry
+`requested_state_before_quality_gate`, `final_state_after_quality_gate`,
+`state_quality_capped`, and `quality_state_block_reason`. Daily briefs,
+router decisions, active-watchlist monitor output, alert snapshots, inboxes,
+research cards, and artifact doctor checks use the final quality-capped state
+by default. A row whose final verdict is `local_only`, insufficient-data, or
+zero-score cannot remain an active `WATCHLIST` / `HIGH_PRIORITY` candidate; it
+appears under `Quality-Capped Watchlist Rows` with the requested/final state and
+block reason. Valid `watchlist` / `high_priority` rows can still remain active,
+and validated watchlist-quality rows can progress through event lifecycle states
+such as `EVENT_PASSED` and `ARMED`. `TRIGGERED_FADE` remains unchanged and can
+only come from deterministic `event_fade.py` plus `proxy_fade`.
+
 Notification visibility is separately controlled by
 `RSI_EVENT_ALPHA_NOTIFICATION_QUALITY_MODE`:
 
@@ -631,6 +644,14 @@ blocks fresh/current rows whose final route is alertable while the opportunity
 verdict is local-only, zero-score, or insufficient-data. Legacy quality-route
 conflicts are warnings by default; use `STRICT_LEGACY=1` only for a deliberate
 migration audit that should fail on old pre-quality rows.
+
+The doctor also checks watchlist lifecycle consistency. Fresh/current rows with
+active `WATCHLIST` / `HIGH_PRIORITY` state that contradict a local-only,
+zero-score, or insufficient-data quality verdict must either carry a non-active
+`final_state_after_quality_gate` with `state_quality_capped=true`, or strict
+doctor blocks the namespace. Properly capped rows are visible in daily brief and
+quality review local-only sections, not in active watchlist sections. Legacy
+uncapped rows are migration warnings unless `STRICT_LEGACY=1` is set.
 
 For migration review only, include legacy/default rows explicitly:
 

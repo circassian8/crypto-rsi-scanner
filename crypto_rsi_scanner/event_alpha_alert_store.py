@@ -15,6 +15,7 @@ from . import (
     event_alpha_outcomes,
     event_alpha_quality_fields,
     event_alpha_router,
+    event_watchlist,
     event_graph,
     event_playbooks,
 )
@@ -369,6 +370,10 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "source_count": len(candidate.event.raw_ids),
         "tier": alert.tier.value,
         "requested_tier_before_quality_gate": alert.tier.value,
+        "requested_state_before_quality_gate": None,
+        "final_state_after_quality_gate": None,
+        "quality_state_block_reason": None,
+        "state_quality_capped": False,
         "requested_route_before_quality_gate": requested_route,
         "opportunity_score": alert.opportunity_score,
         "score_before_priors": alert.score_before_priors,
@@ -485,7 +490,8 @@ def _snapshot_from_route_decision(
         "btc_regime": components.get("btc_regime") or "unknown",
         "signal_type": components.get("signal_type"),
         "fade_state": components.get("fade_state"),
-        "state": entry.state,
+        "state": event_watchlist.final_state_value(entry),
+        **_state_cap_context(entry),
         "route": final_route,
         "lane": final_lane,
         "requested_route_before_quality_gate": decision.requested_route_before_quality_gate or decision.route.value,
@@ -596,6 +602,7 @@ def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]
             "route_alertable": alertable_after_quality,
             "alertable_after_quality_gate": alertable_after_quality,
             "route_reason": str(getattr(decision, "reason", "") or ""),
+            **_state_cap_context(entry),
         }
     return out
 
@@ -616,6 +623,27 @@ def _route_decisions_for_snapshots(router_result: Any | None) -> tuple[event_alp
     return tuple(out)
 
 
+def _state_cap_context(entry: event_watchlist.EventWatchlistEntry) -> dict[str, Any]:
+    requested = event_watchlist.requested_state_value(entry)
+    final = event_watchlist.final_state_value(entry)
+    quality = {
+        key: getattr(entry, key, None)
+        for key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS
+        if getattr(entry, key, None) not in (None, "", [], {}, ())
+    }
+    if not quality:
+        quality = dict(entry.latest_score_components or {})
+    _, computed_block = event_watchlist.quality_cap_watchlist_state(requested, quality)
+    capped = event_watchlist.state_is_quality_capped(entry)
+    return {
+        "state": final,
+        "requested_state_before_quality_gate": requested,
+        "final_state_after_quality_gate": final,
+        "quality_state_block_reason": entry.quality_state_block_reason or computed_block,
+        "state_quality_capped": capped,
+    }
+
+
 def _with_route_context(row: dict[str, Any], route_context: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     context = route_context.get(str(row.get("alert_key") or ""))
     if not context:
@@ -624,6 +652,8 @@ def _with_route_context(row: dict[str, Any], route_context: Mapping[str, Mapping
     if "requested_tier_before_quality_gate" not in out:
         out["requested_tier_before_quality_gate"] = out.get("tier")
     out.update(context)
+    if context.get("state") is not None:
+        out["state"] = context.get("state")
     if not bool(out.get("alertable_after_quality_gate", out.get("route_alertable"))):
         out["tier"] = event_alerts.EventAlertTier.STORE_ONLY.value
     elif out.get("final_tier_after_quality_gate"):
@@ -654,6 +684,8 @@ def classify_alert_snapshot(row: Mapping[str, Any]) -> str:
         return SNAPSHOT_LEGACY_CONFLICT
     if persisted_final and persisted_final != final_route and persisted_final_alertable:
         return SNAPSHOT_LEGACY_CONFLICT
+    if bool(row.get("state_quality_capped")):
+        return SNAPSHOT_QUALITY_GATED_LOCAL
     if block and not final_alertable:
         return SNAPSHOT_QUALITY_GATED_LOCAL
     return SNAPSHOT_CURRENT_CLEAN

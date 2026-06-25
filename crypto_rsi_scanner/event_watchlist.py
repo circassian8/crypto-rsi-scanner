@@ -17,6 +17,7 @@ WATCHLIST_SCHEMA_VERSION = "event_watchlist_v1"
 class EventWatchlistState(str, Enum):
     RAW_EVIDENCE = "RAW_EVIDENCE"
     HYPOTHESIS = "HYPOTHESIS"
+    QUALITY_BLOCKED = "QUALITY_BLOCKED"
     RADAR = "RADAR"
     WATCHLIST = "WATCHLIST"
     HIGH_PRIORITY = "HIGH_PRIORITY"
@@ -30,6 +31,7 @@ class EventWatchlistState(str, Enum):
 _STATE_RANK = {
     EventWatchlistState.RAW_EVIDENCE.value: 0,
     EventWatchlistState.HYPOTHESIS.value: 1,
+    EventWatchlistState.QUALITY_BLOCKED.value: 1,
     EventWatchlistState.RADAR.value: 2,
     EventWatchlistState.WATCHLIST.value: 3,
     EventWatchlistState.HIGH_PRIORITY.value: 4,
@@ -65,6 +67,10 @@ class EventWatchlistEntry:
     previous_state: str | None
     first_seen_at: str
     last_seen_at: str
+    requested_state_before_quality_gate: str | None = None
+    final_state_after_quality_gate: str | None = None
+    quality_state_block_reason: str | None = None
+    state_quality_capped: bool = False
     first_radar_at: str | None = None
     first_watchlisted_at: str | None = None
     first_high_priority_at: str | None = None
@@ -288,6 +294,98 @@ def format_watchlist_report(result: EventWatchlistReadResult) -> str:
     return "\n".join(rows).rstrip()
 
 
+def quality_cap_watchlist_state(
+    requested_state: str | EventWatchlistState | None,
+    quality_bundle: Mapping[str, Any] | None,
+) -> tuple[str, str | None]:
+    """Return the lifecycle state allowed by the final quality verdict.
+
+    This is a research-artifact safety cap, not a scoring model. It prevents
+    local-only or insufficient-data rows from surviving as active watchlist
+    candidates while preserving deterministic event-fade triggers.
+    """
+    requested = _state_value(requested_state)
+    if requested == EventWatchlistState.TRIGGERED_FADE.value:
+        return requested, None
+    if requested in {
+        EventWatchlistState.INVALIDATED.value,
+        EventWatchlistState.EXPIRED.value,
+    }:
+        return requested, None
+    if not _quality_bundle_has_authority(quality_bundle):
+        return requested, None
+    raw_quality = dict(quality_bundle or {})
+    quality = event_alpha_quality_fields.ensure_quality_fields(raw_quality)
+    level = str(quality.get("opportunity_level") or "").strip()
+    score = _optional_float(raw_quality.get("opportunity_score_final"))
+    impact = str(quality.get("impact_path_type") or "").strip()
+    evidence = str(quality.get("evidence_specificity") or "").strip()
+    source = str(quality.get("source_class") or "").strip()
+    role = str(quality.get("candidate_role") or "").strip()
+    requested_rank = _state_rank(requested)
+
+    block = _quality_state_block_reason(quality, level=level, score=score, impact=impact, evidence=evidence, source=source, role=role)
+    if block:
+        if level == "exploratory" and requested_rank >= _STATE_RANK[EventWatchlistState.WATCHLIST.value]:
+            return EventWatchlistState.RADAR.value, block
+        if requested_rank >= _STATE_RANK[EventWatchlistState.RADAR.value]:
+            return EventWatchlistState.QUALITY_BLOCKED.value, block
+        return requested, block
+    if level == "validated_digest" and requested_rank > _STATE_RANK[EventWatchlistState.RADAR.value]:
+        return EventWatchlistState.RADAR.value, "opportunity_level_caps_state:validated_digest"
+    if (
+        level == "watchlist"
+        and requested_rank > _STATE_RANK[EventWatchlistState.WATCHLIST.value]
+        and requested not in {
+            EventWatchlistState.EVENT_PASSED.value,
+            EventWatchlistState.ARMED.value,
+        }
+    ):
+        return EventWatchlistState.WATCHLIST.value, "opportunity_level_caps_state:watchlist"
+    return requested, None
+
+
+def final_state_value(entry: EventWatchlistEntry | Mapping[str, Any]) -> str:
+    """Return the quality-capped state for an entry or raw row."""
+    if isinstance(entry, Mapping):
+        final = _optional_str(entry.get("final_state_after_quality_gate"))
+        if final:
+            return _state_value(final)
+        requested = _optional_str(entry.get("requested_state_before_quality_gate")) or _optional_str(entry.get("state"))
+        if event_alpha_quality_fields.has_any_quality_field(entry, components_key="latest_score_components"):
+            components = entry.get("latest_score_components")
+            quality = {
+                **dict(components if isinstance(components, Mapping) else {}),
+                **{
+                    key: entry.get(key)
+                    for key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS
+                    if not event_alpha_quality_fields.is_missing_quality_value(entry.get(key))
+                },
+            }
+            return quality_cap_watchlist_state(requested, quality)[0]
+        return _state_value(requested)
+    final = entry.final_state_after_quality_gate
+    if final:
+        return _state_value(final)
+    quality = _quality_bundle_from_entry(entry)
+    return quality_cap_watchlist_state(entry.requested_state_before_quality_gate or entry.state, quality)[0]
+
+
+def requested_state_value(entry: EventWatchlistEntry | Mapping[str, Any]) -> str:
+    if isinstance(entry, Mapping):
+        return _state_value(entry.get("requested_state_before_quality_gate") or entry.get("state"))
+    return _state_value(entry.requested_state_before_quality_gate or entry.state)
+
+
+def state_is_quality_capped(entry: EventWatchlistEntry | Mapping[str, Any]) -> bool:
+    if isinstance(entry, Mapping):
+        raw = entry.get("state_quality_capped")
+        if raw is True:
+            return bool(raw)
+        return requested_state_value(entry) != final_state_value(entry)
+    return bool(entry.state_quality_capped is True or requested_state_value(entry) != final_state_value(entry))
+
+
 def _entry_from_alert(
     alert: event_alerts.EventAlertCandidate,
     prior: EventWatchlistEntry | None,
@@ -296,7 +394,11 @@ def _entry_from_alert(
 ) -> EventWatchlistEntry:
     candidate = alert.discovery_candidate
     event = candidate.event
-    state = _state_from_alert(alert, observed, cfg)
+    requested_state = _state_from_alert(alert, observed, cfg)
+    has_quality = event_alpha_quality_fields.has_any_quality_field(alert.score_components)
+    quality = event_alpha_quality_fields.ensure_quality_fields({}, components=alert.score_components)
+    final_state, quality_state_block = quality_cap_watchlist_state(requested_state, alert.score_components if has_quality else {})
+    state = EventWatchlistState(final_state)
     previous_state = prior.state if prior else None
     rank = _state_rank(state)
     previous_rank = _state_rank(previous_state)
@@ -304,14 +406,25 @@ def _entry_from_alert(
     escalation = previous_state is None and rank >= _STATE_RANK[EventWatchlistState.RADAR.value]
     escalation = escalation or (previous_state is not None and rank > previous_rank)
     material_reasons = _material_change_reasons(alert, prior)
-    terminal = state in {EventWatchlistState.INVALIDATED, EventWatchlistState.EXPIRED}
-    should_alert = (escalation or bool(material_reasons) or state == EventWatchlistState.TRIGGERED_FADE) and not terminal
+    state_quality_capped = bool(quality_state_block and state.value != requested_state.value)
+    if prior and prior.state_quality_capped and not state_quality_capped and _state_rank(requested_state) >= _STATE_RANK[EventWatchlistState.WATCHLIST.value]:
+        material_reasons = tuple(dict.fromkeys((*material_reasons, "quality_state_upgraded")))
+    terminal = state in {EventWatchlistState.INVALIDATED, EventWatchlistState.EXPIRED, EventWatchlistState.QUALITY_BLOCKED}
+    should_alert = (
+        escalation
+        or bool(material_reasons)
+        or state == EventWatchlistState.TRIGGERED_FADE
+    ) and not terminal and not state_quality_capped
     observed_iso = observed.isoformat()
     first_seen = prior.first_seen_at if prior else observed_iso
     history = list(prior.alert_history if prior else [])
     history.append({
         "observed_at": observed_iso,
         "state": state.value,
+        "requested_state_before_quality_gate": requested_state.value,
+        "final_state_after_quality_gate": state.value,
+        "quality_state_block_reason": quality_state_block,
+        "state_quality_capped": state_quality_capped,
         "tier": alert.tier.value,
         "score": alert.opportunity_score,
         "rule_playbook_type": alert.rule_playbook_type,
@@ -323,8 +436,9 @@ def _entry_from_alert(
     warnings = list(prior.warnings if prior else [])
     if alert.rejected_reason:
         warnings.append(alert.rejected_reason)
+    if quality_state_block:
+        warnings.append(f"quality_state_blocked:{quality_state_block}")
     warnings = list(dict.fromkeys(warnings))
-    quality = event_alpha_quality_fields.ensure_quality_fields({}, components=alert.score_components)
     entry = EventWatchlistEntry(
         schema_version=WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
@@ -340,6 +454,10 @@ def _entry_from_alert(
         previous_state=previous_state,
         first_seen_at=first_seen,
         last_seen_at=observed_iso,
+        requested_state_before_quality_gate=requested_state.value,
+        final_state_after_quality_gate=state.value,
+        quality_state_block_reason=quality_state_block,
+        state_quality_capped=state_quality_capped,
         first_radar_at=_transition_time(prior, "first_radar_at", state, EventWatchlistState.RADAR, observed_iso),
         first_watchlisted_at=_transition_time(
             prior,
@@ -464,18 +582,51 @@ def _entry_from_hypothesis(
         token_level=validated and scope == "token",
     )
     playbook = str(getattr(hypothesis, "playbook_hint", "") or "impact_hypothesis")
-    state = _state_from_hypothesis(hypothesis, validated=validated, token_level=symbol != "SECTOR")
+    requested_state = _state_from_hypothesis(hypothesis, validated=validated, token_level=symbol != "SECTOR")
+    hypothesis_quality_components = {
+        "impact_path_type": _optional_str(getattr(hypothesis, "impact_path_type", None)),
+        "impact_path_strength": _optional_str(getattr(hypothesis, "impact_path_strength", None)),
+        "candidate_role": _optional_str(getattr(hypothesis, "candidate_role", None)),
+        "evidence_quality_score": _optional_float(getattr(hypothesis, "evidence_quality_score", None)),
+        "source_class": _optional_str(getattr(hypothesis, "source_class", None)),
+        "evidence_specificity": _optional_str(getattr(hypothesis, "evidence_specificity", None)),
+        "market_confirmation_score": _optional_float(getattr(hypothesis, "market_confirmation_score", None)),
+        "market_confirmation_level": _optional_str(getattr(hypothesis, "market_confirmation_level", None)),
+        "opportunity_score_final": _optional_float(getattr(hypothesis, "opportunity_score_final", None)),
+        "opportunity_level": _optional_str(getattr(hypothesis, "opportunity_level", None)),
+        "opportunity_verdict_reasons": list(getattr(hypothesis, "opportunity_verdict_reasons", ()) or ())[:8],
+        "why_local_only": _optional_str(getattr(hypothesis, "why_local_only", None)),
+        "why_not_watchlist": _optional_str(getattr(hypothesis, "why_not_watchlist", None)),
+        "manual_verification_items": list(getattr(hypothesis, "manual_verification_items", ()) or ())[:8],
+    }
+    has_hypothesis_quality = event_alpha_quality_fields.has_any_quality_field(hypothesis_quality_components)
+    hypothesis_quality = event_alpha_quality_fields.ensure_quality_fields(
+        {},
+        components=hypothesis_quality_components,
+    )
+    final_state, quality_state_block = quality_cap_watchlist_state(
+        requested_state,
+        hypothesis_quality_components if has_hypothesis_quality else {},
+    )
+    state = EventWatchlistState(final_state)
     previous_state = prior.state if prior else None
     rank = _state_rank(state)
     previous_rank = _state_rank(previous_state)
     state_changed = previous_state is not None and previous_state != state.value
-    escalation = bool(validated and (previous_state is None or rank > previous_rank))
+    state_quality_capped = bool(quality_state_block and state.value != requested_state.value)
+    escalation = bool(validated and (previous_state is None or rank > previous_rank) and not state_quality_capped)
     event_name = f"{getattr(hypothesis, 'external_asset', None) or category} {scope} impact hypothesis"
     reasons = _hypothesis_material_change_reasons(hypothesis, prior, state, validated=validated)
+    if prior and prior.state_quality_capped and not state_quality_capped and _state_rank(requested_state) >= _STATE_RANK[EventWatchlistState.WATCHLIST.value]:
+        reasons = tuple(dict.fromkeys((*reasons, "quality_state_upgraded")))
     history = list(prior.alert_history if prior else [])
     history.append({
         "observed_at": observed_iso,
         "state": state.value,
+        "requested_state_before_quality_gate": requested_state.value,
+        "final_state_after_quality_gate": state.value,
+        "quality_state_block_reason": quality_state_block,
+        "state_quality_capped": state_quality_capped,
         "tier": _tier_for_hypothesis_state(state, validated=validated),
         "score": score,
         "effective_playbook_type": playbook,
@@ -490,28 +641,10 @@ def _entry_from_hypothesis(
             *tuple(getattr(hypothesis, "warnings", ()) or ()),
             *tuple(getattr(hypothesis, "rejection_reasons", ()) or ()),
             *asset_warnings,
+            *(("quality_state_blocked:" + quality_state_block,) if quality_state_block else ()),
         )
         if str(value)
     ))
-    hypothesis_quality = event_alpha_quality_fields.ensure_quality_fields(
-        {},
-        components={
-            "impact_path_type": _optional_str(getattr(hypothesis, "impact_path_type", None)),
-            "impact_path_strength": _optional_str(getattr(hypothesis, "impact_path_strength", None)),
-            "candidate_role": _optional_str(getattr(hypothesis, "candidate_role", None)),
-            "evidence_quality_score": _optional_float(getattr(hypothesis, "evidence_quality_score", None)),
-            "source_class": _optional_str(getattr(hypothesis, "source_class", None)),
-            "evidence_specificity": _optional_str(getattr(hypothesis, "evidence_specificity", None)),
-            "market_confirmation_score": _optional_float(getattr(hypothesis, "market_confirmation_score", None)),
-            "market_confirmation_level": _optional_str(getattr(hypothesis, "market_confirmation_level", None)),
-            "opportunity_score_final": _optional_float(getattr(hypothesis, "opportunity_score_final", None)),
-            "opportunity_level": _optional_str(getattr(hypothesis, "opportunity_level", None)),
-            "opportunity_verdict_reasons": list(getattr(hypothesis, "opportunity_verdict_reasons", ()) or ())[:8],
-            "why_local_only": _optional_str(getattr(hypothesis, "why_local_only", None)),
-            "why_not_watchlist": _optional_str(getattr(hypothesis, "why_not_watchlist", None)),
-            "manual_verification_items": list(getattr(hypothesis, "manual_verification_items", ()) or ())[:8],
-        },
-    )
     return EventWatchlistEntry(
         schema_version=WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
@@ -527,6 +660,10 @@ def _entry_from_hypothesis(
         previous_state=previous_state,
         first_seen_at=first_seen,
         last_seen_at=observed_iso,
+        requested_state_before_quality_gate=requested_state.value,
+        final_state_after_quality_gate=state.value,
+        quality_state_block_reason=quality_state_block,
+        state_quality_capped=state_quality_capped,
         first_radar_at=_transition_time(prior, "first_radar_at", state, EventWatchlistState.RADAR, observed_iso),
         first_watchlisted_at=_transition_time(prior, "first_watchlisted_at", state, EventWatchlistState.WATCHLIST, observed_iso),
         first_high_priority_at=_transition_time(prior, "first_high_priority_at", state, EventWatchlistState.HIGH_PRIORITY, observed_iso),
@@ -627,8 +764,11 @@ def _entry_from_hypothesis(
         escalation=escalation,
         score_jump=score - int(prior.latest_score if prior else score),
         material_change_reasons=reasons,
-        should_alert=escalation,
-        suppressed_reason=None if escalation else (
+        should_alert=escalation and not state_quality_capped,
+        suppressed_reason=None if escalation and not state_quality_capped else (
+            f"quality state gate capped {requested_state.value} to {state.value}: {quality_state_block}"
+            if state_quality_capped
+            else
             f"validated hypothesis retained at {state.value}" if validated else "impact hypothesis awaiting validation"
         ),
         warnings=warnings,
@@ -931,6 +1071,8 @@ def _suppressed_reason(
     previous_state: str | None,
     state_changed: bool,
 ) -> str:
+    if state == EventWatchlistState.QUALITY_BLOCKED:
+        return "quality verdict capped lifecycle state; local-only research evidence"
     if state == EventWatchlistState.RAW_EVIDENCE:
         return "raw/store-only evidence, no alertable watchlist state"
     if state in {EventWatchlistState.INVALIDATED, EventWatchlistState.EXPIRED}:
@@ -994,13 +1136,29 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
         relationship_type = str(row.get("relationship_type") or "")
         if not key or not event_id or not coin_id or not relationship_type:
             return None
-        state = str(row.get("state") or EventWatchlistState.RAW_EVIDENCE.value)
-        if state not in _STATE_RANK:
-            state = EventWatchlistState.RAW_EVIDENCE.value
+        requested_state = _state_value(row.get("requested_state_before_quality_gate") or row.get("state"))
         first_seen = str(row.get("first_seen_at") or row.get("last_seen_at") or "")
         last_seen = str(row.get("last_seen_at") or first_seen)
         components = dict(row.get("latest_score_components") or {})
+        has_quality = event_alpha_quality_fields.has_any_quality_field(row, components_key="latest_score_components")
         quality = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
+        raw_quality = {
+            **components,
+            **{
+                key: row.get(key)
+                for key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS
+                if row.get(key) not in (None, "", [], {}, ())
+            },
+        }
+        computed_final, computed_block = quality_cap_watchlist_state(
+            requested_state,
+            raw_quality if has_quality else {},
+        )
+        final_state = _state_value(row.get("final_state_after_quality_gate") or computed_final)
+        state_quality_capped = bool(row.get("state_quality_capped"))
+        if not row.get("final_state_after_quality_gate"):
+            state_quality_capped = requested_state != final_state
+        quality_state_block = _optional_str(row.get("quality_state_block_reason")) or computed_block
         return EventWatchlistEntry(
             schema_version=str(row.get("schema_version") or WATCHLIST_SCHEMA_VERSION),
             row_type="event_watchlist_state",
@@ -1012,10 +1170,14 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             relationship_type=relationship_type,
             external_asset=_optional_str(row.get("external_asset")),
             event_time=_optional_str(row.get("event_time")),
-            state=state,
+            state=final_state,
             previous_state=_optional_str(row.get("previous_state")),
             first_seen_at=first_seen,
             last_seen_at=last_seen,
+            requested_state_before_quality_gate=requested_state,
+            final_state_after_quality_gate=final_state,
+            quality_state_block_reason=quality_state_block,
+            state_quality_capped=state_quality_capped,
             first_radar_at=_optional_str(row.get("first_radar_at")),
             first_watchlisted_at=_optional_str(row.get("first_watchlisted_at")),
             first_high_priority_at=_optional_str(row.get("first_high_priority_at")),
@@ -1100,6 +1262,18 @@ def _entry_lines(entry: EventWatchlistEntry) -> list[str]:
     )
     if rule and rule != effective:
         playbook_line += f" · rule={rule}"
+    transition = (
+        f"  transition: {entry.previous_state or 'new'} -> {entry.state}"
+        + (
+            f" · quality-capped from {entry.requested_state_before_quality_gate}: {entry.quality_state_block_reason}"
+            if entry.state_quality_capped
+            else " · alertable escalation"
+            if entry.should_alert and not entry.material_change_reasons
+            else f" · alertable material change: {', '.join(entry.material_change_reasons)}"
+            if entry.should_alert
+            else f" · suppressed: {entry.suppressed_reason}"
+        )
+    )
     return [
         f"{entry.state:<16} score={entry.latest_score:>3} high={entry.highest_score:>3} "
         f"{entry.symbol}/{entry.coin_id}",
@@ -1109,14 +1283,7 @@ def _entry_lines(entry: EventWatchlistEntry) -> list[str]:
         f"  first_seen: {entry.first_seen_at} · last_seen: {entry.last_seen_at}",
         f"  tier: {entry.latest_tier or 'unknown'} · source_count: {entry.source_count} · source: {entry.latest_source}",
         playbook_line,
-        f"  transition: {entry.previous_state or 'new'} -> {entry.state}"
-        + (
-            " · alertable escalation"
-            if entry.should_alert and not entry.material_change_reasons
-            else f" · alertable material change: {', '.join(entry.material_change_reasons)}"
-            if entry.should_alert
-            else f" · suppressed: {entry.suppressed_reason}"
-        ),
+        transition,
     ]
 
 
@@ -1128,6 +1295,71 @@ def _state_rank(state: str | EventWatchlistState | None) -> int:
     if isinstance(state, EventWatchlistState):
         state = state.value
     return _STATE_RANK.get(str(state or ""), -1)
+
+
+def _state_value(state: str | EventWatchlistState | None) -> str:
+    value = state.value if isinstance(state, EventWatchlistState) else str(state or "")
+    return value if value in _STATE_RANK else EventWatchlistState.RAW_EVIDENCE.value
+
+
+def _quality_bundle_has_authority(quality_bundle: Mapping[str, Any] | None) -> bool:
+    if not isinstance(quality_bundle, Mapping) or not quality_bundle:
+        return False
+    return any(
+        key in quality_bundle and not event_alpha_quality_fields.is_missing_quality_value(quality_bundle.get(key))
+        for key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS
+    )
+
+
+def _quality_bundle_from_entry(entry: EventWatchlistEntry) -> dict[str, Any]:
+    row = {
+        key: getattr(entry, key, None)
+        for key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS
+        if getattr(entry, key, None) not in (None, "", [], {}, ())
+    }
+    components = dict(entry.latest_score_components or {})
+    if not event_alpha_quality_fields.has_any_quality_field(row, components_key="latest_score_components") and not event_alpha_quality_fields.has_any_quality_field(components):
+        return {}
+    return {**components, **row}
+
+
+def _quality_state_block_reason(
+    quality: Mapping[str, Any],
+    *,
+    level: str,
+    score: float | None,
+    impact: str,
+    evidence: str,
+    source: str,
+    role: str,
+) -> str | None:
+    text = " ".join(
+        str(value or "")
+        for value in (
+            impact,
+            evidence,
+            source,
+            role,
+            quality.get("why_local_only"),
+            quality.get("why_not_watchlist"),
+            *(quality.get("opportunity_verdict_reasons") or ()),
+            *(quality.get("upgrade_requirements") or ()),
+            *(quality.get("downgrade_warnings") or ()),
+        )
+    ).casefold()
+    if impact == "insufficient_data":
+        return "impact_path_type_insufficient_data"
+    if score is not None and score <= 0:
+        return "opportunity_score_final_zero"
+    if "source_noise" in text:
+        return "source_noise_hard_gate"
+    if "ticker_collision" in text or "word_collision" in text or "ticker_word_collision" in text:
+        return "ticker_collision_hard_gate"
+    if level == "local_only":
+        return str(quality.get("why_local_only") or "opportunity_level_local_only")
+    if level == "exploratory":
+        return str(quality.get("why_not_watchlist") or "opportunity_level_exploratory")
+    return None
 
 
 def _optional_str(value: Any) -> str | None:

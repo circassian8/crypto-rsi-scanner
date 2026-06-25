@@ -259,9 +259,16 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
         rows.append(f"  alert_id: {decision.alert_id} · card_id: {decision.card_id}")
         rows.append(f"  event: {entry.latest_event_name}")
         rows.append(
-            f"  state: {entry.previous_state or 'new'} -> {entry.state} · "
+            f"  state: {entry.previous_state or 'new'} -> {event_watchlist.final_state_value(entry)} · "
             f"watchlist_alertable={str(entry.should_alert).lower()}"
         )
+        if entry.state_quality_capped:
+            rows.append(
+                "  state quality gate: "
+                f"requested={entry.requested_state_before_quality_gate or entry.state} "
+                f"final={event_watchlist.final_state_value(entry)} "
+                f"block={entry.quality_state_block_reason or 'quality_state_capped'}"
+            )
         rows.append(
             f"  playbook: {entry.latest_playbook_type or 'unknown'} "
             f"action={entry.latest_playbook_action or 'store_only'}"
@@ -344,7 +351,7 @@ def format_routed_telegram_digest(
         if profile:
             lines.append(f"profile={_esc(profile)} notification_lane={_esc(decision.lane.value)}")
         lines.append(
-            f"state={_esc(entry.state)} playbook={_esc(entry.latest_playbook_type or 'unknown')} "
+            f"state={_esc(event_watchlist.final_state_value(entry))} playbook={_esc(entry.latest_playbook_type or 'unknown')} "
             f"external_catalyst={_esc(entry.external_asset or 'unknown')}"
         )
         lines.append(_event_time_line(entry))
@@ -379,7 +386,7 @@ def _route_entry(
     cfg: EventAlphaRouterConfig,
 ) -> EventAlphaRouteDecision:
     playbook = entry.latest_playbook_type or ""
-    state = entry.state
+    state = event_watchlist.final_state_value(entry)
     warnings = list(entry.warnings)
 
     if not cfg.enabled:
@@ -390,6 +397,30 @@ def _route_entry(
             reason="Event Alpha router is disabled; retaining watchlist row as research evidence only.",
             lane=EventAlphaRouteLane.LOCAL_ONLY,
             warnings=tuple(warnings),
+        )
+
+    if event_watchlist.state_is_quality_capped(entry):
+        requested_route = _route_value_for_requested_state(event_watchlist.requested_state_value(entry), playbook)
+        _, state_block = event_watchlist.quality_cap_watchlist_state(
+            event_watchlist.requested_state_value(entry),
+            _quality_for_entry(entry),
+        )
+        state_block = entry.quality_state_block_reason or state_block or "quality_state_capped"
+        return EventAlphaRouteDecision(
+            entry=entry,
+            route=EventAlphaRoute.STORE_ONLY,
+            alertable=False,
+            reason=(
+                "Quality verdict capped lifecycle state before routing: "
+                f"{state_block}."
+            ),
+            lane=EventAlphaRouteLane.LOCAL_ONLY,
+            warnings=tuple(dict.fromkeys((*warnings, f"quality_state_blocked:{state_block}"))),
+            requested_route_before_quality_gate=requested_route,
+            final_route_after_quality_gate=EventAlphaRoute.STORE_ONLY.value,
+            quality_gate_block_reason=state_block,
+            opportunity_level=entry.opportunity_level,
+            opportunity_score_final=entry.opportunity_score_final,
         )
 
     if _is_raw_or_terminal(state):
@@ -737,6 +768,7 @@ def _material_change_allowed(
         "market_confirmation_upgraded",
         "evidence_quality_upgraded",
         "opportunity_score_upgraded",
+        "quality_state_upgraded",
     }:
         allowed = True
     if "score_jump" in reasons:
@@ -868,7 +900,7 @@ def _is_validated_hypothesis_digest_entry(entry: event_watchlist.EventWatchlistE
 def _looks_like_validated_hypothesis(entry: event_watchlist.EventWatchlistEntry) -> bool:
     if entry.relationship_type != "impact_hypothesis":
         return False
-    if entry.state != event_watchlist.EventWatchlistState.RADAR.value:
+    if event_watchlist.final_state_value(entry) != event_watchlist.EventWatchlistState.RADAR.value:
         return False
     if (entry.symbol or "").upper() == "SECTOR":
         return False
@@ -909,7 +941,7 @@ def _validated_hypothesis_digest_block_reason(
 ) -> str | None:
     if entry.relationship_type != "impact_hypothesis":
         return "not_impact_hypothesis"
-    if entry.state != event_watchlist.EventWatchlistState.RADAR.value:
+    if event_watchlist.final_state_value(entry) != event_watchlist.EventWatchlistState.RADAR.value:
         return "not_radar_state"
     if (entry.symbol or "").upper() == "SECTOR":
         return "missing_validated_token_identity"
@@ -1199,9 +1231,31 @@ def _is_raw_or_terminal(state: str) -> bool:
     return state in {
         event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
         event_watchlist.EventWatchlistState.HYPOTHESIS.value,
+        event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value,
         event_watchlist.EventWatchlistState.INVALIDATED.value,
         event_watchlist.EventWatchlistState.EXPIRED.value,
     }
+
+
+def _route_value_for_requested_state(state: str, playbook: str) -> str:
+    if state == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value:
+        return EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value
+    if state in {
+        event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        event_watchlist.EventWatchlistState.ARMED.value,
+        event_watchlist.EventWatchlistState.EVENT_PASSED.value,
+    }:
+        return (
+            EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+            if playbook == event_playbooks.EventPlaybookType.PROXY_FADE.value
+            else EventAlphaRoute.RESEARCH_DIGEST.value
+        )
+    if state in {
+        event_watchlist.EventWatchlistState.WATCHLIST.value,
+        event_watchlist.EventWatchlistState.RADAR.value,
+    }:
+        return EventAlphaRoute.RESEARCH_DIGEST.value
+    return EventAlphaRoute.STORE_ONLY.value
 
 
 def _decision_sort_key(decision: EventAlphaRouteDecision) -> tuple[int, int, str]:

@@ -16,6 +16,30 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-25 - Event Alpha quality verdicts must cap lifecycle state
+**Status:** accepted
+**Decision:** Event Alpha final signal-quality / opportunity verdicts are
+authoritative over watchlist lifecycle state, not only notification routes.
+Rows with final `local_only`, insufficient-data, source-noise/ticker-collision,
+or zero-score verdicts must not remain active `WATCHLIST` or `HIGH_PRIORITY`
+rows. They may be persisted as `QUALITY_BLOCKED` or other local/review-only
+state with `requested_state_before_quality_gate`,
+`final_state_after_quality_gate`, `state_quality_capped`, and
+`quality_state_block_reason` for audit. Active watchlist reports, monitor
+updates, router decisions, alert snapshots, daily briefs, research cards,
+quality review, notification inbox, and artifact doctor checks must use the
+final quality-capped state by default. Valid `watchlist` and `high_priority`
+verdicts may still use active lifecycle states, and validated watchlist-quality
+rows may continue through post-event monitoring states such as `EVENT_PASSED`
+and `ARMED`. Deterministic `TRIGGERED_FADE` from `event_fade.py` plus
+`proxy_fade` is preserved and remains the only trigger source.
+**Why:** A row can have stale pre-quality watchlist state even after the final
+quality verdict proves it is local-only or insufficient-data. Operator-facing
+daily briefs and monitor/router paths must not promote stale lifecycle state
+above the canonical quality verdict.
+**Revisit when:** A reviewed Event Alpha dataset justifies a separately
+approved lifecycle policy for a specific quality cohort.
+
 ## 2026-06-25 - Event Alpha routes must obey final quality verdicts
 **Status:** accepted
 **Decision:** Event Alpha routing must apply the final signal-quality /

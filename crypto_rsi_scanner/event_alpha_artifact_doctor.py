@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 
@@ -43,6 +43,10 @@ class EventAlphaArtifactDoctorResult:
     legacy_quality_conflict_rows: int = 0
     alert_rows_missing_final_route: int = 0
     fresh_alert_rows_missing_final_route: int = 0
+    watchlist_state_conflicts_with_quality: int = 0
+    active_watchlist_rows_quality_capped: int = 0
+    fresh_watchlist_state_conflict_rows: int = 0
+    legacy_watchlist_conflicts: int = 0
     strict_legacy: bool = False
     strict: bool = False
     blockers: tuple[str, ...] = ()
@@ -270,6 +274,21 @@ def diagnose_artifacts(
         (blockers if strict and strict_legacy else warnings).append(message)
     if fresh_missing_final_route and strict:
         blockers.append(f"fresh_alert_rows_missing_final_route={fresh_missing_final_route}")
+    watchlist_conflicts = _watchlist_quality_state_conflicts(watchlist)
+    if watchlist_conflicts["active_watchlist_rows_quality_capped"]:
+        warnings.append(
+            f"active_watchlist_rows_quality_capped={watchlist_conflicts['active_watchlist_rows_quality_capped']}"
+        )
+    if watchlist_conflicts["watchlist_state_conflicts_with_quality"]:
+        warnings.append(
+            f"watchlist_state_conflicts_with_quality={watchlist_conflicts['watchlist_state_conflicts_with_quality']}"
+        )
+    if watchlist_conflicts["fresh_uncapped"]:
+        message = f"fresh_watchlist_state_conflict_rows={watchlist_conflicts['fresh_uncapped']}"
+        (blockers if strict else warnings).append(message)
+    if watchlist_conflicts["legacy"]:
+        message = f"legacy_watchlist_conflicts={watchlist_conflicts['legacy']}"
+        (blockers if strict and strict_legacy else warnings).append(message)
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
     return EventAlphaArtifactDoctorResult(
         status=status,
@@ -306,6 +325,10 @@ def diagnose_artifacts(
         legacy_quality_conflict_rows=legacy_route_conflicts,
         alert_rows_missing_final_route=missing_final_route,
         fresh_alert_rows_missing_final_route=fresh_missing_final_route,
+        watchlist_state_conflicts_with_quality=watchlist_conflicts["watchlist_state_conflicts_with_quality"],
+        active_watchlist_rows_quality_capped=watchlist_conflicts["active_watchlist_rows_quality_capped"],
+        fresh_watchlist_state_conflict_rows=watchlist_conflicts["fresh_uncapped"],
+        legacy_watchlist_conflicts=watchlist_conflicts["legacy"],
         strict_legacy=bool(strict_legacy),
         strict=bool(strict),
         blockers=tuple(dict.fromkeys(blockers)),
@@ -449,6 +472,68 @@ def _row_has_alertable_quality_conflict(row: Mapping[str, Any]) -> bool:
     return score <= 0.0
 
 
+def _watchlist_quality_state_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    out = {
+        "watchlist_state_conflicts_with_quality": 0,
+        "active_watchlist_rows_quality_capped": 0,
+        "fresh_uncapped": 0,
+        "legacy": 0,
+    }
+    for row in rows:
+        state = event_watchlist.final_state_value(row)
+        requested = event_watchlist.requested_state_value(row)
+        requested_active = requested in {
+            event_watchlist.EventWatchlistState.WATCHLIST.value,
+            event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+            event_watchlist.EventWatchlistState.EVENT_PASSED.value,
+            event_watchlist.EventWatchlistState.ARMED.value,
+        }
+        final_active = state in {
+            event_watchlist.EventWatchlistState.WATCHLIST.value,
+            event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+            event_watchlist.EventWatchlistState.EVENT_PASSED.value,
+            event_watchlist.EventWatchlistState.ARMED.value,
+        }
+        capped = event_watchlist.state_is_quality_capped(row)
+        has_conflict = _row_has_watchlist_quality_conflict(row)
+        if capped and requested_active:
+            out["active_watchlist_rows_quality_capped"] += 1
+        if has_conflict:
+            out["watchlist_state_conflicts_with_quality"] += 1
+            if event_alpha_artifacts.is_legacy_row(row):
+                out["legacy"] += 1
+            elif not capped or final_active:
+                out["fresh_uncapped"] += 1
+    return out
+
+
+def _row_has_watchlist_quality_conflict(row: Mapping[str, Any]) -> bool:
+    if event_watchlist.final_state_value(row) == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value:
+        return False
+    requested = event_watchlist.requested_state_value(row)
+    if requested not in {
+        event_watchlist.EventWatchlistState.WATCHLIST.value,
+        event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        event_watchlist.EventWatchlistState.EVENT_PASSED.value,
+        event_watchlist.EventWatchlistState.ARMED.value,
+    }:
+        return False
+    components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
+    data = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
+    level = str(data.get("opportunity_level") or "")
+    if level in {"local_only", "exploratory", ""}:
+        return True
+    if str(data.get("impact_path_type") or "") == "insufficient_data":
+        return True
+    if str(data.get("evidence_specificity") or "") == "insufficient_data":
+        return True
+    try:
+        score = float(data.get("opportunity_score_final") or 0.0)
+    except (TypeError, ValueError):
+        score = 0.0
+    return score <= 0.0
+
+
 def _record_snapshot_availability_issue(
     row: Mapping[str, Any],
     availability: str,
@@ -533,6 +618,13 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"legacy_quality_conflict_rows={result.legacy_quality_conflict_rows} "
             f"alert_rows_missing_final_route={result.alert_rows_missing_final_route} "
             f"fresh_alert_rows_missing_final_route={result.fresh_alert_rows_missing_final_route}"
+        ),
+        (
+            "watchlist quality conflicts: "
+            f"watchlist_state_conflicts_with_quality={result.watchlist_state_conflicts_with_quality} "
+            f"active_watchlist_rows_quality_capped={result.active_watchlist_rows_quality_capped} "
+            f"fresh_watchlist_state_conflict_rows={result.fresh_watchlist_state_conflict_rows} "
+            f"legacy_watchlist_conflicts={result.legacy_watchlist_conflicts}"
         ),
         "",
         "blockers:",

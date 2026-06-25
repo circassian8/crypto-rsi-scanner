@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Make Event Alpha quality verdicts authoritative over lifecycle state · Codex
+**Why:** The daily brief could still show a stale BTC/World Cup/Bitcoin World
+row as active `WATCHLIST` even after the final quality verdict downgraded it to
+`local_only`, `opportunity_score_final=0`, `impact_path_type=insufficient_data`,
+and final route `STORE_ONLY`. Quality gates need to cap watchlist lifecycle
+state, not only notification routing.
+**Changes:**
+- Added quality-capped lifecycle state handling in `event_watchlist.py`,
+  including `QUALITY_BLOCKED`, `quality_cap_watchlist_state`, and persisted
+  requested/final state fields plus block reasons on watchlist rows and alert
+  snapshots.
+- Updated router, active monitor, daily brief, research cards, quality review,
+  notification inbox, and artifact doctor consumers to use final
+  quality-capped state for active watchlist/routing decisions while preserving
+  requested state for audit.
+- Daily brief and quality review now separate `Quality-Capped Watchlist Rows`
+  from active watchlist rows; research cards explain why a requested
+  `WATCHLIST` was blocked and what would upgrade it.
+- Artifact doctor now reports watchlist state conflicts with quality and blocks
+  fresh uncapped conflicts in strict mode while treating legacy conflicts as
+  warnings unless strict-legacy review is requested.
+**Verify:** `python3 tests/test_indicators.py` passed (456/456);
+`make event-llm-eval PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`,
+`make event-alpha-eval PYTHON=python3`, `make event-alpha-signal-quality-eval PYTHON=python3`,
+`make event-alpha-quality-validation-cycle PYTHON=python3`, and
+`make verify PYTHON=python3` all passed. Manual smokes for
+`notify_llm_quality` quality review, daily brief, strict artifact doctor, and
+notification inbox passed.
+**Notes/risks:** Research-only. No normal RSI rows, paper/live trades,
+execution, alert-scoring promotion, provider/LLM promotion, or
+LLM/provider-created `TRIGGERED_FADE` behavior changed. Deterministic
+`event_fade.py` + `proxy_fade` remains the only `TRIGGERED_FADE` source.
+
 ## 2026-06-25 — Canonicalize Event Alpha quality artifact truth · Codex
 **Why:** Fresh alert snapshots can be quality-gated correctly while older
 pre-quality fields still make raw rows look alertable to downstream reports.

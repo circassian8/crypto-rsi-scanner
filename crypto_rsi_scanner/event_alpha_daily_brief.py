@@ -277,7 +277,7 @@ def build_daily_brief(
     if alertable:
         for decision in alertable[:10]:
             entry = decision.entry
-            lines.append(f"- {event_alpha_router.final_route_value(decision)}: {entry.symbol}/{entry.coin_id} state={entry.state} score={entry.latest_score} reason={decision.reason}")
+            lines.append(f"- {event_alpha_router.final_route_value(decision)}: {entry.symbol}/{entry.coin_id} state={event_watchlist.final_state_value(entry)} score={entry.latest_score} reason={decision.reason}")
     else:
         lines.append("- None.")
     lines.extend(["", "## Validated Impact Hypothesis Routing"])
@@ -301,7 +301,7 @@ def build_daily_brief(
         if (
             decision.entry.relationship_type == "impact_hypothesis"
             and not event_alpha_router.alertable_after_quality_gate(decision)
-            and decision.entry.state == event_watchlist.EventWatchlistState.RADAR.value
+            and event_watchlist.final_state_value(decision.entry) == event_watchlist.EventWatchlistState.RADAR.value
             and decision.entry.symbol.upper() != "SECTOR"
         )
     ]
@@ -341,7 +341,7 @@ def build_daily_brief(
     exploratory_sector_hypotheses = [
         entry for entry in entries
         if entry.relationship_type == "impact_hypothesis"
-        and entry.state == event_watchlist.EventWatchlistState.HYPOTHESIS.value
+        and event_watchlist.final_state_value(entry) == event_watchlist.EventWatchlistState.HYPOTHESIS.value
     ]
     rejected_hypotheses = [
         row for row in hypotheses
@@ -400,7 +400,8 @@ def build_daily_brief(
     lines.extend(["", "## Active Watchlist"])
     active = [
         entry for entry in entries
-        if entry.state in {
+        if not event_watchlist.state_is_quality_capped(entry)
+        and event_watchlist.final_state_value(entry) in {
             event_watchlist.EventWatchlistState.RADAR.value,
             event_watchlist.EventWatchlistState.WATCHLIST.value,
             event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
@@ -410,9 +411,23 @@ def build_daily_brief(
     ]
     if active:
         for entry in sorted(active, key=lambda item: item.latest_score, reverse=True)[:5]:
-            lines.append(f"- {entry.state}: {entry.symbol}/{entry.coin_id} score={entry.latest_score} playbook={entry.latest_playbook_type or 'unknown'}")
+            lines.append(f"- {event_watchlist.final_state_value(entry)}: {entry.symbol}/{entry.coin_id} score={entry.latest_score} playbook={entry.latest_playbook_type or 'unknown'}")
     else:
         lines.append("- No active watchlist entries.")
+    lines.extend(["", "## Quality-Capped Watchlist Rows"])
+    capped = [entry for entry in entries if event_watchlist.state_is_quality_capped(entry)]
+    if capped:
+        for entry in sorted(capped, key=lambda item: item.latest_score, reverse=True)[:10]:
+            lines.append(
+                f"- {entry.symbol}/{entry.coin_id}: requested={event_watchlist.requested_state_value(entry)} "
+                f"final={event_watchlist.final_state_value(entry)} "
+                f"level={entry.opportunity_level or 'unknown'} "
+                f"path={entry.impact_path_type or 'unknown'} "
+                f"score={entry.opportunity_score_final if entry.opportunity_score_final is not None else 'n/a'} "
+                f"block={entry.quality_state_block_reason or 'quality_state_capped'}"
+            )
+    else:
+        lines.append("- None.")
     lines.extend(["", "## Research Cards"])
     cards = [Path(path) for path in card_paths]
     if cards:
@@ -627,7 +642,7 @@ def _brief_decisions(rows: Iterable[event_alpha_router.EventAlphaRouteDecision])
         final_route = event_alpha_router.final_route_value(decision)
         labels.append(
             f"{entry.symbol}/{entry.coin_id}"
-            f"({entry.state},score={entry.latest_score},v2={_float(components.get('opportunity_score_v2')):.0f},"
+            f"({event_watchlist.final_state_value(entry)},score={entry.latest_score},v2={_float(components.get('opportunity_score_v2')):.0f},"
             f"final={_float(components.get('opportunity_score_final')):.0f},"
             f"level={components.get('opportunity_level') or 'unknown'},"
             f"path={components.get('impact_path_type') or 'unknown'},role={components.get('candidate_role') or 'unknown'},"
@@ -818,7 +833,7 @@ def _downgrade_risk_line(rows: Iterable[event_alpha_router.EventAlphaRouteDecisi
     labels: list[str] = []
     for decision in sorted(rows, key=lambda item: item.entry.latest_score, reverse=True):
         entry = decision.entry
-        if not event_alpha_router.alertable_after_quality_gate(decision) and entry.state not in {"WATCHLIST", "HIGH_PRIORITY"}:
+        if not event_alpha_router.alertable_after_quality_gate(decision) and event_watchlist.final_state_value(entry) not in {"WATCHLIST", "HIGH_PRIORITY"}:
             continue
         components = entry.latest_score_components or {}
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)

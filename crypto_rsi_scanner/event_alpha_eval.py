@@ -113,7 +113,7 @@ def _entry_from_case(case: Mapping[str, Any]) -> event_watchlist.EventWatchlistE
 
 
 def _quality_for_expected_route(expected_route: str, case: Mapping[str, Any]) -> dict[str, Any]:
-    if expected_route in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH"}:
+    if expected_route in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH", "SUPPRESS_DUPLICATE"}:
         level = "high_priority" if expected_route == "HIGH_PRIORITY_RESEARCH" else "watchlist"
         score = float(case.get("score") or (90 if level == "high_priority" else 78))
         return {

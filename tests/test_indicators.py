@@ -10395,6 +10395,12 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
         cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True, score_jump_threshold=10),
     )
     by_symbol = {decision.entry.symbol: decision for decision in routed.decisions}
+    assert event_watchlist.final_state_value(btc) == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value
+    assert event_watchlist.requested_state_value(btc) == event_watchlist.EventWatchlistState.WATCHLIST.value
+    assert event_watchlist.state_is_quality_capped(btc) is True
+    assert event_watchlist.final_state_value(watch) == event_watchlist.EventWatchlistState.WATCHLIST.value
+    assert event_watchlist.final_state_value(high) == event_watchlist.EventWatchlistState.HIGH_PRIORITY.value
+    assert event_watchlist.final_state_value(trigger) == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value
     assert by_symbol["BTC"].requested_route_before_quality_gate == "RESEARCH_DIGEST"
     assert by_symbol["BTC"].final_route_after_quality_gate == "STORE_ONLY"
     assert by_symbol["BTC"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
@@ -10425,6 +10431,10 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     btc_snapshot = next(row for row in rows if row.get("symbol") == "BTC")
     assert btc_snapshot["requested_route_before_quality_gate"] == "RESEARCH_DIGEST"
     assert btc_snapshot["final_route_after_quality_gate"] == "STORE_ONLY"
+    assert btc_snapshot["requested_state_before_quality_gate"] == "WATCHLIST"
+    assert btc_snapshot["final_state_after_quality_gate"] == "QUALITY_BLOCKED"
+    assert btc_snapshot["quality_state_block_reason"] == "impact_path_type_insufficient_data"
+    assert btc_snapshot["state_quality_capped"] is True
     assert btc_snapshot["final_tier_after_quality_gate"] == "STORE_ONLY"
     assert btc_snapshot["quality_gate_block_reason"] == "impact_path_type_insufficient_data"
     assert btc_snapshot["route"] == "STORE_ONLY"
@@ -10438,6 +10448,8 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert snapshots_by_symbol["DIG"]["final_route_after_quality_gate"] == "RESEARCH_DIGEST"
     assert snapshots_by_symbol["DIG"]["final_tier_after_quality_gate"] == "RADAR_DIGEST"
     assert snapshots_by_symbol["WATCH"]["final_route_after_quality_gate"] == "RESEARCH_DIGEST"
+    assert snapshots_by_symbol["WATCH"]["state_quality_capped"] is False
+    assert snapshots_by_symbol["WATCH"]["final_state_after_quality_gate"] == "WATCHLIST"
     assert snapshots_by_symbol["WATCH"]["final_tier_after_quality_gate"] == "WATCHLIST"
     assert snapshots_by_symbol["HIGH"]["final_route_after_quality_gate"] == "HIGH_PRIORITY_RESEARCH"
     assert snapshots_by_symbol["HIGH"]["final_tier_after_quality_gate"] == "HIGH_PRIORITY_WATCH"
@@ -10466,9 +10478,12 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": len(rows)}],
         alert_rows=rows,
+        watchlist_rows=[btc, zero, digest, watch, high, trigger],
         include_legacy_artifacts=True,
     )
     assert doctor.alertable_route_conflicts_with_opportunity_level == 0
+    assert doctor.active_watchlist_rows_quality_capped >= 1
+    assert doctor.fresh_watchlist_state_conflict_rows == 0
     legacy_conflict = dict(btc_snapshot)
     legacy_conflict["run_id"] = "r1"
     legacy_conflict["route_alertable"] = True
@@ -10545,6 +10560,11 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     daily = event_alpha_daily_brief.build_daily_brief(router_result=routed, watchlist_entries=[btc, zero, digest, watch, high, trigger])
     assert "## Quality Gate Downgrades" in daily
     assert "BTC/btc:RESEARCH_DIGEST->STORE_ONLY" in daily
+    assert "## Quality-Capped Watchlist Rows" in daily
+    assert "BTC/btc: requested=WATCHLIST final=QUALITY_BLOCKED" in daily
+    active_section = daily.split("## Active Watchlist", 1)[1].split("## Quality-Capped Watchlist Rows", 1)[0]
+    assert "BTC/btc" not in active_section
+    assert "WATCH/watch" in active_section
     assert "## Legacy Quality Conflicts" in daily
     card = event_research_cards.render_research_card(
         "BTC",
@@ -10557,6 +10577,8 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert "Final route: STORE_ONLY" in card.markdown
     assert "Final tier: STORE_ONLY" in card.markdown
     assert "Snapshot classification: quality_gated_local" in card.markdown
+    assert "## Lifecycle State Gate" in card.markdown
+    assert "Requested WATCHLIST blocked because impact_path_type_insufficient_data" in card.markdown
     assert "impact_path_type_insufficient_data" in card.markdown
 
 
@@ -20570,6 +20592,7 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
 def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):
     from crypto_rsi_scanner import event_watchlist
 
+    high_priority = state == event_watchlist.EventWatchlistState.HIGH_PRIORITY.value
     return event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
@@ -20602,10 +20625,10 @@ def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):
             "evidence_quality_score": 78,
             "source_class": "crypto_native",
             "evidence_specificity": "asset_and_catalyst",
-            "market_confirmation_score": 70,
-            "market_confirmation_level": "confirmed",
-            "opportunity_score_final": 82,
-            "opportunity_level": "watchlist",
+            "market_confirmation_score": 88 if high_priority else 70,
+            "market_confirmation_level": "strong" if high_priority else "confirmed",
+            "opportunity_score_final": 92 if high_priority else 82,
+            "opportunity_level": "high_priority" if high_priority else "watchlist",
             "opportunity_verdict_reasons": ["fixture_watchlist_quality_context"],
             "why_local_only": "not_local_only",
             "why_not_watchlist": "already_watchlisted",

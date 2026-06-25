@@ -61,6 +61,7 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
         "evidence_specificity: " + _format_counts(_counts(rows, "evidence_specificity")),
         "market_confirmation_levels: " + _format_counts(_counts(rows, "market_confirmation_level")),
         "snapshot_quality_classifications: " + _format_counts(_counts(rows, "_snapshot_quality_classification")),
+        "watchlist_state_quality: " + _format_counts(_counts(rows, "state_quality_classification")),
         "candidate_discovery_funnel: " + _format_counts(result.candidate_discovery_funnel),
         "quality_note: unknown/insufficient_data rows are conservative local-only verdicts or legacy rows, not hidden promotions.",
         "",
@@ -81,6 +82,8 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
     lines.extend(_candidate_lines(_possible_false_positives(rows), limit=8))
     lines.extend(["", "Quality Gate Conflicts:"])
     lines.extend(_quality_gate_conflict_lines(rows, limit=8))
+    lines.extend(["", "Quality-Capped Watchlist Rows:"])
+    lines.extend(_quality_capped_state_lines(rows, limit=8))
     lines.extend(["", "Top upgrade candidates:"])
     lines.extend(_upgrade_lines(rows, limit=6))
     lines.extend(["", "Top downgrade risks:"])
@@ -117,6 +120,13 @@ def _normalize_rows(rows: Iterable[Mapping[str, Any]], *, source: str) -> list[d
             if source == "alert_snapshot"
             else "not_alert_snapshot"
         )
+        data["state_quality_classification"] = (
+            "quality_capped"
+            if bool(data.get("state_quality_capped"))
+            else "uncapped"
+            if source == "watchlist"
+            else "not_watchlist"
+        )
         out.append(data)
     return out
 
@@ -129,7 +139,11 @@ def _entry_row(entry: event_watchlist.EventWatchlistEntry | Mapping[str, Any]) -
         "event_id": entry.event_id,
         "symbol": entry.symbol,
         "coin_id": entry.coin_id,
-        "state": entry.state,
+        "state": event_watchlist.final_state_value(entry),
+        "requested_state_before_quality_gate": event_watchlist.requested_state_value(entry),
+        "final_state_after_quality_gate": event_watchlist.final_state_value(entry),
+        "quality_state_block_reason": entry.quality_state_block_reason,
+        "state_quality_capped": event_watchlist.state_is_quality_capped(entry),
         "tier": entry.latest_tier,
         "relationship_type": entry.relationship_type,
         "external_asset": entry.external_asset,
@@ -324,6 +338,25 @@ def _quality_gate_conflict_lines(rows: list[dict[str, Any]], *, limit: int) -> l
         )
     if len(conflicts) > limit:
         out.append(f"- +{len(conflicts) - limit} more conflict rows")
+    return out
+
+
+def _quality_capped_state_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
+    capped = [row for row in rows if bool(row.get("state_quality_capped"))]
+    if not capped:
+        return ["- none"]
+    out: list[str] = []
+    for row in capped[:limit]:
+        out.append(
+            f"- {_label(row)}: requested_state={row.get('requested_state_before_quality_gate') or row.get('state') or 'unknown'} "
+            f"final_state={row.get('final_state_after_quality_gate') or row.get('state') or 'unknown'} "
+            f"level={row.get('opportunity_level') or 'unknown'} "
+            f"path={row.get('impact_path_type') or 'unknown'} "
+            f"score={row.get('opportunity_score_final') if row.get('opportunity_score_final') is not None else 'n/a'} "
+            f"block={row.get('quality_state_block_reason') or 'quality_state_capped'}"
+        )
+    if len(capped) > limit:
+        out.append(f"- +{len(capped) - limit} more quality-capped rows")
     return out
 
 

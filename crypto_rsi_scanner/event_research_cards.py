@@ -59,7 +59,7 @@ def render_research_card(
     coin_id = _value(entry, alert, "coin_id", "asset_coin_id") or "unknown"
     event_name = _value(entry, alert, "latest_event_name", "event_name") or "unknown event"
     tier = _value(entry, alert, "latest_tier", "tier") or "unknown"
-    state = entry.state if entry is not None else str(alert.get("state") or "snapshot")
+    state = event_watchlist.final_state_value(entry) if entry is not None else str(alert.get("final_state_after_quality_gate") or alert.get("state") or "snapshot")
     generated_iso = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat()
     lines = [
         f"# {symbol} Event Research Card",
@@ -122,6 +122,25 @@ def render_research_card(
     ])
     lines.extend(["", "## Quality Gate Result"])
     lines.extend(_quality_gate_lines(entry, alert, decision))
+    if entry is not None and event_watchlist.state_is_quality_capped(entry):
+        _, state_block_reason = event_watchlist.quality_cap_watchlist_state(
+            event_watchlist.requested_state_value(entry),
+            entry.latest_score_components,
+        )
+        lines.extend([
+            "",
+            "## Lifecycle State Gate",
+            "- Local-only after quality/state gate.",
+            (
+                f"- Requested {event_watchlist.requested_state_value(entry)} blocked because "
+                f"{entry.quality_state_block_reason or state_block_reason or 'quality verdict did not allow active watchlist state'}."
+            ),
+            "- What would upgrade this candidate: " + (
+                "; ".join(entry.upgrade_requirements[:3])
+                if entry.upgrade_requirements
+                else "recompute quality with validated impact path, specific evidence, and market confirmation"
+            ),
+        ])
     hypothesis_lines = _impact_hypothesis_lines(entry)
     if hypothesis_lines:
         lines.extend(["", "## Impact Hypothesis Context"])
@@ -203,11 +222,11 @@ def render_selected_cards(
     monitor = list(monitor_rows)
     entries = [
         entry for entry in watchlist_entries
-        if entry.state in {
+        if event_watchlist.final_state_value(entry) in {
             event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
             event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
             event_watchlist.EventWatchlistState.WATCHLIST.value,
-        }
+        } and not event_watchlist.state_is_quality_capped(entry)
     ][: max(1, limit)]
     if not entries:
         return "# Event Research Cards\n\nNo selected watchlist entries found.\n"
@@ -322,7 +341,10 @@ def _selected_entries(
         "HIGH_PRIORITY_WATCH",
     })
     for entry in entries:
-        if entry.state in states or entry.latest_tier in states:
+        if (
+            event_watchlist.final_state_value(entry) in states
+            or entry.latest_tier in states
+        ) and not event_watchlist.state_is_quality_capped(entry):
             selected_by_key[entry.key] = entry
     if include_all_alertable:
         for decision in decisions:

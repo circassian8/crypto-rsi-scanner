@@ -84,10 +84,13 @@ def monitor_watchlist(
     rows: list[EventWatchlistMonitorRow] = []
     skipped = 0
     for entry in read_result.entries:
-        if entry.state == event_watchlist.EventWatchlistState.EXPIRED.value:
+        state = event_watchlist.final_state_value(entry)
+        if state == event_watchlist.EventWatchlistState.EXPIRED.value:
             skipped += 1
             continue
-        if entry.state not in ACTIVE_STATES:
+        if event_watchlist.state_is_quality_capped(entry):
+            continue
+        if state not in ACTIVE_STATES:
             continue
         rows.append(_row_for_entry(entry, market_by_key, derivatives_by_key, supply_by_key, observed))
     return EventWatchlistMonitorResult(
@@ -127,6 +130,9 @@ def apply_monitor_updates_to_watchlist(
         if row is None:
             updated.append(entry)
             continue
+        if event_watchlist.state_is_quality_capped(entry):
+            updated.append(entry)
+            continue
         reasons = tuple(dict.fromkeys(
             MONITOR_HINT_TO_ROUTER_REASON[hint]
             for hint in row.state_transition_hints
@@ -139,10 +145,10 @@ def apply_monitor_updates_to_watchlist(
         if not reasons:
             updated.append(entry)
             continue
-        next_state = entry.state
+        next_state = event_watchlist.final_state_value(entry)
         if (
             "EVENT_PASSED" in row.state_transition_hints
-            and entry.state not in {
+            and event_watchlist.final_state_value(entry) not in {
                 event_watchlist.EventWatchlistState.ARMED.value,
                 event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
                 event_watchlist.EventWatchlistState.INVALIDATED.value,
@@ -151,11 +157,11 @@ def apply_monitor_updates_to_watchlist(
         ):
             next_state = event_watchlist.EventWatchlistState.EVENT_PASSED.value
         if next_state == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value:
-            next_state = entry.state
+            next_state = event_watchlist.final_state_value(entry)
         updated.append(replace(
             entry,
             state=next_state,
-            previous_state=entry.state if next_state != entry.state else entry.previous_state,
+            previous_state=event_watchlist.final_state_value(entry) if next_state != event_watchlist.final_state_value(entry) else entry.previous_state,
             last_seen_at=monitor_result.observed_at,
             score_jump=max(
                 entry.score_jump,
@@ -306,13 +312,13 @@ def _row_for_entry(
         }
     )
     warnings = tuple(w for w in entry.warnings if w)
-    if entry.state == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value:
+    if event_watchlist.final_state_value(entry) == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value:
         warnings = (*warnings, "monitor does not create triggered fade")
     return EventWatchlistMonitorRow(
         key=entry.key,
         symbol=entry.symbol,
         coin_id=entry.coin_id,
-        state=entry.state,
+        state=event_watchlist.final_state_value(entry),
         event_name=entry.latest_event_name,
         event_time=entry.event_time,
         event_countdown_hours=countdown,
