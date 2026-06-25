@@ -7309,6 +7309,69 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
             assert validated.digest_eligible_by_impact_path is True
 
 
+def test_event_impact_hypothesis_persists_upgrade_and_downgrade_paths():
+    # Validated hypotheses must persist the opportunity upgrade/downgrade
+    # diagnostics on the row (and through the store), not only compute them
+    # on-demand in reports. Research-only; no routing/send/trade behavior.
+    import json
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_impact_hypotheses, event_impact_hypothesis_store
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
+    hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:rune-upgrade",
+        event_cluster_id="cluster:rune",
+        event_type="news",
+        external_asset="THORChain",
+        impact_category="security_or_regulatory_shock",
+        candidate_sectors=("direct_token_events",),
+        candidate_symbols=("RUNE",),
+        candidate_coin_ids=("thorchain",),
+        direction_hint="volatility",
+        playbook_hint="security_or_regulatory_shock",
+        confidence=0.85,
+        hypothesis_score=70,
+        validation_stage=event_impact_hypotheses.ValidationStage.VALIDATION_SEARCH_PENDING.value,
+        status=event_impact_hypotheses.HypothesisStatus.VALIDATION_SEARCH_PENDING.value,
+    )
+    source = RawDiscoveredEvent(
+        raw_id="rune",
+        provider="fixture_search",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/rune",
+        title="THORChain exploit investigation",
+        body="THORChain RUNE faces an exploit and security incident after an attack.",
+        raw_json={"market": {"return_24h": 0.32, "volume_zscore_24h": 3.4, "volume_to_market_cap": 0.28}},
+        source_confidence=0.9,
+        content_hash="rune",
+    )
+    validated = event_impact_hypotheses.validate_hypotheses_with_raw_events((hypothesis,), (source,))[0]
+    # Fields exist and are tuples (the dataclass default is an empty tuple).
+    assert isinstance(validated.upgrade_requirements, tuple)
+    assert isinstance(validated.downgrade_warnings, tuple)
+    # explain_upgrade_path always emits at least one downgrade warning, so a
+    # validated hypothesis should carry concrete diagnostics, not just defaults.
+    assert validated.downgrade_warnings, "validated hypothesis should persist downgrade warnings"
+
+    # And the fields survive into the persisted JSONL store row.
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_impact_hypotheses.jsonl"
+        cfg = event_impact_hypothesis_store.EventImpactHypothesisStoreConfig(path=path)
+        event_impact_hypothesis_store.write_impact_hypotheses(
+            (validated,), cfg=cfg, run_id="r1", profile="quality_validation",
+            run_mode="test", artifact_namespace="quality_validation", now=now,
+        )
+        rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        assert rows, "store should write at least one row"
+        row = rows[0]
+        assert "upgrade_requirements" in row and "downgrade_warnings" in row
+        assert list(row["downgrade_warnings"]) == list(validated.downgrade_warnings)
+
+
 def test_event_market_evidence_and_opportunity_verdict_quality_layers():
     from crypto_rsi_scanner import (
         event_evidence_quality,

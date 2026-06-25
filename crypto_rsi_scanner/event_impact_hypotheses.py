@@ -150,6 +150,8 @@ class EventImpactHypothesis:
     manual_verification_items: tuple[str, ...] = ()
     why_local_only: str | None = None
     why_not_watchlist: str | None = None
+    upgrade_requirements: tuple[str, ...] = ()
+    downgrade_warnings: tuple[str, ...] = ()
     created_at: str | None = None
 
 
@@ -2164,6 +2166,13 @@ def _quality_verdict_replace_kwargs(
         hypothesis=hypothesis,
         score_components=merged_components,
     )
+    upgrade_path = event_opportunity_verdict.explain_upgrade_path(
+        verdict=verdict,
+        impact_path=validation,
+        market_confirmation=market_result,
+        evidence_quality=evidence_result,
+        components=merged_components,
+    )
     return {
         "evidence_quality_score": evidence_result.evidence_quality_score,
         "source_class": evidence_result.source_class,
@@ -2182,6 +2191,8 @@ def _quality_verdict_replace_kwargs(
         "manual_verification_items": verdict.manual_verification_items,
         "why_local_only": verdict.why_local_only,
         "why_not_watchlist": verdict.why_not_watchlist,
+        "upgrade_requirements": upgrade_path.upgrade_requirements,
+        "downgrade_warnings": upgrade_path.downgrade_warnings,
     }
 
 

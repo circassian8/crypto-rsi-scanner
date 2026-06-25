@@ -141,6 +141,32 @@ _PROFILES: dict[str, EventAlphaProfile] = {
         snapshot_policy="all",
         watchlist_monitor_enabled=False,
     ),
+    "quality_validation": EventAlphaProfile(
+        name="quality_validation",
+        description=(
+            "Offline fixture cycle for validating the Event Alpha signal-quality "
+            "layer in an isolated namespace; no Telegram sends and no live providers."
+        ),
+        config_overrides={
+            "EVENT_DISCOVERY_UNIVERSE_PATH": _FIXTURE_UNIVERSE,
+            "EVENT_DISCOVERY_UNIVERSE_LIVE": False,
+            "EVENT_MARKET_ENRICHMENT_ENABLED": True,
+            "EVENT_ANOMALY_SCANNER_ENABLED": True,
+            "EVENT_ANOMALY_MIN_RETURN_24H": 0.03,
+            "EVENT_ANOMALY_MIN_VOLUME_MCAP": 0.05,
+            "EVENT_CATALYST_SEARCH_ENABLED": True,
+            "EVENT_CATALYST_SEARCH_PROVIDER": "fixture",
+            "EVENT_CATALYST_SEARCH_PROVIDERS": ("fixture",),
+            "EVENT_WATCHLIST_ENABLED": True,
+            "EVENT_ALPHA_ROUTER_ENABLED": True,
+            "EVENT_RESEARCH_CARDS_AUTO_WRITE": True,
+            "EVENT_RESEARCH_CARDS_WRITE_TIERS": ("HIGH_PRIORITY_WATCH", "TRIGGERED_FADE", "WATCHLIST"),
+        },
+        snapshot_policy="all",
+        card_auto_write=True,
+        card_write_tiers=("HIGH_PRIORITY_WATCH", "TRIGGERED_FADE", "WATCHLIST"),
+        watchlist_monitor_enabled=False,
+    ),
     "no_key_live": EventAlphaProfile(
         name="no_key_live",
         description="No-key live research cycle using public RSS, GDELT, Polymarket, and live CoinGecko universe.",

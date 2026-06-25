@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Validate signal-quality layer + persist upgrade/downgrade paths · Claude
+**Why:** Validate the new Event Alpha signal-quality layer against *fresh*
+artifacts (uploaded artifacts were stale) and patch only real integration gaps.
+**What I found (fresh `quality_validation` namespace cycle, fixture/no-send):**
+- The layer is already integrated. Fresh impact-hypothesis rows and
+  hypothesis-derived watchlist rows carry the full enforced quality field set
+  (impact_path_type/strength, candidate_role, evidence_quality_score,
+  source_class, evidence_specificity, market_confirmation_score/level,
+  opportunity_score_final/level, opportunity_verdict_reasons, why_local_only,
+  why_not_watchlist, manual_verification_items). Alert-snapshot construction
+  (`_snapshot_from_route_decision`) includes them too. Artifact doctor reports
+  `quality fields: missing_total=0`. Router/verdict behavior passes the 16/16
+  signal-quality eval (VELVET/SpaceX, RUNE exploit, ZEC listing, CHZ World Cup →
+  watchlist/high-priority; weak BTC quantum/CFTC → local_only/exploratory;
+  generic co-occurrence capped at exploratory). Opportunity audit loads by
+  symbol/hypothesis_id/alert_id and explains identity→path→evidence→market→
+  verdict→router→upgrade/downgrade.
+- One genuine gap: `upgrade_requirements`/`downgrade_warnings` were computed
+  on-demand in reports but never persisted on hypothesis rows.
+**Changes (minimal):**
+- `event_impact_hypotheses.py`: added `upgrade_requirements`/`downgrade_warnings`
+  to `EventImpactHypothesis`, populated in `_quality_verdict_replace_kwargs` via
+  the existing `event_opportunity_verdict.explain_upgrade_path`. They now persist
+  on hypothesis rows (and through `event_impact_hypothesis_store`). Pure/diagnostic;
+  no routing, send, trade, paper, RSI-write, or `TRIGGERED_FADE` change.
+- Added a `quality_validation` fixture profile (offline, no-send) and a
+  `make event-alpha-quality-validation-cycle` target that runs a no-send fixture
+  cycle + daily brief + quality review + artifact doctor under the
+  `quality_validation` namespace for reproducible validation.
+- Test: `test_event_impact_hypothesis_persists_upgrade_and_downgrade_paths`.
+**Verify:** `.venv/bin/python tests/test_indicators.py` 452/452; `make
+event-llm-eval`, `event-llm-extract-eval`, `event-alpha-eval`,
+`event-alpha-signal-quality-eval` (16/16), and `make verify` all pass
+(`PYTHON=.venv/bin/python`). Fresh cycle wrote under
+`event_fade_cache/quality_validation/`; no sends/trades/paper trades occurred.
+**Notes/risks:** `python3` in this environment lacks numpy, so the canonical
+`.venv/bin/python` interpreter was used. `TRIGGERED_FADE` still comes only from
+`event_fade.py` + `proxy_fade`.
+
 ## 2026-06-25 — Operationalize Event Alpha signal-quality loop · Codex
 **Why:** New live artifacts could still be hard to inspect because quality
 fields, candidate-funnel diagnostics, and threshold effects were spread across

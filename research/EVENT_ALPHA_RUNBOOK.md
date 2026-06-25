@@ -203,6 +203,27 @@ market confirmation, final opportunity verdict, router decision, missing
 evidence, upgrade requirements, downgrade risks, and a feedback command. It is
 diagnostic only and cannot make a candidate alertable or trigger a fade.
 
+### Reproducible quality-validation cycle
+
+To validate the signal-quality layer end-to-end against *fresh* artifacts (rather
+than judging stale uploads), run the isolated offline cycle:
+
+```bash
+make event-alpha-quality-validation-cycle
+```
+
+It uses the `quality_validation` fixture profile (offline, no Telegram sends, no
+live providers, fixture clock), writes the run ledger, impact hypotheses,
+watchlist, alert snapshots (if any), research cards, and daily brief under
+`event_fade_cache/quality_validation/`, then prints the quality review and
+artifact doctor (whose `quality fields: missing_total=...` counters confirm
+field coverage). Hypothesis rows now persist `upgrade_requirements` /
+`downgrade_warnings` alongside the other quality fields. Inspect individual rows
+with `make event-impact-hypotheses-report PROFILE=quality_validation` or
+`make event-opportunity-audit TARGET=<...> PROFILE=quality_validation`. The whole
+cycle is research-only: no sends, trades, paper trades, normal RSI rows, or
+`TRIGGERED_FADE`.
+
 Use the quality-loop targets after live or fixture notification cycles to
 inspect real artifacts:
 
