@@ -410,7 +410,12 @@ def _snapshot_from_route_decision(
     warnings = list(entry.warnings)
     if not symbol and not validated_symbol:
         warnings.append("validated_hypothesis_snapshot_missing_identity")
-    quality = event_alpha_quality_fields.ensure_quality_fields({}, components=components)
+    entry_quality = {
+        key: getattr(entry, key, None)
+        for key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS
+        if getattr(entry, key, None) not in (None, "", [], {}, ())
+    }
+    quality = event_alpha_quality_fields.ensure_quality_fields(entry_quality, components=components)
     return {
         "schema_version": ALERT_STORE_SCHEMA_VERSION,
         "row_type": "event_alpha_alert_snapshot",
@@ -455,6 +460,9 @@ def _snapshot_from_route_decision(
         "state": entry.state,
         "route": decision.route.value,
         "lane": decision.lane.value,
+        "requested_route_before_quality_gate": decision.requested_route_before_quality_gate or decision.route.value,
+        "final_route_after_quality_gate": decision.final_route_after_quality_gate or decision.route.value,
+        "quality_gate_block_reason": decision.quality_gate_block_reason,
         "alert_id": decision.alert_id,
         "card_id": decision.card_id,
         "route_alertable": bool(decision.alertable),
@@ -524,11 +532,29 @@ def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]
         if not key:
             continue
         route = getattr(decision, "route", "")
+        components = getattr(entry, "latest_score_components", None)
+        if not isinstance(components, Mapping):
+            components = {}
+        entry_quality = {
+            quality_key: getattr(entry, quality_key, None)
+            for quality_key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS
+            if getattr(entry, quality_key, None) not in (None, "", [], {}, ())
+        }
+        quality = event_alpha_quality_fields.ensure_quality_fields(entry_quality, components=components)
         out[key] = {
             "alert_id": getattr(decision, "alert_id", f"ea:{key}"),
             "card_id": getattr(decision, "card_id", ""),
             "route": getattr(route, "value", str(route)),
             "lane": getattr(getattr(decision, "lane", ""), "value", str(getattr(decision, "lane", ""))),
+            "requested_route_before_quality_gate": getattr(decision, "requested_route_before_quality_gate", None)
+            or getattr(route, "value", str(route)),
+            "final_route_after_quality_gate": getattr(decision, "final_route_after_quality_gate", None)
+            or getattr(route, "value", str(route)),
+            "quality_gate_block_reason": getattr(decision, "quality_gate_block_reason", None),
+            "opportunity_level": getattr(decision, "opportunity_level", None) or quality.get("opportunity_level"),
+            "opportunity_score_final": getattr(decision, "opportunity_score_final", None)
+            if getattr(decision, "opportunity_score_final", None) is not None
+            else quality.get("opportunity_score_final"),
             "route_alertable": bool(getattr(decision, "alertable", False)),
             "route_reason": str(getattr(decision, "reason", "") or ""),
         }
@@ -540,7 +566,13 @@ def _route_decisions_for_snapshots(router_result: Any | None) -> tuple[event_alp
         return ()
     out: list[event_alpha_router.EventAlphaRouteDecision] = []
     for decision in getattr(router_result, "decisions", ()) or ():
-        if bool(getattr(decision, "alertable", False)):
+        requested = getattr(decision, "requested_route_before_quality_gate", None)
+        final = getattr(decision, "final_route_after_quality_gate", None)
+        if (
+            bool(getattr(decision, "alertable", False))
+            or bool(getattr(decision, "quality_gate_block_reason", None))
+            or (requested and final and requested != final)
+        ):
             out.append(decision)
     return tuple(out)
 

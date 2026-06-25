@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-25 - Event Alpha routes must obey final quality verdicts
+**Status:** accepted
+**Decision:** Event Alpha routing must apply the final signal-quality /
+opportunity verdict before any operator-facing route. Rows with final
+`local_only`, `exploratory`, insufficient-data/source-noise/ticker-collision,
+or zero-score verdicts stay in local/store-only or exploratory review output
+even if the older watchlist/playbook path requested digest, watchlist,
+high-priority, or instant routing. Route artifacts must preserve both the
+requested route and the final route plus a block reason for audit. The only
+exception is an already-deterministic `TRIGGERED_FADE_RESEARCH` route from
+`event_fade.py` plus the `proxy_fade` playbook; LLMs, providers, hypotheses,
+and quality metadata still cannot create `TRIGGERED_FADE`.
+**Why:** Impact/watchlist state can be stale, broad, or pre-quality-layer. The
+final opportunity verdict is the row-level safety contract that combines
+impact path, evidence/source quality, market confirmation, and hard identity
+guards. Operator-facing research messages must not outrank that verdict.
+**Revisit when:** A reviewed Event Alpha dataset proves a specific lower-tier
+opportunity class should have a separately approved exploratory or digest
+route policy.
+
 ## 2026-06-25 - Fresh quality validation needs raw artifact coverage
 **Status:** accepted
 **Decision:** Live-style Event Alpha quality validation should use an isolated

@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-25 — Make Event Alpha routing obey quality verdicts · Codex
+**Why:** Fresh `notify_llm_quality` artifacts could contain a final
+`local_only` / `insufficient_data` opportunity verdict while the legacy
+watchlist/router path still delivered the row as a research digest. The final
+quality verdict must dominate operator-facing routes.
+**Changes:**
+- Added a router quality gate so alertable Event Alpha routes are downgraded
+  when final opportunity metadata says `local_only`, `exploratory`,
+  insufficient-data/source-noise/ticker-collision, or zero final opportunity
+  score. `TRIGGERED_FADE_RESEARCH` still bypasses this gate only when already
+  produced by deterministic `event_fade.py` + `proxy_fade`.
+- Persisted route-before/route-after quality-gate metadata, block reasons, and
+  final opportunity score/level into route decisions and alert snapshots.
+- Added quality-gate downgrade/conflict visibility to router reports, daily
+  briefs, research cards, quality review, and artifact doctor.
+- Cleaned candidate-discovery funnel counters so raw extracted terms,
+  candidate-like terms, resolver-accepted/rejected terms, context-validated
+  candidates, and promoted candidates are separated.
+**Verify:** `python3 tests/test_indicators.py` passed (456/456). Full eval,
+quality-validation, and verification targets are listed in the final Codex
+handoff for this prompt.
+**Notes/risks:** Research-only. No normal RSI rows, paper/live trades,
+execution, alert-scoring promotion, or LLM/provider-created `TRIGGERED_FADE`
+behavior changed.
+
 ## 2026-06-25 — Add fresh Event Alpha quality coverage profile · Codex
 **Why:** Existing `notify_llm` artifacts can contain stale pre-quality-layer
 rows, so live-style quality validation needed an isolated profile plus a

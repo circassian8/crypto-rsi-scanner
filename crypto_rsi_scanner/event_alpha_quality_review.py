@@ -71,6 +71,8 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
     lines.extend(_candidate_lines(_rejected_review(rows), limit=8))
     lines.extend(["", "Possible false positives:"])
     lines.extend(_candidate_lines(_possible_false_positives(rows), limit=8))
+    lines.extend(["", "Quality Gate Conflicts:"])
+    lines.extend(_quality_gate_conflict_lines(rows, limit=8))
     lines.extend(["", "Top upgrade candidates:"])
     lines.extend(_upgrade_lines(rows, limit=6))
     lines.extend(["", "Top downgrade risks:"])
@@ -148,6 +150,12 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         "source_results_fetched": 0,
         "source_results_accepted": 0,
         "source_results_rejected": 0,
+        "raw_terms_extracted": 0,
+        "candidate_like_terms": 0,
+        "resolver_accepted_candidates": 0,
+        "resolver_rejected_terms": 0,
+        "context_validated_candidates": 0,
+        "promoted_candidates": 0,
         "asset_terms_extracted": 0,
         "resolver_accepted": 0,
         "resolver_rejected": 0,
@@ -168,9 +176,17 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         out["source_results_fetched"] += len(rejected_samples) + len(accepted_samples) if isinstance(rejected_samples, list) and isinstance(accepted_samples, list) else 0
         out["source_results_accepted"] += len(accepted_samples) if isinstance(accepted_samples, list) else 0
         out["source_results_rejected"] += len(rejected_samples) if isinstance(rejected_samples, list) else 0
-        out["asset_terms_extracted"] += len(crypto) + len(rejected) if isinstance(crypto, list) and isinstance(rejected, list) else 0
-        out["resolver_accepted"] += sum(1 for item in crypto if isinstance(item, Mapping) and bool(item.get("accepted", item.get("validated", False))))
-        out["resolver_rejected"] += len(rejected) if isinstance(rejected, list) else 0
+        all_terms = [*(crypto if isinstance(crypto, list) else []), *(rejected if isinstance(rejected, list) else [])]
+        candidate_like = sum(1 for item in all_terms if isinstance(item, Mapping) and _candidate_like_term(item))
+        accepted = sum(1 for item in crypto if isinstance(item, Mapping) and bool(item.get("accepted", item.get("validated", False))))
+        rejected_count = len(rejected) if isinstance(rejected, list) else 0
+        out["raw_terms_extracted"] += len(all_terms)
+        out["candidate_like_terms"] += candidate_like
+        out["resolver_accepted_candidates"] += accepted
+        out["resolver_rejected_terms"] += rejected_count
+        out["asset_terms_extracted"] += len(all_terms)
+        out["resolver_accepted"] += accepted
+        out["resolver_rejected"] += rejected_count
         out["false_positive_rejections"] += sum(1 for item in rejected if isinstance(item, Mapping) and _rejection_is_false_positive(item))
         for item in rejected:
             if not isinstance(item, Mapping):
@@ -178,12 +194,24 @@ def _candidate_discovery_funnel(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
             reason = str(item.get("reason") or item.get("rejection_reason") or item.get("identity_reason") or "unknown_rejection")
             if reason:
                 out[f"rejected_{reason}"] = out.get(f"rejected_{reason}", 0) + 1
-        out["candidates_added"] += len(crypto) if isinstance(crypto, list) else 0
+        out["candidates_added"] += candidate_like
         if str(row.get("validation_stage") or "") in {"catalyst_link_validated", "impact_path_validated", "market_confirmed", "promoted_to_radar"}:
             out["candidates_validated"] += 1
+            out["context_validated_candidates"] += 1
         if str(row.get("opportunity_level") or "") in {"validated_digest", "watchlist", "high_priority"}:
             out["candidates_promoted"] += 1
+            out["promoted_candidates"] += 1
     return out
+
+
+def _candidate_like_term(item: Mapping[str, Any]) -> bool:
+    symbol = str(item.get("symbol") or "").strip()
+    coin_id = str(item.get("coin_id") or "").strip()
+    name = str(item.get("name") or item.get("project_name") or "").strip()
+    reason = str(item.get("reason") or item.get("rejection_reason") or item.get("identity_reason") or "").casefold()
+    if any(token in reason for token in ("source_noise", "publisher", "word_collision", "url_only", "generic_symbol")):
+        return False
+    return bool(symbol or coin_id or name)
 
 
 def _rejection_is_false_positive(item: Mapping[str, Any]) -> bool:
@@ -259,6 +287,58 @@ def _possible_false_positives(rows: list[dict[str, Any]]) -> list[dict[str, Any]
         row for row in rows
         if any(needle in str(row).lower() for needle in needles)
     ]
+
+
+def _quality_gate_conflict_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
+    conflicts = [row for row in rows if _quality_gate_conflict(row)]
+    if not conflicts:
+        return ["- none"]
+    out: list[str] = []
+    for row in conflicts[:limit]:
+        out.append(
+            f"- {_label(row)}: route={row.get('route') or 'unknown'} "
+            f"requested={row.get('requested_route_before_quality_gate') or 'unknown'} "
+            f"final={row.get('final_route_after_quality_gate') or row.get('route') or 'unknown'} "
+            f"level={row.get('opportunity_level') or 'unknown'} "
+            f"score={row.get('opportunity_score_final') if row.get('opportunity_score_final') is not None else 'n/a'} "
+            f"block={row.get('quality_gate_block_reason') or _quality_gate_conflict_reason(row)}"
+        )
+    if len(conflicts) > limit:
+        out.append(f"- +{len(conflicts) - limit} more conflict rows")
+    return out
+
+
+def _quality_gate_conflict(row: Mapping[str, Any]) -> bool:
+    if row.get("quality_gate_block_reason"):
+        return True
+    route_alertable = bool(row.get("route_alertable"))
+    route = str(row.get("route") or "")
+    if not route_alertable and route not in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH"}:
+        return False
+    if route == "TRIGGERED_FADE_RESEARCH":
+        return False
+    return _quality_gate_conflict_reason(row) != "none"
+
+
+def _quality_gate_conflict_reason(row: Mapping[str, Any]) -> str:
+    level = str(row.get("opportunity_level") or "")
+    if level in {"", "local_only", "exploratory"}:
+        return f"opportunity_level:{level or 'missing'}"
+    if str(row.get("impact_path_type") or "") == "insufficient_data":
+        return "impact_path_type_insufficient_data"
+    if str(row.get("candidate_role") or "") == "unknown_with_reason":
+        return "candidate_role_unknown_with_reason"
+    if str(row.get("source_class") or "") == "insufficient_data":
+        return "source_class_insufficient_data"
+    if str(row.get("evidence_specificity") or "") == "insufficient_data":
+        return "evidence_specificity_insufficient_data"
+    try:
+        score = float(row.get("opportunity_score_final") or 0.0)
+    except (TypeError, ValueError):
+        score = 0.0
+    if score <= 0.0:
+        return "opportunity_score_final_zero"
+    return "none"
 
 
 def _candidate_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:

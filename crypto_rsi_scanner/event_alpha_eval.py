@@ -79,6 +79,8 @@ def _entry_from_case(case: Mapping[str, Any]) -> event_watchlist.EventWatchlistE
     symbol = str(case.get("symbol") or case.get("id") or "TEST").upper()
     state = str(case.get("state") or event_watchlist.EventWatchlistState.RAW_EVIDENCE.value)
     score = int(case.get("score") or 0)
+    expected_route = str(case.get("expected_route") or "")
+    quality = _quality_for_expected_route(expected_route, case)
     return event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
@@ -103,10 +105,53 @@ def _entry_from_case(case: Mapping[str, Any]) -> event_watchlist.EventWatchlistE
         latest_playbook_type=case.get("playbook_type"),
         latest_playbook_score=score,
         latest_playbook_action=case.get("playbook_action") or "watchlist",
+        latest_score_components=quality,
         should_alert=bool(case.get("should_alert", True)),
         suppressed_reason=case.get("suppressed_reason"),
         warnings=tuple(str(value) for value in case.get("warnings") or ()),
     )
+
+
+def _quality_for_expected_route(expected_route: str, case: Mapping[str, Any]) -> dict[str, Any]:
+    if expected_route in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH"}:
+        level = "high_priority" if expected_route == "HIGH_PRIORITY_RESEARCH" else "watchlist"
+        score = float(case.get("score") or (90 if level == "high_priority" else 78))
+        return {
+            "impact_path_type": "proxy_exposure",
+            "impact_path_strength": "strong",
+            "candidate_role": "proxy_instrument",
+            "evidence_quality_score": 82,
+            "source_class": "crypto_native",
+            "evidence_specificity": "asset_and_catalyst",
+            "market_confirmation_score": 72,
+            "market_confirmation_level": "confirmed",
+            "opportunity_score_final": score,
+            "opportunity_level": level,
+            "opportunity_verdict_reasons": ["fixture_route_quality_context"],
+            "why_local_only": "not_local_only",
+            "why_not_watchlist": "already_watchlisted",
+            "manual_verification_items": ["fixture eval case"],
+            "upgrade_requirements": [],
+            "downgrade_warnings": [],
+        }
+    return {
+        "impact_path_type": "source_noise" if case.get("playbook_type") == "source_noise_control" else "insufficient_data",
+        "impact_path_strength": "none",
+        "candidate_role": "source_noise" if case.get("playbook_type") == "source_noise_control" else "unknown_with_reason",
+        "evidence_quality_score": 0,
+        "source_class": "source_noise" if case.get("playbook_type") == "source_noise_control" else "insufficient_data",
+        "evidence_specificity": "source_origin_only" if case.get("playbook_type") == "source_noise_control" else "insufficient_data",
+        "market_confirmation_score": 0,
+        "market_confirmation_level": "insufficient_data",
+        "opportunity_score_final": 0,
+        "opportunity_level": "local_only",
+        "opportunity_verdict_reasons": ["fixture_local_only"],
+        "why_local_only": "fixture_local_only",
+        "why_not_watchlist": "fixture_local_only",
+        "manual_verification_items": ["fixture eval case"],
+        "upgrade_requirements": ["needs_quality_context"],
+        "downgrade_warnings": ["local_only"],
+    }
 
 
 if __name__ == "__main__":

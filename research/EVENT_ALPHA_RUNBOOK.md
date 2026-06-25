@@ -134,7 +134,12 @@ known external catalyst or explicit direct token-event evidence,
 `impact_path_validated` or stronger validation stage. When final opportunity
 metadata is present, `local_only` and `exploratory` stay local; only
 `validated_digest`, `watchlist`, or `high_priority` verdicts can pass the
-operator-facing digest gate. Strong impact paths can enter the capped digest if
+operator-facing digest gate. The router enforces this verdict after the older
+watchlist/playbook route request is built: blocked rows keep
+`requested_route_before_quality_gate`, `final_route_after_quality_gate`, and
+`quality_gate_block_reason` in route decisions, alert snapshots, daily briefs,
+quality review, and research cards so the downgrade is auditable. Strong impact
+paths can enter the capped digest if
 other gates pass; medium paths need market confirmation; generic co-occurrence
 is blocked by default via
 `RSI_EVENT_ALPHA_BLOCK_GENERIC_COOCCURRENCE_DIGEST=1`. Weak

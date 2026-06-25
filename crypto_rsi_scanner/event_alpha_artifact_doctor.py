@@ -38,6 +38,7 @@ class EventAlphaArtifactDoctorResult:
     fresh_watchlist_rows_missing_top_level_quality: int = 0
     fresh_alert_rows_missing_top_level_quality: int = 0
     legacy_quality_missing_rows: int = 0
+    alertable_route_conflicts_with_opportunity_level: int = 0
     strict: bool = False
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
@@ -247,6 +248,11 @@ def diagnose_artifacts(
             (blockers if strict else warnings).append(message)
         else:
             warnings.append(message)
+    route_conflict_alerts = _latest_run_rows(alerts, runs)
+    route_conflicts = _alertable_quality_route_conflicts(route_conflict_alerts)
+    if route_conflicts:
+        message = f"alertable_route_conflicts_with_opportunity_level={route_conflicts}"
+        (blockers if strict else warnings).append(message)
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
     return EventAlphaArtifactDoctorResult(
         status=status,
@@ -278,6 +284,7 @@ def diagnose_artifacts(
         fresh_watchlist_rows_missing_top_level_quality=quality["fresh_watchlist_rows_missing_top_level_quality"],
         fresh_alert_rows_missing_top_level_quality=quality["fresh_alert_rows_missing_top_level_quality"],
         legacy_quality_missing_rows=quality["legacy_quality_missing_rows"],
+        alertable_route_conflicts_with_opportunity_level=route_conflicts,
         strict=bool(strict),
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
@@ -345,6 +352,45 @@ def _quality_missing_summary(
         "legacy_quality_missing_rows": legacy_missing,
         "non_legacy_quality_missing": max(0, len(missing_rows) - legacy_missing),
     }
+
+
+def _latest_run_rows(rows: Iterable[Mapping[str, Any]], run_rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    run_ids = [str(row.get("run_id") or "") for row in run_rows if str(row.get("run_id") or "")]
+    if not run_ids:
+        return [row for row in rows]
+    latest = sorted(run_ids)[-1]
+    latest_rows = [row for row in rows if str(row.get("run_id") or "") == latest]
+    return latest_rows
+
+
+def _alertable_quality_route_conflicts(alerts: Iterable[Mapping[str, Any]]) -> int:
+    return sum(1 for row in alerts if _row_has_alertable_quality_conflict(row))
+
+
+def _row_has_alertable_quality_conflict(row: Mapping[str, Any]) -> bool:
+    data = event_alpha_quality_fields.ensure_quality_fields(row, components=row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {})
+    route_alertable = bool(row.get("route_alertable"))
+    route = str(row.get("route") or "")
+    if not route_alertable and route not in {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH"}:
+        return False
+    if route == "TRIGGERED_FADE_RESEARCH":
+        return False
+    level = str(data.get("opportunity_level") or "")
+    if level in {"local_only", "exploratory", ""}:
+        return True
+    if str(data.get("impact_path_type") or "") == "insufficient_data":
+        return True
+    if str(data.get("candidate_role") or "") == "unknown_with_reason":
+        return True
+    if str(data.get("source_class") or "") == "insufficient_data":
+        return True
+    if str(data.get("evidence_specificity") or "") == "insufficient_data":
+        return True
+    try:
+        score = float(data.get("opportunity_score_final") or 0.0)
+    except (TypeError, ValueError):
+        score = 0.0
+    return score <= 0.0
 
 
 def _record_snapshot_availability_issue(
@@ -423,6 +469,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"fresh_alerts_missing_top_level={result.fresh_alert_rows_missing_top_level_quality} "
             f"legacy_quality_missing={result.legacy_quality_missing_rows}"
         ),
+        f"quality gate conflicts: alertable_route_conflicts_with_opportunity_level={result.alertable_route_conflicts_with_opportunity_level}",
         "",
         "blockers:",
     ]

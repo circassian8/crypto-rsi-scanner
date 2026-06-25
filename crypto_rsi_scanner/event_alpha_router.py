@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import html
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from . import event_playbooks, event_watchlist
+from . import event_alpha_quality_fields, event_opportunity_verdict, event_playbooks, event_watchlist
 
 
 class EventAlphaRoute(str, Enum):
@@ -62,6 +62,11 @@ class EventAlphaRouteDecision:
     reason: str
     lane: EventAlphaRouteLane = EventAlphaRouteLane.LOCAL_ONLY
     warnings: tuple[str, ...] = ()
+    requested_route_before_quality_gate: str | None = None
+    final_route_after_quality_gate: str | None = None
+    quality_gate_block_reason: str | None = None
+    opportunity_level: str | None = None
+    opportunity_score_final: float | None = None
 
     @property
     def alert_id(self) -> str:
@@ -91,7 +96,8 @@ def route_watchlist(
 ) -> EventAlphaRouterResult:
     """Convert latest watchlist state into artifact-only research route decisions."""
     cfg = cfg or EventAlphaRouterConfig()
-    decisions = _apply_route_caps([_route_entry(entry, cfg=cfg) for entry in read_result.entries], cfg)
+    requested = [_route_entry(entry, cfg=cfg) for entry in read_result.entries]
+    decisions = _apply_route_caps([_apply_quality_gate(decision) for decision in requested], cfg)
     if not cfg.include_suppressed:
         decisions = [decision for decision in decisions if decision.alertable]
     return EventAlphaRouterResult(
@@ -152,6 +158,15 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
                 f"score={components.get('opportunity_score_final') if components.get('opportunity_score_final') is not None else 'n/a'} "
                 f"market={components.get('market_confirmation_level') or 'unknown'} "
                 f"evidence={components.get('source_class') or 'unknown'}/{components.get('evidence_specificity') or 'unknown'}"
+            )
+        if decision.requested_route_before_quality_gate or decision.quality_gate_block_reason:
+            rows.append(
+                "  quality gate: "
+                f"requested={decision.requested_route_before_quality_gate or decision.route.value} "
+                f"final={decision.final_route_after_quality_gate or decision.route.value} "
+                f"level={decision.opportunity_level or components.get('opportunity_level') or 'unknown'} "
+                f"score={decision.opportunity_score_final if decision.opportunity_score_final is not None else components.get('opportunity_score_final', 'n/a')} "
+                f"block={decision.quality_gate_block_reason or 'none'}"
             )
         rows.append(f"  route reason: {decision.reason}")
         rows.append(f"  lane: {decision.lane.value}")
@@ -431,6 +446,147 @@ def _route_entry(
     )
 
 
+def _apply_quality_gate(decision: EventAlphaRouteDecision) -> EventAlphaRouteDecision:
+    """Downgrade alertable routes that conflict with final quality verdicts."""
+    quality = _quality_for_entry(decision.entry)
+    requested = decision.requested_route_before_quality_gate or decision.route.value
+    score = _float_or_none(quality.get("opportunity_score_final"))
+    level = str(quality.get("opportunity_level") or "").strip()
+    base = replace(
+        decision,
+        requested_route_before_quality_gate=requested,
+        final_route_after_quality_gate=decision.route.value,
+        opportunity_level=level or None,
+        opportunity_score_final=score,
+    )
+    if decision.route == EventAlphaRoute.TRIGGERED_FADE_RESEARCH:
+        return base
+    if not decision.alertable:
+        return base
+    block = _quality_gate_block_reason(quality)
+    if block:
+        return _quality_downgrade(base, block, level=level)
+    capped = _quality_route_cap(base, level)
+    if capped is not None:
+        return capped
+    return base
+
+
+def _quality_downgrade(
+    decision: EventAlphaRouteDecision,
+    block: str,
+    *,
+    level: str,
+) -> EventAlphaRouteDecision:
+    route = EventAlphaRoute.LOCAL_REPORT if level == event_opportunity_verdict.OpportunityLevel.EXPLORATORY.value else EventAlphaRoute.STORE_ONLY
+    return replace(
+        decision,
+        route=route,
+        alertable=False,
+        lane=EventAlphaRouteLane.LOCAL_ONLY,
+        reason=f"Quality gate kept route local-only: {block}.",
+        final_route_after_quality_gate=route.value,
+        quality_gate_block_reason=block,
+        warnings=tuple(dict.fromkeys((*decision.warnings, f"quality_gate_blocked:{block}"))),
+    )
+
+
+def _quality_route_cap(decision: EventAlphaRouteDecision, level: str) -> EventAlphaRouteDecision | None:
+    requested = decision.route
+    if level == event_opportunity_verdict.OpportunityLevel.VALIDATED_DIGEST.value:
+        if requested == EventAlphaRoute.HIGH_PRIORITY_RESEARCH:
+            return replace(
+                decision,
+                route=EventAlphaRoute.RESEARCH_DIGEST,
+                alertable=True,
+                lane=EventAlphaRouteLane.DAILY_DIGEST,
+                reason=decision.reason + " Quality gate capped route at validated digest.",
+                final_route_after_quality_gate=EventAlphaRoute.RESEARCH_DIGEST.value,
+                quality_gate_block_reason="opportunity_level_caps_high_priority:validated_digest",
+                warnings=tuple(dict.fromkeys((*decision.warnings, "quality_gate_capped:validated_digest"))),
+            )
+        return None
+    if level == event_opportunity_verdict.OpportunityLevel.WATCHLIST.value:
+        if requested == EventAlphaRoute.HIGH_PRIORITY_RESEARCH:
+            return replace(
+                decision,
+                route=EventAlphaRoute.RESEARCH_DIGEST,
+                alertable=True,
+                lane=EventAlphaRouteLane.DAILY_DIGEST,
+                reason=decision.reason + " Quality gate capped route at watchlist/digest.",
+                final_route_after_quality_gate=EventAlphaRoute.RESEARCH_DIGEST.value,
+                quality_gate_block_reason="opportunity_level_caps_high_priority:watchlist",
+                warnings=tuple(dict.fromkeys((*decision.warnings, "quality_gate_capped:watchlist"))),
+            )
+        return None
+    if level == event_opportunity_verdict.OpportunityLevel.HIGH_PRIORITY.value:
+        return None
+    return None
+
+
+def _quality_gate_block_reason(quality: Mapping[str, object]) -> str | None:
+    level = str(quality.get("opportunity_level") or "").strip()
+    score = _float_or_none(quality.get("opportunity_score_final"))
+    text = _quality_gate_text(quality)
+    if "source_noise" in text:
+        return "source_noise_hard_gate"
+    if "ticker_collision" in text or "word_collision" in text or "ticker_word_collision" in text:
+        return "ticker_collision_hard_gate"
+    if "publisher_source_name_not_asset_identity" in text or "identity_source_origin_rejected" in text:
+        return "publisher_source_origin_identity_rejected"
+    if str(quality.get("impact_path_type") or "") == "insufficient_data":
+        return "impact_path_type_insufficient_data"
+    if score is None or score <= 0:
+        return "opportunity_score_final_zero"
+    if str(quality.get("evidence_specificity") or "") == "insufficient_data":
+        return "evidence_specificity_insufficient_data"
+    if str(quality.get("source_class") or "") == "insufficient_data":
+        return "source_class_insufficient_data"
+    if str(quality.get("candidate_role") or "") == "unknown_with_reason":
+        return "candidate_role_unknown_with_reason"
+    if level == event_opportunity_verdict.OpportunityLevel.LOCAL_ONLY.value:
+        return str(quality.get("why_local_only") or "opportunity_level_local_only")
+    if level == event_opportunity_verdict.OpportunityLevel.EXPLORATORY.value:
+        return str(quality.get("why_not_watchlist") or "opportunity_level_exploratory")
+    if not level:
+        return "opportunity_level_missing"
+    return None
+
+
+def _quality_for_entry(entry: event_watchlist.EventWatchlistEntry) -> dict[str, object]:
+    row: dict[str, object] = {}
+    for key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS:
+        value = getattr(entry, key, None)
+        if value not in (None, "", [], {}, ()):
+            row[key] = value
+    components = dict(entry.latest_score_components or {})
+    return event_alpha_quality_fields.ensure_quality_fields(row, components=components)
+
+
+def _quality_gate_text(quality: Mapping[str, object]) -> str:
+    values: list[object] = []
+    for key in (
+        "impact_path_type",
+        "candidate_role",
+        "evidence_specificity",
+        "source_class",
+        "why_local_only",
+        "why_not_watchlist",
+        "opportunity_verdict_reasons",
+        "manual_verification_items",
+        "upgrade_requirements",
+        "downgrade_warnings",
+        "warnings",
+        "rejection_reasons",
+    ):
+        value = quality.get(key)
+        if isinstance(value, (list, tuple, set)):
+            values.extend(value)
+        else:
+            values.append(value)
+    return " ".join(str(value or "") for value in values).casefold()
+
+
 def alert_id_for_entry(entry: event_watchlist.EventWatchlistEntry) -> str:
     return f"ea:{entry.key}"
 
@@ -522,6 +678,11 @@ def _apply_route_caps(
                 reason=f"Per-key cooldown active ({cfg.per_key_cooldown_hours:g}h).",
                 lane=EventAlphaRouteLane.LOCAL_ONLY,
                 warnings=decision.warnings,
+                requested_route_before_quality_gate=decision.requested_route_before_quality_gate,
+                final_route_after_quality_gate=EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+                quality_gate_block_reason=decision.quality_gate_block_reason,
+                opportunity_level=decision.opportunity_level,
+                opportunity_score_final=decision.opportunity_score_final,
             ))
             continue
         if decision.lane == EventAlphaRouteLane.INSTANT_ESCALATION:
@@ -534,6 +695,11 @@ def _apply_route_caps(
                     reason="High-priority route cap reached for this run.",
                     lane=EventAlphaRouteLane.LOCAL_ONLY,
                     warnings=decision.warnings,
+                    requested_route_before_quality_gate=decision.requested_route_before_quality_gate,
+                    final_route_after_quality_gate=EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+                    quality_gate_block_reason=decision.quality_gate_block_reason,
+                    opportunity_level=decision.opportunity_level,
+                    opportunity_score_final=decision.opportunity_score_final,
                 ))
                 continue
         if decision.lane == EventAlphaRouteLane.DAILY_DIGEST:
@@ -550,6 +716,11 @@ def _apply_route_caps(
                         reason="Validated impact hypothesis digest cap reached for this run.",
                         lane=EventAlphaRouteLane.LOCAL_ONLY,
                         warnings=decision.warnings,
+                        requested_route_before_quality_gate=decision.requested_route_before_quality_gate,
+                        final_route_after_quality_gate=EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+                        quality_gate_block_reason=decision.quality_gate_block_reason,
+                        opportunity_level=decision.opportunity_level,
+                        opportunity_score_final=decision.opportunity_score_final,
                     ))
                     continue
             digest_seen += 1
@@ -561,6 +732,11 @@ def _apply_route_caps(
                     reason="Daily digest item cap reached for this run.",
                     lane=EventAlphaRouteLane.LOCAL_ONLY,
                     warnings=decision.warnings,
+                    requested_route_before_quality_gate=decision.requested_route_before_quality_gate,
+                    final_route_after_quality_gate=EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+                    quality_gate_block_reason=decision.quality_gate_block_reason,
+                    opportunity_level=decision.opportunity_level,
+                    opportunity_score_final=decision.opportunity_score_final,
                 ))
                 continue
         out.append(decision)
@@ -921,6 +1097,13 @@ def _decision_sort_key(decision: EventAlphaRouteDecision) -> tuple[int, int, str
     }
     entry = decision.entry
     return (rank[decision.route], -entry.highest_score, entry.symbol)
+
+
+def _float_or_none(value: object) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 _NON_FADE_RESEARCH_PLAYBOOKS = {

@@ -366,6 +366,11 @@ def build_daily_brief(
     lines.append("- Top Downgrade Risks: " + (_downgrade_risk_line(decisions) or "none"))
     lines.append("- Candidate Discovery Funnel: " + _candidate_discovery_funnel_line(hypotheses))
     lines.append("- Feedback by Impact Path: " + _feedback_by_impact_path(alerts, feedback))
+    lines.extend(["", "## Quality Gate Downgrades"])
+    downgraded = _quality_gate_downgrades(decisions)
+    lines.append("- Downgraded items: " + (_brief_decisions(downgraded[:5]) or "none"))
+    lines.append("- Top blocked route attempts: " + (_blocked_route_attempts_line(downgraded) or "none"))
+    lines.append("- Reason counts: " + _quality_gate_reason_counts(downgraded))
     exploratory = event_alpha_notifications.select_exploratory_candidates(
         decisions,
         cfg=event_alpha_notifications.EventAlphaNotificationConfig(
@@ -668,23 +673,74 @@ def _quality_decision_counts(rows: Iterable[event_alpha_router.EventAlphaRouteDe
     return _format_counts(counts)
 
 
+def _quality_gate_downgrades(
+    rows: Iterable[event_alpha_router.EventAlphaRouteDecision],
+) -> list[event_alpha_router.EventAlphaRouteDecision]:
+    return [
+        decision for decision in rows
+        if decision.quality_gate_block_reason
+        or (
+            decision.requested_route_before_quality_gate
+            and decision.final_route_after_quality_gate
+            and decision.requested_route_before_quality_gate != decision.final_route_after_quality_gate
+        )
+    ]
+
+
+def _blocked_route_attempts_line(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
+    labels: list[str] = []
+    for decision in rows:
+        labels.append(
+            f"{decision.entry.symbol}/{decision.entry.coin_id}:"
+            f"{decision.requested_route_before_quality_gate or 'unknown'}->"
+            f"{decision.final_route_after_quality_gate or decision.route.value}"
+        )
+        if len(labels) >= 5:
+            break
+    return "; ".join(labels)
+
+
+def _quality_gate_reason_counts(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
+    counts: dict[str, int] = {}
+    for decision in rows:
+        reason = str(decision.quality_gate_block_reason or "route_capped")
+        counts[reason] = counts.get(reason, 0) + 1
+    return _format_counts(counts)
+
+
 def _candidate_discovery_funnel_line(rows: Iterable[Mapping[str, Any]]) -> str:
-    generated = executed = accepted = rejected = validated = promoted = 0
+    generated = executed = raw_terms = candidate_like = accepted = rejected = validated = promoted = 0
     for row in rows:
         generated += len(row.get("generated_queries") or [])
         executed += len(row.get("executed_queries") or [])
-        accepted += len(row.get("crypto_candidate_assets") or [])
-        rejected += len(row.get("rejected_candidate_assets") or [])
+        crypto = row.get("crypto_candidate_assets") or []
+        rejects = row.get("rejected_candidate_assets") or []
+        raw_terms += len(crypto) + len(rejects)
+        candidate_like += sum(1 for item in [*crypto, *rejects] if isinstance(item, Mapping) and _candidate_like_term(item))
+        accepted += sum(1 for item in crypto if isinstance(item, Mapping) and bool(item.get("accepted", item.get("validated", False))))
+        rejected += len(rejects)
         if str(row.get("validation_stage") or "") in {"catalyst_link_validated", "impact_path_validated", "market_confirmed", "promoted_to_radar"}:
             validated += 1
         if str(row.get("opportunity_level") or "") in {"validated_digest", "watchlist", "high_priority"}:
             promoted += 1
-    if not any((generated, executed, accepted, rejected, validated, promoted)):
+    if not any((generated, executed, raw_terms, candidate_like, accepted, rejected, validated, promoted)):
         return "none"
     return (
-        f"generated={generated}, executed={executed}, accepted={accepted}, "
-        f"rejected={rejected}, validated={validated}, promoted={promoted}"
+        f"generated={generated}, executed={executed}, raw_terms_extracted={raw_terms}, "
+        f"candidate_like_terms={candidate_like}, resolver_accepted_candidates={accepted}, "
+        f"resolver_rejected_terms={rejected}, context_validated_candidates={validated}, "
+        f"promoted_candidates={promoted}"
     )
+
+
+def _candidate_like_term(item: Mapping[str, Any]) -> bool:
+    symbol = str(item.get("symbol") or "").strip()
+    coin_id = str(item.get("coin_id") or "").strip()
+    name = str(item.get("name") or item.get("project_name") or "").strip()
+    reason = str(item.get("reason") or item.get("rejection_reason") or item.get("identity_reason") or "").casefold()
+    if any(token in reason for token in ("source_noise", "publisher", "word_collision", "url_only", "generic_symbol")):
+        return False
+    return bool(symbol or coin_id or name)
 
 
 def _feedback_by_impact_path(alerts: Iterable[Mapping[str, Any]], feedback: Iterable[Mapping[str, Any]]) -> str:

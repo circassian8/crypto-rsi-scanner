@@ -74,6 +74,17 @@ def render_research_card(
     ]
     if decision is not None:
         lines.append(f"- Route: {decision.route.value} ({decision.reason})")
+        if decision.quality_gate_block_reason or decision.requested_route_before_quality_gate:
+            lines.append(
+                "- Quality gate: "
+                f"{decision.requested_route_before_quality_gate or decision.route.value} -> "
+                f"{decision.final_route_after_quality_gate or decision.route.value}"
+                + (
+                    f" ({decision.quality_gate_block_reason})"
+                    if decision.quality_gate_block_reason
+                    else " (allowed)"
+                )
+            )
     lines.extend([
         "",
         "## Artifact Lineage",
@@ -109,6 +120,8 @@ def render_research_card(
         f"- Rule playbook: {_value(entry, alert, 'latest_rule_playbook_type', 'rule_playbook_type') or 'unknown'}",
         f"- Effective playbook: {_value(entry, alert, 'latest_effective_playbook_type', 'playbook_type') or playbook}",
     ])
+    lines.extend(["", "## Quality Gate Result"])
+    lines.extend(_quality_gate_lines(entry, alert, decision))
     hypothesis_lines = _impact_hypothesis_lines(entry)
     if hypothesis_lines:
         lines.extend(["", "## Impact Hypothesis Context"])
@@ -669,6 +682,52 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     if why_not_promoted:
         lines.append("- Why not promoted diagnostics: " + "; ".join(str(item) for item in why_not_promoted[:4]))
     return lines
+
+
+def _quality_gate_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+    decision: event_alpha_router.EventAlphaRouteDecision | None,
+) -> list[str]:
+    components = dict(entry.latest_score_components if entry else {})
+    if alert is not None:
+        components.update({key: value for key, value in alert.items() if value not in (None, "", [], {})})
+    requested = (
+        getattr(decision, "requested_route_before_quality_gate", None)
+        if decision is not None
+        else components.get("requested_route_before_quality_gate")
+    ) or components.get("route") or "unknown"
+    final = (
+        getattr(decision, "final_route_after_quality_gate", None)
+        if decision is not None
+        else components.get("final_route_after_quality_gate")
+    ) or components.get("route") or "unknown"
+    block = (
+        getattr(decision, "quality_gate_block_reason", None)
+        if decision is not None
+        else components.get("quality_gate_block_reason")
+    ) or "none"
+    opportunity_level = (
+        getattr(decision, "opportunity_level", None)
+        if decision is not None
+        else components.get("opportunity_level")
+    ) or _value(entry, alert, "opportunity_level", "opportunity_level") or "unknown"
+    opportunity_score = (
+        getattr(decision, "opportunity_score_final", None)
+        if decision is not None
+        else components.get("opportunity_score_final")
+    )
+    if opportunity_score is None:
+        opportunity_score = _value(entry, alert, "opportunity_score_final", "opportunity_score_final") or "n/a"
+    allowed = str(block) == "none" and str(final) == str(requested)
+    return [
+        f"- Requested route: {requested}",
+        f"- Final route: {final}",
+        f"- Result: {'allowed' if allowed else 'blocked/downgraded'}",
+        f"- Block reason: {block}",
+        f"- Opportunity verdict: {opportunity_level} / {opportunity_score}",
+        f"- Why blocked / allowed: {block if block != 'none' else 'opportunity verdict permits the final route'}",
+    ]
 
 
 def _monitor_lines(row: event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any] | None) -> list[str]:

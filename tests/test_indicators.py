@@ -9129,6 +9129,22 @@ def test_event_alpha_alert_store_persists_validated_route_snapshots_for_inbox_fe
             "validated_asset": {"symbol": "RUNE", "coin_id": "thorchain", "name": "THORChain", "validated": True},
             "evidence_quotes": ["THORChain RUNE faces an exploit and security incident investigation."],
             "validation_reasons": ["THORChain RUNE faces an exploit and security incident investigation."],
+            "impact_path_type": "exploit_security_event",
+            "impact_path_strength": "strong",
+            "candidate_role": "direct_beneficiary",
+            "evidence_quality_score": 90,
+            "source_class": "crypto_native",
+            "evidence_specificity": "asset_and_catalyst",
+            "market_confirmation_score": 70,
+            "market_confirmation_level": "confirmed",
+            "opportunity_score_final": 88,
+            "opportunity_level": "watchlist",
+            "opportunity_verdict_reasons": ["impact_path_validated"],
+            "why_local_only": "not_local_only",
+            "why_not_watchlist": "already_watchlisted",
+            "manual_verification_items": ["verify exploit status and liquidity"],
+            "upgrade_requirements": [],
+            "downgrade_warnings": [],
         },
         material_change_reasons=("hypothesis_validated",),
         should_alert=True,
@@ -9785,6 +9801,26 @@ def test_event_alpha_router_routes_watchlist_escalations_safely():
         score=75,
         suppressed_reason=None,
     ):
+        quality = {
+            "impact_path_type": "proxy_exposure",
+            "impact_path_strength": "strong",
+            "candidate_role": "proxy_instrument",
+            "evidence_quality_score": 78,
+            "source_class": "crypto_news",
+            "evidence_specificity": "direct_value_capture",
+            "market_confirmation_score": 62,
+            "market_confirmation_level": "moderate",
+            "opportunity_score_final": score,
+            "opportunity_level": "high_priority"
+            if state in {"HIGH_PRIORITY", "ARMED", "EVENT_PASSED"}
+            else "watchlist",
+            "opportunity_verdict_reasons": ["test_quality_fixture"],
+            "why_local_only": "not_local_only",
+            "why_not_watchlist": "already_watchlisted",
+            "manual_verification_items": ["verify catalyst and market confirmation"],
+            "upgrade_requirements": [],
+            "downgrade_warnings": [],
+        }
         return event_watchlist.EventWatchlistEntry(
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
             row_type="event_watchlist_state",
@@ -9809,6 +9845,7 @@ def test_event_alpha_router_routes_watchlist_escalations_safely():
             latest_playbook_type=playbook,
             latest_playbook_score=score,
             latest_playbook_action="watchlist",
+            latest_score_components=quality,
             should_alert=should_alert,
             suppressed_reason=suppressed_reason,
         )
@@ -9980,6 +10017,24 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
         )
 
     def proxy_entry(symbol, score=72):
+        quality = {
+            "impact_path_type": "proxy_exposure",
+            "impact_path_strength": "strong",
+            "candidate_role": "proxy_instrument",
+            "evidence_quality_score": 78,
+            "source_class": "crypto_news",
+            "evidence_specificity": "direct_value_capture",
+            "market_confirmation_score": 55,
+            "market_confirmation_level": "moderate",
+            "opportunity_score_final": score,
+            "opportunity_level": "watchlist",
+            "opportunity_verdict_reasons": ["proxy_impact_path_explained"],
+            "why_local_only": "not_local_only",
+            "why_not_watchlist": "already_watchlisted",
+            "manual_verification_items": ["verify market confirmation"],
+            "upgrade_requirements": [],
+            "downgrade_warnings": [],
+        }
         return event_watchlist.EventWatchlistEntry(
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
             row_type="event_watchlist_state",
@@ -10004,6 +10059,7 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
             latest_playbook_type="proxy_attention",
             latest_playbook_score=score,
             latest_playbook_action="radar_digest",
+            latest_score_components=quality,
             should_alert=True,
         )
 
@@ -10112,6 +10168,24 @@ def test_event_alpha_router_routes_material_changes_with_lanes():
     from crypto_rsi_scanner import event_alpha_router, event_playbooks, event_watchlist
 
     def row(symbol, *, reasons=(), score_jump=0, state=None, playbook=None, should_alert=True, history=None):
+        quality = {
+            "impact_path_type": "proxy_exposure",
+            "impact_path_strength": "strong",
+            "candidate_role": "proxy_instrument",
+            "evidence_quality_score": 78,
+            "source_class": "crypto_news",
+            "evidence_specificity": "direct_value_capture",
+            "market_confirmation_score": 62,
+            "market_confirmation_level": "moderate",
+            "opportunity_score_final": 80,
+            "opportunity_level": "watchlist",
+            "opportunity_verdict_reasons": ["test_quality_fixture"],
+            "why_local_only": "not_local_only",
+            "why_not_watchlist": "already_watchlisted",
+            "manual_verification_items": ["verify catalyst and market confirmation"],
+            "upgrade_requirements": [],
+            "downgrade_warnings": [],
+        }
         return event_watchlist.EventWatchlistEntry(
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
             row_type="event_watchlist_state",
@@ -10136,6 +10210,7 @@ def test_event_alpha_router_routes_material_changes_with_lanes():
             latest_playbook_type=playbook or event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
             latest_playbook_score=80,
             latest_playbook_action="watchlist",
+            latest_score_components=quality,
             should_alert=should_alert,
             score_jump=score_jump,
             material_change_reasons=tuple(reasons),
@@ -10183,6 +10258,197 @@ def test_event_alpha_router_routes_material_changes_with_lanes():
     assert by_symbol["DUP"].route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE
     assert by_symbol["TRIG"].route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
     assert by_symbol["TRIG"].lane == event_alpha_router.EventAlphaRouteLane.TRIGGERED_FADE
+
+
+def test_event_alpha_quality_gate_dominates_router_and_artifacts():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_alert_store,
+        event_alpha_artifact_doctor,
+        event_alpha_daily_brief,
+        event_alpha_quality_review,
+        event_alpha_router,
+        event_playbooks,
+        event_research_cards,
+        event_watchlist,
+    )
+
+    def quality(level, score, *, path="proxy_exposure", role="proxy_instrument", source="crypto_news", specificity="direct_value_capture"):
+        return {
+            "impact_path_type": path,
+            "impact_path_strength": "strong" if path != "insufficient_data" else "none",
+            "candidate_role": role,
+            "evidence_quality_score": 80 if source != "insufficient_data" else 0,
+            "source_class": source,
+            "evidence_specificity": specificity,
+            "market_confirmation_score": 60 if level in {"watchlist", "high_priority"} else 35,
+            "market_confirmation_level": "moderate" if level in {"watchlist", "high_priority"} else "weak",
+            "opportunity_score_final": score,
+            "opportunity_level": level,
+            "opportunity_verdict_reasons": ["test_quality_gate"],
+            "why_local_only": "quality_gate_test_local_only" if level == "local_only" else "not_local_only",
+            "why_not_watchlist": "quality_gate_test_not_watchlist" if level in {"local_only", "exploratory", "validated_digest"} else "already_watchlisted",
+            "manual_verification_items": ["verify source, identity, market confirmation, and liquidity"],
+            "upgrade_requirements": ["needs confirmed impact path"] if level in {"local_only", "exploratory"} else [],
+            "downgrade_warnings": ["insufficient_data"] if path == "insufficient_data" else [],
+        }
+
+    def entry(symbol, *, state, playbook, q, event_name=None):
+        return event_watchlist.EventWatchlistEntry(
+            schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+            row_type="event_watchlist_state",
+            key=f"{symbol}|cluster|{playbook}",
+            cluster_id=f"cluster:{symbol}",
+            event_id=f"event:{symbol}",
+            coin_id=symbol.lower(),
+            symbol=symbol,
+            relationship_type="proxy_attention",
+            external_asset="World Cup",
+            event_time="2026-06-25T12:00:00+00:00",
+            state=state,
+            previous_state=event_watchlist.EventWatchlistState.RADAR.value,
+            first_seen_at="2026-06-25T08:00:00+00:00",
+            last_seen_at="2026-06-25T08:30:00+00:00",
+            source_count=1,
+            highest_score=85,
+            latest_score=85,
+            latest_tier="WATCHLIST" if state == event_watchlist.EventWatchlistState.WATCHLIST.value else "HIGH_PRIORITY_WATCH",
+            latest_event_name=event_name or f"{symbol} quality gate fixture",
+            latest_source="Bitcoin World" if symbol == "BTC" else "fixture",
+            latest_playbook_type=playbook,
+            latest_effective_playbook_type=playbook,
+            latest_playbook_score=85,
+            latest_playbook_action="watchlist",
+            latest_score_components=q,
+            should_alert=True,
+            material_change_reasons=("score_jump",),
+            score_jump=20,
+        )
+
+    btc = entry(
+        "BTC",
+        state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        playbook=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+        q=quality(
+            "local_only",
+            0,
+            path="insufficient_data",
+            role="unknown_with_reason",
+            source="insufficient_data",
+            specificity="insufficient_data",
+        ),
+        event_name="Polymarket World Cup Volume Surges - Bitcoin World",
+    )
+    zero = entry(
+        "ZERO",
+        state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        playbook=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+        q=quality("watchlist", 0),
+    )
+    digest = entry(
+        "DIG",
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        playbook=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+        q=quality("validated_digest", 72),
+    )
+    watch = entry(
+        "WATCH",
+        state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        playbook=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
+        q=quality("watchlist", 82),
+    )
+    high = entry(
+        "HIGH",
+        state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        playbook=event_playbooks.EventPlaybookType.PROXY_FADE.value,
+        q=quality("high_priority", 92),
+    )
+    trigger = entry(
+        "FADE",
+        state=event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+        playbook=event_playbooks.EventPlaybookType.PROXY_FADE.value,
+        q=quality("local_only", 0, path="insufficient_data"),
+    )
+
+    routed = event_alpha_router.route_watchlist(
+        event_watchlist.EventWatchlistReadResult(
+            state_path=Path("watchlist.jsonl"),
+            rows_read=6,
+            latest_only=True,
+            entries=[btc, zero, digest, watch, high, trigger],
+        ),
+        cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True, score_jump_threshold=10),
+    )
+    by_symbol = {decision.entry.symbol: decision for decision in routed.decisions}
+    assert by_symbol["BTC"].requested_route_before_quality_gate == "RESEARCH_DIGEST"
+    assert by_symbol["BTC"].final_route_after_quality_gate == "STORE_ONLY"
+    assert by_symbol["BTC"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
+    assert by_symbol["BTC"].alertable is False
+    assert by_symbol["BTC"].quality_gate_block_reason == "impact_path_type_insufficient_data"
+    assert by_symbol["ZERO"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
+    assert by_symbol["ZERO"].quality_gate_block_reason == "opportunity_score_final_zero"
+    assert by_symbol["DIG"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+    assert by_symbol["WATCH"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+    assert by_symbol["HIGH"].route == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+    assert by_symbol["FADE"].route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
+    assert by_symbol["FADE"].alertable is True
+
+    report = event_alpha_router.format_router_report(routed)
+    assert "quality gate:" in report
+    assert "requested=RESEARCH_DIGEST final=STORE_ONLY" in report
+
+    now = datetime(2026, 6, 25, 8, 31, tzinfo=timezone.utc)
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "alerts.jsonl"
+        write = event_alpha_alert_store.write_alert_snapshots(
+            [],
+            router_result=routed,
+            cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(path=out, snapshot_policy="all"),
+            now=now,
+        )
+        rows = event_alpha_alert_store.load_alert_snapshots(write.path).rows
+    btc_snapshot = next(row for row in rows if row.get("symbol") == "BTC")
+    assert btc_snapshot["requested_route_before_quality_gate"] == "RESEARCH_DIGEST"
+    assert btc_snapshot["final_route_after_quality_gate"] == "STORE_ONLY"
+    assert btc_snapshot["quality_gate_block_reason"] == "impact_path_type_insufficient_data"
+    review = event_alpha_quality_review.format_quality_review(
+        event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=rows)
+    )
+    assert "Quality Gate Conflicts" in review
+    assert "BTC" in review
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": len(rows)}],
+        alert_rows=rows,
+        include_legacy_artifacts=True,
+    )
+    assert doctor.alertable_route_conflicts_with_opportunity_level == 0
+    legacy_conflict = dict(btc_snapshot)
+    legacy_conflict["run_id"] = "r1"
+    legacy_conflict["route_alertable"] = True
+    legacy_conflict["route"] = "RESEARCH_DIGEST"
+    doctor_conflict = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": 1}],
+        alert_rows=[legacy_conflict],
+        include_legacy_artifacts=True,
+    )
+    assert doctor_conflict.alertable_route_conflicts_with_opportunity_level == 1
+    assert "alertable_route_conflicts_with_opportunity_level=1" in event_alpha_artifact_doctor.format_artifact_doctor_report(doctor_conflict)
+
+    daily = event_alpha_daily_brief.build_daily_brief(router_result=routed, watchlist_entries=[btc, zero, digest, watch, high, trigger])
+    assert "## Quality Gate Downgrades" in daily
+    assert "BTC/btc:RESEARCH_DIGEST->STORE_ONLY" in daily
+    card = event_research_cards.render_research_card(
+        "BTC",
+        watchlist_entries=[btc],
+        alert_rows=[btc_snapshot],
+        route_decisions=[by_symbol["BTC"]],
+    )
+    assert "## Quality Gate Result" in card.markdown
+    assert "Requested route: RESEARCH_DIGEST" in card.markdown
+    assert "Final route: STORE_ONLY" in card.markdown
+    assert "impact_path_type_insufficient_data" in card.markdown
 
 
 def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
@@ -12214,7 +12480,26 @@ def test_event_alpha_pipeline_routes_monitor_updates_without_new_source():
             latest_playbook_type=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
             latest_playbook_score=72,
             latest_playbook_action="watchlist",
-            latest_score_components={"derivatives_crowding": 55, "cluster_confidence": 70},
+            latest_score_components={
+                "derivatives_crowding": 55,
+                "cluster_confidence": 70,
+                "impact_path_type": "proxy_exposure",
+                "impact_path_strength": "strong",
+                "candidate_role": "proxy_instrument",
+                "evidence_quality_score": 78,
+                "source_class": "crypto_native",
+                "evidence_specificity": "asset_and_catalyst",
+                "market_confirmation_score": 65,
+                "market_confirmation_level": "confirmed",
+                "opportunity_score_final": 80,
+                "opportunity_level": "watchlist",
+                "opportunity_verdict_reasons": ["fixture_monitor_route_quality_context"],
+                "why_local_only": "not_local_only",
+                "why_not_watchlist": "already_watchlisted",
+                "manual_verification_items": ["verify source, catalyst timing, and liquidity"],
+                "upgrade_requirements": [],
+                "downgrade_warnings": [],
+            },
             should_alert=False,
             suppressed_reason="duplicate state, no escalation",
         )
@@ -20200,7 +20485,25 @@ def _test_watchlist_entry(*, state: str, symbol: str, coin_id: str):
         latest_playbook_type="proxy_attention",
         latest_effective_playbook_type="proxy_attention",
         latest_market_snapshot={},
-        latest_score_components={"cluster_confidence": 70},
+        latest_score_components={
+            "cluster_confidence": 70,
+            "impact_path_type": "proxy_exposure",
+            "impact_path_strength": "strong",
+            "candidate_role": "proxy_instrument",
+            "evidence_quality_score": 78,
+            "source_class": "crypto_native",
+            "evidence_specificity": "asset_and_catalyst",
+            "market_confirmation_score": 70,
+            "market_confirmation_level": "confirmed",
+            "opportunity_score_final": 82,
+            "opportunity_level": "watchlist",
+            "opportunity_verdict_reasons": ["fixture_watchlist_quality_context"],
+            "why_local_only": "not_local_only",
+            "why_not_watchlist": "already_watchlisted",
+            "manual_verification_items": ["verify source, catalyst timing, and liquidity"],
+            "upgrade_requirements": [],
+            "downgrade_warnings": [],
+        },
     )
 
 
