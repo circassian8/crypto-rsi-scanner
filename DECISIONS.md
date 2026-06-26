@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-26 - Fresh live-style quality proof uses an isolated namespace
+**Status:** accepted
+**Decision:** When proving Event Alpha quality/incident fixes against live-style
+inputs, use the isolated `notify_llm_quality_fresh` artifact namespace and
+`make event-alpha-quality-live-smoke PROFILE=notify_llm_quality_fresh` rather
+than interpreting older `notify_llm_quality` rows as fresh evidence. The fresh
+proof path mirrors `notify_llm_quality` quality gates and sources, uses the
+wall clock, does not pass `--event-alert-send`, clears only its own namespace,
+and then runs the daily brief, quality review, incident report, and strict
+artifact doctor.
+**Why:** Stale JSONL artifacts can predate quality lifecycle caps or incident
+subject validation. A clean namespace separates current writer behavior from
+historical leakage without rewriting old artifacts.
+**Revisit when:** Event Alpha artifacts move to a versioned research database
+with explicit migrations and current-vs-legacy row scoping.
+
 ## 2026-06-26 - Event Alpha quality verdicts cap lifecycle state
 **Status:** accepted
 **Decision:** Event Alpha watchlist lifecycle state must obey the final quality

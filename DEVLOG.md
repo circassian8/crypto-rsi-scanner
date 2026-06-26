@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Add fresh live-style quality proof target · Codex
+**Why:** The checked-in/local `notify_llm_quality` artifact namespace can contain
+older pre-fix rows, so Pro-model review needed a clean live-style proof run that
+does not rely on stale watchlist or incident artifacts.
+**Changes:**
+- Added a `notify_llm_quality_fresh` profile that mirrors `notify_llm_quality`
+  inputs and quality gates while writing to an isolated notification-burn-in
+  artifact namespace.
+- Added `make event-alpha-notify-llm-quality-fresh-cycle` and
+  `make event-alpha-quality-live-smoke PROFILE=notify_llm_quality_fresh`; the
+  target clears only the fresh namespace, runs the no-send quality cycle with
+  wall-clock time, then prints the daily brief, quality review, incident report,
+  and strict artifact doctor output.
+- Added regression coverage that the fresh profile is no-send,
+  notification-burn-in, impact-path gated, and that the Make dry-run contains no
+  `--event-alert-send`, fixture clock, or fixed research clock.
+- Updated the runbook/roadmap/decisions to treat `quality_validation` as fixture
+  proof and `notify_llm_quality_fresh` as the clean live-style proof path when
+  stale artifacts are suspected.
+**Verify:** Baseline `python3 tests/test_indicators.py` passed (459/459);
+`make event-alpha-signal-quality-eval PYTHON=python3`; `make verify
+PYTHON=python3`. Fresh `make event-alpha-quality-live-smoke
+PROFILE=notify_llm_quality_fresh PYTHON=python3` completed with
+`send_requested=false`, 186 watchlist rows, 18 quality-capped rows, 0 bad active
+watchlist rows, 155 incident rows, 0 garbage canonical incidents, and strict
+artifact doctor exit 0 with warnings only for unlinked valid incident rows. Final
+verification also ran `make event-alpha-quality-validation-cycle PYTHON=python3`
+and `make verify PYTHON=python3`.
+**Notes/risks:** Research-only proof tooling. No Telegram send was requested; no
+normal RSI rows, paper/live trades, execution, or LLM/provider-created
+`TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-26 — Harden quality lifecycle caps and incident subjects · Codex
 **Why:** Fresh `notify_llm_quality` artifacts could still show non-hypothesis
 rows as active `WATCHLIST` even when their quality verdict said

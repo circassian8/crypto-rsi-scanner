@@ -57,6 +57,7 @@ dedicated scheduled target that does **not** pass `--event-alert-send`:
 ```bash
 make event-alpha-notify-llm-quality-scheduled
 make event-alpha-notify-llm-quality-validation-cycle
+make event-alpha-quality-live-smoke PROFILE=notify_llm_quality_fresh
 make event-alpha-quality-coverage-report PROFILE=notify_llm_quality
 make event-alpha-artifact-doctor PROFILE=notify_llm_quality STRICT=1
 ```
@@ -66,10 +67,20 @@ hypothesis, watchlist, and alert-snapshot artifacts carry the canonical
 top-level quality fields. A failing coverage report means the fresh writer path
 needs patching; it is not a trading or notification promotion signal.
 Use `make event-alpha-notify-llm-quality-validation-cycle` when you need a
-fresh live-style quality namespace for Pro-model review without sending
+fresh rebuild of the regular `notify_llm_quality` namespace without sending
 Telegram messages. It clears `event_fade_cache/notify_llm_quality/`, runs the
 guarded notify cycle without a send flag, then writes/prints the daily brief,
 quality review, incident report, and strict artifact doctor output.
+
+Use `make event-alpha-quality-live-smoke
+PROFILE=notify_llm_quality_fresh` when stale `notify_llm_quality` artifacts are
+suspected. It mirrors the `notify_llm_quality` source/LLM/quality settings but
+writes to `event_fade_cache/notify_llm_quality_fresh/`, clears only that
+namespace, uses wall-clock time, does not pass a fixture clock, does not pass
+`--event-alert-send`, and then runs daily brief, quality review, incident
+report, and strict artifact doctor. Treat this as the clean live-style proof
+path for Pro-model review; `quality_validation` remains the isolated offline
+fixture proof path.
 
 Notification lanes are independent: a daily digest cooldown does not block an
 instant escalation, and instant escalation cooldown does not block a
@@ -373,6 +384,21 @@ with `make event-impact-hypotheses-report PROFILE=quality_validation`,
 `make event-opportunity-audit TARGET=<...> PROFILE=quality_validation`. The whole
 cycle is research-only: no sends, trades, paper trades, normal RSI rows, or
 `TRIGGERED_FADE`.
+
+To validate the same quality/incident invariants against live-style
+`notify_llm_quality` inputs without trusting older local rows, use the fresh
+namespace smoke:
+
+```bash
+make event-alpha-quality-live-smoke PROFILE=notify_llm_quality_fresh
+```
+
+That target writes under `event_fade_cache/notify_llm_quality_fresh/`, leaves
+Telegram sending off, uses the current wall clock, and runs the daily brief,
+quality review, incident report, and strict artifact doctor. If this fresh
+namespace is clean but older `notify_llm_quality` rows show active
+local-only watchlist rows or garbage incident subjects, treat the older rows as
+stale legacy leakage and regenerate before sharing artifacts.
 
 Use the quality-loop targets after live or fixture notification cycles to
 inspect real artifacts:

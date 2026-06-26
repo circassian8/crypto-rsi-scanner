@@ -23097,10 +23097,24 @@ def test_notify_llm_quality_profile_and_make_target_are_no_send():
     assert ctx.run_mode == "notification_burn_in"
     assert ctx.artifact_namespace == "notify_llm_quality"
     assert str(ctx.namespace_dir).endswith("notify_llm_quality")
+    fresh_profile = event_alpha_profiles.get_profile("notify_llm_quality_fresh")
+    assert fresh_profile.with_llm is True
+    assert fresh_profile.send is False
+    assert fresh_profile.notification_burn_in is True
+    assert fresh_profile.config_overrides["EVENT_ALPHA_VALIDATED_HYPOTHESIS_REQUIRE_IMPACT_PATH"] is True
+    fresh_ctx = event_alpha_artifacts.context_from_profile(
+        "notify_llm_quality_fresh",
+        base_dir=Path("/tmp/event-alpha-test"),
+    )
+    assert fresh_ctx.run_mode == "notification_burn_in"
+    assert fresh_ctx.artifact_namespace == "notify_llm_quality_fresh"
+    assert str(fresh_ctx.namespace_dir).endswith("notify_llm_quality_fresh")
 
     text = Path("Makefile").read_text(encoding="utf-8")
     assert "event-alpha-notify-llm-quality-scheduled:" in text
     assert "event-alpha-notify-llm-quality-validation-cycle:" in text
+    assert "event-alpha-notify-llm-quality-fresh-cycle:" in text
+    assert "event-alpha-quality-live-smoke:" in text
     target = text.split("\nevent-alpha-notify-llm-quality-scheduled:", 1)[1].split(
         "\nevent-alpha-provider-health-report:", 1
     )[0]
@@ -23108,6 +23122,29 @@ def test_notify_llm_quality_profile_and_make_target_are_no_send():
     assert "--event-alpha-profile $(PROFILE)" in target
     assert "--event-alert-send" not in target
     assert "EVENT_FIXTURE_NOW_ENV" not in target
+    fresh_target = text.split("\nevent-alpha-notify-llm-quality-fresh-cycle:", 1)[1].split(
+        "\nevent-alpha-quality-live-smoke:", 1
+    )[0]
+    assert "--event-alpha-notify-cycle" in fresh_target
+    assert "--event-alpha-profile $(PROFILE)" in fresh_target
+    assert "--event-alert-send" not in fresh_target
+    assert "EVENT_FIXTURE_NOW_ENV" not in fresh_target
+    assert "RSI_EVENT_RESEARCH_NOW" not in fresh_target
+
+    import subprocess
+
+    dry = subprocess.run(
+        ["make", "-n", "event-alpha-quality-live-smoke", "PROFILE=notify_llm_quality_fresh", "PYTHON=python3"],
+        cwd=Path.cwd(),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "event-alpha-notify-llm-quality-fresh-cycle" in dry.stdout
+    assert "--event-alpha-notify-cycle" in dry.stdout
+    assert "--event-alert-send" not in dry.stdout
+    assert "EVENT_FIXTURE_NOW_ENV" not in dry.stdout
+    assert "RSI_EVENT_RESEARCH_NOW" not in dry.stdout
     validation_target = text.split("\nevent-alpha-notify-llm-quality-validation-cycle:", 1)[1].split(
         "\nevent-alpha-policy-simulate:", 1
     )[0]

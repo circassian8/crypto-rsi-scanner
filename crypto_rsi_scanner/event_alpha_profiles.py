@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -614,4 +614,14 @@ _PROFILES["notify_llm_quality"] = EventAlphaProfile(
         "still requires an explicit send command plus RSI_EVENT_ALERTS_ENABLED=1"
     ),
     notification_burn_in=True,
+)
+
+_PROFILES["notify_llm_quality_fresh"] = replace(
+    _PROFILES["notify_llm_quality"],
+    name="notify_llm_quality_fresh",
+    description=(
+        "Fresh clean-namespace live-style Event Alpha quality proof run. Mirrors "
+        "notify_llm_quality inputs and quality gates, but writes to an isolated "
+        "artifact namespace for stale-artifact validation."
+    ),
 )
