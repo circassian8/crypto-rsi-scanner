@@ -21,18 +21,76 @@ from .event_resolver import clean_text
 
 INCIDENT_GRAPH_SCHEMA_VERSION = "event_incident_graph_v1"
 _GENERIC_SUBJECTS = {
+    "actions",
+    "announcements",
+    "any",
+    "any us",
     "no",
+    "non",
+    "note",
     "none",
     "unknown",
     "unclear",
     "n/a",
     "na",
+    "however",
+    "it",
+    "only",
+    "openai this",
+    "the",
+    "this",
+    "that",
     "market",
     "catalyst",
     "event",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
     "token",
     "coin",
 }
+_GENERIC_SUBJECT_TOKENS = {
+    "a",
+    "actions",
+    "an",
+    "announcements",
+    "any",
+    "coin",
+    "event",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+    "however",
+    "it",
+    "market",
+    "no",
+    "non",
+    "note",
+    "only",
+    "that",
+    "the",
+    "this",
+    "token",
+}
+_TRAILING_GENERIC_TOKENS = {"this", "that", "event", "catalyst", "market", "token", "coin", "announcement", "announcements"}
 
 
 @dataclass(frozen=True)
@@ -62,6 +120,9 @@ class CanonicalIncident:
     current_cause_status: str = event_claim_semantics.CauseStatus.UNKNOWN.value
     conflicting_claims: tuple[str, ...] = ()
     linked_assets: tuple[IncidentAssetRole, ...] = ()
+    subject_quality: str = "valid"
+    subject_quality_reason: str | None = None
+    diagnostic_only: bool = False
     warnings: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -97,7 +158,12 @@ def incident_key(event: NormalizedEvent, raws: Iterable[RawDiscoveredEvent]) -> 
     subject = infer_primary_subject(event, raws, claims=claims)
     ecosystem = infer_affected_ecosystem(event, raws)
     named = _major_named_entities(text)
-    identity = subject or (named[0] if named else None) or event.external_asset or event.event_name
+    identity = (
+        _normalized_subject(subject)
+        or (named[0] if named else None)
+        or (event.external_asset if _valid_subject(event.external_asset) else None)
+        or (event.event_name if _valid_subject(event.event_name) else None)
+    )
     key_parts = (
         _slug(identity),
         _slug(archetype),
@@ -141,23 +207,28 @@ def infer_primary_subject(
     claims: Iterable[event_claim_semantics.EventClaim] = (),
 ) -> str | None:
     for claim in claims:
-        if _valid_subject(claim.subject):
-            return claim.subject
+        candidate = _normalized_subject(claim.subject)
+        if candidate:
+            return candidate
     raws = tuple(raws)
     text = _combined_text(event, raws)
     subject = event_claim_semantics.infer_primary_subject(text)
-    if _valid_subject(subject):
+    subject = _normalized_subject(subject)
+    if subject:
         return subject
     if _is_market_anomaly_event(event, raws):
         asset = _market_anomaly_asset(event, raws)
         fallback = asset.get("symbol") or asset.get("name") or asset.get("coin_id")
-        if asset.get("identity_source") == "market_payload" and _valid_subject(str(fallback or "")):
-            return str(fallback)
+        fallback_subject = _normalized_subject(str(fallback or ""))
+        if asset.get("identity_source") == "market_payload" and fallback_subject:
+            return fallback_subject
     if event is not None:
-        if _valid_subject(event.external_asset):
-            return event.external_asset
-        if _valid_subject(event.event_name):
-            return event.event_name
+        fallback_subject = _normalized_subject(event.external_asset)
+        if fallback_subject:
+            return fallback_subject
+        fallback_subject = _normalized_subject(event.event_name)
+        if fallback_subject:
+            return fallback_subject
     return None
 
 
@@ -232,6 +303,7 @@ def _incident_from_group(
     last_updated = max((raw.fetched_at for raw in raws), default=first_seen)
     first_event = events[0]
     primary_subject = infer_primary_subject(first_event, raws, claims=claims)
+    subject_quality, subject_quality_reason, diagnostic_only = _subject_quality(primary_subject, first_event, raws)
     ecosystem = infer_affected_ecosystem(first_event, raws)
     archetype = event_archetype(first_event, raws, claims=claims)
     domains = _independent_domains(raws)
@@ -241,6 +313,8 @@ def _incident_from_group(
     name = _canonical_name(primary_subject, archetype, ecosystem, event=first_event, raws=raws)
     linked_assets = _incident_linked_assets(first_event, raws, archetype)
     warnings = _incident_warnings_for_group(first_event, raws, archetype, primary_subject)
+    if subject_quality != "valid":
+        warnings = tuple(dict.fromkeys((*warnings, f"incident_primary_subject_{subject_quality}")))
     digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
     return CanonicalIncident(
         schema_version=INCIDENT_GRAPH_SCHEMA_VERSION,
@@ -259,6 +333,9 @@ def _incident_from_group(
         current_cause_status=status,
         conflicting_claims=conflicts,
         linked_assets=linked_assets,
+        subject_quality=subject_quality,
+        subject_quality_reason=subject_quality_reason,
+        diagnostic_only=diagnostic_only,
         warnings=warnings,
     )
 
@@ -289,8 +366,8 @@ def _major_named_entities(text: str) -> tuple[str, ...]:
     names = re.findall(r"\b([A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*){0,3})\b", str(text or ""))
     out: list[str] = []
     for name in names:
-        cleaned = name.strip()
-        if clean_text(cleaned) in {"the", "a", "an", "bitcoin world", "crypto news", *_GENERIC_SUBJECTS}:
+        cleaned = _normalized_subject(name)
+        if not cleaned:
             continue
         if cleaned not in out:
             out.append(cleaned)
@@ -365,8 +442,47 @@ def _slug(value: str | None) -> str:
 
 
 def _valid_subject(value: str | None) -> bool:
-    cleaned = clean_text(value or "")
-    return bool(cleaned and cleaned not in _GENERIC_SUBJECTS)
+    return _normalized_subject(value) is not None
+
+
+def _normalized_subject(value: str | None) -> str | None:
+    text = re.sub(r"\s+", " ", str(value or "").strip(" -:.,;|"))
+    if not text:
+        return None
+    text = re.sub(r"^(The|A|An)\s+", "", text).strip()
+    parts = text.split()
+    while parts and clean_text(parts[0]) in {"the", "a", "an"}:
+        parts.pop(0)
+    while parts and clean_text(parts[-1]) in _TRAILING_GENERIC_TOKENS:
+        parts.pop()
+    text = " ".join(parts).strip(" -:.,;|")
+    cleaned = clean_text(text)
+    if not cleaned or cleaned in {"bitcoin world", "crypto news", *_GENERIC_SUBJECTS}:
+        return None
+    tokens = cleaned.split()
+    if all(token in _GENERIC_SUBJECT_TOKENS for token in tokens):
+        return None
+    if len(tokens) == 1 and tokens[0] in _GENERIC_SUBJECT_TOKENS:
+        return None
+    if len(text) < 3 and not text.isupper():
+        return None
+    return text or None
+
+
+def _subject_quality(
+    subject: str | None,
+    event: NormalizedEvent | None,
+    raws: tuple[RawDiscoveredEvent, ...],
+) -> tuple[str, str | None, bool]:
+    if _normalized_subject(subject):
+        return "valid", "validated_primary_subject", False
+    if _is_market_anomaly_event(event, raws):
+        asset = _market_anomaly_asset(event, raws)
+        if asset.get("identity_source") == "market_payload":
+            return "fallback_used", "validated_market_anomaly_asset", False
+    if event is not None and (_normalized_subject(event.external_asset) or _normalized_subject(event.event_name)):
+        return "fallback_used", "validated_event_entity", False
+    return "invalid", "generic_or_missing_primary_subject", True
 
 
 def _is_market_anomaly_event(event: NormalizedEvent | None, raws: tuple[RawDiscoveredEvent, ...]) -> bool:

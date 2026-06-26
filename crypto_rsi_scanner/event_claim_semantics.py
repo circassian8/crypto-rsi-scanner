@@ -85,18 +85,44 @@ _ABSENCE_OF_VALIDATED_CATALYST_PHRASES = (
     "no independent catalyst",
 )
 _GENERIC_SUBJECTS = {
+    "actions",
+    "announcements",
+    "any",
+    "any us",
     "no",
+    "non",
+    "note",
     "none",
     "unknown",
     "unclear",
     "n/a",
     "na",
+    "however",
+    "it",
+    "only",
+    "openai this",
+    "the",
+    "this",
+    "that",
     "market",
     "catalyst",
     "event",
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
     "token",
     "coin",
 }
+_TRAILING_GENERIC_TOKENS = {"this", "that", "event", "catalyst", "market", "token", "coin", "announcement", "announcements"}
 
 
 def extract_event_claims(raw_events: Iterable[RawDiscoveredEvent]) -> tuple[EventClaim, ...]:
@@ -360,15 +386,30 @@ def _sentences(text: str) -> list[str]:
 
 
 def _clean_subject(value: str | None) -> str | None:
-    text = str(value or "").strip(" -:.,")
+    text = re.sub(r"\s+", " ", str(value or "").strip(" -:.,;|"))
     if not text:
         return None
-    lowered = text.casefold()
+    text = re.sub(r"^(The|A|An)\s+", "", text).strip()
+    parts = text.split()
+    while parts and clean_text(parts[-1]) in _TRAILING_GENERIC_TOKENS:
+        parts.pop()
+    text = " ".join(parts).strip(" -:.,;|")
+    lowered = clean_text(text)
     stop = {
         "the",
         "a",
         "an",
+        "actions",
+        "announcements",
+        "any",
+        "however",
+        "it",
         "meme",
+        "non",
+        "note",
+        "only",
+        "this",
+        "that",
         "token",
         "protocol",
         "team",
@@ -379,7 +420,6 @@ def _clean_subject(value: str | None) -> str | None:
     }
     if lowered in stop or lowered in _GENERIC_SUBJECTS:
         return None
-    text = re.sub(r"^(The|A|An)\s+", "", text).strip()
-    if text.casefold() in _GENERIC_SUBJECTS:
+    if clean_text(text) in _GENERIC_SUBJECTS:
         return None
     return text or None

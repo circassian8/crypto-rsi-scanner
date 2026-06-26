@@ -354,7 +354,7 @@ def quality_cap_watchlist_state(
     raw_quality = dict(quality_bundle or {})
     quality = event_alpha_quality_fields.ensure_quality_fields(raw_quality)
     level = str(quality.get("opportunity_level") or "").strip()
-    score = _optional_float(raw_quality.get("opportunity_score_final"))
+    score = _optional_float(quality.get("opportunity_score_final"))
     impact = str(quality.get("impact_path_type") or "").strip()
     evidence = str(quality.get("evidence_specificity") or "").strip()
     source = str(quality.get("source_class") or "").strip()
@@ -434,7 +434,8 @@ def _entry_from_alert(
     requested_state = _state_from_alert(alert, observed, cfg)
     has_quality = event_alpha_quality_fields.has_any_quality_field(alert.score_components)
     quality = event_alpha_quality_fields.ensure_quality_fields({}, components=alert.score_components)
-    final_state, quality_state_block = quality_cap_watchlist_state(requested_state, alert.score_components if has_quality else {})
+    score_components = {**dict(alert.score_components), **quality} if has_quality else dict(alert.score_components)
+    final_state, quality_state_block = quality_cap_watchlist_state(requested_state, score_components if has_quality else {})
     state = EventWatchlistState(final_state)
     previous_state = prior.state if prior else None
     rank = _state_rank(state)
@@ -582,7 +583,7 @@ def _entry_from_alert(
         latest_llm_asset_role=alert.llm_asset_role,
         latest_llm_confidence=alert.llm_confidence,
         latest_market_snapshot=_market_snapshot(alert),
-        latest_score_components=dict(alert.score_components),
+        latest_score_components=score_components,
         impact_path_type=_optional_str(quality.get("impact_path_type")),
         impact_path_strength=_optional_str(quality.get("impact_path_strength")),
         candidate_role=_optional_str(quality.get("candidate_role")),
@@ -698,11 +699,12 @@ def _entry_from_hypothesis(
         "why_not_watchlist": _optional_str(getattr(hypothesis, "why_not_watchlist", None)),
         "manual_verification_items": list(getattr(hypothesis, "manual_verification_items", ()) or ())[:8],
     }
-    has_hypothesis_quality = event_alpha_quality_fields.has_any_quality_field(hypothesis_quality_components)
     hypothesis_quality = event_alpha_quality_fields.ensure_quality_fields(
         {},
         components=hypothesis_quality_components,
     )
+    has_hypothesis_quality = event_alpha_quality_fields.has_any_quality_field(hypothesis_quality_components)
+    hypothesis_quality_components = {**hypothesis_quality_components, **hypothesis_quality} if has_hypothesis_quality else hypothesis_quality_components
     final_state, quality_state_block = quality_cap_watchlist_state(
         requested_state,
         hypothesis_quality_components if has_hypothesis_quality else {},
@@ -1320,7 +1322,6 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
         first_seen = str(row.get("first_seen_at") or row.get("last_seen_at") or "")
         last_seen = str(row.get("last_seen_at") or first_seen)
         components = dict(row.get("latest_score_components") or {})
-        has_quality = event_alpha_quality_fields.has_any_quality_field(row, components_key="latest_score_components")
         quality = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
         raw_quality = {
             **components,
@@ -1330,6 +1331,7 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
                 if row.get(key) not in (None, "", [], {}, ())
             },
         }
+        has_quality = event_alpha_quality_fields.has_any_quality_field(raw_quality)
         computed_final, computed_block = quality_cap_watchlist_state(
             requested_state,
             raw_quality if has_quality else {},
@@ -1580,6 +1582,12 @@ def _quality_state_block_reason(
         return "impact_path_type_insufficient_data"
     if score is not None and score <= 0:
         return "opportunity_score_final_zero"
+    if role == "unknown_with_reason":
+        return "candidate_role_unknown_with_reason"
+    if source == "insufficient_data":
+        return "source_class_insufficient_data"
+    if evidence == "insufficient_data":
+        return "evidence_specificity_insufficient_data"
     if "source_noise" in text:
         return "source_noise_hard_gate"
     if "ticker_collision" in text or "word_collision" in text or "ticker_word_collision" in text:

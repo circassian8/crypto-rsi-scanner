@@ -44,6 +44,10 @@ class EventAlphaArtifactDoctorResult:
     alert_rows_missing_final_route: int = 0
     fresh_alert_rows_missing_final_route: int = 0
     watchlist_state_conflicts_with_quality: int = 0
+    universal_watchlist_state_conflicts: int = 0
+    non_hypothesis_watchlist_quality_conflicts: int = 0
+    hypothesis_watchlist_quality_conflicts: int = 0
+    quality_capped_watchlist_rows: int = 0
     active_watchlist_rows_quality_capped: int = 0
     fresh_watchlist_state_conflict_rows: int = 0
     legacy_watchlist_conflicts: int = 0
@@ -52,6 +56,8 @@ class EventAlphaArtifactDoctorResult:
     alert_hypothesis_rows_missing_incident_id: int = 0
     incident_rows_without_linked_hypotheses: int = 0
     incident_rows_without_linked_watchlist: int = 0
+    diagnostic_incident_rows: int = 0
+    invalid_canonical_incident_rows: int = 0
     fresh_incident_linkage_blockers: int = 0
     legacy_incident_linkage_warnings: int = 0
     strict_legacy: bool = False
@@ -295,6 +301,16 @@ def diagnose_artifacts(
         warnings.append(
             f"active_watchlist_rows_quality_capped={watchlist_conflicts['active_watchlist_rows_quality_capped']}"
         )
+    if watchlist_conflicts["non_hypothesis_watchlist_quality_conflicts"]:
+        warnings.append(
+            "non_hypothesis_watchlist_quality_conflicts="
+            f"{watchlist_conflicts['non_hypothesis_watchlist_quality_conflicts']}"
+        )
+    if watchlist_conflicts["hypothesis_watchlist_quality_conflicts"]:
+        warnings.append(
+            "hypothesis_watchlist_quality_conflicts="
+            f"{watchlist_conflicts['hypothesis_watchlist_quality_conflicts']}"
+        )
     if watchlist_conflicts["watchlist_state_conflicts_with_quality"]:
         warnings.append(
             f"watchlist_state_conflicts_with_quality={watchlist_conflicts['watchlist_state_conflicts_with_quality']}"
@@ -331,6 +347,11 @@ def diagnose_artifacts(
         warnings.append(
             f"incident_rows_without_linked_watchlist={incident_linkage['incident_rows_without_linked_watchlist']}"
         )
+    if incident_linkage["diagnostic_incident_rows"]:
+        warnings.append(f"diagnostic_incident_rows={incident_linkage['diagnostic_incident_rows']}")
+    if incident_linkage["invalid_canonical_incident_rows"]:
+        message = f"invalid_canonical_incident_rows={incident_linkage['invalid_canonical_incident_rows']}"
+        (blockers if strict else warnings).append(message)
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
     return EventAlphaArtifactDoctorResult(
         status=status,
@@ -368,6 +389,10 @@ def diagnose_artifacts(
         alert_rows_missing_final_route=missing_final_route,
         fresh_alert_rows_missing_final_route=fresh_missing_final_route,
         watchlist_state_conflicts_with_quality=watchlist_conflicts["watchlist_state_conflicts_with_quality"],
+        universal_watchlist_state_conflicts=watchlist_conflicts["universal_watchlist_state_conflicts"],
+        non_hypothesis_watchlist_quality_conflicts=watchlist_conflicts["non_hypothesis_watchlist_quality_conflicts"],
+        hypothesis_watchlist_quality_conflicts=watchlist_conflicts["hypothesis_watchlist_quality_conflicts"],
+        quality_capped_watchlist_rows=watchlist_conflicts["quality_capped_watchlist_rows"],
         active_watchlist_rows_quality_capped=watchlist_conflicts["active_watchlist_rows_quality_capped"],
         fresh_watchlist_state_conflict_rows=watchlist_conflicts["fresh_uncapped"],
         legacy_watchlist_conflicts=watchlist_conflicts["legacy"],
@@ -376,6 +401,8 @@ def diagnose_artifacts(
         alert_hypothesis_rows_missing_incident_id=incident_linkage["alert_hypothesis_rows_missing_incident_id"],
         incident_rows_without_linked_hypotheses=incident_linkage["incident_rows_without_linked_hypotheses"],
         incident_rows_without_linked_watchlist=incident_linkage["incident_rows_without_linked_watchlist"],
+        diagnostic_incident_rows=incident_linkage["diagnostic_incident_rows"],
+        invalid_canonical_incident_rows=incident_linkage["invalid_canonical_incident_rows"],
         fresh_incident_linkage_blockers=(
             incident_linkage["fresh_missing_hypotheses"]
             + incident_linkage["fresh_missing_watchlist"]
@@ -532,6 +559,10 @@ def _row_has_alertable_quality_conflict(row: Mapping[str, Any]) -> bool:
 def _watchlist_quality_state_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     out = {
         "watchlist_state_conflicts_with_quality": 0,
+        "universal_watchlist_state_conflicts": 0,
+        "non_hypothesis_watchlist_quality_conflicts": 0,
+        "hypothesis_watchlist_quality_conflicts": 0,
+        "quality_capped_watchlist_rows": 0,
         "active_watchlist_rows_quality_capped": 0,
         "fresh_uncapped": 0,
         "legacy": 0,
@@ -551,12 +582,19 @@ def _watchlist_quality_state_conflicts(rows: Iterable[Mapping[str, Any]]) -> dic
             event_watchlist.EventWatchlistState.EVENT_PASSED.value,
             event_watchlist.EventWatchlistState.ARMED.value,
         }
-        capped = event_watchlist.state_is_quality_capped(row)
+        persisted_capped = row.get("state_quality_capped") is True
+        capped = persisted_capped and not final_active
         has_conflict = _row_has_watchlist_quality_conflict(row)
         if capped and requested_active:
+            out["quality_capped_watchlist_rows"] += 1
             out["active_watchlist_rows_quality_capped"] += 1
         if has_conflict:
             out["watchlist_state_conflicts_with_quality"] += 1
+            out["universal_watchlist_state_conflicts"] += 1
+            if _is_hypothesis_watchlist_row(row):
+                out["hypothesis_watchlist_quality_conflicts"] += 1
+            else:
+                out["non_hypothesis_watchlist_quality_conflicts"] += 1
             if event_alpha_artifacts.is_legacy_row(row):
                 out["legacy"] += 1
             elif not capped or final_active:
@@ -582,6 +620,10 @@ def _row_has_watchlist_quality_conflict(row: Mapping[str, Any]) -> bool:
         return True
     if str(data.get("impact_path_type") or "") == "insufficient_data":
         return True
+    if str(data.get("candidate_role") or "") == "unknown_with_reason":
+        return True
+    if str(data.get("source_class") or "") == "insufficient_data":
+        return True
     if str(data.get("evidence_specificity") or "") == "insufficient_data":
         return True
     try:
@@ -589,6 +631,11 @@ def _row_has_watchlist_quality_conflict(row: Mapping[str, Any]) -> bool:
     except (TypeError, ValueError):
         score = 0.0
     return score <= 0.0
+
+
+def _is_hypothesis_watchlist_row(row: Mapping[str, Any]) -> bool:
+    components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
+    return bool(row.get("hypothesis_id") or components.get("hypothesis_id") or str(row.get("relationship_type") or "") == "impact_hypothesis")
 
 
 def _incident_linkage_summary(
@@ -610,6 +657,8 @@ def _incident_linkage_summary(
         "legacy_missing_hypotheses": 0,
         "legacy_missing_watchlist": 0,
         "legacy_missing_alerts": 0,
+        "diagnostic_incident_rows": 0,
+        "invalid_canonical_incident_rows": 0,
     }
     for row in hypotheses:
         if dict(row).get("row_type") not in {"event_impact_hypothesis", ""}:
@@ -646,6 +695,13 @@ def _incident_linkage_summary(
     for row in incidents:
         if dict(row).get("row_type") != "event_incident":
             continue
+        subject_quality = str(row.get("incident_subject_quality") or "").strip()
+        diagnostic = row.get("diagnostic_only") is True
+        if diagnostic:
+            out["diagnostic_incident_rows"] += 1
+            continue
+        elif subject_quality in {"invalid", "diagnostic_only"}:
+            out["invalid_canonical_incident_rows"] += 1
         if not row.get("linked_hypothesis_ids"):
             out["incident_rows_without_linked_hypotheses"] += 1
         if not row.get("linked_watchlist_keys"):
@@ -768,6 +824,10 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         (
             "watchlist quality conflicts: "
             f"watchlist_state_conflicts_with_quality={result.watchlist_state_conflicts_with_quality} "
+            f"universal={result.universal_watchlist_state_conflicts} "
+            f"non_hypothesis={result.non_hypothesis_watchlist_quality_conflicts} "
+            f"hypothesis={result.hypothesis_watchlist_quality_conflicts} "
+            f"quality_capped={result.quality_capped_watchlist_rows} "
             f"active_watchlist_rows_quality_capped={result.active_watchlist_rows_quality_capped} "
             f"fresh_watchlist_state_conflict_rows={result.fresh_watchlist_state_conflict_rows} "
             f"legacy_watchlist_conflicts={result.legacy_watchlist_conflicts}"
@@ -779,6 +839,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"alert_hypothesis_rows_missing_incident_id={result.alert_hypothesis_rows_missing_incident_id} "
             f"incident_rows_without_linked_hypotheses={result.incident_rows_without_linked_hypotheses} "
             f"incident_rows_without_linked_watchlist={result.incident_rows_without_linked_watchlist} "
+            f"diagnostic_incident_rows={result.diagnostic_incident_rows} "
+            f"invalid_canonical_incident_rows={result.invalid_canonical_incident_rows} "
             f"fresh_blockers={result.fresh_incident_linkage_blockers} "
             f"legacy_warnings={result.legacy_incident_linkage_warnings}"
         ),

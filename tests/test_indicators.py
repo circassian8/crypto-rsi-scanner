@@ -10393,6 +10393,7 @@ def test_event_alpha_router_routes_material_changes_with_lanes():
 
 def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     import tempfile
+    from dataclasses import asdict
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import (
@@ -10478,6 +10479,9 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert verdict.score_components and verdict.score_components["market_confirmation"] > 0
 
     def entry(symbol, *, state, playbook, q, event_name=None):
+        requested_state = state
+        final_state, block_reason = event_watchlist.quality_cap_watchlist_state(requested_state, q)
+        capped = bool(block_reason and final_state != requested_state)
         return event_watchlist.EventWatchlistEntry(
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
             row_type="event_watchlist_state",
@@ -10489,8 +10493,12 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
             relationship_type="proxy_attention",
             external_asset="World Cup",
             event_time="2026-06-25T12:00:00+00:00",
-            state=state,
+            state=final_state,
             previous_state=event_watchlist.EventWatchlistState.RADAR.value,
+            requested_state_before_quality_gate=requested_state,
+            final_state_after_quality_gate=final_state,
+            state_quality_capped=capped,
+            quality_state_block_reason=block_reason,
             first_seen_at="2026-06-25T08:00:00+00:00",
             last_seen_at="2026-06-25T08:30:00+00:00",
             source_count=1,
@@ -10652,7 +10660,24 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     )
     assert doctor.alertable_route_conflicts_with_opportunity_level == 0
     assert doctor.active_watchlist_rows_quality_capped >= 1
+    assert doctor.universal_watchlist_state_conflicts >= 1
+    assert doctor.non_hypothesis_watchlist_quality_conflicts >= 1
+    assert doctor.quality_capped_watchlist_rows >= 1
     assert doctor.fresh_watchlist_state_conflict_rows == 0
+    uncapped_watchlist_conflict = asdict(btc)
+    uncapped_watchlist_conflict["state"] = "WATCHLIST"
+    uncapped_watchlist_conflict["final_state_after_quality_gate"] = "WATCHLIST"
+    uncapped_watchlist_conflict["state_quality_capped"] = False
+    uncapped_watchlist_conflict["run_mode"] = "burn_in"
+    uncapped_watchlist_conflict["artifact_namespace"] = "notify_llm_quality"
+    doctor_uncapped_watchlist = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{"run_id": "r1", "alertable": 0}],
+        watchlist_rows=[uncapped_watchlist_conflict],
+        include_legacy_artifacts=True,
+        strict=True,
+    )
+    assert doctor_uncapped_watchlist.status == "BLOCKED"
+    assert doctor_uncapped_watchlist.fresh_watchlist_state_conflict_rows == 1
     legacy_conflict = dict(btc_snapshot)
     legacy_conflict["run_id"] = "r1"
     legacy_conflict["route_alertable"] = True
@@ -21904,6 +21929,53 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     assert missing_incident.primary_subject not in {"No", "SECTOR"}
     assert "market_anomaly_missing_validated_asset" in missing_incident.warnings
 
+    prose_fragment_raw = raw(
+        "prose_fragment",
+        "Actions Announcements However",
+        "However, it notes only announcements and no token-specific incident details.",
+        url="https://fragment.example/actions",
+    )
+    prose_fragment_event = NormalizedEvent(
+        "evt_prose_fragment",
+        ("prose_fragment",),
+        "Actions Announcements However",
+        "news",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (prose_fragment_raw.source_url,),
+        None,
+        prose_fragment_raw.body,
+        0.40,
+    )
+    prose_fragment_incident = event_incident_graph.build_incidents(
+        (prose_fragment_event,),
+        {"prose_fragment": prose_fragment_raw},
+    )[0]
+    assert prose_fragment_incident.primary_subject is None
+    assert prose_fragment_incident.subject_quality == "invalid"
+    assert prose_fragment_incident.diagnostic_only is True
+    assert "incident_primary_subject_invalid" in prose_fragment_incident.warnings
+    assert event_claim_semantics.infer_primary_subject("OpenAI This suffered outage reports.") == "OpenAI"
+    with tempfile.TemporaryDirectory() as diag_tmp:
+        diag_write = event_incident_store.write_incidents(
+            EventDiscoveryResult((prose_fragment_raw,), (prose_fragment_event,), (), (), ()),
+            hypotheses=[],
+            watchlist_rows=[],
+            cfg=event_incident_store.EventIncidentStoreConfig(path=Path(diag_tmp) / "diagnostic_incidents.jsonl"),
+            now=now,
+            run_id="run-diagnostic-incident",
+            profile="fixture",
+            run_mode="test",
+            artifact_namespace="fixture",
+        )
+        diag_loaded = event_incident_store.load_incidents(diag_write.path)
+        assert diag_loaded.rows[0]["diagnostic_only"] is True
+        diag_report = event_incident_store.format_incidents_report(diag_loaded)
+        assert "diagnostic_rows_hidden: 1" in diag_report
+        assert "Actions Announcements However" not in diag_report
+
     secondfi_a = raw(
         "secondfi_a",
         "SecondFi loses $2.4m in Cardano wallet exploit",
@@ -22429,9 +22501,12 @@ def test_event_watchlist_validated_hypothesis_market_confirmation_promotes_state
         playbook_hint="proxy_attention",
         external_asset="SpaceX",
         opportunity_level="watchlist",
+        opportunity_score_final=82,
         market_confirmation_level="moderate",
         market_confirmation_score=62,
         evidence_quality_score=78,
+        source_class="crypto_news",
+        evidence_specificity="direct_value_capture",
         impact_path_type="proxy_exposure",
         impact_path_strength="strong",
         candidate_role="proxy_venue",

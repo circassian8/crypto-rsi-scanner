@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Harden quality lifecycle caps and incident subjects · Codex
+**Why:** Fresh `notify_llm_quality` artifacts could still show non-hypothesis
+rows as active `WATCHLIST` even when their quality verdict said
+`local_only`/insufficient data, and canonical incidents could use prose
+fragments such as `Actions` or `However` as primary subjects.
+**Changes:**
+- Extended watchlist lifecycle caps to block active states when quality fields
+  show `candidate_role=unknown_with_reason`, `source_class=insufficient_data`,
+  `evidence_specificity=insufficient_data`, zero final score, or insufficient
+  impact path.
+- Hardened artifact doctor counters for universal, hypothesis, non-hypothesis,
+  safely capped, uncapped, legacy, diagnostic, and invalid incident conflicts.
+- Tightened claim/incident subject validation so generic prose fragments are
+  rejected; invalid canonical incidents are stored as diagnostic-only unless
+  linked to real hypothesis/watchlist context, and hidden from default incident
+  reports.
+- Expanded regression coverage for capped non-hypothesis rows, fresh uncapped
+  watchlist conflicts, diagnostic incident rows, and subject cleanup such as
+  `OpenAI This` -> `OpenAI`.
+**Verify:** `python3 tests/test_indicators.py` passed (459/459);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-quality-validation-cycle PYTHON=python3`;
+`make verify PYTHON=python3`. Manual `notify_llm_quality` quality review,
+daily brief, strict artifact doctor, inbox, and incident report smoke commands
+completed; strict doctor had no blockers.
+**Notes/risks:** Research-only artifact hygiene. No normal RSI rows, paper/live
+trades, execution, Telegram-send promotion, or LLM/provider-created
+`TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-26 — Finish incident-spine quality artifacts · Codex
 **Why:** `notify_llm_quality` needed a no-send validation path that writes the
 same canonical incident artifacts as the clean fixture namespace, and strict

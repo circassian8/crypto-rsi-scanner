@@ -114,6 +114,14 @@ carry the final signal-quality layer: `market_confirmation_score` /
 `why_local_only`, `why_not_watchlist`, and `manual_verification_items`. These
 fields are review/routing metadata only; they do not create trades, paper rows,
 normal RSI alerts, or `TRIGGERED_FADE`.
+The same quality verdict is authoritative for lifecycle state. Rows with
+`local_only`/`exploratory`, zero final score, `impact_path_type=insufficient_data`,
+`candidate_role=unknown_with_reason`, `source_class=insufficient_data`, or
+`evidence_specificity=insufficient_data` must not appear as active
+`WATCHLIST`/`HIGH_PRIORITY` opportunities unless the row also persists an
+explicit non-active `final_state_after_quality_gate`, `state_quality_capped=true`,
+and `quality_state_block_reason`. Treat `state` as final quality-capped state on
+fresh rows; requested pre-quality state is audit-only.
 Impact review now also includes claim and incident context. Check
 `cause_status`, `claim_polarities`, `claim_history`, `primary_subject`,
 `affected_ecosystem`, `candidate_role`, `role_confidence`, and
@@ -132,6 +140,11 @@ No-catalyst phrases such as “no dated external catalyst has been validated,”
 “no clear trigger,” or “without a known cause” are absence-of-evidence /
 unknown-cause metadata. They should never produce `primary_subject=No` or a
 confirmed `explains_market_move` claim.
+Generic prose fragments such as `Actions`, `Announcements`, `However`, `It`,
+`Non`, `Note`, and `Only` are not valid incident subjects. When no validated
+external entity, crypto asset, market-anomaly asset, or event entity is
+available, the incident row should be diagnostic-only and hidden from default
+incident reports rather than shown as a canonical opportunity.
 
 Canonical incidents are persisted separately from hypotheses under the active
 profile namespace:
@@ -153,6 +166,9 @@ creating duplicate watchlist rows, and that ruled-out/unknown causes stayed
 local-only. For market anomalies, verify that canonical names are asset-specific
 (`SOL market anomaly`, `USDT market anomaly`) and that the report separates
 `reaction_observed` from causal confirmation.
+Default incident reports hide diagnostic-only invalid-subject rows but still
+count them, so a rising diagnostic count means the source cleaner/entity guard
+needs review before treating those rows as real incidents.
 The linked-asset roles should show the validated anomaly asset from the market
 payload as `direct_subject`. Sector rows such as `SECTOR`, source context, or
 generic unknown-market text are context only and must not be treated as direct

@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-26 - Event Alpha quality verdicts cap lifecycle state
+**Status:** accepted
+**Decision:** Event Alpha watchlist lifecycle state must obey the final quality
+verdict, not only router/notification gates. Fresh rows with
+`opportunity_level=local_only` or `exploratory`, `opportunity_score_final <= 0`,
+`impact_path_type=insufficient_data`, `candidate_role=unknown_with_reason`,
+`source_class=insufficient_data`, or `evidence_specificity=insufficient_data`
+must not persist as active `WATCHLIST`, `HIGH_PRIORITY`, `EVENT_PASSED`, or
+`ARMED` unless they explicitly persist a non-active
+`final_state_after_quality_gate` plus `state_quality_capped=true`. Generic prose
+fragments are not valid canonical incident subjects; invalid incident rows are
+diagnostic-only unless linked to real hypothesis/watchlist context. These rules
+are artifact truth and operator-UX rules only, and cannot create candidates,
+normal RSI alerts, paper rows, trades, or `TRIGGERED_FADE`.
+**Why:** Operator reports should not show local-only or insufficient-data
+evidence as active opportunities merely because an older playbook/watchlist path
+requested a stronger state. Likewise, incident reports need real entities, not
+capitalized boilerplate fragments.
+**Revisit when:** A typed research database replaces JSONL artifacts and enforces
+equivalent final-state and incident-subject constraints at schema/write time.
+
 ## 2026-06-26 - Canonical incident id is the Event Alpha spine
 **Status:** accepted
 **Decision:** For Event Alpha impact-hypothesis artifacts, the canonical

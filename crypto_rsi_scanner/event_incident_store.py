@@ -172,6 +172,8 @@ def load_incidents(
 
 def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     """Return an operator-readable incident artifact report."""
+    display_rows = [row for row in result.rows if not bool(row.get("diagnostic_only"))]
+    diagnostic_rows = [row for row in result.rows if bool(row.get("diagnostic_only"))]
     rows = [
         "=" * 76,
         "EVENT INCIDENTS REPORT (research artifact only)",
@@ -183,28 +185,30 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
         f"latest_run_rows_available: {result.latest_run_rows_available}",
         f"historical_rows_available: {result.historical_rows_available}",
         f"legacy_rows_available: {result.legacy_rows_available}",
+        f"diagnostic_rows_hidden: {len(diagnostic_rows)}",
         "filters: " + _format_filter_summary(result.filters),
     ]
-    if not result.rows:
+    if not display_rows:
         rows.extend(["", "No stored incidents matched the current report filters."])
         return "\n".join(rows)
 
-    rows.append("event_archetypes: " + _format_counts(_counts(result.rows, "event_archetype")))
-    rows.append("cause_statuses: " + _format_counts(_counts(result.rows, "current_cause_status")))
-    rows.append("primary_subjects: " + _format_counts(_counts(result.rows, "primary_subject")))
-    rows.append("asset_roles: " + _format_counts(_asset_role_counts(result.rows)))
-    rows.append(f"conflicting_claim_incidents: {sum(1 for row in result.rows if row.get('conflicting_claims'))}")
-    rows.append(f"absence_of_validated_catalyst_claims: {_absence_claim_count(result.rows)}")
-    rows.append(f"multiple_source_updates: {sum(1 for row in result.rows if int(row.get('source_update_count') or 0) > 1)}")
-    rows.append(f"linked_to_hypotheses: {sum(1 for row in result.rows if row.get('linked_hypothesis_ids'))}")
-    rows.append(f"linked_to_watchlist: {sum(1 for row in result.rows if row.get('linked_watchlist_keys'))}")
-    rows.append(f"incident_linked_hypotheses_count: {sum(len(row.get('linked_hypothesis_ids') or ()) for row in result.rows)}")
-    rows.append(f"incident_linked_watchlist_count: {sum(len(row.get('linked_watchlist_keys') or ()) for row in result.rows)}")
-    rows.append("material_update_reasons: " + _format_counts(_material_reason_counts(result.rows)))
+    rows.append("event_archetypes: " + _format_counts(_counts(display_rows, "event_archetype")))
+    rows.append("cause_statuses: " + _format_counts(_counts(display_rows, "current_cause_status")))
+    rows.append("primary_subjects: " + _format_counts(_counts(display_rows, "primary_subject")))
+    rows.append("subject_quality: " + _format_counts(_counts(result.rows, "incident_subject_quality")))
+    rows.append("asset_roles: " + _format_counts(_asset_role_counts(display_rows)))
+    rows.append(f"conflicting_claim_incidents: {sum(1 for row in display_rows if row.get('conflicting_claims'))}")
+    rows.append(f"absence_of_validated_catalyst_claims: {_absence_claim_count(display_rows)}")
+    rows.append(f"multiple_source_updates: {sum(1 for row in display_rows if int(row.get('source_update_count') or 0) > 1)}")
+    rows.append(f"linked_to_hypotheses: {sum(1 for row in display_rows if row.get('linked_hypothesis_ids'))}")
+    rows.append(f"linked_to_watchlist: {sum(1 for row in display_rows if row.get('linked_watchlist_keys'))}")
+    rows.append(f"incident_linked_hypotheses_count: {sum(len(row.get('linked_hypothesis_ids') or ()) for row in display_rows)}")
+    rows.append(f"incident_linked_watchlist_count: {sum(len(row.get('linked_watchlist_keys') or ()) for row in display_rows)}")
+    rows.append("material_update_reasons: " + _format_counts(_material_reason_counts(display_rows)))
     rows.append(
         "market_reaction_unknown_cause: "
         + str(sum(
-            1 for row in result.rows
+            1 for row in display_rows
             if (row.get("market_reaction_observed") or row.get("market_reaction_confirmed"))
             and row.get("current_cause_status") in {"unknown", "ruled_out"}
         ))
@@ -212,13 +216,13 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     rows.append(
         "confirmed_cause_missing_market_data: "
         + str(sum(
-            1 for row in result.rows
+            1 for row in display_rows
             if row.get("current_cause_status") == "confirmed" and not row.get("market_context_source")
         ))
     )
     rows.append("")
     rows.append("Notable incidents:")
-    for row in result.rows[:25]:
+    for row in display_rows[:25]:
         rows.extend(_incident_lines(row))
     rows.append("")
     rows.append("No sends, trades, paper rows, normal RSI rows, or event-fade state were changed.")
@@ -246,6 +250,8 @@ def _row_from_incident(
     current_polarities = tuple(dict.fromkeys(
         str(claim.polarity) for claim in incident.claim_history if str(claim.polarity)
     ))
+    diagnostic_only = bool(incident.diagnostic_only and not h_rows and not w_rows)
+    subject_quality = "diagnostic_only" if diagnostic_only else incident.subject_quality
     row = {
         "schema_version": INCIDENT_STORE_SCHEMA_VERSION,
         "row_type": "event_incident",
@@ -258,6 +264,9 @@ def _row_from_incident(
         "canonical_name": incident.canonical_name,
         "event_archetype": incident.event_archetype,
         "primary_subject": incident.primary_subject,
+        "incident_subject_quality": subject_quality,
+        "incident_subject_quality_reason": incident.subject_quality_reason,
+        "diagnostic_only": diagnostic_only,
         "affected_ecosystem": incident.affected_ecosystem,
         "external_entities": _unique(_flatten_values(h_rows, "external_entities", fallback="external_asset")),
         "crypto_entities": _unique(_crypto_entities(h_rows, w_rows)),
