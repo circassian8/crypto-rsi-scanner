@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Split external context from raw incident relevance · Codex
+**Why:** The first incident relevance gate hid broad unlinked events, but it
+still collapsed generic external context and raw observations into the same
+bucket. Pro review asked for a clearer `external_context_only` status plus a
+separate opt-in for storing raw/external rows.
+**Changes:**
+- Added `external_context_only` incident relevance status for broad political,
+  sports, prediction-market, and geopolitical context that has no validated
+  crypto asset, hypothesis, watchlist row, or market-dislocation link.
+- Added `RSI_EVENT_INCIDENT_STORE_RAW_OBSERVATIONS`; diagnostic/rejected rows
+  still use `RSI_EVENT_INCIDENT_STORE_DIAGNOSTIC`, while raw/external-context
+  rows can be stored separately for audits.
+- Extended incident reports, daily briefs, artifact doctor, and signal-quality
+  evals with separate diagnostic/raw/external-context hidden counts and flags.
+- Updated regression coverage so Polymarket/Annexation-style context is
+  `external_context_only`, truly unstructured rows are `raw_observation`, and
+  linked/crypto-relevant incidents still persist normally.
+**Verify:** `python3 tests/test_indicators.py` passed (460/460);
+`make event-llm-eval PYTHON=python3` passed (9/9); `make
+event-llm-extract-eval PYTHON=python3` passed (7/7); `make
+event-alpha-eval PYTHON=python3` passed (11/11); `make
+event-alpha-signal-quality-eval PYTHON=python3` passed (31/31); `make
+event-alpha-quality-validation-cycle PYTHON=python3` completed with strict
+doctor `OK`; `make verify PYTHON=python3` passed. Manual `notify_llm_quality`
+smoke: `make event-incidents-report` now shows `canonical_unlinked_incidents:
+0`; strict artifact doctor reports no blockers and only hidden diagnostic/raw/
+external-context warnings; daily brief writes successfully.
+**Notes/risks:** Research-only artifact classification. No normal RSI rows,
+paper/live trades, execution, Telegram promotion, or LLM/provider-created
+`TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-26 — Gate canonical incidents by crypto relevance · Codex
 **Why:** Event Alpha was preserving broad external events as canonical incidents
 even when they had no validated crypto asset, hypothesis, watchlist linkage, or

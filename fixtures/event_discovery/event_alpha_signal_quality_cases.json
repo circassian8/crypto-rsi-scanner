@@ -690,9 +690,10 @@
         "source_confidence": 0.58
       },
       "expected": {
-        "incident_relevance_status": "raw_observation",
-        "canonical_persistence_reason": "raw_observation_without_crypto_link",
+        "incident_relevance_status": "external_context_only",
+        "canonical_persistence_reason": "external_context_without_crypto_link",
         "diagnostic_hidden_by_default": true,
+        "external_context_hidden_by_default": true,
         "triggered_fade": false
       }
     },
@@ -711,9 +712,10 @@
         "source_confidence": 0.62
       },
       "expected": {
-        "incident_relevance_status": "raw_observation",
-        "canonical_persistence_reason": "raw_observation_without_crypto_link",
+        "incident_relevance_status": "external_context_only",
+        "canonical_persistence_reason": "external_context_without_crypto_link",
         "diagnostic_hidden_by_default": true,
+        "external_context_hidden_by_default": true,
         "triggered_fade": false
       }
     },

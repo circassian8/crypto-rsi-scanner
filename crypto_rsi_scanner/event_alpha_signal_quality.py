@@ -195,9 +195,12 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         "canonical_persistence_reason": incident_relevance["canonical_persistence_reason"],
         "diagnostic_hidden_by_default": incident_relevance["incident_relevance_status"] in {
             event_incident_store.RELEVANCE_RAW_OBSERVATION,
+            event_incident_store.RELEVANCE_EXTERNAL_CONTEXT_ONLY,
             event_incident_store.RELEVANCE_DIAGNOSTIC_ONLY,
             event_incident_store.RELEVANCE_REJECTED_INCIDENT,
         },
+        "external_context_hidden_by_default": incident_relevance["incident_relevance_status"]
+        == event_incident_store.RELEVANCE_EXTERNAL_CONTEXT_ONLY,
     }
     expected = _expected(case)
     diffs, stages = _diff_expected(expected, actual)
@@ -329,6 +332,7 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "incident_relevance_score": "incident_relevance",
         "canonical_persistence_reason": "incident_relevance",
         "diagnostic_hidden_by_default": "incident_relevance",
+        "external_context_hidden_by_default": "incident_relevance",
     }
     for key, expected_value in expected.items():
         actual_value = actual.get(key)

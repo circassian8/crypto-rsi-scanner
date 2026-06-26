@@ -1392,6 +1392,7 @@ def _event_incident_store_config_from_runtime() -> event_incident_store.EventInc
     return event_incident_store.EventIncidentStoreConfig(
         path=config.EVENT_INCIDENT_STORE_PATH,
         store_diagnostic=config.EVENT_INCIDENT_STORE_DIAGNOSTIC,
+        store_raw_observations=config.EVENT_INCIDENT_STORE_RAW_OBSERVATIONS,
     )
 
 
@@ -3824,6 +3825,8 @@ def event_incidents_report(
     run_id: str | None = None,
     include_legacy: bool = True,
     include_diagnostic: bool = False,
+    include_raw: bool = False,
+    include_external_context: bool = False,
 ) -> None:
     """Print stored canonical incident rows for a profile/namespace."""
     _setup_event_discovery_logging(verbose)
@@ -3840,6 +3843,8 @@ def event_incidents_report(
         run_id=run_id,
         include_legacy=include_legacy,
         include_diagnostic=include_diagnostic,
+        include_raw=include_raw,
+        include_external_context=include_external_context,
     )
     print(_event_alpha_context_block(context))
     print(event_incident_store.format_incidents_report(result))
@@ -7865,7 +7870,17 @@ def cli() -> None:
     parser.add_argument(
         "--include-diagnostic-incidents",
         action="store_true",
-        help="For --event-incidents-report, include diagnostic-only invalid-subject incidents that are hidden by default.",
+        help="For --event-incidents-report, include diagnostic/raw/external-context incidents that are hidden by default.",
+    )
+    parser.add_argument(
+        "--include-raw-incidents",
+        action="store_true",
+        help="For --event-incidents-report, include raw-observation incidents hidden by default.",
+    )
+    parser.add_argument(
+        "--include-external-context-incidents",
+        action="store_true",
+        help="For --event-incidents-report, include external-context-only incidents hidden by default.",
     )
     parser.add_argument(
         "--latest-run",
@@ -8734,6 +8749,8 @@ def cli() -> None:
             run_id=args.run_id,
             include_legacy=args.include_legacy or args.all_history,
             include_diagnostic=args.include_diagnostic_incidents,
+            include_raw=args.include_raw_incidents,
+            include_external_context=args.include_external_context_incidents,
         )
         return
     if args.event_impact_hypothesis_smoke:

@@ -803,17 +803,17 @@ def _canonical_incident_lines(rows: Iterable[Mapping[str, Any]]) -> list[str]:
     incidents = [dict(row) for row in rows if isinstance(row, Mapping)]
     if not incidents:
         return ["- Stored incidents: none loaded for this profile."]
-    diagnostic_rows = [row for row in incidents if _incident_is_diagnostic(row)]
+    diagnostic_rows = [row for row in incidents if _incident_is_hidden(row)]
     visible = [row for row in incidents if not _incident_is_diagnostic(row)]
     if not visible:
         return [
             f"- Stored incidents: {len(incidents)}",
-            f"- Diagnostic/raw observations hidden: {len(diagnostic_rows)}",
+            f"- Diagnostic/raw/external-context observations hidden: {len(diagnostic_rows)}",
             "- Canonical incidents: none visible for this profile.",
         ]
     lines = [
         f"- Stored incidents: {len(incidents)}",
-        f"- Diagnostic/raw observations hidden: {len(diagnostic_rows)}",
+        f"- Diagnostic/raw/external-context observations hidden: {len(diagnostic_rows)}",
         "- Relevance statuses: " + _format_counts(_field_counts(incidents, "incident_relevance_status")),
         "- Event archetypes: " + _format_counts(_field_counts(visible, "event_archetype")),
         "- Cause statuses: " + _format_counts(_field_counts(visible, "current_cause_status")),
@@ -872,9 +872,13 @@ def _canonical_incident_lines(rows: Iterable[Mapping[str, Any]]) -> list[str]:
     return lines
 
 
-def _incident_is_diagnostic(row: Mapping[str, Any]) -> bool:
+def _incident_is_hidden(row: Mapping[str, Any]) -> bool:
     status = str(row.get("incident_relevance_status") or "")
-    return bool(row.get("diagnostic_only")) or status in {"raw_observation", "diagnostic_only", "rejected_incident"}
+    return bool(row.get("diagnostic_only")) or status in {"raw_observation", "external_context_only", "diagnostic_only", "rejected_incident"}
+
+
+def _incident_is_diagnostic(row: Mapping[str, Any]) -> bool:
+    return _incident_is_hidden(row)
 
 
 def _incident_asset_summary(value: Any) -> str:

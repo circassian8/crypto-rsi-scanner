@@ -28,6 +28,7 @@ RELEVANCE_LINKED_INCIDENT = "linked_incident"
 RELEVANCE_ACTIVE_INCIDENT = "active_incident"
 RELEVANCE_DIAGNOSTIC_ONLY = "diagnostic_only"
 RELEVANCE_REJECTED_INCIDENT = "rejected_incident"
+RELEVANCE_EXTERNAL_CONTEXT_ONLY = "external_context_only"
 
 _VISIBLE_RELEVANCE_STATUSES = {
     RELEVANCE_INCIDENT_CANDIDATE,
@@ -37,6 +38,15 @@ _VISIBLE_RELEVANCE_STATUSES = {
 }
 _DIAGNOSTIC_RELEVANCE_STATUSES = {
     RELEVANCE_RAW_OBSERVATION,
+    RELEVANCE_DIAGNOSTIC_ONLY,
+    RELEVANCE_REJECTED_INCIDENT,
+    RELEVANCE_EXTERNAL_CONTEXT_ONLY,
+}
+_RAW_RELEVANCE_STATUSES = {
+    RELEVANCE_RAW_OBSERVATION,
+    RELEVANCE_EXTERNAL_CONTEXT_ONLY,
+}
+_STRICT_DIAGNOSTIC_RELEVANCE_STATUSES = {
     RELEVANCE_DIAGNOSTIC_ONLY,
     RELEVANCE_REJECTED_INCIDENT,
 }
@@ -54,12 +64,20 @@ _EXTERNAL_CATALYST_ARCHETYPES = {
     "tokenized_stock_venue",
     "sports_fan_proxy",
 }
+_EXTERNAL_CONTEXT_ARCHETYPES = {
+    "political_event",
+    "sports_event",
+    "external_proxy_event",
+    "prediction_market",
+    "geopolitical_event",
+}
 
 
 @dataclass(frozen=True)
 class EventIncidentStoreConfig:
     path: Path
     store_diagnostic: bool = False
+    store_raw_observations: bool = False
 
 
 @dataclass(frozen=True)
@@ -144,8 +162,17 @@ def write_incidents(
             run_mode=run_mode,
             artifact_namespace=artifact_namespace,
         )
-        store_diagnostic = bool(cfg.store_diagnostic or _debug_allows_diagnostic(profile=profile, run_mode=run_mode))
-        rows_to_write = [row for row in rows if _should_persist_incident_row(row, store_diagnostic=store_diagnostic)]
+        debug_store = _debug_allows_diagnostic(profile=profile, run_mode=run_mode)
+        store_diagnostic = bool(cfg.store_diagnostic or debug_store)
+        store_raw_observations = bool(cfg.store_raw_observations or cfg.store_diagnostic or debug_store)
+        rows_to_write = [
+            row for row in rows
+            if _should_persist_incident_row(
+                row,
+                store_diagnostic=store_diagnostic,
+                store_raw_observations=store_raw_observations,
+            )
+        ]
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as fh:
             for row in rows_to_write:
@@ -170,6 +197,8 @@ def load_incidents(
     run_id: str | None = None,
     include_legacy: bool = True,
     include_diagnostic: bool = False,
+    include_raw: bool = False,
+    include_external_context: bool = False,
 ) -> EventIncidentStoreReadResult:
     """Load stored incidents newest-first, tolerating malformed legacy rows."""
     p = Path(path).expanduser()
@@ -205,6 +234,8 @@ def load_incidents(
             "run_id": run_id,
             "include_legacy": bool(include_legacy),
             "include_diagnostic": bool(include_diagnostic),
+            "include_raw": bool(include_raw),
+            "include_external_context": bool(include_external_context),
             "limit": limit,
         },
     )
@@ -213,9 +244,23 @@ def load_incidents(
 def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     """Return an operator-readable incident artifact report."""
     include_diagnostic = bool(result.filters.get("include_diagnostic"))
-    diagnostic_rows = [row for row in result.rows if _is_diagnostic_relevance(row)]
-    display_rows = list(result.rows) if include_diagnostic else [row for row in result.rows if not _is_diagnostic_relevance(row)]
+    include_raw = bool(result.filters.get("include_raw")) or include_diagnostic
+    include_external_context = bool(result.filters.get("include_external_context")) or include_diagnostic
+    diagnostic_rows = [row for row in result.rows if _is_strict_diagnostic_relevance(row)]
+    raw_rows = [row for row in result.rows if _is_raw_observation_relevance(row)]
+    external_context_rows = [row for row in result.rows if _is_external_context_relevance(row)]
+    display_rows = [
+        row for row in result.rows
+        if not _is_hidden_relevance(
+            row,
+            include_diagnostic=include_diagnostic,
+            include_raw=include_raw,
+            include_external_context=include_external_context,
+        )
+    ]
     diagnostic_hidden = 0 if include_diagnostic else len(diagnostic_rows)
+    raw_hidden = 0 if include_raw else len(raw_rows)
+    external_context_hidden = 0 if include_external_context else len(external_context_rows)
     rows = [
         "=" * 76,
         "EVENT INCIDENTS REPORT (research artifact only)",
@@ -229,6 +274,10 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
         f"legacy_rows_available: {result.legacy_rows_available}",
         f"diagnostic_rows_hidden: {diagnostic_hidden}",
         f"diagnostic_rows_available: {len(diagnostic_rows)}",
+        f"raw_observation_rows_hidden: {raw_hidden}",
+        f"raw_observation_rows_available: {len(raw_rows)}",
+        f"external_context_rows_hidden: {external_context_hidden}",
+        f"external_context_rows_available: {len(external_context_rows)}",
         "filters: " + _format_filter_summary(result.filters),
     ]
     if not display_rows:
@@ -248,7 +297,13 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     rows.append(f"multiple_source_updates: {sum(1 for row in display_rows if int(row.get('source_update_count') or 0) > 1)}")
     rows.append(f"linked_to_hypotheses: {sum(1 for row in display_rows if row.get('linked_hypothesis_ids'))}")
     rows.append(f"linked_to_watchlist: {sum(1 for row in display_rows if row.get('linked_watchlist_keys'))}")
-    rows.append(f"canonical_unlinked_incidents: {sum(1 for row in display_rows if _is_operational_canonical_relevance(row) and not row.get('linked_hypothesis_ids') and not row.get('linked_watchlist_keys'))}")
+    unlinked_canonical = [
+        row for row in display_rows
+        if _is_operational_canonical_relevance(row)
+        and not row.get("linked_hypothesis_ids")
+        and not row.get("linked_watchlist_keys")
+    ]
+    rows.append(f"canonical_unlinked_incidents: {len(unlinked_canonical)}")
     rows.append(f"incident_linked_hypotheses_count: {sum(len(row.get('linked_hypothesis_ids') or ()) for row in display_rows)}")
     rows.append(f"incident_linked_watchlist_count: {sum(len(row.get('linked_watchlist_keys') or ()) for row in display_rows)}")
     rows.append("material_update_reasons: " + _format_counts(_material_reason_counts(display_rows)))
@@ -268,6 +323,15 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
         ))
     )
     rows.append("")
+    if unlinked_canonical:
+        rows.append("Top unlinked canonical incidents:")
+        for row in unlinked_canonical[:10]:
+            rows.append(
+                f"- {row.get('canonical_name') or row.get('incident_id')}: "
+                f"relevance={row.get('incident_relevance_status') or 'unknown'} "
+                f"persistence={row.get('canonical_persistence_reason') or 'unknown'}"
+            )
+        rows.append("")
     rows.append("Notable incidents:")
     for row in display_rows[:25]:
         rows.extend(_incident_lines(row))
@@ -309,9 +373,11 @@ def _row_from_incident(
         diagnostic_only=diagnostic_only,
         subject_quality=subject_quality,
     )
-    diagnostic_only = bool(diagnostic_only or relevance["incident_relevance_status"] in _DIAGNOSTIC_RELEVANCE_STATUSES)
+    relevance_status = str(relevance["incident_relevance_status"])
+    diagnostic_only = bool(diagnostic_only or relevance_status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES)
     if diagnostic_only and subject_quality == "valid":
         subject_quality = "diagnostic_only"
+    hidden_by_default = _status_hidden_by_default(relevance_status) or diagnostic_only
     row = {
         "schema_version": INCIDENT_STORE_SCHEMA_VERSION,
         "row_type": "event_incident",
@@ -332,7 +398,10 @@ def _row_from_incident(
         "incident_relevance_reasons": relevance["incident_relevance_reasons"],
         "incident_relevance_warnings": relevance["incident_relevance_warnings"],
         "canonical_persistence_reason": relevance["canonical_persistence_reason"],
-        "diagnostic_hidden_by_default": diagnostic_only,
+        "diagnostic_hidden_by_default": hidden_by_default,
+        "raw_observation": relevance_status == RELEVANCE_RAW_OBSERVATION,
+        "external_context_only": relevance_status == RELEVANCE_EXTERNAL_CONTEXT_ONLY,
+        "external_context_hidden_by_default": relevance_status == RELEVANCE_EXTERNAL_CONTEXT_ONLY,
         "affected_ecosystem": incident.affected_ecosystem,
         "external_entities": _unique(_flatten_values(h_rows, "external_entities", fallback="external_asset")),
         "crypto_entities": _unique(_crypto_entities(h_rows, w_rows)),
@@ -471,6 +540,12 @@ def classify_incident_relevance(
         status = RELEVANCE_INCIDENT_CANDIDATE
         persistence = "recognized_research_catalyst_candidate"
         score = max(score, 52.0)
+    elif _is_external_context_incident(incident, text):
+        status = RELEVANCE_EXTERNAL_CONTEXT_ONLY
+        persistence = "external_context_without_crypto_link"
+        score = min(max(score, 28.0), 40.0)
+        warnings.append("incident_hidden_from_default_report")
+        reasons.append("external_context_without_crypto_hypothesis_watchlist_asset_or_market_link")
     else:
         status = RELEVANCE_RAW_OBSERVATION
         persistence = "raw_observation_without_crypto_link"
@@ -503,18 +578,63 @@ def _debug_allows_diagnostic(*, profile: str | None, run_mode: str | None) -> bo
     return mode in {"test", "fixture", "replay"} or prof in {"fixture", "quality_validation"}
 
 
-def _should_persist_incident_row(row: Mapping[str, Any], *, store_diagnostic: bool) -> bool:
+def _should_persist_incident_row(
+    row: Mapping[str, Any],
+    *,
+    store_diagnostic: bool,
+    store_raw_observations: bool,
+) -> bool:
     status = str(row.get("incident_relevance_status") or "").strip()
     if status in _VISIBLE_RELEVANCE_STATUSES:
         return True
-    if bool(row.get("diagnostic_only")) or status in _DIAGNOSTIC_RELEVANCE_STATUSES:
+    if status in _RAW_RELEVANCE_STATUSES:
+        return bool(store_raw_observations)
+    if bool(row.get("diagnostic_only")) or status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES:
         return bool(store_diagnostic)
     return True
 
 
 def _is_diagnostic_relevance(row: Mapping[str, Any]) -> bool:
+    return _is_hidden_relevance(
+        row,
+        include_diagnostic=False,
+        include_raw=False,
+        include_external_context=False,
+    )
+
+
+def _is_hidden_relevance(
+    row: Mapping[str, Any],
+    *,
+    include_diagnostic: bool,
+    include_raw: bool,
+    include_external_context: bool,
+) -> bool:
     status = str(row.get("incident_relevance_status") or "").strip()
-    return bool(row.get("diagnostic_only")) or status in _DIAGNOSTIC_RELEVANCE_STATUSES
+    if _is_strict_diagnostic_relevance(row):
+        return not include_diagnostic
+    if status == RELEVANCE_RAW_OBSERVATION:
+        return not include_raw
+    if status == RELEVANCE_EXTERNAL_CONTEXT_ONLY:
+        return not include_external_context
+    return False
+
+
+def _is_strict_diagnostic_relevance(row: Mapping[str, Any]) -> bool:
+    status = str(row.get("incident_relevance_status") or "").strip()
+    return bool(row.get("diagnostic_only")) or status in _STRICT_DIAGNOSTIC_RELEVANCE_STATUSES
+
+
+def _is_raw_observation_relevance(row: Mapping[str, Any]) -> bool:
+    return str(row.get("incident_relevance_status") or "").strip() == RELEVANCE_RAW_OBSERVATION
+
+
+def _is_external_context_relevance(row: Mapping[str, Any]) -> bool:
+    return str(row.get("incident_relevance_status") or "").strip() == RELEVANCE_EXTERNAL_CONTEXT_ONLY
+
+
+def _status_hidden_by_default(status: str) -> bool:
+    return status in _DIAGNOSTIC_RELEVANCE_STATUSES
 
 
 def _is_operational_canonical_relevance(row: Mapping[str, Any]) -> bool:
@@ -543,6 +663,58 @@ def _incident_source_text(
             str(payload.get("impact_category") or ""),
         ])
     return " ".join(str(part or "") for part in parts)
+
+
+def _is_external_context_incident(incident: event_incident_graph.CanonicalIncident, text: str) -> bool:
+    archetype = str(incident.event_archetype or "").strip()
+    if archetype in _EXTERNAL_CONTEXT_ARCHETYPES:
+        return True
+    lowered = str(text or "").casefold()
+    external_terms = (
+        "polymarket",
+        "prediction market",
+        "election",
+        "world cup",
+        "champions league",
+        "geopolitical",
+        "putin",
+        "trump",
+        "macron",
+        "netanyahu",
+        "annexation",
+        "ceasefire",
+        "hamas",
+        "next james bond",
+    )
+    crypto_terms = (
+        "tokenized stock",
+        "pre-ipo",
+        "crypto venue",
+        "fan token",
+        "perp",
+        "futures",
+        "airdrop",
+        "unlock",
+        "listing",
+        "exploit",
+    )
+    return any(term in lowered for term in external_terms) and not any(term in lowered for term in crypto_terms)
+
+
+def _legacy_external_context_text(text: str) -> bool:
+    lowered = str(text or "").casefold()
+    external_terms = (
+        "annexation",
+        "benjamin netanyahu",
+        "hamas",
+        "israel",
+        "macron",
+        "next james bond",
+        "putin",
+        "trump",
+        "world cup",
+    )
+    return any(term in lowered for term in external_terms)
 
 
 def _has_active_watchlist_row(rows: Iterable[Mapping[str, Any]]) -> bool:
@@ -990,6 +1162,10 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
     data = dict(row)
     status = str(data.get("incident_relevance_status") or "").strip()
     if status:
+        data.setdefault("raw_observation", status == RELEVANCE_RAW_OBSERVATION)
+        data.setdefault("external_context_only", status == RELEVANCE_EXTERNAL_CONTEXT_ONLY)
+        data.setdefault("external_context_hidden_by_default", status == RELEVANCE_EXTERNAL_CONTEXT_ONLY)
+        data.setdefault("diagnostic_hidden_by_default", _is_diagnostic_relevance(data))
         return data
     diagnostic = bool(data.get("diagnostic_only")) or str(data.get("incident_subject_quality") or "") == "diagnostic_only"
     linked_h = bool(data.get("linked_hypothesis_ids"))
@@ -997,6 +1173,12 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
     market_observed = bool(data.get("market_reaction_observed") or data.get("market_reaction_confirmed"))
     archetype = str(data.get("event_archetype") or "")
     assets = data.get("linked_assets") or ()
+    source_text = " ".join(str(data.get(key) or "") for key in (
+        "canonical_name",
+        "event_archetype",
+        "primary_subject",
+        "affected_ecosystem",
+    ))
     if diagnostic:
         status = RELEVANCE_DIAGNOSTIC_ONLY
         reason = "legacy_diagnostic_subject"
@@ -1011,14 +1193,26 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
     ):
         status = RELEVANCE_CANONICAL_INCIDENT
         reason = "legacy_crypto_or_market_relevance"
+    elif archetype in _EXTERNAL_CATALYST_ARCHETYPES or archetype in _DIRECT_CRYPTO_ARCHETYPES:
+        status = RELEVANCE_INCIDENT_CANDIDATE
+        reason = "legacy_recognized_research_catalyst_candidate"
+    elif archetype in _EXTERNAL_CONTEXT_ARCHETYPES or _legacy_external_context_text(source_text):
+        status = RELEVANCE_EXTERNAL_CONTEXT_ONLY
+        reason = "legacy_external_context_without_crypto_link"
     else:
-        status = RELEVANCE_CANONICAL_INCIDENT
-        reason = "legacy_missing_relevance_field"
+        status = RELEVANCE_RAW_OBSERVATION
+        reason = "legacy_raw_observation_without_crypto_link"
     data["incident_relevance_status"] = status
-    data.setdefault("incident_relevance_score", 0.0 if diagnostic else 60.0)
+    data.setdefault(
+        "incident_relevance_score",
+        0.0 if diagnostic else (35.0 if status in _RAW_RELEVANCE_STATUSES else 60.0),
+    )
     data.setdefault("incident_relevance_reasons", (reason,))
     data.setdefault("incident_relevance_warnings", () if not diagnostic else ("incident_hidden_from_default_report",))
     data.setdefault("canonical_persistence_reason", reason)
+    data.setdefault("raw_observation", status == RELEVANCE_RAW_OBSERVATION)
+    data.setdefault("external_context_only", status == RELEVANCE_EXTERNAL_CONTEXT_ONLY)
+    data.setdefault("external_context_hidden_by_default", status == RELEVANCE_EXTERNAL_CONTEXT_ONLY)
     data.setdefault("diagnostic_hidden_by_default", _is_diagnostic_relevance(data))
     return data
 

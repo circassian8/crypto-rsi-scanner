@@ -22,14 +22,18 @@ decision, rationale, and revisit condition.
 observations from crypto-relevant canonical incidents. Fresh incident rows carry
 `incident_relevance_status`, `incident_relevance_score`,
 `incident_relevance_reasons`, `incident_relevance_warnings`, and
-`canonical_persistence_reason`. Live-style profiles persist
+`canonical_persistence_reason`. Broad external context without a crypto link
+uses `external_context_only`, while generic unstructured unlinked rows use
+`raw_observation`. Live-style profiles persist
 `incident_candidate`, `canonical_incident`, `linked_incident`, and
-`active_incident` rows by default; `raw_observation`, `diagnostic_only`, and
-`rejected_incident` rows are hidden/not persisted unless
-`RSI_EVENT_INCIDENT_STORE_DIAGNOSTIC=1` or fixture/debug mode is intentionally
+`active_incident` rows by default; `raw_observation`,
+`external_context_only`, `diagnostic_only`, and `rejected_incident` rows are
+hidden/not persisted unless `RSI_EVENT_INCIDENT_STORE_RAW_OBSERVATIONS=1`,
+`RSI_EVENT_INCIDENT_STORE_DIAGNOSTIC=1`, or fixture/debug mode is intentionally
 active. A broad external event without a validated crypto asset, generated
 hypothesis, watchlist linkage, direct crypto archetype, or market-dislocation
-evidence is raw evidence, not an operational canonical incident.
+evidence is external context/raw evidence, not an operational canonical
+incident.
 **Why:** Broad political, sports, prediction-market, and news rows are useful
 for source diagnostics and future search, but showing them beside linked crypto
 incidents overstates actionability and creates noise in daily briefs, doctor

@@ -22636,16 +22636,19 @@ def test_event_incident_relevance_gates_raw_external_observations():
         assert debug_write.success is True
         assert debug_write.rows_written == 1
         hidden = event_incident_store.load_incidents(debug_path)
-        assert hidden.rows[0]["incident_relevance_status"] == "raw_observation"
-        assert hidden.rows[0]["diagnostic_only"] is True
+        assert hidden.rows[0]["incident_relevance_status"] == "external_context_only"
+        assert hidden.rows[0]["diagnostic_only"] is False
+        assert hidden.rows[0]["external_context_only"] is True
         assert hidden.rows[0]["diagnostic_hidden_by_default"] is True
         hidden_report = event_incident_store.format_incidents_report(hidden)
-        assert "diagnostic_rows_hidden: 1" in hidden_report
+        assert "diagnostic_rows_hidden: 0" in hidden_report
+        assert "external_context_rows_hidden: 1" in hidden_report
         assert "Where will Trump meet Putin?" not in hidden_report
         visible_report = event_incident_store.format_incidents_report(
             event_incident_store.load_incidents(debug_path, include_diagnostic=True)
         )
         assert "diagnostic_rows_hidden: 0" in visible_report
+        assert "external_context_rows_hidden: 0" in visible_report
         assert "Putin · prediction market" in visible_report
         debug_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "run-broad-debug", "profile": "quality_validation", "run_mode": "test"}],
@@ -22653,10 +22656,49 @@ def test_event_incident_relevance_gates_raw_external_observations():
             include_test_artifacts=True,
             strict=True,
         )
-        assert debug_doctor.diagnostic_incident_rows == 1
-        assert debug_doctor.raw_observation_incident_rows == 1
+        assert debug_doctor.diagnostic_incident_rows == 0
+        assert debug_doctor.raw_observation_incident_rows == 0
+        assert debug_doctor.external_context_incident_rows == 1
         assert debug_doctor.incident_rows_without_linked_hypotheses == 0
         assert debug_doctor.incident_rows_without_linked_watchlist == 0
+
+        raw_observation = raw(
+            "unstructured_unlinked_note",
+            "Unstructured source note",
+            "A source note has no clear external catalyst, no crypto token, and no market anomaly.",
+            provider="fixture_news",
+            confidence=0.42,
+        )
+        raw_event = NormalizedEvent(
+            "evt_unstructured_note",
+            (raw_observation.raw_id,),
+            "Unstructured source note",
+            "news",
+            None,
+            0.0,
+            now,
+            "fixture_news",
+            (raw_observation.source_url,),
+            None,
+            raw_observation.body,
+            0.42,
+        )
+        raw_path = Path(tmp) / "raw_incidents.jsonl"
+        raw_write = event_incident_store.write_incidents(
+            EventDiscoveryResult((raw_observation,), (raw_event,), (), (), ()),
+            cfg=event_incident_store.EventIncidentStoreConfig(path=raw_path, store_raw_observations=True),
+            now=now,
+            run_id="run-raw-opt-in",
+            profile="notify_llm_quality_fresh",
+            run_mode="notification_burn_in",
+            artifact_namespace="notify_llm_quality_fresh",
+        )
+        assert raw_write.success is True
+        assert raw_write.rows_written == 1
+        raw_rows = event_incident_store.load_incidents(raw_path)
+        assert raw_rows.rows[0]["incident_relevance_status"] == "raw_observation"
+        assert raw_rows.rows[0]["raw_observation"] is True
+        assert "raw_observation_rows_hidden: 1" in event_incident_store.format_incidents_report(raw_rows)
 
         missing_relevance = {
             "schema_version": event_incident_store.INCIDENT_STORE_SCHEMA_VERSION,

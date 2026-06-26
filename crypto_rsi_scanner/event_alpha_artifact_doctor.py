@@ -59,6 +59,7 @@ class EventAlphaArtifactDoctorResult:
     canonical_unlinked_incidents: int = 0
     diagnostic_incident_rows: int = 0
     raw_observation_incident_rows: int = 0
+    external_context_incident_rows: int = 0
     rejected_incident_rows: int = 0
     incident_relevance_missing: int = 0
     invalid_canonical_incident_rows: int = 0
@@ -356,6 +357,8 @@ def diagnose_artifacts(
         warnings.append(f"diagnostic_incident_rows={incident_linkage['diagnostic_incident_rows']}")
     if incident_linkage["raw_observation_incident_rows"]:
         warnings.append(f"raw_observation_incident_rows={incident_linkage['raw_observation_incident_rows']}")
+    if incident_linkage["external_context_incident_rows"]:
+        warnings.append(f"external_context_incident_rows={incident_linkage['external_context_incident_rows']}")
     if incident_linkage["rejected_incident_rows"]:
         warnings.append(f"rejected_incident_rows={incident_linkage['rejected_incident_rows']}")
     if incident_linkage["canonical_unlinked_incidents"]:
@@ -420,6 +423,7 @@ def diagnose_artifacts(
         canonical_unlinked_incidents=incident_linkage["canonical_unlinked_incidents"],
         diagnostic_incident_rows=incident_linkage["diagnostic_incident_rows"],
         raw_observation_incident_rows=incident_linkage["raw_observation_incident_rows"],
+        external_context_incident_rows=incident_linkage["external_context_incident_rows"],
         rejected_incident_rows=incident_linkage["rejected_incident_rows"],
         incident_relevance_missing=incident_linkage["incident_relevance_missing"],
         invalid_canonical_incident_rows=incident_linkage["invalid_canonical_incident_rows"],
@@ -681,6 +685,7 @@ def _incident_linkage_summary(
         "legacy_missing_alerts": 0,
         "diagnostic_incident_rows": 0,
         "raw_observation_incident_rows": 0,
+        "external_context_incident_rows": 0,
         "rejected_incident_rows": 0,
         "incident_relevance_missing": 0,
         "invalid_canonical_incident_rows": 0,
@@ -730,14 +735,18 @@ def _incident_linkage_summary(
             out["garbage_primary_subject_incidents"] += 1
         if relevance == "raw_observation":
             out["raw_observation_incident_rows"] += 1
+        if relevance == "external_context_only":
+            out["external_context_incident_rows"] += 1
         if relevance == "rejected_incident":
             out["rejected_incident_rows"] += 1
         relevance_is_hidden = (
-            relevance in {"raw_observation", "rejected_incident"}
+            relevance in {"raw_observation", "external_context_only", "rejected_incident"}
             or (relevance == "diagnostic_only" and subject_quality != "invalid")
         )
-        if diagnostic or relevance_is_hidden:
+        if diagnostic or (relevance_is_hidden and relevance in {"diagnostic_only", "rejected_incident"}):
             out["diagnostic_incident_rows"] += 1
+            continue
+        if relevance_is_hidden:
             continue
         elif subject_quality in {"invalid", "diagnostic_only"}:
             out["invalid_canonical_incident_rows"] += 1
@@ -929,6 +938,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"canonical_unlinked_incidents={result.canonical_unlinked_incidents} "
             f"diagnostic_incident_rows={result.diagnostic_incident_rows} "
             f"raw_observation_incident_rows={result.raw_observation_incident_rows} "
+            f"external_context_incident_rows={result.external_context_incident_rows} "
             f"rejected_incident_rows={result.rejected_incident_rows} "
             f"incident_relevance_missing={result.incident_relevance_missing} "
             f"invalid_canonical_incident_rows={result.invalid_canonical_incident_rows} "

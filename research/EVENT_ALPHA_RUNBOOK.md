@@ -164,15 +164,18 @@ is available, the incident row should be diagnostic-only and hidden from default
 incident reports rather than shown as a canonical opportunity. Existing
 persisted garbage-subject rows are also quarantined at read/report time.
 Incident persistence also has a separate crypto-relevance gate. Rows may be
-classified as `raw_observation`, `incident_candidate`, `canonical_incident`,
-`linked_incident`, `active_incident`, `diagnostic_only`, or
-`rejected_incident`. Live-style profiles persist only candidate/canonical/
-linked/active incident rows by default. Raw, diagnostic, or rejected rows stay
-hidden and are not written unless `RSI_EVENT_INCIDENT_STORE_DIAGNOSTIC=1` or a
-fixture/debug profile is running. A broad Polymarket, sports, political, or
+classified as `raw_observation`, `external_context_only`,
+`incident_candidate`, `canonical_incident`, `linked_incident`,
+`active_incident`, `diagnostic_only`, or `rejected_incident`. Live-style
+profiles persist only candidate/canonical/linked/active incident rows by
+default. Raw/external-context rows stay hidden and are not written unless
+`RSI_EVENT_INCIDENT_STORE_RAW_OBSERVATIONS=1`; diagnostic/rejected rows require
+`RSI_EVENT_INCIDENT_STORE_DIAGNOSTIC=1`. Fixture/debug profiles may still write
+hidden rows for tests. A broad Polymarket, sports, political, geopolitical, or
 macro event without a validated crypto asset, generated hypothesis, active
-watchlist row, direct crypto archetype, or market-dislocation evidence is raw
-evidence for diagnostics, not an operational canonical incident.
+watchlist row, direct crypto archetype, or market-dislocation evidence is
+external context/raw evidence for diagnostics, not an operational canonical
+incident.
 
 Canonical incidents are persisted separately from hypotheses under the active
 profile namespace:
@@ -195,10 +198,12 @@ creating duplicate watchlist rows, and that ruled-out/unknown causes stayed
 local-only. For market anomalies, verify that canonical names are asset-specific
 (`SOL market anomaly`, `USDT market anomaly`) and that the report separates
 `reaction_observed` from causal confirmation.
-Default incident reports hide diagnostic-only, raw-observation, and rejected
-rows but still count them, so a rising diagnostic/raw count means the source
-cleaner/entity/relevance guard needs review before treating those rows as real
-incidents. Use `--include-diagnostic-incidents` only when intentionally auditing
+Default incident reports hide diagnostic-only, raw-observation,
+external-context-only, and rejected rows but still count them separately, so a
+rising diagnostic/raw/external count means the source cleaner/entity/relevance
+guard needs review before treating those rows as real incidents. Use
+`--include-diagnostic-incidents`, `--include-raw-incidents`, or
+`--include-external-context-incidents` only when intentionally auditing
 quarantined rows such as `LLM`, referral-code/source-noise subjects, or broad
 external events that had no crypto link. Report lines include relevance status,
 score, persistence reason, and relevance reason codes; linked/active incidents
