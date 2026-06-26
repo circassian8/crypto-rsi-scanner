@@ -144,7 +144,7 @@ def diagnose_artifacts(
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
     )
-    watchlist = event_alpha_artifacts.filter_artifact_rows(
+    watchlist = _filter_watchlist_rows_for_doctor(
         raw_watchlist,
         profile=profile,
         artifact_namespace=artifact_namespace,
@@ -643,6 +643,56 @@ def _watchlist_quality_state_conflicts(rows: Iterable[Mapping[str, Any]]) -> dic
             elif not capped or final_active:
                 out["fresh_uncapped"] += 1
     return out
+
+
+def _filter_watchlist_rows_for_doctor(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    profile: str | None,
+    artifact_namespace: str | None,
+    include_test_artifacts: bool,
+    include_legacy_artifacts: bool,
+) -> list[dict[str, Any]]:
+    """Filter watchlist rows while honoring path-scoped legacy metadata gaps.
+
+    Older watchlist entries did not carry profile/run-mode fields even when
+    they lived inside a profile namespace directory. Doctor callers pass rows
+    from a resolved path, so missing metadata should not make those rows
+    invisible to quality checks.
+    """
+    out: list[dict[str, Any]] = []
+    profile_key = _clean_optional(profile)
+    namespace_key = _clean_optional(artifact_namespace)
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        data = dict(row)
+        if not include_test_artifacts and event_alpha_artifacts.is_non_operational_row(data):
+            continue
+        row_profile = _clean_optional(data.get("profile"))
+        if profile_key is not None and row_profile not in (None, profile_key):
+            continue
+        row_ns = _clean_optional(data.get("artifact_namespace") or data.get("namespace"))
+        if namespace_key is not None and row_ns not in (None, namespace_key):
+            continue
+        if not include_legacy_artifacts and event_alpha_artifacts.is_legacy_row(data):
+            if _row_has_watchlist_quality_conflict(data) or event_watchlist.state_is_quality_capped(data):
+                if profile and not data.get("profile"):
+                    data["profile"] = profile
+                if artifact_namespace and not (data.get("artifact_namespace") or data.get("namespace")):
+                    data["artifact_namespace"] = artifact_namespace
+                if not data.get("run_mode"):
+                    data["run_mode"] = "notification_burn_in" if str(profile or "").startswith("notify_") else "burn_in"
+                data["_path_scoped_metadata_inferred"] = True
+            else:
+                continue
+        out.append(data)
+    return out
+
+
+def _clean_optional(value: Any) -> str | None:
+    text = str(value or "").strip().casefold()
+    return text or None
 
 
 def _row_has_watchlist_quality_conflict(row: Mapping[str, Any]) -> bool:

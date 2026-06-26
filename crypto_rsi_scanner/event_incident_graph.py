@@ -149,6 +149,15 @@ class IncidentAssetRole:
 
 
 @dataclass(frozen=True)
+class IncidentSubjectValidation:
+    status: str
+    normalized_subject: str | None
+    fallback_source: str | None = None
+    rejection_reason: str | None = None
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class CanonicalIncident:
     schema_version: str
     incident_id: str
@@ -170,6 +179,33 @@ class CanonicalIncident:
     subject_quality_reason: str | None = None
     diagnostic_only: bool = False
     warnings: tuple[str, ...] = field(default_factory=tuple)
+
+
+def validate_incident_primary_subject(
+    subject: str | None,
+    context: object | None = None,
+) -> IncidentSubjectValidation:
+    """Validate or replace an incident primary subject before persistence."""
+    normalized = _normalized_subject(subject)
+    if normalized:
+        return IncidentSubjectValidation(status="valid", normalized_subject=normalized)
+    fallback, source = _subject_fallback_from_context(context)
+    if fallback:
+        return IncidentSubjectValidation(
+            status="fallback_used",
+            normalized_subject=fallback,
+            fallback_source=source,
+            rejection_reason="invalid_primary_subject_replaced",
+            warnings=("incident_primary_subject_fallback_used",),
+        )
+    cleaned = clean_text(subject or "")
+    status = "diagnostic_only" if _is_noise_subject(cleaned) else "invalid_subject"
+    return IncidentSubjectValidation(
+        status=status,
+        normalized_subject=None,
+        rejection_reason="garbage_or_missing_primary_subject",
+        warnings=("incident_primary_subject_invalid",),
+    )
 
 
 def build_incidents(
@@ -349,7 +385,16 @@ def _incident_from_group(
     last_updated = max((raw.fetched_at for raw in raws), default=first_seen)
     first_event = events[0]
     primary_subject = infer_primary_subject(first_event, raws, claims=claims)
-    subject_quality, subject_quality_reason, diagnostic_only = _subject_quality(primary_subject, first_event, raws)
+    validation = validate_incident_primary_subject(primary_subject, {
+        "event": first_event,
+        "raws": raws,
+    })
+    primary_subject = validation.normalized_subject
+    subject_quality, subject_quality_reason, diagnostic_only = _subject_quality_from_validation(
+        validation,
+        first_event,
+        raws,
+    )
     ecosystem = infer_affected_ecosystem(first_event, raws)
     archetype = event_archetype(first_event, raws, claims=claims)
     domains = _independent_domains(raws)
@@ -361,6 +406,8 @@ def _incident_from_group(
     warnings = _incident_warnings_for_group(first_event, raws, archetype, primary_subject)
     if subject_quality != "valid":
         warnings = tuple(dict.fromkeys((*warnings, f"incident_primary_subject_{subject_quality}")))
+    if validation.warnings:
+        warnings = tuple(dict.fromkeys((*warnings, *validation.warnings)))
     digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
     return CanonicalIncident(
         schema_version=INCIDENT_GRAPH_SCHEMA_VERSION,
@@ -554,6 +601,93 @@ def _subject_quality(
     if event is not None and (_normalized_subject(event.external_asset) or _normalized_subject(event.event_name)):
         return "fallback_used", "validated_event_entity", False
     return "invalid", "generic_or_missing_primary_subject", True
+
+
+def _subject_quality_from_validation(
+    validation: IncidentSubjectValidation,
+    event: NormalizedEvent | None,
+    raws: tuple[RawDiscoveredEvent, ...],
+) -> tuple[str, str | None, bool]:
+    if validation.status == "valid":
+        return "valid", "validated_primary_subject", False
+    if validation.status == "fallback_used" and validation.normalized_subject:
+        return "fallback_used", validation.fallback_source or "validated_fallback_subject", False
+    if _is_market_anomaly_event(event, raws):
+        asset = _market_anomaly_asset(event, raws)
+        if asset.get("identity_source") == "market_payload":
+            return "fallback_used", "validated_market_anomaly_asset", False
+    return "invalid", validation.rejection_reason or "generic_or_missing_primary_subject", True
+
+
+def _subject_fallback_from_context(context: object | None) -> tuple[str | None, str | None]:
+    if context is None:
+        return None, None
+    values: list[tuple[str | None, str]] = []
+    if isinstance(context, dict):
+        event = context.get("event")
+        values.extend(_subject_values_from_event(event))
+        for key in (
+            "validated_external_entity",
+            "external_entity",
+            "external_asset",
+            "validated_symbol",
+            "validated_coin_id",
+            "symbol",
+            "coin_id",
+            "asset",
+            "entity",
+        ):
+            value = context.get(key)
+            if isinstance(value, dict):
+                values.extend(_subject_values_from_asset(value, f"context:{key}"))
+            else:
+                values.append((str(value) if value is not None else None, f"context:{key}"))
+    else:
+        values.extend(_subject_values_from_event(context))
+    for value, source in values:
+        normalized = _normalized_subject(value)
+        if normalized:
+            return normalized, source
+    return None, None
+
+
+def _subject_values_from_event(event: object | None) -> list[tuple[str | None, str]]:
+    if event is None:
+        return []
+    values: list[tuple[str | None, str]] = []
+    values.append((getattr(event, "external_asset", None), "event_external_asset"))
+    payload = getattr(event, "raw_json", None)
+    if isinstance(payload, dict):
+        for key in ("external_asset", "validated_external_entity", "symbol", "coin_id", "name"):
+            values.append((str(payload.get(key)) if payload.get(key) is not None else None, f"raw_json:{key}"))
+        market = payload.get("market")
+        if isinstance(market, dict):
+            values.extend(_subject_values_from_asset(market, "market_payload"))
+    event_name = getattr(event, "event_name", None)
+    if _event_name_can_be_subject(event_name):
+        values.append((str(event_name), "event_name"))
+    return values
+
+
+def _subject_values_from_asset(asset: dict[str, object], source: str) -> list[tuple[str | None, str]]:
+    return [
+        (str(asset.get("name")) if asset.get("name") is not None else None, source + ":name"),
+        (str(asset.get("symbol")) if asset.get("symbol") is not None else None, source + ":symbol"),
+        (str(asset.get("coin_id")) if asset.get("coin_id") is not None else None, source + ":coin_id"),
+        (str(asset.get("id")) if asset.get("id") is not None else None, source + ":id"),
+    ]
+
+
+def _event_name_can_be_subject(value: str | None) -> bool:
+    cleaned = clean_text(value or "")
+    if not cleaned:
+        return False
+    tokens = cleaned.split()
+    if not tokens or tokens[0] in _GENERIC_SUBJECT_TOKENS or tokens[0] in _GENERIC_SUBJECTS:
+        return False
+    if _is_noise_subject(cleaned):
+        return False
+    return True
 
 
 def _is_market_anomaly_event(event: NormalizedEvent | None, raws: tuple[RawDiscoveredEvent, ...]) -> bool:

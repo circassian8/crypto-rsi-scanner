@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
@@ -1309,7 +1309,7 @@ def _event_has_passed(alert: event_alerts.EventAlertCandidate, now: datetime) ->
 
 
 def _append_entries(path: Path, entries: Iterable[EventWatchlistEntry]) -> int:
-    data = list(entries)
+    data = [_entry_with_persistence_quality_cap(entry) for entry in entries]
     if not data:
         return 0
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1318,6 +1318,47 @@ def _append_entries(path: Path, entries: Iterable[EventWatchlistEntry]) -> int:
             fh.write(json.dumps(_json_ready(asdict(entry)), sort_keys=True, separators=(",", ":")))
             fh.write("\n")
     return len(data)
+
+
+def _entry_with_persistence_quality_cap(entry: EventWatchlistEntry) -> EventWatchlistEntry:
+    """Ensure hand-built entries cannot bypass lifecycle quality caps."""
+    requested = requested_state_value(entry)
+    quality = _quality_bundle_from_entry(entry)
+    final_state, block_reason = quality_cap_watchlist_state(requested, quality)
+    if final_state in {
+        EventWatchlistState.TRIGGERED_FADE.value,
+        EventWatchlistState.INVALIDATED.value,
+        EventWatchlistState.EXPIRED.value,
+    }:
+        return entry
+    capped = requested != final_state
+    if (
+        entry.state == final_state
+        and entry.final_state_after_quality_gate == final_state
+        and bool(entry.state_quality_capped) == capped
+        and (entry.quality_state_block_reason or block_reason) == entry.quality_state_block_reason
+    ):
+        return entry
+    warnings = tuple(dict.fromkeys((
+        *entry.warnings,
+        *(("quality_state_blocked:" + str(block_reason),) if block_reason else ()),
+    )))
+    return replace(
+        entry,
+        state=final_state,
+        requested_state_before_quality_gate=requested,
+        final_state_after_quality_gate=final_state,
+        state_quality_capped=capped,
+        quality_state_block_reason=block_reason,
+        should_alert=entry.should_alert and not capped,
+        suppressed_reason=entry.suppressed_reason
+        or (
+            f"quality state gate capped {requested} to {final_state}: {block_reason}"
+            if capped
+            else None
+        ),
+        warnings=warnings,
+    )
 
 
 def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:

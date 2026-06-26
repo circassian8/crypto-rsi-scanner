@@ -136,7 +136,10 @@ fresh rows; requested pre-quality state is audit-only. Fresh alert/playbook or
 market-anomaly rows without explicit quality fields are conservative local-only
 evidence. When old rows carry quality fields but stale active final state,
 read/report paths recompute the final state from quality rather than trusting
-the stale stored final state.
+the stale stored final state. Artifact doctor treats rows loaded from a resolved
+profile namespace as path-scoped current artifacts even if older watchlist rows
+are missing embedded `profile`, `run_mode`, or `artifact_namespace` fields;
+missing metadata must not hide active-state quality conflicts.
 Impact review now also includes claim and incident context. Check
 `cause_status`, `claim_polarities`, `claim_history`, `primary_subject`,
 `affected_ecosystem`, `candidate_role`, `role_confidence`, and
@@ -162,7 +165,10 @@ Generic prose fragments such as `Actions`, `Announcements`, `However`, `It`,
 validated external entity, crypto asset, market-anomaly asset, or event entity
 is available, the incident row should be diagnostic-only and hidden from default
 incident reports rather than shown as a canonical opportunity. Existing
-persisted garbage-subject rows are also quarantined at read/report time.
+persisted garbage-subject rows are also quarantined at read/report time. Fresh
+incident writes validate the primary subject before persistence, so boilerplate,
+publisher/source noise, SEO text, and generic pronouns should never be written
+as `incident_subject_quality=valid` with a missing relevance status.
 Incident persistence also has a separate crypto-relevance gate. Rows may be
 classified as `raw_observation`, `external_context_only`,
 `incident_candidate`, `canonical_incident`, `linked_incident`,

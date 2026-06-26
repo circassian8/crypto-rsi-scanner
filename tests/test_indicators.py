@@ -24510,6 +24510,180 @@ def test_event_alpha_notification_slo_distinguishes_preview_config_and_delivery_
     assert any("provider" in warning for warning in provider_backoff_preview.warnings)
 
 
+def test_event_alpha_live_path_caps_non_hypothesis_watchlist_and_doctor_sees_path_scoped_rows():
+    from dataclasses import asdict
+    from datetime import datetime, timezone
+    from pathlib import Path
+    import tempfile
+
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_watchlist
+
+    now = datetime(2026, 6, 26, 15, 30, tzinfo=timezone.utc)
+    quality = {
+        "impact_path_type": "insufficient_data",
+        "impact_path_strength": "none",
+        "candidate_role": "unknown_with_reason",
+        "evidence_quality_score": 0.0,
+        "source_class": "insufficient_data",
+        "evidence_specificity": "insufficient_data",
+        "market_confirmation_score": 0.0,
+        "market_confirmation_level": "insufficient_data",
+        "opportunity_score_final": 0.0,
+        "opportunity_level": "local_only",
+        "opportunity_verdict_reasons": ["quality_context_missing"],
+        "why_local_only": "quality_context_missing",
+        "why_not_watchlist": "quality_context_missing",
+        "manual_verification_items": ["verify catalyst and asset identity"],
+        "upgrade_requirements": ["needs_quality_context"],
+        "downgrade_warnings": ["insufficient_data"],
+    }
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="world-cup|sports-event|2026-06-26|chiliz|fan_sports_event",
+        cluster_id="world-cup|sports-event|2026-06-26",
+        event_id="evt:world-cup",
+        coin_id="chiliz",
+        symbol="CHZ",
+        relationship_type="proxy_attention",
+        external_asset="World Cup",
+        event_time=now.isoformat(),
+        state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        previous_state=event_watchlist.EventWatchlistState.RADAR.value,
+        requested_state_before_quality_gate=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        final_state_after_quality_gate=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        state_quality_capped=False,
+        first_seen_at=now.isoformat(),
+        last_seen_at=now.isoformat(),
+        source_count=1,
+        highest_score=82,
+        latest_score=82,
+        latest_tier="WATCHLIST",
+        latest_event_name="World Cup fan token attention",
+        latest_source="project_blog_rss",
+        latest_playbook_type="fan_sports_event",
+        latest_effective_playbook_type="fan_sports_event",
+        latest_score_components={
+            "cluster_confidence": 72,
+            "market_move_volume": 12,
+        },
+        should_alert=True,
+        material_change_reasons=("score_jump",),
+        **quality,
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_watchlist_state.jsonl"
+        event_watchlist._append_entries(path, [entry])
+        persisted = event_watchlist.load_watchlist(path).entries[0]
+        assert persisted.state == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value
+        assert persisted.final_state_after_quality_gate == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value
+        assert persisted.state_quality_capped is True
+        assert persisted.quality_state_block_reason == "impact_path_type_insufficient_data"
+        raw_missing_metadata = asdict(entry)
+        raw_missing_metadata.pop("profile", None)
+        raw_missing_metadata.pop("artifact_namespace", None)
+        raw_missing_metadata.pop("run_mode", None)
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            watchlist_rows=[raw_missing_metadata],
+            profile="notify_llm_quality",
+            artifact_namespace="notify_llm_quality",
+            strict=True,
+        )
+        assert doctor.status == "BLOCKED"
+        assert doctor.universal_watchlist_state_conflicts == 1
+        assert doctor.non_hypothesis_watchlist_quality_conflicts == 1
+        assert doctor.fresh_watchlist_state_conflict_rows == 1
+        capped_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            watchlist_rows=[asdict(persisted)],
+            profile="notify_llm_quality",
+            artifact_namespace="notify_llm_quality",
+            strict=True,
+        )
+        assert capped_doctor.fresh_watchlist_state_conflict_rows == 0
+        assert capped_doctor.quality_capped_watchlist_rows == 1
+
+
+def test_event_incident_primary_subject_validator_quarantines_garbage_before_persistence():
+    from datetime import datetime, timezone
+    from pathlib import Path
+    import tempfile
+
+    from crypto_rsi_scanner import event_incident_graph, event_incident_store
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    invalid_subjects = (
+        "About",
+        "All",
+        "Best Prediction Market Apps",
+        "Bitcoin And MSTR Are",
+        "During",
+        "Here",
+        "LLM",
+        "Need",
+        "Not",
+        "Polymarket Invite Code SBWIRE",
+        "Polymarket Referral Code SBWIRE",
+    )
+    for subject in invalid_subjects:
+        result = event_incident_graph.validate_incident_primary_subject(subject)
+        assert result.status in {"invalid_subject", "diagnostic_only"}
+        assert result.normalized_subject is None
+    assert event_incident_graph.validate_incident_primary_subject("OpenAI This").normalized_subject == "OpenAI"
+    assert event_incident_graph.validate_incident_primary_subject("World Cup").normalized_subject == "World Cup"
+    for subject in ("SpaceX", "OpenAI", "Anthropic", "THORChain", "SecondFi", "Solana"):
+        assert event_incident_graph.validate_incident_primary_subject(subject).status == "valid"
+
+    now = datetime(2026, 6, 26, 16, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        "raw_about",
+        "fixture_news",
+        now,
+        now,
+        "https://example.com/about",
+        "About",
+        "About unlock supply event with no validated crypto subject.",
+        {},
+        0.72,
+        "hash-about",
+    )
+    event = NormalizedEvent(
+        "evt_about",
+        (raw.raw_id,),
+        "About",
+        "unlock",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (raw.source_url,),
+        "About",
+        raw.body,
+        0.72,
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_incidents.jsonl"
+        write = event_incident_store.write_incidents(
+            EventDiscoveryResult((raw,), (event,), (), (), ()),
+            cfg=event_incident_store.EventIncidentStoreConfig(path=path, store_diagnostic=True),
+            now=now,
+            run_id="run-about",
+            profile="notify_llm_quality",
+            run_mode="notification_burn_in",
+            artifact_namespace="notify_llm_quality",
+        )
+        assert write.success is True
+        loaded = event_incident_store.load_incidents(path)
+        assert loaded.rows[0]["diagnostic_only"] is True
+        assert loaded.rows[0]["incident_subject_quality"] == "diagnostic_only"
+        assert loaded.rows[0]["incident_relevance_status"] == "diagnostic_only"
+        assert loaded.rows[0]["canonical_persistence_reason"] == "diagnostic_subject_only"
+        report = event_incident_store.format_incidents_report(loaded)
+        assert "diagnostic_rows_hidden: 1" in report
+        visible = event_incident_store.load_incidents(path, include_diagnostic=True)
+        visible_report = event_incident_store.format_incidents_report(visible)
+        assert "diagnostic_rows_hidden: 0" in visible_report
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

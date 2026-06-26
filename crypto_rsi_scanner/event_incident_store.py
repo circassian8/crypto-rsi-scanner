@@ -193,6 +193,7 @@ def write_incidents(
         debug_store = _debug_allows_diagnostic(profile=profile, run_mode=run_mode)
         store_diagnostic = bool(cfg.store_diagnostic or debug_store)
         store_raw_observations = bool(cfg.store_raw_observations or cfg.store_diagnostic or debug_store)
+        rows = [_row_with_effective_relevance(_row_with_effective_subject_quality(row)) for row in rows]
         rows_to_write = [
             row for row in rows
             if _should_persist_incident_row(
@@ -397,8 +398,28 @@ def _row_from_incident(
     current_polarities = tuple(dict.fromkeys(
         str(claim.polarity) for claim in incident.claim_history if str(claim.polarity)
     ))
+    subject_validation = event_incident_graph.validate_incident_primary_subject(
+        incident.primary_subject,
+        {
+            "external_asset": incident.affected_ecosystem,
+        },
+    )
     diagnostic_only = bool(incident.diagnostic_only and not h_rows and not w_rows)
     subject_quality = "diagnostic_only" if diagnostic_only else incident.subject_quality
+    primary_subject = incident.primary_subject
+    subject_quality_reason = incident.subject_quality_reason
+    subject_warnings = tuple(incident.warnings)
+    if subject_validation.status == "fallback_used" and subject_validation.normalized_subject:
+        primary_subject = subject_validation.normalized_subject
+        subject_quality = "fallback_used"
+        subject_quality_reason = subject_validation.fallback_source or "incident_store_subject_fallback"
+        subject_warnings = tuple(dict.fromkeys((*subject_warnings, *subject_validation.warnings)))
+    elif subject_validation.status in {"invalid_subject", "diagnostic_only", "external_context_only"}:
+        primary_subject = subject_validation.normalized_subject
+        subject_quality = "diagnostic_only"
+        subject_quality_reason = subject_validation.rejection_reason or "garbage_primary_subject_quarantined"
+        diagnostic_only = True
+        subject_warnings = tuple(dict.fromkeys((*subject_warnings, *subject_validation.warnings)))
     relevance = classify_incident_relevance(
         incident,
         raw_by_id=raw_by_id,
@@ -425,9 +446,9 @@ def _row_from_incident(
         "incident_id": incident.incident_id,
         "canonical_name": incident.canonical_name,
         "event_archetype": incident.event_archetype,
-        "primary_subject": incident.primary_subject,
+        "primary_subject": primary_subject,
         "incident_subject_quality": subject_quality,
-        "incident_subject_quality_reason": incident.subject_quality_reason,
+        "incident_subject_quality_reason": subject_quality_reason,
         "diagnostic_only": diagnostic_only,
         "incident_relevance_status": relevance["incident_relevance_status"],
         "incident_relevance_score": relevance["incident_relevance_score"],
@@ -477,7 +498,7 @@ def _row_from_incident(
         "market_context_age": market["market_context_age"],
         "incident_confidence": _incident_confidence(incident, h_rows, market),
         "warnings": tuple(dict.fromkeys([
-            *incident.warnings,
+            *subject_warnings,
             *_incident_warnings(incident, market),
             *relevance["incident_relevance_warnings"],
         ])),
@@ -1444,7 +1465,21 @@ _GARBAGE_INCIDENT_SUBJECTS = {
 
 def _row_with_effective_subject_quality(row: Mapping[str, Any]) -> dict[str, Any]:
     data = dict(row)
-    if not _is_garbage_incident_subject(data.get("primary_subject")):
+    validation = event_incident_graph.validate_incident_primary_subject(
+        data.get("primary_subject"),
+        {
+            "external_asset": data.get("affected_ecosystem"),
+        },
+    )
+    if validation.status == "fallback_used" and validation.normalized_subject:
+        warnings = [str(item) for item in data.get("warnings") or () if str(item or "").strip()]
+        warnings.extend(value for value in validation.warnings if value not in warnings)
+        data["primary_subject"] = validation.normalized_subject
+        data["incident_subject_quality"] = "fallback_used"
+        data["incident_subject_quality_reason"] = validation.fallback_source or "garbage_primary_subject_fallback"
+        data["warnings"] = tuple(dict.fromkeys(warnings))
+        return data
+    if validation.status == "valid" and not _is_garbage_incident_subject(data.get("primary_subject")):
         return data
     warnings = [str(item) for item in data.get("warnings") or () if str(item or "").strip()]
     if "incident_primary_subject_garbage_quarantined" not in warnings:
@@ -1452,6 +1487,11 @@ def _row_with_effective_subject_quality(row: Mapping[str, Any]) -> dict[str, Any
     data["diagnostic_only"] = True
     data["incident_subject_quality"] = "diagnostic_only"
     data["incident_subject_quality_reason"] = "garbage_primary_subject_quarantined"
+    data["incident_relevance_status"] = RELEVANCE_DIAGNOSTIC_ONLY
+    data["incident_relevance_score"] = 0.0
+    data["incident_relevance_reasons"] = ("invalid_or_diagnostic_subject",)
+    data["incident_relevance_warnings"] = ("incident_hidden_from_default_report",)
+    data["canonical_persistence_reason"] = "diagnostic_subject_only"
     data["warnings"] = tuple(warnings)
     return data
 

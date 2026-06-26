@@ -102,13 +102,21 @@ must not persist as active `WATCHLIST`, `HIGH_PRIORITY`, `EVENT_PASSED`, or
 `final_state_after_quality_gate` plus `state_quality_capped=true`. Missing
 quality on fresh alert/playbook/market-anomaly rows is conservative local-only
 evidence, and stale persisted final states must be recomputed from quality
-fields when those fields are present. Generic prose, source, and SEO fragments
-are not valid canonical incident subjects; invalid incident rows are
-diagnostic-only unless linked to real hypothesis/watchlist context. Existing
-persisted garbage subjects such as `LLM`, `Best Prediction Market Apps`, or
-`Polymarket Invite Code SBWIRE` must be quarantined at read/report time and
-hidden from default incident reports unless diagnostics are explicitly
-requested. These rules are artifact truth and operator-UX rules only, and
+fields when those fields are present. The lifecycle cap is a persistence rule
+for every fresh watchlist row, including non-hypothesis event-alert/playbook
+rows; requested pre-quality state is audit metadata only. Artifact doctor must
+inspect path-scoped watchlist rows even when older rows lack embedded
+profile/namespace fields.
+Generic prose, source, and SEO fragments are not valid canonical incident
+subjects; invalid incident rows are diagnostic-only unless linked to real
+hypothesis/watchlist context. Existing persisted garbage subjects such as
+`LLM`, `Best Prediction Market Apps`, or `Polymarket Invite Code SBWIRE` must be
+quarantined at read/report time and hidden from default incident reports unless
+diagnostics are explicitly requested. Fresh incident store writes must validate
+primary subjects before persistence so garbage subjects are rejected,
+diagnostic-only, external/raw context, or replaced by validated fallback
+context rather than stored as canonical valid incidents. These rules are
+artifact truth and operator-UX rules only, and
 cannot create candidates, normal RSI alerts, paper rows, trades, or
 `TRIGGERED_FADE`.
 **Why:** Operator reports should not show local-only or insufficient-data

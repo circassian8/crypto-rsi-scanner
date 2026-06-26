@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Enforce Event Alpha live-path quality caps and incident subjects · Codex
+**Why:** Fresh `notify_llm_quality` artifacts still had non-hypothesis
+CHZ/SOL/ADA/DOGE-style rows persisted as `WATCHLIST` despite local-only,
+zero-score, insufficient-data quality verdicts. Incident artifacts also
+contained boilerplate/SEO subjects such as `About`, `All`, `LLM`, and
+`Polymarket Invite Code SBWIRE` as canonical-looking rows.
+**Changes:**
+- Added a watchlist persistence safety cap so hand-built or non-hypothesis
+  entries are normalized through `quality_cap_watchlist_state` before JSONL
+  write; active states with local-only/insufficient-data/unknown-role quality
+  now persist as `QUALITY_BLOCKED` with requested/final state fields.
+- Updated artifact doctor to inspect path-scoped watchlist rows even when older
+  rows lack embedded profile/namespace metadata, so non-hypothesis quality
+  conflicts are no longer invisible.
+- Added a central incident primary-subject validator and wired it into
+  incident graph/store paths before persistence; garbage subjects are
+  diagnostic-only/rejected or replaced by validated context instead of stored
+  as valid canonical incidents.
+- Added regressions for the exact CHZ-style non-hypothesis watchlist shape and
+  the garbage incident subject list.
+**Verify:** `python3 tests/test_indicators.py` passed (463/463); `make
+event-llm-eval PYTHON=python3` passed (9/9); `make event-llm-extract-eval
+PYTHON=python3` passed (7/7); `make event-alpha-eval PYTHON=python3` passed
+(11/11); `make event-alpha-signal-quality-eval PYTHON=python3` passed (31/31);
+`make event-alpha-quality-validation-cycle PYTHON=python3` completed with
+strict doctor WARN only for weak unqualified links and no blockers; `make
+event-alpha-quality-live-smoke PROFILE=notify_llm_quality PYTHON=python3`
+completed with fail-soft provider warnings and strict doctor WARN/no blockers;
+manual artifact checks found 0 active bad watchlist rows and 0 bad canonical
+incident subjects; `make verify PYTHON=python3` passed.
+**Notes/risks:** Research-only artifact truth/hygiene change. No sends, paper
+rows, normal RSI rows, trading, execution, or LLM/provider-created
+`TRIGGERED_FADE`; deterministic `event_fade.py` + `proxy_fade` remains the only
+fade trigger path.
+
 ## 2026-06-26 — Use final opportunity verdicts and refresh near-misses · Codex
 **Why:** `notify_llm_quality` artifacts showed candidates with
 `opportunity_score_final=72` and `opportunity_level=validated_digest` still
