@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-26 - Final opportunity verdict is the Event Alpha routing source
+**Status:** accepted
+**Decision:** Event Alpha validated-hypothesis routing and lifecycle quality
+checks must use `opportunity_score_final` and `opportunity_level` as the
+canonical active verdict. Older/intermediate fields such as
+`opportunity_score_v2`, `hypothesis_score`, and playbook/watchlist score remain
+audit and diagnostic inputs only; they must not block or promote a route when a
+final opportunity verdict is present. Route decisions should record
+`routing_score_used`, `routing_score_source=opportunity_score_final`, and
+`routing_verdict_used` so the operator can see which verdict drove routing.
+Near-miss refresh may fetch bounded market/enrichment/evidence context for
+already-validated near-promotion candidates and recompute the final verdict,
+but it is research-only and cannot send notifications by itself, create paper
+or live rows, write normal RSI signals, execute trades, or create
+`TRIGGERED_FADE`.
+**Why:** A stale intermediate score can contradict the final signal-quality
+verdict and hide useful validated candidates. Near-miss refresh should acquire
+missing evidence before final routing without weakening deterministic safety
+gates.
+**Revisit when:** The opportunity verdict model is replaced by a versioned
+research database/schema with explicit migration and backtest-reviewed
+thresholds.
+
 ## 2026-06-26 - Canonical incidents require crypto relevance
 **Status:** accepted
 **Decision:** Event Alpha incident artifacts must distinguish raw source

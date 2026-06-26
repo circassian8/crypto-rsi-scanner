@@ -193,6 +193,26 @@ class EventImpactHypothesis:
     why_not_watchlist: str | None = None
     upgrade_requirements: tuple[str, ...] = ()
     downgrade_warnings: tuple[str, ...] = ()
+    market_refresh_attempted: bool | None = None
+    market_refresh_success: bool | None = None
+    market_confirmation_before: float | None = None
+    market_confirmation_after: float | None = None
+    derivatives_refresh_attempted: bool | None = None
+    derivatives_refresh_success: bool | None = None
+    supply_refresh_attempted: bool | None = None
+    supply_refresh_success: bool | None = None
+    derivative_confirmation_reasons: tuple[str, ...] = ()
+    supply_confirmation_reasons: tuple[str, ...] = ()
+    evidence_refresh_attempted: bool | None = None
+    evidence_refresh_results: tuple[dict[str, Any], ...] = ()
+    evidence_quality_before: float | None = None
+    evidence_quality_after: float | None = None
+    opportunity_level_before: str | None = None
+    opportunity_level_after: str | None = None
+    opportunity_score_before: float | None = None
+    opportunity_score_after: float | None = None
+    upgrade_reason: str | None = None
+    no_upgrade_reason: str | None = None
     created_at: str | None = None
 
 

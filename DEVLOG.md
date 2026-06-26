@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Use final opportunity verdicts and refresh near-misses · Codex
+**Why:** `notify_llm_quality` artifacts showed candidates with
+`opportunity_score_final=72` and `opportunity_level=validated_digest` still
+kept local because the router consulted stale `opportunity_score_v2=64`. Near
+misses blocked mostly by missing market evidence also needed bounded targeted
+refresh before final routing.
+**Changes:**
+- Made Event Alpha routing use canonical `opportunity_score_final` and
+  `opportunity_level` for validated-hypothesis digest decisions; older
+  `opportunity_score_v2` and `hypothesis_score` remain audit fields only.
+- Added `event_near_miss.py` to identify near-promotion candidates, reject
+  generic/source-noise rows, run bounded market/enrichment refreshes when
+  enabled, recompute final opportunity verdicts, and store before/after
+  diagnostics without creating alerts or triggers.
+- Wired near-miss refresh into the Event Alpha pipeline and `notify_llm`/
+  `notify_llm_deep`/`notify_llm_quality` profiles, plus
+  `--event-alpha-near-miss-report` and `make event-alpha-near-miss-report`.
+- Added near-miss sections to daily briefs and opportunity audits, and exposed
+  route-report fields `routing_score_used`, `routing_score_source`, and
+  `routing_verdict_used`.
+**Verify:** Focused router/near-miss tests passed; `python3
+tests/test_indicators.py` passed (461/461); `make
+event-alpha-signal-quality-eval PYTHON=python3` passed (31/31); `make
+event-alpha-quality-validation-cycle PYTHON=python3` completed with strict
+doctor `WARN` only for weak unqualified incident links and no blockers; `make
+verify PYTHON=python3` passed. Manual smokes: `make
+event-alpha-quality-review PROFILE=notify_llm_quality PYTHON=python3`,
+`make event-alpha-near-miss-report PROFILE=notify_llm_quality PYTHON=python3`,
+and `make event-opportunity-audit PROFILE=notify_llm_quality TARGET=AAVE
+PYTHON=python3` all completed.
+**Notes/risks:** Research-only artifact/route quality control. This does not
+send notifications by itself, create paper/live trades, write normal RSI rows,
+or create `TRIGGERED_FADE`; deterministic `event_fade.py` plus `proxy_fade`
+remains the only fade trigger source.
+
 ## 2026-06-26 — Require quality-qualified incident links · Codex
 **Why:** Broad external events such as Annexation, Macron, OpenAI, Metamask,
 and Databricks were still appearing as `active_incident` because stale/legacy

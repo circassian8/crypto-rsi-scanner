@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_quality_fields, event_alpha_router, event_opportunity_verdict, event_watchlist
+from . import (
+    event_alpha_quality_fields,
+    event_alpha_router,
+    event_near_miss,
+    event_opportunity_verdict,
+    event_watchlist,
+)
 
 
 def format_opportunity_audit(
@@ -38,6 +44,7 @@ def format_opportunity_audit(
     components = _components(row)
     incident = _incident_context(row, components, incidents)
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
+    near_miss = event_near_miss.near_miss_metadata_for_row(row)
     lines = [
         "=" * 76,
         "EVENT OPPORTUNITY AUDIT (research-only)",
@@ -94,6 +101,9 @@ def format_opportunity_audit(
         f"- why local-only: {components.get('why_local_only') or row.get('why_local_only') or 'none'}",
         f"- why not watchlist: {components.get('why_not_watchlist') or row.get('why_not_watchlist') or 'none'}",
         "",
+        "## Near-miss status",
+        *_near_miss_lines(near_miss, row),
+        "",
         "## Router decision",
         f"- route: {_value(row, 'route', default=match.get('route') or 'not_routed')}",
         f"- notification lane: {_value(row, 'lane', default=match.get('lane') or 'local_only')}",
@@ -120,6 +130,32 @@ def format_opportunity_audit(
         "No secrets, Telegram sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
     ]
     return "\n".join(lines)
+
+
+def _near_miss_lines(
+    near_miss: event_near_miss.EventNearMissCandidate | None,
+    row: Mapping[str, Any],
+) -> list[str]:
+    if near_miss is None:
+        return ["- status: not close to promotion by current quality gates"]
+    lines = [
+        "- status: near-miss candidate",
+        f"- near_miss_id: {near_miss.near_miss_id}",
+        f"- score/level before refresh: {near_miss.opportunity_score_before:.0f} / {near_miss.opportunity_level_before}",
+        "- missing evidence: " + (_list_value(near_miss.missing_evidence) or "none"),
+        "- recommended refresh: " + (_list_value(near_miss.recommended_refresh_actions) or "operator_review"),
+    ]
+    score_components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+    before = row.get("opportunity_level_before") or score_components.get("opportunity_level_before")
+    after = row.get("opportunity_level_after") or score_components.get("opportunity_level_after")
+    if before or after or row.get("market_refresh_attempted") is not None:
+        lines.append(
+            "- targeted refresh: "
+            f"market={str(bool(row.get('market_refresh_attempted'))).lower()}/"
+            f"{str(bool(row.get('market_refresh_success'))).lower()} "
+            f"verdict={before or near_miss.opportunity_level_before}->{after or row.get('opportunity_level') or near_miss.opportunity_level_before}"
+        )
+    return lines
 
 
 def _find_match(
@@ -184,7 +220,14 @@ def _row_matches(row: Mapping[str, Any], clean: str, original: str) -> bool:
         row.get("canonical_name"),
         row.get("symbol"),
         row.get("coin_id"),
+        row.get("validated_symbol"),
+        row.get("validated_coin_id"),
     }
+    components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+    keys.update({
+        components.get("validated_symbol"),
+        components.get("validated_coin_id"),
+    })
     text_keys = {str(value) for value in keys if value not in (None, "")}
     return clean in text_keys or original in text_keys or ("ea:" + clean) in text_keys
 

@@ -18,6 +18,7 @@ from . import (
     event_impact_hypotheses,
     event_llm_analyzer,
     event_llm_extractor,
+    event_near_miss,
     event_source_enrichment,
     event_watchlist,
     event_watchlist_enrichment,
@@ -69,6 +70,7 @@ class EventAlphaPipelineResult:
     watchlist_result: event_watchlist.EventWatchlistRefreshResult | None
     watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None
     router_result: event_alpha_router.EventAlphaRouterResult | None
+    near_miss_result: event_near_miss.EventNearMissRefreshResult | None = None
     impact_hypotheses: tuple[event_impact_hypotheses.EventImpactHypothesis, ...] = ()
     warnings: tuple[str, ...] = ()
     clock_status: dict[str, Any] = field(default_factory=dict)
@@ -239,6 +241,14 @@ class EventAlphaPipelineResult:
     def alertable(self) -> int:
         return len(self.router_result.alertable_decisions) if self.router_result else 0
 
+    @property
+    def near_misses(self) -> int:
+        return len(self.near_miss_result.near_misses) if self.near_miss_result else 0
+
+    @property
+    def near_miss_upgrades(self) -> int:
+        return self.near_miss_result.upgraded_count if self.near_miss_result else 0
+
 
 def run_event_alpha_pipeline(
     discovery_result: EventDiscoveryResult,
@@ -270,6 +280,11 @@ def run_event_alpha_pipeline(
     watchlist_monitor_supply_rows: Iterable[dict[str, Any]] = (),
     watchlist_monitor_enrichment_max_assets: int = 50,
     watchlist_monitor_route_updates: bool = True,
+    near_miss_cfg: event_near_miss.EventNearMissConfig | None = None,
+    near_miss_market_rows: Iterable[dict[str, Any]] = (),
+    near_miss_market_provider: event_watchlist_market.EventWatchlistMarketProvider | None = None,
+    near_miss_derivatives_rows: Iterable[dict[str, Any]] = (),
+    near_miss_supply_rows: Iterable[dict[str, Any]] = (),
     extra_warnings: Iterable[str] = (),
 ) -> EventAlphaPipelineResult:
     """Run the research-only Event Alpha pipeline over a discovery result."""
@@ -342,6 +357,20 @@ def run_event_alpha_pipeline(
                 impact_hypotheses,
                 validation_raw,
             )
+
+    near_miss_result: event_near_miss.EventNearMissRefreshResult | None = None
+    if near_miss_cfg is not None and near_miss_cfg.enabled:
+        near_miss_result = event_near_miss.refresh_near_miss_hypotheses(
+            impact_hypotheses,
+            cfg=near_miss_cfg,
+            market_rows=near_miss_market_rows or watchlist_monitor_market_rows,
+            targeted_market_provider=near_miss_market_provider,
+            derivatives_rows=near_miss_derivatives_rows or watchlist_monitor_derivatives_rows,
+            supply_rows=near_miss_supply_rows or watchlist_monitor_supply_rows,
+            now=observed,
+        )
+        impact_hypotheses = near_miss_result.hypotheses
+        warnings.extend(f"near miss: {warning}" for warning in near_miss_result.warnings)
 
     anomaly_lifecycle_result = (
         event_anomaly_state.build_anomaly_lifecycle(
@@ -434,6 +463,7 @@ def run_event_alpha_pipeline(
         watchlist_result=watchlist_result,
         watchlist_monitor_result=watchlist_monitor_result,
         router_result=router_result,
+        near_miss_result=near_miss_result,
         impact_hypotheses=impact_hypotheses,
         warnings=tuple(dict.fromkeys(warnings)),
     )
@@ -473,6 +503,11 @@ def run_event_alpha_operating_cycle(
     watchlist_monitor_supply_rows: Iterable[dict[str, Any]] = (),
     watchlist_monitor_enrichment_max_assets: int = 50,
     watchlist_monitor_route_updates: bool = True,
+    near_miss_cfg: event_near_miss.EventNearMissConfig | None = None,
+    near_miss_market_rows: Iterable[dict[str, Any]] = (),
+    near_miss_market_provider: event_watchlist_market.EventWatchlistMarketProvider | None = None,
+    near_miss_derivatives_rows: Iterable[dict[str, Any]] = (),
+    near_miss_supply_rows: Iterable[dict[str, Any]] = (),
     send: bool = False,
     send_callback: ResearchAlertSender | None = None,
 ) -> EventAlphaPipelineResult:
@@ -615,6 +650,11 @@ def run_event_alpha_operating_cycle(
         watchlist_monitor_supply_rows=watchlist_monitor_supply_rows,
         watchlist_monitor_enrichment_max_assets=watchlist_monitor_enrichment_max_assets,
         watchlist_monitor_route_updates=watchlist_monitor_route_updates,
+        near_miss_cfg=near_miss_cfg,
+        near_miss_market_rows=near_miss_market_rows or watchlist_monitor_market_rows,
+        near_miss_market_provider=near_miss_market_provider,
+        near_miss_derivatives_rows=near_miss_derivatives_rows or watchlist_monitor_derivatives_rows,
+        near_miss_supply_rows=near_miss_supply_rows or watchlist_monitor_supply_rows,
         extra_warnings=warnings,
     )
     if send:
@@ -808,7 +848,8 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
             f"hypotheses_validated={result.hypotheses_validated} · "
             f"hypothesis_search_queries={result.hypothesis_search_queries} · "
             f"hypothesis_search_results={result.hypothesis_search_results} · "
-            f"hypothesis_promotions={result.hypothesis_promotions}"
+            f"hypothesis_promotions={result.hypothesis_promotions} · "
+            f"near_misses={result.near_misses} · near_miss_upgrades={result.near_miss_upgrades}"
         ),
         (
             "hypothesis_search_query_types="

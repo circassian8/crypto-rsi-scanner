@@ -14,6 +14,7 @@ from . import (
     event_alpha_notifications,
     event_alpha_notification_runs,
     event_alpha_explain,
+    event_near_miss,
     event_alpha_run_ledger,
     event_alpha_router,
     event_opportunity_verdict,
@@ -367,6 +368,26 @@ def build_daily_brief(
     lines.append("- Market confirmation by playbook: " + _market_confirmation_by_playbook(decisions))
     lines.append("- Top upgrade candidates: " + (_upgrade_candidate_line(decisions) or "none"))
     lines.append("- Top downgrade risks: " + (_downgrade_risk_line(decisions) or "none"))
+    near_misses = event_near_miss.detect_near_miss_rows(
+        [decision.entry for decision in decisions] + hypotheses,
+        route_decisions=decisions,
+    )
+    lines.extend(["", "## Near-Miss Candidates"])
+    if near_misses:
+        for item in near_misses[:8]:
+            missing = ", ".join(item.missing_evidence[:3]) if item.missing_evidence else "none"
+            actions = ", ".join(item.recommended_refresh_actions[:3]) if item.recommended_refresh_actions else "operator_review"
+            refresh = (
+                f"market_refresh={str(item.market_refresh_attempted).lower()}/"
+                f"{str(item.market_refresh_success).lower()}"
+            )
+            lines.append(
+                f"- {item.symbol}/{item.coin_id}: score={item.opportunity_score_before:.0f} "
+                f"level={item.opportunity_level_before} route={item.final_route_before or 'unknown'} "
+                f"missing={missing}; actions={actions}; {refresh}"
+            )
+    else:
+        lines.append("- None.")
     lines.extend(["", "## Signal Quality Summary"])
     lines.append("- Opportunity Verdict Distribution: " + _quality_decision_counts(decisions, "opportunity_level"))
     lines.append("- Impact Path Distribution: " + _quality_decision_counts(decisions, "impact_path_type"))

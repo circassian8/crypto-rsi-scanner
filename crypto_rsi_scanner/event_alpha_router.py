@@ -67,6 +67,9 @@ class EventAlphaRouteDecision:
     quality_gate_block_reason: str | None = None
     opportunity_level: str | None = None
     opportunity_score_final: float | None = None
+    routing_score_used: float | None = None
+    routing_score_source: str | None = None
+    routing_verdict_used: str | None = None
 
     @property
     def alert_id(self) -> str:
@@ -293,6 +296,13 @@ def format_router_report(result: EventAlphaRouterResult) -> str:
                 f"score={decision.opportunity_score_final if decision.opportunity_score_final is not None else components.get('opportunity_score_final', 'n/a')} "
                 f"block={decision.quality_gate_block_reason or 'none'}"
             )
+        if decision.routing_score_source or decision.routing_verdict_used:
+            rows.append(
+                "  routing score: "
+                f"source={decision.routing_score_source or 'unknown'} "
+                f"value={decision.routing_score_used if decision.routing_score_used is not None else 'n/a'} "
+                f"verdict={decision.routing_verdict_used or 'unknown'}"
+            )
         rows.append(f"  route reason: {decision.reason}")
         rows.append(f"  lane: {decision.lane.value}")
         rows.append(f"  card: {decision.card_id}.md")
@@ -421,6 +431,9 @@ def _route_entry(
             quality_gate_block_reason=state_block,
             opportunity_level=entry.opportunity_level,
             opportunity_score_final=entry.opportunity_score_final,
+            routing_score_used=entry.opportunity_score_final,
+            routing_score_source="opportunity_score_final",
+            routing_verdict_used=entry.opportunity_level,
         )
 
     if _is_raw_or_terminal(state):
@@ -607,6 +620,9 @@ def _apply_quality_gate(decision: EventAlphaRouteDecision) -> EventAlphaRouteDec
         final_route_after_quality_gate=decision.route.value,
         opportunity_level=level or None,
         opportunity_score_final=score,
+        routing_score_used=score,
+        routing_score_source="opportunity_score_final",
+        routing_verdict_used=level or None,
     )
     if decision.route == EventAlphaRoute.TRIGGERED_FADE_RESEARCH:
         return base
@@ -874,6 +890,9 @@ def _apply_route_caps(
                 quality_gate_block_reason=decision.quality_gate_block_reason,
                 opportunity_level=decision.opportunity_level,
                 opportunity_score_final=decision.opportunity_score_final,
+                routing_score_used=decision.routing_score_used,
+                routing_score_source=decision.routing_score_source,
+                routing_verdict_used=decision.routing_verdict_used,
             ))
             continue
         if decision.lane == EventAlphaRouteLane.INSTANT_ESCALATION:
@@ -891,6 +910,9 @@ def _apply_route_caps(
                     quality_gate_block_reason=decision.quality_gate_block_reason,
                     opportunity_level=decision.opportunity_level,
                     opportunity_score_final=decision.opportunity_score_final,
+                    routing_score_used=decision.routing_score_used,
+                    routing_score_source=decision.routing_score_source,
+                    routing_verdict_used=decision.routing_verdict_used,
                 ))
                 continue
         if decision.lane == EventAlphaRouteLane.DAILY_DIGEST:
@@ -912,6 +934,9 @@ def _apply_route_caps(
                         quality_gate_block_reason=decision.quality_gate_block_reason,
                         opportunity_level=decision.opportunity_level,
                         opportunity_score_final=decision.opportunity_score_final,
+                        routing_score_used=decision.routing_score_used,
+                        routing_score_source=decision.routing_score_source,
+                        routing_verdict_used=decision.routing_verdict_used,
                     ))
                     continue
             digest_seen += 1
@@ -928,6 +953,9 @@ def _apply_route_caps(
                     quality_gate_block_reason=decision.quality_gate_block_reason,
                     opportunity_level=decision.opportunity_level,
                     opportunity_score_final=decision.opportunity_score_final,
+                    routing_score_used=decision.routing_score_used,
+                    routing_score_source=decision.routing_score_source,
+                    routing_verdict_used=decision.routing_verdict_used,
                 ))
                 continue
         out.append(decision)
@@ -1017,15 +1045,6 @@ def _validated_hypothesis_digest_block_reason(
     ).casefold()
     if "source_noise" in gate_text or "ticker_collision" in gate_text or "word_collision" in gate_text:
         return "source_noise_or_ticker_collision"
-    score = _hypothesis_score(entry, components)
-    if score < float(cfg.validated_hypothesis_min_score):
-        return f"score_below_threshold:{score:.0f}<{cfg.validated_hypothesis_min_score:.0f}"
-    opportunity_score = _hypothesis_opportunity_score_v2(entry, components)
-    if opportunity_score < float(cfg.validated_hypothesis_min_opportunity_score):
-        return (
-            "opportunity_score_v2_below_threshold:"
-            f"{opportunity_score:.0f}<{cfg.validated_hypothesis_min_opportunity_score:.0f}"
-        )
     final_score = _hypothesis_opportunity_score_final(entry, components)
     if final_score < float(cfg.validated_hypothesis_min_final_score):
         return (
@@ -1060,8 +1079,8 @@ def _validated_hypothesis_digest_block_reason(
                 reason = why_digest_ineligible or components.get("impact_path_reason") or path_strength
                 return f"impact_path_not_digest_eligible:{reason}"
         if stage not in {"impact_path_validated", "market_confirmed", "promoted_to_radar"}:
-            direct_override_score = max(75.0, float(cfg.validated_hypothesis_min_score) + 10.0)
-            if not (_has_clear_direct_token_event(entry, components) and score >= direct_override_score):
+            direct_override_score = max(75.0, float(cfg.validated_hypothesis_min_final_score) + 10.0)
+            if not (_has_clear_direct_token_event(entry, components) and final_score >= direct_override_score):
                 reason = str(components.get("impact_path_reason") or "no_value_capture_explained")
                 return f"impact_path_not_validated:{reason}"
             if cfg.weak_validated_local_only:
@@ -1112,18 +1131,18 @@ def _hypothesis_opportunity_score_final(
     entry: event_watchlist.EventWatchlistEntry,
     components: Mapping[str, object],
 ) -> float:
-    for value in (
-        components.get("opportunity_score_final"),
-        components.get("opportunity_score_v2"),
-        entry.latest_score,
-        components.get("hypothesis_score"),
-    ):
-        try:
-            num = float(value or 0.0)
-        except (TypeError, ValueError):
-            continue
-        if num > 0:
-            return num
+    try:
+        num = float(components.get("opportunity_score_final") or 0.0)
+    except (TypeError, ValueError):
+        num = 0.0
+    if num > 0:
+        return num
+    try:
+        entry_num = float(entry.opportunity_score_final or 0.0)
+    except (TypeError, ValueError):
+        entry_num = 0.0
+    if entry_num > 0:
+        return entry_num
     return 0.0
 
 

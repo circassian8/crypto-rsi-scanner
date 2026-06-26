@@ -10269,11 +10269,39 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
     assert "impact_path_not_digest_eligible" in by_symbol["BTC"].reason
     assert by_symbol["LOW"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
     assert by_symbol["LOW"].alertable is False
-    assert "score_below_threshold" in by_symbol["LOW"].reason
+    assert "opportunity_score_final_below_threshold" in by_symbol["LOW"].reason
     assert by_symbol["VELVET"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
     assert by_symbol["VELVET"].alertable is True
     assert by_symbol["SECTOR"].alertable is False
     assert by_symbol["SECTOR"].route != event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
+
+    canonical = event_alpha_router.route_watchlist(
+        event_watchlist.EventWatchlistReadResult(
+            state_path=Path("watchlist.jsonl"),
+            rows_read=2,
+            latest_only=True,
+            entries=[
+                entry("AAVE", 72, opportunity_score_v2=64, opportunity_score_final=72, opportunity_level="validated_digest"),
+                entry("BAD", 88, opportunity_score_v2=88, opportunity_score_final=40, opportunity_level="local_only"),
+            ],
+        ),
+        cfg=event_alpha_router.EventAlphaRouterConfig(
+            enabled=True,
+            validated_hypothesis_digest_enabled=True,
+            max_validated_hypothesis_digest_items=5,
+        ),
+    )
+    canonical_by_symbol = {decision.entry.symbol: decision for decision in canonical.decisions}
+    assert canonical_by_symbol["AAVE"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+    assert canonical_by_symbol["AAVE"].alertable is True
+    assert canonical_by_symbol["AAVE"].routing_score_used == 72
+    assert canonical_by_symbol["AAVE"].routing_score_source == "opportunity_score_final"
+    assert canonical_by_symbol["AAVE"].routing_verdict_used == "validated_digest"
+    assert canonical_by_symbol["BAD"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
+    assert canonical_by_symbol["BAD"].alertable is False
+    canonical_report = event_alpha_router.format_router_report(canonical)
+    assert "source=opportunity_score_final value=72" in canonical_report
+    assert "opportunity_score_v2_below_threshold" not in canonical_report
 
     disabled = event_alpha_router.route_watchlist(
         event_watchlist.EventWatchlistReadResult(
@@ -10312,6 +10340,187 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
     assert "not a calibrated strategy or trade signal" in card.markdown
     assert "OPENAI_API_KEY" not in card.markdown
     assert "TELEGRAM_BOT_TOKEN" not in card.markdown
+
+
+def test_event_alpha_near_miss_refreshes_market_context_without_triggering_fade():
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_daily_brief,
+        event_alpha_router,
+        event_impact_hypotheses,
+        event_near_miss,
+        event_opportunity_audit,
+        event_watchlist,
+    )
+
+    base_components = {
+        "validated_symbol": "ENA",
+        "validated_coin_id": "ethena",
+        "impact_category": "security_or_regulatory_shock",
+        "playbook_type": "security_or_regulatory_shock",
+        "impact_path_type": "exploit_security_event",
+        "impact_path_strength": "strong",
+        "candidate_role": "direct_subject",
+        "source_class": "crypto_news",
+        "evidence_specificity": "direct_token_mechanism",
+        "source_quality": 82,
+        "evidence_quality_score": 82,
+        "market_confirmation": 15,
+        "market_confirmation_score": 15,
+        "market_confirmation_level": "weak",
+        "opportunity_score_final": 64,
+        "opportunity_level": "exploratory",
+        "missing_requirements": ["market_confirmation"],
+        "why_not_watchlist": "market_confirmation",
+        "opportunity_score_v2": 80,
+    }
+    hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:ena",
+        event_cluster_id="cluster:ena",
+        event_type="security_event",
+        external_asset="Ethena",
+        impact_category="security_or_regulatory_shock",
+        candidate_sectors=("security",),
+        candidate_symbols=("ENA",),
+        candidate_coin_ids=("ethena",),
+        validated_candidate_assets=({"symbol": "ENA", "coin_id": "ethena", "validated": True},),
+        crypto_candidate_assets=({"symbol": "ENA", "coin_id": "ethena", "accepted": True},),
+        playbook_hint="security_or_regulatory_shock",
+        confidence=0.86,
+        hypothesis_score=82,
+        score_components=base_components,
+        validation_stage="impact_path_validated",
+        status="validated",
+        evidence_quotes=("ENA exploit security event was confirmed.",),
+        impact_path_reason="exploit_security_event",
+        impact_path_type="exploit_security_event",
+        impact_path_strength="strong",
+        candidate_role="direct_subject",
+        evidence_quality_score=82,
+        source_class="crypto_news",
+        evidence_specificity="direct_token_mechanism",
+        market_confirmation_score=15,
+        market_confirmation_level="weak",
+        market_confirmation_missing_fields=("market_confirmation",),
+        opportunity_score_v2=80,
+        opportunity_score_final=64,
+        opportunity_level="exploratory",
+        missing_requirements=("market_confirmation",),
+        why_not_watchlist="market_confirmation",
+    )
+    near = event_near_miss.detect_near_miss_rows((hypothesis,), cfg=event_near_miss.EventNearMissConfig())
+    assert len(near) == 1
+    assert near[0].symbol == "ENA"
+    assert "targeted_market_refresh" in near[0].recommended_refresh_actions
+
+    generic = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:generic",
+        event_cluster_id="cluster:generic",
+        event_type="macro",
+        external_asset="Bitcoin World",
+        impact_category="market_anomaly_unknown",
+        candidate_sectors=("macro",),
+        candidate_symbols=("BTC",),
+        candidate_coin_ids=("bitcoin",),
+        score_components={
+            **base_components,
+            "validated_symbol": "BTC",
+            "validated_coin_id": "bitcoin",
+            "impact_path_type": "generic_cooccurrence_only",
+            "candidate_role": "generic_mention",
+            "opportunity_score_final": 64,
+            "opportunity_level": "exploratory",
+        },
+        impact_path_type="generic_cooccurrence_only",
+        candidate_role="generic_mention",
+        opportunity_score_final=64,
+        opportunity_level="exploratory",
+    )
+    assert event_near_miss.detect_near_miss_rows((generic,), cfg=event_near_miss.EventNearMissConfig()) == ()
+
+    refreshed = event_near_miss.refresh_near_miss_hypotheses(
+        (hypothesis,),
+        cfg=event_near_miss.EventNearMissConfig(market_refresh_enabled=True, max_market_refresh_assets=5),
+        market_rows=({
+            "coin_id": "ethena",
+            "symbol": "ENA",
+            "return_24h": 58,
+            "return_72h": 96,
+            "volume_zscore_24h": 4.5,
+            "volume_to_market_cap": 0.42,
+            "timestamp": "2026-06-26T10:00:00+00:00",
+            "source": "fixture_market",
+        },),
+        now=datetime(2026, 6, 26, 11, 0, tzinfo=timezone.utc),
+    )
+    updated = refreshed.hypotheses[0]
+    refreshed_near = refreshed.near_misses[0]
+    assert refreshed_near.market_refresh_attempted is True
+    assert refreshed_near.market_refresh_success is True
+    assert refreshed_near.opportunity_score_after > refreshed_near.opportunity_score_before
+    assert updated.opportunity_level in {"validated_digest", "watchlist", "high_priority"}
+    assert updated.opportunity_score_final >= 65
+    assert updated.market_context_data_quality == "fresh"
+    assert updated.score_components["opportunity_score_v2"] == 80
+    assert "TRIGGERED_FADE" not in event_near_miss.format_near_miss_report(refreshed.near_misses)
+
+    report = event_near_miss.format_near_miss_report(refreshed.near_misses, profile="quality_validation")
+    assert "ENA/ethena" in report
+    assert "market_refresh: attempted=true success=true" in report
+
+    hypothesis_row = {
+        **hypothesis.__dict__,
+        "profile": "quality_validation",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "quality_validation",
+    }
+    daily = event_alpha_daily_brief.build_daily_brief(
+        hypothesis_rows=[hypothesis_row],
+        requested_profile="quality_validation",
+        artifact_namespace="quality_validation",
+    )
+    assert "## Near-Miss Candidates" in daily
+    assert "ENA/ethena" in daily
+
+    audit = event_opportunity_audit.format_opportunity_audit("ENA", hypotheses=[hypothesis], profile="quality_validation")
+    assert "## Near-miss status" in audit
+    assert "status: near-miss candidate" in audit
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="hypothesis|cluster:ena|security_or_regulatory_shock",
+        cluster_id="cluster:ena",
+        event_id="hyp:ena",
+        coin_id="ethena",
+        symbol="ENA",
+        relationship_type="impact_hypothesis",
+        external_asset="Ethena",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        previous_state=event_watchlist.EventWatchlistState.HYPOTHESIS.value,
+        first_seen_at="2026-06-26T10:00:00+00:00",
+        last_seen_at="2026-06-26T11:00:00+00:00",
+        latest_score=80,
+        latest_tier="RADAR_DIGEST",
+        latest_event_name="ENA refreshed near miss",
+        latest_source="fixture",
+        latest_score_components=updated.score_components,
+        opportunity_score_final=updated.opportunity_score_final,
+        opportunity_level=updated.opportunity_level,
+        should_alert=True,
+    )
+    routed = event_alpha_router.route_watchlist(
+        event_watchlist.EventWatchlistReadResult(
+            state_path=Path("watchlist.jsonl"),
+            rows_read=1,
+            latest_only=True,
+            entries=[entry],
+        ),
+        cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True, validated_hypothesis_digest_enabled=True),
+    )
+    assert routed.decisions[0].route != event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
 
 
 def test_event_alpha_router_routes_material_changes_with_lanes():

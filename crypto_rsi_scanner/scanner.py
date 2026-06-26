@@ -115,6 +115,7 @@ from . import event_clock
 from . import event_feedback
 from . import event_llm_analyzer
 from . import event_llm_extractor
+from . import event_near_miss
 from . import event_opportunity_audit
 from . import event_provider_health
 from . import event_provider_status
@@ -1508,6 +1509,19 @@ def _event_alpha_router_config_from_runtime() -> event_alpha_router.EventAlphaRo
     )
 
 
+def _event_near_miss_config_from_runtime() -> event_near_miss.EventNearMissConfig:
+    return event_near_miss.EventNearMissConfig(
+        enabled=True,
+        near_threshold_points=config.EVENT_ALPHA_NEAR_MISS_THRESHOLD_POINTS,
+        digest_threshold=config.EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_FINAL_SCORE,
+        watchlist_threshold=78.0,
+        max_candidates=config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_MAX_ASSETS,
+        market_refresh_enabled=config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_ENABLED,
+        max_market_refresh_assets=config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_MAX_ASSETS,
+        market_refresh_timeout_seconds=config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_TIMEOUT_SECONDS,
+    )
+
+
 def _event_alpha_notification_config_from_runtime(
     profile_name: str | None = None,
 ) -> event_alpha_notifications.EventAlphaNotificationConfig:
@@ -2165,6 +2179,13 @@ def event_alpha_cycle(
         watchlist_monitor_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
         watchlist_monitor_enrichment_max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
         watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
+        near_miss_cfg=_event_near_miss_config_from_runtime(),
+        near_miss_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
+        near_miss_market_provider=_event_watchlist_market_provider_from_runtime()
+        if config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_ENABLED
+        else None,
+        near_miss_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
+        near_miss_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
         send=send,
         send_callback=lambda decisions: _send_event_alpha_routed_digest(
             decisions,
@@ -2608,6 +2629,13 @@ def _event_alpha_notify_cycle_body(
                     watchlist_monitor_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
                     watchlist_monitor_enrichment_max_assets=config.EVENT_WATCHLIST_MONITOR_ENRICHMENT_MAX_ASSETS,
                     watchlist_monitor_route_updates=config.EVENT_WATCHLIST_MONITOR_ROUTE_UPDATES,
+                    near_miss_cfg=_event_near_miss_config_from_runtime(),
+                    near_miss_market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
+                    near_miss_market_provider=_event_watchlist_market_provider_from_runtime()
+                    if config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_ENABLED
+                    else None,
+                    near_miss_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
+                    near_miss_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
                     send=False,
                 )
             except Exception as exc:  # noqa: BLE001 - notification burn-in must fail soft on provider/runtime errors
@@ -4241,6 +4269,59 @@ def event_alpha_router_report(verbose: bool = False, profile_name: str | None = 
     if profile:
         report = report + f"\n\nprofile_applied: {profile.name}"
     print(report)
+
+
+def event_alpha_near_miss_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    event_now: str | datetime | None = None,
+) -> None:
+    """Print near-promotion Event Alpha candidates from local artifacts."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
+        context.impact_hypothesis_store_path,
+        limit=500,
+        latest_run=True,
+        include_legacy=True,
+    )
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
+    cfg = _event_near_miss_config_from_runtime()
+    rows: list[Mapping[str, Any]] = []
+    rows.extend(hypotheses.rows)
+    rows.extend(entry.__dict__ for entry in watchlist.entries)
+    near = event_near_miss.detect_near_miss_rows(rows, route_decisions=routed.decisions, cfg=cfg)
+    refresh_result = event_near_miss.refresh_near_miss_hypotheses(
+        _hypothesis_rows_as_objects(hypotheses.rows),
+        cfg=cfg,
+        market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
+        targeted_market_provider=_event_watchlist_market_provider_from_runtime()
+        if config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_ENABLED
+        else None,
+        derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
+        supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
+        now=_event_research_now(event_now),
+    )
+    route_context = {item.hypothesis_id: item for item in near if item.hypothesis_id}
+    report_items = tuple(
+        replace(item, final_route_before=route_context[item.hypothesis_id].final_route_before)
+        if item.hypothesis_id in route_context and not item.final_route_before
+        else item
+        for item in refresh_result.near_misses
+    ) or near
+    print(_event_alpha_context_block(context))
+    print(event_near_miss.format_near_miss_report(report_items, profile=context.profile))
+
+
+def _hypothesis_rows_as_objects(rows: Iterable[Mapping[str, Any]]) -> tuple[SimpleNamespace, ...]:
+    return tuple(SimpleNamespace(**dict(row)) for row in rows)
 
 
 def event_alpha_signal_quality_eval(
@@ -7994,6 +8075,11 @@ def cli() -> None:
         help="Print missed-opportunity diagnostics from market rows and Event Alpha artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-near-miss-report",
+        action="store_true",
+        help="Print near-promotion Event Alpha candidates and targeted refresh diagnostics.",
+    )
+    parser.add_argument(
         "--event-alpha-calibration-report",
         action="store_true",
         help="Print research-only calibration summaries from alert, feedback, outcome, and missed artifacts.",
@@ -8835,6 +8921,14 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
+        return
+    if args.event_alpha_near_miss_report:
+        event_alpha_near_miss_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            event_now=args.event_now,
         )
         return
     if args.event_alpha_calibration_report:

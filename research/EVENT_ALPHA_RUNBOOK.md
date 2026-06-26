@@ -269,21 +269,24 @@ trade signal. Hypotheses cannot create `WATCHLIST`, `HIGH_PRIORITY`,
 paper/live rows, or `TRIGGERED_FADE`; `TRIGGERED_FADE` still comes only from
 `event_fade.py` plus the `proxy_fade` playbook.
 
-Digest routing is quality-gated. Defaults require score >=
-`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_DIGEST_MIN_SCORE` (65), a validated token
-identity, no source-noise/ticker-collision gate, a non-ambiguous playbook, a
-known external catalyst or explicit direct token-event evidence,
-`opportunity_score_v2` >=
-`RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_OPPORTUNITY_SCORE` (65), and
+Digest routing is quality-gated. Defaults require a validated token identity,
+no source-noise/ticker-collision gate, a non-ambiguous playbook, a known
+external catalyst or explicit direct token-event evidence,
+`opportunity_score_final` >=
 `RSI_EVENT_ALPHA_VALIDATED_HYPOTHESIS_MIN_FINAL_SCORE` (65), and
-`impact_path_validated` or stronger validation stage. When final opportunity
-metadata is present, `local_only` and `exploratory` stay local; only
+`impact_path_validated` or stronger validation stage. `opportunity_score_final`
+and `opportunity_level` are the canonical route inputs; older
+`opportunity_score_v2`, `hypothesis_score`, and watchlist/playbook scores are
+audit-only once a final verdict exists. When final opportunity metadata is
+present, `local_only` and `exploratory` stay local; only
 `validated_digest`, `watchlist`, or `high_priority` verdicts can pass the
 operator-facing digest gate. The router enforces this verdict after the older
 watchlist/playbook route request is built: blocked rows keep
 `requested_route_before_quality_gate`, `final_route_after_quality_gate`, and
 `quality_gate_block_reason` in route decisions, alert snapshots, daily briefs,
-quality review, and research cards so the downgrade is auditable. Alert
+quality review, and research cards so the downgrade is auditable. Route reports
+also show `routing_score_source=opportunity_score_final`, the score used, and
+the verdict used. Alert
 snapshots, notification plans, routed Telegram copy, and inbox queues use the
 final route/lane/tier/alertable flag as authoritative; requested pre-gate fields
 are audit-only. Quality-gated local-only rows belong in optional local review
@@ -384,14 +387,26 @@ To inspect one candidate from the current artifacts, use:
 ```bash
 make event-opportunity-audit TARGET=SYMBOL PROFILE=notify_llm
 make event-opportunity-audit TARGET=incident:<id> PROFILE=notify_llm
+make event-alpha-near-miss-report PROFILE=notify_llm_quality
 ```
 
 `TARGET` can be a symbol, coin id, alert id, card id, event id, route key, or
 incident id. The audit report prints the evidence chain, identity status,
 canonical incident context, claim history, market reaction vs causal mechanism,
 impact path, market confirmation, final opportunity verdict, router decision,
-missing evidence, upgrade requirements, downgrade risks, and a feedback command.
+near-miss status, missing evidence, upgrade requirements, downgrade risks, and
+a feedback command.
 It is diagnostic only and cannot make a candidate alertable or trigger a fade.
+
+The near-miss report identifies validated candidates close to digest/watchlist
+promotion, rejects source-noise/ticker-collision/generic co-occurrence rows, and
+shows missing evidence plus bounded refresh diagnostics. `notify_llm_quality`,
+`notify_llm`, and `notify_llm_deep` profiles enable near-miss market refresh by
+profile; the default environment remains off unless a profile opts in. Refresh
+may update local hypothesis/watchlist artifacts with market/enrichment
+before/after fields and a recomputed final opportunity verdict, but it does not
+send notifications, trade, paper trade, write normal RSI rows, or create
+`TRIGGERED_FADE`.
 
 ### Reproducible quality-validation cycle
 
