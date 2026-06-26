@@ -78,6 +78,7 @@ from . import event_alpha_eval_export
 from . import event_alpha_explain
 from . import event_alpha_health_guard
 from . import event_impact_hypothesis_store
+from . import event_incident_store
 from . import event_alpha_missed
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
@@ -1387,6 +1388,12 @@ def _event_impact_hypothesis_store_config_from_runtime() -> event_impact_hypothe
     )
 
 
+def _event_incident_store_config_from_runtime() -> event_incident_store.EventIncidentStoreConfig:
+    return event_incident_store.EventIncidentStoreConfig(
+        path=config.EVENT_INCIDENT_STORE_PATH,
+    )
+
+
 def _event_watchlist_config_from_runtime() -> event_watchlist.EventWatchlistConfig:
     return event_watchlist.EventWatchlistConfig(
         enabled=config.EVENT_WATCHLIST_ENABLED,
@@ -1704,6 +1711,7 @@ def _apply_event_alpha_context_to_config(context: event_alpha_artifacts.EventAlp
     config.EVENT_PROVIDER_HEALTH_PATH = context.provider_health_path
     config.EVENT_ALPHA_DAILY_BRIEF_PATH = context.daily_brief_path
     config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH = context.impact_hypothesis_store_path
+    config.EVENT_INCIDENT_STORE_PATH = context.incident_store_path
     config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR = context.proposed_eval_cases_dir
     config.EVENT_RESEARCH_CARDS_DIR = context.research_cards_dir
     config.EVENT_LLM_BUDGET_LEDGER_PATH = context.llm_budget_ledger_path
@@ -1748,6 +1756,7 @@ def resolve_event_alpha_artifact_context_for_report(
             provider_health_path=Path(config.EVENT_PROVIDER_HEALTH_PATH),
             daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
             impact_hypothesis_store_path=Path(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH),
+            incident_store_path=Path(config.EVENT_INCIDENT_STORE_PATH),
             proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
             research_cards_dir=Path(config.EVENT_RESEARCH_CARDS_DIR),
             llm_budget_ledger_path=Path(config.EVENT_LLM_BUDGET_LEDGER_PATH),
@@ -1782,6 +1791,7 @@ def _event_alpha_context_block(context: event_alpha_artifacts.EventAlphaArtifact
         f"- feedback_path: {context.feedback_path}",
         f"- provider_health_path: {context.provider_health_path}",
         f"- impact_hypothesis_store_path: {context.impact_hypothesis_store_path}",
+        f"- incident_store_path: {context.incident_store_path}",
         f"- research_cards_dir: {context.research_cards_dir}",
     ])
 
@@ -1818,6 +1828,7 @@ def _event_alpha_report_context(
         provider_health_path=Path(config.EVENT_PROVIDER_HEALTH_PATH),
         daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
         impact_hypothesis_store_path=Path(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH),
+        incident_store_path=Path(config.EVENT_INCIDENT_STORE_PATH),
         proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
         research_cards_dir=Path(config.EVENT_RESEARCH_CARDS_DIR),
         llm_budget_ledger_path=Path(config.EVENT_LLM_BUDGET_LEDGER_PATH),
@@ -1841,6 +1852,7 @@ def _normalize_profile_paths() -> None:
         "EVENT_PROVIDER_HEALTH_PATH",
         "EVENT_ALPHA_DAILY_BRIEF_PATH",
         "EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
+        "EVENT_INCIDENT_STORE_PATH",
         "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
         "EVENT_RESEARCH_CARDS_DIR",
         "EVENT_LLM_BUDGET_LEDGER_PATH",
@@ -2044,6 +2056,39 @@ def _write_event_impact_hypotheses_for_run(
     return updated, write_result
 
 
+def _write_event_incidents_for_run(
+    pipeline_result: event_alpha_pipeline.EventAlphaPipelineResult,
+    *,
+    now: datetime,
+    run_id: str,
+    profile: str,
+    run_mode: str | None,
+    artifact_namespace: str | None,
+) -> tuple[event_alpha_pipeline.EventAlphaPipelineResult, event_incident_store.EventIncidentStoreWriteResult]:
+    store_cfg = _event_incident_store_config_from_runtime()
+    watchlist_rows = tuple(pipeline_result.watchlist_result.entries) if pipeline_result.watchlist_result else ()
+    write_result = event_incident_store.write_incidents(
+        pipeline_result.discovery_result,
+        cfg=store_cfg,
+        hypotheses=pipeline_result.impact_hypotheses,
+        watchlist_rows=watchlist_rows,
+        now=now,
+        run_id=run_id,
+        profile=profile,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+    )
+    updated = replace(
+        pipeline_result,
+        incident_store_path=str(store_cfg.path),
+        incident_write_attempted=write_result.attempted,
+        incident_write_success=write_result.success,
+        incident_rows_written=write_result.rows_written,
+        incident_write_block_reason=write_result.block_reason,
+    )
+    return updated, write_result
+
+
 def event_alpha_cycle(
     verbose: bool = False,
     with_llm: bool = False,
@@ -2135,6 +2180,14 @@ def event_alpha_cycle(
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
     )
+    pipeline_result, incident_store_result = _write_event_incidents_for_run(
+        pipeline_result,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+    )
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
         watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
@@ -2192,6 +2245,12 @@ def event_alpha_cycle(
         f"{hypothesis_store_result.path} rows={hypothesis_store_result.rows_written} "
         f"success={str(hypothesis_store_result.success).lower()}"
         + (f" block={hypothesis_store_result.block_reason}" if hypothesis_store_result.block_reason else "")
+    )
+    print(
+        "Event incidents updated: "
+        f"{incident_store_result.path} rows={incident_store_result.rows_written} "
+        f"success={str(incident_store_result.success).lower()}"
+        + (f" block={incident_store_result.block_reason}" if incident_store_result.block_reason else "")
     )
     run_row = event_alpha_run_ledger.append_run_record(
         pipeline_result,
@@ -2591,6 +2650,14 @@ def _event_alpha_notify_cycle_body(
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
     )
+    pipeline_result, incident_store_result = _write_event_incidents_for_run(
+        pipeline_result,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+    )
     card_write = None
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
@@ -2737,6 +2804,12 @@ def _event_alpha_notify_cycle_body(
         f"{hypothesis_store_result.path} rows={hypothesis_store_result.rows_written} "
         f"success={str(hypothesis_store_result.success).lower()}"
         + (f" block={hypothesis_store_result.block_reason}" if hypothesis_store_result.block_reason else "")
+    )
+    print(
+        "Event incidents updated: "
+        f"{incident_store_result.path} rows={incident_store_result.rows_written} "
+        f"success={str(incident_store_result.success).lower()}"
+        + (f" block={incident_store_result.block_reason}" if incident_store_result.block_reason else "")
     )
     run_row = event_alpha_run_ledger.append_run_record(
         pipeline_result,
@@ -3737,6 +3810,36 @@ def event_impact_hypotheses_inbox(
     print(event_impact_hypothesis_store.format_impact_hypotheses_inbox(result))
 
 
+def event_incidents_report(
+    path: str | None = None,
+    limit: int = 100,
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    latest_run: bool = False,
+    run_id: str | None = None,
+    include_legacy: bool = True,
+) -> None:
+    """Print stored canonical incident rows for a profile/namespace."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    target_path = _event_alpha_report_path(path, context.incident_store_path)
+    result = event_incident_store.load_incidents(
+        target_path,
+        limit=limit,
+        latest_run=latest_run,
+        run_id=run_id,
+        include_legacy=include_legacy,
+    )
+    print(_event_alpha_context_block(context))
+    print(event_incident_store.format_incidents_report(result))
+
+
 def event_impact_hypothesis_smoke(verbose: bool = False, event_now: str | datetime | None = None) -> None:
     """Run an offline smoke proving sector hypothesis validation stays RADAR-only."""
     import tempfile
@@ -4165,6 +4268,7 @@ def event_opportunity_audit_report(
     )
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=True)
+    incidents = event_incident_store.load_incidents(context.incident_store_path, limit=500, include_legacy=True)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
     print(_event_alpha_context_block(context))
     print(event_opportunity_audit.format_opportunity_audit(
@@ -4173,6 +4277,7 @@ def event_opportunity_audit_report(
         watchlist_entries=watchlist.entries,
         alert_rows=alerts.rows,
         route_decisions=routed.decisions,
+        incident_rows=incidents.rows,
         profile=context.profile,
     ))
 
@@ -4244,6 +4349,7 @@ def _event_alpha_reference_quality_rows(
         provider_health_path=namespace_dir / "event_provider_health.json",
         daily_brief_path=namespace_dir / "event_alpha_daily_brief.md",
         impact_hypothesis_store_path=namespace_dir / "event_impact_hypotheses.jsonl",
+        incident_store_path=namespace_dir / "event_incidents.jsonl",
         proposed_eval_cases_dir=namespace_dir / "proposed_eval_cases",
         research_cards_dir=namespace_dir / "research_cards",
         llm_budget_ledger_path=namespace_dir / "event_llm_budget.json",
@@ -5559,6 +5665,7 @@ def event_alpha_daily_brief_report(
         missed_rows=missed_rows,
         notification_runs=event_alpha_notification_runs.load_notification_runs(context.notification_runs_path).rows,
         hypothesis_rows=event_impact_hypothesis_store.load_impact_hypotheses(context.impact_hypothesis_store_path, limit=100).rows,
+        incident_rows=event_incident_store.load_incidents(context.incident_store_path, limit=100, include_legacy=True).rows,
         watchlist_entries=watchlist.entries,
         router_result=router_result,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
@@ -7722,6 +7829,11 @@ def cli() -> None:
         help="Print stored Event Impact Hypothesis rows needing operator review for a profile/namespace.",
     )
     parser.add_argument(
+        "--event-incidents-report",
+        action="store_true",
+        help="Print stored canonical Event Alpha incident rows for a profile/namespace.",
+    )
+    parser.add_argument(
         "--event-impact-hypothesis-smoke",
         action="store_true",
         help="Run offline Event Impact Hypothesis smoke: SpaceX sector hypothesis validates VELVET RADAR only.",
@@ -7730,6 +7842,11 @@ def cli() -> None:
         "--event-impact-hypothesis-store-path",
         default=None,
         help="Optional Event Impact Hypothesis JSONL path for --event-impact-hypotheses-report.",
+    )
+    parser.add_argument(
+        "--event-incident-store-path",
+        default=None,
+        help="Optional canonical incident JSONL path for --event-incidents-report.",
     )
     parser.add_argument(
         "--latest-run",
@@ -8584,6 +8701,19 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_incidents_report:
+        latest_incident_run = args.latest_run or not (args.all_history or args.run_id)
+        event_incidents_report(
+            path=args.event_incident_store_path,
+            limit=args.event_alpha_run_limit,
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            latest_run=latest_incident_run,
+            run_id=args.run_id,
+            include_legacy=args.include_legacy or args.all_history,
         )
         return
     if args.event_impact_hypothesis_smoke:

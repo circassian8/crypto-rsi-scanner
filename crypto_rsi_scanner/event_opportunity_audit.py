@@ -15,13 +15,15 @@ def format_opportunity_audit(
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry | Mapping[str, Any]] = (),
     alert_rows: Iterable[Mapping[str, Any]] = (),
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision | Mapping[str, Any]] = (),
+    incident_rows: Iterable[Mapping[str, Any]] = (),
     profile: str | None = None,
 ) -> str:
     """Explain one candidate's research-only decision path."""
     clean = str(target or "").strip()
     if not clean:
         return "Event opportunity audit failed: target is required."
-    match = _find_match(clean, hypotheses, watchlist_entries, alert_rows, route_decisions)
+    incidents = [dict(row) for row in incident_rows if isinstance(row, Mapping)]
+    match = _find_match(clean, hypotheses, watchlist_entries, alert_rows, route_decisions, incidents)
     if match is None:
         return "\n".join([
             "=" * 76,
@@ -34,6 +36,7 @@ def format_opportunity_audit(
         ])
     row = match["row"]
     components = _components(row)
+    incident = _incident_context(row, components, incidents)
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
     lines = [
         "=" * 76,
@@ -66,6 +69,9 @@ def format_opportunity_audit(
         f"- validated coin_id: {components.get('validated_coin_id') or row.get('validated_coin_id') or row.get('coin_id') or 'unknown'}",
         f"- candidate role: {components.get('candidate_role') or row.get('candidate_role') or 'unknown'}",
         f"- identity warnings: {_list_value(row.get('warnings') or components.get('warnings'))}",
+        "",
+        "## Incident",
+        *_incident_lines(incident, row, components),
         "",
         "## Impact path decision",
         f"- impact path: {components.get('impact_path_type') or row.get('impact_path_type') or 'unknown'}",
@@ -122,6 +128,7 @@ def _find_match(
     entries: Iterable[event_watchlist.EventWatchlistEntry | Mapping[str, Any]],
     alerts: Iterable[Mapping[str, Any]],
     decisions: Iterable[event_alpha_router.EventAlphaRouteDecision | Mapping[str, Any]],
+    incidents: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, Any] | None:
     clean = target[3:] if target.startswith("ea:") else target
     for decision in decisions:
@@ -158,6 +165,10 @@ def _find_match(
         row = _row(item)
         if _row_matches(row, clean, target):
             return {"source": "impact_hypothesis", "row": row}
+    for incident in incidents:
+        row = dict(incident)
+        if _row_matches(row, clean, target):
+            return {"source": "incident", "row": row}
     return None
 
 
@@ -169,6 +180,8 @@ def _row_matches(row: Mapping[str, Any], clean: str, original: str) -> bool:
         row.get("key"),
         row.get("event_id"),
         row.get("hypothesis_id"),
+        row.get("incident_id"),
+        row.get("canonical_name"),
         row.get("symbol"),
         row.get("coin_id"),
     }
@@ -205,6 +218,73 @@ def _components(row: Mapping[str, Any]) -> dict[str, Any]:
         elif key not in out and value not in (None, "", [], {}):
             out[key] = value
     return event_alpha_quality_fields.ensure_quality_fields(out)
+
+
+def _incident_context(
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    incidents: Iterable[Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    incident_id = str(row.get("incident_id") or components.get("incident_id") or "")
+    if not incident_id:
+        return row if str(row.get("row_type") or "") == "event_incident" else None
+    for incident in incidents:
+        if str(incident.get("incident_id") or "") == incident_id:
+            return incident
+    return row if row.get("incident_id") else None
+
+
+def _incident_lines(
+    incident: Mapping[str, Any] | None,
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+) -> list[str]:
+    source = incident or row
+    incident_id = source.get("incident_id") or components.get("incident_id")
+    if not incident_id:
+        return ["- incident link: no_incident"]
+    claim_history = source.get("claim_history") or components.get("claim_history") or ()
+    linked_assets = source.get("linked_assets") or components.get("linked_assets") or ()
+    return [
+        f"- incident_id: {incident_id}",
+        f"- canonical name: {source.get('canonical_name') or source.get('canonical_incident_name') or components.get('canonical_incident_name') or 'unknown'}",
+        f"- primary subject: {source.get('primary_subject') or components.get('primary_subject') or 'unknown'}",
+        f"- affected ecosystem: {source.get('affected_ecosystem') or components.get('affected_ecosystem') or 'unknown'}",
+        f"- current cause status: {source.get('current_cause_status') or source.get('cause_status') or components.get('cause_status') or 'unknown'}",
+        f"- claim history: {_claim_history_value(claim_history)}",
+        f"- conflicting claims: {_list_value(source.get('conflicting_claims') or components.get('conflicting_claims'))}",
+        f"- source updates: {source.get('source_update_count') or len(source.get('source_raw_ids') or []) or 'unknown'} "
+        f"(independent={source.get('independent_source_count') or len(source.get('independent_source_domains') or []) or 'unknown'})",
+        f"- market reaction vs causal mechanism: reaction={str(bool(source.get('market_reaction_confirmed') if source.get('market_reaction_confirmed') is not None else components.get('market_reaction_confirmed'))).lower()} "
+        f"causal={str(bool(source.get('causal_mechanism_confirmed') if source.get('causal_mechanism_confirmed') is not None else components.get('causal_mechanism_confirmed'))).lower()} "
+        f"source={source.get('market_context_source') or components.get('market_context_source') or 'none'}",
+        f"- linked assets and roles: {_asset_list(linked_assets) if linked_assets else _asset_role_summary(row, components)}",
+    ]
+
+
+def _claim_history_value(value: Any) -> str:
+    if not value:
+        return "none"
+    labels: list[str] = []
+    for item in list(value)[:4]:
+        if isinstance(item, Mapping):
+            labels.append(
+                f"{item.get('claim_type') or 'claim'}:"
+                f"{item.get('polarity') or 'unknown'}/"
+                f"{item.get('cause_status') or 'unknown'}"
+            )
+        else:
+            labels.append(str(item))
+    return "; ".join(labels) or "none"
+
+
+def _asset_role_summary(row: Mapping[str, Any], components: Mapping[str, Any]) -> str:
+    symbol = components.get("validated_symbol") or row.get("validated_symbol") or row.get("symbol")
+    coin_id = components.get("validated_coin_id") or row.get("validated_coin_id") or row.get("coin_id")
+    role = components.get("candidate_role") or row.get("candidate_role") or "unknown"
+    if symbol or coin_id:
+        return f"{symbol or coin_id}({role})"
+    return "none"
 
 
 def _quality_source(row: Mapping[str, Any]) -> str:

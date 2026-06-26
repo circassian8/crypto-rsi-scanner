@@ -136,6 +136,8 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "EVENT_RESEARCH_NOW ?=" in makefile
     assert "EVENT_FIXTURE_NOW_ENV = RSI_EVENT_RESEARCH_NOW=$(EVENT_FIXTURE_NOW)" in makefile
     assert "EVENT_RESEARCH_NOW_ENV = $(if $(strip $(EVENT_RESEARCH_NOW)),RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW),)" in makefile
+    assert "event-incidents-report:" in makefile
+    assert "--event-incidents-report" in makefile
     assert "RSI_EVENT_RESEARCH_NOW=$(EVENT_RESEARCH_NOW) \\" not in makefile
     notify_dry = subprocess.check_output(
         ["make", "-n", "event-alpha-notify-no-key", "PYTHON=python3"],
@@ -7451,6 +7453,111 @@ def test_event_market_evidence_and_opportunity_verdict_quality_layers():
     )
     assert low_quality.source_class == "prediction_market"
     assert low_quality.evidence_quality_score <= 55
+
+
+def test_event_opportunity_verdict_uses_incident_confidence_and_cause_status():
+    from crypto_rsi_scanner import (
+        event_evidence_quality,
+        event_impact_path_validator,
+        event_market_confirmation,
+        event_opportunity_verdict,
+    )
+
+    strong_market = event_market_confirmation.EventMarketConfirmationResult(
+        market_confirmation_score=78,
+        level="strong",
+        reasons=("price_momentum", "volume_expansion"),
+        data_quality=80,
+    )
+    strong_evidence = event_evidence_quality.EvidenceQualityResult(
+        evidence_quality_score=82,
+        source_class="crypto_news",
+        evidence_specificity="direct_token_mechanism",
+    )
+
+    def path(role, *, cause="confirmed", polarity=("asserted",)):
+        return event_impact_path_validator.ImpactPathValidation(
+            impact_path_type=event_impact_path_validator.ImpactPathType.EXPLOIT_SECURITY_EVENT.value,
+            impact_path_strength=event_impact_path_validator.ImpactPathStrength.STRONG.value,
+            candidate_role=role,
+            evidence_specificity_score=90,
+            required_evidence_met=True,
+            market_confirmation_required=False,
+            digest_eligible_by_impact_path=True,
+            why_digest_ineligible=None,
+            impact_path_reason="exploit_security_event",
+            opportunity_score_v2=82,
+            cause_status=cause,
+            claim_polarities=polarity,
+        )
+
+    ada_no_market = event_opportunity_verdict.evaluate_opportunity(
+        impact_path=path(event_impact_path_validator.CandidateRole.ECOSYSTEM_AFFECTED_ASSET.value),
+        market_confirmation=strong_market,
+        evidence_quality=strong_evidence,
+        hypothesis=SimpleNamespace(impact_category="security_or_regulatory_shock"),
+        score_components={
+            "incident_confidence": 84,
+            "market_reaction_confirmed": False,
+            "causal_mechanism_confirmed": True,
+        },
+    )
+    assert ada_no_market.watchlist_eligible is False
+    assert "ecosystem_asset_requires_market_reaction" in ada_no_market.verdict_reason_codes
+    assert ada_no_market.opportunity_score_final <= 64
+
+    rune_confirmed = event_opportunity_verdict.evaluate_opportunity(
+        impact_path=path(event_impact_path_validator.CandidateRole.DIRECT_SUBJECT.value),
+        market_confirmation=strong_market,
+        evidence_quality=strong_evidence,
+        hypothesis=SimpleNamespace(impact_category="security_or_regulatory_shock"),
+        score_components={
+            "incident_confidence": 88,
+            "market_reaction_confirmed": True,
+            "causal_mechanism_confirmed": True,
+        },
+    )
+    assert rune_confirmed.watchlist_eligible is True
+    assert "confirmed_direct_incident" in rune_confirmed.verdict_reason_codes
+    assert "confirmed_causal_incident_with_market_reaction" in rune_confirmed.verdict_reason_codes
+
+    memecore_ruled_out = event_opportunity_verdict.evaluate_opportunity(
+        impact_path=path(
+            event_impact_path_validator.CandidateRole.DIRECT_SUBJECT.value,
+            cause="ruled_out",
+            polarity=("ruled_out",),
+        ),
+        market_confirmation=strong_market,
+        evidence_quality=strong_evidence,
+        hypothesis=SimpleNamespace(impact_category="security_or_regulatory_shock"),
+        score_components={
+            "incident_confidence": 80,
+            "market_reaction_confirmed": True,
+            "causal_mechanism_confirmed": False,
+        },
+    )
+    assert memecore_ruled_out.opportunity_level == "local_only"
+    assert memecore_ruled_out.watchlist_eligible is False
+    assert memecore_ruled_out.why_local_only == "incident_cause_ruled_out"
+
+    rumored = event_opportunity_verdict.evaluate_opportunity(
+        impact_path=path(
+            event_impact_path_validator.CandidateRole.DIRECT_SUBJECT.value,
+            cause="suspected",
+            polarity=("rumored",),
+        ),
+        market_confirmation=strong_market,
+        evidence_quality=strong_evidence,
+        hypothesis=SimpleNamespace(impact_category="security_or_regulatory_shock"),
+        score_components={
+            "incident_confidence": 58,
+            "market_reaction_confirmed": True,
+            "causal_mechanism_confirmed": False,
+        },
+    )
+    assert rumored.watchlist_eligible is False
+    assert rumored.opportunity_score_final <= 59
+    assert "unconfirmed_incident_cause_cap" in rumored.verdict_reason_codes
 
 
 def test_event_candidate_discovery_rejects_common_word_false_positives():
@@ -21583,11 +21690,15 @@ def test_event_alpha_signal_quality_fixture_passes_and_reports_stage_failure():
 
 
 def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
+    import tempfile
     from datetime import datetime, timezone
+    from pathlib import Path
     from crypto_rsi_scanner import (
         event_claim_semantics,
         event_impact_hypotheses,
         event_incident_graph,
+        event_incident_store,
+        event_watchlist,
     )
     from crypto_rsi_scanner.event_models import (
         DiscoveredAsset,
@@ -21714,6 +21825,104 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     assert "incident_evidence_update" in hyp.warnings
     assert len(hyp.independent_source_domains) == 2
 
+    thor_raw = raw(
+        "thorchain",
+        "THORChain confirms RUNE exploit after attack",
+        "THORChain confirms a RUNE exploit and security incident after an attack; RUNE trading reacts sharply.",
+        url="https://source-d.example/thorchain-rune-exploit",
+        market={"symbol": "RUNE", "coin_id": "thorchain", "return_24h": -18, "volume_zscore_24h": 3.4},
+    )
+    thor_event = NormalizedEvent(
+        "evt_thorchain",
+        ("thorchain",),
+        "THORChain RUNE exploit",
+        "news",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (thor_raw.source_url,),
+        "THORChain",
+        thor_raw.title,
+        0.90,
+    )
+    rune = DiscoveredAsset("thorchain", "RUNE", "THORChain")
+    thor_link = EventAssetLink("evt_thorchain", "thorchain", "RUNE", "THORChain", 0.95, "fixture", ("THORChain RUNE",))
+    thor_cls = EventClassification("evt_thorchain", "thorchain", False, True, "direct_token_event", 0.90, "fixture", "fixture", ("THORChain RUNE",))
+    thor_candidate = DiscoveredEventFadeCandidate(thor_event, rune, thor_link, thor_cls, None, None, {})
+    thor_hyp = event_impact_hypotheses.generate_impact_hypotheses(
+        EventDiscoveryResult((thor_raw,), (thor_event,), (thor_link,), (thor_cls,), (thor_candidate,)),
+        taxonomy={},
+        now=now,
+    )[0]
+    assert thor_hyp.candidate_role == "direct_subject"
+    assert thor_hyp.cause_status == "confirmed"
+    assert thor_hyp.market_reaction_confirmed is True
+    assert thor_hyp.causal_mechanism_confirmed is True
+
+    discovery = EventDiscoveryResult(
+        raw_events=(memecore_raw, secondfi_a, secondfi_b, thor_raw),
+        normalized_events=(memecore_event, events[0], events[1], thor_event),
+        links=(memecore_link, *links, thor_link),
+        classifications=(memecore_cls, *classes, thor_cls),
+        candidates=(memecore_candidate, *candidates, thor_candidate),
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        one_source_hyp = event_impact_hypotheses.generate_impact_hypotheses(
+            EventDiscoveryResult((secondfi_a,), (events[0],), (links[0],), (classes[0],), (candidates[0],)),
+            taxonomy={},
+            now=now,
+        )[0]
+        watch_cfg = event_watchlist.EventWatchlistConfig(enabled=True, state_path=Path(tmp) / "watchlist.jsonl")
+        event_watchlist.refresh_hypothesis_watchlist((one_source_hyp,), cfg=watch_cfg, now=now)
+        updated_watch = event_watchlist.refresh_hypothesis_watchlist((hyp,), cfg=watch_cfg, now=now)
+        updated_entry = updated_watch.entries[0]
+        assert "independent_source_confirmation" in updated_entry.material_change_reasons
+        assert "incident_confidence_changed" in updated_entry.material_change_reasons
+        watch = event_watchlist.refresh_hypothesis_watchlist(
+            (memecore_hyp, hyp, thor_hyp),
+            cfg=watch_cfg,
+            now=now,
+        )
+        write = event_incident_store.write_incidents(
+            discovery,
+            cfg=event_incident_store.EventIncidentStoreConfig(path=Path(tmp) / "event_incidents.jsonl"),
+            hypotheses=(memecore_hyp, hyp, thor_hyp),
+            watchlist_rows=watch.entries,
+            now=now,
+            run_id="run-incident-test",
+            profile="quality_validation",
+            run_mode="test",
+            artifact_namespace="quality_validation",
+        )
+        assert write.success is True
+        assert write.rows_written == 3
+        loaded = event_incident_store.load_incidents(write.path)
+        assert loaded.rows_read == 3
+        secondfi_row = next(row for row in loaded.rows if row["primary_subject"] == "SecondFi")
+        assert set(secondfi_row["source_raw_ids"]) == {"secondfi_a", "secondfi_b"}
+        assert secondfi_row["source_update_count"] == 2
+        assert secondfi_row["independent_source_count"] == 2
+        assert secondfi_row["linked_hypothesis_ids"] == [hyp.hypothesis_id]
+        assert secondfi_row["linked_watchlist_keys"]
+        assert secondfi_row["market_reaction_confirmed"] is True
+        assert secondfi_row["causal_mechanism_confirmed"] is True
+        assert any(asset["role"] == "ecosystem_affected_asset" for asset in secondfi_row["linked_assets"])
+        memecore_row = next(row for row in loaded.rows if row["primary_subject"] == "MemeCore")
+        assert memecore_row["event_archetype"] == "market_dislocation_unknown"
+        assert memecore_row["current_cause_status"] == "ruled_out"
+        assert memecore_row["market_reaction_confirmed"] is True
+        assert memecore_row["causal_mechanism_confirmed"] is False
+        thor_row = next(row for row in loaded.rows if row["primary_subject"] == "THORChain")
+        assert thor_row["event_archetype"] == "exploit_security_event"
+        assert thor_row["current_cause_status"] == "confirmed"
+        assert any(asset["symbol"] == "RUNE" and asset["role"] == "direct_subject" for asset in thor_row["linked_assets"])
+        report = event_incident_store.format_incidents_report(loaded)
+        assert "EVENT INCIDENTS REPORT" in report
+        assert "market_dislocation_unknown=1" in report
+        assert "exploit_security_event=2" in report
+        assert "multiple_source_updates: 1" in report
+
 
 def test_event_opportunity_upgrade_path_and_audit_sections():
     from crypto_rsi_scanner import event_opportunity_audit, event_opportunity_verdict
@@ -21736,11 +21945,139 @@ def test_event_opportunity_upgrade_path_and_audit_sections():
         event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
         event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
     )
-    report = event_opportunity_audit.format_opportunity_audit("VELVET", route_decisions=[decision], profile="fixture")
+    incident_row = {
+        "row_type": "event_incident",
+        "incident_id": "incident:velvet",
+        "canonical_name": "SpaceX proxy attention",
+        "primary_subject": "SpaceX",
+        "affected_ecosystem": "Velvet",
+        "current_cause_status": "unknown",
+        "claim_history": [{"claim_type": "proxy", "polarity": "asserted", "cause_status": "unknown"}],
+        "source_update_count": 2,
+        "independent_source_count": 2,
+        "market_reaction_confirmed": True,
+        "causal_mechanism_confirmed": False,
+        "market_context_source": "candidate_event_market_snapshot",
+        "linked_assets": [{"symbol": "VELVET", "coin_id": "velvet", "role": "proxy_venue"}],
+    }
+    report = event_opportunity_audit.format_opportunity_audit(
+        "incident:velvet",
+        route_decisions=[decision],
+        incident_rows=[incident_row],
+        profile="fixture",
+    )
     assert "EVENT OPPORTUNITY AUDIT" in report
+    assert "## Incident" in report
+    assert "SpaceX proxy attention" in report
+    assert "market reaction vs causal mechanism" in report
     assert "## What would upgrade this candidate" in report
     assert "## What would downgrade / invalidate this candidate" in report
     assert "No secrets, Telegram sends, trades" in report
+
+
+def test_event_incident_context_appears_in_daily_brief_and_cards():
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_research_cards, event_watchlist
+
+    incident_row = {
+        "row_type": "event_incident",
+        "profile": "quality_validation",
+        "run_mode": "test",
+        "artifact_namespace": "quality_validation",
+        "incident_id": "incident:rune",
+        "canonical_name": "THORChain exploit security event",
+        "event_archetype": "exploit_security_event",
+        "primary_subject": "THORChain",
+        "affected_ecosystem": "THORChain",
+        "current_cause_status": "confirmed",
+        "claim_history": [{"claim_type": "exploit", "polarity": "asserted", "cause_status": "confirmed"}],
+        "source_update_count": 2,
+        "independent_source_count": 2,
+        "linked_assets": [{"symbol": "RUNE", "coin_id": "thorchain", "role": "direct_subject"}],
+        "market_reaction_confirmed": True,
+        "causal_mechanism_confirmed": True,
+        "market_context_source": "candidate_event_market_snapshot",
+        "incident_confidence": 91,
+    }
+    brief = event_alpha_daily_brief.build_daily_brief(
+        incident_rows=[incident_row],
+        requested_profile="quality_validation",
+        artifact_namespace="quality_validation",
+        include_test_artifacts=True,
+    )
+    assert "## Canonical Incidents" in brief
+    assert "THORChain exploit security event" in brief
+    assert "confirmed=1" in brief
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="hypothesis|incident:rune|security_or_regulatory_shock",
+        cluster_id="incident:rune",
+        event_id="hyp:rune",
+        coin_id="thorchain",
+        symbol="RUNE",
+        relationship_type="impact_hypothesis",
+        external_asset="THORChain",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        previous_state=event_watchlist.EventWatchlistState.HYPOTHESIS.value,
+        first_seen_at="2026-06-26T12:00:00+00:00",
+        last_seen_at="2026-06-26T12:00:00+00:00",
+        source_count=2,
+        highest_score=82,
+        latest_score=82,
+        latest_tier="RADAR_DIGEST",
+        latest_event_name="THORChain RUNE exploit validated",
+        latest_source="impact_hypothesis",
+        latest_playbook_type="security_or_regulatory_shock",
+        latest_effective_playbook_type="direct_event",
+        latest_score_components={
+            "hypothesis_id": "hyp:rune",
+            "incident_id": "incident:rune",
+            "canonical_incident_name": "THORChain exploit security event",
+            "event_archetype": "exploit_security_event",
+            "primary_subject": "THORChain",
+            "affected_ecosystem": "THORChain",
+            "cause_status": "confirmed",
+            "claim_polarities": ["asserted"],
+            "claim_history": incident_row["claim_history"],
+            "independent_source_domains": ["source-a.example", "source-b.example"],
+            "conflicting_claims": [],
+            "incident_confidence": 91,
+            "validated_symbol": "RUNE",
+            "validated_coin_id": "thorchain",
+            "validated_asset": {"symbol": "RUNE", "coin_id": "thorchain", "name": "THORChain"},
+            "impact_path_type": "exploit_security_event",
+            "impact_path_strength": "strong",
+            "impact_path_reason": "exploit_security_event",
+            "candidate_role": "direct_subject",
+            "role_confidence": 0.9,
+            "role_evidence": ["candidate_named_as_primary_subject"],
+            "market_context_source": "candidate_event_market_snapshot",
+            "market_context_age_seconds": 600,
+            "market_context_data_quality": "fresh",
+            "market_reaction_confirmed": True,
+            "causal_mechanism_confirmed": True,
+            "market_confirmation_level": "strong",
+            "market_confirmation_score": 78,
+            "evidence_quality_score": 82,
+            "source_class": "crypto_news",
+            "evidence_specificity": "direct_token_mechanism",
+            "opportunity_score_final": 82,
+            "opportunity_level": "watchlist",
+            "opportunity_verdict_reasons": ["confirmed_direct_incident"],
+            "manual_verification_items": ["verify incident source"],
+        },
+        should_alert=True,
+    )
+    card = event_research_cards.render_research_card(
+        "ea:" + entry.key,
+        watchlist_entries=[entry],
+    )
+    assert "## Impact Hypothesis Context" in card.markdown
+    assert "Incident confidence: 91" in card.markdown
+    assert "Claim history: exploit:asserted/confirmed" in card.markdown
+    assert "Market context source: candidate_event_market_snapshot (fresh; age=600)" in card.markdown
 
 
 def test_event_watchlist_validated_hypothesis_market_confirmation_promotes_state():

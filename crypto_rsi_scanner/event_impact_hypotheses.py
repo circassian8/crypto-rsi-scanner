@@ -155,6 +155,7 @@ class EventImpactHypothesis:
     market_context_snapshot: Mapping[str, Any] = field(default_factory=dict)
     market_reaction_confirmed: bool | None = None
     causal_mechanism_confirmed: bool | None = None
+    incident_confidence: float | None = None
     incident_id: str | None = None
     canonical_incident_name: str | None = None
     event_archetype: str | None = None
@@ -1247,6 +1248,7 @@ def _hypothesis_from_rule(
         validation_reasons=(
             ("resolver_validated_candidate_asset",) if validated_assets else ()
         ),
+        incident_confidence=_optional_score(score_components.get("incident_confidence")) if incident else None,
         incident_id=incident.incident_id if incident else None,
         canonical_incident_name=incident.canonical_name if incident else None,
         event_archetype=incident.event_archetype if incident else None,
@@ -2340,6 +2342,7 @@ def _quality_verdict_replace_kwargs(
         "market_context_snapshot": dict(market_context.get("market_snapshot") or {}),
         "market_reaction_confirmed": market_result.level in {"weak", "moderate", "strong"},
         "causal_mechanism_confirmed": _causal_mechanism_confirmed(validation, hypothesis),
+        "incident_confidence": _component_float(merged_components, "incident_confidence"),
         "opportunity_score_final": verdict.opportunity_score_final,
         "opportunity_level": verdict.opportunity_level,
         "opportunity_verdict_reasons": verdict.verdict_reason_codes,
@@ -2521,6 +2524,7 @@ def _quality_score_components(values: Mapping[str, Any]) -> dict[str, Any]:
         "market_context_data_quality": "market_context_data_quality",
         "market_reaction_confirmed": "market_reaction_confirmed",
         "causal_mechanism_confirmed": "causal_mechanism_confirmed",
+        "incident_confidence": "incident_confidence",
         "opportunity_score_final": "opportunity_score_final",
         "opportunity_level": "opportunity_level",
         "why_local_only": "why_local_only",
@@ -2568,6 +2572,11 @@ def _coerce_score(value: object) -> float:
         return max(0.0, min(100.0, float(value or 0.0)))
     except (TypeError, ValueError):
         return 0.0
+
+
+def _optional_score(value: object) -> float | None:
+    score = _coerce_score(value)
+    return score if score > 0 else None
 
 
 def _identity_match_from_symbols(raw: RawDiscoveredEvent, hypothesis: EventImpactHypothesis) -> event_identity.IdentityMatchResult:
@@ -2989,8 +2998,16 @@ def _merge_duplicate_hypotheses(
     components = dict(other.score_components or {})
     components.update(dict(winner.score_components or {}))
     components["incident_source_update_count"] = float(len(set((*current.source_raw_ids, *item.source_raw_ids))))
+    incident_confidence = max(
+        _coerce_score(current.incident_confidence),
+        _coerce_score(item.incident_confidence),
+        _coerce_score(components.get("incident_confidence")),
+    )
+    if incident_confidence:
+        components["incident_confidence"] = incident_confidence
     return replace(
         winner,
+        incident_confidence=incident_confidence or winner.incident_confidence,
         source_raw_ids=tuple(dict.fromkeys((*current.source_raw_ids, *item.source_raw_ids))),
         source_event_ids=tuple(dict.fromkeys((*current.source_event_ids, *item.source_event_ids))),
         evidence_quotes=tuple(dict.fromkeys((*current.evidence_quotes, *item.evidence_quotes))),

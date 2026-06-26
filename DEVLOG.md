@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Persist canonical Event Alpha incidents · Codex
+**Why:** Claim semantics and incident clustering were available in-memory, but
+operators and Pro-model reviews needed durable incident artifacts that link raw
+sources, claims, hypotheses, watchlist rows, cards, audits, and opportunity
+verdicts.
+**Changes:**
+- Added a profile-scoped `event_incidents.jsonl` artifact store and
+  `--event-incidents-report` / `make event-incidents-report`, plus run-ledger,
+  pipeline, profile-context, and config path wiring.
+- Linked incident ids/confidence/cause/claim/market context through impact
+  hypotheses, watchlist material-change reasons, alert snapshots, daily briefs,
+  opportunity audits, and research cards.
+- Tightened opportunity verdict handling so ruled-out exploit causes hard-block
+  exploit paths and suspected ecosystem/direct incidents remain capped until
+  cause and market reaction are confirmed.
+- Expanded tests for SecondFi duplicate-source incident merging, MemeCore
+  market reaction without causal confirmation, THORChain/RUNE direct incidents,
+  incident report/brief/card/audit context, and incident-aware verdict caps.
+**Verify:** Focused incident regressions and `python3 -m compileall -q
+crypto_rsi_scanner tests` passed. Full verification is run before commit.
+**Notes/risks:** Research-only artifact/reporting and verdict-safety hardening.
+No normal RSI rows, paper/live trades, execution, notification promotion, or
+LLM/provider-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-26 — Add Event Alpha claim semantics and incident intelligence · Codex
 **Why:** Event Alpha could validate broad co-occurrence too aggressively when a
 source implied an exploit, policy risk, or ecosystem incident without preserving

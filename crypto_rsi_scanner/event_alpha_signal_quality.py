@@ -264,7 +264,7 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
     stages: list[str] = []
     stage_by_key = {
         "impact_path_type": "impact_path",
-        "candidate_role": "impact_path",
+        "candidate_role": "candidate_role",
         "evidence_specificity": "evidence_quality",
         "market_confirmation_level": "market_confirmation",
         "opportunity_level": "opportunity_verdict",
@@ -279,10 +279,10 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "claim_polarities": "claim_semantics",
         "cause_status": "claim_semantics",
         "event_archetype": "incident_clustering",
-        "primary_subject": "subject_role",
-        "affected_ecosystem": "subject_role",
-        "market_reaction_confirmed": "market_context_propagation",
-        "causal_mechanism_confirmed": "causal_vs_market_confirmation",
+        "primary_subject": "candidate_role",
+        "affected_ecosystem": "candidate_role",
+        "market_reaction_confirmed": "market_reaction",
+        "causal_mechanism_confirmed": "causal_mechanism",
     }
     for key, expected_value in expected.items():
         actual_value = actual.get(key)

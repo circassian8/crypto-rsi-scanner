@@ -117,6 +117,11 @@ class EventAlphaPipelineResult:
     hypothesis_write_success: bool = False
     hypothesis_rows_written: int = 0
     hypothesis_write_block_reason: str | None = None
+    incident_store_path: str | None = None
+    incident_write_attempted: bool = False
+    incident_write_success: bool = False
+    incident_rows_written: int = 0
+    incident_write_block_reason: str | None = None
 
     @property
     def raw_events(self) -> int:
@@ -846,6 +851,14 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
         (
             f"cycle_completed={str(result.cycle_completed).lower()} · "
             f"partial_results={str(result.partial_results).lower()}"
+        ),
+        (
+            f"artifact_writes: hypotheses={result.hypothesis_rows_written} "
+            f"success={str(result.hypothesis_write_success).lower()} · "
+            f"incidents={result.incident_rows_written} "
+            f"success={str(result.incident_write_success).lower()} · "
+            f"snapshots={result.snapshot_rows_written} "
+            f"success={str(result.snapshot_write_success).lower()}"
         ),
     ]
     if result.warnings:

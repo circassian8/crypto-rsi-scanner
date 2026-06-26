@@ -38,6 +38,7 @@ def build_daily_brief(
     missed_rows: Iterable[Mapping[str, Any]] = (),
     notification_runs: Iterable[Mapping[str, Any]] = (),
     hypothesis_rows: Iterable[Mapping[str, Any]] = (),
+    incident_rows: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
@@ -85,6 +86,13 @@ def build_daily_brief(
     )
     hypotheses = event_alpha_artifacts.filter_artifact_rows(
         [dict(row) for row in hypothesis_rows if isinstance(row, Mapping)],
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    incidents = event_alpha_artifacts.filter_artifact_rows(
+        [dict(row) for row in incident_rows if isinstance(row, Mapping)],
         profile=requested_profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -257,6 +265,8 @@ def build_daily_brief(
                 lines.append("- Rejected evidence examples: " + " | ".join(titles[:3]))
     elif latest and int(latest.get("impact_hypotheses") or 0) > 0:
         lines.append("- Stored rows: none loaded for this profile; inspect --event-impact-hypotheses-report.")
+    lines.extend(["", "## Canonical Incidents"])
+    lines.extend(_canonical_incident_lines(incidents))
     lines.extend(["", "## Catalyst Search Skip Reasons"])
     if latest:
         skip_reasons = latest.get("catalyst_search_skip_reasons") or {}
@@ -787,6 +797,70 @@ def _candidate_discovery_funnel_line(rows: Iterable[Mapping[str, Any]]) -> str:
         f"context_validated_candidates={validated}, "
         f"promoted_candidates={promoted}"
     )
+
+
+def _canonical_incident_lines(rows: Iterable[Mapping[str, Any]]) -> list[str]:
+    incidents = [dict(row) for row in rows if isinstance(row, Mapping)]
+    if not incidents:
+        return ["- Stored incidents: none loaded for this profile."]
+    lines = [
+        f"- Stored incidents: {len(incidents)}",
+        "- Event archetypes: " + _format_counts(_field_counts(incidents, "event_archetype")),
+        "- Cause statuses: " + _format_counts(_field_counts(incidents, "current_cause_status")),
+        "- Primary subjects: " + _format_counts(_field_counts(incidents, "primary_subject")),
+        "- New/updated: "
+        f"multiple_source_updates={sum(1 for row in incidents if int(row.get('source_update_count') or 0) > 1)}, "
+        f"conflicting_claims={sum(1 for row in incidents if row.get('conflicting_claims'))}",
+        "- Market reaction but unknown/ruled-out cause: "
+        + str(sum(
+            1 for row in incidents
+            if row.get("market_reaction_confirmed")
+            and str(row.get("current_cause_status") or "") in {"unknown", "ruled_out"}
+        )),
+        "- Confirmed cause missing market data: "
+        + str(sum(
+            1 for row in incidents
+            if str(row.get("current_cause_status") or "") == "confirmed"
+            and not row.get("market_context_source")
+        )),
+    ]
+    notable = sorted(
+        incidents,
+        key=lambda row: (
+            int(row.get("source_update_count") or 0),
+            _float(row.get("incident_confidence")),
+        ),
+        reverse=True,
+    )
+    if notable:
+        labels = []
+        for row in notable[:5]:
+            assets = row.get("linked_assets") or []
+            asset_text = _incident_asset_summary(assets)
+            labels.append(
+                f"{row.get('canonical_name') or row.get('incident_id')}: "
+                f"cause={row.get('current_cause_status') or 'unknown'} "
+                f"archetype={row.get('event_archetype') or 'unknown'} "
+                f"sources={int(row.get('source_update_count') or 0)}/"
+                f"{int(row.get('independent_source_count') or 0)} "
+                f"assets={asset_text}"
+            )
+        lines.append("- Notable incidents: " + " | ".join(labels))
+    return lines
+
+
+def _incident_asset_summary(value: Any) -> str:
+    if not value:
+        return "none"
+    labels: list[str] = []
+    for item in list(value)[:4]:
+        if not isinstance(item, Mapping):
+            continue
+        labels.append(
+            f"{item.get('symbol') or item.get('coin_id') or 'asset'}:"
+            f"{item.get('role') or 'unknown'}"
+        )
+    return ", ".join(labels) or "none"
 
 
 def _candidate_like_term(item: Mapping[str, Any]) -> bool:

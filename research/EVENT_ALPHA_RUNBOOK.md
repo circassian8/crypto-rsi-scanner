@@ -122,6 +122,25 @@ incident subject. Market fields also carry `market_context_source`,
 `market_context_data_quality`, `market_reaction_confirmed`, and
 `causal_mechanism_confirmed`; market reaction is evidence to inspect, not proof
 that the source explains the causal path.
+
+Canonical incidents are persisted separately from hypotheses under the active
+profile namespace:
+
+```bash
+make event-incidents-report PROFILE=notify_llm
+make event-incidents-report PROFILE=quality_validation
+```
+
+The report reads `event_fade_cache/<namespace>/event_incidents.jsonl` unless an
+explicit incident-store path override is set. Each row is a compact research
+artifact with raw source ids/URLs/domains, claim-history summaries, cause
+status, conflicting claims, linked hypothesis ids, linked watchlist keys,
+linked assets and roles, market reaction vs causal-mechanism flags, incident
+confidence, and warnings. It intentionally does not store full article bodies.
+Use this report to verify that duplicate articles about the same incident were
+merged, that a second independent source updated the incident rather than
+creating duplicate watchlist rows, and that ruled-out/unknown causes stayed
+local-only.
 Source-enrichment cache rows include the enrichment schema version, cleaner
 version, source-content hash, and cleaned-text hash. If the cleaner changes,
 old cached cleaned text is intentionally treated as stale and refetched or
@@ -257,13 +276,15 @@ To inspect one candidate from the current artifacts, use:
 
 ```bash
 make event-opportunity-audit TARGET=SYMBOL PROFILE=notify_llm
+make event-opportunity-audit TARGET=incident:<id> PROFILE=notify_llm
 ```
 
-`TARGET` can be a symbol, coin id, alert id, card id, event id, or route key.
-The audit report prints the evidence chain, identity status, impact path,
-market confirmation, final opportunity verdict, router decision, missing
-evidence, upgrade requirements, downgrade risks, and a feedback command. It is
-diagnostic only and cannot make a candidate alertable or trigger a fade.
+`TARGET` can be a symbol, coin id, alert id, card id, event id, route key, or
+incident id. The audit report prints the evidence chain, identity status,
+canonical incident context, claim history, market reaction vs causal mechanism,
+impact path, market confirmation, final opportunity verdict, router decision,
+missing evidence, upgrade requirements, downgrade risks, and a feedback command.
+It is diagnostic only and cannot make a candidate alertable or trigger a fade.
 
 ### Reproducible quality-validation cycle
 
@@ -278,12 +299,14 @@ It uses the `quality_validation` fixture profile (offline, no Telegram sends, no
 live providers, fixture clock). The Make target clears only the isolated
 `event_fade_cache/quality_validation/` namespace first, then writes the run
 ledger, impact hypotheses, watchlist, alert snapshots (if any), research cards,
-and daily brief. It prints the quality review and runs artifact doctor in strict
-mode. The doctor checks top-level canonical quality fields directly with fresh
+canonical incidents, and daily brief. It prints the quality review and runs
+artifact doctor in strict mode. The doctor checks top-level canonical quality
+fields directly with fresh
 hypothesis/watchlist/alert counters; nested `score_components` no longer hide
 missing top-level verdicts. Hypothesis rows now persist `upgrade_requirements` /
 `downgrade_warnings` alongside the other quality fields. Inspect individual rows
-with `make event-impact-hypotheses-report PROFILE=quality_validation` or
+with `make event-impact-hypotheses-report PROFILE=quality_validation`,
+`make event-incidents-report PROFILE=quality_validation`, or
 `make event-opportunity-audit TARGET=<...> PROFILE=quality_validation`. The whole
 cycle is research-only: no sends, trades, paper trades, normal RSI rows, or
 `TRIGGERED_FADE`.
@@ -647,7 +670,8 @@ that profile before loading rows. For example,
 reads `event_fade_cache/no_key_live/...` unless you intentionally pass
 `--event-alpha-artifact-namespace` or an explicit path environment override.
 Major reports print their resolved profile, namespace, run mode, run ledger path,
-and alert store path at the top so the reviewed evidence is auditable.
+alert store path, and incident store path at the top so the reviewed evidence is
+auditable.
 For notification operations, prefer profile-aware commands such as
 `python3 main.py --event-alpha-notification-runs-report --event-alpha-profile notify_no_key`
 and leave `RSI_EVENT_ALPHA_NOTIFICATION_RUNS_PATH` blank unless you are

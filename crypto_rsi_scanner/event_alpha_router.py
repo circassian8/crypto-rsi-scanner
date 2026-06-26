@@ -800,8 +800,18 @@ def _material_change_allowed(
         "evidence_quality_upgraded",
         "opportunity_score_upgraded",
         "quality_state_upgraded",
+        "cause_status_changed",
+        "claim_confirmed",
+        "claim_ruled_out",
+        "incident_confidence_changed",
+        "affected_asset_role_changed",
     }:
         allowed = True
+    if "independent_source_confirmation" in reasons:
+        if cfg.alert_on_new_independent_source:
+            allowed = True
+        else:
+            blocked.append("independent source alerts disabled")
     if "score_jump" in reasons:
         if cfg.alert_on_score_jump and entry.score_jump >= cfg.score_jump_threshold:
             allowed = True

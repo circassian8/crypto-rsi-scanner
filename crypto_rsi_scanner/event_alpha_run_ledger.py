@@ -194,6 +194,13 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"success={str(bool(row.get('hypothesis_write_success'))).lower()} "
             f"block={row.get('hypothesis_write_block_reason') or 'none'}"
         )
+        rows.append(
+            "  "
+            f"incident_store={int(row.get('incident_rows_written') or 0)} "
+            f"attempted={str(bool(row.get('incident_write_attempted'))).lower()} "
+            f"success={str(bool(row.get('incident_write_success'))).lower()} "
+            f"block={row.get('incident_write_block_reason') or 'none'}"
+        )
         if row.get("send_block_reason"):
             rows.append(f"  send_block: {row.get('send_block_reason')}")
         rows.append(
@@ -313,6 +320,11 @@ def _run_record(
         "hypothesis_write_success": bool(getattr(result, "hypothesis_write_success", False)),
         "hypothesis_rows_written": _int(getattr(result, "hypothesis_rows_written", 0)),
         "hypothesis_write_block_reason": getattr(result, "hypothesis_write_block_reason", None),
+        "incident_store_path": getattr(result, "incident_store_path", None),
+        "incident_write_attempted": bool(getattr(result, "incident_write_attempted", False)),
+        "incident_write_success": bool(getattr(result, "incident_write_success", False)),
+        "incident_rows_written": _int(getattr(result, "incident_rows_written", 0)),
+        "incident_write_block_reason": getattr(result, "incident_write_block_reason", None),
         "research_cards_written": len(card_paths),
         "research_card_paths": card_paths,
         "provider_fetch_count": _int(getattr(catalyst, "provider_fetch_count", 0)),

@@ -645,12 +645,17 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     affected_ecosystem = components.get("affected_ecosystem") or "unknown"
     cause_status = components.get("cause_status") or "unknown"
     claim_polarities = components.get("claim_polarities") or []
+    claim_history = components.get("claim_history") or []
+    independent_source_domains = components.get("independent_source_domains") or components.get("source_domains") or []
+    conflicting_claims = components.get("conflicting_claims") or []
     role_confidence = components.get("role_confidence")
     role_evidence = components.get("role_evidence") or []
     market_context_source = components.get("market_context_source") or "unknown"
+    market_context_age = components.get("market_context_age_seconds") or components.get("market_context_age")
     market_context_quality = components.get("market_context_data_quality") or "unknown"
     market_reaction_confirmed = components.get("market_reaction_confirmed")
     causal_mechanism_confirmed = components.get("causal_mechanism_confirmed")
+    incident_confidence = components.get("incident_confidence")
     impact_path_strength = components.get("impact_path_strength") or "unknown"
     opportunity_score_v2 = components.get("opportunity_score_v2")
     evidence_specificity = components.get("evidence_specificity_score")
@@ -684,7 +689,11 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Primary subject: {primary_subject}",
         f"- Affected ecosystem: {affected_ecosystem}",
         f"- Cause status: {cause_status}",
+        f"- Incident confidence: {incident_confidence if incident_confidence is not None else 'n/a'}",
         f"- Claim polarity: {', '.join(str(item) for item in claim_polarities[:6]) if claim_polarities else 'unknown'}",
+        f"- Claim history: {_claim_history_summary(claim_history)}",
+        f"- Independent source domains: {', '.join(str(item) for item in independent_source_domains[:6]) if independent_source_domains else 'none'}",
+        f"- Conflicting claims: {'; '.join(str(item) for item in conflicting_claims[:4]) if conflicting_claims else 'none'}",
         f"- Original sector hypothesis: {', '.join(str(item) for item in (components.get('candidate_sectors') or [])[:6]) or components.get('hypothesis_scope') or 'unknown'}",
         f"- Candidate source: {entry.latest_source or 'impact_hypothesis'}",
         f"- Candidate Discovery Origin: {components.get('candidate_source') or components.get('source') or entry.latest_source or 'impact_hypothesis'}",
@@ -701,7 +710,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Source/evidence specificity: {evidence_specificity if evidence_specificity is not None else 'n/a'}",
         f"- Evidence quality: {source_class}/{evidence_specificity_class} / {evidence_quality_score if evidence_quality_score is not None else 'n/a'}",
         f"- Market confirmation: {market_confirmation_level} / {market_confirmation_score if market_confirmation_score is not None else 'n/a'}",
-        f"- Market context source: {market_context_source} ({market_context_quality})",
+        f"- Market context source: {market_context_source} ({market_context_quality}; age={market_context_age if market_context_age is not None else 'n/a'})",
         f"- Market reaction confirmed: {str(bool(market_reaction_confirmed)).lower() if market_reaction_confirmed is not None else 'unknown'}",
         f"- Causal mechanism confirmed: {str(bool(causal_mechanism_confirmed)).lower() if causal_mechanism_confirmed is not None else 'unknown'}",
         f"- Market summary: {market_confirmation_summary}",
@@ -893,6 +902,22 @@ def _verify_lines(alert: Mapping[str, Any] | None, playbook: str) -> list[str]:
         else:
             items = ["verify source evidence", "verify asset identity"]
     return [f"- {item}" for item in items]
+
+
+def _claim_history_summary(value: Any) -> str:
+    if not value:
+        return "none"
+    rows: list[str] = []
+    for item in list(value)[:4]:
+        if isinstance(item, Mapping):
+            rows.append(
+                f"{item.get('claim_type') or 'claim'}:"
+                f"{item.get('polarity') or 'unknown'}/"
+                f"{item.get('cause_status') or 'unknown'}"
+            )
+        else:
+            rows.append(str(item))
+    return "; ".join(rows) or "none"
 
 
 def _history_lines(entry: event_watchlist.EventWatchlistEntry | None) -> list[str]:

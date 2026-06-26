@@ -716,6 +716,7 @@ def _entry_from_hypothesis(
             "market_context_snapshot": dict(getattr(hypothesis, "market_context_snapshot", {}) or {}),
             "market_reaction_confirmed": getattr(hypothesis, "market_reaction_confirmed", None),
             "causal_mechanism_confirmed": getattr(hypothesis, "causal_mechanism_confirmed", None),
+            "incident_confidence": _optional_float(getattr(hypothesis, "incident_confidence", None)),
             "incident_id": _optional_str(getattr(hypothesis, "incident_id", None)),
             "canonical_incident_name": _optional_str(getattr(hypothesis, "canonical_incident_name", None)),
             "event_archetype": _optional_str(getattr(hypothesis, "event_archetype", None)),
@@ -845,6 +846,26 @@ def _hypothesis_material_change_reasons(
     previous_level = str(components.get("opportunity_level") or "")
     if level in {"validated_digest", "watchlist", "high_priority"} and level != previous_level:
         reasons.append("opportunity_score_upgraded")
+    current_sources = _item_count(getattr(hypothesis, "independent_source_domains", None)) or _item_count(getattr(hypothesis, "source_raw_ids", None))
+    previous_sources = _item_count(components.get("independent_source_domains")) or _item_count(components.get("source_raw_ids"))
+    if current_sources > previous_sources:
+        reasons.append("independent_source_confirmation")
+    current_cause = _optional_str(getattr(hypothesis, "cause_status", None)) or ""
+    previous_cause = _optional_str(components.get("cause_status")) or ""
+    if current_cause and current_cause != previous_cause:
+        reasons.append("cause_status_changed")
+        if current_cause == "confirmed":
+            reasons.append("claim_confirmed")
+        elif current_cause == "ruled_out":
+            reasons.append("claim_ruled_out")
+    current_incident_confidence = _optional_float(getattr(hypothesis, "incident_confidence", None)) or 0.0
+    previous_incident_confidence = _optional_float(components.get("incident_confidence")) or 0.0
+    if current_incident_confidence and abs(current_incident_confidence - previous_incident_confidence) >= 10:
+        reasons.append("incident_confidence_changed")
+    current_role = _optional_str(getattr(hypothesis, "candidate_role", None)) or ""
+    previous_role = _optional_str(components.get("candidate_role")) or ""
+    if current_role and previous_role and current_role != previous_role:
+        reasons.append("affected_asset_role_changed")
     if state == EventWatchlistState.RADAR and market in {"", "none", "weak"}:
         reasons.append("market_reaction_absent_downgrade")
     warnings = tuple(str(value).lower() for value in (
@@ -1434,6 +1455,19 @@ def _optional_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _item_count(value: Any) -> int:
+    if value in (None, "", [], (), {}):
+        return 0
+    if isinstance(value, str):
+        return 1
+    if isinstance(value, Mapping):
+        return len(value)
+    try:
+        return len(value)
+    except TypeError:
+        return 1
 
 
 def _optional_int(value: Any) -> int | None:

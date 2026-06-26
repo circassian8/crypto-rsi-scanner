@@ -148,7 +148,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
   `make event-alpha-fill-outcomes` (read/write Event Alpha alert snapshot
   artifacts and fill 1h/4h/24h/72h/7d plus MFE/MAE outcomes from local OHLCV
   fixtures; no live DB/paper/trading writes) · `make event-alpha-eval` (offline Event Alpha route/feedback golden
-  eval) · `make event-alert-no-key-report` /
+  eval) · `main.py --event-incidents-report` / `make event-incidents-report`
+  (profile-scoped canonical incident rows linking raw source ids/URLs/domains,
+  claim history, cause status, hypotheses, watchlist rows, asset roles, market
+  reaction vs causal mechanism, and incident confidence; research-only) ·
+  `make event-alert-no-key-report` /
   `make event-alert-no-key-llm-report` / `make event-alert-no-key-send`
   (no-key public RSS/GDELT/Polymarket event-alert research surfaces; send still
   requires explicit alert enablement) · `main.py --event-discovery-refresh` (fetch
@@ -283,6 +287,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_market_enrichment.py` / `event_anomaly_scanner.py` | research-only Event Alpha Radar market evidence and anomaly discovery; anomalies without catalyst evidence remain store-only/radar evidence and cannot create event-fade triggers |
 | `event_graph.py` | research-only catalyst clustering by external asset/event type/event-date bucket; used for watchlist identity while preserving rejected/noise asset links |
 | `event_watchlist.py` | research-only Event Alpha Radar state cache; tracks raw/radar/watchlist/high-priority/event-passed/armed/triggered/terminal transitions and duplicate suppression without routing alerts or writing live storage |
+| `event_incident_store.py` | profile-scoped canonical Event Alpha incident JSONL artifacts linking raw sources, claim history, hypotheses, watchlist rows, asset roles, and market/cause context |
 | `event_alpha_router.py` | artifact-only Event Alpha Radar route decisions from watchlist state; local research output only, no sends/trades/live writes |
 | `event_alpha_alert_store.py` | research-only Event Alpha alert snapshot/outcome JSONL artifacts; reports cohorts and fills local OHLCV outcomes without live DB, paper, or execution writes |
 | `event_feedback.py` / `event_alpha_eval.py` | lightweight Event Alpha feedback JSONL artifacts and offline route/feedback golden evals; review metadata only |

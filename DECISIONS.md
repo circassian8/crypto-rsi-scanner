@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-26 - Canonical incidents are first-class research artifacts
+**Status:** accepted
+**Decision:** Event Alpha canonical incidents must be persisted as
+profile-scoped research artifacts (`event_incidents.jsonl`) and treated as the
+shared context linking raw source evidence, claim history, cause status,
+hypotheses, watchlist rows, alert snapshots, daily briefs, research cards, and
+opportunity audits. Incident ids and incident confidence are audit metadata and
+quality inputs; they do not create candidates, routes, paper rows, normal RSI
+rows, trades, or `TRIGGERED_FADE`. Follow-up sources should update the same
+incident when the subject/archetype/ecosystem/date match, and material changes
+should be recorded as review reasons such as independent-source confirmation,
+cause confirmed/ruled out, incident-confidence change, or affected-asset role
+change. Market reaction must stay separate from causal mechanism confirmation.
+**Why:** Without a durable incident layer, duplicate articles can fragment
+source confidence, and a market move can be mistaken for proof of the claimed
+cause. Operators need one auditable object that shows what happened, what was
+claimed, what changed, and which assets are linked by role.
+**Revisit when:** A later schema migration moves incident storage from JSONL
+into a reviewed research database with equivalent point-in-time provenance.
+
 ## 2026-06-26 - Event Alpha claim semantics and incident roles are authoritative context
 **Status:** accepted
 **Decision:** Event Alpha impact validation must preserve event claim polarity,
