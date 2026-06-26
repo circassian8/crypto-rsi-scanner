@@ -30,6 +30,13 @@ fresh hypothesis/watchlist/alert rows are artifact-health problems unless the
 row explicitly represents no-incident evidence. Incident identity and linked
 counts are audit/provenance metadata only; they do not create candidates,
 routes, paper rows, normal RSI rows, trades, or `TRIGGERED_FADE`.
+Explicit no-incident evidence must carry both `incident_link_status=no_incident`
+and an `incident_link_reason`; otherwise strict artifact-health checks should
+treat a missing incident id as a fresh linkage failure. Market-anomaly incidents
+may mark a crypto asset as `direct_subject` only when the validated asset
+identity comes from the market/anomaly payload or equivalent resolver-validated
+evidence. `SECTOR` and generic unknown-market context are sector/context roles,
+not direct incident subjects.
 **Why:** Event Alpha increasingly reasons over follow-up source updates,
 disputed/confirmed claims, and market reaction for the same underlying event.
 Without a stable incident spine, duplicate articles can fragment watchlist

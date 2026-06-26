@@ -21850,6 +21850,59 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     assert sol_incident.current_cause_status == "unknown"
     assert all(claim.subject != "No" for claim in sol_incident.claim_history)
     assert any(claim.claim_type == "absence_of_validated_catalyst" for claim in sol_incident.claim_history)
+    assert any(
+        asset.symbol == "SOL" and asset.coin_id == "solana" and asset.role == "direct_subject"
+        for asset in sol_incident.linked_assets
+    )
+    assert any(
+        asset.symbol == "USDT" and asset.coin_id == "tether" and asset.role == "direct_subject"
+        for asset in usdt_incident.linked_assets
+    )
+    missing_market = RawDiscoveredEvent(
+        raw_id="missing_market_asset",
+        provider="market_anomaly",
+        fetched_at=now,
+        published_at=now,
+        source_url=None,
+        title="No clear trigger market anomaly",
+        body="No clear trigger or validated catalyst has been found for this market anomaly.",
+        raw_json={
+            "event": {
+                "event_id": "market_anomaly:missing:2026-06-26",
+                "event_name": "No clear trigger market anomaly",
+                "event_type": "market_anomaly",
+                "event_time": None,
+                "event_time_confidence": 0.0,
+                "external_asset": None,
+                "description": "No clear trigger market anomaly",
+            },
+            "market": {"anomaly_score": 78},
+            "anomaly": {"score": 78, "research_only": True, "requires_catalyst_evidence": True},
+        },
+        source_confidence=0.50,
+        content_hash="missing_market_asset",
+    )
+    missing_incident = event_incident_graph.build_incidents(
+        (
+            NormalizedEvent(
+                "evt_missing_market",
+                ("missing_market_asset",),
+                "No clear trigger market anomaly",
+                "market_anomaly",
+                None,
+                0.0,
+                now,
+                "market_anomaly",
+                (),
+                None,
+                missing_market.body,
+                0.50,
+            ),
+        ),
+        {"missing_market_asset": missing_market},
+    )[0]
+    assert missing_incident.primary_subject not in {"No", "SECTOR"}
+    assert "market_anomaly_missing_validated_asset" in missing_incident.warnings
 
     secondfi_a = raw(
         "secondfi_a",
@@ -22141,6 +22194,60 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         assert "market_reaction_unknown_cause: 2" in anomaly_report
         assert all(row["market_reaction_observed"] is True for row in anomaly_loaded.rows)
         assert all(row["current_cause_status"] == "unknown" for row in anomaly_loaded.rows)
+        sol_row = next(row for row in anomaly_loaded.rows if row["primary_subject"] == "SOL")
+        usdt_row = next(row for row in anomaly_loaded.rows if row["primary_subject"] == "USDT")
+        assert any(
+            asset["symbol"] == "SOL" and asset["coin_id"] == "solana" and asset["role"] == "direct_subject"
+            for asset in sol_row["linked_assets"]
+        )
+        assert any(
+            asset["symbol"] == "USDT" and asset["coin_id"] == "tether" and asset["role"] == "direct_subject"
+            for asset in usdt_row["linked_assets"]
+        )
+        assert not any(asset["symbol"] == "SECTOR" and asset["role"] == "direct_subject" for asset in sol_row["linked_assets"])
+        no_incident_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-no-incident", "alertable": 0}],
+            hypothesis_rows=[{
+                "row_type": "event_impact_hypothesis",
+                "run_id": "run-no-incident",
+                "profile": "quality_validation",
+                "run_mode": "test",
+                "artifact_namespace": "quality_validation",
+                "hypothesis_id": "hyp:no-incident",
+                "incident_link_status": "no_incident",
+                "incident_link_reason": "no_canonical_incident_for_event_evidence",
+                **clean_quality,
+            }],
+            watchlist_rows=[{
+                "row_type": "event_watchlist_state",
+                "relationship_type": "impact_hypothesis",
+                "key": "fresh-no-incident",
+                "event_id": "hyp:no-incident",
+                "coin_id": "noincident",
+                "symbol": "NOINC",
+                "run_mode": "test",
+                "artifact_namespace": "quality_validation",
+                "incident_link_status": "no_incident",
+                "incident_link_reason": "no_canonical_incident_for_event_evidence",
+                "opportunity_level": "validated_digest",
+                "opportunity_score_final": 75,
+                "impact_path_type": "exploit_security_event",
+                "evidence_specificity": "direct_token_mechanism",
+            }],
+            alert_rows=[{
+                "row_type": "event_alpha_alert_snapshot",
+                "run_id": "run-no-incident",
+                "hypothesis_id": "hyp:no-incident",
+                "incident_link_status": "no_incident",
+                "incident_link_reason": "no_canonical_incident_for_event_evidence",
+                **clean_quality,
+            }],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert no_incident_doctor.hypothesis_rows_missing_incident_id == 0
+        assert no_incident_doctor.watchlist_hypothesis_rows_missing_incident_id == 0
+        assert no_incident_doctor.alert_hypothesis_rows_missing_incident_id == 0
 
 
 def test_event_opportunity_upgrade_path_and_audit_sections():
@@ -22676,6 +22783,7 @@ def test_notify_llm_quality_profile_and_make_target_are_no_send():
 
     text = Path("Makefile").read_text(encoding="utf-8")
     assert "event-alpha-notify-llm-quality-scheduled:" in text
+    assert "event-alpha-notify-llm-quality-validation-cycle:" in text
     target = text.split("\nevent-alpha-notify-llm-quality-scheduled:", 1)[1].split(
         "\nevent-alpha-provider-health-report:", 1
     )[0]
@@ -22683,6 +22791,17 @@ def test_notify_llm_quality_profile_and_make_target_are_no_send():
     assert "--event-alpha-profile $(PROFILE)" in target
     assert "--event-alert-send" not in target
     assert "EVENT_FIXTURE_NOW_ENV" not in target
+    validation_target = text.split("\nevent-alpha-notify-llm-quality-validation-cycle:", 1)[1].split(
+        "\nevent-alpha-policy-simulate:", 1
+    )[0]
+    assert "rm -rf event_fade_cache/$(PROFILE)" in validation_target
+    assert "--event-alpha-notify-cycle" in validation_target
+    assert "--event-alpha-profile $(PROFILE)" in validation_target
+    assert "--event-alert-send" not in validation_target
+    assert "event-alpha-daily-brief" in validation_target
+    assert "event-incidents-report" in validation_target
+    assert "event-alpha-artifact-doctor" in validation_target
+    assert "EVENT_FIXTURE_NOW_ENV" not in validation_target
 
 
 def test_event_alpha_quality_coverage_checks_latest_raw_rows_only():

@@ -56,6 +56,7 @@ dedicated scheduled target that does **not** pass `--event-alert-send`:
 
 ```bash
 make event-alpha-notify-llm-quality-scheduled
+make event-alpha-notify-llm-quality-validation-cycle
 make event-alpha-quality-coverage-report PROFILE=notify_llm_quality
 make event-alpha-artifact-doctor PROFILE=notify_llm_quality STRICT=1
 ```
@@ -64,6 +65,11 @@ The coverage report reads raw JSONL rows for the latest run and checks that
 hypothesis, watchlist, and alert-snapshot artifacts carry the canonical
 top-level quality fields. A failing coverage report means the fresh writer path
 needs patching; it is not a trading or notification promotion signal.
+Use `make event-alpha-notify-llm-quality-validation-cycle` when you need a
+fresh live-style quality namespace for Pro-model review without sending
+Telegram messages. It clears `event_fade_cache/notify_llm_quality/`, runs the
+guarded notify cycle without a send flag, then writes/prints the daily brief,
+quality review, incident report, and strict artifact doctor output.
 
 Notification lanes are independent: a daily digest cooldown does not block an
 instant escalation, and instant escalation cooldown does not block a
@@ -147,6 +153,11 @@ creating duplicate watchlist rows, and that ruled-out/unknown causes stayed
 local-only. For market anomalies, verify that canonical names are asset-specific
 (`SOL market anomaly`, `USDT market anomaly`) and that the report separates
 `reaction_observed` from causal confirmation.
+The linked-asset roles should show the validated anomaly asset from the market
+payload as `direct_subject`. Sector rows such as `SECTOR`, source context, or
+generic unknown-market text are context only and must not be treated as direct
+incident subjects. If a market anomaly lacks validated asset identity, the
+incident should carry `market_anomaly_missing_validated_asset`.
 
 Incident id is now the preferred spine for impact-hypothesis state. Fresh
 hypothesis rows, hypothesis-derived watchlist rows, route alert snapshots, and
@@ -159,7 +170,8 @@ run-ledger/doctor reports should carry top-level incident aliases such as
 impact_path_type` when an incident exists, so a new independent source updates
 the same canonical watchlist row instead of creating a duplicate. Artifact
 doctor strict mode blocks fresh hypothesis/watchlist/alert rows that are
-missing incident ids unless they are explicitly no-incident evidence.
+missing incident ids unless they are explicitly no-incident evidence with both
+`incident_link_status=no_incident` and a non-empty `incident_link_reason`.
 Incident-specific material update reasons include `incident_new_independent_source`,
 `incident_cause_status_changed`, `incident_claim_confirmed`,
 `incident_claim_ruled_out`, `incident_conflicting_claim_added`,

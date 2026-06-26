@@ -328,6 +328,15 @@ def _row_from_hypothesis(
     incident_causal = data.get("incident_causal_mechanism_confirmed")
     if incident_causal is None:
         incident_causal = data.get("causal_mechanism_confirmed")
+    incident_id = str(data.get("incident_id") or "").strip()
+    incident_link_status = str(
+        data.get("incident_link_status")
+        or ("linked" if incident_id else "no_incident")
+    ).strip()
+    incident_link_reason = (
+        data.get("incident_link_reason")
+        or (None if incident_link_status == "linked" else "no_canonical_incident_for_event_evidence")
+    )
     data.update({
         "schema_version": IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION,
         "row_type": "event_impact_hypothesis",
@@ -339,6 +348,8 @@ def _row_from_hypothesis(
         "research_only": True,
         "candidate_sources": _candidate_sources(data.get("candidate_source")),
         "promoted_watchlist_key": promoted_watchlist_key,
+        "incident_link_status": incident_link_status,
+        "incident_link_reason": incident_link_reason,
         "validated_symbol": str(validated_asset.get("symbol") or "") or None,
         "validated_coin_id": str(validated_asset.get("coin_id") or "") or None,
         "incident_canonical_name": incident_canonical,

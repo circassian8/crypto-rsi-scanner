@@ -151,7 +151,7 @@ def infer_primary_subject(
     if _is_market_anomaly_event(event, raws):
         asset = _market_anomaly_asset(event, raws)
         fallback = asset.get("symbol") or asset.get("name") or asset.get("coin_id")
-        if _valid_subject(str(fallback or "")):
+        if asset.get("identity_source") == "market_payload" and _valid_subject(str(fallback or "")):
             return str(fallback)
     if event is not None:
         if _valid_subject(event.external_asset):
@@ -239,6 +239,8 @@ def _incident_from_group(
     status = event_claim_semantics.current_cause_status(claims, "exploit")
     conflicts = _conflicting_claims(claims)
     name = _canonical_name(primary_subject, archetype, ecosystem, event=first_event, raws=raws)
+    linked_assets = _incident_linked_assets(first_event, raws, archetype)
+    warnings = _incident_warnings_for_group(first_event, raws, archetype, primary_subject)
     digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
     return CanonicalIncident(
         schema_version=INCIDENT_GRAPH_SCHEMA_VERSION,
@@ -256,7 +258,8 @@ def _incident_from_group(
         claim_history=claims,
         current_cause_status=status,
         conflicting_claims=conflicts,
-        linked_assets=(),
+        linked_assets=linked_assets,
+        warnings=warnings,
     )
 
 
@@ -328,7 +331,13 @@ def _canonical_name(
 ) -> str:
     if _is_market_anomaly_event(event, raws) or archetype == "market_dislocation_unknown":
         asset = _market_anomaly_asset(event, raws)
-        label = str(asset.get("symbol") or asset.get("name") or asset.get("coin_id") or subject or "Unknown asset")
+        label = str(
+            asset.get("symbol")
+            or asset.get("name")
+            or asset.get("coin_id")
+            or (subject if _valid_subject(subject) else None)
+            or "Unknown asset"
+        )
         if _is_market_anomaly_event(event, raws):
             return f"{label} market anomaly"
         return f"{label} market dislocation"
@@ -393,6 +402,7 @@ def _market_anomaly_asset(
                 "coin_id": coin_id,
                 "name": name,
                 "anomaly_type": anomaly_type,
+                "identity_source": "market_payload",
             }
     if event is not None:
         name = str(event.external_asset or "").strip()
@@ -404,5 +414,49 @@ def _market_anomaly_asset(
                 "coin_id": "",
                 "name": name,
                 "anomaly_type": clean_text(event.event_type) or "market_anomaly",
+                "identity_source": "event_name",
             }
-    return {"symbol": "", "coin_id": "", "name": "", "anomaly_type": "market_anomaly"}
+    return {"symbol": "", "coin_id": "", "name": "", "anomaly_type": "market_anomaly", "identity_source": "missing"}
+
+
+def _incident_linked_assets(
+    event: NormalizedEvent,
+    raws: tuple[RawDiscoveredEvent, ...],
+    archetype: str,
+) -> tuple[IncidentAssetRole, ...]:
+    """Return direct incident asset roles known from canonical incident evidence."""
+    if not (_is_market_anomaly_event(event, raws) or archetype == "market_dislocation_unknown"):
+        return ()
+    asset = _market_anomaly_asset(event, raws)
+    if asset.get("identity_source") != "market_payload":
+        return ()
+    symbol = str(asset.get("symbol") or "").strip().upper() or None
+    coin_id = str(asset.get("coin_id") or "").strip() or None
+    name = str(asset.get("name") or "").strip()
+    if not (symbol or coin_id or name):
+        return ()
+    return (
+        IncidentAssetRole(
+            symbol=symbol,
+            coin_id=coin_id,
+            role="direct_subject",
+            confidence=0.90,
+            evidence=("market_anomaly_validated_asset",),
+        ),
+    )
+
+
+def _incident_warnings_for_group(
+    event: NormalizedEvent,
+    raws: tuple[RawDiscoveredEvent, ...],
+    archetype: str,
+    primary_subject: str | None,
+) -> tuple[str, ...]:
+    warnings: list[str] = []
+    if _is_market_anomaly_event(event, raws) or archetype == "market_dislocation_unknown":
+        asset = _market_anomaly_asset(event, raws)
+        if asset.get("identity_source") != "market_payload":
+            warnings.append("market_anomaly_missing_validated_asset")
+        if primary_subject is not None and not _valid_subject(primary_subject):
+            warnings.append("market_anomaly_generic_primary_subject_rejected")
+    return tuple(dict.fromkeys(warnings))

@@ -164,6 +164,8 @@ class EventImpactHypothesis:
     incident_cause_status: str | None = None
     incident_market_reaction_observed: bool | None = None
     incident_causal_mechanism_confirmed: bool | None = None
+    incident_link_status: str | None = None
+    incident_link_reason: str | None = None
     canonical_incident_name: str | None = None
     event_archetype: str | None = None
     primary_subject: str | None = None
@@ -1268,6 +1270,8 @@ def _hypothesis_from_rule(
             if incident
             else None
         ),
+        incident_link_status="linked" if incident else "no_incident",
+        incident_link_reason=None if incident else "no_canonical_incident_for_event_evidence",
         canonical_incident_name=incident.canonical_name if incident else None,
         event_archetype=incident.event_archetype if incident else None,
         primary_subject=incident.primary_subject if incident else None,
@@ -1520,6 +1524,11 @@ def _with_incident_aliases(hypothesis: EventImpactHypothesis) -> EventImpactHypo
         incident_cause_status=cause,
         incident_market_reaction_observed=observed,
         incident_causal_mechanism_confirmed=causal,
+        incident_link_status=hypothesis.incident_link_status or ("linked" if hypothesis.incident_id else "no_incident"),
+        incident_link_reason=(
+            hypothesis.incident_link_reason
+            or (None if hypothesis.incident_id else "no_canonical_incident_for_event_evidence")
+        ),
         canonical_incident_name=hypothesis.canonical_incident_name or canonical,
         event_archetype=hypothesis.event_archetype or archetype,
         primary_subject=hypothesis.primary_subject or subject,
@@ -3089,6 +3098,8 @@ def _merge_duplicate_hypotheses(
         incident_cause_status=winner.incident_cause_status or winner.cause_status,
         incident_market_reaction_observed=incident_observed,
         incident_causal_mechanism_confirmed=incident_causal,
+        incident_link_status=winner.incident_link_status or other.incident_link_status,
+        incident_link_reason=winner.incident_link_reason or other.incident_link_reason,
         source_raw_ids=tuple(dict.fromkeys((*current.source_raw_ids, *item.source_raw_ids))),
         source_event_ids=tuple(dict.fromkeys((*current.source_event_ids, *item.source_event_ids))),
         evidence_quotes=tuple(dict.fromkeys((*current.evidence_quotes, *item.evidence_quotes))),

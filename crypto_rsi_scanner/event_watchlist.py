@@ -75,6 +75,8 @@ class EventWatchlistEntry:
     incident_cause_status: str | None = None
     incident_market_reaction_observed: bool | None = None
     incident_causal_mechanism_confirmed: bool | None = None
+    incident_link_status: str | None = None
+    incident_link_reason: str | None = None
     requested_state_before_quality_gate: str | None = None
     final_state_after_quality_gate: str | None = None
     quality_state_block_reason: str | None = None
@@ -673,6 +675,12 @@ def _entry_from_hypothesis(
     incident_causal = _optional_bool(getattr(hypothesis, "incident_causal_mechanism_confirmed", None))
     if incident_causal is None:
         incident_causal = _optional_bool(getattr(hypothesis, "causal_mechanism_confirmed", None))
+    incident_link_status = _optional_str(getattr(hypothesis, "incident_link_status", None)) or (
+        "linked" if incident_id else "no_incident"
+    )
+    incident_link_reason = _optional_str(getattr(hypothesis, "incident_link_reason", None)) or (
+        None if incident_link_status == "linked" else "no_canonical_incident_for_event_evidence"
+    )
     requested_state = _state_from_hypothesis(hypothesis, validated=validated, token_level=symbol != "SECTOR")
     hypothesis_quality_components = {
         "impact_path_type": _optional_str(getattr(hypothesis, "impact_path_type", None)),
@@ -732,7 +740,9 @@ def _entry_from_hypothesis(
             *tuple(getattr(hypothesis, "warnings", ()) or ()),
             *tuple(getattr(hypothesis, "rejection_reasons", ()) or ()),
             *asset_warnings,
-            *(("missing_incident_id_for_hypothesis_watchlist_key",) if not incident_id else ()),
+            *((
+                "missing_incident_id_for_hypothesis_watchlist_key",
+            ) if not incident_id and incident_link_status != "no_incident" else ()),
             *(("quality_state_blocked:" + quality_state_block,) if quality_state_block else ()),
         )
         if str(value)
@@ -760,6 +770,8 @@ def _entry_from_hypothesis(
         incident_cause_status=incident_cause_status,
         incident_market_reaction_observed=incident_market_observed,
         incident_causal_mechanism_confirmed=incident_causal,
+        incident_link_status=incident_link_status,
+        incident_link_reason=incident_link_reason,
         requested_state_before_quality_gate=requested_state.value,
         final_state_after_quality_gate=state.value,
         quality_state_block_reason=quality_state_block,
@@ -831,6 +843,8 @@ def _entry_from_hypothesis(
             "role_evidence": list(getattr(hypothesis, "role_evidence", ()) or ())[:8],
             "incident_cause_status": incident_cause_status,
             "cause_status": incident_cause_status,
+            "incident_link_status": incident_link_status,
+            "incident_link_reason": incident_link_reason,
             "claim_polarities": list(getattr(hypothesis, "claim_polarities", ()) or ())[:8],
             "claim_history": list(getattr(hypothesis, "claim_history", ()) or ())[:8],
             "independent_source_domains": list(getattr(hypothesis, "independent_source_domains", ()) or ())[:8],
@@ -1387,6 +1401,8 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
                 if "causal_mechanism_confirmed" in row
                 else components.get("causal_mechanism_confirmed")
             ),
+            incident_link_status=_optional_str(row.get("incident_link_status") or components.get("incident_link_status")),
+            incident_link_reason=_optional_str(row.get("incident_link_reason") or components.get("incident_link_reason")),
             requested_state_before_quality_gate=requested_state,
             final_state_after_quality_gate=final_state,
             quality_state_block_reason=quality_state_block,

@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Finish incident-spine quality artifacts · Codex
+**Why:** `notify_llm_quality` needed a no-send validation path that writes the
+same canonical incident artifacts as the clean fixture namespace, and strict
+doctor checks needed to distinguish intentional no-incident evidence from fresh
+rows that silently lost their incident linkage.
+**Changes:**
+- Added explicit `incident_link_status` / `incident_link_reason` propagation
+  through impact hypotheses, hypothesis-store rows, hypothesis watchlist rows,
+  and alert snapshots.
+- Hardened artifact doctor so `no_incident` only bypasses missing-incident
+  checks when an explicit reason is present, while still preserving legacy
+  warning behavior.
+- Tightened market-anomaly incident roles so validated anomaly assets from the
+  market payload become `direct_subject`, sector context cannot masquerade as
+  the direct subject, and missing validated anomaly identity is warned.
+- Added `make event-alpha-notify-llm-quality-validation-cycle`, a fresh
+  `notify_llm_quality` no-send rebuild that writes the daily brief, incident
+  report, quality review, and strict artifact-doctor output.
+- Expanded incident regression coverage for SOL/USDT anomaly roles,
+  missing-anomaly-asset warnings, intentional no-incident rows, and the new
+  no-send quality target.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed (459/459). Broader Make verification
+is run before commit.
+**Notes/risks:** Research-only artifact and operator-target hardening. No
+normal RSI rows, paper/live trades, execution, Telegram send promotion, or
+LLM/provider-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-26 — Make canonical incidents the Event Alpha spine · Codex
 **Why:** The incident store existed, but incident identity still needed to be
 the durable join key across hypotheses, watchlist rows, alert snapshots, run

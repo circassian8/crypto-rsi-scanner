@@ -660,8 +660,21 @@ def _row_incident_id(row: Mapping[str, Any]) -> str:
 
 
 def _row_has_no_incident(row: Mapping[str, Any]) -> bool:
-    status = str(row.get("incident_link_status") or "").strip()
-    if status == "no_incident":
+    components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
+    score = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+    status = str(
+        row.get("incident_link_status")
+        or components.get("incident_link_status")
+        or score.get("incident_link_status")
+        or ""
+    ).strip()
+    reason = str(
+        row.get("incident_link_reason")
+        or components.get("incident_link_reason")
+        or score.get("incident_link_reason")
+        or ""
+    ).strip()
+    if status == "no_incident" and reason:
         return True
     warnings = " ".join(str(value) for value in row.get("warnings") or ())
     return "no_incident" in warnings

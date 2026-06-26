@@ -239,7 +239,7 @@ def _row_from_incident(
 ) -> dict[str, Any]:
     h_rows = [_object_row(item) for item in hypotheses]
     w_rows = [_object_row(item) for item in watchlist_rows]
-    linked_assets = _linked_assets(h_rows, w_rows)
+    linked_assets = _linked_assets(h_rows, w_rows, incident=incident)
     market = _incident_market_context(h_rows, w_rows, incident=incident, raw_by_id=raw_by_id)
     claim_history = [_claim_summary(claim) for claim in incident.claim_history[:12]]
     source_urls = tuple(sorted({raw_by_id[raw_id].source_url for raw_id in incident.raw_ids if raw_id in raw_by_id and raw_by_id[raw_id].source_url}))
@@ -311,8 +311,24 @@ def _watchlist_by_incident(watchlist_rows: Iterable[Mapping[str, Any] | object])
     return out
 
 
-def _linked_assets(h_rows: list[dict[str, Any]], w_rows: list[dict[str, Any]]) -> tuple[dict[str, Any], ...]:
+def _linked_assets(
+    h_rows: list[dict[str, Any]],
+    w_rows: list[dict[str, Any]],
+    *,
+    incident: event_incident_graph.CanonicalIncident | None = None,
+) -> tuple[dict[str, Any], ...]:
     assets: list[dict[str, Any]] = []
+    if incident is not None:
+        for asset in incident.linked_assets:
+            if asset.symbol or asset.coin_id:
+                assets.append({
+                    "symbol": asset.symbol,
+                    "coin_id": asset.coin_id,
+                    "role": asset.role,
+                    "role_confidence": asset.confidence,
+                    "source": "incident",
+                    "evidence": tuple(asset.evidence),
+                })
     for row in h_rows:
         role = _value(row, "candidate_role")
         validated_asset = row.get("validated_asset") if isinstance(row.get("validated_asset"), Mapping) else {}
@@ -325,6 +341,12 @@ def _linked_assets(h_rows: list[dict[str, Any]], w_rows: list[dict[str, Any]]) -
             coin_ids = row.get("candidate_coin_ids") or ()
             coin_id = str(coin_ids[0]) if coin_ids else ""
         if symbol or coin_id:
+            role = _incident_asset_role(
+                symbol=symbol,
+                coin_id=coin_id,
+                role=role or "unknown",
+                incident=incident,
+            )
             assets.append({
                 "symbol": symbol,
                 "coin_id": coin_id,
@@ -338,6 +360,12 @@ def _linked_assets(h_rows: list[dict[str, Any]], w_rows: list[dict[str, Any]]) -
         coin_id = _value(row, "coin_id") or _value(components, "validated_coin_id")
         role = _value(row, "candidate_role") or _value(components, "candidate_role")
         if symbol or coin_id:
+            role = _incident_asset_role(
+                symbol=symbol,
+                coin_id=coin_id,
+                role=role or "unknown",
+                incident=incident,
+            )
             assets.append({
                 "symbol": symbol,
                 "coin_id": coin_id,
@@ -346,6 +374,22 @@ def _linked_assets(h_rows: list[dict[str, Any]], w_rows: list[dict[str, Any]]) -
                 "source": "watchlist",
             })
     return tuple(_unique_dicts(assets, keys=("symbol", "coin_id", "role")))
+
+
+def _incident_asset_role(
+    *,
+    symbol: str,
+    coin_id: str,
+    role: str,
+    incident: event_incident_graph.CanonicalIncident | None,
+) -> str:
+    if incident is None or incident.event_archetype != "market_dislocation_unknown":
+        return role
+    clean_symbol = str(symbol or "").strip().casefold()
+    clean_coin = str(coin_id or "").strip().casefold()
+    if clean_symbol == "sector" or clean_coin in {"market_anomaly_unknown", "sector", "unknown"}:
+        return "sector_context"
+    return role
 
 
 def _asset_roles(linked_assets: Iterable[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
