@@ -415,6 +415,11 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
             else alert.score_components.get("incident_link_reason")
             or "no_canonical_incident_for_event_evidence"
         ),
+        "incident_relevance_status": alert.score_components.get("incident_relevance_status"),
+        "incident_relevance_score": alert.score_components.get("incident_relevance_score"),
+        "incident_relevance_reasons": alert.score_components.get("incident_relevance_reasons") or (),
+        "incident_relevance_warnings": alert.score_components.get("incident_relevance_warnings") or (),
+        "canonical_persistence_reason": alert.score_components.get("canonical_persistence_reason"),
         "incident_canonical_name": alert.score_components.get("incident_canonical_name") or alert.score_components.get("canonical_incident_name"),
         "canonical_incident_name": alert.score_components.get("canonical_incident_name"),
         "incident_event_archetype": alert.score_components.get("incident_event_archetype") or alert.score_components.get("event_archetype"),
@@ -546,6 +551,11 @@ def _snapshot_from_route_decision(
             or entry.incident_link_reason
             or (None if components.get("incident_id") or entry.incident_id else "no_canonical_incident_for_event_evidence")
         ),
+        "incident_relevance_status": components.get("incident_relevance_status"),
+        "incident_relevance_score": components.get("incident_relevance_score"),
+        "incident_relevance_reasons": components.get("incident_relevance_reasons") or (),
+        "incident_relevance_warnings": components.get("incident_relevance_warnings") or (),
+        "canonical_persistence_reason": components.get("canonical_persistence_reason"),
         "incident_canonical_name": components.get("incident_canonical_name") or components.get("canonical_incident_name") or entry.incident_canonical_name,
         "canonical_incident_name": components.get("canonical_incident_name") or components.get("incident_canonical_name") or entry.incident_canonical_name,
         "incident_event_archetype": components.get("incident_event_archetype") or components.get("event_archetype"),

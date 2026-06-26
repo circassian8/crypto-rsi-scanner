@@ -56,7 +56,11 @@ class EventAlphaArtifactDoctorResult:
     alert_hypothesis_rows_missing_incident_id: int = 0
     incident_rows_without_linked_hypotheses: int = 0
     incident_rows_without_linked_watchlist: int = 0
+    canonical_unlinked_incidents: int = 0
     diagnostic_incident_rows: int = 0
+    raw_observation_incident_rows: int = 0
+    rejected_incident_rows: int = 0
+    incident_relevance_missing: int = 0
     invalid_canonical_incident_rows: int = 0
     garbage_primary_subject_incidents: int = 0
     fresh_incident_linkage_blockers: int = 0
@@ -350,6 +354,15 @@ def diagnose_artifacts(
         )
     if incident_linkage["diagnostic_incident_rows"]:
         warnings.append(f"diagnostic_incident_rows={incident_linkage['diagnostic_incident_rows']}")
+    if incident_linkage["raw_observation_incident_rows"]:
+        warnings.append(f"raw_observation_incident_rows={incident_linkage['raw_observation_incident_rows']}")
+    if incident_linkage["rejected_incident_rows"]:
+        warnings.append(f"rejected_incident_rows={incident_linkage['rejected_incident_rows']}")
+    if incident_linkage["canonical_unlinked_incidents"]:
+        warnings.append(f"canonical_unlinked_incidents={incident_linkage['canonical_unlinked_incidents']}")
+    if incident_linkage["incident_relevance_missing"]:
+        message = f"incident_relevance_missing={incident_linkage['incident_relevance_missing']}"
+        (blockers if strict else warnings).append(message)
     if incident_linkage["garbage_primary_subject_incidents"]:
         warnings.append(f"garbage_primary_subject_incidents={incident_linkage['garbage_primary_subject_incidents']}")
     if incident_linkage["invalid_canonical_incident_rows"]:
@@ -404,7 +417,11 @@ def diagnose_artifacts(
         alert_hypothesis_rows_missing_incident_id=incident_linkage["alert_hypothesis_rows_missing_incident_id"],
         incident_rows_without_linked_hypotheses=incident_linkage["incident_rows_without_linked_hypotheses"],
         incident_rows_without_linked_watchlist=incident_linkage["incident_rows_without_linked_watchlist"],
+        canonical_unlinked_incidents=incident_linkage["canonical_unlinked_incidents"],
         diagnostic_incident_rows=incident_linkage["diagnostic_incident_rows"],
+        raw_observation_incident_rows=incident_linkage["raw_observation_incident_rows"],
+        rejected_incident_rows=incident_linkage["rejected_incident_rows"],
+        incident_relevance_missing=incident_linkage["incident_relevance_missing"],
         invalid_canonical_incident_rows=incident_linkage["invalid_canonical_incident_rows"],
         garbage_primary_subject_incidents=incident_linkage["garbage_primary_subject_incidents"],
         fresh_incident_linkage_blockers=(
@@ -655,6 +672,7 @@ def _incident_linkage_summary(
         "alert_hypothesis_rows_missing_incident_id": 0,
         "incident_rows_without_linked_hypotheses": 0,
         "incident_rows_without_linked_watchlist": 0,
+        "canonical_unlinked_incidents": 0,
         "fresh_missing_hypotheses": 0,
         "fresh_missing_watchlist": 0,
         "fresh_missing_alerts": 0,
@@ -662,6 +680,9 @@ def _incident_linkage_summary(
         "legacy_missing_watchlist": 0,
         "legacy_missing_alerts": 0,
         "diagnostic_incident_rows": 0,
+        "raw_observation_incident_rows": 0,
+        "rejected_incident_rows": 0,
+        "incident_relevance_missing": 0,
         "invalid_canonical_incident_rows": 0,
         "garbage_primary_subject_incidents": 0,
     }
@@ -702,17 +723,31 @@ def _incident_linkage_summary(
             continue
         subject_quality = str(row.get("incident_subject_quality") or "").strip()
         diagnostic = row.get("diagnostic_only") is True
+        relevance = str(row.get("incident_relevance_status") or "").strip()
+        if not relevance:
+            out["incident_relevance_missing"] += 1
         if _is_garbage_incident_subject(row.get("primary_subject")):
             out["garbage_primary_subject_incidents"] += 1
-        if diagnostic:
+        if relevance == "raw_observation":
+            out["raw_observation_incident_rows"] += 1
+        if relevance == "rejected_incident":
+            out["rejected_incident_rows"] += 1
+        relevance_is_hidden = (
+            relevance in {"raw_observation", "rejected_incident"}
+            or (relevance == "diagnostic_only" and subject_quality != "invalid")
+        )
+        if diagnostic or relevance_is_hidden:
             out["diagnostic_incident_rows"] += 1
             continue
         elif subject_quality in {"invalid", "diagnostic_only"}:
             out["invalid_canonical_incident_rows"] += 1
-        if not row.get("linked_hypothesis_ids"):
+        operational = relevance in {"canonical_incident", "linked_incident", "active_incident"} or (not relevance and not diagnostic)
+        if operational and not row.get("linked_hypothesis_ids"):
             out["incident_rows_without_linked_hypotheses"] += 1
-        if not row.get("linked_watchlist_keys"):
+        if operational and not row.get("linked_watchlist_keys"):
             out["incident_rows_without_linked_watchlist"] += 1
+        if operational and not row.get("linked_hypothesis_ids") and not row.get("linked_watchlist_keys"):
+            out["canonical_unlinked_incidents"] += 1
     return out
 
 
@@ -891,7 +926,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"alert_hypothesis_rows_missing_incident_id={result.alert_hypothesis_rows_missing_incident_id} "
             f"incident_rows_without_linked_hypotheses={result.incident_rows_without_linked_hypotheses} "
             f"incident_rows_without_linked_watchlist={result.incident_rows_without_linked_watchlist} "
+            f"canonical_unlinked_incidents={result.canonical_unlinked_incidents} "
             f"diagnostic_incident_rows={result.diagnostic_incident_rows} "
+            f"raw_observation_incident_rows={result.raw_observation_incident_rows} "
+            f"rejected_incident_rows={result.rejected_incident_rows} "
+            f"incident_relevance_missing={result.incident_relevance_missing} "
             f"invalid_canonical_incident_rows={result.invalid_canonical_incident_rows} "
             f"garbage_primary_subject_incidents={result.garbage_primary_subject_incidents} "
             f"fresh_blockers={result.fresh_incident_linkage_blockers} "

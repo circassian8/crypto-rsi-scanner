@@ -685,6 +685,10 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     lines = [
         f"- Validated asset: {validated_symbol or 'unknown'}/{validated_coin_id or 'unknown'}",
         f"- Incident: {canonical_incident_name} ({incident_id})",
+        f"- Incident relevance: {components.get('incident_relevance_status') or 'unknown'} "
+        f"score={components.get('incident_relevance_score') if components.get('incident_relevance_score') is not None else 'n/a'}",
+        f"- Canonical persistence reason: {components.get('canonical_persistence_reason') or 'unknown'}",
+        f"- Incident relevance reasons: {'; '.join(str(item) for item in (components.get('incident_relevance_reasons') or [])[:4]) if components.get('incident_relevance_reasons') else 'none'}",
         f"- Event archetype: {event_archetype}",
         f"- Primary subject: {primary_subject}",
         f"- Affected ecosystem: {affected_ecosystem}",

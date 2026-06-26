@@ -803,29 +803,52 @@ def _canonical_incident_lines(rows: Iterable[Mapping[str, Any]]) -> list[str]:
     incidents = [dict(row) for row in rows if isinstance(row, Mapping)]
     if not incidents:
         return ["- Stored incidents: none loaded for this profile."]
+    diagnostic_rows = [row for row in incidents if _incident_is_diagnostic(row)]
+    visible = [row for row in incidents if not _incident_is_diagnostic(row)]
+    if not visible:
+        return [
+            f"- Stored incidents: {len(incidents)}",
+            f"- Diagnostic/raw observations hidden: {len(diagnostic_rows)}",
+            "- Canonical incidents: none visible for this profile.",
+        ]
     lines = [
         f"- Stored incidents: {len(incidents)}",
-        "- Event archetypes: " + _format_counts(_field_counts(incidents, "event_archetype")),
-        "- Cause statuses: " + _format_counts(_field_counts(incidents, "current_cause_status")),
-        "- Primary subjects: " + _format_counts(_field_counts(incidents, "primary_subject")),
+        f"- Diagnostic/raw observations hidden: {len(diagnostic_rows)}",
+        "- Relevance statuses: " + _format_counts(_field_counts(incidents, "incident_relevance_status")),
+        "- Event archetypes: " + _format_counts(_field_counts(visible, "event_archetype")),
+        "- Cause statuses: " + _format_counts(_field_counts(visible, "current_cause_status")),
+        "- Primary subjects: " + _format_counts(_field_counts(visible, "primary_subject")),
         "- New/updated: "
-        f"multiple_source_updates={sum(1 for row in incidents if int(row.get('source_update_count') or 0) > 1)}, "
-        f"conflicting_claims={sum(1 for row in incidents if row.get('conflicting_claims'))}",
+        f"multiple_source_updates={sum(1 for row in visible if int(row.get('source_update_count') or 0) > 1)}, "
+        f"conflicting_claims={sum(1 for row in visible if row.get('conflicting_claims'))}",
         "- Market reaction but unknown/ruled-out cause: "
         + str(sum(
-            1 for row in incidents
+            1 for row in visible
             if (row.get("market_reaction_observed") or row.get("market_reaction_confirmed"))
             and str(row.get("current_cause_status") or "") in {"unknown", "ruled_out"}
         )),
         "- Confirmed cause missing market data: "
         + str(sum(
-            1 for row in incidents
+            1 for row in visible
             if str(row.get("current_cause_status") or "") == "confirmed"
             and not row.get("market_context_source")
         )),
     ]
+    candidates = [row for row in visible if str(row.get("incident_relevance_status") or "") == "incident_candidate"]
+    linked = [
+        row for row in visible
+        if str(row.get("incident_relevance_status") or "") in {"linked_incident", "active_incident"}
+    ]
+    market_unknown = [
+        row for row in visible
+        if (row.get("market_reaction_observed") or row.get("market_reaction_confirmed"))
+        and str(row.get("current_cause_status") or "") in {"unknown", "ruled_out"}
+    ]
+    lines.append(f"- Incident candidates: {len(candidates)}")
+    lines.append(f"- Linked/active incidents: {len(linked)}")
+    lines.append(f"- Market reactions with unknown/ruled-out cause: {len(market_unknown)}")
     notable = sorted(
-        incidents,
+        visible,
         key=lambda row: (
             int(row.get("source_update_count") or 0),
             _float(row.get("incident_confidence")),
@@ -847,6 +870,11 @@ def _canonical_incident_lines(rows: Iterable[Mapping[str, Any]]) -> list[str]:
             )
         lines.append("- Notable incidents: " + " | ".join(labels))
     return lines
+
+
+def _incident_is_diagnostic(row: Mapping[str, Any]) -> bool:
+    status = str(row.get("incident_relevance_status") or "")
+    return bool(row.get("diagnostic_only")) or status in {"raw_observation", "diagnostic_only", "rejected_incident"}
 
 
 def _incident_asset_summary(value: Any) -> str:

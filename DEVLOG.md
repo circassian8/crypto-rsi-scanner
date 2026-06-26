@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Gate canonical incidents by crypto relevance · Codex
+**Why:** Event Alpha was preserving broad external events as canonical incidents
+even when they had no validated crypto asset, hypothesis, watchlist linkage, or
+market reaction. That made incident reports look more actionable than the
+underlying evidence justified.
+**Changes:**
+- Added explicit incident relevance statuses:
+  `raw_observation`, `incident_candidate`, `canonical_incident`,
+  `linked_incident`, `active_incident`, `diagnostic_only`, and
+  `rejected_incident`.
+- Added relevance scoring, reason codes, warnings, and
+  `canonical_persistence_reason` fields to incident rows, impact hypotheses,
+  hypothesis-store rows, watchlist metadata, alert snapshots, daily briefs,
+  opportunity audits, research cards, and artifact doctor output.
+- Changed incident-store writes so live-style profiles persist canonical,
+  linked, active, and candidate incidents by default, while raw/diagnostic/
+  rejected observations are hidden unless `RSI_EVENT_INCIDENT_STORE_DIAGNOSTIC=1`
+  or a fixture/debug profile is running.
+- Updated signal-quality fixtures and regression tests for raw Polymarket/
+  geopolitical observations, linked OpenAI sector incidents, RWA/pre-IPO
+  candidates, market anomalies, and active THORChain/RUNE-style incidents.
+**Verify:** `python3 tests/test_indicators.py` passed (460/460);
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (31/31);
+`make event-alpha-quality-validation-cycle PYTHON=python3` completed with
+strict doctor `OK`; `make verify PYTHON=python3` passed. Fresh
+`make event-alpha-quality-live-smoke PROFILE=notify_llm_quality_fresh
+PYTHON=python3` completed with 200 raw events, 198/200 extraction rows, 49
+extraction hints, 104 hypotheses, 91 persisted incidents, 0 alertable routes,
+0 sends, 0 missing relevance fields, 0 raw/rejected diagnostic rows persisted by
+default, and strict doctor `WARN` only for 8 canonical unlinked incident review
+warnings. Manual `make event-incidents-report`, `make
+event-alpha-artifact-doctor STRICT=1`, and `make event-alpha-daily-brief` passed
+for `notify_llm_quality_fresh`.
+**Notes/risks:** Research-only artifact relevance gating. This does not create
+events, watchlist states, notifications, paper/live trades, normal RSI rows, or
+LLM/provider-created `TRIGGERED_FADE`; deterministic `event_fade.py` remains the
+only fade trigger source.
+
 ## 2026-06-26 — Add fresh live-style quality proof target · Codex
 **Why:** The checked-in/local `notify_llm_quality` artifact namespace can contain
 older pre-fix rows, so Pro-model review needed a clean live-style proof run that

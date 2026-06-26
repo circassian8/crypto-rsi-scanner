@@ -22564,6 +22564,239 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         assert no_incident_doctor.alert_hypothesis_rows_missing_incident_id == 0
 
 
+def test_event_incident_relevance_gates_raw_external_observations():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_incident_graph, event_incident_store
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 26, 12, 0, tzinfo=timezone.utc)
+
+    def raw(raw_id: str, title: str, body: str, *, provider: str = "fixture_news", confidence: float = 0.65, payload=None):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider=provider,
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://example.test/{raw_id}",
+            title=title,
+            body=body,
+            raw_json=dict(payload or {}),
+            source_confidence=confidence,
+            content_hash=raw_id,
+        )
+
+    broad_raw = raw(
+        "trump_putin_polymarket",
+        "Where will Trump meet Putin?",
+        "A Polymarket question asks where Trump will meet Putin. No crypto asset, token, venue value capture, or market anomaly is mentioned.",
+        provider="polymarket",
+        confidence=0.58,
+    )
+    broad_event = NormalizedEvent(
+        "evt_trump_putin_polymarket",
+        (broad_raw.raw_id,),
+        "Where will Trump meet Putin?",
+        "prediction_market",
+        None,
+        0.0,
+        now,
+        "polymarket",
+        (broad_raw.source_url,),
+        "Trump Putin meeting",
+        broad_raw.body,
+        0.58,
+    )
+    broad_result = EventDiscoveryResult((broad_raw,), (broad_event,), (), (), ())
+    with tempfile.TemporaryDirectory() as tmp:
+        live_path = Path(tmp) / "live_incidents.jsonl"
+        live_write = event_incident_store.write_incidents(
+            broad_result,
+            cfg=event_incident_store.EventIncidentStoreConfig(path=live_path),
+            now=now,
+            run_id="run-broad-live",
+            profile="notify_llm_quality_fresh",
+            run_mode="notification_burn_in",
+            artifact_namespace="notify_llm_quality_fresh",
+        )
+        assert live_write.success is True
+        assert live_write.rows_written == 0
+
+        debug_path = Path(tmp) / "debug_incidents.jsonl"
+        debug_write = event_incident_store.write_incidents(
+            broad_result,
+            cfg=event_incident_store.EventIncidentStoreConfig(path=debug_path),
+            now=now,
+            run_id="run-broad-debug",
+            profile="quality_validation",
+            run_mode="test",
+            artifact_namespace="quality_validation",
+        )
+        assert debug_write.success is True
+        assert debug_write.rows_written == 1
+        hidden = event_incident_store.load_incidents(debug_path)
+        assert hidden.rows[0]["incident_relevance_status"] == "raw_observation"
+        assert hidden.rows[0]["diagnostic_only"] is True
+        assert hidden.rows[0]["diagnostic_hidden_by_default"] is True
+        hidden_report = event_incident_store.format_incidents_report(hidden)
+        assert "diagnostic_rows_hidden: 1" in hidden_report
+        assert "Where will Trump meet Putin?" not in hidden_report
+        visible_report = event_incident_store.format_incidents_report(
+            event_incident_store.load_incidents(debug_path, include_diagnostic=True)
+        )
+        assert "diagnostic_rows_hidden: 0" in visible_report
+        assert "Putin · prediction market" in visible_report
+        debug_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-broad-debug", "profile": "quality_validation", "run_mode": "test"}],
+            incident_rows=hidden.rows,
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert debug_doctor.diagnostic_incident_rows == 1
+        assert debug_doctor.raw_observation_incident_rows == 1
+        assert debug_doctor.incident_rows_without_linked_hypotheses == 0
+        assert debug_doctor.incident_rows_without_linked_watchlist == 0
+
+        missing_relevance = {
+            "schema_version": event_incident_store.INCIDENT_STORE_SCHEMA_VERSION,
+            "row_type": "event_incident",
+            "run_id": "run-missing-relevance",
+            "profile": "notify_llm_quality_fresh",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_quality_fresh",
+            "incident_id": "incident:missing_relevance",
+            "canonical_name": "Missing relevance crypto incident",
+            "event_archetype": "exploit_security_event",
+            "primary_subject": "THORChain",
+            "incident_subject_quality": "valid",
+            "diagnostic_only": False,
+            "linked_hypothesis_ids": [],
+            "linked_watchlist_keys": [],
+        }
+        strict_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-missing-relevance", "profile": "notify_llm_quality_fresh", "run_mode": "notification_burn_in"}],
+            incident_rows=[missing_relevance],
+            strict=True,
+        )
+        assert strict_doctor.status == "BLOCKED"
+        assert strict_doctor.incident_relevance_missing == 1
+
+    thor_raw = raw(
+        "thorchain_relevance",
+        "THORChain confirms RUNE exploit",
+        "THORChain confirms a RUNE exploit and security incident affecting the RUNE token.",
+        confidence=0.91,
+    )
+    thor_event = NormalizedEvent(
+        "evt_thorchain_relevance",
+        (thor_raw.raw_id,),
+        "THORChain RUNE exploit",
+        "news",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (thor_raw.source_url,),
+        "THORChain",
+        thor_raw.body,
+        0.91,
+    )
+    thor_incident = event_incident_graph.build_incidents((thor_event,), {thor_raw.raw_id: thor_raw})[0]
+    thor_relevance = event_incident_store.classify_incident_relevance(
+        thor_incident,
+        raw_by_id={thor_raw.raw_id: thor_raw},
+        hypotheses=({"hypothesis_id": "hyp:rune", "incident_id": thor_incident.incident_id, "validated_symbol": "RUNE", "validated_coin_id": "thorchain"},),
+        watchlist_rows=({"key": "watch:rune", "incident_id": thor_incident.incident_id, "state": "WATCHLIST", "symbol": "RUNE", "coin_id": "thorchain"},),
+    )
+    assert thor_relevance["incident_relevance_status"] == "active_incident"
+    assert thor_relevance["canonical_persistence_reason"] == "active_watchlist_incident"
+
+    sol_raw = raw(
+        "sol_market_anomaly_relevance",
+        "SOL market anomaly",
+        "SOL matched market-anomaly filters with no confirmed catalyst.",
+        provider="market_anomaly",
+        payload={
+            "market": {"symbol": "SOL", "coin_id": "solana", "return_24h": 42},
+            "anomaly": {"score": 91, "research_only": True},
+        },
+    )
+    sol_event = NormalizedEvent(
+        "evt_sol_market_anomaly_relevance",
+        (sol_raw.raw_id,),
+        "SOL market anomaly",
+        "market_anomaly",
+        None,
+        0.0,
+        now,
+        "market_anomaly",
+        (),
+        None,
+        sol_raw.body,
+        0.72,
+    )
+    sol_incident = event_incident_graph.build_incidents((sol_event,), {sol_raw.raw_id: sol_raw})[0]
+    sol_relevance = event_incident_store.classify_incident_relevance(sol_incident, raw_by_id={sol_raw.raw_id: sol_raw})
+    assert sol_relevance["incident_relevance_status"] == "canonical_incident"
+    assert sol_relevance["canonical_persistence_reason"] == "market_dislocation"
+
+    openai_raw = raw(
+        "openai_preipo_sector_relevance",
+        "OpenAI pre-IPO markets expand",
+        "OpenAI pre-IPO exposure could affect tokenized-stock crypto venues if listed by a venue.",
+        confidence=0.86,
+    )
+    openai_event = NormalizedEvent(
+        "evt_openai_preipo_relevance",
+        (openai_raw.raw_id,),
+        "OpenAI pre-IPO markets expand",
+        "news",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (openai_raw.source_url,),
+        "OpenAI",
+        openai_raw.body,
+        0.86,
+    )
+    openai_incident = event_incident_graph.build_incidents((openai_event,), {openai_raw.raw_id: openai_raw})[0]
+    openai_relevance = event_incident_store.classify_incident_relevance(
+        openai_incident,
+        raw_by_id={openai_raw.raw_id: openai_raw},
+        hypotheses=({"hypothesis_id": "hyp:openai-sector", "incident_id": openai_incident.incident_id, "candidate_sectors": ("tokenized_stock_venues",)},),
+    )
+    assert openai_relevance["incident_relevance_status"] == "linked_incident"
+
+    fannie_raw = raw(
+        "fannie_rwa_candidate",
+        "Fannie Mae pre-IPO tokenized stock venue watch",
+        "A high-quality source says Fannie Mae pre-IPO and tokenized stock venues may become relevant to RWA markets.",
+        confidence=0.88,
+    )
+    fannie_event = NormalizedEvent(
+        "evt_fannie_rwa_candidate",
+        (fannie_raw.raw_id,),
+        "Fannie Mae pre-IPO tokenized stock venue watch",
+        "news",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (fannie_raw.source_url,),
+        "Fannie Mae",
+        fannie_raw.body,
+        0.88,
+    )
+    fannie_incident = event_incident_graph.build_incidents((fannie_event,), {fannie_raw.raw_id: fannie_raw})[0]
+    fannie_relevance = event_incident_store.classify_incident_relevance(
+        fannie_incident,
+        raw_by_id={fannie_raw.raw_id: fannie_raw},
+    )
+    assert fannie_relevance["incident_relevance_status"] == "incident_candidate"
+
+
 def test_event_opportunity_upgrade_path_and_audit_sections():
     from crypto_rsi_scanner import event_opportunity_audit, event_opportunity_verdict
 

@@ -57,6 +57,9 @@
         "route_tier": ["WATCHLIST", "HIGH_PRIORITY"],
         "digest_eligible": true,
         "watchlist_eligible": true,
+        "incident_relevance_status": "linked_incident",
+        "canonical_persistence_reason": "linked_to_hypothesis_or_watchlist",
+        "diagnostic_hidden_by_default": false,
         "triggered_fade": false
       }
     },
@@ -669,6 +672,114 @@
         "candidate_role": "direct_subject",
         "opportunity_level": ["validated_digest", "watchlist", "high_priority"],
         "digest_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "generic_polymarket_unlinked_raw_observation",
+      "title": "Generic Polymarket question without crypto link",
+      "impact_category": "political_meme_proxy",
+      "external_asset": "Trump Putin meeting",
+      "incident_hypothesis_generated": false,
+      "raw_event": {
+        "raw_id": "sq_polymarket_trump_putin",
+        "provider": "fixture_polymarket",
+        "source_url": "https://polymarket.example/trump-putin",
+        "title": "Where will Trump meet Putin?",
+        "body": "A prediction market asks where Trump will meet Putin. The article does not mention a crypto token, venue, market anomaly, or value-capture path.",
+        "source_confidence": 0.58
+      },
+      "expected": {
+        "incident_relevance_status": "raw_observation",
+        "canonical_persistence_reason": "raw_observation_without_crypto_link",
+        "diagnostic_hidden_by_default": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "broad_geopolitical_unlinked_raw_observation",
+      "title": "Broad geopolitical event without crypto link",
+      "impact_category": "political_meme_proxy",
+      "external_asset": "Annexation",
+      "incident_hypothesis_generated": false,
+      "raw_event": {
+        "raw_id": "sq_annexation_broad",
+        "provider": "fixture_global_news",
+        "source_url": "https://news.example/annexation",
+        "title": "Annexation talks dominate diplomatic agenda",
+        "body": "A broad geopolitical article discusses annexation and diplomacy without naming a crypto asset, token venue, or market reaction.",
+        "source_confidence": 0.62
+      },
+      "expected": {
+        "incident_relevance_status": "raw_observation",
+        "canonical_persistence_reason": "raw_observation_without_crypto_link",
+        "diagnostic_hidden_by_default": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "openai_preipo_sector_incident_linked",
+      "title": "OpenAI pre-IPO sector hypothesis becomes linked incident",
+      "impact_category": "rwa_preipo_proxy",
+      "external_asset": "OpenAI",
+      "incident_hypothesis_generated": true,
+      "raw_event": {
+        "raw_id": "sq_openai_sector_incident",
+        "provider": "fixture_news",
+        "source_url": "https://news.example/openai-preipo-sector",
+        "title": "OpenAI pre-IPO markets expand",
+        "body": "OpenAI pre-IPO exposure may create watch items for tokenized-stock crypto venues, but no specific token is validated yet.",
+        "source_confidence": 0.84
+      },
+      "expected": {
+        "incident_relevance_status": "linked_incident",
+        "canonical_persistence_reason": "linked_to_hypothesis_or_watchlist",
+        "diagnostic_hidden_by_default": false,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "fannie_mae_rwa_incident_candidate",
+      "title": "Fannie Mae RWA pre-IPO event is a candidate until hypothesis generated",
+      "impact_category": "rwa_preipo_proxy",
+      "external_asset": "Fannie Mae",
+      "incident_hypothesis_generated": false,
+      "raw_event": {
+        "raw_id": "sq_fannie_rwa_candidate",
+        "provider": "fixture_news",
+        "source_url": "https://news.example/fannie-rwa",
+        "title": "Fannie Mae tokenized stock pre-IPO venue watch",
+        "body": "A high-quality source says Fannie Mae pre-IPO and tokenized stock venues may become relevant to RWA crypto markets.",
+        "source_confidence": 0.88
+      },
+      "expected": {
+        "incident_relevance_status": "incident_candidate",
+        "canonical_persistence_reason": "recognized_research_catalyst_candidate",
+        "diagnostic_hidden_by_default": false,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "market_anomaly_relevance_canonical",
+      "title": "Market anomaly remains canonical market dislocation",
+      "impact_category": "market_anomaly_unknown",
+      "incident_hypothesis_generated": false,
+      "raw_event": {
+        "raw_id": "sq_sol_relevance_market_anomaly",
+        "provider": "market_anomaly",
+        "source_url": "https://market.example/sol",
+        "title": "SOL market anomaly",
+        "body": "SOL matched market-anomaly research filters with no confirmed catalyst.",
+        "source_confidence": 0.72,
+        "raw_json": {
+          "market": {"symbol": "SOL", "coin_id": "solana", "return_24h": 42},
+          "anomaly": {"score": 91, "research_only": true}
+        }
+      },
+      "expected": {
+        "incident_relevance_status": "canonical_incident",
+        "canonical_persistence_reason": "market_dislocation",
+        "diagnostic_hidden_by_default": false,
         "triggered_fade": false
       }
     }

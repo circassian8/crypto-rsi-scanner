@@ -163,6 +163,16 @@ validated external entity, crypto asset, market-anomaly asset, or event entity
 is available, the incident row should be diagnostic-only and hidden from default
 incident reports rather than shown as a canonical opportunity. Existing
 persisted garbage-subject rows are also quarantined at read/report time.
+Incident persistence also has a separate crypto-relevance gate. Rows may be
+classified as `raw_observation`, `incident_candidate`, `canonical_incident`,
+`linked_incident`, `active_incident`, `diagnostic_only`, or
+`rejected_incident`. Live-style profiles persist only candidate/canonical/
+linked/active incident rows by default. Raw, diagnostic, or rejected rows stay
+hidden and are not written unless `RSI_EVENT_INCIDENT_STORE_DIAGNOSTIC=1` or a
+fixture/debug profile is running. A broad Polymarket, sports, political, or
+macro event without a validated crypto asset, generated hypothesis, active
+watchlist row, direct crypto archetype, or market-dislocation evidence is raw
+evidence for diagnostics, not an operational canonical incident.
 
 Canonical incidents are persisted separately from hypotheses under the active
 profile namespace:
@@ -185,11 +195,15 @@ creating duplicate watchlist rows, and that ruled-out/unknown causes stayed
 local-only. For market anomalies, verify that canonical names are asset-specific
 (`SOL market anomaly`, `USDT market anomaly`) and that the report separates
 `reaction_observed` from causal confirmation.
-Default incident reports hide diagnostic-only invalid-subject rows but still
-count them, so a rising diagnostic count means the source cleaner/entity guard
-needs review before treating those rows as real incidents. Use
-`--include-diagnostic-incidents` only when intentionally auditing quarantined
-rows such as `LLM` or referral-code/source-noise subjects.
+Default incident reports hide diagnostic-only, raw-observation, and rejected
+rows but still count them, so a rising diagnostic/raw count means the source
+cleaner/entity/relevance guard needs review before treating those rows as real
+incidents. Use `--include-diagnostic-incidents` only when intentionally auditing
+quarantined rows such as `LLM`, referral-code/source-noise subjects, or broad
+external events that had no crypto link. Report lines include relevance status,
+score, persistence reason, and relevance reason codes; linked/active incidents
+should have explicit `linked_to_event_impact_hypothesis`,
+`linked_to_watchlist_row`, or `active_watchlist_lifecycle_state` style reasons.
 The linked-asset roles should show the validated anomaly asset from the market
 payload as `direct_subject`. Sector rows such as `SECTOR`, source context, or
 generic unknown-market text are context only and must not be treated as direct
@@ -791,9 +805,12 @@ zero-score, or insufficient-data quality verdict must either carry a non-active
 doctor blocks the namespace. Properly capped rows are visible in daily brief and
 quality review local-only sections, not in active watchlist sections. Legacy
 uncapped rows are migration warnings unless `STRICT_LEGACY=1` is set. The
-doctor also reports quarantined diagnostic incident rows and garbage primary
-subjects; diagnostic garbage warns by default, while fresh invalid canonical
-incident rows block strict checks.
+doctor also reports incident relevance health: missing relevance fields,
+canonical unlinked incidents, raw observations, rejected incidents, quarantined
+diagnostic incident rows, and garbage primary subjects. Diagnostic/raw/rejected
+rows warn by default and are hidden from operational incident counts; fresh
+canonical incident rows missing relevance fields block strict checks. Fresh
+invalid canonical incident rows still block strict checks.
 
 For migration review only, include legacy/default rows explicitly:
 

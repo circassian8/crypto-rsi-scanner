@@ -684,6 +684,11 @@ def _entry_from_hypothesis(
     incident_link_reason = _optional_str(getattr(hypothesis, "incident_link_reason", None)) or (
         None if incident_link_status == "linked" else "no_canonical_incident_for_event_evidence"
     )
+    incident_relevance_status = _optional_str(getattr(hypothesis, "incident_relevance_status", None))
+    incident_relevance_score = _optional_float(getattr(hypothesis, "incident_relevance_score", None))
+    incident_relevance_reasons = list(getattr(hypothesis, "incident_relevance_reasons", ()) or ())[:8]
+    incident_relevance_warnings = list(getattr(hypothesis, "incident_relevance_warnings", ()) or ())[:8]
+    canonical_persistence_reason = _optional_str(getattr(hypothesis, "canonical_persistence_reason", None))
     requested_state = _state_from_hypothesis(hypothesis, validated=validated, token_level=symbol != "SECTOR")
     hypothesis_quality_components = {
         "impact_path_type": _optional_str(getattr(hypothesis, "impact_path_type", None)),
@@ -848,6 +853,11 @@ def _entry_from_hypothesis(
             "cause_status": incident_cause_status,
             "incident_link_status": incident_link_status,
             "incident_link_reason": incident_link_reason,
+            "incident_relevance_status": incident_relevance_status,
+            "incident_relevance_score": incident_relevance_score,
+            "incident_relevance_reasons": incident_relevance_reasons,
+            "incident_relevance_warnings": incident_relevance_warnings,
+            "canonical_persistence_reason": canonical_persistence_reason,
             "claim_polarities": list(getattr(hypothesis, "claim_polarities", ()) or ())[:8],
             "claim_history": list(getattr(hypothesis, "claim_history", ()) or ())[:8],
             "independent_source_domains": list(getattr(hypothesis, "independent_source_domains", ()) or ())[:8],

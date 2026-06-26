@@ -259,6 +259,10 @@ def _incident_lines(
     return [
         f"- incident_id: {incident_id}",
         f"- canonical name: {source.get('canonical_name') or source.get('canonical_incident_name') or components.get('canonical_incident_name') or 'unknown'}",
+        f"- relevance: {source.get('incident_relevance_status') or components.get('incident_relevance_status') or 'unknown'} "
+        f"score={source.get('incident_relevance_score') or components.get('incident_relevance_score') or 'n/a'}",
+        f"- persistence reason: {source.get('canonical_persistence_reason') or components.get('canonical_persistence_reason') or 'unknown'}",
+        f"- relevance reasons: {_list_value(source.get('incident_relevance_reasons') or components.get('incident_relevance_reasons'))}",
         f"- primary subject: {source.get('primary_subject') or components.get('primary_subject') or 'unknown'}",
         f"- affected ecosystem: {source.get('affected_ecosystem') or components.get('affected_ecosystem') or 'unknown'}",
         f"- current cause status: {source.get('current_cause_status') or source.get('cause_status') or components.get('cause_status') or 'unknown'}",

@@ -21,10 +21,45 @@ from .event_models import EventDiscoveryResult, RawDiscoveredEvent
 
 INCIDENT_STORE_SCHEMA_VERSION = "event_incident_store_v1"
 
+RELEVANCE_RAW_OBSERVATION = "raw_observation"
+RELEVANCE_INCIDENT_CANDIDATE = "incident_candidate"
+RELEVANCE_CANONICAL_INCIDENT = "canonical_incident"
+RELEVANCE_LINKED_INCIDENT = "linked_incident"
+RELEVANCE_ACTIVE_INCIDENT = "active_incident"
+RELEVANCE_DIAGNOSTIC_ONLY = "diagnostic_only"
+RELEVANCE_REJECTED_INCIDENT = "rejected_incident"
+
+_VISIBLE_RELEVANCE_STATUSES = {
+    RELEVANCE_INCIDENT_CANDIDATE,
+    RELEVANCE_CANONICAL_INCIDENT,
+    RELEVANCE_LINKED_INCIDENT,
+    RELEVANCE_ACTIVE_INCIDENT,
+}
+_DIAGNOSTIC_RELEVANCE_STATUSES = {
+    RELEVANCE_RAW_OBSERVATION,
+    RELEVANCE_DIAGNOSTIC_ONLY,
+    RELEVANCE_REJECTED_INCIDENT,
+}
+_ACTIVE_WATCHLIST_STATES = {"WATCHLIST", "HIGH_PRIORITY", "EVENT_PASSED", "ARMED", "TRIGGERED_FADE"}
+_DIRECT_CRYPTO_ARCHETYPES = {
+    "exploit_security_event",
+    "alleged_security_event",
+    "listing_liquidity_event",
+    "unlock_supply_event",
+}
+_EXTERNAL_CATALYST_ARCHETYPES = {
+    "proxy_attention",
+    "rwa_preipo_proxy",
+    "ai_ipo_proxy",
+    "tokenized_stock_venue",
+    "sports_fan_proxy",
+}
+
 
 @dataclass(frozen=True)
 class EventIncidentStoreConfig:
     path: Path
+    store_diagnostic: bool = False
 
 
 @dataclass(frozen=True)
@@ -109,12 +144,14 @@ def write_incidents(
             run_mode=run_mode,
             artifact_namespace=artifact_namespace,
         )
+        store_diagnostic = bool(cfg.store_diagnostic or _debug_allows_diagnostic(profile=profile, run_mode=run_mode))
+        rows_to_write = [row for row in rows if _should_persist_incident_row(row, store_diagnostic=store_diagnostic)]
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as fh:
-            for row in rows:
+            for row in rows_to_write:
                 fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
                 fh.write("\n")
-        return EventIncidentStoreWriteResult(path=path, attempted=True, success=True, rows_written=len(rows))
+        return EventIncidentStoreWriteResult(path=path, attempted=True, success=True, rows_written=len(rows_to_write))
     except Exception as exc:  # noqa: BLE001 - artifact writes must fail soft.
         return EventIncidentStoreWriteResult(
             path=path,
@@ -151,7 +188,7 @@ def load_incidents(
         run_id=run_id,
         include_legacy=include_legacy,
     )
-    rows = [_row_with_effective_subject_quality(row) for row in rows]
+    rows = [_row_with_effective_relevance(_row_with_effective_subject_quality(row)) for row in rows]
     if limit is not None and limit > 0:
         rows = rows[:limit]
     return EventIncidentStoreReadResult(
@@ -176,8 +213,8 @@ def load_incidents(
 def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     """Return an operator-readable incident artifact report."""
     include_diagnostic = bool(result.filters.get("include_diagnostic"))
-    diagnostic_rows = [row for row in result.rows if bool(row.get("diagnostic_only"))]
-    display_rows = list(result.rows) if include_diagnostic else [row for row in result.rows if not bool(row.get("diagnostic_only"))]
+    diagnostic_rows = [row for row in result.rows if _is_diagnostic_relevance(row)]
+    display_rows = list(result.rows) if include_diagnostic else [row for row in result.rows if not _is_diagnostic_relevance(row)]
     diagnostic_hidden = 0 if include_diagnostic else len(diagnostic_rows)
     rows = [
         "=" * 76,
@@ -199,6 +236,9 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
         return "\n".join(rows)
 
     rows.append("event_archetypes: " + _format_counts(_counts(display_rows, "event_archetype")))
+    rows.append("incident_relevance_statuses: " + _format_counts(_counts(result.rows, "incident_relevance_status")))
+    rows.append("visible_relevance_statuses: " + _format_counts(_counts(display_rows, "incident_relevance_status")))
+    rows.append("incident_relevance_score_buckets: " + _format_counts(_score_buckets(result.rows, "incident_relevance_score")))
     rows.append("cause_statuses: " + _format_counts(_counts(display_rows, "current_cause_status")))
     rows.append("primary_subjects: " + _format_counts(_counts(display_rows, "primary_subject")))
     rows.append("subject_quality: " + _format_counts(_counts(result.rows, "incident_subject_quality")))
@@ -208,6 +248,7 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     rows.append(f"multiple_source_updates: {sum(1 for row in display_rows if int(row.get('source_update_count') or 0) > 1)}")
     rows.append(f"linked_to_hypotheses: {sum(1 for row in display_rows if row.get('linked_hypothesis_ids'))}")
     rows.append(f"linked_to_watchlist: {sum(1 for row in display_rows if row.get('linked_watchlist_keys'))}")
+    rows.append(f"canonical_unlinked_incidents: {sum(1 for row in display_rows if _is_operational_canonical_relevance(row) and not row.get('linked_hypothesis_ids') and not row.get('linked_watchlist_keys'))}")
     rows.append(f"incident_linked_hypotheses_count: {sum(len(row.get('linked_hypothesis_ids') or ()) for row in display_rows)}")
     rows.append(f"incident_linked_watchlist_count: {sum(len(row.get('linked_watchlist_keys') or ()) for row in display_rows)}")
     rows.append("material_update_reasons: " + _format_counts(_material_reason_counts(display_rows)))
@@ -258,6 +299,19 @@ def _row_from_incident(
     ))
     diagnostic_only = bool(incident.diagnostic_only and not h_rows and not w_rows)
     subject_quality = "diagnostic_only" if diagnostic_only else incident.subject_quality
+    relevance = classify_incident_relevance(
+        incident,
+        raw_by_id=raw_by_id,
+        hypotheses=h_rows,
+        watchlist_rows=w_rows,
+        linked_assets=linked_assets,
+        market=market,
+        diagnostic_only=diagnostic_only,
+        subject_quality=subject_quality,
+    )
+    diagnostic_only = bool(diagnostic_only or relevance["incident_relevance_status"] in _DIAGNOSTIC_RELEVANCE_STATUSES)
+    if diagnostic_only and subject_quality == "valid":
+        subject_quality = "diagnostic_only"
     row = {
         "schema_version": INCIDENT_STORE_SCHEMA_VERSION,
         "row_type": "event_incident",
@@ -273,6 +327,12 @@ def _row_from_incident(
         "incident_subject_quality": subject_quality,
         "incident_subject_quality_reason": incident.subject_quality_reason,
         "diagnostic_only": diagnostic_only,
+        "incident_relevance_status": relevance["incident_relevance_status"],
+        "incident_relevance_score": relevance["incident_relevance_score"],
+        "incident_relevance_reasons": relevance["incident_relevance_reasons"],
+        "incident_relevance_warnings": relevance["incident_relevance_warnings"],
+        "canonical_persistence_reason": relevance["canonical_persistence_reason"],
+        "diagnostic_hidden_by_default": diagnostic_only,
         "affected_ecosystem": incident.affected_ecosystem,
         "external_entities": _unique(_flatten_values(h_rows, "external_entities", fallback="external_asset")),
         "crypto_entities": _unique(_crypto_entities(h_rows, w_rows)),
@@ -301,9 +361,131 @@ def _row_from_incident(
         "market_context_asset": market["market_context_asset"],
         "market_context_age": market["market_context_age"],
         "incident_confidence": _incident_confidence(incident, h_rows, market),
-        "warnings": tuple(dict.fromkeys([*incident.warnings, *_incident_warnings(incident, market)])),
+        "warnings": tuple(dict.fromkeys([
+            *incident.warnings,
+            *_incident_warnings(incident, market),
+            *relevance["incident_relevance_warnings"],
+        ])),
     }
     return row
+
+
+def classify_incident_relevance(
+    incident: event_incident_graph.CanonicalIncident,
+    *,
+    raw_by_id: Mapping[str, RawDiscoveredEvent],
+    hypotheses: Iterable[Mapping[str, Any] | object] = (),
+    watchlist_rows: Iterable[Mapping[str, Any] | object] = (),
+    linked_assets: Iterable[Mapping[str, Any]] = (),
+    market: Mapping[str, Any] | None = None,
+    diagnostic_only: bool | None = None,
+    subject_quality: str | None = None,
+) -> dict[str, Any]:
+    """Classify whether an incident is operationally crypto-relevant.
+
+    This is metadata only. It controls local incident artifact visibility and
+    doctor warnings; it cannot create candidates, alerts, trades, or fades.
+    """
+    h_rows = [_object_row(item) for item in hypotheses]
+    w_rows = [_object_row(item) for item in watchlist_rows]
+    assets = [dict(asset) for asset in linked_assets if isinstance(asset, Mapping)]
+    market = dict(market or {})
+    text = _incident_source_text(incident, raw_by_id)
+    market_like = (
+        incident.event_archetype in {"market_dislocation_unknown", "market_anomaly"}
+        or "market anomaly" in str(incident.canonical_name or "").casefold()
+    )
+    reasons: list[str] = []
+    warnings: list[str] = []
+    score = 0.0
+
+    if diagnostic_only or str(subject_quality or incident.subject_quality or "") in {"invalid", "diagnostic_only"}:
+        return {
+            "incident_relevance_status": RELEVANCE_DIAGNOSTIC_ONLY,
+            "incident_relevance_score": 0.0,
+            "incident_relevance_reasons": ("invalid_or_diagnostic_subject",),
+            "incident_relevance_warnings": ("incident_hidden_from_default_report",),
+            "canonical_persistence_reason": "diagnostic_subject_only",
+        }
+
+    if h_rows:
+        reasons.append("linked_to_event_impact_hypothesis")
+        score += 45.0
+    if w_rows:
+        reasons.append("linked_to_watchlist_row")
+        score += 35.0
+    if _has_active_watchlist_row(w_rows):
+        reasons.append("active_watchlist_lifecycle_state")
+        score += 20.0
+    if _has_crypto_asset_link(assets):
+        reasons.append("linked_to_validated_crypto_candidate")
+        score += 22.0
+    if market_like or bool(market.get("market_reaction_observed")):
+        reasons.append("market_dislocation_or_market_reaction")
+        score += 25.0
+    if incident.event_archetype in _DIRECT_CRYPTO_ARCHETYPES and _crypto_specific_text(text, incident=incident, assets=assets):
+        reasons.append(f"crypto_specific_{incident.event_archetype}")
+        score += 20.0
+    elif incident.event_archetype in _DIRECT_CRYPTO_ARCHETYPES:
+        reasons.append(f"incident_candidate_{incident.event_archetype}")
+        score += 12.0
+    if incident.event_archetype in _EXTERNAL_CATALYST_ARCHETYPES:
+        if h_rows or _has_crypto_asset_link(assets) or _crypto_specific_text(text, incident=incident, assets=assets):
+            reasons.append(f"crypto_linked_external_catalyst:{incident.event_archetype}")
+            score += 18.0
+        else:
+            reasons.append(f"external_catalyst_candidate:{incident.event_archetype}")
+            score += 10.0
+    if _crypto_specific_text(text, incident=incident, assets=assets):
+        reasons.append("crypto_specific_source_evidence")
+        score += 12.0
+    if _high_quality_external_candidate(incident, raw_by_id, h_rows):
+        reasons.append("high_quality_external_catalyst_with_candidate_context")
+        score += 10.0
+
+    if _has_active_watchlist_row(w_rows):
+        status = RELEVANCE_ACTIVE_INCIDENT
+        persistence = "active_watchlist_incident"
+        score = max(score, 90.0)
+    elif h_rows or w_rows:
+        status = RELEVANCE_LINKED_INCIDENT
+        persistence = "linked_to_hypothesis_or_watchlist"
+        score = max(score, 82.0)
+    elif (
+        _has_crypto_asset_link(assets)
+        or market_like
+        or bool(market.get("market_reaction_observed"))
+        or (
+            incident.event_archetype in _DIRECT_CRYPTO_ARCHETYPES
+            and _crypto_specific_text(text, incident=incident, assets=assets)
+        )
+    ):
+        status = RELEVANCE_CANONICAL_INCIDENT
+        persistence = (
+            "market_dislocation"
+            if market_like or bool(market.get("market_reaction_observed"))
+            else "crypto_specific_incident"
+        )
+        score = max(score, 68.0)
+    elif incident.event_archetype in _EXTERNAL_CATALYST_ARCHETYPES or incident.event_archetype in _DIRECT_CRYPTO_ARCHETYPES:
+        status = RELEVANCE_INCIDENT_CANDIDATE
+        persistence = "recognized_research_catalyst_candidate"
+        score = max(score, 52.0)
+    else:
+        status = RELEVANCE_RAW_OBSERVATION
+        persistence = "raw_observation_without_crypto_link"
+        score = min(score, 35.0)
+        warnings.append("incident_hidden_from_default_report")
+        if not reasons:
+            reasons.append("no_crypto_hypothesis_watchlist_asset_or_market_link")
+
+    return {
+        "incident_relevance_status": status,
+        "incident_relevance_score": round(max(0.0, min(100.0, score)), 2),
+        "incident_relevance_reasons": tuple(dict.fromkeys(reasons)),
+        "incident_relevance_warnings": tuple(dict.fromkeys(warnings)),
+        "canonical_persistence_reason": persistence,
+    }
 
 
 def _hypotheses_by_incident(hypotheses: Iterable[object]) -> dict[str, list[object]]:
@@ -313,6 +495,152 @@ def _hypotheses_by_incident(hypotheses: Iterable[object]) -> dict[str, list[obje
         if incident_id:
             out.setdefault(incident_id, []).append(item)
     return out
+
+
+def _debug_allows_diagnostic(*, profile: str | None, run_mode: str | None) -> bool:
+    mode = str(run_mode or "").strip().casefold()
+    prof = str(profile or "").strip().casefold()
+    return mode in {"test", "fixture", "replay"} or prof in {"fixture", "quality_validation"}
+
+
+def _should_persist_incident_row(row: Mapping[str, Any], *, store_diagnostic: bool) -> bool:
+    status = str(row.get("incident_relevance_status") or "").strip()
+    if status in _VISIBLE_RELEVANCE_STATUSES:
+        return True
+    if bool(row.get("diagnostic_only")) or status in _DIAGNOSTIC_RELEVANCE_STATUSES:
+        return bool(store_diagnostic)
+    return True
+
+
+def _is_diagnostic_relevance(row: Mapping[str, Any]) -> bool:
+    status = str(row.get("incident_relevance_status") or "").strip()
+    return bool(row.get("diagnostic_only")) or status in _DIAGNOSTIC_RELEVANCE_STATUSES
+
+
+def _is_operational_canonical_relevance(row: Mapping[str, Any]) -> bool:
+    return str(row.get("incident_relevance_status") or "") in {
+        RELEVANCE_CANONICAL_INCIDENT,
+        RELEVANCE_LINKED_INCIDENT,
+        RELEVANCE_ACTIVE_INCIDENT,
+    }
+
+
+def _incident_source_text(
+    incident: event_incident_graph.CanonicalIncident,
+    raw_by_id: Mapping[str, RawDiscoveredEvent],
+) -> str:
+    parts = [incident.canonical_name, incident.event_archetype, incident.primary_subject or "", incident.affected_ecosystem or ""]
+    for raw_id in incident.raw_ids:
+        raw = raw_by_id.get(raw_id)
+        if raw is None:
+            continue
+        payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+        parts.extend([
+            raw.provider,
+            raw.title,
+            raw.body or "",
+            str(payload.get("source_origin") or ""),
+            str(payload.get("impact_category") or ""),
+        ])
+    return " ".join(str(part or "") for part in parts)
+
+
+def _has_active_watchlist_row(rows: Iterable[Mapping[str, Any]]) -> bool:
+    for row in rows:
+        state = str(
+            row.get("final_state_after_quality_gate")
+            or row.get("state")
+            or ""
+        ).strip().upper()
+        if state in _ACTIVE_WATCHLIST_STATES or bool(row.get("should_alert")):
+            return True
+    return False
+
+
+def _has_crypto_asset_link(assets: Iterable[Mapping[str, Any]]) -> bool:
+    for asset in assets:
+        symbol = str(asset.get("symbol") or "").strip().upper()
+        coin_id = str(asset.get("coin_id") or "").strip().casefold()
+        role = str(asset.get("role") or "").strip()
+        if not (symbol or coin_id):
+            continue
+        if symbol in {"SECTOR", "UNKNOWN"} or coin_id in {"sector", "unknown", "market_anomaly_unknown"}:
+            continue
+        if role in {"sector_context", "source_noise", "ticker_word_collision"}:
+            continue
+        return True
+    return False
+
+
+def _crypto_specific_text(
+    text: str,
+    *,
+    incident: event_incident_graph.CanonicalIncident,
+    assets: Iterable[Mapping[str, Any]],
+) -> bool:
+    cleaned = str(text or "").casefold()
+    crypto_terms = (
+        "crypto",
+        "token",
+        "coin",
+        "blockchain",
+        "defi",
+        "perp",
+        "perpetual",
+        "binance",
+        "bybit",
+        "coinbase",
+        "okx",
+        "kucoin",
+        "airdrop",
+        "tge",
+        "unlock",
+        "tokenized stock",
+        "pre-ipo exposure",
+        "synthetic exposure",
+        "bitcoin",
+        "ethereum",
+        "solana",
+        "thorchain",
+        "zcash",
+        "rune",
+        "chz",
+        "usdt",
+    )
+    if any(term in cleaned for term in crypto_terms):
+        return True
+    for asset in assets:
+        for key in ("symbol", "coin_id"):
+            value = str(asset.get(key) or "").strip().casefold()
+            if value and value not in {"sector", "unknown"} and value in cleaned:
+                return True
+    if incident.linked_assets:
+        return _has_crypto_asset_link(
+            {
+                "symbol": asset.symbol,
+                "coin_id": asset.coin_id,
+                "role": asset.role,
+            }
+            for asset in incident.linked_assets
+        )
+    return False
+
+
+def _high_quality_external_candidate(
+    incident: event_incident_graph.CanonicalIncident,
+    raw_by_id: Mapping[str, RawDiscoveredEvent],
+    h_rows: Iterable[Mapping[str, Any]],
+) -> bool:
+    if h_rows:
+        return True
+    if incident.event_archetype not in _EXTERNAL_CATALYST_ARCHETYPES:
+        return False
+    confidences = [
+        float(raw_by_id[raw_id].source_confidence or 0.0)
+        for raw_id in incident.raw_ids
+        if raw_id in raw_by_id
+    ]
+    return bool(confidences and max(confidences) >= 0.80)
 
 
 def _watchlist_by_incident(watchlist_rows: Iterable[Mapping[str, Any] | object]) -> dict[str, list[Mapping[str, Any] | object]]:
@@ -547,9 +875,14 @@ def _incident_lines(row: Mapping[str, Any]) -> list[str]:
             f"- {row.get('incident_id')}: {row.get('canonical_name')} "
             f"archetype={row.get('event_archetype')} cause={row.get('current_cause_status')} "
             f"sources={row.get('source_update_count')}/{row.get('independent_source_count')} "
-            f"confidence={row.get('incident_confidence')}"
+            f"confidence={row.get('incident_confidence')} "
+            f"relevance={row.get('incident_relevance_status') or 'unknown'}:{row.get('incident_relevance_score') or 0}"
         ),
         f"  assets: {asset_text}",
+        "  persistence: "
+        + str(row.get("canonical_persistence_reason") or "unknown")
+        + " reasons="
+        + (", ".join(str(item) for item in row.get("incident_relevance_reasons") or ()) or "none"),
         "  material_update_reasons: "
         + (", ".join(str(item) for item in row.get("material_update_reasons") or ()) or "none"),
         (
@@ -653,6 +986,43 @@ def _row_with_effective_subject_quality(row: Mapping[str, Any]) -> dict[str, Any
     return data
 
 
+def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
+    data = dict(row)
+    status = str(data.get("incident_relevance_status") or "").strip()
+    if status:
+        return data
+    diagnostic = bool(data.get("diagnostic_only")) or str(data.get("incident_subject_quality") or "") == "diagnostic_only"
+    linked_h = bool(data.get("linked_hypothesis_ids"))
+    linked_w = bool(data.get("linked_watchlist_keys"))
+    market_observed = bool(data.get("market_reaction_observed") or data.get("market_reaction_confirmed"))
+    archetype = str(data.get("event_archetype") or "")
+    assets = data.get("linked_assets") or ()
+    if diagnostic:
+        status = RELEVANCE_DIAGNOSTIC_ONLY
+        reason = "legacy_diagnostic_subject"
+    elif linked_w:
+        status = RELEVANCE_ACTIVE_INCIDENT
+        reason = "legacy_linked_watchlist"
+    elif linked_h:
+        status = RELEVANCE_LINKED_INCIDENT
+        reason = "legacy_linked_hypothesis"
+    elif market_observed or archetype == "market_dislocation_unknown" or _has_crypto_asset_link(
+        asset for asset in assets if isinstance(asset, Mapping)
+    ):
+        status = RELEVANCE_CANONICAL_INCIDENT
+        reason = "legacy_crypto_or_market_relevance"
+    else:
+        status = RELEVANCE_CANONICAL_INCIDENT
+        reason = "legacy_missing_relevance_field"
+    data["incident_relevance_status"] = status
+    data.setdefault("incident_relevance_score", 0.0 if diagnostic else 60.0)
+    data.setdefault("incident_relevance_reasons", (reason,))
+    data.setdefault("incident_relevance_warnings", () if not diagnostic else ("incident_hidden_from_default_report",))
+    data.setdefault("canonical_persistence_reason", reason)
+    data.setdefault("diagnostic_hidden_by_default", _is_diagnostic_relevance(data))
+    return data
+
+
 def _is_garbage_incident_subject(value: Any) -> bool:
     text = str(value or "").strip().casefold()
     text = " ".join(text.replace("-", " ").replace("_", " ").split())
@@ -696,6 +1066,21 @@ def _counts(rows: Iterable[Mapping[str, Any]], key: str) -> dict[str, int]:
         value = str(row.get(key) or "unknown")
         counts[value] = counts.get(value, 0) + 1
     return counts
+
+
+def _score_buckets(rows: Iterable[Mapping[str, Any]], key: str) -> dict[str, int]:
+    buckets = {"0-24": 0, "25-49": 0, "50-74": 0, "75-100": 0}
+    for row in rows:
+        score = _float(row.get(key))
+        if score < 25:
+            buckets["0-24"] += 1
+        elif score < 50:
+            buckets["25-49"] += 1
+        elif score < 75:
+            buckets["50-74"] += 1
+        else:
+            buckets["75-100"] += 1
+    return {key: value for key, value in buckets.items() if value}
 
 
 def _asset_role_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:

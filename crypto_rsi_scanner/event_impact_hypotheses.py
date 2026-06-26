@@ -23,6 +23,7 @@ from . import (
     event_graph,
     event_identity,
     event_incident_graph,
+    event_incident_store,
     event_impact_path_validator,
     event_market_confirmation,
     event_opportunity_verdict,
@@ -166,6 +167,11 @@ class EventImpactHypothesis:
     incident_causal_mechanism_confirmed: bool | None = None
     incident_link_status: str | None = None
     incident_link_reason: str | None = None
+    incident_relevance_status: str | None = None
+    incident_relevance_score: float | None = None
+    incident_relevance_reasons: tuple[str, ...] = ()
+    incident_relevance_warnings: tuple[str, ...] = ()
+    canonical_persistence_reason: str | None = None
     canonical_incident_name: str | None = None
     event_archetype: str | None = None
     primary_subject: str | None = None
@@ -1284,6 +1290,8 @@ def _hypothesis_from_rule(
         conflicting_claims=incident.conflicting_claims if incident else (),
         created_at=now.isoformat(),
     )
+    if incident:
+        hypothesis = replace(hypothesis, **_incident_relevance_replace_kwargs(incident, raws, hypothesis))
     if validated_assets and raws:
         asset = validated_assets[0]
         validation = event_impact_path_validator.validate_impact_path(
@@ -1529,12 +1537,37 @@ def _with_incident_aliases(hypothesis: EventImpactHypothesis) -> EventImpactHypo
             hypothesis.incident_link_reason
             or (None if hypothesis.incident_id else "no_canonical_incident_for_event_evidence")
         ),
+        incident_relevance_status=hypothesis.incident_relevance_status,
+        incident_relevance_score=hypothesis.incident_relevance_score,
+        incident_relevance_reasons=hypothesis.incident_relevance_reasons,
+        incident_relevance_warnings=hypothesis.incident_relevance_warnings,
+        canonical_persistence_reason=hypothesis.canonical_persistence_reason,
         canonical_incident_name=hypothesis.canonical_incident_name or canonical,
         event_archetype=hypothesis.event_archetype or archetype,
         primary_subject=hypothesis.primary_subject or subject,
         affected_ecosystem=hypothesis.affected_ecosystem or ecosystem,
         cause_status=hypothesis.cause_status or cause,
     )
+
+
+def _incident_relevance_replace_kwargs(
+    incident: event_incident_graph.CanonicalIncident,
+    raws: tuple[RawDiscoveredEvent, ...],
+    hypothesis: EventImpactHypothesis,
+) -> dict[str, Any]:
+    relevance = event_incident_store.classify_incident_relevance(
+        incident,
+        raw_by_id={raw.raw_id: raw for raw in raws},
+        hypotheses=(hypothesis,),
+        watchlist_rows=(),
+    )
+    return {
+        "incident_relevance_status": str(relevance.get("incident_relevance_status") or ""),
+        "incident_relevance_score": _optional_score(relevance.get("incident_relevance_score")),
+        "incident_relevance_reasons": tuple(str(item) for item in relevance.get("incident_relevance_reasons") or ()),
+        "incident_relevance_warnings": tuple(str(item) for item in relevance.get("incident_relevance_warnings") or ()),
+        "canonical_persistence_reason": str(relevance.get("canonical_persistence_reason") or "") or None,
+    }
 
 
 def _claim_to_row(claim: event_claim_semantics.EventClaim) -> dict[str, Any]:

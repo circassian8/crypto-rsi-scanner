@@ -13,11 +13,12 @@ from . import (
     event_claim_semantics,
     event_evidence_quality,
     event_incident_graph,
+    event_incident_store,
     event_impact_path_validator,
     event_market_confirmation,
     event_opportunity_verdict,
 )
-from .event_models import RawDiscoveredEvent
+from .event_models import NormalizedEvent, RawDiscoveredEvent
 
 
 DEFAULT_SIGNAL_QUALITY_CASES_PATH = Path("fixtures/event_discovery/event_alpha_signal_quality_cases.json")
@@ -85,6 +86,10 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
     )
     claims = event_claim_semantics.extract_event_claims((raw,))
     archetype = event_incident_graph.event_archetype(None, (raw,), claims=claims)
+    incident = event_incident_graph.build_incidents(
+        (_normalized_event_for_case(case, raw),),
+        {raw.raw_id: raw},
+    )[0]
     market = event_market_confirmation.evaluate_market_confirmation(
         event_market_confirmation.EventMarketConfirmationInput(
             market_snapshot=_mapping(case.get("market_snapshot")),
@@ -142,6 +147,18 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         high_priority = False
         blocked = identity_rejection
         reason_codes = tuple(dict.fromkeys((*reason_codes, identity_rejection, "needs_identity_validation")))
+    incident_hypothesis_generated = bool(
+        case.get(
+            "incident_hypothesis_generated",
+            bool(case.get("candidate_symbol") or case.get("candidate_coin_id")),
+        )
+    )
+    incident_relevance = event_incident_store.classify_incident_relevance(
+        incident,
+        raw_by_id={raw.raw_id: raw},
+        hypotheses=(hypothesis,) if incident_hypothesis_generated else (),
+        watchlist_rows=(),
+    )
     reported_impact_path = impact.impact_path_type
     reported_role = impact.candidate_role
     if not symbol and not coin_id:
@@ -173,6 +190,14 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         "blocked_reason": blocked,
         "triggered_fade": False,
         "identity_rejection_reason": identity_rejection,
+        "incident_relevance_status": incident_relevance["incident_relevance_status"],
+        "incident_relevance_score": incident_relevance["incident_relevance_score"],
+        "canonical_persistence_reason": incident_relevance["canonical_persistence_reason"],
+        "diagnostic_hidden_by_default": incident_relevance["incident_relevance_status"] in {
+            event_incident_store.RELEVANCE_RAW_OBSERVATION,
+            event_incident_store.RELEVANCE_DIAGNOSTIC_ONLY,
+            event_incident_store.RELEVANCE_REJECTED_INCIDENT,
+        },
     }
     expected = _expected(case)
     diffs, stages = _diff_expected(expected, actual)
@@ -246,6 +271,23 @@ def _raw_event(case: Mapping[str, Any]) -> RawDiscoveredEvent:
     )
 
 
+def _normalized_event_for_case(case: Mapping[str, Any], raw: RawDiscoveredEvent) -> NormalizedEvent:
+    return NormalizedEvent(
+        event_id=str(case.get("event_id") or case.get("case_id") or raw.raw_id),
+        raw_ids=(raw.raw_id,),
+        event_name=str(case.get("title") or raw.title or raw.raw_id),
+        event_type=str(case.get("event_type") or case.get("impact_category") or "news"),
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=raw.fetched_at,
+        source=str(raw.provider or "fixture_signal_quality"),
+        source_urls=(raw.source_url,) if raw.source_url else (),
+        external_asset=_optional_str(case.get("external_asset")),
+        description=raw.body,
+        confidence=float(case.get("source_confidence") or raw.source_confidence or 0.8),
+    )
+
+
 def _hypothesis(case: Mapping[str, Any]) -> SimpleNamespace:
     return SimpleNamespace(
         impact_category=str(case.get("impact_category") or "market_anomaly_unknown"),
@@ -283,6 +325,10 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "affected_ecosystem": "candidate_role",
         "market_reaction_confirmed": "market_reaction_vs_cause",
         "causal_mechanism_confirmed": "market_reaction_vs_cause",
+        "incident_relevance_status": "incident_relevance",
+        "incident_relevance_score": "incident_relevance",
+        "canonical_persistence_reason": "incident_relevance",
+        "diagnostic_hidden_by_default": "incident_relevance",
     }
     for key, expected_value in expected.items():
         actual_value = actual.get(key)

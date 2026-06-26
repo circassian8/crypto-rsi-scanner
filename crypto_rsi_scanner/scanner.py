@@ -1391,6 +1391,7 @@ def _event_impact_hypothesis_store_config_from_runtime() -> event_impact_hypothe
 def _event_incident_store_config_from_runtime() -> event_incident_store.EventIncidentStoreConfig:
     return event_incident_store.EventIncidentStoreConfig(
         path=config.EVENT_INCIDENT_STORE_PATH,
+        store_diagnostic=config.EVENT_INCIDENT_STORE_DIAGNOSTIC,
     )
 
 
