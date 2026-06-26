@@ -20,6 +20,19 @@ from .event_resolver import clean_text
 
 
 INCIDENT_GRAPH_SCHEMA_VERSION = "event_incident_graph_v1"
+_GENERIC_SUBJECTS = {
+    "no",
+    "none",
+    "unknown",
+    "unclear",
+    "n/a",
+    "na",
+    "market",
+    "catalyst",
+    "event",
+    "token",
+    "coin",
+}
 
 
 @dataclass(frozen=True)
@@ -68,10 +81,21 @@ def incident_key(event: NormalizedEvent, raws: Iterable[RawDiscoveredEvent]) -> 
     raws = tuple(raws)
     text = _combined_text(event, raws)
     claims = event_claim_semantics.extract_event_claims(raws)
-    subject = infer_primary_subject(event, raws, claims=claims)
-    ecosystem = infer_affected_ecosystem(event, raws)
     archetype = event_archetype(event, raws, claims=claims)
     bucket = _date_bucket(event, raws)
+    if _is_market_anomaly_event(event, raws) or archetype == "market_dislocation_unknown":
+        asset = _market_anomaly_asset(event, raws)
+        identity = asset.get("coin_id") or asset.get("symbol") or asset.get("name") or "unknown"
+        anomaly_type = asset.get("anomaly_type") or archetype or "market_anomaly"
+        return "|".join((
+            "market-anomaly",
+            _slug(str(identity)),
+            _slug(str(asset.get("symbol") or "")),
+            _slug(str(anomaly_type)),
+            bucket,
+        ))
+    subject = infer_primary_subject(event, raws, claims=claims)
+    ecosystem = infer_affected_ecosystem(event, raws)
     named = _major_named_entities(text)
     identity = subject or (named[0] if named else None) or event.external_asset or event.event_name
     key_parts = (
@@ -117,14 +141,23 @@ def infer_primary_subject(
     claims: Iterable[event_claim_semantics.EventClaim] = (),
 ) -> str | None:
     for claim in claims:
-        if claim.subject:
+        if _valid_subject(claim.subject):
             return claim.subject
-    text = _combined_text(event, tuple(raws))
+    raws = tuple(raws)
+    text = _combined_text(event, raws)
     subject = event_claim_semantics.infer_primary_subject(text)
-    if subject:
+    if _valid_subject(subject):
         return subject
+    if _is_market_anomaly_event(event, raws):
+        asset = _market_anomaly_asset(event, raws)
+        fallback = asset.get("symbol") or asset.get("name") or asset.get("coin_id")
+        if _valid_subject(str(fallback or "")):
+            return str(fallback)
     if event is not None:
-        return event.external_asset or event.event_name
+        if _valid_subject(event.external_asset):
+            return event.external_asset
+        if _valid_subject(event.event_name):
+            return event.event_name
     return None
 
 
@@ -205,7 +238,7 @@ def _incident_from_group(
     urls = tuple(sorted({raw.source_url for raw in raws if raw.source_url}))
     status = event_claim_semantics.current_cause_status(claims, "exploit")
     conflicts = _conflicting_claims(claims)
-    name = _canonical_name(primary_subject, archetype, ecosystem)
+    name = _canonical_name(primary_subject, archetype, ecosystem, event=first_event, raws=raws)
     digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
     return CanonicalIncident(
         schema_version=INCIDENT_GRAPH_SCHEMA_VERSION,
@@ -254,7 +287,7 @@ def _major_named_entities(text: str) -> tuple[str, ...]:
     out: list[str] = []
     for name in names:
         cleaned = name.strip()
-        if clean_text(cleaned) in {"the", "a", "an", "bitcoin world", "crypto news"}:
+        if clean_text(cleaned) in {"the", "a", "an", "bitcoin world", "crypto news", *_GENERIC_SUBJECTS}:
             continue
         if cleaned not in out:
             out.append(cleaned)
@@ -285,7 +318,20 @@ def _conflicting_claims(claims: tuple[event_claim_semantics.EventClaim, ...]) ->
     return tuple(out)
 
 
-def _canonical_name(subject: str | None, archetype: str, ecosystem: str | None) -> str:
+def _canonical_name(
+    subject: str | None,
+    archetype: str,
+    ecosystem: str | None,
+    *,
+    event: NormalizedEvent | None = None,
+    raws: tuple[RawDiscoveredEvent, ...] = (),
+) -> str:
+    if _is_market_anomaly_event(event, raws) or archetype == "market_dislocation_unknown":
+        asset = _market_anomaly_asset(event, raws)
+        label = str(asset.get("symbol") or asset.get("name") or asset.get("coin_id") or subject or "Unknown asset")
+        if _is_market_anomaly_event(event, raws):
+            return f"{label} market anomaly"
+        return f"{label} market dislocation"
     parts = [subject or "Unknown subject", archetype.replace("_", " ")]
     if ecosystem and clean_text(ecosystem) != clean_text(subject or ""):
         parts.append(f"in {ecosystem}")
@@ -307,3 +353,56 @@ def _slug(value: str | None) -> str:
     cleaned = clean_text(value or "")
     cleaned = re.sub(r"[^a-z0-9]+", "-", cleaned).strip("-")
     return cleaned or "unknown"
+
+
+def _valid_subject(value: str | None) -> bool:
+    cleaned = clean_text(value or "")
+    return bool(cleaned and cleaned not in _GENERIC_SUBJECTS)
+
+
+def _is_market_anomaly_event(event: NormalizedEvent | None, raws: tuple[RawDiscoveredEvent, ...]) -> bool:
+    if event is not None and clean_text(event.event_type) == "market_anomaly":
+        return True
+    for raw in raws:
+        payload = raw.raw_json if isinstance(raw.raw_json, dict) else {}
+        if raw.provider == "market_anomaly" or isinstance(payload.get("anomaly"), dict):
+            return True
+        event_payload = payload.get("event") if isinstance(payload.get("event"), dict) else {}
+        if clean_text(event_payload.get("event_type") or payload.get("event_type") or "") == "market_anomaly":
+            return True
+    return False
+
+
+def _market_anomaly_asset(
+    event: NormalizedEvent | None,
+    raws: tuple[RawDiscoveredEvent, ...],
+) -> dict[str, str]:
+    for raw in raws:
+        payload = raw.raw_json if isinstance(raw.raw_json, dict) else {}
+        market = payload.get("market") if isinstance(payload.get("market"), dict) else {}
+        event_payload = payload.get("event") if isinstance(payload.get("event"), dict) else {}
+        symbol = str(market.get("symbol") or payload.get("symbol") or "").strip().upper()
+        coin_id = str(market.get("coin_id") or market.get("id") or payload.get("coin_id") or payload.get("id") or "").strip()
+        name = str(market.get("name") or payload.get("name") or "").strip()
+        if not name and coin_id:
+            name = coin_id.replace("-", " ").title()
+        anomaly_type = str(event_payload.get("event_type") or payload.get("event_type") or "market_anomaly")
+        if symbol or coin_id or name:
+            return {
+                "symbol": symbol,
+                "coin_id": coin_id,
+                "name": name,
+                "anomaly_type": anomaly_type,
+            }
+    if event is not None:
+        name = str(event.external_asset or "").strip()
+        symbol_match = re.match(r"\s*([A-Z0-9]{2,12})\s+market\s+anomaly\b", str(event.event_name or ""))
+        symbol = symbol_match.group(1) if symbol_match else ""
+        if symbol or name:
+            return {
+                "symbol": symbol,
+                "coin_id": "",
+                "name": name,
+                "anomaly_type": clean_text(event.event_type) or "market_anomaly",
+            }
+    return {"symbol": "", "coin_id": "", "name": "", "anomaly_type": "market_anomaly"}

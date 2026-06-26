@@ -814,7 +814,7 @@ def _canonical_incident_lines(rows: Iterable[Mapping[str, Any]]) -> list[str]:
         "- Market reaction but unknown/ruled-out cause: "
         + str(sum(
             1 for row in incidents
-            if row.get("market_reaction_confirmed")
+            if (row.get("market_reaction_observed") or row.get("market_reaction_confirmed"))
             and str(row.get("current_cause_status") or "") in {"unknown", "ruled_out"}
         )),
         "- Confirmed cause missing market data: "

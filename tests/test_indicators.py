@@ -21726,6 +21726,44 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
             content_hash=raw_id,
         )
 
+    def anomaly_raw(raw_id, symbol, coin_id, name, *, fetched_at=now, score=86):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="market_anomaly",
+            fetched_at=fetched_at,
+            published_at=fetched_at,
+            source_url=None,
+            title=f"{symbol} market anomaly: 24h return 64%",
+            body=(
+                f"{name} ({symbol}) matched market-anomaly research filters: 24h return 64%, "
+                "volume/mcap 0.34. No dated external catalyst has been validated; "
+                "keep as radar/store-only until source evidence exists."
+            ),
+            raw_json={
+                "event": {
+                    "event_id": f"market_anomaly:{coin_id}:{fetched_at.date().isoformat()}",
+                    "event_name": f"{symbol} market anomaly",
+                    "event_type": "market_anomaly",
+                    "event_time": None,
+                    "event_time_confidence": 0.0,
+                    "external_asset": None,
+                    "description": f"{symbol} market anomaly",
+                },
+                "market": {
+                    "symbol": symbol,
+                    "coin_id": coin_id,
+                    "name": name,
+                    "return_24h": 64,
+                    "volume_to_market_cap": 0.34,
+                    "volume_zscore_24h": 4.5,
+                    "anomaly_score": score,
+                },
+                "anomaly": {"score": score, "research_only": True, "requires_catalyst_evidence": True},
+            },
+            source_confidence=0.55,
+            content_hash=raw_id,
+        )
+
     claims = event_claim_semantics.claims_from_text(
         "MemeCore's M token crashes 80% with no exploit or announcement to explain it. "
         "The exploit was initially suspected, later ruled out."
@@ -21733,6 +21771,20 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     assert any(claim.polarity == "negated" for claim in claims)
     assert any(claim.polarity == "ruled_out" for claim in claims)
     assert event_claim_semantics.current_cause_status(claims, "exploit") == "ruled_out"
+
+    absence_claims = event_claim_semantics.claims_from_text("No dated external catalyst has been validated.")
+    assert all(claim.subject != "No" for claim in absence_claims)
+    assert any(claim.claim_type == "absence_of_validated_catalyst" for claim in absence_claims)
+    assert not any(
+        claim.predicate == "explains_market_move" and claim.cause_status == "confirmed"
+        for claim in absence_claims
+    )
+    no_trigger_claims = event_claim_semantics.claims_from_text("No clear trigger for token crash.")
+    assert all(claim.subject != "No" for claim in no_trigger_claims)
+    assert all(claim.cause_status == "unknown" for claim in no_trigger_claims)
+    no_exploit_claims = event_claim_semantics.claims_from_text("No exploit or announcement to explain it.")
+    assert event_claim_semantics.has_ruled_out_claim(no_exploit_claims, "exploit")
+    assert not event_claim_semantics.has_confirmed_claim(no_exploit_claims, "exploit")
 
     memecore_raw = raw(
         "memecore",
@@ -21772,6 +21824,29 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     assert memecore_hyp.market_context_snapshot["return_24h"] == -71
     assert memecore_hyp.market_reaction_confirmed is True
     assert memecore_hyp.causal_mechanism_confirmed is False
+
+    sol_a = anomaly_raw("sol_a", "SOL", "solana", "Solana")
+    sol_b = anomaly_raw("sol_b", "SOL", "solana", "Solana")
+    usdt = anomaly_raw("usdt_a", "USDT", "tether", "Tether")
+    anomaly_events = (
+        NormalizedEvent("evt_sol_a", ("sol_a",), "SOL market anomaly", "market_anomaly", None, 0.0, now, "market_anomaly", (), None, sol_a.body, 0.55),
+        NormalizedEvent("evt_sol_b", ("sol_b",), "SOL market anomaly update", "market_anomaly", None, 0.0, now, "market_anomaly", (), None, sol_b.body, 0.55),
+        NormalizedEvent("evt_usdt_a", ("usdt_a",), "USDT market anomaly", "market_anomaly", None, 0.0, now, "market_anomaly", (), None, usdt.body, 0.55),
+    )
+    anomaly_incidents = event_incident_graph.build_incidents(
+        anomaly_events,
+        {row.raw_id: row for row in (sol_a, sol_b, usdt)},
+    )
+    assert len(anomaly_incidents) == 2
+    sol_incident = next(item for item in anomaly_incidents if item.primary_subject == "SOL")
+    usdt_incident = next(item for item in anomaly_incidents if item.primary_subject == "USDT")
+    assert set(sol_incident.raw_ids) == {"sol_a", "sol_b"}
+    assert set(usdt_incident.raw_ids) == {"usdt_a"}
+    assert sol_incident.canonical_name == "SOL market anomaly"
+    assert usdt_incident.canonical_name == "USDT market anomaly"
+    assert sol_incident.current_cause_status == "unknown"
+    assert all(claim.subject != "No" for claim in sol_incident.claim_history)
+    assert any(claim.claim_type == "absence_of_validated_catalyst" for claim in sol_incident.claim_history)
 
     secondfi_a = raw(
         "secondfi_a",
@@ -21922,6 +21997,28 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         assert "market_dislocation_unknown=1" in report
         assert "exploit_security_event=2" in report
         assert "multiple_source_updates: 1" in report
+
+        anomaly_write = event_incident_store.write_incidents(
+            EventDiscoveryResult((sol_a, sol_b, usdt), anomaly_events, (), (), ()),
+            cfg=event_incident_store.EventIncidentStoreConfig(path=Path(tmp) / "market_incidents.jsonl"),
+            now=now,
+            run_id="run-market-anomaly-test",
+            profile="quality_validation",
+            run_mode="test",
+            artifact_namespace="quality_validation",
+        )
+        assert anomaly_write.success is True
+        assert anomaly_write.rows_written == 2
+        anomaly_loaded = event_incident_store.load_incidents(anomaly_write.path)
+        anomaly_report = event_incident_store.format_incidents_report(anomaly_loaded)
+        assert "SOL market anomaly" in anomaly_report
+        assert "USDT market anomaly" in anomaly_report
+        assert "No · market anomaly" not in anomaly_report
+        assert "primary_subjects: SOL=1, USDT=1" in anomaly_report
+        assert "absence_of_validated_catalyst_claims: 3" in anomaly_report
+        assert "market_reaction_unknown_cause: 2" in anomaly_report
+        assert all(row["market_reaction_observed"] is True for row in anomaly_loaded.rows)
+        assert all(row["current_cause_status"] == "unknown" for row in anomaly_loaded.rows)
 
 
 def test_event_opportunity_upgrade_path_and_audit_sections():

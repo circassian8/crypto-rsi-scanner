@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Fix no-catalyst incident semantics · Codex
+**Why:** Fresh `quality_validation` artifacts showed a bad canonical incident
+named `No · market anomaly`, with `primary_subject=No` and a misleading
+`No explains_market_move` claim. “No dated external catalyst has been
+validated” is absence-of-evidence, not a confirmed causal claim, and unrelated
+market anomalies must not merge under a generic unknown-cause incident.
+**Changes:**
+- Tightened claim semantics so no-catalyst/no-clear-trigger phrases become
+  `absence_of_validated_catalyst` / unknown-cause metadata instead of confirmed
+  `explains_market_move` claims.
+- Added subject guardrails for generic terms such as `No`, `Unknown`,
+  `Market`, `Catalyst`, `Token`, and `Coin`, with market anomalies falling back
+  to the asset symbol/coin id from the raw anomaly payload.
+- Made market-anomaly incident identity asset/date/anomaly-specific, so SOL and
+  USDT anomalies on the same date are separate incidents while repeated SOL
+  anomaly rows can merge.
+- Added `market_reaction_observed` to incident rows/reports so observed market
+  movement remains distinct from confirmed causal mechanism, and updated
+  incident reports/daily briefs/audits accordingly.
+- Expanded tests and signal-quality fixtures for no-catalyst phrases, no-exploit
+  language, SOL/Tether market anomalies, MemeCore no-exploit dislocation,
+  THORChain confirmed exploit, and SecondFi duplicate-source merging.
+**Verify:** `python3 tests/test_indicators.py` passed (459/459);
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (26/26);
+`make event-alpha-quality-validation-cycle PYTHON=python3` passed with strict
+artifact doctor `OK`; `make event-incidents-report PROFILE=quality_validation
+PYTHON=python3` showed separate `SOL market anomaly` and `USDT market anomaly`
+rows with `cause=unknown`, `reaction_observed=true`, and `causal=false`.
+Full `make verify` is run before commit.
+**Notes/risks:** Research-only semantic/artifact hardening. No normal RSI rows,
+paper/live trades, execution, alert promotion, or LLM/provider-created
+`TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-26 — Persist canonical Event Alpha incidents · Codex
 **Why:** Claim semantics and incident clustering were available in-memory, but
 operators and Pro-model reviews needed durable incident artifacts that link raw

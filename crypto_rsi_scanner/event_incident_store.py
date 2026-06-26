@@ -194,6 +194,7 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     rows.append("primary_subjects: " + _format_counts(_counts(result.rows, "primary_subject")))
     rows.append("asset_roles: " + _format_counts(_asset_role_counts(result.rows)))
     rows.append(f"conflicting_claim_incidents: {sum(1 for row in result.rows if row.get('conflicting_claims'))}")
+    rows.append(f"absence_of_validated_catalyst_claims: {_absence_claim_count(result.rows)}")
     rows.append(f"multiple_source_updates: {sum(1 for row in result.rows if int(row.get('source_update_count') or 0) > 1)}")
     rows.append(f"linked_to_hypotheses: {sum(1 for row in result.rows if row.get('linked_hypothesis_ids'))}")
     rows.append(f"linked_to_watchlist: {sum(1 for row in result.rows if row.get('linked_watchlist_keys'))}")
@@ -201,7 +202,8 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
         "market_reaction_unknown_cause: "
         + str(sum(
             1 for row in result.rows
-            if row.get("market_reaction_confirmed") and row.get("current_cause_status") in {"unknown", "ruled_out"}
+            if (row.get("market_reaction_observed") or row.get("market_reaction_confirmed"))
+            and row.get("current_cause_status") in {"unknown", "ruled_out"}
         ))
     )
     rows.append(
@@ -235,7 +237,7 @@ def _row_from_incident(
     h_rows = [_object_row(item) for item in hypotheses]
     w_rows = [_object_row(item) for item in watchlist_rows]
     linked_assets = _linked_assets(h_rows, w_rows)
-    market = _incident_market_context(h_rows, w_rows)
+    market = _incident_market_context(h_rows, w_rows, incident=incident, raw_by_id=raw_by_id)
     claim_history = [_claim_summary(claim) for claim in incident.claim_history[:12]]
     source_urls = tuple(sorted({raw_by_id[raw_id].source_url for raw_id in incident.raw_ids if raw_id in raw_by_id and raw_by_id[raw_id].source_url}))
     current_polarities = tuple(dict.fromkeys(
@@ -272,6 +274,7 @@ def _row_from_incident(
         "linked_watchlist_keys": _unique(row.get("key") for row in w_rows),
         "linked_assets": linked_assets,
         "asset_roles": _asset_roles(linked_assets),
+        "market_reaction_observed": market["market_reaction_observed"],
         "market_reaction_confirmed": market["market_reaction_confirmed"],
         "market_reaction_level": market["market_reaction_level"],
         "causal_mechanism_confirmed": market["causal_mechanism_confirmed"],
@@ -353,15 +356,38 @@ def _asset_roles(linked_assets: Iterable[Mapping[str, Any]]) -> tuple[dict[str, 
     )
 
 
-def _incident_market_context(h_rows: list[dict[str, Any]], w_rows: list[dict[str, Any]]) -> dict[str, Any]:
+def _incident_market_context(
+    h_rows: list[dict[str, Any]],
+    w_rows: list[dict[str, Any]],
+    *,
+    incident: event_incident_graph.CanonicalIncident | None = None,
+    raw_by_id: Mapping[str, RawDiscoveredEvent] | None = None,
+) -> dict[str, Any]:
     candidates: list[dict[str, Any]] = []
     for row in [*h_rows, *w_rows]:
         components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
         merged = {**dict(components), **row}
         if merged.get("market_reaction_confirmed") is not None or merged.get("market_context_source"):
             candidates.append(merged)
+    if incident is not None and raw_by_id is not None:
+        for raw_id in incident.raw_ids:
+            raw = raw_by_id.get(raw_id)
+            payload = raw.raw_json if raw is not None and isinstance(raw.raw_json, Mapping) else {}
+            market = payload.get("market") if isinstance(payload.get("market"), Mapping) else {}
+            anomaly = payload.get("anomaly") if isinstance(payload.get("anomaly"), Mapping) else {}
+            if not market and not anomaly:
+                continue
+            candidates.append({
+                "market_reaction_confirmed": False,
+                "causal_mechanism_confirmed": False,
+                "market_context_source": "raw_market_anomaly_snapshot" if anomaly else "raw_market_snapshot",
+                "market_context_asset": market.get("symbol") or market.get("coin_id") or market.get("id"),
+                "market_confirmation_level": "observed",
+                "market_confirmation_score": anomaly.get("score") or market.get("anomaly_score") or 1.0,
+            })
     if not candidates:
         return {
+            "market_reaction_observed": False,
             "market_reaction_confirmed": False,
             "market_reaction_level": "insufficient_data",
             "causal_mechanism_confirmed": False,
@@ -370,7 +396,15 @@ def _incident_market_context(h_rows: list[dict[str, Any]], w_rows: list[dict[str
             "market_context_age": None,
         }
     best = sorted(candidates, key=lambda row: _float(row.get("market_confirmation_score")), reverse=True)[0]
+    reaction_observed = any(
+        bool(row.get("market_reaction_confirmed"))
+        or bool(row.get("market_context_source"))
+        or _float(row.get("market_confirmation_score")) > 0
+        or str(row.get("market_confirmation_level") or "").casefold() in {"weak", "moderate", "strong"}
+        for row in candidates
+    )
     return {
+        "market_reaction_observed": reaction_observed,
         "market_reaction_confirmed": any(bool(row.get("market_reaction_confirmed")) for row in candidates),
         "market_reaction_level": _value(best, "market_confirmation_level") or "unknown",
         "causal_mechanism_confirmed": any(bool(row.get("causal_mechanism_confirmed")) for row in candidates),
@@ -445,7 +479,8 @@ def _incident_lines(row: Mapping[str, Any]) -> list[str]:
         f"  assets: {asset_text}",
         (
             "  market_vs_cause: "
-            f"reaction={str(bool(row.get('market_reaction_confirmed'))).lower()} "
+            f"reaction_observed={str(bool(row.get('market_reaction_observed') or row.get('market_reaction_confirmed'))).lower()} "
+            f"reaction_confirmed={str(bool(row.get('market_reaction_confirmed'))).lower()} "
             f"level={row.get('market_reaction_level') or 'unknown'} "
             f"causal={str(bool(row.get('causal_mechanism_confirmed'))).lower()} "
             f"source={row.get('market_context_source') or 'none'}"
@@ -538,6 +573,16 @@ def _asset_role_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
             role = str(asset.get("role") or "unknown")
             counts[role] = counts.get(role, 0) + 1
     return counts
+
+
+def _absence_claim_count(rows: Iterable[Mapping[str, Any]]) -> int:
+    return sum(
+        1
+        for row in rows
+        for claim in row.get("claim_history") or ()
+        if isinstance(claim, Mapping)
+        and str(claim.get("claim_type") or "") == "absence_of_validated_catalyst"
+    )
 
 
 def _format_counts(counts: Mapping[str, int]) -> str:

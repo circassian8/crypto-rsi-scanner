@@ -349,11 +349,72 @@
       "market_snapshot": {"return_24h": 85, "return_72h": 140, "volume_zscore_24h": 5.0, "volume_to_market_cap": 0.44, "anomaly_score": 90},
       "score_components": {"event_clarity": 10, "event_time_quality": 0},
       "expected": {
+        "primary_subject": "PUMP",
+        "cause_status": "unknown",
+        "event_archetype": "market_dislocation_unknown",
         "opportunity_level": ["local_only", "exploratory"],
         "route_tier": "STORE_ONLY",
         "digest_eligible": false,
         "watchlist_eligible": false,
         "reason_codes": "contains:market_anomaly_without_confirmed_catalyst"
+      }
+    },
+    {
+      "case_id": "sol_market_anomaly_no_catalyst",
+      "title": "SOL market anomaly with no catalyst",
+      "impact_category": "market_anomaly_unknown",
+      "candidate_symbol": "SOL",
+      "candidate_coin_id": "solana",
+      "raw_event": {
+        "raw_id": "sq_sol_anomaly",
+        "provider": "fixture_market_anomaly",
+        "source_url": "https://markets.example/top-gainers",
+        "title": "SOL market anomaly: 24h return 64%",
+        "body": "SOLUSDT has a large market move but no dated external catalyst has been validated.",
+        "source_confidence": 0.55
+      },
+      "market_snapshot": {"return_24h": 64, "volume_zscore_24h": 4.5, "volume_to_market_cap": 0.34, "anomaly_score": 86},
+      "score_components": {"event_clarity": 10, "event_time_quality": 0},
+      "expected": {
+        "primary_subject": "SOL",
+        "cause_status": "unknown",
+        "event_archetype": "market_dislocation_unknown",
+        "market_reaction_confirmed": true,
+        "causal_mechanism_confirmed": false,
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "digest_eligible": false,
+        "watchlist_eligible": false,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "tether_market_anomaly_no_catalyst",
+      "title": "Tether market anomaly with no catalyst",
+      "impact_category": "market_anomaly_unknown",
+      "candidate_symbol": "USDT",
+      "candidate_coin_id": "tether",
+      "raw_event": {
+        "raw_id": "sq_tether_anomaly",
+        "provider": "fixture_market_anomaly",
+        "source_url": "https://markets.example/volume-spikes",
+        "title": "USDT market anomaly: volume/mcap spike",
+        "body": "Tether (USDT) has unusual volume but no known catalyst or independent event source has been confirmed.",
+        "source_confidence": 0.55
+      },
+      "market_snapshot": {"return_24h": 4, "volume_zscore_24h": 4.0, "volume_to_market_cap": 0.55, "anomaly_score": 82},
+      "score_components": {"event_clarity": 10, "event_time_quality": 0},
+      "expected": {
+        "primary_subject": "USDT",
+        "cause_status": "unknown",
+        "event_archetype": "market_dislocation_unknown",
+        "market_reaction_confirmed": true,
+        "causal_mechanism_confirmed": false,
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "digest_eligible": false,
+        "watchlist_eligible": false,
+        "triggered_fade": false
       }
     },
     {

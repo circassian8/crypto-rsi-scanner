@@ -56,6 +56,47 @@ class EventClaim:
 _SECURITY_TERMS = ("exploit", "hack", "hacked", "breach", "attack", "security incident")
 _ANNOUNCEMENT_TERMS = ("announcement", "clear trigger", "catalyst")
 _LOSS_RE = re.compile(r"\b(?:loses|lost|drained|stolen|stole|exploit(?:ed)?|hack(?:ed)?)\b.{0,80}?(?:\$?\d+(?:\.\d+)?\s?(?:m|million|bn|billion)|funds|wallet)", re.I)
+_UNKNOWN_CAUSE_PHRASES = (
+    "no dated external catalyst has been validated",
+    "no catalyst confirmed",
+    "no clear trigger",
+    "no known catalyst",
+    "no explanation yet",
+    "without a known cause",
+    "without clear trigger",
+    "cause unknown",
+    "unknown cause",
+    "no catalyst",
+    "no announcement",
+    "no exploit or announcement",
+    "no independent catalyst source",
+    "no independent catalyst",
+)
+_ABSENCE_OF_VALIDATED_CATALYST_PHRASES = (
+    "no dated external catalyst has been validated",
+    "no catalyst confirmed",
+    "no clear trigger",
+    "no known catalyst",
+    "no explanation yet",
+    "without a known cause",
+    "no exploit or announcement to explain",
+    "no exploit or announcement explains",
+    "no independent catalyst source",
+    "no independent catalyst",
+)
+_GENERIC_SUBJECTS = {
+    "no",
+    "none",
+    "unknown",
+    "unclear",
+    "n/a",
+    "na",
+    "market",
+    "catalyst",
+    "event",
+    "token",
+    "coin",
+}
 
 
 def extract_event_claims(raw_events: Iterable[RawDiscoveredEvent]) -> tuple[EventClaim, ...]:
@@ -114,18 +155,7 @@ def has_ruled_out_claim(claims: Iterable[EventClaim], claim_type: str) -> bool:
 
 def text_has_unknown_cause(text: str) -> bool:
     cleaned = clean_text(text)
-    return any(
-        phrase in cleaned
-        for phrase in (
-            "no clear trigger",
-            "cause unknown",
-            "unknown cause",
-            "without clear trigger",
-            "no catalyst",
-            "no announcement",
-            "no exploit or announcement",
-        )
-    )
+    return any(phrase in cleaned for phrase in _UNKNOWN_CAUSE_PHRASES)
 
 
 def _claims_from_text(text: str, *, raw: RawDiscoveredEvent | None) -> list[EventClaim]:
@@ -179,6 +209,21 @@ def _claims_from_text(text: str, *, raw: RawDiscoveredEvent | None) -> list[Even
                 source_url=raw.source_url if raw else None,
                 published_at=raw.published_at if raw else None,
             ))
+        if _has_absence_of_validated_catalyst(cleaned):
+            claims.append(EventClaim(
+                claim_type="absence_of_validated_catalyst",
+                subject=subject,
+                predicate="has_no_validated_catalyst",
+                object=None,
+                polarity=ClaimPolarity.UNKNOWN.value,
+                cause_status=CauseStatus.UNKNOWN.value,
+                confidence=_claim_confidence(ClaimPolarity.UNKNOWN.value),
+                evidence_quote=sentence.strip()[:280],
+                source_raw_id=raw.raw_id if raw else None,
+                source_url=raw.source_url if raw else None,
+                published_at=raw.published_at if raw else None,
+            ))
+            continue
         if any(term in cleaned for term in _ANNOUNCEMENT_TERMS) or text_has_unknown_cause(cleaned):
             polarity, cause = _cause_polarity(cleaned)
             claims.append(EventClaim(
@@ -205,7 +250,7 @@ def infer_primary_subject(text: str) -> str | None:
     # Prefer possessive/project names before high-impact terms.
     possessive = re.search(r"\b([A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*){0,3})'s\b.{0,60}\b(?:token|wallet|protocol|bridge|market|venue)\b", source)
     if possessive:
-        return possessive.group(1).strip()
+        return _clean_subject(possessive.group(1))
     direct = re.search(
         r"\b([A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*){0,3})\b.{0,80}\b(?:was|is|gets|faces|suffers|lost|loses|resumes|halted|exploit|hack|breach)",
         source,
@@ -276,6 +321,10 @@ def _cause_polarity(cleaned: str) -> tuple[str, str]:
     return ClaimPolarity.ASSERTED.value, CauseStatus.CONFIRMED.value
 
 
+def _has_absence_of_validated_catalyst(cleaned: str) -> bool:
+    return any(phrase in cleaned for phrase in _ABSENCE_OF_VALIDATED_CATALYST_PHRASES)
+
+
 def _claim_confidence(polarity: str) -> float:
     return {
         ClaimPolarity.ASSERTED.value: 0.86,
@@ -328,7 +377,9 @@ def _clean_subject(value: str | None) -> str | None:
         "bitcoin world",
         "crypto",
     }
-    if lowered in stop:
+    if lowered in stop or lowered in _GENERIC_SUBJECTS:
         return None
     text = re.sub(r"^(The|A|An)\s+", "", text).strip()
+    if text.casefold() in _GENERIC_SUBJECTS:
+        return None
     return text or None

@@ -245,6 +245,17 @@ def _incident_lines(
         return ["- incident link: no_incident"]
     claim_history = source.get("claim_history") or components.get("claim_history") or ()
     linked_assets = source.get("linked_assets") or components.get("linked_assets") or ()
+    reaction_confirmed = source.get("market_reaction_confirmed")
+    if reaction_confirmed is None:
+        reaction_confirmed = components.get("market_reaction_confirmed")
+    reaction_observed = source.get("market_reaction_observed")
+    if reaction_observed is None:
+        reaction_observed = components.get("market_reaction_observed")
+    if reaction_observed is None:
+        reaction_observed = reaction_confirmed
+    causal = source.get("causal_mechanism_confirmed")
+    if causal is None:
+        causal = components.get("causal_mechanism_confirmed")
     return [
         f"- incident_id: {incident_id}",
         f"- canonical name: {source.get('canonical_name') or source.get('canonical_incident_name') or components.get('canonical_incident_name') or 'unknown'}",
@@ -255,8 +266,9 @@ def _incident_lines(
         f"- conflicting claims: {_list_value(source.get('conflicting_claims') or components.get('conflicting_claims'))}",
         f"- source updates: {source.get('source_update_count') or len(source.get('source_raw_ids') or []) or 'unknown'} "
         f"(independent={source.get('independent_source_count') or len(source.get('independent_source_domains') or []) or 'unknown'})",
-        f"- market reaction vs causal mechanism: reaction={str(bool(source.get('market_reaction_confirmed') if source.get('market_reaction_confirmed') is not None else components.get('market_reaction_confirmed'))).lower()} "
-        f"causal={str(bool(source.get('causal_mechanism_confirmed') if source.get('causal_mechanism_confirmed') is not None else components.get('causal_mechanism_confirmed'))).lower()} "
+        f"- market reaction vs causal mechanism: observed={str(bool(reaction_observed)).lower()} "
+        f"confirmed={str(bool(reaction_confirmed)).lower()} "
+        f"causal={str(bool(causal)).lower()} "
         f"source={source.get('market_context_source') or components.get('market_context_source') or 'none'}",
         f"- linked assets and roles: {_asset_list(linked_assets) if linked_assets else _asset_role_summary(row, components)}",
     ]

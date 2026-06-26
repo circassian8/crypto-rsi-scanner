@@ -119,9 +119,13 @@ not as a confirmed exploit path. Third-party incidents can affect ecosystem
 tokens as `ecosystem_affected_asset` without making the token the direct
 incident subject. Market fields also carry `market_context_source`,
 `market_context_timestamp`, `market_context_age_seconds`,
-`market_context_data_quality`, `market_reaction_confirmed`, and
-`causal_mechanism_confirmed`; market reaction is evidence to inspect, not proof
-that the source explains the causal path.
+`market_context_data_quality`, `market_reaction_observed`,
+`market_reaction_confirmed`, and `causal_mechanism_confirmed`; market reaction
+is evidence to inspect, not proof that the source explains the causal path.
+No-catalyst phrases such as “no dated external catalyst has been validated,”
+“no clear trigger,” or “without a known cause” are absence-of-evidence /
+unknown-cause metadata. They should never produce `primary_subject=No` or a
+confirmed `explains_market_move` claim.
 
 Canonical incidents are persisted separately from hypotheses under the active
 profile namespace:
@@ -140,7 +144,9 @@ confidence, and warnings. It intentionally does not store full article bodies.
 Use this report to verify that duplicate articles about the same incident were
 merged, that a second independent source updated the incident rather than
 creating duplicate watchlist rows, and that ruled-out/unknown causes stayed
-local-only.
+local-only. For market anomalies, verify that canonical names are asset-specific
+(`SOL market anomaly`, `USDT market anomaly`) and that the report separates
+`reaction_observed` from causal confirmation.
 Source-enrichment cache rows include the enrichment schema version, cleaner
 version, source-content hash, and cleaned-text hash. If the cleaner changes,
 old cached cleaned text is intentionally treated as stale and refetched or

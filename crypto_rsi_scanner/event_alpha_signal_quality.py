@@ -277,12 +277,12 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "triggered_fade": "routing",
         "identity_rejection_reason": "identity",
         "claim_polarities": "claim_semantics",
-        "cause_status": "claim_semantics",
-        "event_archetype": "incident_clustering",
-        "primary_subject": "candidate_role",
+        "cause_status": "cause_status",
+        "event_archetype": "incident_identity",
+        "primary_subject": "primary_subject",
         "affected_ecosystem": "candidate_role",
-        "market_reaction_confirmed": "market_reaction",
-        "causal_mechanism_confirmed": "causal_mechanism",
+        "market_reaction_confirmed": "market_reaction_vs_cause",
+        "causal_mechanism_confirmed": "market_reaction_vs_cause",
     }
     for key, expected_value in expected.items():
         actual_value = actual.get(key)

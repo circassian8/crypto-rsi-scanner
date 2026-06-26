@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-26 - No-catalyst statements are absence evidence, not incident subjects
+**Status:** accepted
+**Decision:** Event Alpha claim semantics must treat phrases such as “no dated
+external catalyst has been validated,” “no clear trigger,” “no known catalyst,”
+and “without a known cause” as absence-of-validated-catalyst / unknown-cause
+metadata. They must not create a `subject=No`, a confirmed
+`explains_market_move` causal claim, or a generic incident that merges unrelated
+market anomalies. Generic words such as `No`, `None`, `Unknown`, `Unclear`,
+`Market`, `Catalyst`, `Event`, `Token`, and `Coin` cannot be canonical incident
+subjects unless a resolver/entity context proves they are real named entities.
+Market-anomaly incidents must key by asset identity, date bucket, and anomaly
+type, and incident artifacts must distinguish observed market reaction from
+confirmed causal mechanism.
+**Why:** Absence-of-evidence language is common in anomaly copy. Treating “No”
+as a subject or “no catalyst” as a confirmed cause makes artifacts misleading
+and can merge unrelated anomalies into one false canonical incident.
+**Revisit when:** A reviewed incident dataset supports a richer unknown-cause
+taxonomy with separate but equally explicit absence-of-evidence fields.
+
 ## 2026-06-26 - Canonical incidents are first-class research artifacts
 **Status:** accepted
 **Decision:** Event Alpha canonical incidents must be persisted as
