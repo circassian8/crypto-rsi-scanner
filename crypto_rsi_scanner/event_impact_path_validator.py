@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Iterable, Mapping
 
+from . import event_claim_semantics, event_incident_graph
 from .event_models import RawDiscoveredEvent
 from .event_resolver import clean_text
 
@@ -29,12 +30,14 @@ class ImpactPathType(str, Enum):
     MARKET_STRUCTURE_POLICY = "market_structure_policy"
     TECHNOLOGY_RISK = "technology_risk"
     MACRO_ATTENTION_ONLY = "macro_attention_only"
+    MARKET_DISLOCATION_UNKNOWN = "market_dislocation_unknown"
     GENERIC_COOCCURRENCE_ONLY = "generic_cooccurrence_only"
     UNKNOWN = "unknown"
 
 
 class CandidateRole(str, Enum):
     DIRECT_SUBJECT = "direct_subject"
+    ECOSYSTEM_AFFECTED_ASSET = "ecosystem_affected_asset"
     PROXY_INSTRUMENT = "proxy_instrument"
     PROXY_VENUE = "proxy_venue"
     INFRASTRUCTURE_PROVIDER = "infrastructure_provider"
@@ -64,6 +67,13 @@ class ImpactPathValidation:
     impact_path_reason: str
     opportunity_score_v2: float
     opportunity_score_components: Mapping[str, float] = field(default_factory=dict)
+    primary_subject: str | None = None
+    affected_entity: str | None = None
+    affected_ecosystem: str | None = None
+    role_confidence: float | None = None
+    role_evidence: tuple[str, ...] = ()
+    cause_status: str | None = None
+    claim_polarities: tuple[str, ...] = ()
 
 
 _DIRECT_EVENT_CATEGORIES = {
@@ -92,6 +102,10 @@ def validate_impact_path(
 ) -> ImpactPathValidation:
     """Classify source specificity, candidate role, and impact path strength."""
     text = clean_text(_raw_text(raw) if raw is not None else "")
+    claims = event_claim_semantics.extract_event_claims((raw,)) if raw is not None else ()
+    primary_subject = event_incident_graph.infer_primary_subject(None, (raw,) if raw is not None else (), claims=claims)
+    affected_ecosystem = event_incident_graph.infer_affected_ecosystem(None, (raw,) if raw is not None else ())
+    cause_status = event_claim_semantics.current_cause_status(claims, "exploit")
     category = str(getattr(hypothesis, "impact_category", "") or "")
     external = clean_text(getattr(hypothesis, "external_asset", "") or "")
     components = dict(score_components or getattr(hypothesis, "score_components", {}) or {})
@@ -122,6 +136,18 @@ def validate_impact_path(
         external=external,
         specificity=specificity,
         market_confirmation=market_confirmation,
+        claims=claims,
+        primary_subject=primary_subject,
+        affected_ecosystem=affected_ecosystem,
+    )
+    role, role_confidence, role_evidence = _refine_candidate_role(
+        role,
+        text=text,
+        symbol=symbol,
+        coin_id=coin_id,
+        category=category,
+        primary_subject=primary_subject,
+        affected_ecosystem=affected_ecosystem,
     )
     required_evidence_met = strength in {ImpactPathStrength.STRONG.value, ImpactPathStrength.MEDIUM.value}
     market_confirmation_required = strength == ImpactPathStrength.MEDIUM.value
@@ -160,6 +186,13 @@ def validate_impact_path(
         impact_path_reason=reason or path_type,
         opportunity_score_v2=round(opportunity_score, 2),
         opportunity_score_components={key: round(value, 2) for key, value in opportunity_components.items()},
+        primary_subject=primary_subject,
+        affected_entity=primary_subject,
+        affected_ecosystem=affected_ecosystem,
+        role_confidence=role_confidence,
+        role_evidence=role_evidence,
+        cause_status=cause_status,
+        claim_polarities=tuple(dict.fromkeys(claim.polarity for claim in claims)),
     )
 
 
@@ -190,8 +223,21 @@ def _classify_path(
     external: str,
     specificity: float,
     market_confirmation: float,
+    claims: tuple[event_claim_semantics.EventClaim, ...] = (),
+    primary_subject: str | None = None,
+    affected_ecosystem: str | None = None,
 ) -> tuple[str, str, str, str]:
     asset_present = _asset_terms_present(text, symbol=symbol, coin_id=coin_id)
+    if category == "market_anomaly_unknown" and (
+        event_claim_semantics.text_has_unknown_cause(text)
+        or _any_term_hit(text, ("crash", "crashes", "plunge", "plunges", "dumps", "selloff", "market anomaly"))
+    ):
+        return (
+            ImpactPathType.MARKET_DISLOCATION_UNKNOWN.value,
+            CandidateRole.DIRECT_SUBJECT.value if asset_present else CandidateRole.GENERIC_MENTION.value,
+            ImpactPathStrength.WEAK.value,
+            "cause_unknown_market_dislocation",
+        )
     if _generic_policy_without_specific_path(text):
         if _any_term_hit(text, ("cftc", "perp", "perps", "perpetual", "futures", "market structure")):
             path_type = ImpactPathType.MARKET_STRUCTURE_POLICY.value
@@ -270,12 +316,41 @@ def _classify_path(
         )
 
     if category == "security_or_regulatory_shock":
-        if _any_term_hit(text, ("exploit", "hack", "security incident", "attack", "breach", "resumes trading", "halted trading")):
+        exploit_confirmed = event_claim_semantics.has_confirmed_claim(claims, "exploit")
+        exploit_ruled_out = event_claim_semantics.has_ruled_out_claim(claims, "exploit")
+        exploit_suspected = any(
+            claim.claim_type == "exploit"
+            and claim.cause_status == event_claim_semantics.CauseStatus.SUSPECTED.value
+            for claim in claims
+        )
+        if (exploit_ruled_out and not exploit_confirmed) or (
+            event_claim_semantics.text_has_unknown_cause(text)
+            and not exploit_confirmed
+        ):
+            return (
+                ImpactPathType.MARKET_DISLOCATION_UNKNOWN.value,
+                CandidateRole.DIRECT_SUBJECT.value if asset_present else CandidateRole.GENERIC_MENTION.value,
+                ImpactPathStrength.WEAK.value,
+                "cause_unknown_market_dislocation",
+            )
+        if exploit_suspected and not exploit_confirmed:
+            role = _security_role(text, symbol=symbol, coin_id=coin_id, primary_subject=primary_subject, affected_ecosystem=affected_ecosystem)
             return (
                 ImpactPathType.EXPLOIT_SECURITY_EVENT.value,
-                CandidateRole.DIRECT_SUBJECT.value,
-                ImpactPathStrength.STRONG.value,
-                "exploit_security_event",
+                role,
+                ImpactPathStrength.WEAK.value,
+                "alleged_exploit_unconfirmed",
+            )
+        if _any_term_hit(text, ("exploit", "hack", "security incident", "attack", "breach", "resumes trading", "halted trading")):
+            role = _security_role(text, symbol=symbol, coin_id=coin_id, primary_subject=primary_subject, affected_ecosystem=affected_ecosystem)
+            strength = ImpactPathStrength.STRONG.value if role == CandidateRole.DIRECT_SUBJECT.value else (
+                ImpactPathStrength.MEDIUM.value if market_confirmation >= 40 else ImpactPathStrength.WEAK.value
+            )
+            return (
+                ImpactPathType.EXPLOIT_SECURITY_EVENT.value,
+                role,
+                strength,
+                "exploit_security_event" if role == CandidateRole.DIRECT_SUBJECT.value else "ecosystem_security_event",
             )
         if _any_term_hit(text, ("quantum", "cryptography", "technology risk")):
             return (
@@ -350,6 +425,62 @@ def _classify_path(
         ImpactPathStrength.WEAK.value if asset_present else ImpactPathStrength.NONE.value,
         "weak_cooccurrence_only" if asset_present else "no_value_capture_explained",
     )
+
+
+def _refine_candidate_role(
+    role: str,
+    *,
+    text: str,
+    symbol: str | None,
+    coin_id: str | None,
+    category: str,
+    primary_subject: str | None,
+    affected_ecosystem: str | None,
+) -> tuple[str, float, tuple[str, ...]]:
+    if role in {
+        CandidateRole.PROXY_INSTRUMENT.value,
+        CandidateRole.PROXY_VENUE.value,
+        CandidateRole.INFRASTRUCTURE_PROVIDER.value,
+        CandidateRole.MACRO_AFFECTED_ASSET.value,
+    }:
+        return role, 0.82, ("deterministic_playbook_role_preserved",)
+    refined, confidence, evidence = event_incident_graph.classify_candidate_role(
+        text=text,
+        symbol=symbol,
+        coin_id=coin_id,
+        primary_subject=primary_subject,
+        affected_ecosystem=affected_ecosystem,
+        impact_category=category,
+    )
+    if role == CandidateRole.DIRECT_SUBJECT.value and refined in {
+        CandidateRole.MACRO_AFFECTED_ASSET.value,
+        CandidateRole.GENERIC_MENTION.value,
+    }:
+        return role, 0.78, ("asset_named_as_security_subject",)
+    if refined != CandidateRole.GENERIC_MENTION.value:
+        return refined, confidence, evidence
+    return role, 0.50 if role != CandidateRole.GENERIC_MENTION.value else confidence, evidence
+
+
+def _security_role(
+    text: str,
+    *,
+    symbol: str | None,
+    coin_id: str | None,
+    primary_subject: str | None,
+    affected_ecosystem: str | None,
+) -> str:
+    role, _confidence, _evidence = event_incident_graph.classify_candidate_role(
+        text=text,
+        symbol=symbol,
+        coin_id=coin_id,
+        primary_subject=primary_subject,
+        affected_ecosystem=affected_ecosystem,
+        impact_category="security_or_regulatory_shock",
+    )
+    if role == CandidateRole.ECOSYSTEM_AFFECTED_ASSET.value:
+        return role
+    return CandidateRole.DIRECT_SUBJECT.value if _asset_terms_present(text, symbol=symbol, coin_id=coin_id) else CandidateRole.GENERIC_MENTION.value
 
 
 def _evidence_specificity_score(

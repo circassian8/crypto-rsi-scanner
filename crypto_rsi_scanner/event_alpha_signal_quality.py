@@ -10,7 +10,9 @@ from types import SimpleNamespace
 from typing import Any, Iterable, Mapping
 
 from . import (
+    event_claim_semantics,
     event_evidence_quality,
+    event_incident_graph,
     event_impact_path_validator,
     event_market_confirmation,
     event_opportunity_verdict,
@@ -81,6 +83,8 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         coin_id=coin_id,
         score_components=dict(case.get("score_components") or {}),
     )
+    claims = event_claim_semantics.extract_event_claims((raw,))
+    archetype = event_incident_graph.event_archetype(None, (raw,), claims=claims)
     market = event_market_confirmation.evaluate_market_confirmation(
         event_market_confirmation.EventMarketConfirmationInput(
             market_snapshot=_mapping(case.get("market_snapshot")),
@@ -147,6 +151,17 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
     actual = {
         "impact_path_type": reported_impact_path,
         "candidate_role": reported_role,
+        "claim_polarities": tuple(dict.fromkeys(claim.polarity for claim in claims)),
+        "cause_status": event_claim_semantics.current_cause_status(claims, "exploit"),
+        "event_archetype": archetype,
+        "primary_subject": impact.primary_subject,
+        "affected_ecosystem": impact.affected_ecosystem,
+        "market_reaction_confirmed": market.level in {"weak", "moderate", "strong"},
+        "causal_mechanism_confirmed": impact.cause_status == "confirmed" or (
+            impact.impact_path_strength in {"strong", "medium"}
+            and impact.impact_path_type != "market_dislocation_unknown"
+            and impact.impact_path_reason not in {"alleged_exploit_unconfirmed", "cause_unknown_market_dislocation"}
+        ),
         "evidence_specificity": evidence.evidence_specificity,
         "market_confirmation_level": market.level,
         "opportunity_level": opportunity_level,
@@ -261,6 +276,13 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "blocked_reason": "opportunity_verdict",
         "triggered_fade": "routing",
         "identity_rejection_reason": "identity",
+        "claim_polarities": "claim_semantics",
+        "cause_status": "claim_semantics",
+        "event_archetype": "incident_clustering",
+        "primary_subject": "subject_role",
+        "affected_ecosystem": "subject_role",
+        "market_reaction_confirmed": "market_context_propagation",
+        "causal_mechanism_confirmed": "causal_vs_market_confirmation",
     }
     for key, expected_value in expected.items():
         actual_value = actual.get(key)

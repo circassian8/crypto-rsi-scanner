@@ -61,6 +61,95 @@
       }
     },
     {
+      "case_id": "memecore_crash_no_exploit",
+      "title": "MemeCore crash with exploit ruled out",
+      "impact_category": "security_or_regulatory_shock",
+      "external_asset": "MemeCore",
+      "candidate_symbol": "M",
+      "candidate_coin_id": "memecore",
+      "raw_event": {
+        "raw_id": "sq_memecore_no_exploit",
+        "provider": "fixture_crypto_news",
+        "source_url": "https://example.test/memecore-crash",
+        "title": "MemeCore's M token crashes 80% with no exploit or announcement to explain it",
+        "body": "The source says there is no exploit or announcement to explain the crash, leaving the cause unknown.",
+        "source_confidence": 0.86
+      },
+      "market_snapshot": {"return_24h": -71, "volume_zscore_24h": 5.0, "volume_to_market_cap": 0.42},
+      "score_components": {"event_clarity": 70, "event_time_quality": 20},
+      "expected": {
+        "impact_path_type": "market_dislocation_unknown",
+        "candidate_role": "direct_subject",
+        "claim_polarities": "contains:negated",
+        "cause_status": "ruled_out",
+        "event_archetype": "market_dislocation_unknown",
+        "market_reaction_confirmed": true,
+        "causal_mechanism_confirmed": false,
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "digest_eligible": false,
+        "watchlist_eligible": false,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "secondfi_cardano_wallet_exploit",
+      "title": "SecondFi wallet exploit affects Cardano ecosystem",
+      "impact_category": "security_or_regulatory_shock",
+      "external_asset": "SecondFi",
+      "candidate_symbol": "ADA",
+      "candidate_coin_id": "cardano",
+      "raw_event": {
+        "raw_id": "sq_secondfi_cardano",
+        "provider": "fixture_crypto_news",
+        "source_url": "https://example.test/secondfi-cardano-wallet",
+        "title": "SecondFi loses $2.4m in Cardano wallet exploit",
+        "body": "A third-party SecondFi wallet exploit in the Cardano ecosystem affected ADA sentiment, but the Cardano protocol itself was not the exploited subject.",
+        "source_confidence": 0.84
+      },
+      "market_snapshot": {"return_24h": -9, "volume_zscore_24h": 2.6, "volume_to_market_cap": 0.14},
+      "score_components": {"event_clarity": 72, "event_time_quality": 65},
+      "expected": {
+        "impact_path_type": "exploit_security_event",
+        "candidate_role": "ecosystem_affected_asset",
+        "primary_subject": "SecondFi",
+        "affected_ecosystem": "Cardano",
+        "cause_status": "confirmed",
+        "opportunity_level": ["local_only", "exploratory", "validated_digest"],
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "alleged_exploit_local_only",
+      "title": "Rumored exploit stays local",
+      "impact_category": "security_or_regulatory_shock",
+      "external_asset": "ExampleProtocol",
+      "candidate_symbol": "EXM",
+      "candidate_coin_id": "example-protocol",
+      "raw_event": {
+        "raw_id": "sq_alleged_exploit",
+        "provider": "fixture_social_news",
+        "source_url": "https://example.test/rumored-exploit",
+        "title": "Rumored exploit hits ExampleProtocol token",
+        "body": "The rumored exploit mentions EXM ExampleProtocol token directly, but it is unconfirmed and the team has not confirmed the cause.",
+        "source_confidence": 0.55
+      },
+      "market_snapshot": {"return_24h": -18, "volume_zscore_24h": 2.0},
+      "score_components": {"event_clarity": 42, "event_time_quality": 20},
+      "expected": {
+        "impact_path_type": "exploit_security_event",
+        "candidate_role": "direct_subject",
+        "claim_polarities": "contains:rumored",
+        "cause_status": "suspected",
+        "causal_mechanism_confirmed": false,
+        "opportunity_level": ["local_only", "exploratory"],
+        "route_tier": "STORE_ONLY",
+        "digest_eligible": false,
+        "watchlist_eligible": false,
+        "triggered_fade": false
+      }
+    },
+    {
       "case_id": "zec_miner_nasdaq_listing",
       "title": "ZEC miner Nasdaq listing",
       "impact_category": "listing_liquidity_event",

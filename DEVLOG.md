@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Add Event Alpha claim semantics and incident intelligence · Codex
+**Why:** Event Alpha could validate broad co-occurrence too aggressively when a
+source implied an exploit, policy risk, or ecosystem incident without preserving
+claim polarity, cause status, canonical incident identity, or the candidate's
+actual role in the event. The radar needs to distinguish confirmed impact paths
+from negated/unknown causes and third-party ecosystem exposure before routing
+research artifacts.
+**Changes:**
+- Added pure claim-semantics extraction for asserted, alleged, negated,
+  disputed, denied, ruled-out, and unknown-cause event claims, plus cause-status
+  helpers used by impact validation and signal-quality evals.
+- Added canonical incident clustering and affected-asset role classification so
+  duplicate articles merge by incident subject/archetype/ecosystem/date and
+  candidates can be labeled as direct subjects, ecosystem-affected assets,
+  proxy instruments/venues, infrastructure providers, macro-affected assets, or
+  generic mentions.
+- Updated impact-path validation and impact hypotheses to propagate incident
+  ids, primary subjects, affected ecosystems, candidate role confidence,
+  claim history, source domains, market-context source/age/data-quality, market
+  reaction confirmation, and causal-mechanism confirmation into watchlist rows,
+  quality review, daily briefs, and research cards.
+- Versioned source-enrichment cache rows with a cleaner version and text/content
+  hashes so stale cleaned-source artifacts are refetched/recleaned instead of
+  silently reused.
+- Expanded signal-quality fixtures and unit coverage for ruled-out exploit
+  market dislocations, third-party ecosystem exploits, alleged/unconfirmed
+  exploits, incident dedupe, and market-context propagation.
+**Verify:** `python3 tests/test_indicators.py` passed (457/457). Plain
+`python3` lacks `aiohttp` for dependency-heavy Make targets on this machine, so
+the project venv was used for full verification:
+`make event-llm-eval PYTHON=.venv/bin/python`,
+`make event-llm-extract-eval PYTHON=.venv/bin/python`,
+`make event-alpha-eval PYTHON=.venv/bin/python`,
+`make event-alpha-signal-quality-eval PYTHON=.venv/bin/python`,
+`make event-alpha-quality-validation-cycle PYTHON=.venv/bin/python`, and
+`make verify PYTHON=.venv/bin/python` all passed.
+**Notes/risks:** Research-only metadata and artifact quality hardening. No
+normal RSI rows, paper/live trades, execution, route promotion, provider/LLM
+promotion, or LLM/provider-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-25 — Clean Event Alpha state-cap reasons and candidate funnel counts · Codex
 **Why:** The lifecycle cap was in place, but some legacy/local-only rows could
 still display positive-sounding block reasons such as `strong_market_confirmation`,

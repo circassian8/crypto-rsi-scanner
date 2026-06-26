@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-26 - Event Alpha claim semantics and incident roles are authoritative context
+**Status:** accepted
+**Decision:** Event Alpha impact validation must preserve event claim polarity,
+cause status, canonical incident identity, and candidate role before treating a
+source as an impact path. Confirmed causes, alleged/suspected causes,
+negated/ruled-out causes, disputed/denied claims, and unknown-cause market
+moves must remain distinguishable in artifacts and reports. A ruled-out or
+unknown-cause exploit narrative must not be promoted as a confirmed
+`exploit_security_event`; it should be stored as `market_dislocation_unknown`
+or local review evidence unless later source evidence confirms the cause.
+Third-party ecosystem incidents may classify a token as
+`ecosystem_affected_asset`, but that must not be collapsed into
+`direct_subject` unless the token/protocol itself is the incident subject.
+Market reaction confirmation is useful evidence, but it does not by itself
+prove causal mechanism confirmation.
+**Why:** Public event sources often blend rumor, denial, publisher/source noise,
+ecosystem exposure, and price movement. Without claim polarity and candidate
+role, the radar can make a local-only market move look like a validated token
+impact path.
+**Revisit when:** A reviewed Event Alpha dataset proves a narrower or broader
+role/claim policy has better precision for a specific playbook.
+
 ## 2026-06-25 - Event Alpha block reasons must name missing evidence
 **Status:** accepted
 **Decision:** Event Alpha `why_local_only`, `why_not_watchlist`,

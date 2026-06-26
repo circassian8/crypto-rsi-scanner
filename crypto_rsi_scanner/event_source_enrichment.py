@@ -13,10 +13,12 @@ from pathlib import Path
 from typing import Callable, Iterable
 from urllib.request import Request, urlopen
 
+from . import config
 from .event_models import RawDiscoveredEvent
 
 
 FetchFn = Callable[[str, float], str | bytes]
+SOURCE_ENRICHMENT_SCHEMA_VERSION = "event_source_enrichment_cache_v2"
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,7 @@ class EventSourceEnrichmentConfig:
     max_chars: int = 12000
     max_rows_per_run: int = 0
     min_source_confidence: float = 0.55
+    cleaner_version: str = config.EVENT_SOURCE_ENRICHMENT_CLEANER_VERSION
 
 
 @dataclass(frozen=True)
@@ -85,7 +88,7 @@ def enrich_source_text(
         try:
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
             text = str(cached.get("text") or "")
-            if text:
+            if text and _cache_entry_current(cached, raw_event, cleaner_version=cfg.cleaner_version):
                 return EventSourceEnrichmentResult(
                     raw_event=raw_event,
                     enriched_text=text[: max(1, int(cfg.max_chars or 1))],
@@ -100,7 +103,21 @@ def enrich_source_text(
         enriched = extracted or original
         if cache_path:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(json.dumps({"url": raw_event.source_url, "text": enriched}, sort_keys=True), encoding="utf-8")
+            cache_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": SOURCE_ENRICHMENT_SCHEMA_VERSION,
+                        "cleaner_version": cfg.cleaner_version,
+                        "fetched_at": raw_event.fetched_at.isoformat() if raw_event.fetched_at else None,
+                        "url": raw_event.source_url,
+                        "source_content_hash": _source_content_hash(raw_event),
+                        "cleaned_text_hash": hashlib.sha1(enriched.encode("utf-8")).hexdigest(),
+                        "text": enriched,
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
         return EventSourceEnrichmentResult(raw_event=raw_event, enriched_text=enriched, fetched=True)
     except Exception as exc:  # noqa: BLE001 - live source fetch must never crash a research cycle.
         return EventSourceEnrichmentResult(
@@ -114,6 +131,7 @@ def annotate_raw_event_with_enrichment(result: EventSourceEnrichmentResult) -> R
     """Return a raw event carrying enriched source text in raw_json metadata."""
     payload = dict(result.raw_event.raw_json or {})
     payload["source_enrichment"] = {
+        "schema_version": SOURCE_ENRICHMENT_SCHEMA_VERSION,
         "enriched_text": result.enriched_text,
         "used_cache": result.used_cache,
         "fetched": result.fetched,
@@ -152,6 +170,28 @@ def _cache_path(cache_dir: Path | None, url: str) -> Path | None:
         return None
     digest = hashlib.sha1(str(url or "").encode("utf-8")).hexdigest()
     return Path(cache_dir).expanduser() / f"{digest}.json"
+
+
+def _cache_entry_current(
+    cached: dict[str, object],
+    raw_event: RawDiscoveredEvent,
+    *,
+    cleaner_version: str,
+) -> bool:
+    if cached.get("schema_version") != SOURCE_ENRICHMENT_SCHEMA_VERSION:
+        return False
+    if str(cached.get("cleaner_version") or "") != str(cleaner_version or ""):
+        return False
+    if str(cached.get("source_content_hash") or "") != _source_content_hash(raw_event):
+        return False
+    if not cached.get("cleaned_text_hash"):
+        return False
+    return True
+
+
+def _source_content_hash(raw_event: RawDiscoveredEvent) -> str:
+    source = " ".join(str(part or "") for part in (raw_event.title, raw_event.body, raw_event.content_hash))
+    return hashlib.sha1(source.encode("utf-8")).hexdigest()
 
 
 class _TextHTMLParser(HTMLParser):

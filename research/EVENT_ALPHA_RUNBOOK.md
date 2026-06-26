@@ -108,6 +108,25 @@ carry the final signal-quality layer: `market_confirmation_score` /
 `why_local_only`, `why_not_watchlist`, and `manual_verification_items`. These
 fields are review/routing metadata only; they do not create trades, paper rows,
 normal RSI alerts, or `TRIGGERED_FADE`.
+Impact review now also includes claim and incident context. Check
+`cause_status`, `claim_polarities`, `claim_history`, `primary_subject`,
+`affected_ecosystem`, `candidate_role`, `role_confidence`, and
+`role_evidence` before treating an item as validated. A confirmed exploit, an
+alleged exploit, a denied/ruled-out exploit, and a no-clear-cause market
+dislocation are different research objects. Ruled-out or unknown-cause exploit
+language should appear as `market_dislocation_unknown` / local review evidence,
+not as a confirmed exploit path. Third-party incidents can affect ecosystem
+tokens as `ecosystem_affected_asset` without making the token the direct
+incident subject. Market fields also carry `market_context_source`,
+`market_context_timestamp`, `market_context_age_seconds`,
+`market_context_data_quality`, `market_reaction_confirmed`, and
+`causal_mechanism_confirmed`; market reaction is evidence to inspect, not proof
+that the source explains the causal path.
+Source-enrichment cache rows include the enrichment schema version, cleaner
+version, source-content hash, and cleaned-text hash. If the cleaner changes,
+old cached cleaned text is intentionally treated as stale and refetched or
+recleaned. Set `RSI_EVENT_SOURCE_ENRICHMENT_CLEANER_VERSION` only when
+deliberately testing a new cleaner contract.
 Candidate-only or identity-only evidence can improve review context but does
 not promote a token-level row. Candidate-discovery search hits can suggest new
 crypto candidates when the source payload or quote-validated extraction names an

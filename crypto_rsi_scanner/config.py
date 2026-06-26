@@ -413,6 +413,10 @@ EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN = int(os.getenv("RSI_EVENT_SOURCE_ENRIC
 EVENT_SOURCE_ENRICHMENT_MIN_SOURCE_CONFIDENCE = float(
     os.getenv("RSI_EVENT_SOURCE_ENRICHMENT_MIN_SOURCE_CONFIDENCE", "0.55")
 )
+EVENT_SOURCE_ENRICHMENT_CLEANER_VERSION = os.getenv(
+    "RSI_EVENT_SOURCE_ENRICHMENT_CLEANER_VERSION",
+    "source_enrichment_cleaner_v2",
+)
 
 # Event Alpha Radar research phases. Market enrichment, anomaly scanning,
 # watchlist state, local router decisions, and feedback artifacts are implemented

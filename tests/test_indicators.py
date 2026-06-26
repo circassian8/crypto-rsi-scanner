@@ -7967,6 +7967,18 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
         assert "Velvet Capital is named" in second.enriched_text
         assert "Hyperliquid HYPE token traders" in second.enriched_text
         assert calls["count"] == 1
+        refreshed = event_source_enrichment.enrich_source_text(
+            raw,
+            cfg=event_source_enrichment.EventSourceEnrichmentConfig(
+                enabled=True,
+                cache_dir=Path(tmp),
+                timeout_seconds=2,
+                cleaner_version="source_enrichment_cleaner_v999",
+            ),
+            fetch_fn=fetch,
+        )
+        assert refreshed.fetched is True
+        assert calls["count"] == 2
         annotated = event_source_enrichment.annotate_raw_event_with_enrichment(first)
         packet = event_llm_extractor.build_raw_event_packet(annotated)
         assert "Velvet Capital is named" in packet["body"]
@@ -21568,6 +21580,139 @@ def test_event_alpha_signal_quality_fixture_passes_and_reports_stage_failure():
     assert bad.failed_cases == 1
     assert "routing" in bad.case_results[0].stage_failures
     assert any("route_tier" in diff for diff in bad.case_results[0].diffs)
+
+
+def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_claim_semantics,
+        event_impact_hypotheses,
+        event_incident_graph,
+    )
+    from crypto_rsi_scanner.event_models import (
+        DiscoveredAsset,
+        DiscoveredEventFadeCandidate,
+        EventAssetLink,
+        EventClassification,
+        EventDiscoveryResult,
+        NormalizedEvent,
+        RawDiscoveredEvent,
+    )
+
+    now = datetime(2026, 6, 26, 12, 0, tzinfo=timezone.utc)
+
+    def raw(raw_id, title, body, *, url, market=None):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="fixture_news",
+            fetched_at=now,
+            published_at=now,
+            source_url=url,
+            title=title,
+            body=body,
+            raw_json={"market": market or {}},
+            source_confidence=0.88,
+            content_hash=raw_id,
+        )
+
+    claims = event_claim_semantics.claims_from_text(
+        "MemeCore's M token crashes 80% with no exploit or announcement to explain it. "
+        "The exploit was initially suspected, later ruled out."
+    )
+    assert any(claim.polarity == "negated" for claim in claims)
+    assert any(claim.polarity == "ruled_out" for claim in claims)
+    assert event_claim_semantics.current_cause_status(claims, "exploit") == "ruled_out"
+
+    memecore_raw = raw(
+        "memecore",
+        "MemeCore's M token crashes 80% with no exploit or announcement to explain it",
+        "No exploit or announcement explains the M token selloff; cause unknown.",
+        url="https://alpha.example/memecore",
+        market={"symbol": "M", "coin_id": "memecore", "return_24h": -71, "volume_zscore_24h": 5.0},
+    )
+    memecore_event = NormalizedEvent(
+        event_id="evt_memecore",
+        raw_ids=("memecore",),
+        event_name="MemeCore M token crash",
+        event_type="news",
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=now,
+        source="fixture_news",
+        source_urls=("https://alpha.example/memecore",),
+        external_asset="MemeCore",
+        description=memecore_raw.title,
+        confidence=0.86,
+    )
+    memecore_asset = DiscoveredAsset("memecore", "M", "MemeCore")
+    memecore_link = EventAssetLink("evt_memecore", "memecore", "M", "MemeCore", 0.95, "fixture", ("MemeCore M token",))
+    memecore_cls = EventClassification("evt_memecore", "memecore", False, True, "direct_token_event", 0.90, "fixture", "fixture", ("MemeCore M token",))
+    memecore_candidate = DiscoveredEventFadeCandidate(memecore_event, memecore_asset, memecore_link, memecore_cls, None, None, {})
+    memecore_hyp = event_impact_hypotheses.generate_impact_hypotheses(
+        EventDiscoveryResult((memecore_raw,), (memecore_event,), (memecore_link,), (memecore_cls,), (memecore_candidate,)),
+        taxonomy={},
+        now=now,
+    )[0]
+    assert memecore_hyp.impact_category == "market_anomaly_unknown"
+    assert memecore_hyp.event_archetype == "market_dislocation_unknown"
+    assert memecore_hyp.impact_path_type == "market_dislocation_unknown"
+    assert memecore_hyp.cause_status == "ruled_out"
+    assert memecore_hyp.market_context_source == "candidate_event_market_snapshot"
+    assert memecore_hyp.market_context_snapshot["return_24h"] == -71
+    assert memecore_hyp.market_reaction_confirmed is True
+    assert memecore_hyp.causal_mechanism_confirmed is False
+
+    secondfi_a = raw(
+        "secondfi_a",
+        "SecondFi loses $2.4m in Cardano wallet exploit",
+        "A third-party SecondFi wallet exploit in the Cardano ecosystem affected ADA sentiment.",
+        url="https://source-a.example/secondfi",
+        market={"symbol": "ADA", "coin_id": "cardano", "return_24h": -9, "volume_zscore_24h": 2.6},
+    )
+    secondfi_b = raw(
+        "secondfi_b",
+        "SecondFi traces Cardano wallet exploit to address-level issue",
+        "SecondFi says the Cardano wallet exploit was address-level and did not compromise the Cardano protocol.",
+        url="https://source-b.example/secondfi-update",
+        market={"symbol": "ADA", "coin_id": "cardano", "return_24h": -11, "volume_zscore_24h": 3.0},
+    )
+    unrelated = raw(
+        "cardano_vote",
+        "Cardano governance vote opens",
+        "ADA holders discuss a governance vote unrelated to the SecondFi exploit.",
+        url="https://source-c.example/cardano-vote",
+    )
+    events = (
+        NormalizedEvent("evt_secondfi_a", ("secondfi_a",), "SecondFi Cardano wallet exploit", "news", None, 0.0, now, "fixture_news", (secondfi_a.source_url,), "SecondFi", secondfi_a.title, 0.84),
+        NormalizedEvent("evt_secondfi_b", ("secondfi_b",), "SecondFi Cardano wallet exploit update", "news", None, 0.0, now, "fixture_news", (secondfi_b.source_url,), "SecondFi", secondfi_b.title, 0.84),
+        NormalizedEvent("evt_cardano_vote", ("cardano_vote",), "Cardano governance vote", "governance", None, 0.0, now, "fixture_news", (unrelated.source_url,), "Cardano", unrelated.title, 0.70),
+    )
+    raw_by_id = {row.raw_id: row for row in (secondfi_a, secondfi_b, unrelated)}
+    incidents = event_incident_graph.build_incidents(events, raw_by_id)
+    secondfi_incidents = [item for item in incidents if item.primary_subject == "SecondFi"]
+    assert len(secondfi_incidents) == 1
+    assert set(secondfi_incidents[0].raw_ids) == {"secondfi_a", "secondfi_b"}
+    assert len(secondfi_incidents[0].independent_source_domains) == 2
+    assert len(incidents) == 2
+
+    ada = DiscoveredAsset("cardano", "ADA", "Cardano")
+    links = tuple(EventAssetLink(event.event_id, "cardano", "ADA", "Cardano", 0.90, "fixture", ("ADA",)) for event in events[:2])
+    classes = tuple(EventClassification(event.event_id, "cardano", False, False, "ecosystem_event", 0.85, "fixture", "fixture", ("ADA",)) for event in events[:2])
+    candidates = tuple(DiscoveredEventFadeCandidate(event, ada, link, cls, None, None, {}) for event, link, cls in zip(events[:2], links, classes))
+    hypotheses = event_impact_hypotheses.generate_impact_hypotheses(
+        EventDiscoveryResult((secondfi_a, secondfi_b), events[:2], links, classes, candidates),
+        taxonomy={},
+        now=now,
+    )
+    assert len(hypotheses) == 1
+    hyp = hypotheses[0]
+    assert hyp.primary_subject == "SecondFi"
+    assert hyp.affected_ecosystem == "Cardano"
+    assert hyp.candidate_role == "ecosystem_affected_asset"
+    assert hyp.impact_path_reason == "ecosystem_security_event"
+    assert set(hyp.source_raw_ids) == {"secondfi_a", "secondfi_b"}
+    assert "incident_evidence_update" in hyp.warnings
+    assert len(hyp.independent_source_domains) == 2
 
 
 def test_event_opportunity_upgrade_path_and_audit_sections():

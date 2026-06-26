@@ -18,9 +18,11 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import (
+    event_claim_semantics,
     event_evidence_quality,
     event_graph,
     event_identity,
+    event_incident_graph,
     event_impact_path_validator,
     event_market_confirmation,
     event_opportunity_verdict,
@@ -80,6 +82,9 @@ class ImpactPathReason(str, Enum):
     UNLOCK_SUPPLY_EVENT = "unlock_supply_event"
     LISTING_LIQUIDITY_EVENT = "listing_liquidity_event"
     EXPLOIT_SECURITY_EVENT = "exploit_security_event"
+    ECOSYSTEM_SECURITY_EVENT = "ecosystem_security_event"
+    CAUSE_UNKNOWN_MARKET_DISLOCATION = "cause_unknown_market_dislocation"
+    ALLEGED_EXPLOIT_UNCONFIRMED = "alleged_exploit_unconfirmed"
     WEAK_COOCCURRENCE_ONLY = "weak_cooccurrence_only"
     GENERIC_POLICY_ONLY = "generic_policy_only"
     NO_VALUE_CAPTURE_EXPLAINED = "no_value_capture_explained"
@@ -143,6 +148,26 @@ class EventImpactHypothesis:
     market_confirmation_warnings: tuple[str, ...] = ()
     market_confirmation_missing_fields: tuple[str, ...] = ()
     market_confirmation_summary: str | None = None
+    market_context_source: str | None = None
+    market_context_timestamp: str | None = None
+    market_context_age_seconds: float | None = None
+    market_context_data_quality: str | None = None
+    market_context_snapshot: Mapping[str, Any] = field(default_factory=dict)
+    market_reaction_confirmed: bool | None = None
+    causal_mechanism_confirmed: bool | None = None
+    incident_id: str | None = None
+    canonical_incident_name: str | None = None
+    event_archetype: str | None = None
+    primary_subject: str | None = None
+    affected_entity: str | None = None
+    affected_ecosystem: str | None = None
+    role_confidence: float | None = None
+    role_evidence: tuple[str, ...] = ()
+    cause_status: str | None = None
+    claim_polarities: tuple[str, ...] = ()
+    claim_history: tuple[dict[str, Any], ...] = ()
+    independent_source_domains: tuple[str, ...] = ()
+    conflicting_claims: tuple[str, ...] = ()
     opportunity_score_final: float | None = None
     opportunity_level: str | None = None
     opportunity_verdict_reasons: tuple[str, ...] = ()
@@ -344,6 +369,12 @@ def generate_impact_hypotheses(
     """Generate deterministic research-only impact hypotheses."""
     observed = _as_utc(now or datetime.now(timezone.utc))
     raw_by_id = {raw.raw_id: raw for raw in (*result.raw_events, *tuple(raw_events))}
+    incidents = event_incident_graph.build_incidents(result.normalized_events, raw_by_id)
+    incidents_by_event = {
+        event_id: incident
+        for incident in incidents
+        for event_id in incident.event_ids
+    }
     clusters_by_event = {
         event_id: cluster
         for cluster in (tuple(clusters) or event_graph.build_event_clusters(result))
@@ -362,7 +393,8 @@ def generate_impact_hypotheses(
     for event in result.normalized_events:
         raws = tuple(raw_by_id[raw_id] for raw_id in event.raw_ids if raw_id in raw_by_id)
         text = _event_text(event, raws, extractions_by_raw)
-        matches = _matched_rules(text, event)
+        incident = incidents_by_event.get(event.event_id)
+        matches = _matched_rules(text, event, raws=raws)
         if not matches and _is_market_anomaly(raws):
             matches = (_market_anomaly_rule(),)
         for rule in matches:
@@ -371,6 +403,7 @@ def generate_impact_hypotheses(
                 raws,
                 rule,
                 cluster=clusters_by_event.get(event.event_id),
+                incident=incident,
                 taxonomy=sector_taxonomy,
                 text=text,
                 now=observed,
@@ -1131,6 +1164,7 @@ def _hypothesis_from_rule(
     rule: Mapping[str, Any],
     *,
     cluster: event_graph.EventCluster | None,
+    incident: event_incident_graph.CanonicalIncident | None = None,
     taxonomy: Mapping[str, Mapping[str, Any]],
     text: str,
     now: datetime,
@@ -1163,6 +1197,13 @@ def _hypothesis_from_rule(
         validated_assets=validated_assets,
         suggested_assets=accepted_suggested,
     )
+    claim_rows = event_claim_semantics.extract_event_claims(raws)
+    incident = incident or _incident_for_single_event(event, raws)
+    if incident is not None:
+        score_components.update(_incident_score_components(incident))
+        category_value = _category_from_incident(category_value, incident)
+        if category_value == ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:
+            rule = {**dict(rule), "category": ImpactCategory.MARKET_ANOMALY_UNKNOWN, "playbook": "market_anomaly_unknown", "direction": "unknown"}
     hypothesis_score = _weighted_hypothesis_score(score_components, category_value)
     confidence = max(0.0, min(1.0, round(hypothesis_score / 100.0, 4)))
     quotes = _evidence_quotes(text, (*rule.get("keywords", ()), *rule.get("secondary", ())))
@@ -1176,8 +1217,8 @@ def _hypothesis_from_rule(
         status = HypothesisStatus.VALIDATED.value
     candidate_source = _candidate_source(taxonomy_symbols, accepted_suggested, validated_assets)
     hypothesis = EventImpactHypothesis(
-        hypothesis_id=_hypothesis_id(event, category_value, sectors, symbols),
-        event_cluster_id=cluster.cluster_id if cluster else event_graph.cluster_id_for_event(event),
+        hypothesis_id=_hypothesis_id(event, category_value, sectors, symbols, incident_id=incident.incident_id if incident else None),
+        event_cluster_id=incident.incident_id if incident else (cluster.cluster_id if cluster else event_graph.cluster_id_for_event(event)),
         event_type=str(event.event_type or "unknown"),
         external_asset=event.external_asset,
         impact_category=category_value,
@@ -1206,6 +1247,17 @@ def _hypothesis_from_rule(
         validation_reasons=(
             ("resolver_validated_candidate_asset",) if validated_assets else ()
         ),
+        incident_id=incident.incident_id if incident else None,
+        canonical_incident_name=incident.canonical_name if incident else None,
+        event_archetype=incident.event_archetype if incident else None,
+        primary_subject=incident.primary_subject if incident else None,
+        affected_entity=incident.primary_subject if incident else None,
+        affected_ecosystem=incident.affected_ecosystem if incident else None,
+        cause_status=incident.current_cause_status if incident else event_claim_semantics.current_cause_status(claim_rows, "exploit"),
+        claim_polarities=tuple(dict.fromkeys(claim.polarity for claim in claim_rows)),
+        claim_history=tuple(_claim_to_row(claim) for claim in claim_rows[:12]),
+        independent_source_domains=incident.independent_source_domains if incident else (),
+        conflicting_claims=incident.conflicting_claims if incident else (),
         created_at=now.isoformat(),
     )
     if validated_assets and raws:
@@ -1252,13 +1304,31 @@ def _hypothesis_from_rule(
     return _with_promotion_diagnostics(hypothesis)
 
 
-def _matched_rules(text: str, event: NormalizedEvent) -> tuple[Mapping[str, Any], ...]:
+def _matched_rules(
+    text: str,
+    event: NormalizedEvent,
+    *,
+    raws: tuple[RawDiscoveredEvent, ...] = (),
+) -> tuple[Mapping[str, Any], ...]:
     event_type = clean_text(event.event_type or "")
     matches: list[Mapping[str, Any]] = []
+    claims = event_claim_semantics.extract_event_claims(raws) if raws else event_claim_semantics.claims_from_text(text)
+    security_ruled_out = event_claim_semantics.has_ruled_out_claim(claims, "exploit")
+    security_confirmed = event_claim_semantics.has_confirmed_claim(claims, "exploit")
+    unknown_cause = event_claim_semantics.text_has_unknown_cause(text)
     for rule in _CATEGORY_RULES:
         category = rule["category"]
+        if (
+            category == ImpactCategory.SECURITY_OR_REGULATORY_SHOCK
+            and (security_ruled_out or unknown_cause)
+            and not security_confirmed
+        ):
+            continue
         if _rule_matches(rule, text, event_type, category):
             matches.append(rule)
+    if (security_ruled_out or unknown_cause) and not security_confirmed and _market_dislocation_text(text):
+        matches = [rule for rule in matches if rule.get("category") != ImpactCategory.SECURITY_OR_REGULATORY_SHOCK]
+        matches.append(_market_anomaly_rule())
     return tuple(matches)
 
 
@@ -1342,6 +1412,69 @@ def _market_anomaly_rule() -> Mapping[str, Any]:
         "sectors": (),
         "direction": "unknown",
         "playbook": "market_anomaly_unknown",
+    }
+
+
+def _market_dislocation_text(text: str) -> bool:
+    cleaned = clean_text(text)
+    return any(
+        term in cleaned
+        for term in (
+            "crash",
+            "crashes",
+            "plunge",
+            "plunges",
+            "dumps",
+            "selloff",
+            "market anomaly",
+            "no clear trigger",
+            "cause unknown",
+            "no exploit or announcement",
+        )
+    )
+
+
+def _incident_for_single_event(
+    event: NormalizedEvent,
+    raws: tuple[RawDiscoveredEvent, ...],
+) -> event_incident_graph.CanonicalIncident | None:
+    incidents = event_incident_graph.build_incidents((event,), {raw.raw_id: raw for raw in raws})
+    return incidents[0] if incidents else None
+
+
+def _category_from_incident(category: str, incident: event_incident_graph.CanonicalIncident) -> str:
+    if incident.event_archetype == "market_dislocation_unknown":
+        return ImpactCategory.MARKET_ANOMALY_UNKNOWN.value
+    return category
+
+
+def _incident_score_components(incident: event_incident_graph.CanonicalIncident) -> dict[str, float]:
+    components: dict[str, float] = {
+        "incident_confidence": min(100.0, 35.0 + len(incident.raw_ids) * 12.0 + len(incident.independent_source_domains) * 18.0),
+        "independent_source_count": float(len(incident.independent_source_domains)),
+    }
+    if incident.current_cause_status == event_claim_semantics.CauseStatus.CONFIRMED.value:
+        components["causal_mechanism_confirmed"] = 85.0
+    elif incident.current_cause_status == event_claim_semantics.CauseStatus.SUSPECTED.value:
+        components["causal_mechanism_confirmed"] = 35.0
+    elif incident.current_cause_status == event_claim_semantics.CauseStatus.RULED_OUT.value:
+        components["causal_mechanism_confirmed"] = 0.0
+    return components
+
+
+def _claim_to_row(claim: event_claim_semantics.EventClaim) -> dict[str, Any]:
+    return {
+        "claim_type": claim.claim_type,
+        "subject": claim.subject,
+        "predicate": claim.predicate,
+        "object": claim.object,
+        "polarity": claim.polarity,
+        "cause_status": claim.cause_status,
+        "confidence": claim.confidence,
+        "evidence_quote": claim.evidence_quote,
+        "source_raw_id": claim.source_raw_id,
+        "source_url": claim.source_url,
+        "published_at": claim.published_at.isoformat() if hasattr(claim.published_at, "isoformat") else claim.published_at,
     }
 
 
@@ -2097,6 +2230,13 @@ def _impact_validation_replace_kwargs(
         "why_digest_ineligible": validation.why_digest_ineligible,
         "opportunity_score_v2": validation.opportunity_score_v2,
         "opportunity_score_components": dict(validation.opportunity_score_components or {}),
+        "primary_subject": validation.primary_subject,
+        "affected_entity": validation.affected_entity,
+        "affected_ecosystem": validation.affected_ecosystem,
+        "role_confidence": validation.role_confidence,
+        "role_evidence": validation.role_evidence,
+        "cause_status": validation.cause_status,
+        "claim_polarities": validation.claim_polarities,
     }
 
 
@@ -2108,10 +2248,19 @@ def _quality_verdict_replace_kwargs(
     components: Mapping[str, float],
 ) -> dict[str, Any]:
     raw, symbol, coin_id = impact_context if impact_context is not None else (None, None, None)
+    market_context = resolve_hypothesis_market_context(
+        hypothesis,
+        discovery_result=None,
+        current_cycle_market_rows=(),
+        active_watchlist_rows=(),
+        targeted_provider=None,
+        raw_event=raw,
+        validated_coin_id=coin_id,
+    )
     payload = raw.raw_json if raw is not None and isinstance(raw.raw_json, Mapping) else {}
     market_result = event_market_confirmation.evaluate_market_confirmation(
         event_market_confirmation.EventMarketConfirmationInput(
-            market_snapshot=_payload_mapping(payload, "market", "market_snapshot"),
+            market_snapshot=market_context.get("market_snapshot") or _payload_mapping(payload, "market", "market_snapshot"),
             market_anomaly_row=_payload_mapping(payload, "anomaly", "market_anomaly"),
             derivatives_snapshot=_payload_mapping(payload, "derivatives", "derivatives_snapshot"),
             supply_snapshot=_payload_mapping(payload, "supply", "supply_snapshot"),
@@ -2184,6 +2333,13 @@ def _quality_verdict_replace_kwargs(
         "market_confirmation_warnings": market_result.warnings,
         "market_confirmation_missing_fields": market_result.missing_fields,
         "market_confirmation_summary": market_result.confirmation_summary,
+        "market_context_source": market_context.get("source"),
+        "market_context_timestamp": market_context.get("timestamp"),
+        "market_context_age_seconds": market_context.get("age_seconds"),
+        "market_context_data_quality": market_context.get("data_quality"),
+        "market_context_snapshot": dict(market_context.get("market_snapshot") or {}),
+        "market_reaction_confirmed": market_result.level in {"weak", "moderate", "strong"},
+        "causal_mechanism_confirmed": _causal_mechanism_confirmed(validation, hypothesis),
         "opportunity_score_final": verdict.opportunity_score_final,
         "opportunity_level": verdict.opportunity_level,
         "opportunity_verdict_reasons": verdict.verdict_reason_codes,
@@ -2196,6 +2352,161 @@ def _quality_verdict_replace_kwargs(
     }
 
 
+def resolve_hypothesis_market_context(
+    hypothesis: object,
+    discovery_result: object | None = None,
+    current_cycle_market_rows: Iterable[Mapping[str, Any]] = (),
+    active_watchlist_rows: Iterable[Mapping[str, Any] | object] = (),
+    targeted_provider: object | None = None,
+    *,
+    raw_event: RawDiscoveredEvent | None = None,
+    validated_coin_id: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Resolve market context for a hypothesis using a deterministic fallback order."""
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    coin_id = clean_text(
+        validated_coin_id
+        or _first_asset_value(getattr(hypothesis, "validated_candidate_assets", ()) or (), "coin_id")
+        or (getattr(hypothesis, "candidate_coin_ids", ()) or ("",))[0]
+    )
+    symbol = clean_text(
+        _first_asset_value(getattr(hypothesis, "validated_candidate_assets", ()) or (), "symbol")
+        or (getattr(hypothesis, "candidate_symbols", ()) or ("",))[0]
+    )
+    if raw_event is not None:
+        snapshot = _market_snapshot_from_raw(raw_event)
+        if snapshot:
+            return _market_context_row(snapshot, source="candidate_event_market_snapshot", now=observed)
+    for raw in getattr(discovery_result, "raw_events", ()) or ():
+        if not isinstance(raw, RawDiscoveredEvent):
+            continue
+        if _raw_matches_asset(raw, coin_id=coin_id, symbol=symbol):
+            snapshot = _market_snapshot_from_raw(raw)
+            if snapshot:
+                return _market_context_row(snapshot, source="discovery_candidate_market_snapshot", now=observed)
+    for row in current_cycle_market_rows:
+        if _row_matches_asset(row, coin_id=coin_id, symbol=symbol):
+            return _market_context_row(dict(row), source="current_cycle_market_row", now=observed)
+    for row in active_watchlist_rows:
+        data = row if isinstance(row, Mapping) else getattr(row, "__dict__", {}) or {}
+        if not _row_matches_asset(data, coin_id=coin_id, symbol=symbol):
+            continue
+        snapshot = data.get("latest_market_snapshot") if isinstance(data.get("latest_market_snapshot"), Mapping) else {}
+        if snapshot:
+            return _market_context_row(dict(snapshot), source="active_watchlist_market_snapshot", now=observed)
+    if targeted_provider is not None and coin_id:
+        try:
+            rows = targeted_provider.fetch_market_rows((coin_id,))  # type: ignore[attr-defined]
+        except Exception:
+            rows = ()
+        for row in rows or ():
+            if isinstance(row, Mapping) and _row_matches_asset(row, coin_id=coin_id, symbol=symbol):
+                return _market_context_row(dict(row), source="targeted_market_lookup", now=observed)
+    return {
+        "market_snapshot": {},
+        "source": "missing",
+        "timestamp": None,
+        "age_seconds": None,
+        "data_quality": "missing",
+        "missing_fields": ("market_snapshot", "current_cycle_market_row", "targeted_market_lookup"),
+    }
+
+
+def _market_snapshot_from_raw(raw: RawDiscoveredEvent) -> dict[str, Any]:
+    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    market = payload.get("market") if isinstance(payload.get("market"), Mapping) else {}
+    anomaly = payload.get("anomaly") if isinstance(payload.get("anomaly"), Mapping) else {}
+    snapshot = dict(market)
+    for key, value in anomaly.items():
+        snapshot.setdefault(key, value)
+    return {key: value for key, value in snapshot.items() if value not in (None, "", [], {})}
+
+
+def _market_context_row(snapshot: Mapping[str, Any], *, source: str, now: datetime) -> dict[str, Any]:
+    timestamp = (
+        snapshot.get("timestamp")
+        or snapshot.get("market_timestamp")
+        or snapshot.get("observed_at")
+        or snapshot.get("fetched_at")
+    )
+    age = _age_seconds(timestamp, now)
+    quality = "fresh" if age is None or age <= 6 * 3600 else "stale"
+    return {
+        "market_snapshot": dict(snapshot),
+        "source": source,
+        "timestamp": str(timestamp) if timestamp not in (None, "") else None,
+        "age_seconds": age,
+        "data_quality": quality,
+        "missing_fields": tuple(_market_missing_fields(snapshot)),
+    }
+
+
+def _market_missing_fields(snapshot: Mapping[str, Any]) -> tuple[str, ...]:
+    missing: list[str] = []
+    if not any(key in snapshot for key in ("return_24h", "price_change_24h", "price_change_percentage_24h")):
+        missing.append("return_24h")
+    if not any(key in snapshot for key in ("volume_zscore_24h", "volume_zscore")):
+        missing.append("volume_zscore_24h")
+    if not any(key in snapshot for key in ("volume_to_market_cap", "volume_mcap", "volume_mcap_ratio")):
+        missing.append("volume_to_market_cap")
+    return tuple(missing)
+
+
+def _age_seconds(timestamp: Any, now: datetime) -> float | None:
+    if timestamp in (None, ""):
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    parsed = _as_utc(parsed)
+    return max(0.0, (now - parsed).total_seconds())
+
+
+def _raw_matches_asset(raw: RawDiscoveredEvent, *, coin_id: str, symbol: str) -> bool:
+    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+    market = payload.get("market") if isinstance(payload.get("market"), Mapping) else {}
+    return _row_matches_asset(market, coin_id=coin_id, symbol=symbol)
+
+
+def _row_matches_asset(row: Mapping[str, Any], *, coin_id: str, symbol: str) -> bool:
+    values = {
+        clean_text(row.get("coin_id") or row.get("id") or ""),
+        clean_text(row.get("symbol") or ""),
+        clean_text(row.get("asset_symbol") or ""),
+    }
+    return bool((coin_id and coin_id in values) or (symbol and symbol in values))
+
+
+def _first_asset_value(rows: Iterable[Mapping[str, Any]], key: str) -> str | None:
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value
+    return None
+
+
+def _causal_mechanism_confirmed(
+    validation: event_impact_path_validator.ImpactPathValidation,
+    hypothesis: EventImpactHypothesis,
+) -> bool:
+    if validation.impact_path_type == event_impact_path_validator.ImpactPathType.MARKET_DISLOCATION_UNKNOWN.value:
+        return False
+    if validation.cause_status == event_claim_semantics.CauseStatus.RULED_OUT.value:
+        return False
+    if validation.cause_status == event_claim_semantics.CauseStatus.CONFIRMED.value:
+        return True
+    return validation.impact_path_strength in {"strong", "medium"} and validation.impact_path_reason not in {
+        "cause_unknown_market_dislocation",
+        "alleged_exploit_unconfirmed",
+        "weak_cooccurrence_only",
+        "generic_policy_only",
+    }
+
+
 def _quality_score_components(values: Mapping[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     mapping = {
@@ -2204,6 +2515,12 @@ def _quality_score_components(values: Mapping[str, Any]) -> dict[str, Any]:
         "evidence_specificity": "evidence_specificity",
         "market_confirmation_score": "market_confirmation_score",
         "market_confirmation_level": "market_confirmation_level",
+        "market_context_source": "market_context_source",
+        "market_context_timestamp": "market_context_timestamp",
+        "market_context_age_seconds": "market_context_age_seconds",
+        "market_context_data_quality": "market_context_data_quality",
+        "market_reaction_confirmed": "market_reaction_confirmed",
+        "causal_mechanism_confirmed": "causal_mechanism_confirmed",
         "opportunity_score_final": "opportunity_score_final",
         "opportunity_level": "opportunity_level",
         "why_local_only": "why_local_only",
@@ -2229,6 +2546,8 @@ def _quality_score_components(values: Mapping[str, Any]) -> dict[str, Any]:
         "opportunity_verdict_reasons",
         "missing_requirements",
         "manual_verification_items",
+        "role_evidence",
+        "claim_polarities",
     ):
         value = values.get(key)
         if value:
@@ -2653,9 +2972,36 @@ def _dedupe_hypotheses(items: Iterable[EventImpactHypothesis]) -> list[EventImpa
     by_key: dict[str, EventImpactHypothesis] = {}
     for item in items:
         current = by_key.get(item.hypothesis_id)
-        if current is None or item.confidence > current.confidence:
+        if current is None:
             by_key[item.hypothesis_id] = item
+            continue
+        merged = _merge_duplicate_hypotheses(current, item)
+        by_key[item.hypothesis_id] = merged
     return sorted(by_key.values(), key=lambda item: (item.status != HypothesisStatus.VALIDATED.value, -item.confidence, item.hypothesis_id))
+
+
+def _merge_duplicate_hypotheses(
+    current: EventImpactHypothesis,
+    item: EventImpactHypothesis,
+) -> EventImpactHypothesis:
+    winner = item if item.confidence > current.confidence else current
+    other = current if winner is item else item
+    components = dict(other.score_components or {})
+    components.update(dict(winner.score_components or {}))
+    components["incident_source_update_count"] = float(len(set((*current.source_raw_ids, *item.source_raw_ids))))
+    return replace(
+        winner,
+        source_raw_ids=tuple(dict.fromkeys((*current.source_raw_ids, *item.source_raw_ids))),
+        source_event_ids=tuple(dict.fromkeys((*current.source_event_ids, *item.source_event_ids))),
+        evidence_quotes=tuple(dict.fromkeys((*current.evidence_quotes, *item.evidence_quotes))),
+        validation_reasons=tuple(dict.fromkeys((*current.validation_reasons, *item.validation_reasons))),
+        rejection_reasons=tuple(dict.fromkeys((*current.rejection_reasons, *item.rejection_reasons))),
+        warnings=tuple(dict.fromkeys((*current.warnings, *item.warnings, "incident_evidence_update"))),
+        claim_history=tuple({json.dumps(row, sort_keys=True): row for row in (*current.claim_history, *item.claim_history)}.values()),
+        independent_source_domains=tuple(dict.fromkeys((*current.independent_source_domains, *item.independent_source_domains))),
+        conflicting_claims=tuple(dict.fromkeys((*current.conflicting_claims, *item.conflicting_claims))),
+        score_components=components,
+    )
 
 
 def _hypothesis_id(
@@ -2663,9 +3009,11 @@ def _hypothesis_id(
     category: str,
     sectors: tuple[str, ...],
     symbols: tuple[str, ...],
+    *,
+    incident_id: str | None = None,
 ) -> str:
     source = "|".join((
-        event_graph.cluster_id_for_event(event),
+        incident_id or event_graph.cluster_id_for_event(event),
         category,
         ",".join(sectors),
         ",".join(symbols[:8]),

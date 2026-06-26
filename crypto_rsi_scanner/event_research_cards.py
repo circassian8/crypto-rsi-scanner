@@ -638,6 +638,19 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     impact_path_reason = components.get("impact_path_reason") or "unknown"
     impact_path_type = components.get("impact_path_type") or "unknown"
     candidate_role = components.get("candidate_role") or "unknown"
+    incident_id = components.get("incident_id") or "unknown"
+    canonical_incident_name = components.get("canonical_incident_name") or "unknown"
+    event_archetype = components.get("event_archetype") or "unknown"
+    primary_subject = components.get("primary_subject") or "unknown"
+    affected_ecosystem = components.get("affected_ecosystem") or "unknown"
+    cause_status = components.get("cause_status") or "unknown"
+    claim_polarities = components.get("claim_polarities") or []
+    role_confidence = components.get("role_confidence")
+    role_evidence = components.get("role_evidence") or []
+    market_context_source = components.get("market_context_source") or "unknown"
+    market_context_quality = components.get("market_context_data_quality") or "unknown"
+    market_reaction_confirmed = components.get("market_reaction_confirmed")
+    causal_mechanism_confirmed = components.get("causal_mechanism_confirmed")
     impact_path_strength = components.get("impact_path_strength") or "unknown"
     opportunity_score_v2 = components.get("opportunity_score_v2")
     evidence_specificity = components.get("evidence_specificity_score")
@@ -666,6 +679,12 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
     lines = [
         f"- Validated asset: {validated_symbol or 'unknown'}/{validated_coin_id or 'unknown'}",
+        f"- Incident: {canonical_incident_name} ({incident_id})",
+        f"- Event archetype: {event_archetype}",
+        f"- Primary subject: {primary_subject}",
+        f"- Affected ecosystem: {affected_ecosystem}",
+        f"- Cause status: {cause_status}",
+        f"- Claim polarity: {', '.join(str(item) for item in claim_polarities[:6]) if claim_polarities else 'unknown'}",
         f"- Original sector hypothesis: {', '.join(str(item) for item in (components.get('candidate_sectors') or [])[:6]) or components.get('hypothesis_scope') or 'unknown'}",
         f"- Candidate source: {entry.latest_source or 'impact_hypothesis'}",
         f"- Candidate Discovery Origin: {components.get('candidate_source') or components.get('source') or entry.latest_source or 'impact_hypothesis'}",
@@ -673,6 +692,8 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Playbook: {entry.latest_playbook_type or 'impact_hypothesis'}",
         f"- Impact path type: {impact_path_type}",
         f"- Candidate role: {candidate_role}",
+        f"- Candidate role confidence: {role_confidence if role_confidence is not None else 'n/a'}",
+        f"- Candidate role evidence: {'; '.join(str(item) for item in role_evidence[:4]) if role_evidence else 'none'}",
         f"- Impact path strength: {impact_path_strength}",
         f"- Impact path reason: {impact_path_reason}",
         f"- Opportunity score v2: {opportunity_score_v2 if opportunity_score_v2 is not None else 'n/a'}",
@@ -680,6 +701,9 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Source/evidence specificity: {evidence_specificity if evidence_specificity is not None else 'n/a'}",
         f"- Evidence quality: {source_class}/{evidence_specificity_class} / {evidence_quality_score if evidence_quality_score is not None else 'n/a'}",
         f"- Market confirmation: {market_confirmation_level} / {market_confirmation_score if market_confirmation_score is not None else 'n/a'}",
+        f"- Market context source: {market_context_source} ({market_context_quality})",
+        f"- Market reaction confirmed: {str(bool(market_reaction_confirmed)).lower() if market_reaction_confirmed is not None else 'unknown'}",
+        f"- Causal mechanism confirmed: {str(bool(causal_mechanism_confirmed)).lower() if causal_mechanism_confirmed is not None else 'unknown'}",
         f"- Market summary: {market_confirmation_summary}",
         f"- Impact path digest eligible: {str(bool(digest_eligible)).lower() if digest_eligible is not None else 'unknown'}",
         f"- Missing evidence / gate failure: {why_digest_ineligible}",
