@@ -147,6 +147,25 @@ creating duplicate watchlist rows, and that ruled-out/unknown causes stayed
 local-only. For market anomalies, verify that canonical names are asset-specific
 (`SOL market anomaly`, `USDT market anomaly`) and that the report separates
 `reaction_observed` from causal confirmation.
+
+Incident id is now the preferred spine for impact-hypothesis state. Fresh
+hypothesis rows, hypothesis-derived watchlist rows, route alert snapshots, and
+run-ledger/doctor reports should carry top-level incident aliases such as
+`incident_canonical_name`, `incident_primary_subject`,
+`incident_affected_ecosystem`, `incident_cause_status`,
+`incident_market_reaction_observed`, and
+`incident_causal_mechanism_confirmed`. Hypothesis watchlist keys use
+`incident_id + validated asset/sector identity + candidate_role +
+impact_path_type` when an incident exists, so a new independent source updates
+the same canonical watchlist row instead of creating a duplicate. Artifact
+doctor strict mode blocks fresh hypothesis/watchlist/alert rows that are
+missing incident ids unless they are explicitly no-incident evidence.
+Incident-specific material update reasons include `incident_new_independent_source`,
+`incident_cause_status_changed`, `incident_claim_confirmed`,
+`incident_claim_ruled_out`, `incident_conflicting_claim_added`,
+`incident_market_reaction_confirmed`, `incident_causal_mechanism_confirmed`,
+and `incident_asset_role_changed`.
+
 Source-enrichment cache rows include the enrichment schema version, cleaner
 version, source-content hash, and cleaned-text hash. If the cleaner changes,
 old cached cleaned text is intentionally treated as stale and refetched or

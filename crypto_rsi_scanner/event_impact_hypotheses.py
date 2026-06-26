@@ -157,6 +157,13 @@ class EventImpactHypothesis:
     causal_mechanism_confirmed: bool | None = None
     incident_confidence: float | None = None
     incident_id: str | None = None
+    incident_canonical_name: str | None = None
+    incident_event_archetype: str | None = None
+    incident_primary_subject: str | None = None
+    incident_affected_ecosystem: str | None = None
+    incident_cause_status: str | None = None
+    incident_market_reaction_observed: bool | None = None
+    incident_causal_mechanism_confirmed: bool | None = None
     canonical_incident_name: str | None = None
     event_archetype: str | None = None
     primary_subject: str | None = None
@@ -1250,6 +1257,17 @@ def _hypothesis_from_rule(
         ),
         incident_confidence=_optional_score(score_components.get("incident_confidence")) if incident else None,
         incident_id=incident.incident_id if incident else None,
+        incident_canonical_name=incident.canonical_name if incident else None,
+        incident_event_archetype=incident.event_archetype if incident else None,
+        incident_primary_subject=incident.primary_subject if incident else None,
+        incident_affected_ecosystem=incident.affected_ecosystem if incident else None,
+        incident_cause_status=incident.current_cause_status if incident else None,
+        incident_market_reaction_observed=_incident_market_reaction_observed(incident, raws) if incident else None,
+        incident_causal_mechanism_confirmed=(
+            incident.current_cause_status == event_claim_semantics.CauseStatus.CONFIRMED.value
+            if incident
+            else None
+        ),
         canonical_incident_name=incident.canonical_name if incident else None,
         event_archetype=incident.event_archetype if incident else None,
         primary_subject=incident.primary_subject if incident else None,
@@ -1296,6 +1314,7 @@ def _hypothesis_from_rule(
             **_impact_validation_replace_kwargs(validation),
             **quality_kwargs,
         )
+        hypothesis = _with_incident_aliases(hypothesis)
     query_details = _default_search_query_details(hypothesis)
     hypothesis = replace(
         hypothesis,
@@ -1303,7 +1322,7 @@ def _hypothesis_from_rule(
         search_query_details=query_details,
         generated_queries=query_details,
     )
-    return _with_promotion_diagnostics(hypothesis)
+    return _with_promotion_diagnostics(_with_incident_aliases(hypothesis))
 
 
 def _matched_rules(
@@ -1462,6 +1481,51 @@ def _incident_score_components(incident: event_incident_graph.CanonicalIncident)
     elif incident.current_cause_status == event_claim_semantics.CauseStatus.RULED_OUT.value:
         components["causal_mechanism_confirmed"] = 0.0
     return components
+
+
+def _incident_market_reaction_observed(
+    incident: event_incident_graph.CanonicalIncident | None,
+    raws: Iterable[RawDiscoveredEvent],
+) -> bool:
+    if incident is not None and incident.event_archetype == "market_dislocation_unknown":
+        return True
+    for raw in raws:
+        payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+        if isinstance(payload.get("market"), Mapping) and payload.get("market"):
+            return True
+        if isinstance(payload.get("anomaly"), Mapping) and payload.get("anomaly"):
+            return True
+    return False
+
+
+def _with_incident_aliases(hypothesis: EventImpactHypothesis) -> EventImpactHypothesis:
+    """Populate durable incident_* aliases while preserving legacy field names."""
+    canonical = hypothesis.incident_canonical_name or hypothesis.canonical_incident_name
+    archetype = hypothesis.incident_event_archetype or hypothesis.event_archetype
+    subject = hypothesis.incident_primary_subject or hypothesis.primary_subject
+    ecosystem = hypothesis.incident_affected_ecosystem or hypothesis.affected_ecosystem
+    cause = hypothesis.incident_cause_status or hypothesis.cause_status
+    observed = hypothesis.incident_market_reaction_observed
+    if observed is None and hypothesis.market_reaction_confirmed is not None:
+        observed = bool(hypothesis.market_reaction_confirmed)
+    causal = hypothesis.incident_causal_mechanism_confirmed
+    if causal is None and hypothesis.causal_mechanism_confirmed is not None:
+        causal = bool(hypothesis.causal_mechanism_confirmed)
+    return replace(
+        hypothesis,
+        incident_canonical_name=canonical,
+        incident_event_archetype=archetype,
+        incident_primary_subject=subject,
+        incident_affected_ecosystem=ecosystem,
+        incident_cause_status=cause,
+        incident_market_reaction_observed=observed,
+        incident_causal_mechanism_confirmed=causal,
+        canonical_incident_name=hypothesis.canonical_incident_name or canonical,
+        event_archetype=hypothesis.event_archetype or archetype,
+        primary_subject=hypothesis.primary_subject or subject,
+        affected_ecosystem=hypothesis.affected_ecosystem or ecosystem,
+        cause_status=hypothesis.cause_status or cause,
+    )
 
 
 def _claim_to_row(claim: event_claim_semantics.EventClaim) -> dict[str, Any]:
@@ -2340,8 +2404,14 @@ def _quality_verdict_replace_kwargs(
         "market_context_age_seconds": market_context.get("age_seconds"),
         "market_context_data_quality": market_context.get("data_quality"),
         "market_context_snapshot": dict(market_context.get("market_snapshot") or {}),
+        "incident_market_reaction_observed": (
+            market_result.level in {"observed", "weak", "moderate", "strong"}
+            or bool(market_context.get("source"))
+            or bool(market_context.get("market_snapshot"))
+        ),
         "market_reaction_confirmed": market_result.level in {"weak", "moderate", "strong"},
         "causal_mechanism_confirmed": _causal_mechanism_confirmed(validation, hypothesis),
+        "incident_causal_mechanism_confirmed": _causal_mechanism_confirmed(validation, hypothesis),
         "incident_confidence": _component_float(merged_components, "incident_confidence"),
         "opportunity_score_final": verdict.opportunity_score_final,
         "opportunity_level": verdict.opportunity_level,
@@ -2522,8 +2592,10 @@ def _quality_score_components(values: Mapping[str, Any]) -> dict[str, Any]:
         "market_context_timestamp": "market_context_timestamp",
         "market_context_age_seconds": "market_context_age_seconds",
         "market_context_data_quality": "market_context_data_quality",
+        "incident_market_reaction_observed": "incident_market_reaction_observed",
         "market_reaction_confirmed": "market_reaction_confirmed",
         "causal_mechanism_confirmed": "causal_mechanism_confirmed",
+        "incident_causal_mechanism_confirmed": "incident_causal_mechanism_confirmed",
         "incident_confidence": "incident_confidence",
         "opportunity_score_final": "opportunity_score_final",
         "opportunity_level": "opportunity_level",
@@ -3005,9 +3077,18 @@ def _merge_duplicate_hypotheses(
     )
     if incident_confidence:
         components["incident_confidence"] = incident_confidence
+    incident_observed = bool(current.incident_market_reaction_observed or item.incident_market_reaction_observed)
+    incident_causal = bool(current.incident_causal_mechanism_confirmed or item.incident_causal_mechanism_confirmed)
     return replace(
         winner,
         incident_confidence=incident_confidence or winner.incident_confidence,
+        incident_canonical_name=winner.incident_canonical_name or winner.canonical_incident_name,
+        incident_event_archetype=winner.incident_event_archetype or winner.event_archetype,
+        incident_primary_subject=winner.incident_primary_subject or winner.primary_subject,
+        incident_affected_ecosystem=winner.incident_affected_ecosystem or winner.affected_ecosystem,
+        incident_cause_status=winner.incident_cause_status or winner.cause_status,
+        incident_market_reaction_observed=incident_observed,
+        incident_causal_mechanism_confirmed=incident_causal,
         source_raw_ids=tuple(dict.fromkeys((*current.source_raw_ids, *item.source_raw_ids))),
         source_event_ids=tuple(dict.fromkeys((*current.source_event_ids, *item.source_event_ids))),
         evidence_quotes=tuple(dict.fromkeys((*current.evidence_quotes, *item.evidence_quotes))),

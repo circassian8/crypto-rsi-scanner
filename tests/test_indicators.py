@@ -9263,7 +9263,7 @@ def test_event_alpha_alert_store_persists_validated_route_snapshots_for_inbox_fe
             "why_not_watchlist": "already_watchlisted",
             "manual_verification_items": ["verify exploit status and liquidity"],
             "upgrade_requirements": [],
-            "downgrade_warnings": [],
+            "downgrade_warnings": ["none"],
         },
         material_change_reasons=("hypothesis_validated",),
         should_alert=True,
@@ -9950,7 +9950,7 @@ def test_event_alpha_router_routes_watchlist_escalations_safely():
             "why_not_watchlist": "already_watchlisted",
             "manual_verification_items": ["verify catalyst and market confirmation"],
             "upgrade_requirements": [],
-            "downgrade_warnings": [],
+            "downgrade_warnings": ["none"],
         }
         return event_watchlist.EventWatchlistEntry(
             schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -21694,6 +21694,9 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import (
+        event_alpha_alert_store,
+        event_alpha_artifact_doctor,
+        event_alpha_router,
         event_claim_semantics,
         event_impact_hypotheses,
         event_incident_graph,
@@ -21899,6 +21902,13 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     assert set(hyp.source_raw_ids) == {"secondfi_a", "secondfi_b"}
     assert "incident_evidence_update" in hyp.warnings
     assert len(hyp.independent_source_domains) == 2
+    assert hyp.incident_id
+    assert hyp.incident_canonical_name == hyp.canonical_incident_name
+    assert hyp.incident_primary_subject == "SecondFi"
+    assert hyp.incident_affected_ecosystem == "Cardano"
+    assert hyp.incident_cause_status == hyp.cause_status
+    assert hyp.incident_market_reaction_observed is True
+    assert hyp.incident_causal_mechanism_confirmed is True
 
     thor_raw = raw(
         "thorchain",
@@ -21952,7 +21962,20 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         event_watchlist.refresh_hypothesis_watchlist((one_source_hyp,), cfg=watch_cfg, now=now)
         updated_watch = event_watchlist.refresh_hypothesis_watchlist((hyp,), cfg=watch_cfg, now=now)
         updated_entry = updated_watch.entries[0]
+        loaded_watch = event_watchlist.load_watchlist(watch_cfg.state_path)
+        assert len(loaded_watch.entries) == 1
+        assert loaded_watch.entries[0].key == updated_entry.key
+        assert updated_entry.key.startswith(f"hypothesis|{hyp.incident_id}|cardano|ecosystem_affected_asset|")
+        assert updated_entry.incident_id == hyp.incident_id
+        assert updated_entry.hypothesis_id == hyp.hypothesis_id
+        assert updated_entry.incident_canonical_name == hyp.incident_canonical_name
+        assert updated_entry.incident_primary_subject == "SecondFi"
+        assert updated_entry.incident_cause_status == hyp.cause_status
+        assert updated_entry.incident_market_reaction_observed is True
+        assert updated_entry.incident_causal_mechanism_confirmed is True
+        assert updated_entry.source_count == 2
         assert "independent_source_confirmation" in updated_entry.material_change_reasons
+        assert "incident_new_independent_source" in updated_entry.material_change_reasons
         assert "incident_confidence_changed" in updated_entry.material_change_reasons
         watch = event_watchlist.refresh_hypothesis_watchlist(
             (memecore_hyp, hyp, thor_hyp),
@@ -21992,11 +22015,110 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         assert thor_row["event_archetype"] == "exploit_security_event"
         assert thor_row["current_cause_status"] == "confirmed"
         assert any(asset["symbol"] == "RUNE" and asset["role"] == "direct_subject" for asset in thor_row["linked_assets"])
+        thor_entry = next(entry for entry in watch.entries if entry.symbol == "RUNE")
+        assert thor_entry.incident_id == thor_hyp.incident_id
+        assert thor_entry.hypothesis_id == thor_hyp.hypothesis_id
+        assert thor_entry.incident_canonical_name == thor_hyp.incident_canonical_name
+        assert thor_entry.incident_primary_subject == "THORChain"
+        decision = event_alpha_router.EventAlphaRouteDecision(
+            entry=thor_entry,
+            route=event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+            alertable=True,
+            reason="fixture incident-linked hypothesis",
+            lane=event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+        )
+        snap_path = Path(tmp) / "alerts.jsonl"
+        event_alpha_alert_store.write_alert_snapshots(
+            [],
+            router_result=type("Router", (), {"decisions": [decision]})(),
+            cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(path=snap_path),
+            now=now,
+            run_id="run-incident-test",
+            profile="quality_validation",
+            run_mode="test",
+            artifact_namespace="quality_validation",
+        )
+        snap = event_alpha_alert_store.load_alert_snapshots(snap_path).rows[0]
+        assert snap["incident_id"] == thor_hyp.incident_id
+        assert snap["hypothesis_id"] == thor_hyp.hypothesis_id
+        assert snap["incident_canonical_name"] == thor_hyp.incident_canonical_name
+        assert snap["incident_primary_subject"] == "THORChain"
+        clean_quality = {
+            "impact_path_type": "exploit_security_event",
+            "impact_path_strength": "strong",
+            "candidate_role": "direct_subject",
+            "evidence_quality_score": 85,
+            "source_class": "primary_or_reputable_source",
+            "evidence_specificity": "direct_token_mechanism",
+            "market_confirmation_score": 80,
+            "market_confirmation_level": "confirmed",
+            "opportunity_score_final": 75,
+            "opportunity_level": "validated_digest",
+            "opportunity_verdict_reasons": ["incident_linked"],
+            "why_local_only": "not_local_only",
+            "why_not_watchlist": "not_watchlist_without_market_followthrough",
+            "manual_verification_items": ["verify incident source and token-specific market reaction"],
+            "upgrade_requirements": ["needs watchlist confirmation"],
+            "downgrade_warnings": ["none"],
+        }
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-incident-test",
+                "profile": "quality_validation",
+                "run_mode": "test",
+                "artifact_namespace": "quality_validation",
+                "alertable": 1,
+                "snapshot_write_success": True,
+                "snapshot_rows_written": 1,
+            }],
+            hypothesis_rows=[{
+                "row_type": "event_impact_hypothesis",
+                "run_id": "run-incident-test",
+                "profile": "quality_validation",
+                "run_mode": "test",
+                "artifact_namespace": "quality_validation",
+                "hypothesis_id": thor_hyp.hypothesis_id,
+                "incident_id": thor_hyp.incident_id,
+                **clean_quality,
+            }],
+            watchlist_rows=[thor_entry],
+            alert_rows=[snap],
+            incident_rows=loaded.rows,
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor.hypothesis_rows_missing_incident_id == 0
+        assert doctor.watchlist_hypothesis_rows_missing_incident_id == 0
+        assert doctor.alert_hypothesis_rows_missing_incident_id == 0
+        assert doctor.status in {"OK", "WARN"}
+        missing_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-incident-test", "alertable": 0}],
+            watchlist_rows=[{
+                "row_type": "event_watchlist_state",
+                "relationship_type": "impact_hypothesis",
+                "key": "fresh-missing-incident",
+                "event_id": "hyp:missing",
+                "coin_id": "missing",
+                "symbol": "MISS",
+                "run_mode": "burn_in",
+                "artifact_namespace": "quality_validation",
+                "opportunity_level": "validated_digest",
+                "opportunity_score_final": 75,
+                "impact_path_type": "exploit_security_event",
+                "evidence_specificity": "direct_token_mechanism",
+            }],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert missing_doctor.status == "BLOCKED"
+        assert missing_doctor.watchlist_hypothesis_rows_missing_incident_id == 1
         report = event_incident_store.format_incidents_report(loaded)
         assert "EVENT INCIDENTS REPORT" in report
         assert "market_dislocation_unknown=1" in report
         assert "exploit_security_event=2" in report
         assert "multiple_source_updates: 1" in report
+        assert "incident_linked_hypotheses_count: 3" in report
+        assert "incident_linked_watchlist_count: 3" in report
 
         anomaly_write = event_incident_store.write_incidents(
             EventDiscoveryResult((sol_a, sol_b, usdt), anomaly_events, (), (), ()),

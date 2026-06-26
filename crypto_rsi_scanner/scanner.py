@@ -2988,6 +2988,7 @@ def event_alpha_notify_go_no_go(
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
+        incident_rows=artifacts["incidents"].rows,
         card_paths=[str(path) for path in _research_card_markdown_paths(context.research_cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -3394,6 +3395,7 @@ def event_alpha_notification_checklist_report(
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
+        incident_rows=artifacts["incidents"].rows,
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -4990,6 +4992,12 @@ def _event_alpha_local_artifacts(*, run_limit: int = 500, latest_alerts: bool = 
         latest_run=True,
         include_legacy=True,
     )
+    incidents = event_incident_store.load_incidents(
+        config.EVENT_INCIDENT_STORE_PATH,
+        limit=500,
+        latest_run=True,
+        include_legacy=True,
+    )
     feedback_rows = [record.__dict__ for record in feedback.records]
     outcome_rows = [row for row in alerts.rows if any(row.get(field) not in (None, "") for field in (
         "primary_horizon_return",
@@ -5014,6 +5022,7 @@ def _event_alpha_local_artifacts(*, run_limit: int = 500, latest_alerts: bool = 
         "budget_rows": budget_rows,
         "watchlist": watchlist,
         "hypotheses": hypotheses,
+        "incidents": incidents,
         "outcome_rows": outcome_rows,
     }
 
@@ -5234,6 +5243,7 @@ def event_alpha_artifact_doctor_report(
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
+        incident_rows=artifacts["incidents"].rows,
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -5354,6 +5364,7 @@ def event_alpha_export_burn_in_pack(
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
+        incident_rows=artifacts["incidents"].rows,
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],

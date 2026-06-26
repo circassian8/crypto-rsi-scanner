@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-26 - Canonical incident id is the Event Alpha spine
+**Status:** accepted
+**Decision:** For Event Alpha impact-hypothesis artifacts, the canonical
+incident id is the primary research identity spine. Hypotheses, hypothesis-store
+rows, hypothesis-derived watchlist rows, route alert snapshots, incident
+reports, run-ledger rows, opportunity audits, daily briefs, cards, and artifact
+doctor checks should carry incident linkage when the source evidence belongs to
+an incident. Hypothesis watchlist identity should prefer
+`incident_id + validated asset/sector identity + candidate_role +
+impact_path_type`, not only symbol/title/source text. Missing incident ids on
+fresh hypothesis/watchlist/alert rows are artifact-health problems unless the
+row explicitly represents no-incident evidence. Incident identity and linked
+counts are audit/provenance metadata only; they do not create candidates,
+routes, paper rows, normal RSI rows, trades, or `TRIGGERED_FADE`.
+**Why:** Event Alpha increasingly reasons over follow-up source updates,
+disputed/confirmed claims, and market reaction for the same underlying event.
+Without a stable incident spine, duplicate articles can fragment watchlist
+state, hide independent-source confirmation, and make artifact reports disagree
+about what happened.
+**Revisit when:** Incident storage is migrated to a reviewed research database
+with an explicit schema version and equivalent point-in-time incident linkage
+guarantees.
+
 ## 2026-06-26 - No-catalyst statements are absence evidence, not incident subjects
 **Status:** accepted
 **Decision:** Event Alpha claim semantics must treat phrases such as “no dated

@@ -47,6 +47,13 @@ class EventAlphaArtifactDoctorResult:
     active_watchlist_rows_quality_capped: int = 0
     fresh_watchlist_state_conflict_rows: int = 0
     legacy_watchlist_conflicts: int = 0
+    hypothesis_rows_missing_incident_id: int = 0
+    watchlist_hypothesis_rows_missing_incident_id: int = 0
+    alert_hypothesis_rows_missing_incident_id: int = 0
+    incident_rows_without_linked_hypotheses: int = 0
+    incident_rows_without_linked_watchlist: int = 0
+    fresh_incident_linkage_blockers: int = 0
+    legacy_incident_linkage_warnings: int = 0
     strict_legacy: bool = False
     strict: bool = False
     blockers: tuple[str, ...] = ()
@@ -61,6 +68,7 @@ def diagnose_artifacts(
     outcome_rows: Iterable[Mapping[str, Any]] = (),
     hypothesis_rows: Iterable[Mapping[str, Any] | object] = (),
     watchlist_rows: Iterable[Mapping[str, Any] | object] = (),
+    incident_rows: Iterable[Mapping[str, Any] | object] = (),
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
@@ -80,6 +88,7 @@ def diagnose_artifacts(
     raw_outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
     raw_hypotheses = [_row(row) for row in hypothesis_rows]
     raw_watchlist = [_row(row) for row in watchlist_rows]
+    raw_incidents = [_row(row) for row in incident_rows]
     raw_legacy = sum(
         1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
         if event_alpha_artifacts.is_legacy_row(row)
@@ -121,6 +130,13 @@ def diagnose_artifacts(
     )
     watchlist = event_alpha_artifacts.filter_artifact_rows(
         raw_watchlist,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    incidents = event_alpha_artifacts.filter_artifact_rows(
+        raw_incidents,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -289,6 +305,32 @@ def diagnose_artifacts(
     if watchlist_conflicts["legacy"]:
         message = f"legacy_watchlist_conflicts={watchlist_conflicts['legacy']}"
         (blockers if strict and strict_legacy else warnings).append(message)
+    incident_linkage = _incident_linkage_summary(
+        hypotheses=hypotheses,
+        watchlist=watchlist,
+        alerts=alerts,
+        incidents=incidents,
+    )
+    if incident_linkage["hypothesis_rows_missing_incident_id"]:
+        message = f"hypothesis_rows_missing_incident_id={incident_linkage['hypothesis_rows_missing_incident_id']}"
+        (blockers if strict and incident_linkage["fresh_missing_hypotheses"] else warnings).append(message)
+    if incident_linkage["watchlist_hypothesis_rows_missing_incident_id"]:
+        message = (
+            "watchlist_hypothesis_rows_missing_incident_id="
+            f"{incident_linkage['watchlist_hypothesis_rows_missing_incident_id']}"
+        )
+        (blockers if strict and incident_linkage["fresh_missing_watchlist"] else warnings).append(message)
+    if incident_linkage["alert_hypothesis_rows_missing_incident_id"]:
+        message = f"alert_hypothesis_rows_missing_incident_id={incident_linkage['alert_hypothesis_rows_missing_incident_id']}"
+        (blockers if strict and incident_linkage["fresh_missing_alerts"] else warnings).append(message)
+    if incident_linkage["incident_rows_without_linked_hypotheses"]:
+        warnings.append(
+            f"incident_rows_without_linked_hypotheses={incident_linkage['incident_rows_without_linked_hypotheses']}"
+        )
+    if incident_linkage["incident_rows_without_linked_watchlist"]:
+        warnings.append(
+            f"incident_rows_without_linked_watchlist={incident_linkage['incident_rows_without_linked_watchlist']}"
+        )
     status = "BLOCKED" if blockers else ("WARN" if warnings else "OK")
     return EventAlphaArtifactDoctorResult(
         status=status,
@@ -329,6 +371,21 @@ def diagnose_artifacts(
         active_watchlist_rows_quality_capped=watchlist_conflicts["active_watchlist_rows_quality_capped"],
         fresh_watchlist_state_conflict_rows=watchlist_conflicts["fresh_uncapped"],
         legacy_watchlist_conflicts=watchlist_conflicts["legacy"],
+        hypothesis_rows_missing_incident_id=incident_linkage["hypothesis_rows_missing_incident_id"],
+        watchlist_hypothesis_rows_missing_incident_id=incident_linkage["watchlist_hypothesis_rows_missing_incident_id"],
+        alert_hypothesis_rows_missing_incident_id=incident_linkage["alert_hypothesis_rows_missing_incident_id"],
+        incident_rows_without_linked_hypotheses=incident_linkage["incident_rows_without_linked_hypotheses"],
+        incident_rows_without_linked_watchlist=incident_linkage["incident_rows_without_linked_watchlist"],
+        fresh_incident_linkage_blockers=(
+            incident_linkage["fresh_missing_hypotheses"]
+            + incident_linkage["fresh_missing_watchlist"]
+            + incident_linkage["fresh_missing_alerts"]
+        ),
+        legacy_incident_linkage_warnings=(
+            incident_linkage["legacy_missing_hypotheses"]
+            + incident_linkage["legacy_missing_watchlist"]
+            + incident_linkage["legacy_missing_alerts"]
+        ),
         strict_legacy=bool(strict_legacy),
         strict=bool(strict),
         blockers=tuple(dict.fromkeys(blockers)),
@@ -534,6 +591,82 @@ def _row_has_watchlist_quality_conflict(row: Mapping[str, Any]) -> bool:
     return score <= 0.0
 
 
+def _incident_linkage_summary(
+    *,
+    hypotheses: Iterable[Mapping[str, Any]],
+    watchlist: Iterable[Mapping[str, Any]],
+    alerts: Iterable[Mapping[str, Any]],
+    incidents: Iterable[Mapping[str, Any]],
+) -> dict[str, int]:
+    out = {
+        "hypothesis_rows_missing_incident_id": 0,
+        "watchlist_hypothesis_rows_missing_incident_id": 0,
+        "alert_hypothesis_rows_missing_incident_id": 0,
+        "incident_rows_without_linked_hypotheses": 0,
+        "incident_rows_without_linked_watchlist": 0,
+        "fresh_missing_hypotheses": 0,
+        "fresh_missing_watchlist": 0,
+        "fresh_missing_alerts": 0,
+        "legacy_missing_hypotheses": 0,
+        "legacy_missing_watchlist": 0,
+        "legacy_missing_alerts": 0,
+    }
+    for row in hypotheses:
+        if dict(row).get("row_type") not in {"event_impact_hypothesis", ""}:
+            continue
+        if _row_has_no_incident(row):
+            continue
+        if not _row_incident_id(row):
+            out["hypothesis_rows_missing_incident_id"] += 1
+            if event_alpha_artifacts.is_legacy_row(row):
+                out["legacy_missing_hypotheses"] += 1
+            else:
+                out["fresh_missing_hypotheses"] += 1
+    for row in watchlist:
+        if str(row.get("relationship_type") or "") != "impact_hypothesis":
+            continue
+        if _row_has_no_incident(row):
+            continue
+        if not _row_incident_id(row):
+            out["watchlist_hypothesis_rows_missing_incident_id"] += 1
+            if event_alpha_artifacts.is_legacy_row(row):
+                out["legacy_missing_watchlist"] += 1
+            else:
+                out["fresh_missing_watchlist"] += 1
+    for row in alerts:
+        is_hypothesis = bool(row.get("hypothesis_id")) or str(row.get("relationship_type") or "") == "impact_hypothesis"
+        if not is_hypothesis or _row_has_no_incident(row):
+            continue
+        if not _row_incident_id(row):
+            out["alert_hypothesis_rows_missing_incident_id"] += 1
+            if event_alpha_artifacts.is_legacy_row(row):
+                out["legacy_missing_alerts"] += 1
+            else:
+                out["fresh_missing_alerts"] += 1
+    for row in incidents:
+        if dict(row).get("row_type") != "event_incident":
+            continue
+        if not row.get("linked_hypothesis_ids"):
+            out["incident_rows_without_linked_hypotheses"] += 1
+        if not row.get("linked_watchlist_keys"):
+            out["incident_rows_without_linked_watchlist"] += 1
+    return out
+
+
+def _row_incident_id(row: Mapping[str, Any]) -> str:
+    components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
+    score = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+    return str(row.get("incident_id") or components.get("incident_id") or score.get("incident_id") or "").strip()
+
+
+def _row_has_no_incident(row: Mapping[str, Any]) -> bool:
+    status = str(row.get("incident_link_status") or "").strip()
+    if status == "no_incident":
+        return True
+    warnings = " ".join(str(value) for value in row.get("warnings") or ())
+    return "no_incident" in warnings
+
+
 def _record_snapshot_availability_issue(
     row: Mapping[str, Any],
     availability: str,
@@ -625,6 +758,16 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"active_watchlist_rows_quality_capped={result.active_watchlist_rows_quality_capped} "
             f"fresh_watchlist_state_conflict_rows={result.fresh_watchlist_state_conflict_rows} "
             f"legacy_watchlist_conflicts={result.legacy_watchlist_conflicts}"
+        ),
+        (
+            "incident linkage: "
+            f"hypothesis_rows_missing_incident_id={result.hypothesis_rows_missing_incident_id} "
+            f"watchlist_hypothesis_rows_missing_incident_id={result.watchlist_hypothesis_rows_missing_incident_id} "
+            f"alert_hypothesis_rows_missing_incident_id={result.alert_hypothesis_rows_missing_incident_id} "
+            f"incident_rows_without_linked_hypotheses={result.incident_rows_without_linked_hypotheses} "
+            f"incident_rows_without_linked_watchlist={result.incident_rows_without_linked_watchlist} "
+            f"fresh_blockers={result.fresh_incident_linkage_blockers} "
+            f"legacy_warnings={result.legacy_incident_linkage_warnings}"
         ),
         "",
         "blockers:",

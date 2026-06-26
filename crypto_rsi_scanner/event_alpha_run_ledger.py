@@ -199,7 +199,9 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"incident_store={int(row.get('incident_rows_written') or 0)} "
             f"attempted={str(bool(row.get('incident_write_attempted'))).lower()} "
             f"success={str(bool(row.get('incident_write_success'))).lower()} "
-            f"block={row.get('incident_write_block_reason') or 'none'}"
+            f"block={row.get('incident_write_block_reason') or 'none'} "
+            f"linked_hypotheses={int(row.get('incident_linked_hypotheses') or 0)} "
+            f"linked_watchlist={int(row.get('incident_linked_watchlist_rows') or 0)}"
         )
         if row.get("send_block_reason"):
             rows.append(f"  send_block: {row.get('send_block_reason')}")
@@ -324,6 +326,10 @@ def _run_record(
         "incident_write_attempted": bool(getattr(result, "incident_write_attempted", False)),
         "incident_write_success": bool(getattr(result, "incident_write_success", False)),
         "incident_rows_written": _int(getattr(result, "incident_rows_written", 0)),
+        "incidents_written": _int(getattr(result, "incident_rows_written", 0)),
+        "incident_store_success": bool(getattr(result, "incident_write_success", False)),
+        "incident_linked_hypotheses": _incident_linked_hypotheses(result),
+        "incident_linked_watchlist_rows": _incident_linked_watchlist_rows(result),
         "incident_write_block_reason": getattr(result, "incident_write_block_reason", None),
         "research_cards_written": len(card_paths),
         "research_card_paths": card_paths,
@@ -371,6 +377,37 @@ def _notification_summary(result: Any, *, profile: str | None, notify_burn: bool
         "provider_fail_fast_blocks": provider_blocks,
         "runtime_budget_exhausted": any("notification_runtime_budget_exhausted" in warning for warning in warnings),
     }
+
+
+def _incident_linked_hypotheses(result: Any) -> int:
+    return sum(
+        1
+        for item in getattr(result, "impact_hypotheses", ()) or ()
+        if _value(item, "incident_id")
+    )
+
+
+def _incident_linked_watchlist_rows(result: Any) -> int:
+    watchlist = getattr(result, "watchlist_result", None)
+    entries = getattr(watchlist, "entries", ()) or ()
+    return sum(
+        1
+        for entry in entries
+        if str(_value(entry, "relationship_type") or "") == "impact_hypothesis"
+        and (
+            _value(entry, "incident_id")
+            or (
+                isinstance(_value(entry, "latest_score_components"), Mapping)
+                and _value(entry, "latest_score_components").get("incident_id")
+            )
+        )
+    )
+
+
+def _value(item: Any, key: str) -> Any:
+    if isinstance(item, Mapping):
+        return item.get(key)
+    return getattr(item, key, None)
 
 
 def _llm_stats(rows: Iterable[object]) -> dict[str, int]:

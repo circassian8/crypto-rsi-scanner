@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Make canonical incidents the Event Alpha spine · Codex
+**Why:** The incident store existed, but incident identity still needed to be
+the durable join key across hypotheses, watchlist rows, alert snapshots, run
+ledgers, reports, and artifact health checks. Otherwise duplicate source
+updates could still fragment state or hide missing incident linkage.
+**Changes:**
+- Propagated `incident_*` aliases and `hypothesis_id` through impact
+  hypotheses, hypothesis JSONL rows, watchlist rows, route alert snapshots, and
+  incident reports.
+- Changed hypothesis watchlist keys to use
+  `incident_id + asset/sector identity + candidate_role + impact_path_type`
+  when an incident id exists, while warning on hypothesis rows that lack an
+  incident id.
+- Added incident-specific material update reasons for new independent sources,
+  cause-status changes, confirmed/ruled-out/conflicting claims, market reaction
+  confirmation, causal-mechanism confirmation, and affected-role changes.
+- Extended run-ledger and incident reports with linked-hypothesis/watchlist
+  counts, and artifact doctor strict checks for missing incident ids or
+  incident rows that do not link back to hypotheses/watchlist state.
+- Made `make event-alpha-artifact-doctor PROFILE=quality_validation STRICT=1`
+  include test artifacts automatically so the documented validation smoke
+  inspects the fresh fixture namespace instead of filtering it out.
+- Expanded incident regression coverage for SecondFi duplicate-source updates,
+  THORChain/RUNE alert snapshots, incident-linked doctor checks, and missing
+  incident-id blockers.
+**Verify:** `python3 tests/test_indicators.py` passed (459/459);
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (26/26);
+`make event-alpha-quality-validation-cycle PYTHON=python3` passed with strict
+artifact doctor `OK`; `make event-incidents-report PROFILE=quality_validation
+PYTHON=python3` and `make event-opportunity-audit PROFILE=quality_validation
+TARGET=SOL PYTHON=python3` printed fresh incident/audit context; `make
+event-alpha-artifact-doctor PROFILE=quality_validation STRICT=1 PYTHON=python3`
+returned `OK`; `make verify PYTHON=python3` passed.
+**Notes/risks:** Research-only artifact identity and reporting hardening. No
+normal RSI rows, paper/live trades, execution, alert promotion, or
+LLM/provider-created `TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-26 — Fix no-catalyst incident semantics · Codex
 **Why:** Fresh `quality_validation` artifacts showed a bad canonical incident
 named `No · market anomaly`, with `primary_subject=No` and a misleading

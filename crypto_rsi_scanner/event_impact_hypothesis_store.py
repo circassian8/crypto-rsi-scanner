@@ -317,6 +317,17 @@ def _row_from_hypothesis(
     else:
         data = dict(getattr(hypothesis, "__dict__", {}) or {})
     validated_asset = _first_mapping(data.get("validated_candidate_assets") or ())
+    incident_canonical = data.get("incident_canonical_name") or data.get("canonical_incident_name")
+    incident_archetype = data.get("incident_event_archetype") or data.get("event_archetype")
+    incident_subject = data.get("incident_primary_subject") or data.get("primary_subject")
+    incident_ecosystem = data.get("incident_affected_ecosystem") or data.get("affected_ecosystem")
+    incident_cause = data.get("incident_cause_status") or data.get("cause_status")
+    incident_observed = data.get("incident_market_reaction_observed")
+    if incident_observed is None:
+        incident_observed = data.get("market_reaction_confirmed")
+    incident_causal = data.get("incident_causal_mechanism_confirmed")
+    if incident_causal is None:
+        incident_causal = data.get("causal_mechanism_confirmed")
     data.update({
         "schema_version": IMPACT_HYPOTHESIS_STORE_SCHEMA_VERSION,
         "row_type": "event_impact_hypothesis",
@@ -330,6 +341,18 @@ def _row_from_hypothesis(
         "promoted_watchlist_key": promoted_watchlist_key,
         "validated_symbol": str(validated_asset.get("symbol") or "") or None,
         "validated_coin_id": str(validated_asset.get("coin_id") or "") or None,
+        "incident_canonical_name": incident_canonical,
+        "canonical_incident_name": data.get("canonical_incident_name") or incident_canonical,
+        "incident_event_archetype": incident_archetype,
+        "event_archetype": data.get("event_archetype") or incident_archetype,
+        "incident_primary_subject": incident_subject,
+        "primary_subject": data.get("primary_subject") or incident_subject,
+        "incident_affected_ecosystem": incident_ecosystem,
+        "affected_ecosystem": data.get("affected_ecosystem") or incident_ecosystem,
+        "incident_cause_status": incident_cause,
+        "cause_status": data.get("cause_status") or incident_cause,
+        "incident_market_reaction_observed": incident_observed,
+        "incident_causal_mechanism_confirmed": incident_causal,
     })
     return event_alpha_quality_fields.ensure_quality_fields(
         data,

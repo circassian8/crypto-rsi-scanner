@@ -67,6 +67,14 @@ class EventWatchlistEntry:
     previous_state: str | None
     first_seen_at: str
     last_seen_at: str
+    incident_id: str | None = None
+    hypothesis_id: str | None = None
+    incident_canonical_name: str | None = None
+    incident_primary_subject: str | None = None
+    incident_affected_ecosystem: str | None = None
+    incident_cause_status: str | None = None
+    incident_market_reaction_observed: bool | None = None
+    incident_causal_mechanism_confirmed: bool | None = None
     requested_state_before_quality_gate: str | None = None
     final_state_after_quality_gate: str | None = None
     quality_state_block_reason: str | None = None
@@ -242,12 +250,39 @@ def watchlist_key(alert: event_alerts.EventAlertCandidate) -> str:
 
 
 def hypothesis_watchlist_key(hypothesis: object) -> str:
+    incident_id = _optional_str(getattr(hypothesis, "incident_id", None))
+    if incident_id:
+        return "|".join((
+            "hypothesis",
+            incident_id,
+            _hypothesis_key_asset_identity(hypothesis),
+            _optional_str(getattr(hypothesis, "candidate_role", None)) or "unknown_role",
+            _optional_str(getattr(hypothesis, "impact_path_type", None)) or "unknown_path",
+        ))
     parts = (
         "hypothesis",
         getattr(hypothesis, "event_cluster_id", None) or getattr(hypothesis, "hypothesis_id", "unknown"),
         getattr(hypothesis, "impact_category", "unknown"),
     )
     return "|".join(str(part) for part in parts)
+
+
+def _hypothesis_key_asset_identity(hypothesis: object) -> str:
+    asset = _direct_validated_hypothesis_asset(hypothesis)
+    if not asset:
+        asset = _first_validated_asset(getattr(hypothesis, "crypto_candidate_assets", ()) or ())
+    if not asset:
+        asset = _first_validated_asset(getattr(hypothesis, "validated_candidate_assets", ()) or ())
+    symbol = str(asset.get("symbol") or "").strip().upper() if asset else ""
+    coin_id = str(asset.get("coin_id") or "").strip() if asset else ""
+    if coin_id:
+        return coin_id
+    if symbol:
+        return symbol
+    sectors = tuple(str(value) for value in getattr(hypothesis, "candidate_sectors", ()) or () if str(value))
+    if sectors:
+        return "sector:" + ",".join(sectors[:4])
+    return "sector:" + str(getattr(hypothesis, "impact_category", "") or "unknown")
 
 
 def format_watchlist_refresh_result(result: EventWatchlistRefreshResult) -> str:
@@ -454,6 +489,34 @@ def _entry_from_alert(
         previous_state=previous_state,
         first_seen_at=first_seen,
         last_seen_at=observed_iso,
+        incident_id=_optional_str(alert.score_components.get("incident_id")),
+        hypothesis_id=_optional_str(alert.score_components.get("hypothesis_id")),
+        incident_canonical_name=_optional_str(
+            alert.score_components.get("incident_canonical_name")
+            or alert.score_components.get("canonical_incident_name")
+        ),
+        incident_primary_subject=_optional_str(
+            alert.score_components.get("incident_primary_subject")
+            or alert.score_components.get("primary_subject")
+        ),
+        incident_affected_ecosystem=_optional_str(
+            alert.score_components.get("incident_affected_ecosystem")
+            or alert.score_components.get("affected_ecosystem")
+        ),
+        incident_cause_status=_optional_str(
+            alert.score_components.get("incident_cause_status")
+            or alert.score_components.get("cause_status")
+        ),
+        incident_market_reaction_observed=_optional_bool(
+            alert.score_components.get("incident_market_reaction_observed")
+            if "incident_market_reaction_observed" in alert.score_components
+            else alert.score_components.get("market_reaction_observed")
+        ),
+        incident_causal_mechanism_confirmed=_optional_bool(
+            alert.score_components.get("incident_causal_mechanism_confirmed")
+            if "incident_causal_mechanism_confirmed" in alert.score_components
+            else alert.score_components.get("causal_mechanism_confirmed")
+        ),
         requested_state_before_quality_gate=requested_state.value,
         final_state_after_quality_gate=state.value,
         quality_state_block_reason=quality_state_block,
@@ -582,6 +645,34 @@ def _entry_from_hypothesis(
         token_level=validated and scope == "token",
     )
     playbook = str(getattr(hypothesis, "playbook_hint", "") or "impact_hypothesis")
+    incident_id = _optional_str(getattr(hypothesis, "incident_id", None))
+    hypothesis_id = _optional_str(getattr(hypothesis, "hypothesis_id", None))
+    incident_canonical_name = _optional_str(
+        getattr(hypothesis, "incident_canonical_name", None)
+        or getattr(hypothesis, "canonical_incident_name", None)
+    )
+    incident_event_archetype = _optional_str(
+        getattr(hypothesis, "incident_event_archetype", None)
+        or getattr(hypothesis, "event_archetype", None)
+    )
+    incident_primary_subject = _optional_str(
+        getattr(hypothesis, "incident_primary_subject", None)
+        or getattr(hypothesis, "primary_subject", None)
+    )
+    incident_affected_ecosystem = _optional_str(
+        getattr(hypothesis, "incident_affected_ecosystem", None)
+        or getattr(hypothesis, "affected_ecosystem", None)
+    )
+    incident_cause_status = _optional_str(
+        getattr(hypothesis, "incident_cause_status", None)
+        or getattr(hypothesis, "cause_status", None)
+    )
+    incident_market_observed = _optional_bool(getattr(hypothesis, "incident_market_reaction_observed", None))
+    if incident_market_observed is None:
+        incident_market_observed = _optional_bool(getattr(hypothesis, "market_reaction_confirmed", None))
+    incident_causal = _optional_bool(getattr(hypothesis, "incident_causal_mechanism_confirmed", None))
+    if incident_causal is None:
+        incident_causal = _optional_bool(getattr(hypothesis, "causal_mechanism_confirmed", None))
     requested_state = _state_from_hypothesis(hypothesis, validated=validated, token_level=symbol != "SECTOR")
     hypothesis_quality_components = {
         "impact_path_type": _optional_str(getattr(hypothesis, "impact_path_type", None)),
@@ -641,6 +732,7 @@ def _entry_from_hypothesis(
             *tuple(getattr(hypothesis, "warnings", ()) or ()),
             *tuple(getattr(hypothesis, "rejection_reasons", ()) or ()),
             *asset_warnings,
+            *(("missing_incident_id_for_hypothesis_watchlist_key",) if not incident_id else ()),
             *(("quality_state_blocked:" + quality_state_block,) if quality_state_block else ()),
         )
         if str(value)
@@ -650,7 +742,7 @@ def _entry_from_hypothesis(
         row_type="event_watchlist_state",
         key=hypothesis_watchlist_key(hypothesis),
         cluster_id=_optional_str(getattr(hypothesis, "event_cluster_id", None)),
-        event_id=str(getattr(hypothesis, "hypothesis_id", "") or hypothesis_watchlist_key(hypothesis)),
+        event_id=str(hypothesis_id or hypothesis_watchlist_key(hypothesis)),
         coin_id=coin_id,
         symbol=symbol,
         relationship_type="impact_hypothesis",
@@ -660,6 +752,14 @@ def _entry_from_hypothesis(
         previous_state=previous_state,
         first_seen_at=first_seen,
         last_seen_at=observed_iso,
+        incident_id=incident_id,
+        hypothesis_id=hypothesis_id,
+        incident_canonical_name=incident_canonical_name,
+        incident_primary_subject=incident_primary_subject,
+        incident_affected_ecosystem=incident_affected_ecosystem,
+        incident_cause_status=incident_cause_status,
+        incident_market_reaction_observed=incident_market_observed,
+        incident_causal_mechanism_confirmed=incident_causal,
         requested_state_before_quality_gate=requested_state.value,
         final_state_after_quality_gate=state.value,
         quality_state_block_reason=quality_state_block,
@@ -685,7 +785,7 @@ def _entry_from_hypothesis(
         latest_playbook_action=_action_for_hypothesis_state(state, validated=validated),
         latest_market_snapshot=dict(getattr(hypothesis, "market_context_snapshot", {}) or {}),
         latest_score_components={
-            "hypothesis_id": str(getattr(hypothesis, "hypothesis_id", "") or ""),
+            "hypothesis_id": str(hypothesis_id or ""),
             "impact_category": category,
             "validation_stage": validation_stage or "unknown",
             "impact_path_reason": _optional_str(getattr(hypothesis, "impact_path_reason", None)),
@@ -717,19 +817,27 @@ def _entry_from_hypothesis(
             "market_reaction_confirmed": getattr(hypothesis, "market_reaction_confirmed", None),
             "causal_mechanism_confirmed": getattr(hypothesis, "causal_mechanism_confirmed", None),
             "incident_confidence": _optional_float(getattr(hypothesis, "incident_confidence", None)),
-            "incident_id": _optional_str(getattr(hypothesis, "incident_id", None)),
-            "canonical_incident_name": _optional_str(getattr(hypothesis, "canonical_incident_name", None)),
-            "event_archetype": _optional_str(getattr(hypothesis, "event_archetype", None)),
-            "primary_subject": _optional_str(getattr(hypothesis, "primary_subject", None)),
+            "incident_id": incident_id,
+            "incident_canonical_name": incident_canonical_name,
+            "canonical_incident_name": incident_canonical_name,
+            "incident_event_archetype": incident_event_archetype,
+            "event_archetype": incident_event_archetype,
+            "incident_primary_subject": incident_primary_subject,
+            "primary_subject": incident_primary_subject,
             "affected_entity": _optional_str(getattr(hypothesis, "affected_entity", None)),
-            "affected_ecosystem": _optional_str(getattr(hypothesis, "affected_ecosystem", None)),
+            "incident_affected_ecosystem": incident_affected_ecosystem,
+            "affected_ecosystem": incident_affected_ecosystem,
             "role_confidence": _optional_float(getattr(hypothesis, "role_confidence", None)),
             "role_evidence": list(getattr(hypothesis, "role_evidence", ()) or ())[:8],
-            "cause_status": _optional_str(getattr(hypothesis, "cause_status", None)),
+            "incident_cause_status": incident_cause_status,
+            "cause_status": incident_cause_status,
             "claim_polarities": list(getattr(hypothesis, "claim_polarities", ()) or ())[:8],
             "claim_history": list(getattr(hypothesis, "claim_history", ()) or ())[:8],
             "independent_source_domains": list(getattr(hypothesis, "independent_source_domains", ()) or ())[:8],
             "conflicting_claims": list(getattr(hypothesis, "conflicting_claims", ()) or ())[:8],
+            "incident_market_reaction_observed": incident_market_observed,
+            "market_reaction_observed": incident_market_observed,
+            "incident_causal_mechanism_confirmed": incident_causal,
             "opportunity_score_final": _optional_float(getattr(hypothesis, "opportunity_score_final", None)),
             "opportunity_level": _optional_str(getattr(hypothesis, "opportunity_level", None)),
             "opportunity_verdict_reasons": list(getattr(hypothesis, "opportunity_verdict_reasons", ()) or ())[:8],
@@ -850,14 +958,30 @@ def _hypothesis_material_change_reasons(
     previous_sources = _item_count(components.get("independent_source_domains")) or _item_count(components.get("source_raw_ids"))
     if current_sources > previous_sources:
         reasons.append("independent_source_confirmation")
+        reasons.append("incident_new_independent_source")
     current_cause = _optional_str(getattr(hypothesis, "cause_status", None)) or ""
     previous_cause = _optional_str(components.get("cause_status")) or ""
     if current_cause and current_cause != previous_cause:
         reasons.append("cause_status_changed")
+        reasons.append("incident_cause_status_changed")
         if current_cause == "confirmed":
             reasons.append("claim_confirmed")
+            reasons.append("incident_claim_confirmed")
         elif current_cause == "ruled_out":
             reasons.append("claim_ruled_out")
+            reasons.append("incident_claim_ruled_out")
+    current_conflicts = _item_count(getattr(hypothesis, "conflicting_claims", None))
+    previous_conflicts = _item_count(components.get("conflicting_claims"))
+    if current_conflicts > previous_conflicts:
+        reasons.append("incident_conflicting_claim_added")
+    current_market = bool(getattr(hypothesis, "market_reaction_confirmed", False))
+    previous_market = bool(components.get("market_reaction_confirmed"))
+    if current_market and not previous_market:
+        reasons.append("incident_market_reaction_confirmed")
+    current_causal = bool(getattr(hypothesis, "causal_mechanism_confirmed", False))
+    previous_causal = bool(components.get("causal_mechanism_confirmed"))
+    if current_causal and not previous_causal:
+        reasons.append("incident_causal_mechanism_confirmed")
     current_incident_confidence = _optional_float(getattr(hypothesis, "incident_confidence", None)) or 0.0
     previous_incident_confidence = _optional_float(components.get("incident_confidence")) or 0.0
     if current_incident_confidence and abs(current_incident_confidence - previous_incident_confidence) >= 10:
@@ -866,6 +990,7 @@ def _hypothesis_material_change_reasons(
     previous_role = _optional_str(components.get("candidate_role")) or ""
     if current_role and previous_role and current_role != previous_role:
         reasons.append("affected_asset_role_changed")
+        reasons.append("incident_asset_role_changed")
     if state == EventWatchlistState.RADAR and market in {"", "none", "weak"}:
         reasons.append("market_reaction_absent_downgrade")
     warnings = tuple(str(value).lower() for value in (
@@ -1218,6 +1343,50 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             previous_state=_optional_str(row.get("previous_state")),
             first_seen_at=first_seen,
             last_seen_at=last_seen,
+            incident_id=_optional_str(row.get("incident_id") or components.get("incident_id")),
+            hypothesis_id=_optional_str(row.get("hypothesis_id") or components.get("hypothesis_id")),
+            incident_canonical_name=_optional_str(
+                row.get("incident_canonical_name")
+                or row.get("canonical_incident_name")
+                or components.get("incident_canonical_name")
+                or components.get("canonical_incident_name")
+            ),
+            incident_primary_subject=_optional_str(
+                row.get("incident_primary_subject")
+                or row.get("primary_subject")
+                or components.get("incident_primary_subject")
+                or components.get("primary_subject")
+            ),
+            incident_affected_ecosystem=_optional_str(
+                row.get("incident_affected_ecosystem")
+                or row.get("affected_ecosystem")
+                or components.get("incident_affected_ecosystem")
+                or components.get("affected_ecosystem")
+            ),
+            incident_cause_status=_optional_str(
+                row.get("incident_cause_status")
+                or row.get("cause_status")
+                or components.get("incident_cause_status")
+                or components.get("cause_status")
+            ),
+            incident_market_reaction_observed=_optional_bool(
+                row.get("incident_market_reaction_observed")
+                if "incident_market_reaction_observed" in row
+                else components.get("incident_market_reaction_observed")
+                if "incident_market_reaction_observed" in components
+                else row.get("market_reaction_observed")
+                if "market_reaction_observed" in row
+                else components.get("market_reaction_observed")
+            ),
+            incident_causal_mechanism_confirmed=_optional_bool(
+                row.get("incident_causal_mechanism_confirmed")
+                if "incident_causal_mechanism_confirmed" in row
+                else components.get("incident_causal_mechanism_confirmed")
+                if "incident_causal_mechanism_confirmed" in components
+                else row.get("causal_mechanism_confirmed")
+                if "causal_mechanism_confirmed" in row
+                else components.get("causal_mechanism_confirmed")
+            ),
             requested_state_before_quality_gate=requested_state,
             final_state_after_quality_gate=final_state,
             quality_state_block_reason=quality_state_block,
@@ -1455,6 +1624,21 @@ def _optional_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().casefold()
+    if text in {"true", "1", "yes", "y"}:
+        return True
+    if text in {"false", "0", "no", "n"}:
+        return False
+    return None
 
 
 def _item_count(value: Any) -> int:

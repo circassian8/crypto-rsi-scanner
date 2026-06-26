@@ -198,6 +198,9 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     rows.append(f"multiple_source_updates: {sum(1 for row in result.rows if int(row.get('source_update_count') or 0) > 1)}")
     rows.append(f"linked_to_hypotheses: {sum(1 for row in result.rows if row.get('linked_hypothesis_ids'))}")
     rows.append(f"linked_to_watchlist: {sum(1 for row in result.rows if row.get('linked_watchlist_keys'))}")
+    rows.append(f"incident_linked_hypotheses_count: {sum(len(row.get('linked_hypothesis_ids') or ()) for row in result.rows)}")
+    rows.append(f"incident_linked_watchlist_count: {sum(len(row.get('linked_watchlist_keys') or ()) for row in result.rows)}")
+    rows.append("material_update_reasons: " + _format_counts(_material_reason_counts(result.rows)))
     rows.append(
         "market_reaction_unknown_cause: "
         + str(sum(
@@ -274,6 +277,7 @@ def _row_from_incident(
         "linked_watchlist_keys": _unique(row.get("key") for row in w_rows),
         "linked_assets": linked_assets,
         "asset_roles": _asset_roles(linked_assets),
+        "material_update_reasons": _unique(_flatten_values(w_rows, "material_change_reasons")),
         "market_reaction_observed": market["market_reaction_observed"],
         "market_reaction_confirmed": market["market_reaction_confirmed"],
         "market_reaction_level": market["market_reaction_level"],
@@ -354,6 +358,16 @@ def _asset_roles(linked_assets: Iterable[Mapping[str, Any]]) -> tuple[dict[str, 
         }
         for asset in linked_assets
     )
+
+
+def _material_reason_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        for reason in row.get("material_update_reasons") or ():
+            key = str(reason or "").strip()
+            if key:
+                counts[key] = counts.get(key, 0) + 1
+    return counts
 
 
 def _incident_market_context(
@@ -477,6 +491,8 @@ def _incident_lines(row: Mapping[str, Any]) -> list[str]:
             f"confidence={row.get('incident_confidence')}"
         ),
         f"  assets: {asset_text}",
+        "  material_update_reasons: "
+        + (", ".join(str(item) for item in row.get("material_update_reasons") or ()) or "none"),
         (
             "  market_vs_cause: "
             f"reaction_observed={str(bool(row.get('market_reaction_observed') or row.get('market_reaction_confirmed'))).lower()} "
