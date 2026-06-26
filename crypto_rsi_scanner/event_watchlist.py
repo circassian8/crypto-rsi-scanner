@@ -386,20 +386,23 @@ def final_state_value(entry: EventWatchlistEntry | Mapping[str, Any]) -> str:
     """Return the quality-capped state for an entry or raw row."""
     if isinstance(entry, Mapping):
         final = _optional_str(entry.get("final_state_after_quality_gate"))
-        if final:
-            return _state_value(final)
         requested = _optional_str(entry.get("requested_state_before_quality_gate")) or _optional_str(entry.get("state"))
+        persisted_final = _state_value(final)
+        if persisted_final in {
+            EventWatchlistState.TRIGGERED_FADE.value,
+            EventWatchlistState.INVALIDATED.value,
+            EventWatchlistState.EXPIRED.value,
+        }:
+            return persisted_final
+        components = entry.get("latest_score_components")
         if event_alpha_quality_fields.has_any_quality_field(entry, components_key="latest_score_components"):
-            components = entry.get("latest_score_components")
-            quality = {
-                **dict(components if isinstance(components, Mapping) else {}),
-                **{
-                    key: entry.get(key)
-                    for key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS
-                    if not event_alpha_quality_fields.is_missing_quality_value(entry.get(key))
-                },
-            }
+            quality = event_alpha_quality_fields.ensure_quality_fields(
+                entry,
+                components=dict(components if isinstance(components, Mapping) else {}),
+            )
             return quality_cap_watchlist_state(requested, quality)[0]
+        if final:
+            return persisted_final
         return _state_value(requested)
     final = entry.final_state_after_quality_gate
     if final:
@@ -432,10 +435,9 @@ def _entry_from_alert(
     candidate = alert.discovery_candidate
     event = candidate.event
     requested_state = _state_from_alert(alert, observed, cfg)
-    has_quality = event_alpha_quality_fields.has_any_quality_field(alert.score_components)
     quality = event_alpha_quality_fields.ensure_quality_fields({}, components=alert.score_components)
-    score_components = {**dict(alert.score_components), **quality} if has_quality else dict(alert.score_components)
-    final_state, quality_state_block = quality_cap_watchlist_state(requested_state, score_components if has_quality else {})
+    score_components = {**dict(alert.score_components), **quality}
+    final_state, quality_state_block = quality_cap_watchlist_state(requested_state, score_components)
     state = EventWatchlistState(final_state)
     previous_state = prior.state if prior else None
     rank = _state_rank(state)
@@ -703,11 +705,10 @@ def _entry_from_hypothesis(
         {},
         components=hypothesis_quality_components,
     )
-    has_hypothesis_quality = event_alpha_quality_fields.has_any_quality_field(hypothesis_quality_components)
-    hypothesis_quality_components = {**hypothesis_quality_components, **hypothesis_quality} if has_hypothesis_quality else hypothesis_quality_components
+    hypothesis_quality_components = {**hypothesis_quality_components, **hypothesis_quality}
     final_state, quality_state_block = quality_cap_watchlist_state(
         requested_state,
-        hypothesis_quality_components if has_hypothesis_quality else {},
+        hypothesis_quality_components,
     )
     state = EventWatchlistState(final_state)
     previous_state = prior.state if prior else None
@@ -1322,24 +1323,28 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
         first_seen = str(row.get("first_seen_at") or row.get("last_seen_at") or "")
         last_seen = str(row.get("last_seen_at") or first_seen)
         components = dict(row.get("latest_score_components") or {})
+        has_quality = event_alpha_quality_fields.has_any_quality_field(row, components_key="latest_score_components")
         quality = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
-        raw_quality = {
-            **components,
-            **{
-                key: row.get(key)
-                for key in event_alpha_quality_fields.REQUIRED_QUALITY_FIELDS
-                if row.get(key) not in (None, "", [], {}, ())
-            },
-        }
-        has_quality = event_alpha_quality_fields.has_any_quality_field(raw_quality)
-        computed_final, computed_block = quality_cap_watchlist_state(
-            requested_state,
-            raw_quality if has_quality else {},
+        raw_quality = {**components, **quality} if has_quality else components
+        computed_final, computed_block = (
+            quality_cap_watchlist_state(requested_state, raw_quality)
+            if has_quality
+            else (requested_state, None)
         )
-        final_state = _state_value(row.get("final_state_after_quality_gate") or computed_final)
-        state_quality_capped = bool(row.get("state_quality_capped"))
-        if not row.get("final_state_after_quality_gate"):
-            state_quality_capped = requested_state != final_state
+        persisted_final = _state_value(row.get("final_state_after_quality_gate"))
+        if persisted_final in {
+            EventWatchlistState.TRIGGERED_FADE.value,
+            EventWatchlistState.INVALIDATED.value,
+            EventWatchlistState.EXPIRED.value,
+        }:
+            final_state = persisted_final
+        elif has_quality:
+            final_state = computed_final
+        elif row.get("final_state_after_quality_gate"):
+            final_state = persisted_final
+        else:
+            final_state = requested_state
+        state_quality_capped = bool(row.get("state_quality_capped")) if not has_quality else requested_state != final_state
         quality_state_block = _normalize_quality_state_block_reason(
             _optional_str(row.get("quality_state_block_reason")) or computed_block,
             quality,
@@ -1433,7 +1438,7 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             latest_llm_asset_role=_optional_str(row.get("latest_llm_asset_role")),
             latest_llm_confidence=_optional_float(row.get("latest_llm_confidence")),
             latest_market_snapshot=dict(row.get("latest_market_snapshot") or {}),
-            latest_score_components=components,
+            latest_score_components=raw_quality,
             impact_path_type=_optional_str(quality.get("impact_path_type")),
             impact_path_strength=_optional_str(quality.get("impact_path_strength")),
             candidate_role=_optional_str(quality.get("candidate_role")),

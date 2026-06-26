@@ -21,27 +21,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 **Why:** Fresh `notify_llm_quality` artifacts could still show non-hypothesis
 rows as active `WATCHLIST` even when their quality verdict said
 `local_only`/insufficient data, and canonical incidents could use prose
-fragments such as `Actions` or `However` as primary subjects.
+fragments such as `Actions`, `However`, `LLM`, or SEO/referral phrases as
+primary subjects.
 **Changes:**
 - Extended watchlist lifecycle caps to block active states when quality fields
   show `candidate_role=unknown_with_reason`, `source_class=insufficient_data`,
   `evidence_specificity=insufficient_data`, zero final score, or insufficient
   impact path.
+- Applied conservative quality defaults and final-state recomputation to
+  non-hypothesis alert/playbook/market-anomaly rows, so stale persisted
+  `final_state_after_quality_gate=WATCHLIST` cannot override a local-only
+  verdict.
 - Hardened artifact doctor counters for universal, hypothesis, non-hypothesis,
   safely capped, uncapped, legacy, diagnostic, and invalid incident conflicts.
 - Tightened claim/incident subject validation so generic prose fragments are
   rejected; invalid canonical incidents are stored as diagnostic-only unless
   linked to real hypothesis/watchlist context, and hidden from default incident
-  reports.
+  reports. Existing persisted garbage subjects are also quarantined at read
+  time unless `--include-diagnostic-incidents` is requested.
 - Expanded regression coverage for capped non-hypothesis rows, fresh uncapped
   watchlist conflicts, diagnostic incident rows, and subject cleanup such as
-  `OpenAI This` -> `OpenAI`.
+  `OpenAI This` -> `OpenAI`, `Polymarket World Cup Volume` -> `World Cup`, and
+  stale `LLM` rows becoming diagnostic-only.
 **Verify:** `python3 tests/test_indicators.py` passed (459/459);
 `make event-alpha-signal-quality-eval PYTHON=python3`;
 `make event-alpha-quality-validation-cycle PYTHON=python3`;
 `make verify PYTHON=python3`. Manual `notify_llm_quality` quality review,
 daily brief, strict artifact doctor, inbox, and incident report smoke commands
-completed; strict doctor had no blockers.
+completed; strict doctor had no blockers, and the default incident report hid
+the stale `LLM` diagnostic row.
 **Notes/risks:** Research-only artifact hygiene. No normal RSI rows, paper/live
 trades, execution, Telegram-send promotion, or LLM/provider-created
 `TRIGGERED_FADE` behavior changed.

@@ -85,12 +85,21 @@ _ABSENCE_OF_VALIDATED_CATALYST_PHRASES = (
     "no independent catalyst",
 )
 _GENERIC_SUBJECTS = {
+    "about",
     "actions",
+    "all",
     "announcements",
     "any",
     "any us",
+    "best prediction market apps",
+    "bitcoin and mstr are",
+    "during",
+    "here",
+    "llm",
+    "need",
     "no",
     "non",
+    "not",
     "note",
     "none",
     "unknown",
@@ -101,9 +110,16 @@ _GENERIC_SUBJECTS = {
     "it",
     "only",
     "openai this",
+    "seo",
+    "polymarket invite code sbwire",
+    "polymarket referral code sbwire",
     "the",
     "this",
     "that",
+    "when",
+    "where",
+    "will",
+    "yes",
     "market",
     "catalyst",
     "event",
@@ -122,7 +138,22 @@ _GENERIC_SUBJECTS = {
     "token",
     "coin",
 }
-_TRAILING_GENERIC_TOKENS = {"this", "that", "event", "catalyst", "market", "token", "coin", "announcement", "announcements"}
+_SUBJECT_REPLACEMENTS = {
+    "openai this": "OpenAI",
+    "polymarket world cup volume": "World Cup",
+}
+_TRAILING_GENERIC_TOKENS = {
+    "this",
+    "that",
+    "event",
+    "catalyst",
+    "market",
+    "token",
+    "coin",
+    "announcement",
+    "announcements",
+    "volume",
+}
 
 
 def extract_event_claims(raw_events: Iterable[RawDiscoveredEvent]) -> tuple[EventClaim, ...]:
@@ -390,21 +421,35 @@ def _clean_subject(value: str | None) -> str | None:
     if not text:
         return None
     text = re.sub(r"^(The|A|An)\s+", "", text).strip()
+    initial_cleaned = clean_text(text)
+    if initial_cleaned in _SUBJECT_REPLACEMENTS:
+        return _SUBJECT_REPLACEMENTS[initial_cleaned]
+    if _is_noise_subject(initial_cleaned):
+        return None
     parts = text.split()
     while parts and clean_text(parts[-1]) in _TRAILING_GENERIC_TOKENS:
         parts.pop()
     text = " ".join(parts).strip(" -:.,;|")
     lowered = clean_text(text)
+    if lowered in _SUBJECT_REPLACEMENTS:
+        return _SUBJECT_REPLACEMENTS[lowered]
     stop = {
         "the",
         "a",
         "an",
+        "about",
         "actions",
+        "all",
         "announcements",
         "any",
+        "during",
+        "here",
         "however",
         "it",
+        "llm",
         "meme",
+        "need",
+        "not",
         "non",
         "note",
         "only",
@@ -415,11 +460,26 @@ def _clean_subject(value: str | None) -> str | None:
         "team",
         "report",
         "source",
+        "seo",
         "bitcoin world",
         "crypto",
     }
-    if lowered in stop or lowered in _GENERIC_SUBJECTS:
+    if lowered in stop or lowered in _GENERIC_SUBJECTS or _is_noise_subject(lowered):
         return None
     if clean_text(text) in _GENERIC_SUBJECTS:
         return None
     return text or None
+
+
+def _is_noise_subject(cleaned: str) -> bool:
+    if not cleaned:
+        return True
+    if cleaned in _GENERIC_SUBJECTS:
+        return True
+    if "invite code" in cleaned or "referral code" in cleaned:
+        return True
+    if cleaned.startswith("best ") and cleaned.endswith(" apps"):
+        return True
+    if cleaned.endswith(" are") and " and " in cleaned:
+        return True
+    return False

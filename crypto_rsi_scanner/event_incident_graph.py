@@ -21,12 +21,21 @@ from .event_resolver import clean_text
 
 INCIDENT_GRAPH_SCHEMA_VERSION = "event_incident_graph_v1"
 _GENERIC_SUBJECTS = {
+    "about",
     "actions",
+    "all",
     "announcements",
     "any",
     "any us",
+    "best prediction market apps",
+    "bitcoin and mstr are",
+    "during",
+    "here",
+    "llm",
+    "need",
     "no",
     "non",
+    "not",
     "note",
     "none",
     "unknown",
@@ -37,9 +46,16 @@ _GENERIC_SUBJECTS = {
     "it",
     "only",
     "openai this",
+    "seo",
+    "polymarket invite code sbwire",
+    "polymarket referral code sbwire",
     "the",
     "this",
     "that",
+    "when",
+    "where",
+    "will",
+    "yes",
     "market",
     "catalyst",
     "event",
@@ -60,11 +76,17 @@ _GENERIC_SUBJECTS = {
 }
 _GENERIC_SUBJECT_TOKENS = {
     "a",
+    "about",
     "actions",
+    "all",
     "an",
     "announcements",
     "any",
+    "apps",
+    "are",
+    "best",
     "coin",
+    "during",
     "event",
     "january",
     "february",
@@ -78,19 +100,43 @@ _GENERIC_SUBJECT_TOKENS = {
     "october",
     "november",
     "december",
+    "here",
     "however",
     "it",
+    "llm",
     "market",
+    "need",
     "no",
     "non",
+    "not",
     "note",
     "only",
+    "seo",
     "that",
     "the",
     "this",
     "token",
+    "when",
+    "where",
+    "will",
+    "yes",
 }
-_TRAILING_GENERIC_TOKENS = {"this", "that", "event", "catalyst", "market", "token", "coin", "announcement", "announcements"}
+_SUBJECT_REPLACEMENTS = {
+    "openai this": "OpenAI",
+    "polymarket world cup volume": "World Cup",
+}
+_TRAILING_GENERIC_TOKENS = {
+    "this",
+    "that",
+    "event",
+    "catalyst",
+    "market",
+    "token",
+    "coin",
+    "announcement",
+    "announcements",
+    "volume",
+}
 
 
 @dataclass(frozen=True)
@@ -450,6 +496,12 @@ def _normalized_subject(value: str | None) -> str | None:
     if not text:
         return None
     text = re.sub(r"^(The|A|An)\s+", "", text).strip()
+    initial_cleaned = clean_text(text)
+    replacement = _SUBJECT_REPLACEMENTS.get(initial_cleaned)
+    if replacement:
+        return replacement
+    if _is_noise_subject(initial_cleaned):
+        return None
     parts = text.split()
     while parts and clean_text(parts[0]) in {"the", "a", "an"}:
         parts.pop(0)
@@ -457,6 +509,11 @@ def _normalized_subject(value: str | None) -> str | None:
         parts.pop()
     text = " ".join(parts).strip(" -:.,;|")
     cleaned = clean_text(text)
+    replacement = _SUBJECT_REPLACEMENTS.get(cleaned)
+    if replacement:
+        return replacement
+    if _is_noise_subject(cleaned):
+        return None
     if not cleaned or cleaned in {"bitcoin world", "crypto news", *_GENERIC_SUBJECTS}:
         return None
     tokens = cleaned.split()
@@ -467,6 +524,20 @@ def _normalized_subject(value: str | None) -> str | None:
     if len(text) < 3 and not text.isupper():
         return None
     return text or None
+
+
+def _is_noise_subject(cleaned: str) -> bool:
+    if not cleaned:
+        return True
+    if cleaned in _GENERIC_SUBJECTS:
+        return True
+    if "invite code" in cleaned or "referral code" in cleaned:
+        return True
+    if cleaned.startswith("best ") and cleaned.endswith(" apps"):
+        return True
+    if cleaned.endswith(" are") and " and " in cleaned:
+        return True
+    return False
 
 
 def _subject_quality(

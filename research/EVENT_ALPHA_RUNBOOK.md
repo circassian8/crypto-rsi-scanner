@@ -121,7 +121,11 @@ The same quality verdict is authoritative for lifecycle state. Rows with
 `WATCHLIST`/`HIGH_PRIORITY` opportunities unless the row also persists an
 explicit non-active `final_state_after_quality_gate`, `state_quality_capped=true`,
 and `quality_state_block_reason`. Treat `state` as final quality-capped state on
-fresh rows; requested pre-quality state is audit-only.
+fresh rows; requested pre-quality state is audit-only. Fresh alert/playbook or
+market-anomaly rows without explicit quality fields are conservative local-only
+evidence. When old rows carry quality fields but stale active final state,
+read/report paths recompute the final state from quality rather than trusting
+the stale stored final state.
 Impact review now also includes claim and incident context. Check
 `cause_status`, `claim_polarities`, `claim_history`, `primary_subject`,
 `affected_ecosystem`, `candidate_role`, `role_confidence`, and
@@ -141,10 +145,13 @@ No-catalyst phrases such as “no dated external catalyst has been validated,”
 unknown-cause metadata. They should never produce `primary_subject=No` or a
 confirmed `explains_market_move` claim.
 Generic prose fragments such as `Actions`, `Announcements`, `However`, `It`,
-`Non`, `Note`, and `Only` are not valid incident subjects. When no validated
-external entity, crypto asset, market-anomaly asset, or event entity is
-available, the incident row should be diagnostic-only and hidden from default
-incident reports rather than shown as a canonical opportunity.
+`LLM`, `Non`, `Note`, and `Only`, and SEO/source phrases such as
+`Best Prediction Market Apps`, `Bitcoin And MSTR Are`, and
+`Polymarket Invite Code SBWIRE` are not valid incident subjects. When no
+validated external entity, crypto asset, market-anomaly asset, or event entity
+is available, the incident row should be diagnostic-only and hidden from default
+incident reports rather than shown as a canonical opportunity. Existing
+persisted garbage-subject rows are also quarantined at read/report time.
 
 Canonical incidents are persisted separately from hypotheses under the active
 profile namespace:
@@ -152,6 +159,7 @@ profile namespace:
 ```bash
 make event-incidents-report PROFILE=notify_llm
 make event-incidents-report PROFILE=quality_validation
+python3 main.py --event-incidents-report --event-alpha-profile notify_llm_quality --include-diagnostic-incidents
 ```
 
 The report reads `event_fade_cache/<namespace>/event_incidents.jsonl` unless an
@@ -168,7 +176,9 @@ local-only. For market anomalies, verify that canonical names are asset-specific
 `reaction_observed` from causal confirmation.
 Default incident reports hide diagnostic-only invalid-subject rows but still
 count them, so a rising diagnostic count means the source cleaner/entity guard
-needs review before treating those rows as real incidents.
+needs review before treating those rows as real incidents. Use
+`--include-diagnostic-incidents` only when intentionally auditing quarantined
+rows such as `LLM` or referral-code/source-noise subjects.
 The linked-asset roles should show the validated anomaly asset from the market
 payload as `direct_subject`. Sector rows such as `SECTOR`, source context, or
 generic unknown-market text are context only and must not be treated as direct
@@ -754,7 +764,10 @@ zero-score, or insufficient-data quality verdict must either carry a non-active
 `final_state_after_quality_gate` with `state_quality_capped=true`, or strict
 doctor blocks the namespace. Properly capped rows are visible in daily brief and
 quality review local-only sections, not in active watchlist sections. Legacy
-uncapped rows are migration warnings unless `STRICT_LEGACY=1` is set.
+uncapped rows are migration warnings unless `STRICT_LEGACY=1` is set. The
+doctor also reports quarantined diagnostic incident rows and garbage primary
+subjects; diagnostic garbage warns by default, while fresh invalid canonical
+incident rows block strict checks.
 
 For migration review only, include legacy/default rows explicitly:
 

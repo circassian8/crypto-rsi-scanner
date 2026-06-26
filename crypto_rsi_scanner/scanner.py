@@ -3822,6 +3822,7 @@ def event_incidents_report(
     latest_run: bool = False,
     run_id: str | None = None,
     include_legacy: bool = True,
+    include_diagnostic: bool = False,
 ) -> None:
     """Print stored canonical incident rows for a profile/namespace."""
     _setup_event_discovery_logging(verbose)
@@ -3837,6 +3838,7 @@ def event_incidents_report(
         latest_run=latest_run,
         run_id=run_id,
         include_legacy=include_legacy,
+        include_diagnostic=include_diagnostic,
     )
     print(_event_alpha_context_block(context))
     print(event_incident_store.format_incidents_report(result))
@@ -7860,6 +7862,11 @@ def cli() -> None:
         help="Optional canonical incident JSONL path for --event-incidents-report.",
     )
     parser.add_argument(
+        "--include-diagnostic-incidents",
+        action="store_true",
+        help="For --event-incidents-report, include diagnostic-only invalid-subject incidents that are hidden by default.",
+    )
+    parser.add_argument(
         "--latest-run",
         action="store_true",
         help="For impact-hypothesis reports, show only rows from the latest stored run_id. This is the default unless --all-history, --run-id, or --since is used.",
@@ -8725,6 +8732,7 @@ def cli() -> None:
             latest_run=latest_incident_run,
             run_id=args.run_id,
             include_legacy=args.include_legacy or args.all_history,
+            include_diagnostic=args.include_diagnostic_incidents,
         )
         return
     if args.event_impact_hypothesis_smoke:

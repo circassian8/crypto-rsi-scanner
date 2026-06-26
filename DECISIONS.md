@@ -25,11 +25,18 @@ verdict, not only router/notification gates. Fresh rows with
 `source_class=insufficient_data`, or `evidence_specificity=insufficient_data`
 must not persist as active `WATCHLIST`, `HIGH_PRIORITY`, `EVENT_PASSED`, or
 `ARMED` unless they explicitly persist a non-active
-`final_state_after_quality_gate` plus `state_quality_capped=true`. Generic prose
-fragments are not valid canonical incident subjects; invalid incident rows are
-diagnostic-only unless linked to real hypothesis/watchlist context. These rules
-are artifact truth and operator-UX rules only, and cannot create candidates,
-normal RSI alerts, paper rows, trades, or `TRIGGERED_FADE`.
+`final_state_after_quality_gate` plus `state_quality_capped=true`. Missing
+quality on fresh alert/playbook/market-anomaly rows is conservative local-only
+evidence, and stale persisted final states must be recomputed from quality
+fields when those fields are present. Generic prose, source, and SEO fragments
+are not valid canonical incident subjects; invalid incident rows are
+diagnostic-only unless linked to real hypothesis/watchlist context. Existing
+persisted garbage subjects such as `LLM`, `Best Prediction Market Apps`, or
+`Polymarket Invite Code SBWIRE` must be quarantined at read/report time and
+hidden from default incident reports unless diagnostics are explicitly
+requested. These rules are artifact truth and operator-UX rules only, and
+cannot create candidates, normal RSI alerts, paper rows, trades, or
+`TRIGGERED_FADE`.
 **Why:** Operator reports should not show local-only or insufficient-data
 evidence as active opportunities merely because an older playbook/watchlist path
 requested a stronger state. Likewise, incident reports need real entities, not

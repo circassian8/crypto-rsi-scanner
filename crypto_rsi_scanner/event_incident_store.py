@@ -132,6 +132,7 @@ def load_incidents(
     latest_run: bool = False,
     run_id: str | None = None,
     include_legacy: bool = True,
+    include_diagnostic: bool = False,
 ) -> EventIncidentStoreReadResult:
     """Load stored incidents newest-first, tolerating malformed legacy rows."""
     p = Path(path).expanduser()
@@ -150,6 +151,7 @@ def load_incidents(
         run_id=run_id,
         include_legacy=include_legacy,
     )
+    rows = [_row_with_effective_subject_quality(row) for row in rows]
     if limit is not None and limit > 0:
         rows = rows[:limit]
     return EventIncidentStoreReadResult(
@@ -165,6 +167,7 @@ def load_incidents(
             "latest_run": bool(latest_run),
             "run_id": run_id,
             "include_legacy": bool(include_legacy),
+            "include_diagnostic": bool(include_diagnostic),
             "limit": limit,
         },
     )
@@ -172,8 +175,10 @@ def load_incidents(
 
 def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     """Return an operator-readable incident artifact report."""
-    display_rows = [row for row in result.rows if not bool(row.get("diagnostic_only"))]
+    include_diagnostic = bool(result.filters.get("include_diagnostic"))
     diagnostic_rows = [row for row in result.rows if bool(row.get("diagnostic_only"))]
+    display_rows = list(result.rows) if include_diagnostic else [row for row in result.rows if not bool(row.get("diagnostic_only"))]
+    diagnostic_hidden = 0 if include_diagnostic else len(diagnostic_rows)
     rows = [
         "=" * 76,
         "EVENT INCIDENTS REPORT (research artifact only)",
@@ -185,7 +190,8 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
         f"latest_run_rows_available: {result.latest_run_rows_available}",
         f"historical_rows_available: {result.historical_rows_available}",
         f"legacy_rows_available: {result.legacy_rows_available}",
-        f"diagnostic_rows_hidden: {len(diagnostic_rows)}",
+        f"diagnostic_rows_hidden: {diagnostic_hidden}",
+        f"diagnostic_rows_available: {len(diagnostic_rows)}",
         "filters: " + _format_filter_summary(result.filters),
     ]
     if not display_rows:
@@ -602,6 +608,65 @@ def _filter_rows(
             continue
         out.append(data)
     return out
+
+
+_GARBAGE_INCIDENT_SUBJECTS = {
+    "about",
+    "actions",
+    "all",
+    "announcements",
+    "any",
+    "any us",
+    "best prediction market apps",
+    "bitcoin and mstr are",
+    "during",
+    "here",
+    "however",
+    "it",
+    "llm",
+    "need",
+    "non",
+    "not",
+    "note",
+    "only",
+    "polymarket invite code sbwire",
+    "polymarket referral code sbwire",
+    "polymarket world cup volume",
+    "when",
+    "where",
+    "will",
+    "yes",
+}
+
+
+def _row_with_effective_subject_quality(row: Mapping[str, Any]) -> dict[str, Any]:
+    data = dict(row)
+    if not _is_garbage_incident_subject(data.get("primary_subject")):
+        return data
+    warnings = [str(item) for item in data.get("warnings") or () if str(item or "").strip()]
+    if "incident_primary_subject_garbage_quarantined" not in warnings:
+        warnings.append("incident_primary_subject_garbage_quarantined")
+    data["diagnostic_only"] = True
+    data["incident_subject_quality"] = "diagnostic_only"
+    data["incident_subject_quality_reason"] = "garbage_primary_subject_quarantined"
+    data["warnings"] = tuple(warnings)
+    return data
+
+
+def _is_garbage_incident_subject(value: Any) -> bool:
+    text = str(value or "").strip().casefold()
+    text = " ".join(text.replace("-", " ").replace("_", " ").split())
+    if not text:
+        return False
+    if text in _GARBAGE_INCIDENT_SUBJECTS:
+        return True
+    if "invite code" in text or "referral code" in text:
+        return True
+    if text.startswith("best ") and text.endswith(" apps"):
+        return True
+    if text.endswith(" are") and " and " in text:
+        return True
+    return False
 
 
 def _latest_run_id(rows: Iterable[Mapping[str, Any]]) -> str | None:

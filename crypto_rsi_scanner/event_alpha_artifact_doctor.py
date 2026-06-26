@@ -58,6 +58,7 @@ class EventAlphaArtifactDoctorResult:
     incident_rows_without_linked_watchlist: int = 0
     diagnostic_incident_rows: int = 0
     invalid_canonical_incident_rows: int = 0
+    garbage_primary_subject_incidents: int = 0
     fresh_incident_linkage_blockers: int = 0
     legacy_incident_linkage_warnings: int = 0
     strict_legacy: bool = False
@@ -349,6 +350,8 @@ def diagnose_artifacts(
         )
     if incident_linkage["diagnostic_incident_rows"]:
         warnings.append(f"diagnostic_incident_rows={incident_linkage['diagnostic_incident_rows']}")
+    if incident_linkage["garbage_primary_subject_incidents"]:
+        warnings.append(f"garbage_primary_subject_incidents={incident_linkage['garbage_primary_subject_incidents']}")
     if incident_linkage["invalid_canonical_incident_rows"]:
         message = f"invalid_canonical_incident_rows={incident_linkage['invalid_canonical_incident_rows']}"
         (blockers if strict else warnings).append(message)
@@ -403,6 +406,7 @@ def diagnose_artifacts(
         incident_rows_without_linked_watchlist=incident_linkage["incident_rows_without_linked_watchlist"],
         diagnostic_incident_rows=incident_linkage["diagnostic_incident_rows"],
         invalid_canonical_incident_rows=incident_linkage["invalid_canonical_incident_rows"],
+        garbage_primary_subject_incidents=incident_linkage["garbage_primary_subject_incidents"],
         fresh_incident_linkage_blockers=(
             incident_linkage["fresh_missing_hypotheses"]
             + incident_linkage["fresh_missing_watchlist"]
@@ -659,6 +663,7 @@ def _incident_linkage_summary(
         "legacy_missing_alerts": 0,
         "diagnostic_incident_rows": 0,
         "invalid_canonical_incident_rows": 0,
+        "garbage_primary_subject_incidents": 0,
     }
     for row in hypotheses:
         if dict(row).get("row_type") not in {"event_impact_hypothesis", ""}:
@@ -697,6 +702,8 @@ def _incident_linkage_summary(
             continue
         subject_quality = str(row.get("incident_subject_quality") or "").strip()
         diagnostic = row.get("diagnostic_only") is True
+        if _is_garbage_incident_subject(row.get("primary_subject")):
+            out["garbage_primary_subject_incidents"] += 1
         if diagnostic:
             out["diagnostic_incident_rows"] += 1
             continue
@@ -707,6 +714,51 @@ def _incident_linkage_summary(
         if not row.get("linked_watchlist_keys"):
             out["incident_rows_without_linked_watchlist"] += 1
     return out
+
+
+_GARBAGE_INCIDENT_SUBJECTS = {
+    "about",
+    "actions",
+    "all",
+    "announcements",
+    "any",
+    "any us",
+    "best prediction market apps",
+    "bitcoin and mstr are",
+    "during",
+    "here",
+    "however",
+    "it",
+    "llm",
+    "need",
+    "non",
+    "not",
+    "note",
+    "only",
+    "polymarket invite code sbwire",
+    "polymarket referral code sbwire",
+    "polymarket world cup volume",
+    "when",
+    "where",
+    "will",
+    "yes",
+}
+
+
+def _is_garbage_incident_subject(value: Any) -> bool:
+    text = str(value or "").strip().casefold()
+    text = " ".join(text.replace("-", " ").replace("_", " ").split())
+    if not text:
+        return False
+    if text in _GARBAGE_INCIDENT_SUBJECTS:
+        return True
+    if "invite code" in text or "referral code" in text:
+        return True
+    if text.startswith("best ") and text.endswith(" apps"):
+        return True
+    if text.endswith(" are") and " and " in text:
+        return True
+    return False
 
 
 def _row_incident_id(row: Mapping[str, Any]) -> str:
@@ -841,6 +893,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"incident_rows_without_linked_watchlist={result.incident_rows_without_linked_watchlist} "
             f"diagnostic_incident_rows={result.diagnostic_incident_rows} "
             f"invalid_canonical_incident_rows={result.invalid_canonical_incident_rows} "
+            f"garbage_primary_subject_incidents={result.garbage_primary_subject_incidents} "
             f"fresh_blockers={result.fresh_incident_linkage_blockers} "
             f"legacy_warnings={result.legacy_incident_linkage_warnings}"
         ),

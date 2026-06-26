@@ -9812,8 +9812,28 @@ def test_event_watchlist_refresh_tracks_escalations_and_suppresses_duplicates():
     )
     discovery = event_discovery.run_discovery([raw], [asset], now=now)
     base = event_alerts.build_event_alert_candidates(discovery, now=now)[0]
-    radar = replace(base, tier=event_alerts.EventAlertTier.RADAR_DIGEST, opportunity_score=60)
-    watch = replace(base, tier=event_alerts.EventAlertTier.WATCHLIST, opportunity_score=75)
+    active_quality = {
+        **base.score_components,
+        "impact_path_type": "proxy_exposure",
+        "impact_path_strength": "strong",
+        "candidate_role": "proxy_instrument",
+        "evidence_quality_score": 82,
+        "source_class": "crypto_news",
+        "evidence_specificity": "direct_value_capture",
+        "market_confirmation_score": 58,
+        "market_confirmation_level": "weak",
+        "opportunity_score_final": 72,
+        "opportunity_level": "validated_digest",
+        "opportunity_verdict_reasons": ["fixture_valid_proxy_watch"],
+        "why_local_only": "not_local_only",
+        "why_not_watchlist": "needs_strong_market_confirmation",
+        "manual_verification_items": ["verify proxy instrument and market confirmation"],
+        "upgrade_requirements": ["needs_strong_market_confirmation"],
+        "downgrade_warnings": [],
+    }
+    radar = replace(base, tier=event_alerts.EventAlertTier.RADAR_DIGEST, opportunity_score=60, score_components=active_quality)
+    watch_quality = {**active_quality, "market_confirmation_score": 70, "market_confirmation_level": "moderate", "opportunity_score_final": 82, "opportunity_level": "watchlist", "why_not_watchlist": "already_watchlisted", "upgrade_requirements": []}
+    watch = replace(base, tier=event_alerts.EventAlertTier.WATCHLIST, opportunity_score=75, score_components=watch_quality)
 
     with tempfile.TemporaryDirectory() as tmp:
         state_path = Path(tmp) / "watchlist.jsonl"
@@ -10392,6 +10412,7 @@ def test_event_alpha_router_routes_material_changes_with_lanes():
 
 
 def test_event_alpha_quality_gate_dominates_router_and_artifacts():
+    import json
     import tempfile
     from dataclasses import asdict
     from datetime import datetime, timezone
@@ -10678,6 +10699,37 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     )
     assert doctor_uncapped_watchlist.status == "BLOCKED"
     assert doctor_uncapped_watchlist.fresh_watchlist_state_conflict_rows == 1
+    with tempfile.TemporaryDirectory() as stale_tmp:
+        stale_path = Path(stale_tmp) / "event_watchlist_state.jsonl"
+        stale_non_hypothesis = asdict(btc)
+        stale_non_hypothesis["key"] = "stale-non-hypothesis|chz"
+        stale_non_hypothesis["symbol"] = "CHZ"
+        stale_non_hypothesis["coin_id"] = "chiliz"
+        stale_non_hypothesis["hypothesis_id"] = None
+        stale_non_hypothesis["incident_id"] = None
+        stale_non_hypothesis["state"] = "WATCHLIST"
+        stale_non_hypothesis["requested_state_before_quality_gate"] = "WATCHLIST"
+        stale_non_hypothesis["final_state_after_quality_gate"] = "WATCHLIST"
+        stale_non_hypothesis["state_quality_capped"] = False
+        stale_non_hypothesis["run_mode"] = "burn_in"
+        stale_non_hypothesis["artifact_namespace"] = "notify_llm_quality"
+        stale_path.write_text(json.dumps(stale_non_hypothesis) + "\n", encoding="utf-8")
+        loaded_stale = event_watchlist.load_watchlist(stale_path).entries[0]
+        assert event_watchlist.requested_state_value(loaded_stale) == "WATCHLIST"
+        assert event_watchlist.final_state_value(loaded_stale) == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value
+        assert loaded_stale.state == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value
+        assert loaded_stale.state_quality_capped is True
+        assert loaded_stale.quality_state_block_reason == "impact_path_type_insufficient_data"
+        assert event_watchlist.final_state_value(stale_non_hypothesis) == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value
+        stale_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "r1", "alertable": 0}],
+            watchlist_rows=[stale_non_hypothesis],
+            include_legacy_artifacts=True,
+            strict=True,
+        )
+        assert stale_doctor.status == "BLOCKED"
+        assert stale_doctor.universal_watchlist_state_conflicts == 1
+        assert stale_doctor.non_hypothesis_watchlist_quality_conflicts == 1
     legacy_conflict = dict(btc_snapshot)
     legacy_conflict["run_id"] = "r1"
     legacy_conflict["route_alertable"] = True
@@ -21958,6 +22010,120 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     assert prose_fragment_incident.diagnostic_only is True
     assert "incident_primary_subject_invalid" in prose_fragment_incident.warnings
     assert event_claim_semantics.infer_primary_subject("OpenAI This suffered outage reports.") == "OpenAI"
+    invalid_subject_examples = (
+        "About",
+        "All",
+        "During",
+        "Here",
+        "LLM",
+        "Need",
+        "Not",
+        "When",
+        "Where",
+        "Will",
+        "Yes",
+        "Best Prediction Market Apps",
+        "Bitcoin And MSTR Are",
+        "Polymarket Invite Code SBWIRE",
+        "Polymarket Referral Code SBWIRE",
+    )
+    for idx, title in enumerate(invalid_subject_examples):
+        bad_raw = raw(
+            f"bad_subject_{idx}",
+            title,
+            f"{title} is a page heading, source label, or SEO phrase with no validated event subject.",
+            url=f"https://fragment.example/{idx}",
+        )
+        bad_event = NormalizedEvent(
+            f"evt_bad_subject_{idx}",
+            (bad_raw.raw_id,),
+            title,
+            "news",
+            None,
+            0.0,
+            now,
+            "fixture_news",
+            (bad_raw.source_url,),
+            None,
+            bad_raw.body,
+            0.35,
+        )
+        bad_incident = event_incident_graph.build_incidents((bad_event,), {bad_raw.raw_id: bad_raw})[0]
+        assert bad_incident.primary_subject != title
+        assert bad_incident.subject_quality == "invalid"
+        assert bad_incident.diagnostic_only is True
+    polymarket_wc_raw = raw(
+        "polymarket_world_cup_volume",
+        "Polymarket World Cup Volume",
+        "Polymarket World Cup volume rises before a prediction-market fixture.",
+        url="https://fragment.example/polymarket-world-cup-volume",
+    )
+    polymarket_wc_event = NormalizedEvent(
+        "evt_polymarket_world_cup",
+        ("polymarket_world_cup_volume",),
+        "Polymarket World Cup Volume",
+        "sports_event",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (),
+        "World Cup",
+        polymarket_wc_raw.body,
+        0.72,
+    )
+    polymarket_wc_incident = event_incident_graph.build_incidents(
+        (polymarket_wc_event,),
+        {"polymarket_world_cup_volume": polymarket_wc_raw},
+    )[0]
+    assert polymarket_wc_incident.primary_subject == "World Cup"
+    assert polymarket_wc_incident.diagnostic_only is False
+    next_bond_raw = raw(
+        "next_bond",
+        "Next James Bond prediction market",
+        "A prediction market asks who will be the Next James Bond.",
+        url="https://fragment.example/next-james-bond",
+    )
+    next_bond_event = NormalizedEvent(
+        "evt_next_bond",
+        ("next_bond",),
+        "Next James Bond prediction market",
+        "prediction_market",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (),
+        "Next James Bond",
+        next_bond_raw.body,
+        0.74,
+    )
+    next_bond_incident = event_incident_graph.build_incidents((next_bond_event,), {"next_bond": next_bond_raw})[0]
+    assert next_bond_incident.primary_subject == "Next James Bond"
+    for valid_subject in ("SpaceX", "OpenAI", "Anthropic", "THORChain", "SecondFi", "Solana"):
+        valid_raw = raw(
+            f"valid_{valid_subject.lower()}",
+            f"{valid_subject} suffered outage reports",
+            f"{valid_subject} is the named subject in a concrete incident source.",
+            url=f"https://fragment.example/{valid_subject.lower()}",
+        )
+        valid_event = NormalizedEvent(
+            f"evt_valid_{valid_subject.lower()}",
+            (valid_raw.raw_id,),
+            f"{valid_subject} incident",
+            "news",
+            None,
+            0.0,
+            now,
+            "fixture_news",
+            (),
+            valid_subject,
+            valid_raw.body,
+            0.80,
+        )
+        valid_incident = event_incident_graph.build_incidents((valid_event,), {valid_raw.raw_id: valid_raw})[0]
+        assert valid_incident.primary_subject == valid_subject
+        assert valid_incident.subject_quality == "valid"
     with tempfile.TemporaryDirectory() as diag_tmp:
         diag_write = event_incident_store.write_incidents(
             EventDiscoveryResult((prose_fragment_raw,), (prose_fragment_event,), (), (), ()),
@@ -21974,7 +22140,83 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         assert diag_loaded.rows[0]["diagnostic_only"] is True
         diag_report = event_incident_store.format_incidents_report(diag_loaded)
         assert "diagnostic_rows_hidden: 1" in diag_report
+        assert "diagnostic_rows_available: 1" in diag_report
         assert "Actions Announcements However" not in diag_report
+        diag_visible = event_incident_store.load_incidents(diag_write.path, include_diagnostic=True)
+        diag_visible_report = event_incident_store.format_incidents_report(diag_visible)
+        assert "diagnostic_rows_hidden: 0" in diag_visible_report
+        assert "Unknown subject" in diag_visible_report
+        diagnostic_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-diagnostic-incident", "profile": "fixture", "artifact_namespace": "fixture", "run_mode": "test"}],
+            incident_rows=diag_loaded.rows,
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert diagnostic_doctor.status == "WARN"
+        assert diagnostic_doctor.diagnostic_incident_rows == 1
+        assert diagnostic_doctor.garbage_primary_subject_incidents == 0
+        canonical_bad = dict(diag_loaded.rows[0])
+        canonical_bad["diagnostic_only"] = False
+        canonical_bad["incident_subject_quality"] = "invalid"
+        canonical_bad["primary_subject"] = "About"
+        canonical_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-diagnostic-incident", "profile": "fixture", "artifact_namespace": "fixture", "run_mode": "test"}],
+            incident_rows=[canonical_bad],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert canonical_doctor.status == "BLOCKED"
+        assert canonical_doctor.invalid_canonical_incident_rows == 1
+        assert canonical_doctor.garbage_primary_subject_incidents == 1
+
+        import json
+
+        stale_garbage_path = Path(diag_tmp) / "stale_garbage_incidents.jsonl"
+        stale_garbage_row = {
+            "schema_version": event_incident_store.INCIDENT_STORE_SCHEMA_VERSION,
+            "row_type": "event_incident",
+            "observed_at": now.isoformat(),
+            "run_id": "run-stale-garbage",
+            "profile": "fixture",
+            "run_mode": "test",
+            "artifact_namespace": "fixture",
+            "incident_id": "incident:stale_garbage",
+            "canonical_name": "LLM political event",
+            "event_archetype": "political_event",
+            "primary_subject": "LLM",
+            "incident_subject_quality": "valid",
+            "incident_subject_quality_reason": "legacy_artifact",
+            "diagnostic_only": False,
+            "linked_hypothesis_ids": [],
+            "linked_watchlist_keys": [],
+            "linked_assets": [],
+            "current_cause_status": "unknown",
+            "source_update_count": 1,
+            "independent_source_count": 1,
+            "incident_confidence": 63,
+            "warnings": [],
+        }
+        stale_garbage_path.write_text(json.dumps(stale_garbage_row) + "\n", encoding="utf-8")
+        stale_loaded = event_incident_store.load_incidents(stale_garbage_path)
+        assert stale_loaded.rows[0]["diagnostic_only"] is True
+        assert stale_loaded.rows[0]["incident_subject_quality"] == "diagnostic_only"
+        stale_report = event_incident_store.format_incidents_report(stale_loaded)
+        assert "diagnostic_rows_hidden: 1" in stale_report
+        assert "LLM political event" not in stale_report
+        stale_visible = event_incident_store.load_incidents(stale_garbage_path, include_diagnostic=True)
+        stale_visible_report = event_incident_store.format_incidents_report(stale_visible)
+        assert "diagnostic_rows_hidden: 0" in stale_visible_report
+        assert "LLM political event" in stale_visible_report
+        stale_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-stale-garbage", "profile": "fixture", "artifact_namespace": "fixture", "run_mode": "test"}],
+            incident_rows=stale_loaded.rows,
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert stale_doctor.status == "WARN"
+        assert stale_doctor.diagnostic_incident_rows == 1
+        assert stale_doctor.garbage_primary_subject_incidents == 1
+        assert stale_doctor.invalid_canonical_incident_rows == 0
 
     secondfi_a = raw(
         "secondfi_a",
