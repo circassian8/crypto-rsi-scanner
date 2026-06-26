@@ -34,6 +34,14 @@ active. A broad external event without a validated crypto asset, generated
 hypothesis, watchlist linkage, direct crypto archetype, or market-dislocation
 evidence is external context/raw evidence, not an operational canonical
 incident.
+`active_incident` and `linked_incident` status require quality-qualified crypto
+links, not merely any legacy hypothesis/watchlist id. A link qualifies only when
+the linked row is not quality-capped/local-only, has a non-generic impact path,
+has non-insufficient evidence, has a concrete validated asset or strong sector
+thesis, and avoids unknown/generic/source-noise roles. Weak sector-only,
+unknown-role, or quality-blocked links are recorded as link-quality diagnostics
+and may leave an event as `incident_candidate`/`external_context_only`, but they
+do not make the incident active.
 **Why:** Broad political, sports, prediction-market, and news rows are useful
 for source diagnostics and future search, but showing them beside linked crypto
 incidents overstates actionability and creates noise in daily briefs, doctor

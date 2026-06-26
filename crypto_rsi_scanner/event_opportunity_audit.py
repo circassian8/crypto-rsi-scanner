@@ -263,6 +263,22 @@ def _incident_lines(
         f"score={source.get('incident_relevance_score') or components.get('incident_relevance_score') or 'n/a'}",
         f"- persistence reason: {source.get('canonical_persistence_reason') or components.get('canonical_persistence_reason') or 'unknown'}",
         f"- relevance reasons: {_list_value(source.get('incident_relevance_reasons') or components.get('incident_relevance_reasons'))}",
+        (
+            "- link quality: "
+            f"raw={source.get('raw_link_count') or components.get('raw_link_count') or 0}, "
+            f"qualified={source.get('qualified_link_count') or components.get('qualified_link_count') or 0}, "
+            f"weak={source.get('weak_link_count') or components.get('weak_link_count') or 0}, "
+            f"quality_blocked={source.get('quality_blocked_link_count') or components.get('quality_blocked_link_count') or 0}, "
+            f"unknown_role={source.get('unknown_role_link_count') or components.get('unknown_role_link_count') or 0}"
+        ),
+        "- link quality reasons: "
+        + _list_value(source.get("link_quality_reasons") or components.get("link_quality_reasons")),
+        "- weak-link explanation: "
+        + (
+            "this candidate qualified the incident"
+            if int(source.get("qualified_link_count") or components.get("qualified_link_count") or 0) > 0
+            else "weak or quality-blocked links do not make an incident active"
+        ),
         f"- primary subject: {source.get('primary_subject') or components.get('primary_subject') or 'unknown'}",
         f"- affected ecosystem: {source.get('affected_ecosystem') or components.get('affected_ecosystem') or 'unknown'}",
         f"- current cause status: {source.get('current_cause_status') or source.get('cause_status') or components.get('cause_status') or 'unknown'}",

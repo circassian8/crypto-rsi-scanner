@@ -833,11 +833,19 @@ def _canonical_incident_lines(rows: Iterable[Mapping[str, Any]]) -> list[str]:
             if str(row.get("current_cause_status") or "") == "confirmed"
             and not row.get("market_context_source")
         )),
+        "- Weak unqualified incident links: "
+        + str(sum(int(row.get("weak_link_count") or 0) for row in visible)),
     ]
     candidates = [row for row in visible if str(row.get("incident_relevance_status") or "") == "incident_candidate"]
+    active = [
+        row for row in visible
+        if str(row.get("incident_relevance_status") or "") == "active_incident"
+        and int(row.get("qualified_link_count") or 0) > 0
+    ]
     linked = [
         row for row in visible
-        if str(row.get("incident_relevance_status") or "") in {"linked_incident", "active_incident"}
+        if str(row.get("incident_relevance_status") or "") == "linked_incident"
+        and int(row.get("qualified_link_count") or 0) > 0
     ]
     market_unknown = [
         row for row in visible
@@ -845,8 +853,18 @@ def _canonical_incident_lines(rows: Iterable[Mapping[str, Any]]) -> list[str]:
         and str(row.get("current_cause_status") or "") in {"unknown", "ruled_out"}
     ]
     lines.append(f"- Incident candidates: {len(candidates)}")
-    lines.append(f"- Linked/active incidents: {len(linked)}")
+    lines.append(f"- Active incidents with qualified links: {len(active)}")
+    lines.append(f"- Linked incidents with qualified links: {len(linked)}")
     lines.append(f"- Market reactions with unknown/ruled-out cause: {len(market_unknown)}")
+    if candidates:
+        labels = []
+        for row in candidates[:5]:
+            labels.append(
+                f"{row.get('canonical_name') or row.get('incident_id')}: "
+                f"reason={row.get('canonical_persistence_reason') or 'candidate'} "
+                f"weak_links={int(row.get('weak_link_count') or 0)}"
+            )
+        lines.append("- Incident candidates awaiting qualified crypto link: " + " | ".join(labels))
     notable = sorted(
         visible,
         key=lambda row: (

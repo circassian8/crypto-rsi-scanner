@@ -153,10 +153,21 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
             bool(case.get("candidate_symbol") or case.get("candidate_coin_id")),
         )
     )
+    incident_hypothesis_row = _incident_hypothesis_row(
+        hypothesis,
+        incident_id=incident.incident_id,
+        symbol=symbol,
+        coin_id=coin_id,
+        impact=impact,
+        evidence=evidence,
+        verdict=verdict,
+        opportunity_level=opportunity_level,
+        identity_rejection=identity_rejection,
+    )
     incident_relevance = event_incident_store.classify_incident_relevance(
         incident,
         raw_by_id={raw.raw_id: raw},
-        hypotheses=(hypothesis,) if incident_hypothesis_generated else (),
+        hypotheses=(incident_hypothesis_row,) if incident_hypothesis_generated else (),
         watchlist_rows=(),
     )
     reported_impact_path = impact.impact_path_type
@@ -193,6 +204,11 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         "incident_relevance_status": incident_relevance["incident_relevance_status"],
         "incident_relevance_score": incident_relevance["incident_relevance_score"],
         "canonical_persistence_reason": incident_relevance["canonical_persistence_reason"],
+        "qualified_link_count": incident_relevance.get("qualified_link_count"),
+        "weak_link_count": incident_relevance.get("weak_link_count"),
+        "quality_blocked_link_count": incident_relevance.get("quality_blocked_link_count"),
+        "unknown_role_link_count": incident_relevance.get("unknown_role_link_count"),
+        "link_quality_reasons": incident_relevance.get("link_quality_reasons"),
         "diagnostic_hidden_by_default": incident_relevance["incident_relevance_status"] in {
             event_incident_store.RELEVANCE_RAW_OBSERVATION,
             event_incident_store.RELEVANCE_EXTERNAL_CONTEXT_ONLY,
@@ -300,6 +316,41 @@ def _hypothesis(case: Mapping[str, Any]) -> SimpleNamespace:
     )
 
 
+def _incident_hypothesis_row(
+    hypothesis: SimpleNamespace,
+    *,
+    incident_id: str,
+    symbol: str | None,
+    coin_id: str | None,
+    impact: event_impact_path_validator.ImpactPathValidation,
+    evidence: event_evidence_quality.EvidenceQualityResult,
+    verdict: event_opportunity_verdict.OpportunityVerdict,
+    opportunity_level: str,
+    identity_rejection: str | None,
+) -> dict[str, Any]:
+    level = "local_only" if identity_rejection else opportunity_level
+    return {
+        "row_type": "event_impact_hypothesis",
+        "hypothesis_id": f"signal-quality:{incident_id}",
+        "incident_id": incident_id,
+        "validated_symbol": None if identity_rejection else symbol,
+        "validated_coin_id": None if identity_rejection else coin_id,
+        "candidate_symbols": (symbol,) if symbol else (),
+        "candidate_coin_ids": (coin_id,) if coin_id else (),
+        "candidate_sectors": ("tokenized_stock_venues",) if not symbol and str(getattr(hypothesis, "impact_category", "")).endswith("_proxy") else (),
+        "impact_category": getattr(hypothesis, "impact_category", None),
+        "impact_path_type": impact.impact_path_type,
+        "impact_path_strength": impact.impact_path_strength,
+        "candidate_role": impact.candidate_role,
+        "evidence_specificity": evidence.evidence_specificity,
+        "source_class": evidence.source_class,
+        "opportunity_level": level,
+        "opportunity_score_final": 0.0 if identity_rejection else verdict.opportunity_score_final,
+        "why_local_only": identity_rejection or verdict.why_local_only,
+        "why_not_watchlist": identity_rejection or verdict.why_not_watchlist,
+    }
+
+
 def _expected(case: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in dict(case.get("expected") or {}).items()}
 
@@ -331,6 +382,11 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "incident_relevance_status": "incident_relevance",
         "incident_relevance_score": "incident_relevance",
         "canonical_persistence_reason": "incident_relevance",
+        "qualified_link_count": "incident_relevance",
+        "weak_link_count": "incident_relevance",
+        "quality_blocked_link_count": "incident_relevance",
+        "unknown_role_link_count": "incident_relevance",
+        "link_quality_reasons": "incident_relevance",
         "diagnostic_hidden_by_default": "incident_relevance",
         "external_context_hidden_by_default": "incident_relevance",
     }

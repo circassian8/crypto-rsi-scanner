@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-26 — Require quality-qualified incident links · Codex
+**Why:** Broad external events such as Annexation, Macron, OpenAI, Metamask,
+and Databricks were still appearing as `active_incident` because stale/legacy
+watchlist links existed, even when those links were unknown-role, sector-only,
+or quality-blocked. Active incident status needs to mean a real
+quality-qualified crypto link exists.
+**Changes:**
+- Added incident link-quality classification with raw, qualified, weak,
+  quality-blocked, unknown-role, and sector-only link counts plus reason codes.
+- Changed incident relevance so `active_incident` requires a qualified
+  hypothesis/watchlist link or explicit non-blocked material update; weak links
+  now leave rows as `incident_candidate` or hidden `external_context_only`.
+- Hardened legacy artifact reads so old no-status or legacy-linked rows are
+  downgraded at report time when their links are not quality-qualified.
+- Surfaced link quality in incident reports, daily briefs, opportunity audits,
+  artifact doctor checks, signal-quality evals, and regression tests.
+**Verify:** Focused incident relevance tests passed; `python3
+tests/test_indicators.py` passed (460/460); `make
+event-alpha-signal-quality-eval PYTHON=python3` passed (31/31); `make
+event-alpha-quality-validation-cycle PYTHON=python3` completed with strict
+doctor warnings only for weak unqualified links and no blockers; `make verify
+PYTHON=python3` passed. Manual `notify_llm_quality` smoke: incidents report now
+shows `active_incidents: 0`, `linked_incidents: 0`, and weak OpenAI/Databricks/
+Anthropic rows as `incident_candidate`; strict doctor has no incident-link
+blockers; daily brief writes with incident candidates separated from active
+qualified incidents.
+**Notes/risks:** Research-only artifact classification. No normal RSI rows,
+paper/live trades, execution, Telegram promotion, or LLM/provider-created
+`TRIGGERED_FADE` behavior changed.
+
 ## 2026-06-26 — Split external context from raw incident relevance · Codex
 **Why:** The first incident relevance gate hid broad unlinked events, but it
 still collapsed generic external context and raw observations into the same

@@ -81,6 +81,34 @@ class EventIncidentStoreConfig:
 
 
 @dataclass(frozen=True)
+class IncidentLinkQuality:
+    raw_link_count: int = 0
+    qualified_link_count: int = 0
+    qualified_hypothesis_count: int = 0
+    qualified_watchlist_count: int = 0
+    weak_link_count: int = 0
+    quality_blocked_link_count: int = 0
+    unknown_role_link_count: int = 0
+    generic_sector_only_link_count: int = 0
+    link_quality_reasons: tuple[str, ...] = ()
+    link_quality_warnings: tuple[str, ...] = ()
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "raw_link_count": self.raw_link_count,
+            "qualified_link_count": self.qualified_link_count,
+            "qualified_hypothesis_count": self.qualified_hypothesis_count,
+            "qualified_watchlist_count": self.qualified_watchlist_count,
+            "weak_link_count": self.weak_link_count,
+            "quality_blocked_link_count": self.quality_blocked_link_count,
+            "unknown_role_link_count": self.unknown_role_link_count,
+            "generic_sector_only_link_count": self.generic_sector_only_link_count,
+            "link_quality_reasons": self.link_quality_reasons,
+            "link_quality_warnings": self.link_quality_warnings,
+        }
+
+
+@dataclass(frozen=True)
 class EventIncidentStoreWriteResult:
     path: Path
     attempted: bool
@@ -297,6 +325,14 @@ def format_incidents_report(result: EventIncidentStoreReadResult) -> str:
     rows.append(f"multiple_source_updates: {sum(1 for row in display_rows if int(row.get('source_update_count') or 0) > 1)}")
     rows.append(f"linked_to_hypotheses: {sum(1 for row in display_rows if row.get('linked_hypothesis_ids'))}")
     rows.append(f"linked_to_watchlist: {sum(1 for row in display_rows if row.get('linked_watchlist_keys'))}")
+    rows.append(f"active_incidents: {sum(1 for row in display_rows if str(row.get('incident_relevance_status') or '') == RELEVANCE_ACTIVE_INCIDENT)}")
+    rows.append(f"linked_incidents: {sum(1 for row in display_rows if str(row.get('incident_relevance_status') or '') == RELEVANCE_LINKED_INCIDENT)}")
+    rows.append(f"incident_candidates: {sum(1 for row in display_rows if str(row.get('incident_relevance_status') or '') == RELEVANCE_INCIDENT_CANDIDATE)}")
+    rows.append(f"external_context_only_hidden: {external_context_hidden}")
+    rows.append(f"weak_unqualified_links: {sum(int(row.get('weak_link_count') or 0) for row in display_rows)}")
+    rows.append(f"qualified_incident_links: {sum(int(row.get('qualified_link_count') or 0) for row in display_rows)}")
+    rows.append(f"quality_blocked_incident_links: {sum(int(row.get('quality_blocked_link_count') or 0) for row in display_rows)}")
+    rows.append(f"unknown_role_incident_links: {sum(int(row.get('unknown_role_link_count') or 0) for row in display_rows)}")
     unlinked_canonical = [
         row for row in display_rows
         if _is_operational_canonical_relevance(row)
@@ -398,6 +434,16 @@ def _row_from_incident(
         "incident_relevance_reasons": relevance["incident_relevance_reasons"],
         "incident_relevance_warnings": relevance["incident_relevance_warnings"],
         "canonical_persistence_reason": relevance["canonical_persistence_reason"],
+        "raw_link_count": relevance["raw_link_count"],
+        "qualified_link_count": relevance["qualified_link_count"],
+        "qualified_hypothesis_count": relevance["qualified_hypothesis_count"],
+        "qualified_watchlist_count": relevance["qualified_watchlist_count"],
+        "weak_link_count": relevance["weak_link_count"],
+        "quality_blocked_link_count": relevance["quality_blocked_link_count"],
+        "unknown_role_link_count": relevance["unknown_role_link_count"],
+        "generic_sector_only_link_count": relevance["generic_sector_only_link_count"],
+        "link_quality_reasons": relevance["link_quality_reasons"],
+        "link_quality_warnings": relevance["link_quality_warnings"],
         "diagnostic_hidden_by_default": hidden_by_default,
         "raw_observation": relevance_status == RELEVANCE_RAW_OBSERVATION,
         "external_context_only": relevance_status == RELEVANCE_EXTERNAL_CONTEXT_ONLY,
@@ -459,6 +505,7 @@ def classify_incident_relevance(
     w_rows = [_object_row(item) for item in watchlist_rows]
     assets = [dict(asset) for asset in linked_assets if isinstance(asset, Mapping)]
     market = dict(market or {})
+    link_quality = classify_incident_link_quality(incident, h_rows, w_rows)
     text = _incident_source_text(incident, raw_by_id)
     market_like = (
         incident.event_archetype in {"market_dislocation_unknown", "market_anomaly"}
@@ -475,6 +522,7 @@ def classify_incident_relevance(
             "incident_relevance_reasons": ("invalid_or_diagnostic_subject",),
             "incident_relevance_warnings": ("incident_hidden_from_default_report",),
             "canonical_persistence_reason": "diagnostic_subject_only",
+            **link_quality.as_dict(),
         }
 
     if h_rows:
@@ -512,14 +560,25 @@ def classify_incident_relevance(
         reasons.append("high_quality_external_catalyst_with_candidate_context")
         score += 10.0
 
-    if _has_active_watchlist_row(w_rows):
+    reasons.extend(link_quality.link_quality_reasons)
+    warnings.extend(link_quality.link_quality_warnings)
+
+    has_qualified_link = link_quality.qualified_link_count > 0
+    has_valid_crypto_specific_link = _has_crypto_asset_link(assets) and link_quality.unknown_role_link_count < max(1, link_quality.raw_link_count)
+    has_material_update = _has_explicit_material_update(w_rows, incident=incident)
+
+    if has_qualified_link and (link_quality.qualified_watchlist_count > 0 or link_quality.qualified_hypothesis_count > 0):
         status = RELEVANCE_ACTIVE_INCIDENT
-        persistence = "active_watchlist_incident"
-        score = max(score, 90.0)
-    elif h_rows or w_rows:
+        persistence = "qualified_watchlist_link" if link_quality.qualified_watchlist_count > 0 else "qualified_hypothesis_link"
+        score = max(score, 90.0 if link_quality.qualified_watchlist_count > 0 else 84.0)
+    elif has_material_update:
+        status = RELEVANCE_ACTIVE_INCIDENT
+        persistence = "explicit_active_material_update"
+        score = max(score, 86.0)
+    elif has_valid_crypto_specific_link:
         status = RELEVANCE_LINKED_INCIDENT
-        persistence = "linked_to_hypothesis_or_watchlist"
-        score = max(score, 82.0)
+        persistence = "valid_crypto_specific_link"
+        score = max(score, 74.0)
     elif (
         _has_crypto_asset_link(assets)
         or market_like
@@ -538,21 +597,23 @@ def classify_incident_relevance(
         score = max(score, 68.0)
     elif incident.event_archetype in _EXTERNAL_CATALYST_ARCHETYPES or incident.event_archetype in _DIRECT_CRYPTO_ARCHETYPES:
         status = RELEVANCE_INCIDENT_CANDIDATE
-        persistence = "recognized_research_catalyst_candidate"
+        persistence = _unqualified_persistence_reason(link_quality) or "recognized_research_catalyst_candidate"
         score = max(score, 52.0)
     elif _is_external_context_incident(incident, text):
         status = RELEVANCE_EXTERNAL_CONTEXT_ONLY
-        persistence = "external_context_without_crypto_link"
+        persistence = _unqualified_persistence_reason(link_quality) or "external_context_without_crypto_link"
         score = min(max(score, 28.0), 40.0)
         warnings.append("incident_hidden_from_default_report")
         reasons.append("external_context_without_crypto_hypothesis_watchlist_asset_or_market_link")
     else:
         status = RELEVANCE_RAW_OBSERVATION
-        persistence = "raw_observation_without_crypto_link"
+        persistence = _unqualified_persistence_reason(link_quality) or "raw_observation_without_crypto_link"
         score = min(score, 35.0)
         warnings.append("incident_hidden_from_default_report")
         if not reasons:
             reasons.append("no_crypto_hypothesis_watchlist_asset_or_market_link")
+    if status == RELEVANCE_INCIDENT_CANDIDATE and link_quality.raw_link_count > 0 and link_quality.qualified_link_count <= 0:
+        score = min(max(score, 52.0), 60.0)
 
     return {
         "incident_relevance_status": status,
@@ -560,7 +621,97 @@ def classify_incident_relevance(
         "incident_relevance_reasons": tuple(dict.fromkeys(reasons)),
         "incident_relevance_warnings": tuple(dict.fromkeys(warnings)),
         "canonical_persistence_reason": persistence,
+        **link_quality.as_dict(),
     }
+
+
+def classify_incident_link_quality(
+    incident: event_incident_graph.CanonicalIncident,
+    linked_hypotheses: Iterable[Mapping[str, Any] | object] = (),
+    linked_watchlist_rows: Iterable[Mapping[str, Any] | object] = (),
+) -> IncidentLinkQuality:
+    """Summarize whether incident links are quality-qualified crypto links.
+
+    This is artifact metadata only. It does not create candidates, alerts,
+    notifications, trades, or event-fade triggers.
+    """
+    h_rows = [_object_row(item) for item in linked_hypotheses]
+    w_rows = [_object_row(item) for item in linked_watchlist_rows]
+    raw_link_count = len(h_rows) + len(w_rows)
+    qualified_hypothesis = 0
+    qualified_watchlist = 0
+    quality_blocked = 0
+    unknown_role = 0
+    sector_only = 0
+    reasons: list[str] = []
+    warnings: list[str] = []
+
+    for row in h_rows:
+        result = _link_row_quality(row, incident=incident, source="hypothesis")
+        if result["qualified"]:
+            qualified_hypothesis += 1
+            reasons.append("qualified_hypothesis_link")
+        else:
+            reasons.extend(result["reasons"])
+            warnings.extend(result["warnings"])
+            quality_blocked += int(result["quality_blocked"])
+            unknown_role += int(result["unknown_role"])
+            sector_only += int(result["sector_only"])
+    for row in w_rows:
+        result = _link_row_quality(row, incident=incident, source="watchlist")
+        if result["qualified"]:
+            qualified_watchlist += 1
+            reasons.append("qualified_watchlist_link")
+        else:
+            reasons.extend(result["reasons"])
+            warnings.extend(result["warnings"])
+            quality_blocked += int(result["quality_blocked"])
+            unknown_role += int(result["unknown_role"])
+            sector_only += int(result["sector_only"])
+
+    qualified = qualified_hypothesis + qualified_watchlist
+    weak = max(0, raw_link_count - qualified)
+    if raw_link_count == 0:
+        reasons.append("no_incident_links")
+    elif qualified == 0:
+        if quality_blocked:
+            reasons.append("quality_blocked_link_only")
+        if unknown_role and unknown_role >= raw_link_count:
+            reasons.append("unknown_role_link_only")
+        if sector_only and sector_only >= raw_link_count:
+            reasons.append("sector_only_unqualified_link")
+        if not (quality_blocked or unknown_role or sector_only):
+            reasons.append("weak_unqualified_link_only")
+        warnings.append("incident_has_no_quality_qualified_crypto_link")
+
+    return IncidentLinkQuality(
+        raw_link_count=raw_link_count,
+        qualified_link_count=qualified,
+        qualified_hypothesis_count=qualified_hypothesis,
+        qualified_watchlist_count=qualified_watchlist,
+        weak_link_count=weak,
+        quality_blocked_link_count=quality_blocked,
+        unknown_role_link_count=unknown_role,
+        generic_sector_only_link_count=sector_only,
+        link_quality_reasons=tuple(dict.fromkeys(reasons)),
+        link_quality_warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _unqualified_persistence_reason(link_quality: IncidentLinkQuality) -> str | None:
+    if link_quality.qualified_watchlist_count > 0:
+        return "qualified_watchlist_link"
+    if link_quality.qualified_hypothesis_count > 0:
+        return "qualified_hypothesis_link"
+    if link_quality.quality_blocked_link_count > 0:
+        return "quality_blocked_link_only"
+    if link_quality.unknown_role_link_count > 0:
+        return "unknown_role_link_only"
+    if link_quality.generic_sector_only_link_count > 0:
+        return "sector_only_unqualified_link"
+    if link_quality.weak_link_count > 0:
+        return "weak_unqualified_watchlist_link"
+    return None
 
 
 def _hypotheses_by_incident(hypotheses: Iterable[object]) -> dict[str, list[object]]:
@@ -729,6 +880,143 @@ def _has_active_watchlist_row(rows: Iterable[Mapping[str, Any]]) -> bool:
     return False
 
 
+_BAD_LINK_STATES = {"QUALITY_BLOCKED", "STORE_ONLY", "LOCAL_ONLY", "RAW_EVIDENCE"}
+_BAD_LINK_ROLES = {
+    "unknown",
+    "unknown_with_reason",
+    "generic_mention",
+    "source_noise",
+    "ticker_word_collision",
+    "sector_context",
+    "ambiguous",
+}
+_BAD_IMPACT_PATHS = {"insufficient_data", "generic_cooccurrence_only"}
+
+
+def _link_row_quality(
+    row: Mapping[str, Any],
+    *,
+    incident: event_incident_graph.CanonicalIncident,
+    source: str,
+) -> dict[str, Any]:
+    components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
+    if not components and isinstance(row.get("score_components"), Mapping):
+        components = row.get("score_components")
+    merged = {**dict(components or {}), **dict(row)}
+    validated_asset = merged.get("validated_asset") if isinstance(merged.get("validated_asset"), Mapping) else {}
+    symbol = _first_text(
+        merged.get("validated_symbol"),
+        validated_asset.get("symbol"),
+        merged.get("symbol"),
+    ).upper()
+    coin_id = _first_text(
+        merged.get("validated_coin_id"),
+        validated_asset.get("coin_id"),
+        merged.get("coin_id"),
+    ).casefold()
+    role = _first_text(merged.get("candidate_role"), merged.get("asset_role"), merged.get("relationship_type")).casefold()
+    impact = _first_text(merged.get("impact_path_type"), merged.get("impact_category")).casefold()
+    evidence = _first_text(merged.get("evidence_specificity")).casefold()
+    level = _first_text(merged.get("opportunity_level")).casefold()
+    final_state = _first_text(merged.get("final_state_after_quality_gate"), merged.get("state")).upper()
+    route = _first_text(merged.get("final_route_after_quality_gate"), merged.get("route")).upper()
+    score = _float(merged.get("opportunity_score_final"))
+    has_quality = any(
+        key in merged and merged.get(key) not in (None, "", [], {})
+        for key in (
+            "opportunity_level",
+            "impact_path_type",
+            "candidate_role",
+            "evidence_specificity",
+            "opportunity_score_final",
+        )
+    )
+    sector_only = _is_sector_identity(symbol=symbol, coin_id=coin_id) or (
+        not (symbol or coin_id)
+        and bool(merged.get("candidate_sectors") or merged.get("sectors"))
+    )
+    has_valid_asset = bool(symbol or coin_id) and not _is_sector_identity(symbol=symbol, coin_id=coin_id)
+    strong_sector = _strong_sector_hypothesis(merged, incident=incident)
+    unknown_role = bool(role in _BAD_LINK_ROLES or (not role and not strong_sector))
+    quality_blocked = bool(
+        merged.get("state_quality_capped")
+        or final_state in _BAD_LINK_STATES
+        or route in {"STORE_ONLY", "LOCAL_ONLY", "LOCAL_REPORT"}
+        or level == "local_only"
+        or impact in _BAD_IMPACT_PATHS
+        or evidence == "insufficient_data"
+        or (has_quality and score <= 0.0)
+    )
+    reasons: list[str] = []
+    warnings: list[str] = []
+    if quality_blocked:
+        reasons.append("quality_blocked_link_only")
+    if unknown_role:
+        reasons.append("unknown_role_link_only")
+    if sector_only and not strong_sector:
+        reasons.append("sector_only_unqualified_link")
+    if not has_valid_asset and not strong_sector:
+        reasons.append("missing_validated_crypto_identity")
+
+    qualified = bool(
+        not quality_blocked
+        and not unknown_role
+        and (has_valid_asset or strong_sector)
+        and (not has_quality or (level != "local_only" and impact not in _BAD_IMPACT_PATHS and evidence != "insufficient_data"))
+    )
+    if not qualified:
+        reasons.append(f"weak_unqualified_{source}_link")
+        warnings.append(f"{source}_link_not_quality_qualified")
+    return {
+        "qualified": qualified,
+        "quality_blocked": quality_blocked,
+        "unknown_role": unknown_role,
+        "sector_only": bool(sector_only and not strong_sector),
+        "reasons": tuple(dict.fromkeys(reasons)),
+        "warnings": tuple(dict.fromkeys(warnings)),
+    }
+
+
+def _strong_sector_hypothesis(row: Mapping[str, Any], *, incident: event_incident_graph.CanonicalIncident) -> bool:
+    level = _first_text(row.get("opportunity_level")).casefold()
+    impact = _first_text(row.get("impact_path_type"), row.get("impact_category")).casefold()
+    role = _first_text(row.get("candidate_role")).casefold()
+    evidence = _first_text(row.get("evidence_specificity")).casefold()
+    if level not in {"validated_digest", "watchlist", "high_priority"}:
+        return False
+    if impact in _BAD_IMPACT_PATHS or evidence == "insufficient_data":
+        return False
+    if role in _BAD_LINK_ROLES:
+        return False
+    return incident.event_archetype in _EXTERNAL_CATALYST_ARCHETYPES | _DIRECT_CRYPTO_ARCHETYPES
+
+
+def _is_sector_identity(*, symbol: str, coin_id: str) -> bool:
+    return symbol.upper() in {"", "SECTOR", "UNKNOWN"} and coin_id.casefold() in {"", "sector", "unknown", "market_anomaly_unknown"}
+
+
+def _first_text(*values: Any) -> str:
+    for value in values:
+        if value not in (None, "", [], {}):
+            return str(value).strip()
+    return ""
+
+
+def _has_explicit_material_update(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    incident: event_incident_graph.CanonicalIncident,
+) -> bool:
+    for row in rows:
+        if _link_row_quality(row, incident=incident, source="watchlist")["quality_blocked"]:
+            continue
+        if row.get("material_change_reasons"):
+            return True
+        if bool(row.get("state_changed") or row.get("escalation")) and _has_active_watchlist_row((row,)):
+            return True
+    return False
+
+
 def _has_crypto_asset_link(assets: Iterable[Mapping[str, Any]]) -> bool:
     for asset in assets:
         symbol = str(asset.get("symbol") or "").strip().upper()
@@ -738,7 +1026,7 @@ def _has_crypto_asset_link(assets: Iterable[Mapping[str, Any]]) -> bool:
             continue
         if symbol in {"SECTOR", "UNKNOWN"} or coin_id in {"sector", "unknown", "market_anomaly_unknown"}:
             continue
-        if role in {"sector_context", "source_noise", "ticker_word_collision"}:
+        if role in {"unknown", "unknown_with_reason", "generic_mention", "sector_context", "source_noise", "ticker_word_collision"}:
             continue
         return True
     return False
@@ -1055,6 +1343,16 @@ def _incident_lines(row: Mapping[str, Any]) -> list[str]:
         + str(row.get("canonical_persistence_reason") or "unknown")
         + " reasons="
         + (", ".join(str(item) for item in row.get("incident_relevance_reasons") or ()) or "none"),
+        (
+            "  link_quality: "
+            f"raw={int(row.get('raw_link_count') or 0)} "
+            f"qualified={int(row.get('qualified_link_count') or 0)} "
+            f"weak={int(row.get('weak_link_count') or 0)} "
+            f"quality_blocked={int(row.get('quality_blocked_link_count') or 0)} "
+            f"unknown_role={int(row.get('unknown_role_link_count') or 0)} "
+            f"reasons="
+            + (", ".join(str(item) for item in row.get("link_quality_reasons") or ()) or "none")
+        ),
         "  material_update_reasons: "
         + (", ".join(str(item) for item in row.get("material_update_reasons") or ()) or "none"),
         (
@@ -1162,10 +1460,27 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
     data = dict(row)
     status = str(data.get("incident_relevance_status") or "").strip()
     if status:
-        data.setdefault("raw_observation", status == RELEVANCE_RAW_OBSERVATION)
-        data.setdefault("external_context_only", status == RELEVANCE_EXTERNAL_CONTEXT_ONLY)
-        data.setdefault("external_context_hidden_by_default", status == RELEVANCE_EXTERNAL_CONTEXT_ONLY)
-        data.setdefault("diagnostic_hidden_by_default", _is_diagnostic_relevance(data))
+        _ensure_existing_link_quality(data)
+        if status in {RELEVANCE_ACTIVE_INCIDENT, RELEVANCE_LINKED_INCIDENT} and int(data.get("qualified_link_count") or 0) <= 0:
+            status, reason = _downgraded_relevance_for_unqualified_links(data)
+            data["incident_relevance_status"] = status
+            data["canonical_persistence_reason"] = reason
+            reasons = [str(item) for item in data.get("incident_relevance_reasons") or () if str(item or "").strip()]
+            if reason not in reasons:
+                reasons.append(reason)
+            data["incident_relevance_reasons"] = tuple(reasons)
+            warnings = [str(item) for item in data.get("incident_relevance_warnings") or () if str(item or "").strip()]
+            if "incident_link_not_quality_qualified" not in warnings:
+                warnings.append("incident_link_not_quality_qualified")
+            data["incident_relevance_warnings"] = tuple(warnings)
+            if status in _RAW_RELEVANCE_STATUSES:
+                data["incident_relevance_score"] = min(_float(data.get("incident_relevance_score")), 40.0)
+            else:
+                data["incident_relevance_score"] = min(_float(data.get("incident_relevance_score")), 60.0)
+        data["raw_observation"] = status == RELEVANCE_RAW_OBSERVATION
+        data["external_context_only"] = status == RELEVANCE_EXTERNAL_CONTEXT_ONLY
+        data["external_context_hidden_by_default"] = status == RELEVANCE_EXTERNAL_CONTEXT_ONLY
+        data["diagnostic_hidden_by_default"] = _is_diagnostic_relevance(data)
         return data
     diagnostic = bool(data.get("diagnostic_only")) or str(data.get("incident_subject_quality") or "") == "diagnostic_only"
     linked_h = bool(data.get("linked_hypothesis_ids"))
@@ -1214,7 +1529,132 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
     data.setdefault("external_context_only", status == RELEVANCE_EXTERNAL_CONTEXT_ONLY)
     data.setdefault("external_context_hidden_by_default", status == RELEVANCE_EXTERNAL_CONTEXT_ONLY)
     data.setdefault("diagnostic_hidden_by_default", _is_diagnostic_relevance(data))
+    _ensure_existing_link_quality(data)
+    if status in {RELEVANCE_ACTIVE_INCIDENT, RELEVANCE_LINKED_INCIDENT} and int(data.get("qualified_link_count") or 0) <= 0:
+        status, reason = _downgraded_relevance_for_unqualified_links(data)
+        data["incident_relevance_status"] = status
+        data["canonical_persistence_reason"] = reason
+        reasons = [str(item) for item in data.get("incident_relevance_reasons") or () if str(item or "").strip()]
+        if reason not in reasons:
+            reasons.append(reason)
+        data["incident_relevance_reasons"] = tuple(reasons)
+        warnings = [str(item) for item in data.get("incident_relevance_warnings") or () if str(item or "").strip()]
+        if "incident_link_not_quality_qualified" not in warnings:
+            warnings.append("incident_link_not_quality_qualified")
+        data["incident_relevance_warnings"] = tuple(warnings)
+        if status in _RAW_RELEVANCE_STATUSES:
+            data["incident_relevance_score"] = min(_float(data.get("incident_relevance_score")), 40.0)
+        else:
+            data["incident_relevance_score"] = min(_float(data.get("incident_relevance_score")), 60.0)
+        data["raw_observation"] = status == RELEVANCE_RAW_OBSERVATION
+        data["external_context_only"] = status == RELEVANCE_EXTERNAL_CONTEXT_ONLY
+        data["external_context_hidden_by_default"] = status == RELEVANCE_EXTERNAL_CONTEXT_ONLY
+        data["diagnostic_hidden_by_default"] = _is_diagnostic_relevance(data)
     return data
+
+
+def _ensure_existing_link_quality(data: dict[str, Any]) -> None:
+    if "qualified_link_count" in data and "link_quality_reasons" in data:
+        return
+    summary = _link_quality_from_existing_row(data)
+    data.setdefault("raw_link_count", summary.raw_link_count)
+    data.setdefault("qualified_link_count", summary.qualified_link_count)
+    data.setdefault("qualified_hypothesis_count", summary.qualified_hypothesis_count)
+    data.setdefault("qualified_watchlist_count", summary.qualified_watchlist_count)
+    data.setdefault("weak_link_count", summary.weak_link_count)
+    data.setdefault("quality_blocked_link_count", summary.quality_blocked_link_count)
+    data.setdefault("unknown_role_link_count", summary.unknown_role_link_count)
+    data.setdefault("generic_sector_only_link_count", summary.generic_sector_only_link_count)
+    data.setdefault("link_quality_reasons", summary.link_quality_reasons)
+    data.setdefault("link_quality_warnings", summary.link_quality_warnings)
+
+
+def _link_quality_from_existing_row(row: Mapping[str, Any]) -> IncidentLinkQuality:
+    linked_h = tuple(row.get("linked_hypothesis_ids") or ())
+    linked_w = tuple(row.get("linked_watchlist_keys") or ())
+    raw_count = len(linked_h) + len(linked_w)
+    assets = [asset for asset in row.get("linked_assets") or () if isinstance(asset, Mapping)]
+    if raw_count == 0 and assets:
+        raw_count = len(assets)
+    qualified = 0
+    unknown_role = 0
+    sector_only = 0
+    for asset in assets:
+        symbol = str(asset.get("symbol") or "").strip().upper()
+        coin_id = str(asset.get("coin_id") or "").strip().casefold()
+        role = str(asset.get("role") or "").strip().casefold()
+        if _is_sector_identity(symbol=symbol, coin_id=coin_id):
+            sector_only += 1
+            continue
+        if role in _BAD_LINK_ROLES or not role:
+            unknown_role += 1
+            continue
+        qualified += 1
+    quality_blocked = 0
+    if row.get("state_quality_capped") or str(row.get("opportunity_level") or "").strip() == "local_only":
+        quality_blocked = max(1, raw_count or 1)
+    weak = max(0, raw_count - qualified)
+    reasons: list[str] = []
+    warnings: list[str] = []
+    if qualified:
+        if linked_w:
+            reasons.append("qualified_watchlist_link")
+        if linked_h:
+            reasons.append("qualified_hypothesis_link")
+    elif raw_count:
+        if quality_blocked:
+            reasons.append("quality_blocked_link_only")
+        if unknown_role:
+            reasons.append("unknown_role_link_only")
+        if sector_only:
+            reasons.append("sector_only_unqualified_link")
+        if not (quality_blocked or unknown_role or sector_only):
+            reasons.append("weak_unqualified_link_only")
+        warnings.append("incident_has_no_quality_qualified_crypto_link")
+    else:
+        reasons.append("no_incident_links")
+    return IncidentLinkQuality(
+        raw_link_count=raw_count,
+        qualified_link_count=qualified,
+        qualified_hypothesis_count=qualified if linked_h and not linked_w else 0,
+        qualified_watchlist_count=qualified if linked_w else 0,
+        weak_link_count=weak,
+        quality_blocked_link_count=quality_blocked,
+        unknown_role_link_count=unknown_role,
+        generic_sector_only_link_count=sector_only,
+        link_quality_reasons=tuple(dict.fromkeys(reasons)),
+        link_quality_warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def _downgraded_relevance_for_unqualified_links(row: Mapping[str, Any]) -> tuple[str, str]:
+    archetype = str(row.get("event_archetype") or "")
+    source_text = " ".join(str(row.get(key) or "") for key in (
+        "canonical_name",
+        "event_archetype",
+        "primary_subject",
+        "affected_ecosystem",
+    ))
+    reason = _legacy_unqualified_reason(row)
+    if archetype in _EXTERNAL_CONTEXT_ARCHETYPES or _legacy_external_context_text(source_text):
+        return RELEVANCE_EXTERNAL_CONTEXT_ONLY, reason or "external_context_without_crypto_link"
+    if archetype in _EXTERNAL_CATALYST_ARCHETYPES or archetype in _DIRECT_CRYPTO_ARCHETYPES:
+        return RELEVANCE_INCIDENT_CANDIDATE, reason or "recognized_research_catalyst_candidate"
+    if bool(row.get("market_reaction_observed") or row.get("market_reaction_confirmed")) or archetype == "market_dislocation_unknown":
+        return RELEVANCE_CANONICAL_INCIDENT, "market_dislocation"
+    return RELEVANCE_RAW_OBSERVATION, reason or "raw_observation_without_crypto_link"
+
+
+def _legacy_unqualified_reason(row: Mapping[str, Any]) -> str | None:
+    if int(row.get("quality_blocked_link_count") or 0) > 0:
+        return "quality_blocked_link_only"
+    if int(row.get("unknown_role_link_count") or 0) > 0:
+        return "unknown_role_link_only"
+    if int(row.get("generic_sector_only_link_count") or 0) > 0:
+        return "sector_only_unqualified_link"
+    if int(row.get("weak_link_count") or 0) > 0:
+        return "weak_unqualified_watchlist_link"
+    return None
 
 
 def _is_garbage_incident_subject(value: Any) -> bool:

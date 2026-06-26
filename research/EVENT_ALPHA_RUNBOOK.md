@@ -177,6 +177,17 @@ watchlist row, direct crypto archetype, or market-dislocation evidence is
 external context/raw evidence for diagnostics, not an operational canonical
 incident.
 
+Incident links are also quality-gated. A hypothesis/watchlist link is
+qualified only when it survives the quality gate: non-local opportunity level,
+non-blocked final state, non-generic impact path, non-insufficient evidence,
+non-unknown candidate role, and a validated asset identity or strong recognized
+sector thesis. Weak legacy links such as `UMA:unknown`, `TRUMP:unknown`,
+`FET:unknown`, or `SECTOR:unknown_with_reason` are kept as diagnostics with
+`weak_link_count`, `unknown_role_link_count`, `quality_blocked_link_count`, and
+`link_quality_reasons`; they do not make an incident `active_incident`.
+`active_incident` should mean there is at least one qualified hypothesis or
+watchlist link, or an explicit material update on a non-blocked row.
+
 Canonical incidents are persisted separately from hypotheses under the active
 profile namespace:
 
@@ -206,9 +217,12 @@ guard needs review before treating those rows as real incidents. Use
 `--include-external-context-incidents` only when intentionally auditing
 quarantined rows such as `LLM`, referral-code/source-noise subjects, or broad
 external events that had no crypto link. Report lines include relevance status,
-score, persistence reason, and relevance reason codes; linked/active incidents
-should have explicit `linked_to_event_impact_hypothesis`,
-`linked_to_watchlist_row`, or `active_watchlist_lifecycle_state` style reasons.
+score, persistence reason, relevance reason codes, and link-quality counts.
+Linked/active incidents should have `qualified_link_count > 0` and persistence
+reasons such as `qualified_watchlist_link` or `qualified_hypothesis_link`.
+Rows with `quality_blocked_link_only`, `unknown_role_link_only`,
+`sector_only_unqualified_link`, or `weak_unqualified_watchlist_link` are not
+active incidents; review them as candidates or hidden external context.
 The linked-asset roles should show the validated anomaly asset from the market
 payload as `direct_subject`. Sector rows such as `SECTOR`, source context, or
 generic unknown-market text are context only and must not be treated as direct
@@ -811,11 +825,14 @@ doctor blocks the namespace. Properly capped rows are visible in daily brief and
 quality review local-only sections, not in active watchlist sections. Legacy
 uncapped rows are migration warnings unless `STRICT_LEGACY=1` is set. The
 doctor also reports incident relevance health: missing relevance fields,
-canonical unlinked incidents, raw observations, rejected incidents, quarantined
-diagnostic incident rows, and garbage primary subjects. Diagnostic/raw/rejected
-rows warn by default and are hidden from operational incident counts; fresh
-canonical incident rows missing relevance fields block strict checks. Fresh
-invalid canonical incident rows still block strict checks.
+canonical unlinked incidents, active incidents without qualified links, linked
+incidents without qualified links, weak unqualified links, quality-blocked links
+that would otherwise promote incidents, raw observations, external context,
+rejected incidents, quarantined diagnostic incident rows, and garbage primary
+subjects. Diagnostic/raw/rejected rows warn by default and are hidden from
+operational incident counts; fresh canonical incident rows missing relevance
+fields block strict checks. Fresh active incidents without qualified links block
+strict checks. Fresh invalid canonical incident rows still block strict checks.
 
 For migration review only, include legacy/default rows explicitly:
 

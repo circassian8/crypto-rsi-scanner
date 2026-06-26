@@ -57,8 +57,10 @@
         "route_tier": ["WATCHLIST", "HIGH_PRIORITY"],
         "digest_eligible": true,
         "watchlist_eligible": true,
-        "incident_relevance_status": "linked_incident",
-        "canonical_persistence_reason": "linked_to_hypothesis_or_watchlist",
+        "incident_relevance_status": "active_incident",
+        "canonical_persistence_reason": "qualified_hypothesis_link",
+        "qualified_link_count": 1,
+        "link_quality_reasons": "contains:qualified_hypothesis_link",
         "diagnostic_hidden_by_default": false,
         "triggered_fade": false
       }
@@ -734,8 +736,11 @@
         "source_confidence": 0.84
       },
       "expected": {
-        "incident_relevance_status": "linked_incident",
-        "canonical_persistence_reason": "linked_to_hypothesis_or_watchlist",
+        "incident_relevance_status": "incident_candidate",
+        "canonical_persistence_reason": "quality_blocked_link_only",
+        "qualified_link_count": 0,
+        "quality_blocked_link_count": 1,
+        "link_quality_reasons": "contains:quality_blocked_link_only",
         "diagnostic_hidden_by_default": false,
         "triggered_fade": false
       }

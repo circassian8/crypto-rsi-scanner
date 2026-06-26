@@ -22748,11 +22748,34 @@ def test_event_incident_relevance_gates_raw_external_observations():
     thor_relevance = event_incident_store.classify_incident_relevance(
         thor_incident,
         raw_by_id={thor_raw.raw_id: thor_raw},
-        hypotheses=({"hypothesis_id": "hyp:rune", "incident_id": thor_incident.incident_id, "validated_symbol": "RUNE", "validated_coin_id": "thorchain"},),
-        watchlist_rows=({"key": "watch:rune", "incident_id": thor_incident.incident_id, "state": "WATCHLIST", "symbol": "RUNE", "coin_id": "thorchain"},),
+        hypotheses=({
+            "hypothesis_id": "hyp:rune",
+            "incident_id": thor_incident.incident_id,
+            "validated_symbol": "RUNE",
+            "validated_coin_id": "thorchain",
+            "candidate_role": "direct_subject",
+            "impact_path_type": "exploit_security_event",
+            "evidence_specificity": "direct_token_mechanism",
+            "opportunity_level": "watchlist",
+            "opportunity_score_final": 82,
+        },),
+        watchlist_rows=({
+            "key": "watch:rune",
+            "incident_id": thor_incident.incident_id,
+            "state": "WATCHLIST",
+            "final_state_after_quality_gate": "WATCHLIST",
+            "symbol": "RUNE",
+            "coin_id": "thorchain",
+            "candidate_role": "direct_subject",
+            "impact_path_type": "exploit_security_event",
+            "evidence_specificity": "direct_token_mechanism",
+            "opportunity_level": "watchlist",
+            "opportunity_score_final": 82,
+        },),
     )
     assert thor_relevance["incident_relevance_status"] == "active_incident"
-    assert thor_relevance["canonical_persistence_reason"] == "active_watchlist_incident"
+    assert thor_relevance["canonical_persistence_reason"] == "qualified_watchlist_link"
+    assert thor_relevance["qualified_link_count"] == 2
 
     sol_raw = raw(
         "sol_market_anomaly_relevance",
@@ -22809,7 +22832,9 @@ def test_event_incident_relevance_gates_raw_external_observations():
         raw_by_id={openai_raw.raw_id: openai_raw},
         hypotheses=({"hypothesis_id": "hyp:openai-sector", "incident_id": openai_incident.incident_id, "candidate_sectors": ("tokenized_stock_venues",)},),
     )
-    assert openai_relevance["incident_relevance_status"] == "linked_incident"
+    assert openai_relevance["incident_relevance_status"] == "incident_candidate"
+    assert openai_relevance["qualified_link_count"] == 0
+    assert "weak_unqualified_hypothesis_link" in openai_relevance["link_quality_reasons"]
 
     fannie_raw = raw(
         "fannie_rwa_candidate",
@@ -22837,6 +22862,129 @@ def test_event_incident_relevance_gates_raw_external_observations():
         raw_by_id={fannie_raw.raw_id: fannie_raw},
     )
     assert fannie_relevance["incident_relevance_status"] == "incident_candidate"
+
+    def classify_weak_event(raw_id: str, title: str, body: str, event_type: str, symbol: str, coin_id: str):
+        event_raw = raw(raw_id, title, body, confidence=0.76)
+        event = NormalizedEvent(
+            f"evt_{raw_id}",
+            (event_raw.raw_id,),
+            title,
+            event_type,
+            None,
+            0.0,
+            now,
+            "fixture_news",
+            (event_raw.source_url,),
+            title,
+            event_raw.body,
+            0.76,
+        )
+        incident = event_incident_graph.build_incidents((event,), {event_raw.raw_id: event_raw})[0]
+        weak_watchlist = {
+            "key": f"watch:{raw_id}",
+            "incident_id": incident.incident_id,
+            "state": "WATCHLIST",
+            "requested_state_before_quality_gate": "WATCHLIST",
+            "final_state_after_quality_gate": "QUALITY_BLOCKED",
+            "state_quality_capped": True,
+            "symbol": symbol,
+            "coin_id": coin_id,
+            "candidate_role": "unknown",
+            "impact_path_type": "insufficient_data",
+            "evidence_specificity": "insufficient_data",
+            "opportunity_level": "local_only",
+            "opportunity_score_final": 0,
+        }
+        return event_incident_store.classify_incident_relevance(
+            incident,
+            raw_by_id={event_raw.raw_id: event_raw},
+            watchlist_rows=(weak_watchlist,),
+        )
+
+    annexation = classify_weak_event(
+        "annexation_weak_link",
+        "Annexation prediction market",
+        "A broad annexation prediction market mentions no validated crypto token impact path.",
+        "political_event",
+        "UMA",
+        "uma",
+    )
+    assert annexation["incident_relevance_status"] == "external_context_only"
+    assert annexation["qualified_link_count"] == 0
+    assert "quality_blocked_link_only" in annexation["link_quality_reasons"]
+
+    macron = classify_weak_event(
+        "macron_weak_link",
+        "Macron election odds move",
+        "A broad election article mentions Macron and prediction markets but no direct TRUMP token value path.",
+        "political_event",
+        "TRUMP",
+        "official-trump",
+    )
+    assert macron["incident_relevance_status"] == "external_context_only"
+    assert macron["unknown_role_link_count"] == 1
+
+    openai_fet = classify_weak_event(
+        "openai_fet_weak_link",
+        "OpenAI pre-IPO markets expand",
+        "OpenAI pre-IPO exposure may matter to crypto AI tokens someday, but no FET value-capture path is validated.",
+        "ai_ipo_proxy",
+        "FET",
+        "fetch-ai",
+    )
+    assert openai_fet["incident_relevance_status"] == "incident_candidate"
+    assert openai_fet["canonical_persistence_reason"] == "quality_blocked_link_only"
+
+    databricks_velvet_weak = classify_weak_event(
+        "databricks_velvet_weak_link",
+        "Databricks IPO closing",
+        "Databricks IPO closing is broad pre-IPO news, while the VELVET link has not been quality validated.",
+        "rwa_preipo_proxy",
+        "VELVET",
+        "velvet",
+    )
+    assert databricks_velvet_weak["incident_relevance_status"] == "incident_candidate"
+    assert databricks_velvet_weak["qualified_link_count"] == 0
+
+    velvet_quality_raw = raw(
+        "velvet_spacex_quality_link",
+        "Velvet offers SpaceX pre-IPO exposure",
+        "VELVET users can trade SpaceX pre-IPO exposure through the Velvet crypto venue.",
+        confidence=0.92,
+    )
+    velvet_event = NormalizedEvent(
+        "evt_velvet_spacex_quality",
+        (velvet_quality_raw.raw_id,),
+        "Velvet offers SpaceX pre-IPO exposure",
+        "rwa_preipo_proxy",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (velvet_quality_raw.source_url,),
+        "SpaceX",
+        velvet_quality_raw.body,
+        0.92,
+    )
+    velvet_incident = event_incident_graph.build_incidents((velvet_event,), {velvet_quality_raw.raw_id: velvet_quality_raw})[0]
+    velvet_relevance = event_incident_store.classify_incident_relevance(
+        velvet_incident,
+        raw_by_id={velvet_quality_raw.raw_id: velvet_quality_raw},
+        hypotheses=({
+            "hypothesis_id": "hyp:velvet-spacex",
+            "incident_id": velvet_incident.incident_id,
+            "validated_symbol": "VELVET",
+            "validated_coin_id": "velvet",
+            "candidate_role": "proxy_venue",
+            "impact_path_type": "venue_value_capture",
+            "evidence_specificity": "direct_token_mechanism",
+            "opportunity_level": "watchlist",
+            "opportunity_score_final": 84,
+        },),
+    )
+    assert velvet_relevance["incident_relevance_status"] == "active_incident"
+    assert velvet_relevance["canonical_persistence_reason"] == "qualified_hypothesis_link"
+    assert velvet_relevance["qualified_link_count"] == 1
 
 
 def test_event_opportunity_upgrade_path_and_audit_sections():
