@@ -1,0 +1,226 @@
+{
+  "llm_catalyst_frames": [
+    {
+      "case_id": "aave_kraken_kelpdao",
+      "raw_id": "aave_kraken",
+      "analysis": {
+        "main_catalyst_frame": {
+          "frame_type": "acquisition_or_stake",
+          "frame_role": "main_catalyst",
+          "subject": "Aave",
+          "actor": "Kraken",
+          "object": "15% stake at $385M valuation",
+          "affected_entities": ["Aave", "Kraken"],
+          "affected_assets": ["AAVE"],
+          "event_archetype": "strategic_investment",
+          "claim_polarity": "asserted",
+          "cause_status": "confirmed",
+          "confidence": 0.94,
+          "evidence_quote": "Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+          "why_this_role": "The title frames Kraken's proposed stake purchase as the current event."
+        },
+        "background_frames": [
+          {
+            "frame_type": "prior_exploit_context",
+            "frame_role": "background_context",
+            "subject": "KelpDAO",
+            "actor": null,
+            "object": "exploit fallout",
+            "affected_entities": ["KelpDAO"],
+            "affected_assets": [],
+            "event_archetype": "exploit_security_event",
+            "claim_polarity": "asserted",
+            "cause_status": "confirmed",
+            "confidence": 0.86,
+            "evidence_quote": "after the fallout from April's KelpDAO exploit",
+            "why_this_role": "The exploit is historical context explaining the backdrop, not the current Aave catalyst."
+          }
+        ],
+        "negated_or_corrective_frames": [
+          {
+            "frame_type": "denied_or_negated_exploit",
+            "frame_role": "corrective_context",
+            "subject": "Aave",
+            "actor": null,
+            "object": "not hacked",
+            "affected_entities": ["Aave"],
+            "affected_assets": ["AAVE"],
+            "event_archetype": "market_dislocation_unknown",
+            "claim_polarity": "negated",
+            "cause_status": "ruled_out",
+            "confidence": 0.92,
+            "evidence_quote": "despite Aave itself not being hacked",
+            "why_this_role": "The source explicitly corrects a possible Aave exploit interpretation."
+          }
+        ],
+        "external_entities": ["Kraken", "KelpDAO"],
+        "crypto_assets": ["AAVE"],
+        "rejected_impact_paths": ["exploit_security_event:background_for:KelpDAO", "denied_or_negated_exploit:negated_for:Aave"],
+        "manual_verification_items": ["Verify whether the Kraken stake report is confirmed by a primary source."],
+        "semantic_confidence": 0.91,
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "thorchain_exploit",
+      "raw_id": "thor_exploit",
+      "analysis": {
+        "main_catalyst_frame": {
+          "frame_type": "exploit_security_event",
+          "frame_role": "main_catalyst",
+          "subject": "THORChain",
+          "actor": null,
+          "object": "exploit",
+          "affected_entities": ["THORChain"],
+          "affected_assets": ["RUNE"],
+          "event_archetype": "exploit_security_event",
+          "claim_polarity": "asserted",
+          "cause_status": "confirmed",
+          "confidence": 0.91,
+          "evidence_quote": "THORChain suffers exploit and RUNE resumes trading",
+          "why_this_role": "The exploit is the current event in the title."
+        },
+        "background_frames": [],
+        "negated_or_corrective_frames": [],
+        "external_entities": ["THORChain"],
+        "crypto_assets": ["RUNE"],
+        "rejected_impact_paths": [],
+        "manual_verification_items": ["Verify exploit details and trading-resumption timing."],
+        "semantic_confidence": 0.89,
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "memecore_no_exploit",
+      "raw_id": "memecore_no_exploit",
+      "analysis": {
+        "main_catalyst_frame": {
+          "frame_type": "market_dislocation_unknown",
+          "frame_role": "market_reaction",
+          "subject": "MemeCore",
+          "actor": null,
+          "object": "unexplained token crash",
+          "affected_entities": ["MemeCore"],
+          "affected_assets": ["M"],
+          "event_archetype": "market_dislocation_unknown",
+          "claim_polarity": "unknown",
+          "cause_status": "unknown",
+          "confidence": 0.82,
+          "evidence_quote": "MemeCore's M token crashes 80% with no exploit or announcement to explain it",
+          "why_this_role": "The source frames an unexplained market move rather than a confirmed catalyst."
+        },
+        "background_frames": [],
+        "negated_or_corrective_frames": [
+          {
+            "frame_type": "denied_or_negated_exploit",
+            "frame_role": "negated_claim",
+            "subject": "MemeCore",
+            "actor": null,
+            "object": "no exploit",
+            "affected_entities": ["MemeCore"],
+            "affected_assets": ["M"],
+            "event_archetype": "market_dislocation_unknown",
+            "claim_polarity": "negated",
+            "cause_status": "ruled_out",
+            "confidence": 0.88,
+            "evidence_quote": "no exploit or announcement",
+            "why_this_role": "The source says the crash is not explained by an exploit."
+          }
+        ],
+        "external_entities": ["MemeCore"],
+        "crypto_assets": ["M"],
+        "rejected_impact_paths": ["denied_or_negated_exploit:negated_for:MemeCore"],
+        "manual_verification_items": ["Find independent catalyst evidence before promotion."],
+        "semantic_confidence": 0.83,
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "zec_miner_listing",
+      "raw_id": "zec_miner_listing",
+      "analysis": {
+        "main_catalyst_frame": {
+          "frame_type": "listing_liquidity_event",
+          "frame_role": "main_catalyst",
+          "subject": "Zcash miner",
+          "actor": null,
+          "object": "Nasdaq listing",
+          "affected_entities": ["Zcash miner", "Zcash"],
+          "affected_assets": ["ZEC"],
+          "event_archetype": "listing_liquidity_event",
+          "claim_polarity": "asserted",
+          "cause_status": "confirmed",
+          "confidence": 0.88,
+          "evidence_quote": "Zcash miner plans Nasdaq listing tied to ZEC treasury strategy",
+          "why_this_role": "The listing/valuation event is the current catalyst."
+        },
+        "background_frames": [],
+        "negated_or_corrective_frames": [],
+        "external_entities": ["Zcash miner"],
+        "crypto_assets": ["ZEC"],
+        "rejected_impact_paths": [],
+        "manual_verification_items": ["Verify listing status and ZEC treasury exposure."],
+        "semantic_confidence": 0.86,
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "velvet_spacex",
+      "raw_id": "velvet_spacex",
+      "analysis": {
+        "main_catalyst_frame": {
+          "frame_type": "proxy_attention",
+          "frame_role": "main_catalyst",
+          "subject": "SpaceX pre-IPO exposure",
+          "actor": "Velvet",
+          "object": "pre-IPO trading venue",
+          "affected_entities": ["SpaceX", "Velvet"],
+          "affected_assets": ["VELVET"],
+          "event_archetype": "proxy_attention",
+          "claim_polarity": "asserted",
+          "cause_status": "unknown",
+          "confidence": 0.90,
+          "evidence_quote": "Velvet users can trade SpaceX pre-IPO exposure",
+          "why_this_role": "The article ties the token/venue to synthetic SpaceX exposure."
+        },
+        "background_frames": [],
+        "negated_or_corrective_frames": [],
+        "external_entities": ["SpaceX"],
+        "crypto_assets": ["VELVET"],
+        "rejected_impact_paths": [],
+        "manual_verification_items": ["Confirm VELVET value capture from SpaceX exposure activity."],
+        "semantic_confidence": 0.88,
+        "warnings": []
+      }
+    },
+    {
+      "case_id": "invalid_quote",
+      "raw_id": "invalid_quote",
+      "analysis": {
+        "main_catalyst_frame": {
+          "frame_type": "exploit_security_event",
+          "frame_role": "main_catalyst",
+          "subject": "Aave",
+          "actor": null,
+          "object": "exploit",
+          "affected_entities": ["Aave"],
+          "affected_assets": ["AAVE"],
+          "event_archetype": "exploit_security_event",
+          "claim_polarity": "asserted",
+          "cause_status": "confirmed",
+          "confidence": 0.91,
+          "evidence_quote": "Aave suffered a confirmed protocol exploit",
+          "why_this_role": "Unsupported quote used to test validation."
+        },
+        "background_frames": [],
+        "negated_or_corrective_frames": [],
+        "external_entities": [],
+        "crypto_assets": ["AAVE"],
+        "rejected_impact_paths": [],
+        "manual_verification_items": ["Quote must be rejected."],
+        "semantic_confidence": 0.80,
+        "warnings": []
+      }
+    }
+  ]
+}

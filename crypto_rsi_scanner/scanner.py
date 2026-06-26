@@ -114,6 +114,7 @@ from . import event_catalyst_search
 from . import event_clock
 from . import event_feedback
 from . import event_llm_analyzer
+from . import event_llm_catalyst_frames
 from . import event_llm_extractor
 from . import event_near_miss
 from . import event_opportunity_audit
@@ -129,7 +130,11 @@ from . import event_watchlist_market
 from . import event_watchlist_monitor
 from .event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
-from .llm_providers.fixture import FixtureLLMExtractionProvider, FixtureLLMRelationshipProvider
+from .llm_providers.fixture import (
+    FixtureLLMCatalystFrameProvider,
+    FixtureLLMExtractionProvider,
+    FixtureLLMRelationshipProvider,
+)
 from .llm_providers.openai_provider import OpenAILLMExtractionProvider, OpenAILLMRelationshipProvider
 
 log = logging.getLogger(__name__)
@@ -1383,6 +1388,19 @@ def _event_llm_extractor_config_from_runtime() -> event_llm_extractor.EventLLMEx
     )
 
 
+def _event_llm_catalyst_frame_config_from_runtime() -> event_llm_catalyst_frames.EventLLMCatalystFrameConfig:
+    return event_llm_catalyst_frames.EventLLMCatalystFrameConfig(
+        enabled=config.EVENT_LLM_CATALYST_FRAMES_ENABLED,
+        provider=config.EVENT_LLM_CATALYST_FRAMES_PROVIDER,
+        model=config.EVENT_LLM_CATALYST_FRAMES_MODEL,
+        max_rows_per_run=config.EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN,
+        min_source_score=config.EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE,
+        use_enriched_text=config.EVENT_LLM_CATALYST_FRAMES_USE_ENRICHED_TEXT,
+        only_ambiguous=config.EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS,
+        prompt_version=config.EVENT_LLM_CATALYST_FRAMES_PROMPT_VERSION,
+    )
+
+
 def _event_impact_hypothesis_store_config_from_runtime() -> event_impact_hypothesis_store.EventImpactHypothesisStoreConfig:
     return event_impact_hypothesis_store.EventImpactHypothesisStoreConfig(
         path=config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH,
@@ -2133,11 +2151,15 @@ def event_alpha_cycle(
     run_id = event_alpha_run_ledger.run_id_for(started_at, profile_for_run)
     extraction_provider = None
     extraction_cfg = None
+    catalyst_frame_provider = None
+    catalyst_frame_cfg = None
     relationship_provider = None
     relationship_cfg = None
     if with_llm:
         extraction_cfg = _event_llm_extractor_config_from_runtime()
         extraction_provider = _event_llm_extraction_provider(extraction_cfg)
+        catalyst_frame_cfg = _event_llm_catalyst_frame_config_from_runtime()
+        catalyst_frame_provider = _event_llm_catalyst_frame_provider(catalyst_frame_cfg)
         relationship_cfg = _event_llm_config_from_runtime()
         relationship_provider = _event_llm_provider(relationship_cfg)
     catalyst_search_cfg = _event_catalyst_search_config_from_runtime()
@@ -2154,6 +2176,8 @@ def event_alpha_cycle(
         with_llm=with_llm,
         extraction_provider=extraction_provider,
         extraction_cfg=extraction_cfg,
+        catalyst_frame_provider=catalyst_frame_provider,
+        catalyst_frame_cfg=catalyst_frame_cfg,
         catalyst_search_provider=catalyst_search_provider,
         catalyst_search_cfg=catalyst_search_cfg,
         hypothesis_search_provider=catalyst_search_provider,
@@ -2370,6 +2394,7 @@ def _empty_notification_pipeline_result(
         hypothesis_search_result=None,
         anomaly_lifecycle_result=None,
         extraction_rows=[],
+        catalyst_frame_rows=[],
         relationship_rows=[],
         watchlist_result=None,
         watchlist_monitor_result=None,
@@ -2549,6 +2574,8 @@ def _event_alpha_notify_cycle_body(
             pre_stage_warnings.append("provider_backoff_ignored_for_run")
         extraction_provider = None
         extraction_cfg = None
+        catalyst_frame_provider = None
+        catalyst_frame_cfg = None
         relationship_provider = None
         relationship_cfg = None
         llm_budget_warning = budget.warning_if_low("llm")
@@ -2566,6 +2593,8 @@ def _event_alpha_notify_cycle_body(
             if llm_deadline_at is not None:
                 extraction_cfg = replace(extraction_cfg, deadline_at=llm_deadline_at)
             extraction_provider = _event_llm_extraction_provider(extraction_cfg)
+            catalyst_frame_cfg = _event_llm_catalyst_frame_config_from_runtime()
+            catalyst_frame_provider = _event_llm_catalyst_frame_provider(catalyst_frame_cfg)
             relationship_cfg = _event_llm_config_from_runtime()
             if llm_deadline_at is not None:
                 relationship_cfg = replace(relationship_cfg, deadline_at=llm_deadline_at)
@@ -2602,6 +2631,8 @@ def _event_alpha_notify_cycle_body(
                     with_llm=effective_with_llm,
                     extraction_provider=extraction_provider,
                     extraction_cfg=extraction_cfg,
+                    catalyst_frame_provider=catalyst_frame_provider,
+                    catalyst_frame_cfg=catalyst_frame_cfg,
                     catalyst_search_provider=catalyst_search_provider,
                     catalyst_search_cfg=catalyst_search_cfg,
                     hypothesis_search_provider=catalyst_search_provider,
@@ -6104,6 +6135,27 @@ def _event_llm_extraction_provider(extractor_cfg: event_llm_extractor.EventLLMEx
             timeout=config.EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT,
         )
     print(f"Unknown event LLM extractor provider: {extractor_cfg.provider}. Use fixture or openai.")
+    return None
+
+
+def _event_llm_catalyst_frame_provider(catalyst_frame_cfg: event_llm_catalyst_frames.EventLLMCatalystFrameConfig):
+    provider_name = catalyst_frame_cfg.provider.strip().lower()
+    if provider_name == "fixture":
+        return FixtureLLMCatalystFrameProvider()
+    if provider_name == "openai":
+        if not catalyst_frame_cfg.enabled:
+            print(
+                "Event LLM catalyst-frame OpenAI provider disabled. "
+                "Set RSI_EVENT_LLM_CATALYST_FRAMES_ENABLED=1 to opt into live LLM calls."
+            )
+            return None
+        return OpenAILLMRelationshipProvider(
+            api_key=config.OPENAI_API_KEY,
+            model=catalyst_frame_cfg.model,
+            prompt_version=catalyst_frame_cfg.prompt_version,
+            timeout=config.EVENT_LLM_OPENAI_TIMEOUT,
+        )
+    print(f"Unknown event LLM catalyst-frame provider: {catalyst_frame_cfg.provider}. Use fixture or openai.")
     return None
 
 

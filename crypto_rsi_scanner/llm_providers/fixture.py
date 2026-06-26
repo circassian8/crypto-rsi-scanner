@@ -112,12 +112,66 @@ class FixtureLLMExtractionProvider:
             return self._cases
 
 
+class FixtureLLMCatalystFrameProvider:
+    name = "fixture"
+
+    def __init__(self, path: str | Path | None = None, *, required: bool = False) -> None:
+        self.path = Path(path).expanduser() if path else _default_catalyst_frame_fixture_path()
+        self.required = required
+        self._cases: dict[str, dict[str, Any]] | None = None
+
+    def analyze_catalyst_frames(self, packet: Mapping[str, Any]) -> LLMProviderResult:
+        cases = self._load_cases()
+        for key in _catalyst_frame_packet_keys(packet):
+            raw = cases.get(key)
+            if raw is not None:
+                return LLMProviderResult(raw=dict(raw))
+        return LLMProviderResult(warning=f"fixture LLM catalyst frames not found for raw event {packet.get('raw_id')}")
+
+    def _load_cases(self) -> dict[str, dict[str, Any]]:
+        if self._cases is not None:
+            return self._cases
+        if self.path is None or not self.path.exists():
+            if self.required:
+                raise FileNotFoundError(f"fixture LLM catalyst-frame cases not found: {self.path}")
+            log.warning("Fixture LLM catalyst-frame cases missing: %s", self.path)
+            self._cases = {}
+            return self._cases
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            outputs = raw.get("llm_catalyst_frames", raw) if isinstance(raw, dict) else raw
+            if not isinstance(outputs, list):
+                raise ValueError("fixture LLM catalyst-frame cases must be a list or {'llm_catalyst_frames': [...]}")
+            cases: dict[str, dict[str, Any]] = {}
+            for item in outputs:
+                if not isinstance(item, Mapping):
+                    raise ValueError("fixture LLM catalyst-frame entries must be objects")
+                analysis = item.get("analysis") if isinstance(item.get("analysis"), Mapping) else item
+                keys = _catalyst_frame_case_keys(item)
+                if not keys:
+                    raise ValueError("fixture LLM catalyst-frame case missing case_id/raw_id/source_url")
+                for key in keys:
+                    cases[key] = dict(analysis)
+            self._cases = cases
+            return cases
+        except Exception as exc:  # noqa: BLE001
+            if self.required:
+                raise
+            log.warning("Fixture LLM catalyst-frame load failed: %s", exc)
+            self._cases = {}
+            return self._cases
+
+
 def _default_fixture_path() -> Path:
     return Path(__file__).resolve().parents[2] / "fixtures" / "event_discovery" / "llm_golden_cases.json"
 
 
 def _default_extraction_fixture_path() -> Path:
     return Path(__file__).resolve().parents[2] / "fixtures" / "event_discovery" / "llm_extraction_golden_cases.json"
+
+
+def _default_catalyst_frame_fixture_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "fixtures" / "event_discovery" / "llm_catalyst_frame_cases.json"
 
 
 def _case_keys(item: Mapping[str, Any]) -> tuple[str, ...]:
@@ -164,6 +218,24 @@ def _extraction_case_keys(item: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def _extraction_packet_keys(packet: Mapping[str, Any]) -> tuple[str, ...]:
+    raw_keys = (
+        packet.get("case_id"),
+        packet.get("raw_id"),
+        packet.get("source_url"),
+    )
+    return tuple(str(key) for key in raw_keys if key)
+
+
+def _catalyst_frame_case_keys(item: Mapping[str, Any]) -> tuple[str, ...]:
+    raw_keys = (
+        item.get("case_id"),
+        item.get("raw_id"),
+        item.get("source_url"),
+    )
+    return tuple(str(key) for key in raw_keys if key)
+
+
+def _catalyst_frame_packet_keys(packet: Mapping[str, Any]) -> tuple[str, ...]:
     raw_keys = (
         packet.get("case_id"),
         packet.get("raw_id"),

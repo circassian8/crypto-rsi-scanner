@@ -66,6 +66,97 @@
       }
     },
     {
+      "case_id": "aave_kraken_kelpdao_background",
+      "title": "AAVE Kraken stake article with KelpDAO background",
+      "impact_category": "security_or_regulatory_shock",
+      "external_asset": "Aave",
+      "candidate_symbol": "AAVE",
+      "candidate_coin_id": "aave",
+      "raw_event": {
+        "raw_id": "sq_aave_kraken_kelpdao",
+        "provider": "fixture_crypto_news",
+        "source_url": "https://alpha.example/aave-kraken",
+        "title": "Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+        "body": "The DeFi lender is rebuilding after the fallout from April's KelpDAO exploit sparked a multibillion-dollar exodus of deposits despite Aave itself not being hacked.",
+        "source_confidence": 0.92,
+        "raw_json": {
+          "llm_catalyst_frame_validation": {
+            "valid_frames": [
+              {
+                "frame_id": "frame:llm:aave-main",
+                "frame_type": "acquisition_or_stake",
+                "frame_role": "main_catalyst",
+                "subject": "Aave",
+                "actor": "Kraken",
+                "object": "15% stake at $385M valuation",
+                "affected_entities": ["Aave", "Kraken"],
+                "affected_assets": ["AAVE"],
+                "event_archetype": "strategic_investment",
+                "claim_polarity": "asserted",
+                "cause_status": "confirmed",
+                "confidence": 0.94,
+                "evidence_quote": "Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation"
+              },
+              {
+                "frame_id": "frame:llm:kelpdao-background",
+                "frame_type": "prior_exploit_context",
+                "frame_role": "background_context",
+                "subject": "KelpDAO",
+                "actor": null,
+                "object": "exploit fallout",
+                "affected_entities": ["KelpDAO"],
+                "affected_assets": [],
+                "event_archetype": "exploit_security_event",
+                "claim_polarity": "asserted",
+                "cause_status": "confirmed",
+                "confidence": 0.86,
+                "evidence_quote": "after the fallout from April's KelpDAO exploit"
+              },
+              {
+                "frame_id": "frame:llm:aave-not-hacked",
+                "frame_type": "denied_or_negated_exploit",
+                "frame_role": "corrective_context",
+                "subject": "Aave",
+                "actor": null,
+                "object": "not hacked",
+                "affected_entities": ["Aave"],
+                "affected_assets": ["AAVE"],
+                "event_archetype": "market_dislocation_unknown",
+                "claim_polarity": "negated",
+                "cause_status": "ruled_out",
+                "confidence": 0.92,
+                "evidence_quote": "despite Aave itself not being hacked"
+              }
+            ],
+            "rejected_impact_paths": ["exploit_security_event:background_for:KelpDAO", "denied_or_negated_exploit:negated_for:Aave"],
+            "rule_predicted_impact_path": "exploit_security_event",
+            "llm_predicted_main_frame_type": "acquisition_or_stake",
+            "frame_rule_disagreement": true,
+            "disagreement_reason": "rules=exploit_security_event;llm=acquisition_or_stake",
+            "resolution": "llm_wins",
+            "manual_verification_items": ["Verify whether the Kraken stake report is confirmed by a primary source."]
+          }
+        }
+      },
+      "market_snapshot": {"return_24h": 5, "volume_zscore_24h": 1.1, "volume_to_market_cap": 0.07},
+      "score_components": {"event_clarity": 82, "event_time_quality": 45},
+      "expected": {
+        "impact_path_type": "strategic_investment_or_valuation",
+        "candidate_role": "direct_subject",
+        "cause_status": "ruled_out",
+        "event_archetype": "strategic_investment",
+        "selected_main_frame_type": "acquisition_or_stake",
+        "background_frame_count": 1,
+        "negated_frame_count": 1,
+        "frame_rule_disagreement": true,
+        "frame_disagreement_resolution": "llm_wins",
+        "opportunity_level": ["validated_digest", "watchlist"],
+        "route_tier": ["RADAR_DIGEST", "WATCHLIST"],
+        "digest_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
       "case_id": "memecore_crash_no_exploit",
       "title": "MemeCore crash with exploit ruled out",
       "impact_category": "security_or_regulatory_shock",

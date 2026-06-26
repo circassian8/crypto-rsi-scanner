@@ -17,6 +17,7 @@ from ..event_llm_extraction_models import (
     ASSET_MENTION_TYPE_VALUES,
     CATALYST_TYPE_VALUES,
 )
+from ..event_llm_catalyst_frames import structured_output_schema as _catalyst_frame_schema
 from .base import LLMProviderResult
 
 log = logging.getLogger(__name__)
@@ -72,6 +73,36 @@ class OpenAILLMRelationshipProvider:
             log.warning("OpenAI LLM relationship provider failed: %s", exc)
             return LLMProviderResult(warning=f"OpenAI LLM relationship provider failed: {type(exc).__name__}")
 
+    def analyze_catalyst_frames(self, packet: Mapping[str, Any]) -> LLMProviderResult:
+        if not self.api_key:
+            return LLMProviderResult(warning="OpenAI LLM catalyst-frame provider skipped: missing OPENAI_API_KEY")
+        try:
+            payload = json.dumps(self._catalyst_frame_request_payload(packet), sort_keys=True).encode("utf-8")
+            request = Request(
+                self.base_url,
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                method="POST",
+            )
+            with self.opener(request, timeout=self.timeout) as response:
+                status = int(getattr(response, "status", getattr(response, "code", 200)))
+                if status >= 400:
+                    raise RuntimeError(f"HTTP {status}")
+                body = json.loads(response.read().decode("utf-8"))
+            text = _extract_response_text(body)
+            if not text:
+                return LLMProviderResult(warning="OpenAI LLM catalyst-frame provider returned no output text")
+            return LLMProviderResult(raw=json.loads(text))
+        except HTTPError as exc:
+            return LLMProviderResult(warning=f"OpenAI LLM catalyst-frame provider failed: HTTP {exc.code}")
+        except (URLError, TimeoutError, json.JSONDecodeError, OSError, RuntimeError) as exc:
+            log.warning("OpenAI LLM catalyst-frame provider failed: %s", exc)
+            return LLMProviderResult(warning=f"OpenAI LLM catalyst-frame provider failed: {type(exc).__name__}")
+
     def _request_payload(self, packet: Mapping[str, Any]) -> dict[str, Any]:
         return {
             "model": self.model,
@@ -97,6 +128,35 @@ class OpenAILLMRelationshipProvider:
                     "name": "event_relationship_analysis",
                     "strict": True,
                     "schema": _analysis_schema(),
+                }
+            },
+        }
+
+    def _catalyst_frame_request_payload(self, packet: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "input": [
+                {
+                    "role": "system",
+                    "content": [{
+                        "type": "input_text",
+                        "text": _catalyst_frame_system_prompt(self.prompt_version),
+                    }],
+                },
+                {
+                    "role": "user",
+                    "content": [{
+                        "type": "input_text",
+                        "text": json.dumps(packet, sort_keys=True, default=str),
+                    }],
+                },
+            ],
+            "text": {
+                "format": {
+                    "type": "json_schema",
+                    "name": "event_catalyst_frame_analysis",
+                    "strict": True,
+                    "schema": _catalyst_frame_schema(),
                 }
             },
         }
@@ -201,6 +261,17 @@ def _extraction_system_prompt(prompt_version: str) -> str:
         "crypto assets/projects actually mentioned, false-positive terms such as publisher "
         "names or ordinary words, and event date hints. Use exact quotes copied from the "
         "packet text. If evidence is weak, lower confidence and explain the ambiguity."
+    )
+
+
+def _catalyst_frame_system_prompt(prompt_version: str) -> str:
+    return (
+        f"Prompt version: {prompt_version}.\n"
+        "Parse source evidence into catalyst frames. Separate the main catalyst from "
+        "background, historical, corrective, negated, side-note, and market-reaction "
+        "context. You do not recommend trades, alerts, paper trades, position sizes, "
+        "or execution. Use exact source quotes. If a quote does not support a frame, "
+        "lower confidence and put it in manual verification instead of promoting it."
     )
 
 

@@ -57,6 +57,7 @@ def format_profile_report(profile: EventAlphaProfile) -> str:
     budget_keys = [
         "EVENT_LLM_MAX_CANDIDATES_PER_RUN",
         "EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN",
+        "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN",
         "EVENT_LLM_MAX_CALLS_PER_RUN",
         "EVENT_LLM_MAX_CALLS_PER_DAY",
         "EVENT_LLM_MAX_ESTIMATED_COST_USD_PER_DAY",
@@ -89,6 +90,7 @@ def artifact_policy(profile: EventAlphaProfile) -> dict[str, Any]:
     budget = {
         "max_candidates_per_run": overrides.get("EVENT_LLM_MAX_CANDIDATES_PER_RUN", "default"),
         "max_extractor_events_per_run": overrides.get("EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN", "default"),
+        "max_catalyst_frame_rows_per_run": overrides.get("EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN", "default"),
         "max_calls_per_run": overrides.get("EVENT_LLM_MAX_CALLS_PER_RUN", "default"),
         "max_calls_per_day": overrides.get("EVENT_LLM_MAX_CALLS_PER_DAY", "default"),
         "max_parallel_calls": overrides.get("EVENT_LLM_MAX_PARALLEL_CALLS", "default"),
@@ -273,6 +275,11 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_EXTRACTOR_PROVIDER": "openai",
             "EVENT_LLM_EXTRACTOR_MODE": "advisory",
             "EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT": 30.0,
+            "EVENT_LLM_CATALYST_FRAMES_ENABLED": True,
+            "EVENT_LLM_CATALYST_FRAMES_PROVIDER": "openai",
+            "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": 40,
+            "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE": 0.50,
+            "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS": True,
             "EVENT_WATCHLIST_ENABLED": True,
             "EVENT_WATCHLIST_MONITOR_ENABLED": True,
             "EVENT_WATCHLIST_MONITOR_MARKET_SOURCE": "cycle",
@@ -356,6 +363,8 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_EXTRACTOR_ENABLED": False,
             "EVENT_LLM_EXTRACTOR_PROVIDER": "fixture",
             "EVENT_LLM_EXTRACTOR_MODE": "shadow",
+            "EVENT_LLM_CATALYST_FRAMES_ENABLED": False,
+            "EVENT_LLM_CATALYST_FRAMES_PROVIDER": "fixture",
             "EVENT_ALPHA_RUN_MODE": "notification_burn_in",
             "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
             "EVENT_ALPHA_NOTIFY_SCOPE": "namespace",
@@ -447,6 +456,11 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_EXTRACTOR_PROVIDER": "openai",
             "EVENT_LLM_EXTRACTOR_MODE": "advisory",
             "EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT": 30.0,
+            "EVENT_LLM_CATALYST_FRAMES_ENABLED": True,
+            "EVENT_LLM_CATALYST_FRAMES_PROVIDER": "openai",
+            "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": 25,
+            "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE": 0.55,
+            "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS": True,
             "EVENT_ALPHA_RUN_MODE": "notification_burn_in",
             "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
             "EVENT_ALPHA_NOTIFY_SCOPE": "namespace",
@@ -541,6 +555,11 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_EXTRACTOR_PROVIDER": "openai",
             "EVENT_LLM_EXTRACTOR_MODE": "advisory",
             "EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT": 45.0,
+            "EVENT_LLM_CATALYST_FRAMES_ENABLED": True,
+            "EVENT_LLM_CATALYST_FRAMES_PROVIDER": "openai",
+            "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": 60,
+            "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE": 0.50,
+            "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS": True,
             "EVENT_ALPHA_RUN_MODE": "notification_burn_in",
             "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
             "EVENT_ALPHA_NOTIFY_SCOPE": "namespace",
@@ -587,6 +606,31 @@ _PROFILES: dict[str, EventAlphaProfile] = {
         notification_burn_in=True,
     ),
 }
+
+
+_PROFILES["catalyst_frame_validation"] = replace(
+    _PROFILES["quality_validation"],
+    name="catalyst_frame_validation",
+    description=(
+        "Offline fixture Event Alpha cycle for validating quote-checked LLM "
+        "catalyst-frame parsing before deterministic incident/impact logic; no sends."
+    ),
+    config_overrides={
+        **_PROFILES["quality_validation"].config_overrides,
+        "EVENT_LLM_ENABLED": True,
+        "EVENT_LLM_PROVIDER": "fixture",
+        "EVENT_LLM_MODE": "advisory",
+        "EVENT_LLM_EXTRACTOR_ENABLED": False,
+        "EVENT_LLM_EXTRACTOR_PROVIDER": "fixture",
+        "EVENT_LLM_EXTRACTOR_MODE": "shadow",
+        "EVENT_LLM_CATALYST_FRAMES_ENABLED": True,
+        "EVENT_LLM_CATALYST_FRAMES_PROVIDER": "fixture",
+        "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": 100,
+        "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE": 0.0,
+        "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS": False,
+    },
+    with_llm=True,
+)
 
 
 _PROFILES["notify_llm_quality"] = EventAlphaProfile(

@@ -217,6 +217,19 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         },
         "external_context_hidden_by_default": incident_relevance["incident_relevance_status"]
         == event_incident_store.RELEVANCE_EXTERNAL_CONTEXT_ONLY,
+        "selected_main_frame_type": incident.main_frame_type,
+        "background_frame_count": _frame_role_count(incident.frame_summary, {"background_context", "historical_context"}),
+        "negated_frame_count": _frame_role_count(incident.frame_summary, {"negated_claim", "corrective_context"}),
+        "frame_rule_disagreement": bool(
+            (raw.raw_json if isinstance(raw.raw_json, Mapping) else {})
+            .get("llm_catalyst_frame_validation", {})
+            .get("frame_rule_disagreement", False)
+        ),
+        "frame_disagreement_resolution": (
+            (raw.raw_json if isinstance(raw.raw_json, Mapping) else {})
+            .get("llm_catalyst_frame_validation", {})
+            .get("resolution")
+        ),
     }
     expected = _expected(case)
     diffs, stages = _diff_expected(expected, actual)
@@ -288,6 +301,18 @@ def _raw_event(case: Mapping[str, Any]) -> RawDiscoveredEvent:
         source_confidence=float(row.get("source_confidence") or case.get("source_confidence") or 0.8),
         content_hash=str(row.get("content_hash") or row.get("raw_id") or case.get("case_id") or ""),
     )
+
+
+def _frame_role_count(frame_summary: Iterable[Mapping[str, Any]], roles: set[str]) -> int:
+    keys = {
+        (
+            str(frame.get("frame_type") or ""),
+            str(frame.get("subject") or ""),
+        )
+        for frame in frame_summary
+        if isinstance(frame, Mapping) and str(frame.get("frame_role") or "") in roles
+    }
+    return len(keys)
 
 
 def _normalized_event_for_case(case: Mapping[str, Any], raw: RawDiscoveredEvent) -> NormalizedEvent:
@@ -389,6 +414,11 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "link_quality_reasons": "incident_relevance",
         "diagnostic_hidden_by_default": "incident_relevance",
         "external_context_hidden_by_default": "incident_relevance",
+        "selected_main_frame_type": "catalyst_frame",
+        "background_frame_count": "catalyst_frame",
+        "negated_frame_count": "catalyst_frame",
+        "frame_rule_disagreement": "catalyst_frame",
+        "frame_disagreement_resolution": "catalyst_frame",
     }
     for key, expected_value in expected.items():
         actual_value = actual.get(key)

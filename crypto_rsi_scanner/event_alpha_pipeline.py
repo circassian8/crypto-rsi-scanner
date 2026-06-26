@@ -13,6 +13,8 @@ from . import (
     event_alpha_router,
     event_alpha_priors,
     event_anomaly_state,
+    event_catalyst_frame_validator,
+    event_llm_catalyst_frames,
     event_catalyst_search,
     event_graph,
     event_impact_hypotheses,
@@ -66,6 +68,7 @@ class EventAlphaPipelineResult:
     hypothesis_search_result: event_catalyst_search.CatalystSearchRunResult | None
     anomaly_lifecycle_result: event_anomaly_state.EventAnomalyStateResult | None
     extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow]
+    catalyst_frame_rows: list[event_llm_catalyst_frames.EventLLMCatalystFrameReportRow]
     relationship_rows: list[event_llm_analyzer.EventLLMReportRow]
     watchlist_result: event_watchlist.EventWatchlistRefreshResult | None
     watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None
@@ -166,6 +169,17 @@ class EventAlphaPipelineResult:
         return len([row for row in self.extraction_rows if row.extraction is not None])
 
     @property
+    def catalyst_frame_analyses(self) -> int:
+        return len([row for row in self.catalyst_frame_rows if row.analysis is not None])
+
+    @property
+    def catalyst_frame_validations_applied(self) -> int:
+        return len([
+            raw for raw in self.discovery_result.raw_events
+            if raw.raw_json and raw.raw_json.get("llm_catalyst_frame_validation")
+        ])
+
+    @property
     def extraction_hint_events(self) -> int:
         return len([
             raw for raw in self.discovery_result.raw_events
@@ -256,6 +270,7 @@ def run_event_alpha_pipeline(
     alert_cfg: event_alerts.EventAlertConfig | None = None,
     now: datetime | None = None,
     extraction_rows: Iterable[event_llm_extractor.EventLLMExtractionReportRow] = (),
+    catalyst_frame_rows: Iterable[event_llm_catalyst_frames.EventLLMCatalystFrameReportRow] = (),
     catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None = None,
     hypothesis_search_provider: event_catalyst_search.CatalystSearchProvider | None = None,
     hypothesis_search_cfg: event_catalyst_search.EventImpactHypothesisSearchConfig | None = None,
@@ -292,7 +307,9 @@ def run_event_alpha_pipeline(
     alert_cfg = alert_cfg or event_alerts.EventAlertConfig()
     warnings: list[str] = list(extra_warnings)
     extraction_rows_list = list(extraction_rows)
+    catalyst_frame_rows_list = list(catalyst_frame_rows)
     warnings.extend(_llm_budget_warnings(extraction_rows_list, label="extractor"))
+    warnings.extend(_llm_budget_warnings(catalyst_frame_rows_list, label="catalyst_frame"))
     alerts = event_alerts.build_event_alert_candidates(discovery_result, cfg=alert_cfg, now=observed)
     relationship_rows: list[event_llm_analyzer.EventLLMReportRow] = []
     if relationship_provider is not None and relationship_cfg is not None:
@@ -459,6 +476,7 @@ def run_event_alpha_pipeline(
         hypothesis_search_result=hypothesis_search_result,
         anomaly_lifecycle_result=anomaly_lifecycle_result,
         extraction_rows=extraction_rows_list,
+        catalyst_frame_rows=catalyst_frame_rows_list,
         relationship_rows=relationship_rows,
         watchlist_result=watchlist_result,
         watchlist_monitor_result=watchlist_monitor_result,
@@ -477,6 +495,8 @@ def run_event_alpha_operating_cycle(
     with_llm: bool = False,
     extraction_provider: object | None = None,
     extraction_cfg: event_llm_extractor.EventLLMExtractorConfig | None = None,
+    catalyst_frame_provider: object | None = None,
+    catalyst_frame_cfg: event_llm_catalyst_frames.EventLLMCatalystFrameConfig | None = None,
     catalyst_search_provider: event_catalyst_search.CatalystSearchProvider | None = None,
     catalyst_search_cfg: event_catalyst_search.EventCatalystSearchConfig | None = None,
     hypothesis_search_provider: event_catalyst_search.CatalystSearchProvider | None = None,
@@ -523,8 +543,10 @@ def run_event_alpha_operating_cycle(
     warnings: list[str] = []
     catalyst_search_result: event_catalyst_search.CatalystSearchRunResult | None = None
     extraction_rows: list[event_llm_extractor.EventLLMExtractionReportRow] = []
+    catalyst_frame_rows: list[event_llm_catalyst_frames.EventLLMCatalystFrameReportRow] = []
     source_raw_events: tuple[RawDiscoveredEvent, ...] = ()
     llm_transform: RawEventTransform | None = None
+    catalyst_frame_transform: RawEventTransform | None = None
     relationship_provider_to_use = None
     relationship_cfg_to_use = None
 
@@ -566,6 +588,42 @@ def run_event_alpha_operating_cycle(
         elif extraction_cfg is not None:
             warnings.append("Event LLM extractor skipped: no extraction provider available")
 
+        if catalyst_frame_cfg is not None and catalyst_frame_cfg.enabled:
+            if catalyst_frame_provider is None:
+                warnings.append("Event LLM catalyst-frame analysis skipped: no provider available")
+            else:
+                def _enrich_with_llm_catalyst_frames(
+                    raw_events: tuple[RawDiscoveredEvent, ...],
+                ) -> tuple[RawDiscoveredEvent, ...]:
+                    nonlocal catalyst_frame_rows
+                    catalyst_frame_rows = event_llm_catalyst_frames.analyze_raw_events(
+                        raw_events,
+                        catalyst_frame_provider,
+                        cfg=catalyst_frame_cfg,
+                    )
+                    enriched: list[RawDiscoveredEvent] = []
+                    analyses_by_raw_id = {
+                        row.raw_event.raw_id: row.analysis
+                        for row in catalyst_frame_rows
+                        if row.analysis is not None
+                    }
+                    for raw in raw_events:
+                        analysis = analyses_by_raw_id.get(raw.raw_id)
+                        if analysis is None:
+                            enriched.append(raw)
+                            continue
+                        validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(
+                            analysis,
+                            raw_events,
+                        )
+                        enriched.append(event_catalyst_frame_validator.apply_validation_to_raw_event(
+                            raw,
+                            analysis,
+                            validation,
+                        ))
+                    return tuple(enriched)
+
+                catalyst_frame_transform = _enrich_with_llm_catalyst_frames
         if relationship_cfg is not None and relationship_provider is not None:
             if relationship_cfg.mode in {"shadow", "advisory"}:
                 relationship_provider_to_use = relationship_provider
@@ -609,11 +667,14 @@ def run_event_alpha_operating_cycle(
             )
         if llm_transform is not None:
             transformed = tuple(llm_transform(transformed))
+        if catalyst_frame_transform is not None:
+            transformed = tuple(catalyst_frame_transform(transformed))
         return transformed
 
     raw_event_transform: RawEventTransform | None = None
     if (
         llm_transform is not None
+        or catalyst_frame_transform is not None
         or (catalyst_search_cfg is not None and catalyst_search_cfg.enabled)
         or (source_enrichment_cfg is not None and source_enrichment_cfg.enabled)
     ):
@@ -630,6 +691,7 @@ def run_event_alpha_operating_cycle(
         hypothesis_search_cfg=hypothesis_search_cfg,
         source_raw_events=source_raw_events,
         extraction_rows=extraction_rows,
+        catalyst_frame_rows=catalyst_frame_rows,
         relationship_provider=relationship_provider_to_use,
         relationship_cfg=relationship_cfg_to_use,
         watchlist_cfg=watchlist_cfg,
@@ -841,6 +903,8 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
             f"anomaly_lifecycle={result.anomaly_lifecycle_entries} · "
             f"extractions={result.extractions}/{len(result.extraction_rows)} · "
             f"extraction_hints_applied={result.extraction_hint_events} · "
+            f"catalyst_frames={result.catalyst_frame_analyses}/{len(result.catalyst_frame_rows)} · "
+            f"catalyst_frame_validations={result.catalyst_frame_validations_applied} · "
             f"candidates={result.candidates} · clusters={result.clusters} · alerts={len(result.alerts)}"
         ),
         (

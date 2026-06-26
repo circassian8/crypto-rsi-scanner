@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - LLM catalyst frames are validated research metadata only
+**Status:** accepted
+**Decision:** Event Alpha may use a constrained LLM catalyst-frame analyzer to
+propose the source's main catalyst, background/historical context, negated or
+corrective claims, rejected impact paths, and manual verification items, but
+only after deterministic validation. Valid frames require quote support in the
+source text, acceptable crypto-asset identity evidence, no external-entity-as-
+crypto misuse, and no generic ticker-word collision. A validated LLM main frame
+may override a weaker deterministic rule frame only when those gates pass and
+the disagreement is recorded. Hard deterministic safety gates still win:
+validated LLM frames cannot create `TRIGGERED_FADE`, send notifications, open
+paper/live trades, write normal RSI signal rows, or bypass resolver, quality,
+proxy/direct, or event-fade eligibility checks.
+**Why:** Some articles contain the actionable catalyst in the headline while
+using exploit/policy/background language elsewhere. The AAVE/Kraken/KelpDAO
+case needs semantic framing to preserve the Kraken strategic-stake catalyst and
+reject the KelpDAO exploit mention as background without letting an LLM invent
+assets or routes.
+**Revisit when:** A reviewed artifact dataset shows either systematic LLM
+frame mistakes that require stricter gating, or enough validated cases to move
+frame analysis from ambiguous-only support into a broader configured review
+surface.
+
 ## 2026-06-27 - Main catalyst frames drive incident and impact classification
 **Status:** accepted
 **Decision:** Event Alpha source interpretation must separate the article's

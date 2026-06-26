@@ -237,9 +237,10 @@ def _run_record(
     watchlist = getattr(result, "watchlist_result", None)
     router = getattr(result, "router_result", None)
     extraction_rows = list(getattr(result, "extraction_rows", ()) or ())
+    catalyst_frame_rows = list(getattr(result, "catalyst_frame_rows", ()) or ())
     relationship_rows = list(getattr(result, "relationship_rows", ()) or ())
     card_paths = tuple(str(path) for path in getattr(result, "research_card_paths", ()) or ())
-    llm_stats = _llm_stats((*extraction_rows, *relationship_rows))
+    llm_stats = _llm_stats((*extraction_rows, *catalyst_frame_rows, *relationship_rows))
     warnings = list(getattr(result, "warnings", ()) or ())
     clock_status = dict(getattr(result, "clock_status", {}) or {})
     if failure:
@@ -282,6 +283,8 @@ def _run_record(
         ),
         "extraction_rows": len(extraction_rows),
         "extraction_hints_applied": _int(getattr(result, "extraction_hint_events", 0)),
+        "catalyst_frame_rows": len(catalyst_frame_rows),
+        "catalyst_frame_validations_applied": _int(getattr(result, "catalyst_frame_validations_applied", 0)),
         "impact_hypotheses": len(tuple(getattr(result, "impact_hypotheses", ()) or ())),
         "hypotheses_validated": _int(getattr(result, "hypotheses_validated", 0)),
         "hypothesis_search_queries": _int(getattr(result, "hypothesis_search_queries", 0)),

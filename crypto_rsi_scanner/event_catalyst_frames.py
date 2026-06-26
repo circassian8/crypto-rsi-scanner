@@ -144,11 +144,48 @@ def _frames_from_raw(raw: RawDiscoveredEvent, *, event: NormalizedEvent | None) 
     title = str(raw.title or "")
     body = str(raw.body or "")
     frames: list[EventCatalystFrame] = []
+    frames.extend(_validated_llm_frames_from_raw(raw))
     if title:
         frames.extend(_frames_from_text(title, title=title, raw=raw, event=event))
     for segment in (body, _enriched_text(raw)):
         if segment:
             frames.extend(_frames_from_text(segment, title=title, raw=raw, event=event))
+    return frames
+
+
+def _validated_llm_frames_from_raw(raw: RawDiscoveredEvent) -> list[EventCatalystFrame]:
+    payload = raw.raw_json if isinstance(raw.raw_json, dict) else {}
+    validation = payload.get("llm_catalyst_frame_validation") if isinstance(payload.get("llm_catalyst_frame_validation"), dict) else {}
+    raw_frames = validation.get("valid_frames") if isinstance(validation.get("valid_frames"), list) else []
+    frames: list[EventCatalystFrame] = []
+    for item in raw_frames:
+        if not isinstance(item, dict):
+            continue
+        frame_type = str(item.get("frame_type") or "")
+        frame_role = str(item.get("frame_role") or "")
+        if not frame_type or not frame_role:
+            continue
+        quote = re.sub(r"\s+", " ", str(item.get("evidence_quote") or "")).strip()[:320]
+        subject = _clean_subject(str(item.get("subject") or "")) if item.get("subject") else None
+        frame_id = str(item.get("frame_id") or _frame_id(raw.raw_id, frame_type, frame_role, subject, quote))
+        frames.append(EventCatalystFrame(
+            frame_id=frame_id,
+            frame_type=frame_type,
+            frame_role=frame_role,
+            subject=subject,
+            actor=_clean_subject(str(item.get("actor") or "")) if item.get("actor") else None,
+            object=str(item.get("object") or "") or None,
+            affected_entities=tuple(str(value) for value in item.get("affected_entities") or () if str(value).strip()),
+            affected_assets=tuple(str(value) for value in item.get("affected_assets") or () if str(value).strip()),
+            event_archetype=str(item.get("event_archetype") or frame_type),
+            claim_polarity=str(item.get("claim_polarity") or event_claim_semantics.ClaimPolarity.UNKNOWN.value),
+            cause_status=str(item.get("cause_status") or event_claim_semantics.CauseStatus.UNKNOWN.value),
+            confidence=max(0.0, min(1.0, float(item.get("confidence") or 0.0))),
+            evidence_quote=quote,
+            source_raw_id=raw.raw_id,
+            source_url=raw.source_url,
+            published_at=raw.published_at,
+        ))
     return frames
 
 

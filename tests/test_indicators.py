@@ -22168,6 +22168,318 @@ def test_aave_kraken_hypothesis_uses_strategic_frame_in_cards_and_audit():
     assert "negated frame count: 1" in audit
 
 
+def test_llm_catalyst_frame_fixture_validation_and_downstream_use():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import (
+        event_catalyst_frame_validator,
+        event_catalyst_frames,
+        event_impact_path_validator,
+        event_incident_graph,
+        event_llm_catalyst_frames,
+    )
+    from crypto_rsi_scanner.event_models import NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMCatalystFrameProvider
+
+    now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
+
+    def raw(raw_id, title, body, *, external="Aave"):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="fixture_news",
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://alpha.example/{raw_id}",
+            title=title,
+            body=body,
+            raw_json={},
+            source_confidence=0.90,
+            content_hash=raw_id,
+        ), NormalizedEvent(
+            event_id=f"evt_{raw_id}",
+            raw_ids=(raw_id,),
+            event_name=title,
+            event_type="news",
+            event_time=None,
+            event_time_confidence=0.0,
+            first_seen_time=now,
+            source="fixture_news",
+            source_urls=(f"https://alpha.example/{raw_id}",),
+            external_asset=external,
+            description=body,
+            confidence=0.90,
+        )
+
+    provider = FixtureLLMCatalystFrameProvider(required=True)
+    cfg = event_llm_catalyst_frames.EventLLMCatalystFrameConfig(
+        enabled=True,
+        max_rows_per_run=10,
+        min_source_score=0.0,
+        only_ambiguous=False,
+    )
+    aave_raw, aave_event = raw(
+        "aave_kraken",
+        "Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+        "The DeFi lender is rebuilding after the fallout from April's KelpDAO exploit "
+        "sparked a multibillion-dollar exodus of deposits despite Aave itself not being hacked.",
+    )
+    report = event_llm_catalyst_frames.analyze_raw_events((aave_raw,), provider, cfg=cfg)
+    assert report and report[0].analysis is not None
+    analysis = report[0].analysis
+    assert analysis.main_catalyst_frame is not None
+    assert analysis.main_catalyst_frame.frame_type == "acquisition_or_stake"
+    assert analysis.background_frames[0].frame_type == "prior_exploit_context"
+    assert analysis.negated_or_corrective_frames[0].frame_type == "denied_or_negated_exploit"
+
+    rule_exploit = event_catalyst_frames.EventCatalystFrame(
+        frame_id="rule:exploit",
+        frame_type="exploit_security_event",
+        frame_role="main_catalyst",
+        subject="Aave",
+        event_archetype="exploit_security_event",
+        claim_polarity="asserted",
+        cause_status="confirmed",
+        confidence=0.80,
+        evidence_quote="KelpDAO exploit",
+    )
+    validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(
+        analysis,
+        (aave_raw,),
+        event=aave_event,
+        rule_frames=(rule_exploit,),
+    )
+    assert validation.selected_main_frame is not None
+    assert validation.selected_main_frame.frame_type == "acquisition_or_stake"
+    assert validation.frame_rule_disagreement is True
+    assert validation.resolution == "llm_wins"
+    assert any("prior_exploit_context" in item for item in validation.rejected_impact_paths)
+    assert any("denied_or_negated_exploit" in item for item in validation.rejected_impact_paths)
+
+    enriched_raw = event_catalyst_frame_validator.apply_validation_to_raw_event(aave_raw, analysis, validation)
+    incident = event_incident_graph.build_incidents((aave_event,), {enriched_raw.raw_id: enriched_raw})[0]
+    assert incident.event_archetype == "strategic_investment"
+    assert incident.main_frame_type == "acquisition_or_stake"
+    assert incident.background_frame_ids
+    assert incident.negated_frame_ids
+    impact = event_impact_path_validator.validate_impact_path(
+        enriched_raw,
+        SimpleNamespace(impact_category="security_or_regulatory_shock", external_asset="Aave", score_components={}),
+        symbol="AAVE",
+        coin_id="aave",
+    )
+    assert impact.impact_path_type == "strategic_investment_or_valuation"
+    assert impact.impact_path_type != "exploit_security_event"
+
+    thor_raw, _ = raw(
+        "thor_exploit",
+        "THORChain suffers exploit and RUNE resumes trading",
+        "THORChain exploit drained funds before RUNE resumed trading.",
+        external="THORChain",
+    )
+    thor_report = event_llm_catalyst_frames.analyze_raw_events((thor_raw,), provider, cfg=cfg)
+    thor_validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(thor_report[0].analysis, (thor_raw,))
+    assert thor_validation.selected_main_frame is not None
+    assert thor_validation.selected_main_frame.frame_type == "exploit_security_event"
+    assert thor_validation.frame_rule_disagreement is False
+
+
+def test_event_alpha_operating_cycle_applies_llm_catalyst_frame_validation():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_pipeline,
+        event_catalyst_frames,
+        event_incident_graph,
+        event_llm_catalyst_frames,
+    )
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMCatalystFrameProvider
+
+    now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="aave_kraken",
+        provider="fixture_news",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://alpha.example/aave",
+        title="Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+        body=(
+            "The DeFi lender is rebuilding after the fallout from April's KelpDAO exploit "
+            "sparked a multibillion-dollar exodus of deposits despite Aave itself not being hacked."
+        ),
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="aave_kraken",
+    )
+    event = NormalizedEvent(
+        event_id="evt_aave_kraken",
+        raw_ids=("aave_kraken",),
+        event_name=raw.title,
+        event_type="news",
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=now,
+        source="fixture_news",
+        source_urls=(raw.source_url or "",),
+        external_asset="Aave",
+        description=raw.body,
+        confidence=0.90,
+    )
+
+    def load_discovery_result(observed, raw_event_transform):
+        raw_events = (raw,)
+        if raw_event_transform is not None:
+            raw_events = tuple(raw_event_transform(raw_events))
+        return EventDiscoveryResult(
+            raw_events=raw_events,
+            normalized_events=(event,),
+            links=(),
+            classifications=(),
+            candidates=(),
+        )
+
+    result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=load_discovery_result,
+        now=now,
+        with_llm=True,
+        catalyst_frame_provider=FixtureLLMCatalystFrameProvider(required=True),
+        catalyst_frame_cfg=event_llm_catalyst_frames.EventLLMCatalystFrameConfig(
+            enabled=True,
+            max_rows_per_run=10,
+            min_source_score=0.0,
+            only_ambiguous=False,
+        ),
+        refresh_watchlist=False,
+        route=False,
+    )
+
+    assert result.catalyst_frame_analyses == 1
+    assert result.catalyst_frame_validations_applied == 1
+    enriched_raw = result.discovery_result.raw_events[0]
+    validation = enriched_raw.raw_json["llm_catalyst_frame_validation"]
+    assert validation["selected_main_frame"]["frame_type"] == "acquisition_or_stake"
+    frames = event_catalyst_frames.build_catalyst_frames((enriched_raw,), event=event)
+    selected_main, supporting_frames = event_catalyst_frames.select_main_catalyst_frame(frames)
+    assert selected_main is not None
+    assert selected_main.frame_type == "acquisition_or_stake"
+    assert any(frame.frame_type == "prior_exploit_context" for frame in supporting_frames)
+    incident = event_incident_graph.build_incidents((event,), {enriched_raw.raw_id: enriched_raw})[0]
+    assert incident.event_archetype == "strategic_investment"
+    assert incident.background_frame_ids
+
+
+def test_llm_catalyst_frame_validator_rejects_bad_quotes_and_identity_noise():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_frame_validator, event_llm_catalyst_frames
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMCatalystFrameProvider
+
+    now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
+    invalid_raw = RawDiscoveredEvent(
+        raw_id="invalid_quote",
+        provider="fixture_news",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://alpha.example/invalid",
+        title="Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+        body="The source says Aave itself was not hacked.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="invalid_quote",
+    )
+    cfg = event_llm_catalyst_frames.EventLLMCatalystFrameConfig(enabled=True, only_ambiguous=False, min_source_score=0.0)
+    provider = FixtureLLMCatalystFrameProvider(required=True)
+    report = event_llm_catalyst_frames.analyze_raw_events((invalid_raw,), provider, cfg=cfg)
+    validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(report[0].analysis, (invalid_raw,))
+    assert validation.selected_main_frame is None
+    assert validation.invalid_frames[0]["reason"] == "llm_frame_quote_not_found"
+
+    packet = event_llm_catalyst_frames.build_catalyst_frame_packet(invalid_raw, cfg=cfg)
+    openai_noise = event_llm_catalyst_frames.parse_catalyst_frame_analysis(
+        {
+            "main_catalyst_frame": {
+                "frame_type": "proxy_attention",
+                "frame_role": "main_catalyst",
+                "subject": "OpenAI",
+                "actor": None,
+                "object": "pre-IPO mention",
+                "affected_entities": ["OpenAI"],
+                "affected_assets": ["OpenAI"],
+                "event_archetype": "proxy_attention",
+                "claim_polarity": "asserted",
+                "cause_status": "unknown",
+                "confidence": 0.80,
+                "evidence_quote": "Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+                "why_this_role": "identity-noise test",
+            },
+            "background_frames": [],
+            "negated_or_corrective_frames": [],
+            "external_entities": ["OpenAI"],
+            "crypto_assets": ["OpenAI"],
+            "rejected_impact_paths": [],
+            "manual_verification_items": [],
+            "semantic_confidence": 0.70,
+            "warnings": [],
+        },
+        packet=packet,
+        cfg=cfg,
+    )
+    openai_validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(openai_noise, (invalid_raw,))
+    assert openai_validation.invalid_frames[0]["reason"] == "external_entity_cannot_be_crypto_asset"
+
+    hype_noise = event_llm_catalyst_frames.parse_catalyst_frame_analysis(
+        {
+            "main_catalyst_frame": {
+                "frame_type": "proxy_attention",
+                "frame_role": "main_catalyst",
+                "subject": "HYPE",
+                "actor": None,
+                "object": "IPO hype",
+                "affected_entities": ["HYPE"],
+                "affected_assets": ["HYPE"],
+                "event_archetype": "proxy_attention",
+                "claim_polarity": "asserted",
+                "cause_status": "unknown",
+                "confidence": 0.80,
+                "evidence_quote": "Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+                "why_this_role": "generic ticker-noise test",
+            },
+            "background_frames": [],
+            "negated_or_corrective_frames": [],
+            "external_entities": [],
+            "crypto_assets": ["HYPE"],
+            "rejected_impact_paths": [],
+            "manual_verification_items": [],
+            "semantic_confidence": 0.70,
+            "warnings": [],
+        },
+        packet=packet,
+        cfg=cfg,
+    )
+    hype_validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(hype_noise, (invalid_raw,))
+    assert hype_validation.invalid_frames[0]["reason"] == "ticker_word_collision_rejected"
+
+
+def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
+    from crypto_rsi_scanner import event_alpha_profiles
+    from crypto_rsi_scanner.llm_providers.openai_provider import OpenAILLMRelationshipProvider
+
+    assert event_alpha_profiles.get_profile("notify_no_key").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is False
+    assert event_alpha_profiles.get_profile("notify_llm_deep").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
+    assert event_alpha_profiles.get_profile("notify_llm_deep").config_overrides["EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN"] == 60
+    assert event_alpha_profiles.get_profile("full_llm_live").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
+    assert event_alpha_profiles.get_profile("catalyst_frame_validation").config_overrides["EVENT_LLM_CATALYST_FRAMES_PROVIDER"] == "fixture"
+    assert event_alpha_profiles.get_profile("catalyst_frame_validation").with_llm is True
+    report = event_alpha_profiles.format_profile_report(event_alpha_profiles.get_profile("notify_llm_deep"))
+    assert "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN=60" in report
+    provider = OpenAILLMRelationshipProvider(api_key="")
+    result = provider.analyze_catalyst_frames({"raw_id": "missing-key"})
+    assert result.raw is None
+    assert "missing OPENAI_API_KEY" in (result.warning or "")
+    with open("Makefile", encoding="utf-8") as fh:
+        text = fh.read()
+    assert "event-alpha-catalyst-frame-validation-cycle" in text
+
+
 def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     import tempfile
     from datetime import datetime, timezone

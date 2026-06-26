@@ -163,6 +163,24 @@ itself. Example: an AAVE/Kraken strategic-stake article that mentions a prior
 KelpDAO exploit should validate as `strategic_investment_or_valuation`, not
 `exploit_security_event`, because the exploit is background context and “Aave
 itself not being hacked” is a negated/corrective frame.
+OpenAI/fixture LLM catalyst-frame analysis is an optional support layer for
+this same metadata. It is disabled by default, off for `notify_no_key`, enabled
+with bounded caps in OpenAI-backed `notify_llm`/`notify_llm_deep`/`full_llm_live`
+profiles, and fixture-backed in `catalyst_frame_validation`. LLM output is never
+trusted raw: quotes must appear in the source, external entities cannot be
+accepted as crypto assets, generic ticker-word collisions are rejected, and
+rule/LLM disagreements are recorded before a validated frame can override a
+weaker deterministic frame. Use:
+
+```
+make event-alpha-catalyst-frame-validation-cycle PYTHON=python3
+make event-opportunity-audit TARGET=AAVE PROFILE=catalyst_frame_validation PYTHON=python3
+make event-alpha-daily-brief PROFILE=catalyst_frame_validation PYTHON=python3
+```
+
+The feature is research metadata only. It cannot send notifications, create
+paper/live rows, write normal RSI signals, execute trades, or create
+`TRIGGERED_FADE`.
 No-catalyst phrases such as “no dated external catalyst has been validated,”
 “no clear trigger,” or “without a known cause” are absence-of-evidence /
 unknown-cause metadata. They should never produce `primary_subject=No` or a

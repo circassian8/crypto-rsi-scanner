@@ -17,6 +17,47 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Add quote-validated LLM catalyst-frame analyzer · Codex
+**Why:** Deterministic catalyst framing now separates main/background context,
+but AAVE/Kraken/KelpDAO-style articles need a constrained semantic support
+layer so the source's main catalyst can be recognized without letting an LLM
+invent identity, impact paths, routes, or triggers.
+**Changes:**
+- Added `event_llm_catalyst_frames.py` and
+  `event_catalyst_frame_validator.py` with strict structured frame models,
+  quote validation, external-entity/crypto-identity guards, generic ticker-word
+  collision rejection, rejected impact paths, manual verification items, and
+  explicit rule-vs-LLM disagreement resolution.
+- Added fixture and OpenAI provider support for catalyst-frame analysis, plus
+  fixture golden cases for AAVE/Kraken/KelpDAO, THORChain/RUNE, MemeCore,
+  ZEC/miner listing, VELVET/SpaceX, and invalid-quote rejection.
+- Wired validated LLM frames into the unified Event Alpha raw-event transform so
+  deterministic incident/impact logic can consume only validated frames; raw
+  LLM output is ignored unless the validator accepts it.
+- Added catalyst-frame counters to the Event Alpha pipeline report/run ledger,
+  `RSI_EVENT_LLM_CATALYST_FRAMES_*` config, profile rollout (`notify_no_key`
+  off, OpenAI LLM profiles bounded/on, fixture `catalyst_frame_validation`),
+  `make event-alpha-catalyst-frame-validation-cycle`, signal-quality fixtures,
+  tests, and docs.
+**Verify:** `python3 tests/test_indicators.py` passed (469/469);
+`python3 -m compileall -q crypto_rsi_scanner tests` passed; `make
+event-llm-eval PYTHON=python3` passed (9/9); `make event-llm-extract-eval
+PYTHON=python3` passed (7/7); `make event-alpha-eval PYTHON=python3` passed
+(11/11); `make event-alpha-signal-quality-eval PYTHON=python3` passed (32/32);
+`make event-alpha-catalyst-frame-validation-cycle PYTHON=python3` passed,
+including AAVE/Kraken resolving to `acquisition_or_stake` with `llm_wins`;
+`make event-alpha-quality-validation-cycle PYTHON=python3` passed with strict
+doctor WARN only for weak unqualified fixture links; `make verify PYTHON=python3`
+passed. Manual `make event-opportunity-audit PROFILE=catalyst_frame_validation
+TARGET=AAVE PYTHON=python3` ran safely but found no artifact row because AAVE is
+currently an eval fixture, not part of that profile's anomaly source cycle;
+`make event-alpha-daily-brief PROFILE=catalyst_frame_validation PYTHON=python3`
+wrote the fixture daily brief.
+**Notes/risks:** Research-only semantic metadata. Validated LLM frames can inform
+incident/impact artifacts, but cannot create `TRIGGERED_FADE`, send Telegram,
+open paper/live trades, write normal RSI rows, bypass resolver/quality gates, or
+alter event-fade eligibility.
+
 ## 2026-06-27 — Add Event Alpha main-catalyst frames · Codex
 **Why:** Event Alpha could misread an article's background context as the
 actionable catalyst. The concrete failure was an AAVE/Kraken strategic-stake
