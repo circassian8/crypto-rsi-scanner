@@ -644,6 +644,11 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     primary_subject = components.get("primary_subject") or "unknown"
     affected_ecosystem = components.get("affected_ecosystem") or "unknown"
     cause_status = components.get("cause_status") or "unknown"
+    main_frame_type = components.get("main_frame_type") or "unknown"
+    background_context_summary = components.get("background_context_summary") or "none"
+    negated_frame_ids = components.get("negated_frame_ids") or []
+    rejected_impact_paths = components.get("rejected_impact_paths") or []
+    frame_summary = components.get("frame_summary") or []
     claim_polarities = components.get("claim_polarities") or []
     claim_history = components.get("claim_history") or []
     independent_source_domains = components.get("independent_source_domains") or components.get("source_domains") or []
@@ -690,6 +695,11 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Canonical persistence reason: {components.get('canonical_persistence_reason') or 'unknown'}",
         f"- Incident relevance reasons: {'; '.join(str(item) for item in (components.get('incident_relevance_reasons') or [])[:4]) if components.get('incident_relevance_reasons') else 'none'}",
         f"- Event archetype: {event_archetype}",
+        f"- Main catalyst: {main_frame_type}",
+        f"- Background context: {background_context_summary}",
+        f"- Negated/corrective frames: {len(negated_frame_ids)}",
+        f"- Rejected/background impact paths: {'; '.join(str(item) for item in rejected_impact_paths[:4]) if rejected_impact_paths else 'none'}",
+        f"- Catalyst frame evidence: {_frame_summary_value(frame_summary)}",
         f"- Primary subject: {primary_subject}",
         f"- Affected ecosystem: {affected_ecosystem}",
         f"- Cause status: {cause_status}",
@@ -918,6 +928,22 @@ def _claim_history_summary(value: Any) -> str:
                 f"{item.get('claim_type') or 'claim'}:"
                 f"{item.get('polarity') or 'unknown'}/"
                 f"{item.get('cause_status') or 'unknown'}"
+            )
+        else:
+            rows.append(str(item))
+    return "; ".join(rows) or "none"
+
+
+def _frame_summary_value(value: Any) -> str:
+    if not value:
+        return "none"
+    rows: list[str] = []
+    for item in list(value)[:4]:
+        if isinstance(item, Mapping):
+            rows.append(
+                f"{item.get('frame_role') or 'frame'}:"
+                f"{item.get('frame_type') or 'unknown'}"
+                f"({item.get('subject') or 'unknown'})"
             )
         else:
             rows.append(str(item))

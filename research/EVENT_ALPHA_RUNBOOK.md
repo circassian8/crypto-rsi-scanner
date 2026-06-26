@@ -154,6 +154,15 @@ incident subject. Market fields also carry `market_context_source`,
 `market_context_data_quality`, `market_reaction_observed`,
 `market_reaction_confirmed`, and `causal_mechanism_confirmed`; market reaction
 is evidence to inspect, not proof that the source explains the causal path.
+Incident and hypothesis rows also carry catalyst-frame metadata when source
+text contains multiple event claims. `main_frame_type` and
+`main_catalyst_frame_id` describe the event the source is primarily about;
+`background_frame_ids`, `negated_frame_ids`, `background_context_summary`, and
+`rejected_impact_paths` describe context that must not drive promotion by
+itself. Example: an AAVE/Kraken strategic-stake article that mentions a prior
+KelpDAO exploit should validate as `strategic_investment_or_valuation`, not
+`exploit_security_event`, because the exploit is background context and “Aave
+itself not being hacked” is a negated/corrective frame.
 No-catalyst phrases such as “no dated external catalyst has been validated,”
 “no clear trigger,” or “without a known cause” are absence-of-evidence /
 unknown-cause metadata. They should never produce `primary_subject=No` or a

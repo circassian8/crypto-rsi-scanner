@@ -180,6 +180,7 @@ def evaluate_opportunity(
 
     direct_event = path_type in {
         event_impact_path_validator.ImpactPathType.DIRECT_TOKEN_EVENT.value,
+        event_impact_path_validator.ImpactPathType.STRATEGIC_INVESTMENT_OR_VALUATION.value,
         event_impact_path_validator.ImpactPathType.LISTING_LIQUIDITY_EVENT.value,
         event_impact_path_validator.ImpactPathType.UNLOCK_SUPPLY_EVENT.value,
         event_impact_path_validator.ImpactPathType.EXPLOIT_SECURITY_EVENT.value,

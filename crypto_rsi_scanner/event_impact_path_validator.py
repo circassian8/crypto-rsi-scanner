@@ -13,13 +13,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Iterable, Mapping
 
-from . import event_claim_semantics, event_incident_graph
+from . import event_catalyst_frames, event_claim_semantics, event_incident_graph
 from .event_models import RawDiscoveredEvent
 from .event_resolver import clean_text
 
 
 class ImpactPathType(str, Enum):
     DIRECT_TOKEN_EVENT = "direct_token_event"
+    STRATEGIC_INVESTMENT_OR_VALUATION = "strategic_investment_or_valuation"
     LISTING_LIQUIDITY_EVENT = "listing_liquidity_event"
     UNLOCK_SUPPLY_EVENT = "unlock_supply_event"
     EXPLOIT_SECURITY_EVENT = "exploit_security_event"
@@ -78,6 +79,7 @@ class ImpactPathValidation:
 
 _DIRECT_EVENT_CATEGORIES = {
     "listing_liquidity_event",
+    "strategic_investment_or_valuation",
     "unlock_supply_pressure",
     "security_or_regulatory_shock",
     "stablecoin_regulatory",
@@ -103,9 +105,26 @@ def validate_impact_path(
     """Classify source specificity, candidate role, and impact path strength."""
     text = clean_text(_raw_text(raw) if raw is not None else "")
     claims = event_claim_semantics.extract_event_claims((raw,)) if raw is not None else ()
-    primary_subject = event_incident_graph.infer_primary_subject(None, (raw,) if raw is not None else (), claims=claims)
+    frames = event_catalyst_frames.build_catalyst_frames((raw,) if raw is not None else ())
+    main_frame, supporting_frames = event_catalyst_frames.select_main_catalyst_frame(frames, raw)
+    primary_subject = (
+        main_frame.subject
+        if main_frame is not None and main_frame.subject
+        else event_incident_graph.infer_primary_subject(None, (raw,) if raw is not None else (), claims=claims)
+    )
     affected_ecosystem = event_incident_graph.infer_affected_ecosystem(None, (raw,) if raw is not None else ())
-    cause_status = event_claim_semantics.current_cause_status(claims, "exploit")
+    cause_status = (
+        main_frame.cause_status
+        if main_frame is not None
+        and main_frame.frame_type != event_catalyst_frames.TYPE_PRIOR_EXPLOIT_CONTEXT
+        else event_claim_semantics.current_cause_status(claims, "exploit")
+    )
+    if (
+        main_frame is not None
+        and main_frame.frame_type == event_catalyst_frames.TYPE_MARKET_DISLOCATION
+        and any(frame.frame_role == event_catalyst_frames.ROLE_NEGATED for frame in supporting_frames)
+    ):
+        cause_status = event_claim_semantics.CauseStatus.RULED_OUT.value
     category = str(getattr(hypothesis, "impact_category", "") or "")
     external = clean_text(getattr(hypothesis, "external_asset", "") or "")
     components = dict(score_components or getattr(hypothesis, "score_components", {}) or {})
@@ -139,6 +158,8 @@ def validate_impact_path(
         claims=claims,
         primary_subject=primary_subject,
         affected_ecosystem=affected_ecosystem,
+        main_frame=main_frame,
+        supporting_frames=supporting_frames,
     )
     role, role_confidence, role_evidence = _refine_candidate_role(
         role,
@@ -226,8 +247,35 @@ def _classify_path(
     claims: tuple[event_claim_semantics.EventClaim, ...] = (),
     primary_subject: str | None = None,
     affected_ecosystem: str | None = None,
+    main_frame: event_catalyst_frames.EventCatalystFrame | None = None,
+    supporting_frames: tuple[event_catalyst_frames.EventCatalystFrame, ...] = (),
 ) -> tuple[str, str, str, str]:
     asset_present = _asset_terms_present(text, symbol=symbol, coin_id=coin_id)
+    asset_matches_main_subject = _subject_matches_asset(main_frame.subject if main_frame else None, symbol=symbol, coin_id=coin_id)
+    negated_direct_security = any(
+        frame.frame_role == event_catalyst_frames.ROLE_NEGATED
+        and _subject_matches_asset(frame.subject, symbol=symbol, coin_id=coin_id)
+        for frame in supporting_frames
+    )
+    if main_frame is not None and main_frame.frame_type in {
+        event_catalyst_frames.TYPE_ACQUISITION_OR_STAKE,
+        event_catalyst_frames.TYPE_STRATEGIC_INVESTMENT,
+        event_catalyst_frames.TYPE_VALUATION_EVENT,
+    }:
+        strength = ImpactPathStrength.STRONG.value if (asset_present or asset_matches_main_subject) and specificity >= 65 else ImpactPathStrength.MEDIUM.value
+        return (
+            ImpactPathType.STRATEGIC_INVESTMENT_OR_VALUATION.value,
+            CandidateRole.DIRECT_SUBJECT.value if (asset_present or asset_matches_main_subject) else CandidateRole.GENERIC_MENTION.value,
+            strength,
+            "strategic_investment",
+        )
+    if negated_direct_security and category == "security_or_regulatory_shock":
+        return (
+            ImpactPathType.MARKET_DISLOCATION_UNKNOWN.value,
+            CandidateRole.DIRECT_SUBJECT.value if (asset_present or asset_matches_main_subject) else CandidateRole.GENERIC_MENTION.value,
+            ImpactPathStrength.WEAK.value,
+            "direct_exploit_negated",
+        )
     if category == "market_anomaly_unknown" and (
         event_claim_semantics.text_has_unknown_cause(text)
         or _any_term_hit(text, ("crash", "crashes", "plunge", "plunges", "dumps", "selloff", "market anomaly"))
@@ -296,6 +344,17 @@ def _classify_path(
                 "political_meme_event",
             )
 
+    if category == "strategic_investment_or_valuation" and _any_term_hit(
+        text,
+        ("stake", "strategic investment", "valuation", "acquisition", "acquire", "buy"),
+    ):
+        return (
+            ImpactPathType.STRATEGIC_INVESTMENT_OR_VALUATION.value,
+            CandidateRole.DIRECT_SUBJECT.value if asset_present else CandidateRole.GENERIC_MENTION.value,
+            ImpactPathStrength.STRONG.value if asset_present and specificity >= 65 else ImpactPathStrength.MEDIUM.value,
+            "strategic_investment",
+        )
+
     if category == "unlock_supply_pressure" and _any_term_hit(text, ("unlock", "vesting", "airdrop", "tge", "emission", "claim")):
         return (
             ImpactPathType.UNLOCK_SUPPLY_EVENT.value,
@@ -316,6 +375,21 @@ def _classify_path(
         )
 
     if category == "security_or_regulatory_shock":
+        if main_frame is not None and main_frame.frame_type not in {
+            event_catalyst_frames.TYPE_EXPLOIT_SECURITY,
+            event_catalyst_frames.TYPE_PRIOR_EXPLOIT_CONTEXT,
+            event_catalyst_frames.TYPE_DENIED_EXPLOIT,
+            event_catalyst_frames.TYPE_MARKET_DISLOCATION,
+            event_catalyst_frames.TYPE_POLICY_CONTEXT,
+        }:
+            return (
+                ImpactPathType.STRATEGIC_INVESTMENT_OR_VALUATION.value
+                if main_frame.event_archetype == event_catalyst_frames.TYPE_STRATEGIC_INVESTMENT
+                else ImpactPathType.DIRECT_TOKEN_EVENT.value,
+                CandidateRole.DIRECT_SUBJECT.value if (asset_present or asset_matches_main_subject) else CandidateRole.GENERIC_MENTION.value,
+                ImpactPathStrength.MEDIUM.value,
+                str(main_frame.frame_type or "main_catalyst_not_security"),
+            )
         exploit_confirmed = event_claim_semantics.has_confirmed_claim(claims, "exploit")
         exploit_ruled_out = event_claim_semantics.has_ruled_out_claim(claims, "exploit")
         exploit_suspected = any(
@@ -342,6 +416,13 @@ def _classify_path(
                 "alleged_exploit_unconfirmed",
             )
         if _any_term_hit(text, ("exploit", "hack", "security incident", "attack", "breach", "resumes trading", "halted trading")):
+            if negated_direct_security:
+                return (
+                    ImpactPathType.MARKET_DISLOCATION_UNKNOWN.value,
+                    CandidateRole.DIRECT_SUBJECT.value if (asset_present or asset_matches_main_subject) else CandidateRole.GENERIC_MENTION.value,
+                    ImpactPathStrength.WEAK.value,
+                    "direct_exploit_negated",
+                )
             role = _security_role(text, symbol=symbol, coin_id=coin_id, primary_subject=primary_subject, affected_ecosystem=affected_ecosystem)
             strength = ImpactPathStrength.STRONG.value if role == CandidateRole.DIRECT_SUBJECT.value else (
                 ImpactPathStrength.MEDIUM.value if market_confirmation >= 40 else ImpactPathStrength.WEAK.value
@@ -427,6 +508,18 @@ def _classify_path(
     )
 
 
+def _subject_matches_asset(subject: str | None, *, symbol: str | None, coin_id: str | None) -> bool:
+    cleaned = clean_text(subject or "")
+    if not cleaned:
+        return False
+    candidates = {
+        clean_text(symbol or ""),
+        clean_text(coin_id or ""),
+        clean_text(str(coin_id or "").replace("-", " ")),
+    }
+    return cleaned in candidates or any(value and value in cleaned for value in candidates)
+
+
 def _refine_candidate_role(
     role: str,
     *,
@@ -509,7 +602,7 @@ def _evidence_specificity_score(
             score = max(score, 45.0)
     if _asset_terms_present(text, symbol=symbol, coin_id=coin_id):
         score += 12.0
-    if _any_term_hit(text, ("offers", "lets users trade", "listed", "unlocked", "exploit", "hack", "resumes trading", "fan token", "tokenized stock", "synthetic exposure", "trading pair")):
+    if _any_term_hit(text, ("offers", "lets users trade", "listed", "unlocked", "exploit", "hack", "resumes trading", "fan token", "tokenized stock", "synthetic exposure", "trading pair", "stake", "strategic investment", "valuation", "acquisition")):
         score += 18.0
     if category in _DIRECT_EVENT_CATEGORIES and _any_term_hit(text, ("listing", "unlock", "exploit", "hack", "airdrop", "tge")):
         score += 12.0

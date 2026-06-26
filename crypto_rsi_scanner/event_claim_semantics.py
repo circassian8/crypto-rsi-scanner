@@ -349,6 +349,7 @@ def _security_polarity(cleaned: str) -> tuple[str, str]:
         "no exploit",
         "no evidence of exploit",
         "without an exploit",
+        "not being hacked",
         "not hacked",
         "not hack",
         "exploit ruled out",

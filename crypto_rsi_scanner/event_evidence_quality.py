@@ -72,6 +72,10 @@ _MECHANISM_TERMS = (
     "trading pair",
     "airdrop",
     "tge",
+    "stake",
+    "strategic investment",
+    "valuation",
+    "acquisition",
 )
 _CATALYST_TERMS = (
     "ipo",
@@ -88,6 +92,10 @@ _CATALYST_TERMS = (
     "sec",
     "quantum",
     "prediction market",
+    "stake",
+    "strategic investment",
+    "valuation",
+    "acquisition",
 )
 
 

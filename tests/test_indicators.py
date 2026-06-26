@@ -21975,6 +21975,199 @@ def test_event_alpha_signal_quality_fixture_passes_and_reports_stage_failure():
     assert any("route_tier" in diff for diff in bad.case_results[0].diffs)
 
 
+def test_event_catalyst_frames_separate_main_background_and_negation():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_frames, event_claim_semantics, event_incident_graph
+    from crypto_rsi_scanner.event_models import NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
+
+    def raw(raw_id, title, body, *, external="Aave"):
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="fixture_news",
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://alpha.example/{raw_id}",
+            title=title,
+            body=body,
+            raw_json={},
+            source_confidence=0.90,
+            content_hash=raw_id,
+        ), NormalizedEvent(
+            event_id=f"evt_{raw_id}",
+            raw_ids=(raw_id,),
+            event_name=title,
+            event_type="news",
+            event_time=None,
+            event_time_confidence=0.0,
+            first_seen_time=now,
+            source="fixture_news",
+            source_urls=(f"https://alpha.example/{raw_id}",),
+            external_asset=external,
+            description=title,
+            confidence=0.90,
+        )
+
+    aave_raw, aave_event = raw(
+        "aave_kraken",
+        "Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+        "The DeFi lender is rebuilding after the fallout from April's KelpDAO exploit "
+        "sparked a multibillion-dollar exodus of deposits despite Aave itself not being hacked.",
+    )
+    frames = event_catalyst_frames.build_catalyst_frames((aave_raw,), event=aave_event)
+    main, supporting = event_catalyst_frames.select_main_catalyst_frame(frames, aave_event)
+    assert main is not None
+    assert main.frame_role == "main_catalyst"
+    assert main.frame_type == "acquisition_or_stake"
+    assert main.subject == "Aave"
+    assert main.actor == "Kraken"
+    assert any(frame.frame_type == "prior_exploit_context" and frame.subject == "KelpDAO" for frame in supporting)
+    assert any(frame.frame_type == "denied_or_negated_exploit" and frame.subject == "Aave" for frame in frames)
+    aave_claims = event_claim_semantics.extract_event_claims((aave_raw,))
+    assert event_claim_semantics.has_ruled_out_claim(aave_claims, "exploit")
+    aave_incident = event_incident_graph.build_incidents((aave_event,), {"aave_kraken": aave_raw})[0]
+    assert aave_incident.event_archetype == "strategic_investment"
+    assert aave_incident.primary_subject == "Aave"
+    assert aave_incident.main_frame_type == "acquisition_or_stake"
+    assert aave_incident.background_frame_ids
+    assert aave_incident.negated_frame_ids
+    assert "KelpDAO" in (aave_incident.background_context_summary or "")
+
+    thor_raw, thor_event = raw(
+        "thor_exploit",
+        "THORChain suffers exploit and RUNE resumes trading",
+        "THORChain exploit drained funds before RUNE resumed trading.",
+        external="THORChain",
+    )
+    thor_incident = event_incident_graph.build_incidents((thor_event,), {"thor_exploit": thor_raw})[0]
+    assert thor_incident.event_archetype == "exploit_security_event"
+    assert thor_incident.main_frame_type == "exploit_security_event"
+    assert thor_incident.current_cause_status == "confirmed"
+
+    meme_raw, meme_event = raw(
+        "memecore_no_exploit",
+        "MemeCore's M token crashes 80% with no exploit or announcement to explain it",
+        "No exploit or announcement explains the M token selloff; cause unknown.",
+        external="MemeCore",
+    )
+    meme_frames = event_catalyst_frames.build_catalyst_frames((meme_raw,), event=meme_event)
+    meme_main, _ = event_catalyst_frames.select_main_catalyst_frame(meme_frames, meme_event)
+    assert meme_main is not None
+    assert meme_main.frame_type == "market_dislocation_unknown"
+    assert any(frame.frame_type == "denied_or_negated_exploit" for frame in meme_frames)
+    meme_incident = event_incident_graph.build_incidents((meme_event,), {"memecore_no_exploit": meme_raw})[0]
+    assert meme_incident.event_archetype == "market_dislocation_unknown"
+    assert meme_incident.current_cause_status == "ruled_out"
+
+
+def test_aave_kraken_hypothesis_uses_strategic_frame_in_cards_and_audit():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_impact_hypotheses,
+        event_opportunity_audit,
+        event_research_cards,
+        event_watchlist,
+    )
+    from crypto_rsi_scanner.event_models import (
+        DiscoveredAsset,
+        DiscoveredEventFadeCandidate,
+        EventAssetLink,
+        EventClassification,
+        EventDiscoveryResult,
+        NormalizedEvent,
+        RawDiscoveredEvent,
+    )
+
+    now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="aave_kraken",
+        provider="fixture_news",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://alpha.example/aave-kraken",
+        title="Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+        body=(
+            "The DeFi lender is rebuilding after the fallout from April's KelpDAO exploit "
+            "sparked a multibillion-dollar exodus of deposits despite Aave itself not being hacked."
+        ),
+        raw_json={"market": {}},
+        source_confidence=0.90,
+        content_hash="aave_kraken",
+    )
+    event = NormalizedEvent(
+        event_id="evt_aave_kraken",
+        raw_ids=("aave_kraken",),
+        event_name="Kraken stake in Aave",
+        event_type="news",
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=now,
+        source="fixture_news",
+        source_urls=("https://alpha.example/aave-kraken",),
+        external_asset="Aave",
+        description=raw.title,
+        confidence=0.90,
+    )
+    asset = DiscoveredAsset("aave", "AAVE", "Aave")
+    link = EventAssetLink("evt_aave_kraken", "aave", "AAVE", "Aave", 0.95, "fixture", ("Aave",))
+    classification = EventClassification(
+        "evt_aave_kraken",
+        "aave",
+        False,
+        True,
+        "direct_token_event",
+        0.90,
+        "fixture",
+        "Aave named as DeFi lender in strategic stake article",
+        ("Aave",),
+    )
+    candidate = DiscoveredEventFadeCandidate(event, asset, link, classification, None, None, {})
+    discovery = EventDiscoveryResult((raw,), (event,), (link,), (classification,), (candidate,))
+
+    hypotheses = event_impact_hypotheses.generate_impact_hypotheses(discovery, taxonomy={}, now=now)
+    hypothesis = next(item for item in hypotheses if item.validated_candidate_assets)
+    assert hypothesis.impact_category == "strategic_investment_or_valuation"
+    assert hypothesis.impact_path_type == "strategic_investment_or_valuation"
+    assert hypothesis.impact_path_reason == "strategic_investment"
+    assert hypothesis.candidate_role == "direct_subject"
+    assert hypothesis.event_archetype == "strategic_investment"
+    assert hypothesis.main_frame_type == "acquisition_or_stake"
+    assert hypothesis.background_frame_ids
+    assert hypothesis.negated_frame_ids
+    assert any("prior_exploit_context" in item for item in hypothesis.rejected_impact_paths)
+    assert any("denied_or_negated_exploit" in item for item in hypothesis.rejected_impact_paths)
+    assert hypothesis.opportunity_level == "validated_digest"
+    assert hypothesis.why_not_watchlist == "market_confirmation"
+    assert hypothesis.impact_path_type != "exploit_security_event"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        watch = event_watchlist.refresh_hypothesis_watchlist(
+            [hypothesis],
+            cfg=event_watchlist.EventWatchlistConfig(enabled=True, state_path=Path(tmp) / "watch.jsonl"),
+            now=now,
+        )
+    entry = watch.entries[0]
+    assert entry.state == event_watchlist.EventWatchlistState.RADAR.value
+    assert entry.latest_score_components["main_frame_type"] == "acquisition_or_stake"
+    assert "KelpDAO" in entry.latest_score_components["background_context_summary"]
+    card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    assert "Main catalyst: acquisition_or_stake" in card.markdown
+    assert "prior_exploit_context(KelpDAO)" in card.markdown
+    assert "denied_or_negated_exploit" in card.markdown
+    audit = event_opportunity_audit.format_opportunity_audit(
+        entry.key,
+        hypotheses=[hypothesis],
+        watchlist_entries=[entry],
+        profile="quality_validation",
+    )
+    assert "main catalyst frame: acquisition_or_stake" in audit
+    assert "background context: background: prior_exploit_context(KelpDAO)" in audit
+    assert "negated frame count: 1" in audit
+
+
 def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
     import tempfile
     from datetime import datetime, timezone

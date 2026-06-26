@@ -323,6 +323,10 @@ def _incident_lines(
             else "weak or quality-blocked links do not make an incident active"
         ),
         f"- primary subject: {source.get('primary_subject') or components.get('primary_subject') or 'unknown'}",
+        f"- main catalyst frame: {source.get('main_frame_type') or components.get('main_frame_type') or 'unknown'}",
+        f"- background context: {source.get('background_context_summary') or components.get('background_context_summary') or 'none'}",
+        f"- negated frame count: {len(source.get('negated_frame_ids') or components.get('negated_frame_ids') or [])}",
+        f"- rejected/background impact paths: {_list_value(source.get('rejected_impact_paths') or components.get('rejected_impact_paths'))}",
         f"- affected ecosystem: {source.get('affected_ecosystem') or components.get('affected_ecosystem') or 'unknown'}",
         f"- current cause status: {source.get('current_cause_status') or source.get('cause_status') or components.get('cause_status') or 'unknown'}",
         f"- claim history: {_claim_history_value(claim_history)}",

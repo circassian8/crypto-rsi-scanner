@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 from urllib.parse import urlparse
 
-from . import event_claim_semantics
+from . import event_catalyst_frames, event_claim_semantics
 from .event_models import NormalizedEvent, RawDiscoveredEvent
 from .event_resolver import clean_text
 
@@ -175,6 +175,12 @@ class CanonicalIncident:
     current_cause_status: str = event_claim_semantics.CauseStatus.UNKNOWN.value
     conflicting_claims: tuple[str, ...] = ()
     linked_assets: tuple[IncidentAssetRole, ...] = ()
+    main_catalyst_frame_id: str | None = None
+    main_frame_type: str | None = None
+    background_frame_ids: tuple[str, ...] = ()
+    negated_frame_ids: tuple[str, ...] = ()
+    frame_summary: tuple[dict[str, object], ...] = ()
+    background_context_summary: str | None = None
     subject_quality: str = "valid"
     subject_quality_reason: str | None = None
     diagnostic_only: bool = False
@@ -261,7 +267,21 @@ def event_archetype(
     *,
     claims: Iterable[event_claim_semantics.EventClaim] = (),
 ) -> str:
-    text = clean_text(_combined_text(event, tuple(raws)))
+    raws_tuple = tuple(raws)
+    frames = event_catalyst_frames.build_catalyst_frames(raws_tuple, event=event)
+    main_frame, _supporting_frames = event_catalyst_frames.select_main_catalyst_frame(frames, event)
+    if main_frame is not None and main_frame.frame_role in {
+        event_catalyst_frames.ROLE_MAIN,
+        event_catalyst_frames.ROLE_MARKET_REACTION,
+    }:
+        if main_frame.event_archetype:
+            return str(main_frame.event_archetype)
+    if main_frame is not None and main_frame.frame_role in {
+        event_catalyst_frames.ROLE_BACKGROUND,
+        event_catalyst_frames.ROLE_HISTORICAL,
+    } and event is not None and event.event_type:
+        return clean_text(event.event_type).replace(" ", "_") or "unknown"
+    text = clean_text(_combined_text(event, raws_tuple))
     claims = tuple(claims)
     if event_claim_semantics.has_confirmed_claim(claims, "exploit"):
         return "exploit_security_event"
@@ -288,11 +308,28 @@ def infer_primary_subject(
     *,
     claims: Iterable[event_claim_semantics.EventClaim] = (),
 ) -> str | None:
+    raws = tuple(raws)
+    if event is not None and clean_text(event.event_type or "") == "prediction_market":
+        prediction_subject = _prediction_market_question_subject(_combined_text(event, raws))
+        if prediction_subject:
+            return prediction_subject
+    frames = event_catalyst_frames.build_catalyst_frames(raws, event=event)
+    main_frame, _supporting_frames = event_catalyst_frames.select_main_catalyst_frame(frames, event)
+    if main_frame is not None:
+        candidate = _normalized_subject(main_frame.subject)
+        if candidate and main_frame.frame_role in {
+            event_catalyst_frames.ROLE_MAIN,
+            event_catalyst_frames.ROLE_MARKET_REACTION,
+        }:
+            return candidate
+        if main_frame.frame_role in {event_catalyst_frames.ROLE_BACKGROUND, event_catalyst_frames.ROLE_HISTORICAL} and event is not None:
+            event_candidate = _normalized_subject(event.external_asset) or _normalized_subject(event.event_name)
+            if event_candidate:
+                return event_candidate
     for claim in claims:
         candidate = _normalized_subject(claim.subject)
         if candidate:
             return candidate
-    raws = tuple(raws)
     text = _combined_text(event, raws)
     subject = event_claim_semantics.infer_primary_subject(text)
     subject = _normalized_subject(subject)
@@ -311,6 +348,17 @@ def infer_primary_subject(
         fallback_subject = _normalized_subject(event.event_name)
         if fallback_subject:
             return fallback_subject
+    return None
+
+
+def _prediction_market_question_subject(text: str) -> str | None:
+    match = re.search(
+        r"\bwhere\s+will\s+[A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*){0,2}\s+meet\s+([A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*){0,2})\b",
+        str(text or ""),
+        flags=re.I,
+    )
+    if match:
+        return _normalized_subject(match.group(1))
     return None
 
 
@@ -384,7 +432,18 @@ def _incident_from_group(
     first_seen = min((event.first_seen_time for event in events), default=datetime.now(timezone.utc))
     last_updated = max((raw.fetched_at for raw in raws), default=first_seen)
     first_event = events[0]
-    primary_subject = infer_primary_subject(first_event, raws, claims=claims)
+    frames = event_catalyst_frames.build_catalyst_frames(raws, event=first_event)
+    main_frame, supporting_frames = event_catalyst_frames.select_main_catalyst_frame(frames, first_event)
+    primary_subject = (
+        main_frame.subject
+        if main_frame
+        and main_frame.subject
+        and main_frame.frame_role in {
+            event_catalyst_frames.ROLE_MAIN,
+            event_catalyst_frames.ROLE_MARKET_REACTION,
+        }
+        else infer_primary_subject(first_event, raws, claims=claims)
+    )
     validation = validate_incident_primary_subject(primary_subject, {
         "event": first_event,
         "raws": raws,
@@ -396,10 +455,23 @@ def _incident_from_group(
         raws,
     )
     ecosystem = infer_affected_ecosystem(first_event, raws)
-    archetype = event_archetype(first_event, raws, claims=claims)
+    archetype = (
+        str(main_frame.event_archetype)
+        if main_frame is not None
+        and main_frame.event_archetype
+        and main_frame.frame_role in {
+            event_catalyst_frames.ROLE_MAIN,
+            event_catalyst_frames.ROLE_MARKET_REACTION,
+        }
+        else event_archetype(first_event, raws, claims=claims)
+    )
     domains = _independent_domains(raws)
     urls = tuple(sorted({raw.source_url for raw in raws if raw.source_url}))
-    status = event_claim_semantics.current_cause_status(claims, "exploit")
+    status = (
+        str(main_frame.cause_status)
+        if main_frame is not None and main_frame.frame_type != event_catalyst_frames.TYPE_PRIOR_EXPLOIT_CONTEXT
+        else event_claim_semantics.current_cause_status(claims, "exploit")
+    )
     conflicts = _conflicting_claims(claims)
     name = _canonical_name(primary_subject, archetype, ecosystem, event=first_event, raws=raws)
     linked_assets = _incident_linked_assets(first_event, raws, archetype)
@@ -408,6 +480,21 @@ def _incident_from_group(
         warnings = tuple(dict.fromkeys((*warnings, f"incident_primary_subject_{subject_quality}")))
     if validation.warnings:
         warnings = tuple(dict.fromkeys((*warnings, *validation.warnings)))
+    background_frames = tuple(
+        frame for frame in supporting_frames
+        if frame.frame_role in {
+            event_catalyst_frames.ROLE_BACKGROUND,
+            event_catalyst_frames.ROLE_HISTORICAL,
+            event_catalyst_frames.ROLE_CORRECTIVE,
+        }
+    )
+    negated_frames = tuple(frame for frame in frames if frame.frame_role == event_catalyst_frames.ROLE_NEGATED)
+    if archetype == "market_dislocation_unknown" and negated_frames:
+        status = event_claim_semantics.CauseStatus.RULED_OUT.value
+    if background_frames:
+        warnings = tuple(dict.fromkeys((*warnings, "incident_has_background_context_frames")))
+    if negated_frames:
+        warnings = tuple(dict.fromkeys((*warnings, "incident_has_negated_claim_frames")))
     digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
     return CanonicalIncident(
         schema_version=INCIDENT_GRAPH_SCHEMA_VERSION,
@@ -426,11 +513,41 @@ def _incident_from_group(
         current_cause_status=status,
         conflicting_claims=conflicts,
         linked_assets=linked_assets,
+        main_catalyst_frame_id=main_frame.frame_id if main_frame else None,
+        main_frame_type=main_frame.frame_type if main_frame else None,
+        background_frame_ids=tuple(frame.frame_id for frame in background_frames),
+        negated_frame_ids=tuple(frame.frame_id for frame in negated_frames),
+        frame_summary=event_catalyst_frames.frame_summary(frames),
+        background_context_summary=_background_context_summary(background_frames, negated_frames),
         subject_quality=subject_quality,
         subject_quality_reason=subject_quality_reason,
         diagnostic_only=diagnostic_only,
         warnings=warnings,
     )
+
+
+def _background_context_summary(
+    background_frames: tuple[event_catalyst_frames.EventCatalystFrame, ...],
+    negated_frames: tuple[event_catalyst_frames.EventCatalystFrame, ...],
+) -> str | None:
+    parts: list[str] = []
+    if background_frames:
+        parts.append(
+            "background: "
+            + "; ".join(
+                f"{frame.frame_type}({frame.subject or 'unknown'})"
+                for frame in background_frames[:4]
+            )
+        )
+    if negated_frames:
+        parts.append(
+            "negated: "
+            + "; ".join(
+                f"{frame.frame_type}({frame.subject or 'unknown'})"
+                for frame in negated_frames[:4]
+            )
+        )
+    return " | ".join(parts) if parts else None
 
 
 def _combined_text(event: NormalizedEvent | None, raws: tuple[RawDiscoveredEvent, ...]) -> str:

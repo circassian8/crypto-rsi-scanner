@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Main catalyst frames drive incident and impact classification
+**Status:** accepted
+**Decision:** Event Alpha source interpretation must separate the article's
+main catalyst from background, historical, corrective, negated, side-note, and
+market-reaction context before incident, impact-path, hypothesis, and
+opportunity verdict logic run. Fresh rows should carry frame metadata such as
+`main_catalyst_frame_id`, `main_frame_type`, `background_frame_ids`,
+`negated_frame_ids`, `frame_summary`, `background_context_summary`, and
+`rejected_impact_paths` when relevant. Only the selected main catalyst frame may
+drive direct impact classification. Background/historical exploit mentions and
+negated/corrective claims may be persisted for audit, but they must not promote
+the event into an exploit/security playbook or make a token the affected subject
+when the main catalyst is a strategic stake, valuation, listing, proxy, or
+other non-security event.
+**Why:** Source articles often include unrelated incident history or corrective
+language. Treating those context phrases as the main event produced false
+security paths, such as reading an AAVE/Kraken strategic-stake article as an
+AAVE exploit because the body referenced a prior KelpDAO exploit and said Aave
+itself was not hacked.
+**Revisit when:** A reviewed incident dataset supports a richer multi-catalyst
+model with explicit simultaneous main events and audited precedence rules.
+
 ## 2026-06-26 - Final opportunity verdict is the Event Alpha routing source
 **Status:** accepted
 **Decision:** Event Alpha validated-hypothesis routing and lifecycle quality

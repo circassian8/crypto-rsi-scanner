@@ -664,6 +664,7 @@ def _brief_hypothesis_labels(rows: Iterable[Mapping[str, Any]]) -> str:
             f",score={_float(row.get('hypothesis_score') or _float(row.get('confidence')) * 100):.0f}"
             f",v2={_float(row.get('opportunity_score_v2')):.0f}"
             f",path={row.get('impact_path_type') or 'unknown'}"
+            f",main={row.get('main_frame_type') or 'unknown'}"
             f",role={row.get('candidate_role') or 'unknown'})"
         )
     return "; ".join(labels)
@@ -681,6 +682,7 @@ def _brief_decisions(rows: Iterable[event_alpha_router.EventAlphaRouteDecision])
             f"final={_float(components.get('opportunity_score_final')):.0f},"
             f"level={components.get('opportunity_level') or 'unknown'},"
             f"path={components.get('impact_path_type') or 'unknown'},role={components.get('candidate_role') or 'unknown'},"
+            f"main={components.get('main_frame_type') or 'unknown'},"
             f"route={final_route},requested={decision.requested_route_before_quality_gate or decision.route.value},reason={decision.reason})"
         )
     return "; ".join(labels)
@@ -694,7 +696,7 @@ def _brief_entries(rows: Iterable[event_watchlist.EventWatchlistEntry]) -> str:
             f"{entry.symbol}/{entry.coin_id}"
             f"({components.get('impact_category') or entry.latest_playbook_type or 'unknown'},"
             f"score={entry.latest_score},v2={_float(components.get('opportunity_score_v2')):.0f},"
-            f"path={components.get('impact_path_type') or 'unknown'})"
+            f"path={components.get('impact_path_type') or 'unknown'},main={components.get('main_frame_type') or 'unknown'})"
         )
     return "; ".join(labels)
 

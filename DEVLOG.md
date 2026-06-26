@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Add Event Alpha main-catalyst frames · Codex
+**Why:** Event Alpha could misread an article's background context as the
+actionable catalyst. The concrete failure was an AAVE/Kraken strategic-stake
+article being treated as an `exploit_security_event` because the body mentioned
+KelpDAO exploit history and corrective “Aave itself not hacked” language.
+**Changes:**
+- Added `event_catalyst_frames.py`, a pure deterministic catalyst-frame layer
+  that separates main catalysts from background, historical, negated,
+  corrective, side-note, policy, proxy, and market-reaction context.
+- Wired frame selection into incident graph/store, impact-path validation,
+  impact-hypothesis generation, opportunity verdict quality, daily briefs,
+  research cards, and opportunity audits; rows now preserve main/background/
+  negated frame metadata and rejected/background impact paths.
+- Added a strategic-investment/valuation impact path and reason so AAVE/Kraken
+  style stake/valuation events validate as direct strategic catalysts rather
+  than exploit/security events.
+- Hardened broad prediction-market/source-context handling so hidden diagnostic
+  rows keep useful subjects without becoming canonical crypto incidents.
+**Verify:** `python3 tests/test_indicators.py` passed (465/465); `make
+event-llm-eval PYTHON=python3` passed (9/9); `make event-llm-extract-eval
+PYTHON=python3` passed (7/7); `make event-alpha-eval PYTHON=python3` passed
+(11/11); `make event-alpha-signal-quality-eval PYTHON=python3` passed (31/31);
+`make event-alpha-quality-validation-cycle PYTHON=python3` completed with
+strict doctor WARN only for weak unqualified links and no blockers; `make
+verify PYTHON=python3` passed.
+**Notes/risks:** Research-only classification/artifact-truth change. No sends,
+paper rows, normal RSI rows, trading, execution, or LLM/provider-created
+`TRIGGERED_FADE`; deterministic `event_fade.py` + `proxy_fade` remains the only
+fade trigger path.
+
 ## 2026-06-26 — Enforce Event Alpha live-path quality caps and incident subjects · Codex
 **Why:** Fresh `notify_llm_quality` artifacts still had non-hypothesis
 CHZ/SOL/ADA/DOGE-style rows persisted as `WATCHLIST` despite local-only,

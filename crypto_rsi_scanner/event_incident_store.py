@@ -55,6 +55,7 @@ _DIRECT_CRYPTO_ARCHETYPES = {
     "exploit_security_event",
     "alleged_security_event",
     "listing_liquidity_event",
+    "strategic_investment",
     "unlock_supply_event",
 }
 _EXTERNAL_CATALYST_ARCHETYPES = {
@@ -447,6 +448,12 @@ def _row_from_incident(
         "canonical_name": incident.canonical_name,
         "event_archetype": incident.event_archetype,
         "primary_subject": primary_subject,
+        "main_catalyst_frame_id": incident.main_catalyst_frame_id,
+        "main_frame_type": incident.main_frame_type,
+        "background_frame_ids": tuple(incident.background_frame_ids),
+        "negated_frame_ids": tuple(incident.negated_frame_ids),
+        "frame_summary": tuple(incident.frame_summary),
+        "background_context_summary": incident.background_context_summary,
         "incident_subject_quality": subject_quality,
         "incident_subject_quality_reason": subject_quality_reason,
         "diagnostic_only": diagnostic_only,
@@ -1360,6 +1367,13 @@ def _incident_lines(row: Mapping[str, Any]) -> list[str]:
             f"relevance={row.get('incident_relevance_status') or 'unknown'}:{row.get('incident_relevance_score') or 0}"
         ),
         f"  assets: {asset_text}",
+        (
+            "  catalyst_frames: "
+            f"main={row.get('main_frame_type') or 'unknown'} "
+            f"background={len(row.get('background_frame_ids') or [])} "
+            f"negated={len(row.get('negated_frame_ids') or [])} "
+            f"context={row.get('background_context_summary') or 'none'}"
+        ),
         "  persistence: "
         + str(row.get("canonical_persistence_reason") or "unknown")
         + " reasons="

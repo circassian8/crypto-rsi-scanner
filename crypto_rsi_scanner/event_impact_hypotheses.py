@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import (
+    event_catalyst_frames,
     event_claim_semantics,
     event_evidence_quality,
     event_graph,
@@ -42,6 +43,7 @@ class ImpactCategory(str, Enum):
     TOKENIZED_STOCK_VENUE = "tokenized_stock_venue"
     PREDICTION_MARKET_INFRA = "prediction_market_infra"
     PERP_VENUE_ATTENTION = "perp_venue_attention"
+    STRATEGIC_INVESTMENT_OR_VALUATION = "strategic_investment_or_valuation"
     UNLOCK_SUPPLY_PRESSURE = "unlock_supply_pressure"
     LISTING_LIQUIDITY_EVENT = "listing_liquidity_event"
     SECURITY_OR_REGULATORY_SHOCK = "security_or_regulatory_shock"
@@ -82,6 +84,7 @@ class ImpactPathReason(str, Enum):
     FAN_TOKEN_EVENT = "fan_token_event"
     UNLOCK_SUPPLY_EVENT = "unlock_supply_event"
     LISTING_LIQUIDITY_EVENT = "listing_liquidity_event"
+    STRATEGIC_INVESTMENT = "strategic_investment"
     EXPLOIT_SECURITY_EVENT = "exploit_security_event"
     ECOSYSTEM_SECURITY_EVENT = "ecosystem_security_event"
     CAUSE_UNKNOWN_MARKET_DISLOCATION = "cause_unknown_market_dislocation"
@@ -182,6 +185,13 @@ class EventImpactHypothesis:
     cause_status: str | None = None
     claim_polarities: tuple[str, ...] = ()
     claim_history: tuple[dict[str, Any], ...] = ()
+    main_catalyst_frame_id: str | None = None
+    main_frame_type: str | None = None
+    background_frame_ids: tuple[str, ...] = ()
+    negated_frame_ids: tuple[str, ...] = ()
+    frame_summary: tuple[dict[str, Any], ...] = ()
+    background_context_summary: str | None = None
+    rejected_impact_paths: tuple[str, ...] = ()
     independent_source_domains: tuple[str, ...] = ()
     conflicting_claims: tuple[str, ...] = ()
     opportunity_score_final: float | None = None
@@ -351,6 +361,21 @@ _CATEGORY_RULES: tuple[dict[str, Any], ...] = (
         "sectors": ("direct_token_events",),
         "direction": "volatility",
         "playbook": "listing_volatility",
+    },
+    {
+        "category": ImpactCategory.STRATEGIC_INVESTMENT_OR_VALUATION,
+        "keywords": (
+            "strategic investment",
+            "stake",
+            "valuation",
+            "acquisition",
+            "acquire",
+            "buy",
+        ),
+        "secondary": ("valuation", "stake", "investment", "talks", "confidence", "capital"),
+        "sectors": ("direct_token_events", "defi_tokens"),
+        "direction": "up",
+        "playbook": "direct_event",
     },
     {
         "category": ImpactCategory.SECURITY_OR_REGULATORY_SHOCK,
@@ -1237,6 +1262,7 @@ def _hypothesis_from_rule(
     incident = incident or _incident_for_single_event(event, raws)
     if incident is not None:
         score_components.update(_incident_score_components(incident))
+        score_components.update(_incident_frame_components(incident))
         category_value = _category_from_incident(category_value, incident)
         if category_value == ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:
             rule = {**dict(rule), "category": ImpactCategory.MARKET_ANOMALY_UNKNOWN, "playbook": "market_anomaly_unknown", "direction": "unknown"}
@@ -1306,6 +1332,13 @@ def _hypothesis_from_rule(
         cause_status=incident.current_cause_status if incident else event_claim_semantics.current_cause_status(claim_rows, "exploit"),
         claim_polarities=tuple(dict.fromkeys(claim.polarity for claim in claim_rows)),
         claim_history=tuple(_claim_to_row(claim) for claim in claim_rows[:12]),
+        main_catalyst_frame_id=incident.main_catalyst_frame_id if incident else None,
+        main_frame_type=incident.main_frame_type if incident else None,
+        background_frame_ids=incident.background_frame_ids if incident else (),
+        negated_frame_ids=incident.negated_frame_ids if incident else (),
+        frame_summary=tuple(dict(item) for item in incident.frame_summary) if incident else (),
+        background_context_summary=incident.background_context_summary if incident else None,
+        rejected_impact_paths=_rejected_impact_paths_from_frames(incident) if incident else (),
         independent_source_domains=incident.independent_source_domains if incident else (),
         conflicting_claims=incident.conflicting_claims if incident else (),
         created_at=now.isoformat(),
@@ -1365,6 +1398,8 @@ def _matched_rules(
 ) -> tuple[Mapping[str, Any], ...]:
     event_type = clean_text(event.event_type or "")
     matches: list[Mapping[str, Any]] = []
+    frames = event_catalyst_frames.build_catalyst_frames(raws, event=event) if raws else ()
+    main_frame, _supporting_frames = event_catalyst_frames.select_main_catalyst_frame(frames, event)
     claims = event_claim_semantics.extract_event_claims(raws) if raws else event_claim_semantics.claims_from_text(text)
     security_ruled_out = event_claim_semantics.has_ruled_out_claim(claims, "exploit")
     security_confirmed = event_claim_semantics.has_confirmed_claim(claims, "exploit")
@@ -1373,9 +1408,26 @@ def _matched_rules(
         category = rule["category"]
         if (
             category == ImpactCategory.SECURITY_OR_REGULATORY_SHOCK
+            and main_frame is not None
+            and main_frame.event_archetype not in {
+                "exploit_security_event",
+                "market_dislocation_unknown",
+                "policy_or_regulatory_context",
+            }
+        ):
+            continue
+        if (
+            category == ImpactCategory.SECURITY_OR_REGULATORY_SHOCK
             and (security_ruled_out or unknown_cause)
             and not security_confirmed
         ):
+            continue
+        if (
+            category == ImpactCategory.STRATEGIC_INVESTMENT_OR_VALUATION
+            and main_frame is not None
+            and main_frame.event_archetype == event_catalyst_frames.TYPE_STRATEGIC_INVESTMENT
+        ):
+            matches.append(rule)
             continue
         if _rule_matches(rule, text, event_type, category):
             matches.append(rule)
@@ -1433,6 +1485,7 @@ def _rule_matches(rule: Mapping[str, Any], text: str, event_type: str, category:
     if category in {
         ImpactCategory.LISTING_LIQUIDITY_EVENT,
         ImpactCategory.PERP_VENUE_ATTENTION,
+        ImpactCategory.STRATEGIC_INVESTMENT_OR_VALUATION,
         ImpactCategory.UNLOCK_SUPPLY_PRESSURE,
         ImpactCategory.SECURITY_OR_REGULATORY_SHOCK,
     }:
@@ -1450,9 +1503,10 @@ def _hypothesis_scope(category: str, text: str) -> str:
         return HypothesisScope.VENUE.value
     if category in {
         ImpactCategory.LISTING_LIQUIDITY_EVENT.value,
+        ImpactCategory.STRATEGIC_INVESTMENT_OR_VALUATION.value,
         ImpactCategory.UNLOCK_SUPPLY_PRESSURE.value,
         ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value,
-    } and _any_term_hit(text, ("token", "coin", "listed on", "trading pair", "unlock", "airdrop", "tge")):
+    } and _any_term_hit(text, ("token", "coin", "listed on", "trading pair", "unlock", "airdrop", "tge", "stake", "valuation", "investment")):
         return HypothesisScope.TOKEN.value
     return HypothesisScope.SECTOR.value
 
@@ -1498,6 +1552,8 @@ def _incident_for_single_event(
 def _category_from_incident(category: str, incident: event_incident_graph.CanonicalIncident) -> str:
     if incident.event_archetype == "market_dislocation_unknown":
         return ImpactCategory.MARKET_ANOMALY_UNKNOWN.value
+    if incident.event_archetype == event_catalyst_frames.TYPE_STRATEGIC_INVESTMENT:
+        return ImpactCategory.STRATEGIC_INVESTMENT_OR_VALUATION.value
     return category
 
 
@@ -1513,6 +1569,38 @@ def _incident_score_components(incident: event_incident_graph.CanonicalIncident)
     elif incident.current_cause_status == event_claim_semantics.CauseStatus.RULED_OUT.value:
         components["causal_mechanism_confirmed"] = 0.0
     return components
+
+
+def _incident_frame_components(incident: event_incident_graph.CanonicalIncident) -> dict[str, Any]:
+    return {
+        "main_catalyst_frame_id": incident.main_catalyst_frame_id,
+        "main_frame_type": incident.main_frame_type,
+        "background_frame_ids": tuple(incident.background_frame_ids),
+        "negated_frame_ids": tuple(incident.negated_frame_ids),
+        "background_context_summary": incident.background_context_summary,
+        "frame_summary": tuple(incident.frame_summary),
+        "selected_event_archetype": incident.event_archetype,
+        "background_frame_count": float(len(incident.background_frame_ids)),
+        "negated_frame_count": float(len(incident.negated_frame_ids)),
+        "rejected_impact_paths": _rejected_impact_paths_from_frames(incident),
+    }
+
+
+def _rejected_impact_paths_from_frames(incident: event_incident_graph.CanonicalIncident | None) -> tuple[str, ...]:
+    if incident is None:
+        return ()
+    out: list[str] = []
+    for frame in incident.frame_summary:
+        if not isinstance(frame, Mapping):
+            continue
+        frame_type = str(frame.get("frame_type") or "")
+        role = str(frame.get("frame_role") or "")
+        subject = str(frame.get("subject") or "unknown")
+        if role in {"background_context", "historical_context"} and frame_type:
+            out.append(f"{frame_type}:background_for:{subject}")
+        if role == "negated_claim" and frame_type:
+            out.append(f"{frame_type}:negated_for:{subject}")
+    return tuple(dict.fromkeys(out))
 
 
 def _incident_market_reaction_observed(
@@ -2196,6 +2284,9 @@ def _impact_path_reason(
     if category in {ImpactCategory.LISTING_LIQUIDITY_EVENT.value, ImpactCategory.PERP_VENUE_ATTENTION.value}:
         if _any_term_hit(text, ("listing", "listed on", "nasdaq", "public listing", "merger", "trading pair", "perp", "futures")):
             return ImpactPathReason.LISTING_LIQUIDITY_EVENT.value
+    if category == ImpactCategory.STRATEGIC_INVESTMENT_OR_VALUATION.value:
+        if _any_term_hit(text, ("stake", "strategic investment", "valuation", "acquisition", "acquire", "buy")):
+            return ImpactPathReason.STRATEGIC_INVESTMENT.value
     if category == ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value:
         if _any_term_hit(text, ("exploit", "hack", "security incident", "attack", "breach", "resumes trading", "halted trading")):
             return ImpactPathReason.EXPLOIT_SECURITY_EVENT.value
@@ -2977,6 +3068,7 @@ def _hypothesis_warnings(
     warnings: list[str] = []
     if not event.external_asset and category not in {
         ImpactCategory.LISTING_LIQUIDITY_EVENT.value,
+        ImpactCategory.STRATEGIC_INVESTMENT_OR_VALUATION.value,
         ImpactCategory.UNLOCK_SUPPLY_PRESSURE.value,
         ImpactCategory.MARKET_ANOMALY_UNKNOWN.value,
         ImpactCategory.SECURITY_OR_REGULATORY_SHOCK.value,
@@ -3003,6 +3095,8 @@ def _validation_steps(category: str) -> tuple[str, ...]:
         return (*common, "verify the asset is proxy venue/instrument rather than publisher noise")
     if category == ImpactCategory.MARKET_ANOMALY_UNKNOWN.value:
         return ("find independent catalyst evidence", "verify move is not purely liquidity/noise")
+    if category == ImpactCategory.STRATEGIC_INVESTMENT_OR_VALUATION.value:
+        return (*common, "verify the investment/stake/valuation is current and token/protocol-specific")
     return common
 
 
