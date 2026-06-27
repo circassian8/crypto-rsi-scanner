@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Source-pack acquisition executes evidence, not alerts
+**Status:** accepted
+**Decision:** Event Alpha may execute bounded source-pack evidence plans for
+selected near-misses and validated hypotheses, using fixture or configured
+providers to collect candidate evidence. Every result must still pass
+deterministic identity, catalyst-link, impact-path, source-mission, and
+source-quality checks before it can improve a research verdict. Acquisition
+artifacts may record accepted/rejected evidence, before/after quality, provider
+failures, and upgrade/no-upgrade reasons, and feedback/calibration may group by
+source pack and accepted evidence reason codes. Acquisition must not send
+Telegram messages, trade, paper trade, write normal RSI rows, or create
+`TRIGGERED_FADE`; only `event_fade.py` plus `proxy_fade` can do that.
+**Why:** The source registry and planner were useful but too passive when they
+only described what to search next. Executing the plans makes near-miss review
+actionable while preserving the safety boundary between evidence collection and
+alert/trade creation.
+**Revisit when:** Reviewed acquisition artifacts show stable precision/recall
+by source pack, provider, and accepted reason code, and the human explicitly
+approves any promotion beyond local research artifacts.
+
 ## 2026-06-28 - Event Alpha source evidence is mission-scoped
 **Status:** accepted
 **Decision:** Event Alpha source evidence must be interpreted through source

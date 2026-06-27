@@ -401,6 +401,21 @@ version, source-content hash, and cleaned-text hash. If the cleaner changes,
 old cached cleaned text is intentionally treated as stale and refetched or
 recleaned. Set `RSI_EVENT_SOURCE_ENRICHMENT_CLEANER_VERSION` only when
 deliberately testing a new cleaner contract.
+
+Source-pack evidence acquisition is the executable follow-up to the source
+registry and evidence planner. Profiles may enable
+`RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_ENABLED=1` to run bounded searches for
+selected near-misses and validated hypotheses, capped by
+`RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES` and
+`RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES`. Results are written only to
+`event_evidence_acquisition.jsonl` under the active artifact namespace and are
+shown in the run ledger, daily brief, research cards, and opportunity audits.
+Accepted rows must pass deterministic identity, catalyst-link, impact-path, and
+source-quality checks; context-only or generic results stay rejected/local. Use
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3` for the fixture
+proof path: it runs VELVET, RUNE, ZEC, and context/no-result examples with no
+Telegram sends, trades, paper rows, normal RSI rows, or event-fade trigger
+creation.
 Candidate-only or identity-only evidence can improve review context but does
 not promote a token-level row. Candidate-discovery search hits can suggest new
 crypto candidates when the source payload or quote-validated extraction names an

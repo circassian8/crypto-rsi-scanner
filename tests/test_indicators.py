@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 import numpy as np
@@ -26360,6 +26362,9 @@ def test_feedback_and_calibration_include_signal_quality_fields():
         "market_confirmation_level": "moderate",
         "opportunity_level": "watchlist",
         "source_class": "crypto_native",
+        "evidence_acquisition_source_pack": "proxy_preipo_rwa_pack",
+        "evidence_acquisition_providers_used": ("cryptopanic",),
+        "accepted_evidence_reason_codes": ("cryptopanic_currency_tag_match", "direct_token_mechanism"),
     })
     with tempfile.TemporaryDirectory() as tmp:
         cfg = event_feedback.EventFeedbackConfig(path=__import__("pathlib").Path(tmp) / "feedback.jsonl")
@@ -26373,11 +26378,17 @@ def test_feedback_and_calibration_include_signal_quality_fields():
         loaded = event_feedback.load_feedback(cfg.path)
     assert record.impact_path_type == "proxy_exposure"
     assert record.incident_id == "incident:velvet-spacex"
+    assert record.source_pack == "proxy_preipo_rwa_pack"
+    assert record.source_provider == "cryptopanic"
+    assert "direct_token_mechanism" in record.accepted_evidence_reason_codes
     assert loaded.records[0].incident_id == "incident:velvet-spacex"
     report = event_alpha_calibration.format_calibration_report([], feedback_rows=[r.__dict__ for r in loaded.records])
     assert "feedback by impact path type: proxy_exposure: useful=1" in report
     assert "feedback by candidate role: proxy_venue: useful=1" in report
     assert "feedback by source class: crypto_native: useful=1" in report
+    assert "feedback by source pack: proxy_preipo_rwa_pack: useful=1" in report
+    assert "feedback by accepted evidence reason: cryptopanic_currency_tag_match: useful=1" in report
+    assert "direct_token_mechanism: useful=1" in report
     assert "feedback by incident id: incident:velvet-spacex: useful=1" in report
 
 
@@ -27423,6 +27434,238 @@ def test_event_near_miss_source_pack_and_operator_surfaces():
     assert "## Source coverage and acquisition plan" in audit
     assert "source pack: proxy_preipo_rwa_pack" in audit
     assert "provider coverage: degraded" in audit
+
+
+def test_event_evidence_acquisition_executes_fixture_searches():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search, event_evidence_acquisition, event_impact_hypotheses
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    rune = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:rune-acquisition",
+        event_cluster_id="cluster:rune",
+        event_type="security_incident",
+        external_asset="THORChain",
+        impact_category="security_or_regulatory_shock",
+        candidate_sectors=("defi_tokens",),
+        candidate_symbols=("RUNE",),
+        candidate_coin_ids=("thorchain",),
+        impact_path_type="exploit_security_event",
+        playbook_hint="security_or_regulatory_shock",
+        confidence=0.78,
+        hypothesis_score=64.0,
+        opportunity_score_final=64.0,
+        opportunity_level="exploratory",
+        missing_requirements=("source evidence", "impact_path_validation"),
+        validation_stage="catalyst_link_validated",
+        score_components={
+            "symbol": "RUNE",
+            "coin_id": "thorchain",
+            "validated_symbol": "RUNE",
+            "validated_coin_id": "thorchain",
+            "playbook_type": "security_or_regulatory_shock",
+            "impact_path_type": "exploit_security_event",
+            "opportunity_score_final": 64.0,
+            "opportunity_level": "exploratory",
+            "missing_requirements": ("source evidence", "impact_path_validation"),
+        },
+    )
+    fetched = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+    accepted_raw = RawDiscoveredEvent(
+        raw_id="raw:rune-accepted",
+        provider="cryptopanic",
+        fetched_at=fetched,
+        published_at=fetched,
+        source_url="https://cryptopanic.com/news/rune-exploit",
+        title="RUNE exploit update: THORChain resumes trading after incident",
+        body="RUNE and THORChain markets reacted after an exploit; the project resumes trading and publishes the security update.",
+        raw_json={"currency_tags": ("RUNE",), "currencies": [{"code": "RUNE", "slug": "thorchain"}], "source_origin": "CryptoPanic"},
+        source_confidence=0.88,
+        content_hash="rune-accepted",
+    )
+    rejected_raw = RawDiscoveredEvent(
+        raw_id="raw:rune-rejected",
+        provider="polymarket",
+        fetched_at=fetched,
+        published_at=fetched,
+        source_url="https://polymarket.com/event/thorchain-hack",
+        title="Will THORChain exploit be resolved this week?",
+        body="Prediction market context tracks the exploit resolution, but does not mention RUNE token identity or market impact.",
+        raw_json={"source_origin": "Polymarket"},
+        source_confidence=0.70,
+        content_hash="rune-rejected",
+    )
+    provider = event_catalyst_search.FixtureCatalystSearchProvider(rows_by_query={
+        "RUNE hack incident security market reaction": (accepted_raw,),
+        "RUNE exploit official update": (rejected_raw,),
+    })
+    with TemporaryDirectory() as tmp:
+        artifact_path = Path(tmp) / "event_evidence_acquisition.jsonl"
+        result = event_evidence_acquisition.run_evidence_acquisition(
+            (rune,),
+            provider=provider,
+            providers_by_hint={"cryptopanic": provider, "project_blog_rss": provider},
+            cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(
+                enabled=True,
+                max_candidates=3,
+                max_queries=4,
+                max_results_per_query=2,
+                fixture_only=True,
+                artifact_path=artifact_path,
+            ),
+            now=fetched,
+            run_context={"run_id": "run:test", "profile": "quality_validation", "run_mode": "test", "artifact_namespace": "quality_validation"},
+        )
+        assert result.attempted == 1
+        assert result.accepted == 1
+        assert result.rows_written == 1
+        assert result.results[0].status == "accepted_evidence_found"
+        assert any("cryptopanic_currency_tag_match" in item["reason_codes"] for item in result.results[0].accepted_evidence)
+        assert result.path == artifact_path
+        rows = event_evidence_acquisition.load_acquisition_results(artifact_path)
+        assert rows[0]["symbol"] == "RUNE"
+        assert rows[0]["coin_id"] == "thorchain"
+        assert rows[0]["accepted_evidence"]
+
+
+def test_event_evidence_acquisition_provider_unavailable_and_operator_surfaces():
+    from crypto_rsi_scanner import (
+        event_alpha_daily_brief,
+        event_catalyst_search,
+        event_evidence_acquisition,
+        event_impact_hypotheses,
+        event_opportunity_audit,
+        event_research_cards,
+        event_watchlist,
+    )
+
+    velvet = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:velvet-acquisition",
+        event_cluster_id="cluster:spacex",
+        event_type="ipo_proxy",
+        external_asset="SpaceX",
+        impact_category="tokenized_stock_venue",
+        candidate_sectors=("tokenized_stock_venues",),
+        candidate_symbols=("VELVET",),
+        candidate_coin_ids=("velvet",),
+        impact_path_type="venue_value_capture",
+        candidate_role="proxy_venue",
+        playbook_hint="proxy_attention",
+        confidence=0.82,
+        hypothesis_score=72.0,
+        opportunity_score_final=72.0,
+        opportunity_level="validated_digest",
+        validation_stage="impact_path_validated",
+        score_components={
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "validated_symbol": "VELVET",
+            "validated_coin_id": "velvet",
+            "external_asset": "SpaceX",
+            "playbook_type": "proxy_attention",
+            "impact_category": "tokenized_stock_venue",
+            "impact_path_type": "venue_value_capture",
+            "candidate_role": "proxy_venue",
+            "opportunity_score_final": 72.0,
+            "opportunity_level": "validated_digest",
+        },
+    )
+    unavailable = event_evidence_acquisition.run_evidence_acquisition(
+        (velvet,),
+        provider=None,
+        providers_by_hint={},
+        cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(enabled=True, max_candidates=1, max_queries=1),
+    )
+    assert unavailable.results[0].status == "provider_unavailable"
+    assert unavailable.results[0].query_results[0].evidence_absence_is_meaningful is True
+
+    provider = event_catalyst_search.FixtureCatalystSearchProvider(rows_by_query={
+        "VELVET SpaceX pre IPO tokenized stock": (
+            event_catalyst_search._raw_event_from_fixture({
+                "raw_id": "raw:velvet-acquisition",
+                "provider": "cryptopanic",
+                "source_url": "https://cryptopanic.com/news/velvet-spacex",
+                "title": "VELVET offers SpaceX pre-IPO tokenized stock exposure",
+                "body": "Velvet users can trade SpaceX pre-IPO exposure through tokenized stock markets, explaining VELVET venue value capture.",
+                "raw_json": {"currency_tags": ["VELVET"], "source_origin": "CryptoPanic"},
+                "source_confidence": 0.90,
+            }),
+        ),
+        "SpaceX prediction market VELVET": (
+            event_catalyst_search._raw_event_from_fixture({
+                "raw_id": "raw:spacex-context-only",
+                "provider": "polymarket",
+                "source_url": "https://polymarket.com/event/spacex-ipo",
+                "title": "SpaceX IPO prediction market volume rises",
+                "body": "Prediction market context for SpaceX IPO odds; no VELVET token or venue value capture is described.",
+                "raw_json": {"source_origin": "Polymarket"},
+                "source_confidence": 0.70,
+            }),
+        ),
+    })
+    with TemporaryDirectory() as tmp:
+        artifact_path = Path(tmp) / "event_evidence_acquisition.jsonl"
+        result = event_evidence_acquisition.run_evidence_acquisition(
+            (velvet,),
+            provider=provider,
+            providers_by_hint={"cryptopanic": provider, "polymarket": provider, "project_blog_rss": provider},
+            cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(
+                enabled=True,
+                max_candidates=1,
+                max_queries=3,
+                fixture_only=True,
+                artifact_path=artifact_path,
+            ),
+            run_context={"profile": "quality_validation", "artifact_namespace": "quality_validation", "run_mode": "test"},
+        )
+        rows = event_evidence_acquisition.load_acquisition_results(artifact_path)
+    brief = event_alpha_daily_brief.build_daily_brief(
+        evidence_acquisition_rows=rows,
+        requested_profile="quality_validation",
+        artifact_namespace="quality_validation",
+        include_test_artifacts=True,
+    )
+    assert "Executed source-pack searches" in brief
+    assert "VELVET" in brief
+    assert "accepted=1" in brief
+
+    updated = result.hypotheses[0]
+    components = dict(updated.score_components)
+    assert components["evidence_acquisition_status"] == "accepted_evidence_found"
+    assert components["evidence_acquisition_accepted_count"] == 1
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="hypothesis|cluster:spacex|velvet",
+        cluster_id="cluster:spacex",
+        event_id="hyp:velvet-acquisition",
+        coin_id="velvet",
+        symbol="VELVET",
+        relationship_type="impact_hypothesis",
+        external_asset="SpaceX",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        previous_state=None,
+        first_seen_at="2026-06-15T12:00:00+00:00",
+        last_seen_at="2026-06-15T12:00:00+00:00",
+        latest_source="cryptopanic",
+        latest_playbook_type="proxy_attention",
+        latest_score_components=components,
+    )
+    card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    assert "Evidence acquisition result: status=accepted_evidence_found" in card.markdown
+    assert "Accepted evidence reasons:" in card.markdown
+    audit = event_opportunity_audit.format_opportunity_audit("VELVET", hypotheses=[updated], watchlist_entries=[entry])
+    assert "execution result: status=accepted_evidence_found" in audit
+    assert "accepted reason codes:" in audit
+
+
+def test_event_alpha_evidence_acquisition_smoke_target_exists():
+    makefile = Path("Makefile").read_text(encoding="utf-8")
+    assert "event-alpha-evidence-acquisition-smoke" in makefile
+    profiles = Path("crypto_rsi_scanner/event_alpha_profiles.py").read_text(encoding="utf-8")
+    assert "evidence_acquisition_smoke" in profiles
+    assert "EVENT_ALPHA_EVIDENCE_ACQUISITION_FIXTURE_ONLY" in profiles
 
 
 def _run_all():

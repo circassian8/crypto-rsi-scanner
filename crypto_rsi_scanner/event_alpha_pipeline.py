@@ -17,6 +17,7 @@ from . import (
     event_catalyst_frame_validator,
     event_llm_catalyst_frames,
     event_catalyst_search,
+    event_evidence_acquisition,
     event_graph,
     event_impact_hypotheses,
     event_llm_analyzer,
@@ -75,6 +76,7 @@ class EventAlphaPipelineResult:
     watchlist_monitor_result: event_watchlist_monitor.EventWatchlistMonitorResult | None
     router_result: event_alpha_router.EventAlphaRouterResult | None
     near_miss_result: event_near_miss.EventNearMissRefreshResult | None = None
+    evidence_acquisition_result: event_evidence_acquisition.EventEvidenceAcquisitionRunResult | None = None
     impact_hypotheses: tuple[event_impact_hypotheses.EventImpactHypothesis, ...] = ()
     warnings: tuple[str, ...] = ()
     clock_status: dict[str, Any] = field(default_factory=dict)
@@ -264,6 +266,22 @@ class EventAlphaPipelineResult:
     def near_miss_upgrades(self) -> int:
         return self.near_miss_result.upgraded_count if self.near_miss_result else 0
 
+    @property
+    def evidence_acquisition_attempted(self) -> int:
+        return self.evidence_acquisition_result.attempted if self.evidence_acquisition_result else 0
+
+    @property
+    def evidence_acquisition_accepted(self) -> int:
+        return self.evidence_acquisition_result.accepted if self.evidence_acquisition_result else 0
+
+    @property
+    def evidence_acquisition_rejected_only(self) -> int:
+        return self.evidence_acquisition_result.rejected_only if self.evidence_acquisition_result else 0
+
+    @property
+    def evidence_acquisition_upgraded(self) -> int:
+        return self.evidence_acquisition_result.upgraded if self.evidence_acquisition_result else 0
+
 
 def run_event_alpha_pipeline(
     discovery_result: EventDiscoveryResult,
@@ -301,6 +319,10 @@ def run_event_alpha_pipeline(
     near_miss_market_provider: event_watchlist_market.EventWatchlistMarketProvider | None = None,
     near_miss_derivatives_rows: Iterable[dict[str, Any]] = (),
     near_miss_supply_rows: Iterable[dict[str, Any]] = (),
+    evidence_acquisition_cfg: event_evidence_acquisition.EvidenceAcquisitionConfig | None = None,
+    evidence_acquisition_provider: event_evidence_acquisition.EvidenceSearchProvider | None = None,
+    evidence_acquisition_providers_by_hint: dict[str, event_evidence_acquisition.EvidenceSearchProvider | None] | None = None,
+    evidence_acquisition_context: dict[str, Any] | None = None,
     extra_warnings: Iterable[str] = (),
 ) -> EventAlphaPipelineResult:
     """Run the research-only Event Alpha pipeline over a discovery result."""
@@ -389,6 +411,24 @@ def run_event_alpha_pipeline(
         )
         impact_hypotheses = near_miss_result.hypotheses
         warnings.extend(f"near miss: {warning}" for warning in near_miss_result.warnings)
+
+    evidence_acquisition_result: event_evidence_acquisition.EventEvidenceAcquisitionRunResult | None = None
+    if evidence_acquisition_cfg is not None and evidence_acquisition_cfg.enabled:
+        evidence_acquisition_result = event_evidence_acquisition.run_evidence_acquisition(
+            impact_hypotheses,
+            near_misses=near_miss_result.near_misses if near_miss_result else (),
+            provider=evidence_acquisition_provider,
+            providers_by_hint=evidence_acquisition_providers_by_hint or {},
+            cfg=evidence_acquisition_cfg,
+            now=observed,
+            run_context=evidence_acquisition_context or {},
+        )
+        impact_hypotheses = tuple(
+            item
+            for item in evidence_acquisition_result.hypotheses
+            if isinstance(item, event_impact_hypotheses.EventImpactHypothesis)
+        )
+        warnings.extend(f"evidence acquisition: {warning}" for warning in evidence_acquisition_result.warnings)
 
     anomaly_lifecycle_result = (
         event_anomaly_state.build_anomaly_lifecycle(
@@ -483,6 +523,7 @@ def run_event_alpha_pipeline(
         watchlist_monitor_result=watchlist_monitor_result,
         router_result=router_result,
         near_miss_result=near_miss_result,
+        evidence_acquisition_result=evidence_acquisition_result,
         impact_hypotheses=impact_hypotheses,
         warnings=tuple(dict.fromkeys(warnings)),
     )
@@ -529,6 +570,10 @@ def run_event_alpha_operating_cycle(
     near_miss_market_provider: event_watchlist_market.EventWatchlistMarketProvider | None = None,
     near_miss_derivatives_rows: Iterable[dict[str, Any]] = (),
     near_miss_supply_rows: Iterable[dict[str, Any]] = (),
+    evidence_acquisition_cfg: event_evidence_acquisition.EvidenceAcquisitionConfig | None = None,
+    evidence_acquisition_provider: event_evidence_acquisition.EvidenceSearchProvider | None = None,
+    evidence_acquisition_providers_by_hint: dict[str, event_evidence_acquisition.EvidenceSearchProvider | None] | None = None,
+    evidence_acquisition_context: dict[str, Any] | None = None,
     send: bool = False,
     send_callback: ResearchAlertSender | None = None,
 ) -> EventAlphaPipelineResult:
@@ -783,6 +828,10 @@ def run_event_alpha_operating_cycle(
         near_miss_market_provider=near_miss_market_provider,
         near_miss_derivatives_rows=near_miss_derivatives_rows or watchlist_monitor_derivatives_rows,
         near_miss_supply_rows=near_miss_supply_rows or watchlist_monitor_supply_rows,
+        evidence_acquisition_cfg=evidence_acquisition_cfg,
+        evidence_acquisition_provider=evidence_acquisition_provider,
+        evidence_acquisition_providers_by_hint=evidence_acquisition_providers_by_hint,
+        evidence_acquisition_context=evidence_acquisition_context,
         extra_warnings=warnings,
     )
     if send:
@@ -979,7 +1028,10 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
             f"hypothesis_search_queries={result.hypothesis_search_queries} · "
             f"hypothesis_search_results={result.hypothesis_search_results} · "
             f"hypothesis_promotions={result.hypothesis_promotions} · "
-            f"near_misses={result.near_misses} · near_miss_upgrades={result.near_miss_upgrades}"
+            f"near_misses={result.near_misses} · near_miss_upgrades={result.near_miss_upgrades} · "
+            f"evidence_acquisition={result.evidence_acquisition_attempted} "
+            f"accepted={result.evidence_acquisition_accepted} "
+            f"upgraded={result.evidence_acquisition_upgraded}"
         ),
         (
             "hypothesis_search_query_types="
@@ -1044,6 +1096,13 @@ def format_event_alpha_pipeline_report(result: EventAlphaPipelineResult) -> str:
     if result.anomaly_lifecycle_result is not None:
         lines.append("")
         lines.append(event_anomaly_state.format_anomaly_lifecycle_report(result.anomaly_lifecycle_result))
+    if result.evidence_acquisition_result is not None and result.evidence_acquisition_result.results:
+        lines.append("")
+        lines.append("Evidence acquisition execution:")
+        lines.append(event_evidence_acquisition.format_acquisition_report(
+            event_evidence_acquisition._artifact_row(result_item, context={}, observed_at="")
+            for result_item in result.evidence_acquisition_result.results
+        ))
     if result.impact_hypotheses:
         lines.append("")
         lines.append(event_impact_hypotheses.format_impact_hypothesis_report(result.impact_hypotheses))

@@ -48,6 +48,7 @@ class EventAlphaArtifactContext:
     daily_brief_path: Path
     impact_hypothesis_store_path: Path
     incident_store_path: Path
+    evidence_acquisition_path: Path
     proposed_eval_cases_dir: Path
     research_cards_dir: Path
     llm_budget_ledger_path: Path
@@ -143,6 +144,11 @@ def context_from_profile(
         incident_store_path=_path_override(
             "RSI_EVENT_INCIDENT_STORE_PATH",
             namespace_dir / "event_incidents.jsonl",
+            data_dir=config.DATA_DIR,
+        ),
+        evidence_acquisition_path=_path_override(
+            "RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH",
+            namespace_dir / "event_evidence_acquisition.jsonl",
             data_dir=config.DATA_DIR,
         ),
         proposed_eval_cases_dir=_path_override(

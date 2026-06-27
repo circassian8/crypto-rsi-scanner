@@ -173,6 +173,14 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
         )
         rows.append(
             "  "
+            f"evidence_acquisition attempted={int(row.get('evidence_acquisition_attempted') or 0)} "
+            f"accepted={int(row.get('evidence_acquisition_accepted') or 0)} "
+            f"rejected_only={int(row.get('evidence_acquisition_rejected_only') or 0)} "
+            f"upgraded={int(row.get('evidence_acquisition_upgraded') or 0)} "
+            f"rows={int(row.get('evidence_acquisition_rows_written') or 0)}"
+        )
+        rows.append(
+            "  "
             f"catalyst_frames analyzed={int(row.get('catalyst_frames_analyzed') or 0)} "
             f"validated={int(row.get('catalyst_frame_validations') or 0)} "
             f"disagreements={int(row.get('catalyst_frame_disagreements') or 0)} "
@@ -271,6 +279,7 @@ def _run_record(
     card_paths = tuple(str(path) for path in getattr(result, "research_card_paths", ()) or ())
     llm_stats = _llm_stats((*extraction_rows, *catalyst_frame_rows, *relationship_rows))
     catalyst_frame_counts = _catalyst_frame_counts(result, catalyst_frame_rows)
+    acquisition = getattr(result, "evidence_acquisition_result", None)
     warnings = list(getattr(result, "warnings", ()) or ())
     clock_status = dict(getattr(result, "clock_status", {}) or {})
     if failure:
@@ -335,6 +344,13 @@ def _run_record(
         "hypothesis_search_results_by_type": _query_type_counts(getattr(result, "hypothesis_search_result", None), "result_events"),
         "hypothesis_search_skip_reasons": _hypothesis_search_skip_reasons(result, warnings=warnings),
         "hypothesis_promotions": _int(getattr(result, "hypothesis_promotions", 0)),
+        "evidence_acquisition_attempted": _int(getattr(result, "evidence_acquisition_attempted", 0)),
+        "evidence_acquisition_accepted": _int(getattr(result, "evidence_acquisition_accepted", 0)),
+        "evidence_acquisition_rejected_only": _int(getattr(result, "evidence_acquisition_rejected_only", 0)),
+        "evidence_acquisition_upgraded": _int(getattr(result, "evidence_acquisition_upgraded", 0)),
+        "evidence_acquisition_rows_written": _int(getattr(acquisition, "rows_written", 0)) if acquisition is not None else 0,
+        "evidence_acquisition_path": str(getattr(acquisition, "path", "") or ""),
+        "evidence_acquisition_status_counts": _evidence_acquisition_status_counts(acquisition),
         "candidates": _int(getattr(result, "candidates", 0)),
         "clusters": _int(getattr(result, "clusters", 0)),
         "alerts": len(list(getattr(result, "alerts", ()) or ())),
@@ -551,6 +567,16 @@ def _hypothesis_search_skip_reasons(
         out["provider_unavailable"] = out.get("provider_unavailable", 0) + 1
     if "hypothesis search provider failed" in warning_text and not {"provider_unavailable", "provider_backoff"} & set(out):
         out["provider_unavailable"] = out.get("provider_unavailable", 0) + 1
+    return out
+
+
+def _evidence_acquisition_status_counts(acquisition: Any) -> dict[str, int]:
+    out: dict[str, int] = {}
+    if acquisition is None:
+        return out
+    for result in getattr(acquisition, "results", ()) or ():
+        status = str(getattr(result, "status", "") or "unknown")
+        out[status] = out.get(status, 0) + 1
     return out
 
 

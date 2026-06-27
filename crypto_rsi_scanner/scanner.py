@@ -113,6 +113,7 @@ from . import event_alpha_environment_doctor
 from . import event_source_reliability
 from . import event_catalyst_search
 from . import event_clock
+from . import event_evidence_acquisition
 from . import event_feedback
 from . import event_llm_analyzer
 from . import event_llm_catalyst_frames
@@ -131,6 +132,7 @@ from . import event_watchlist_market
 from . import event_watchlist_monitor
 from .event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
+from .event_providers.bybit_announcements import BybitAnnouncementProvider
 from .llm_providers.fixture import (
     FixtureLLMCatalystFrameProvider,
     FixtureLLMExtractionProvider,
@@ -1601,6 +1603,18 @@ def _event_impact_hypothesis_search_config_from_runtime(
     )
 
 
+def _event_evidence_acquisition_config_from_runtime() -> event_evidence_acquisition.EvidenceAcquisitionConfig:
+    return event_evidence_acquisition.EvidenceAcquisitionConfig(
+        enabled=config.EVENT_ALPHA_EVIDENCE_ACQUISITION_ENABLED,
+        max_candidates=config.EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES,
+        max_queries=config.EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES,
+        max_results_per_query=config.EVENT_CATALYST_SEARCH_MAX_RESULTS_PER_QUERY,
+        timeout_seconds=config.EVENT_ALPHA_EVIDENCE_ACQUISITION_TIMEOUT_SECONDS,
+        fixture_only=config.EVENT_ALPHA_EVIDENCE_ACQUISITION_FIXTURE_ONLY,
+        artifact_path=config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH,
+    )
+
+
 def _event_source_enrichment_config_from_runtime() -> event_source_enrichment.EventSourceEnrichmentConfig:
     return event_source_enrichment.EventSourceEnrichmentConfig(
         enabled=config.EVENT_SOURCE_ENRICHMENT_ENABLED,
@@ -1747,6 +1761,7 @@ def _apply_event_alpha_context_to_config(context: event_alpha_artifacts.EventAlp
     config.EVENT_ALPHA_DAILY_BRIEF_PATH = context.daily_brief_path
     config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH = context.impact_hypothesis_store_path
     config.EVENT_INCIDENT_STORE_PATH = context.incident_store_path
+    config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH = context.evidence_acquisition_path
     config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR = context.proposed_eval_cases_dir
     config.EVENT_RESEARCH_CARDS_DIR = context.research_cards_dir
     config.EVENT_LLM_BUDGET_LEDGER_PATH = context.llm_budget_ledger_path
@@ -1792,6 +1807,7 @@ def resolve_event_alpha_artifact_context_for_report(
             daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
             impact_hypothesis_store_path=Path(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH),
             incident_store_path=Path(config.EVENT_INCIDENT_STORE_PATH),
+            evidence_acquisition_path=Path(config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH),
             proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
             research_cards_dir=Path(config.EVENT_RESEARCH_CARDS_DIR),
             llm_budget_ledger_path=Path(config.EVENT_LLM_BUDGET_LEDGER_PATH),
@@ -1827,6 +1843,7 @@ def _event_alpha_context_block(context: event_alpha_artifacts.EventAlphaArtifact
         f"- provider_health_path: {context.provider_health_path}",
         f"- impact_hypothesis_store_path: {context.impact_hypothesis_store_path}",
         f"- incident_store_path: {context.incident_store_path}",
+        f"- evidence_acquisition_path: {context.evidence_acquisition_path}",
         f"- research_cards_dir: {context.research_cards_dir}",
     ])
 
@@ -1864,6 +1881,7 @@ def _event_alpha_report_context(
         daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
         impact_hypothesis_store_path=Path(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH),
         incident_store_path=Path(config.EVENT_INCIDENT_STORE_PATH),
+        evidence_acquisition_path=Path(config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH),
         proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
         research_cards_dir=Path(config.EVENT_RESEARCH_CARDS_DIR),
         llm_budget_ledger_path=Path(config.EVENT_LLM_BUDGET_LEDGER_PATH),
@@ -1888,6 +1906,7 @@ def _normalize_profile_paths() -> None:
         "EVENT_ALPHA_DAILY_BRIEF_PATH",
         "EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
         "EVENT_INCIDENT_STORE_PATH",
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH",
         "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
         "EVENT_RESEARCH_CARDS_DIR",
         "EVENT_LLM_BUDGET_LEDGER_PATH",
@@ -2191,6 +2210,8 @@ def event_alpha_cycle(
     catalyst_search_cfg = _event_catalyst_search_config_from_runtime()
     catalyst_search_provider = _event_catalyst_search_provider(catalyst_search_cfg)
     hypothesis_search_cfg = _event_impact_hypothesis_search_config_from_runtime()
+    evidence_acquisition_cfg = _event_evidence_acquisition_config_from_runtime()
+    evidence_acquisition_providers = _event_evidence_acquisition_providers_from_runtime(evidence_acquisition_cfg)
     alert_cfg = _event_alert_config_from_runtime()
     pipeline_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
         load_discovery_result=lambda observed, raw_event_transform: _event_discovery_result_from_config(
@@ -2236,6 +2257,15 @@ def event_alpha_cycle(
         else None,
         near_miss_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
         near_miss_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
+        evidence_acquisition_cfg=evidence_acquisition_cfg,
+        evidence_acquisition_provider=evidence_acquisition_providers.get("default"),
+        evidence_acquisition_providers_by_hint=evidence_acquisition_providers,
+        evidence_acquisition_context={
+            "run_id": run_id,
+            "profile": profile_for_run,
+            "run_mode": run_mode,
+            "artifact_namespace": artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE,
+        },
         send=send,
         send_callback=lambda decisions: _send_event_alpha_routed_digest(
             decisions,
@@ -2649,6 +2679,12 @@ def _event_alpha_notify_cycle_body(
             hypothesis_search_cfg = _event_impact_hypothesis_search_config_from_runtime(
                 enabled_override=False if catalyst_budget_warning else None
             )
+            evidence_acquisition_cfg = _event_evidence_acquisition_config_from_runtime()
+            evidence_acquisition_providers = (
+                {}
+                if catalyst_budget_warning
+                else _event_evidence_acquisition_providers_from_runtime(evidence_acquisition_cfg)
+            )
             watchlist_budget_warning = budget.warning_if_low("watchlist_refresh")
             if watchlist_budget_warning:
                 pre_stage_warnings.append(watchlist_budget_warning)
@@ -2699,6 +2735,15 @@ def _event_alpha_notify_cycle_body(
                     else None,
                     near_miss_derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
                     near_miss_supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
+                    evidence_acquisition_cfg=evidence_acquisition_cfg,
+                    evidence_acquisition_provider=evidence_acquisition_providers.get("default"),
+                    evidence_acquisition_providers_by_hint=evidence_acquisition_providers,
+                    evidence_acquisition_context={
+                        "run_id": run_id,
+                        "profile": profile_for_run,
+                        "run_mode": run_mode,
+                        "artifact_namespace": artifact_namespace or lock_context.artifact_namespace,
+                    },
                     send=False,
                 )
             except Exception as exc:  # noqa: BLE001 - notification burn-in must fail soft on provider/runtime errors
@@ -4522,6 +4567,7 @@ def _event_alpha_reference_quality_rows(
         daily_brief_path=namespace_dir / "event_alpha_daily_brief.md",
         impact_hypothesis_store_path=namespace_dir / "event_impact_hypotheses.jsonl",
         incident_store_path=namespace_dir / "event_incidents.jsonl",
+        evidence_acquisition_path=namespace_dir / "event_evidence_acquisition.jsonl",
         proposed_eval_cases_dir=namespace_dir / "proposed_eval_cases",
         research_cards_dir=namespace_dir / "research_cards",
         llm_budget_ledger_path=namespace_dir / "event_llm_budget.json",
@@ -5612,6 +5658,7 @@ def event_alpha_export_burn_in_pack(
         missed_rows=artifacts["missed_rows"],
         notification_runs=event_alpha_notification_runs.load_notification_runs(config.EVENT_ALPHA_NOTIFICATION_RUNS_PATH).rows,
         hypothesis_rows=event_impact_hypothesis_store.load_impact_hypotheses(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH, limit=100).rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH),
         watchlist_entries=artifacts["watchlist"].entries,
         router_result=router_result,
         provider_health_rows=artifacts["provider_rows"],
@@ -5919,6 +5966,7 @@ def event_alpha_daily_brief_report(
         notification_runs=event_alpha_notification_runs.load_notification_runs(context.notification_runs_path).rows,
         hypothesis_rows=hypotheses.rows,
         incident_rows=event_incident_store.load_incidents(context.incident_store_path, limit=100, include_legacy=True).rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         watchlist_entries=watchlist.entries,
         router_result=router_result,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
@@ -6348,6 +6396,101 @@ def _event_catalyst_search_provider(
     if len(providers) == 1:
         return providers[0]
     return event_catalyst_search.CompositeCatalystSearchProvider(providers)
+
+
+def _event_evidence_acquisition_providers_from_runtime(
+    cfg: event_evidence_acquisition.EvidenceAcquisitionConfig,
+):
+    """Return source-pack provider dispatch for evidence acquisition."""
+    providers: dict[str, object | None] = {}
+    fixture_provider = event_catalyst_search.FixtureCatalystSearchProvider(
+        path=config.EVENT_CATALYST_SEARCH_FIXTURE_PATH,
+    )
+    if cfg.fixture_only:
+        for key in (
+            "default",
+            "fixture",
+            "cryptopanic",
+            "project_blog_rss",
+            "rss",
+            "polymarket",
+            "official_exchange",
+            "binance_announcements",
+            "bybit_announcements",
+            "tokenomist",
+            "coinalyze",
+            "sports_fixtures",
+        ):
+            providers[key] = fixture_provider
+        return providers
+
+    providers["default"] = fixture_provider
+    providers["fixture"] = fixture_provider
+    providers["cryptopanic"] = event_catalyst_search.CryptoPanicCatalystSearchProvider(
+        path=config.EVENT_DISCOVERY_CRYPTOPANIC_PATH,
+        live_enabled=config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
+        api_token=config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN,
+        base_url=config.EVENT_DISCOVERY_CRYPTOPANIC_BASE_URL,
+        public=config.EVENT_DISCOVERY_CRYPTOPANIC_PUBLIC,
+        filter_name=config.EVENT_DISCOVERY_CRYPTOPANIC_FILTER,
+        currencies=config.EVENT_DISCOVERY_CRYPTOPANIC_CURRENCIES,
+        regions=config.EVENT_DISCOVERY_CRYPTOPANIC_REGIONS,
+        kind=config.EVENT_DISCOVERY_CRYPTOPANIC_KIND,
+        timeout=min(config.EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT, cfg.timeout_seconds),
+    )
+    providers["project_blog_rss"] = event_catalyst_search.ProjectRssCatalystSearchProvider(
+        path=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,
+        live_enabled=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE,
+        feed_urls=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS,
+        timeout=min(config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT, cfg.timeout_seconds),
+    )
+    providers["rss"] = providers["project_blog_rss"]
+    providers["polymarket"] = event_catalyst_search.PolymarketCatalystSearchProvider(
+        path=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_PATH,
+        live_enabled=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE,
+        base_url=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_BASE_URL,
+        limit=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT,
+        timeout=min(config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_TIMEOUT, cfg.timeout_seconds),
+    )
+    official_exchange = event_catalyst_search.CompositeCatalystSearchProvider((
+        event_catalyst_search.EventProviderCatalystSearchProvider(
+            lambda query: BinanceAnnouncementProvider(
+                config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_PATH,
+                live_enabled=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LIVE,
+                api_key=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_KEY,
+                api_secret=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_API_SECRET,
+                ws_url=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_WS_URL,
+                topic=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_TOPIC,
+                recv_window_ms=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_RECV_WINDOW_MS,
+                listen_seconds=min(config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_LISTEN_SECONDS, cfg.timeout_seconds),
+                max_messages=config.EVENT_DISCOVERY_BINANCE_ANNOUNCEMENTS_MAX_MESSAGES,
+            ),
+            name="binance_announcements",
+            filter_by_query=True,
+            max_fetches_per_search=1,
+        ),
+        event_catalyst_search.EventProviderCatalystSearchProvider(
+            lambda query: BybitAnnouncementProvider(
+                config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_PATH,
+                live_enabled=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIVE,
+                base_url=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_BASE_URL,
+                locale=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LOCALE,
+                announcement_type=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TYPE,
+                limit=config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_LIMIT,
+                timeout=min(config.EVENT_DISCOVERY_BYBIT_ANNOUNCEMENTS_TIMEOUT, cfg.timeout_seconds),
+            ),
+            name="bybit_announcements",
+            filter_by_query=True,
+            max_fetches_per_search=1,
+        ),
+    ))
+    providers["official_exchange"] = official_exchange
+    providers["binance_announcements"] = official_exchange
+    providers["bybit_announcements"] = official_exchange
+    providers["tokenomist"] = fixture_provider
+    providers["coinalyze"] = fixture_provider
+    providers["sports_fixtures"] = fixture_provider
+    return providers
 
 
 def _send_event_alert_digest(

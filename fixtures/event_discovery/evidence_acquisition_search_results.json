@@ -1,0 +1,65 @@
+{
+  "search_results": [
+    {
+      "query_contains": "VELVET SpaceX pre IPO tokenized stock",
+      "raw_id": "evidence-acq:velvet:cryptopanic",
+      "provider": "cryptopanic",
+      "source_url": "https://cryptopanic.com/news/velvet-spacex-pre-ipo",
+      "title": "VELVET offers SpaceX pre-IPO tokenized stock exposure",
+      "body": "Velvet users can trade SpaceX pre-IPO exposure through tokenized stock markets, explaining VELVET venue value capture before the dated IPO catalyst.",
+      "published_at": "2026-06-15T12:00:00Z",
+      "fetched_at": "2026-06-15T12:05:00Z",
+      "source_confidence": 0.9,
+      "raw_json": {
+        "source_origin": "CryptoPanic",
+        "currency_tags": ["VELVET"],
+        "currencies": [{"code": "VELVET", "slug": "velvet"}]
+      }
+    },
+    {
+      "query_contains": "SpaceX prediction market VELVET",
+      "raw_id": "evidence-acq:spacex:polymarket-context",
+      "provider": "polymarket",
+      "source_url": "https://polymarket.com/event/spacex-ipo-2026",
+      "title": "SpaceX IPO prediction market volume rises",
+      "body": "Prediction market context tracks SpaceX IPO odds, but this row does not prove VELVET token identity or venue value capture.",
+      "published_at": "2026-06-15T12:10:00Z",
+      "fetched_at": "2026-06-15T12:15:00Z",
+      "source_confidence": 0.7,
+      "raw_json": {
+        "source_origin": "Polymarket"
+      }
+    },
+    {
+      "query_contains": "RUNE hack incident security market reaction",
+      "raw_id": "evidence-acq:rune:cryptopanic",
+      "provider": "cryptopanic",
+      "source_url": "https://cryptopanic.com/news/rune-exploit-update",
+      "title": "RUNE exploit update: THORChain resumes trading after incident",
+      "body": "RUNE and THORChain markets reacted after an exploit. The project resumes trading and publishes an incident update for token holders.",
+      "published_at": "2026-06-15T13:00:00Z",
+      "fetched_at": "2026-06-15T13:05:00Z",
+      "source_confidence": 0.88,
+      "raw_json": {
+        "source_origin": "CryptoPanic",
+        "currency_tags": ["RUNE"],
+        "currencies": [{"code": "RUNE", "slug": "thorchain"}]
+      }
+    },
+    {
+      "query_contains": "ZEC listing announcement",
+      "raw_id": "evidence-acq:zec:binance",
+      "provider": "binance_announcements",
+      "source_url": "https://www.binance.com/en/support/announcement/zec-usdt-listing",
+      "title": "Binance Will List ZEC and Open Trading for ZECUSDT",
+      "body": "Binance will list ZEC and open trading for the ZECUSDT pair. This listing is a direct liquidity event for ZEC.",
+      "published_at": "2026-06-15T14:00:00Z",
+      "fetched_at": "2026-06-15T14:05:00Z",
+      "source_confidence": 0.95,
+      "raw_json": {
+        "source_origin": "Binance Announcements",
+        "symbol": "ZEC"
+      }
+    }
+  ]
+}

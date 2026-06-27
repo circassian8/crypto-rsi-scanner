@@ -60,6 +60,9 @@ class EventFeedbackRecord:
     candidate_role: str | None = None
     opportunity_level: str | None = None
     market_confirmation_level: str | None = None
+    source_pack: str | None = None
+    source_provider: str | None = None
+    accepted_evidence_reason_codes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -293,6 +296,13 @@ def _record_from_entry(
         candidate_role=_optional_str(components.get("candidate_role")),
         opportunity_level=_optional_str(components.get("opportunity_level")),
         market_confirmation_level=_optional_str(components.get("market_confirmation_level")),
+        source_pack=_optional_str(components.get("evidence_acquisition_source_pack") or components.get("source_pack")),
+        source_provider=_optional_str(
+            components.get("source_provider")
+            or _first_text(components.get("evidence_acquisition_providers_used"))
+            or entry.latest_source
+        ),
+        accepted_evidence_reason_codes=_text_tuple(components.get("accepted_evidence_reason_codes")),
     )
 
 
@@ -343,6 +353,9 @@ def _record_from_row(row: Mapping[str, Any]) -> EventFeedbackRecord | None:
             candidate_role=_optional_str(row.get("candidate_role")),
             opportunity_level=_optional_str(row.get("opportunity_level")),
             market_confirmation_level=_optional_str(row.get("market_confirmation_level")),
+            source_pack=_optional_str(row.get("source_pack")),
+            source_provider=_optional_str(row.get("source_provider")),
+            accepted_evidence_reason_codes=_text_tuple(row.get("accepted_evidence_reason_codes")),
         )
     except (TypeError, ValueError):
         return None
@@ -377,6 +390,24 @@ def _optional_str(value: Any) -> str | None:
     if value in (None, ""):
         return None
     return str(value)
+
+
+def _first_text(value: Any) -> str | None:
+    for item in _text_tuple(value):
+        return item
+    return None
+
+
+def _text_tuple(value: Any) -> tuple[str, ...]:
+    if value in (None, ""):
+        return ()
+    if isinstance(value, (str, bytes)):
+        text = str(value).strip()
+        return (text,) if text else ()
+    if isinstance(value, Iterable) and not isinstance(value, Mapping):
+        return tuple(dict.fromkeys(str(item).strip() for item in value if str(item).strip()))
+    text = str(value).strip()
+    return (text,) if text else ()
 
 
 def _optional_int(value: Any) -> int | None:

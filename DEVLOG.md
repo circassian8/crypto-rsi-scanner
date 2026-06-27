@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Execute Event Alpha source-pack evidence plans · Codex
+**Why:** The source registry and evidence planner could tell operators what to
+search next, but daily briefs still showed mostly `planned` acquisition rows.
+Event Alpha needed a safe fixture-first loop that actually runs those targeted
+source-pack queries, validates evidence, records before/after quality, and
+surfaces accepted/rejected/no-result outcomes.
+**Changes:**
+- Added `event_evidence_acquisition.py`, a research-only executor with bounded
+  source-pack requests, provider dispatch, accepted/rejected evidence
+  validation, before/after quality/opportunity metadata, JSONL artifact writes,
+  and no send/trade/paper/normal-RSI/trigger side effects.
+- Wired evidence acquisition into Event Alpha cycles, profiles, artifact
+  context, run ledgers, daily briefs, research cards, opportunity audits, and
+  scanner runtime provider setup.
+- Added fixture search results and `make event-alpha-evidence-acquisition-smoke`
+  to prove VELVET/RUNE/ZEC accepted evidence plus context-only/no-result cases.
+- Added acquisition source-pack and accepted-reason metadata to feedback rows
+  and calibration grouping for later source-reliability review.
+- Documented the new env knobs, runbook flow, roadmap status, and durable
+  research-only decision.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed (496/496);
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (36/36);
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3` passed with
+accepted VELVET/RUNE/ZEC evidence and no sends/trades/paper/live RSI rows;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed with no
+doctor blockers; `make event-alpha-quality-validation-cycle PYTHON=python3`
+passed with no doctor blockers; `make verify PYTHON=python3` passed.
+**Notes/risks:** Research-only. Source-pack acquisition can improve local
+research verdicts only through deterministic validation; it cannot create
+`TRIGGERED_FADE`, which remains limited to `event_fade.py` plus `proxy_fade`.
+
 ## 2026-06-28 — Add Event Alpha source registry and evidence planning · Codex
 **Why:** Event Alpha needed a stronger data/news evidence layer so broad sources
 like GDELT, Polymarket, and RSS can collect context without being treated as

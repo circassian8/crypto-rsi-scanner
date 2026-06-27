@@ -1276,6 +1276,9 @@ def _source_acquisition_lines(
     needed = plan.get("evidence_needed") if isinstance(plan, Mapping) else components.get("evidence_needed")
     queries = plan.get("evidence_query_plan") if isinstance(plan, Mapping) else components.get("evidence_query_plan")
     failures = components.get("evidence_acquisition_failures") or assessment.warnings
+    acquisition = components.get("evidence_acquisition_results") if isinstance(components.get("evidence_acquisition_results"), Mapping) else {}
+    accepted_evidence = components.get("evidence_acquisition_accepted_evidence") or ()
+    accepted_reasons = components.get("accepted_evidence_reason_codes") or ()
     if isinstance(failures, str):
         failures = [failures]
     if isinstance(needed, str):
@@ -1290,6 +1293,19 @@ def _source_acquisition_lines(
         f"- Evidence absence meaningful: {str(bool(components.get('evidence_absence_is_meaningful', assessment.evidence_absence_is_meaningful))).lower()}",
         f"- Source quality prior/cap: {components.get('source_quality_prior') or assessment.source_quality_prior}/{components.get('source_confidence_cap') or assessment.confidence_cap}",
         f"- Evidence acquisition attempted: {str(bool(components.get('evidence_acquisition_attempted'))).lower()}",
+        (
+            f"- Evidence acquisition result: status={acquisition.get('status') or components.get('evidence_acquisition_status') or 'not_executed'} "
+            f"accepted={acquisition.get('accepted', components.get('evidence_acquisition_accepted_count', 0))} "
+            f"rejected={acquisition.get('rejected', components.get('evidence_acquisition_rejected_count', 0))} "
+            f"upgrade={acquisition.get('upgrade_status') or components.get('acquisition_upgrade_status') or 'unchanged'}"
+        ),
+        "- Accepted evidence reasons: " + ("; ".join(str(item) for item in list(accepted_reasons or ())[:5]) if accepted_reasons else "none"),
+        "- Accepted evidence samples: "
+        + (
+            "; ".join(str((item or {}).get("title") or (item or {}).get("source_url") or "evidence")[:120] for item in list(accepted_evidence or ())[:2])
+            if accepted_evidence
+            else "none"
+        ),
         "- Evidence needed: " + ("; ".join(str(item) for item in list(needed or ())[:5]) if needed else "; ".join(pack.minimum_evidence[:4])),
         f"- Planned queries: {len(queries or ()) if isinstance(queries, Iterable) and not isinstance(queries, (str, bytes, Mapping)) else 0}",
         "- Provider/source gaps: " + ("; ".join(str(item) for item in list(failures or ())[:4]) if failures else "none"),

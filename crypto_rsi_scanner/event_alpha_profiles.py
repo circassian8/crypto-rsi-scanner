@@ -300,6 +300,10 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": 40,
             "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE": 0.50,
             "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS": True,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_ENABLED": True,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES": 10,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES": 20,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_TIMEOUT_SECONDS": 8.0,
             "EVENT_WATCHLIST_ENABLED": True,
             "EVENT_WATCHLIST_MONITOR_ENABLED": True,
             "EVENT_WATCHLIST_MONITOR_MARKET_SOURCE": "cycle",
@@ -484,6 +488,10 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": 25,
             "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE": 0.55,
             "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS": True,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_ENABLED": True,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES": 10,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES": 20,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_TIMEOUT_SECONDS": 8.0,
             "EVENT_ALPHA_RUN_MODE": "notification_burn_in",
             "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
             "EVENT_ALPHA_NOTIFY_SCOPE": "namespace",
@@ -586,6 +594,10 @@ _PROFILES: dict[str, EventAlphaProfile] = {
             "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": 60,
             "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE": 0.50,
             "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS": True,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_ENABLED": True,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES": 20,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES": 40,
+            "EVENT_ALPHA_EVIDENCE_ACQUISITION_TIMEOUT_SECONDS": 10.0,
             "EVENT_ALPHA_RUN_MODE": "notification_burn_in",
             "EVENT_ALPHA_SNAPSHOT_POLICY": "alertable",
             "EVENT_ALPHA_NOTIFY_SCOPE": "namespace",
@@ -723,6 +735,10 @@ _PROFILES["notify_llm_quality"] = EventAlphaProfile(
         "EVENT_ALPHA_BLOCK_GENERIC_COOCCURRENCE_DIGEST": True,
         "EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_ENABLED": True,
         "EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED": True,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_ENABLED": True,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES": 10,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES": 20,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_TIMEOUT_SECONDS": 8.0,
         "EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_MAX_ASSETS": 20,
         "EVENT_ALPHA_TARGETED_MARKET_REFRESH_MAX_ASSETS": 20,
         "EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_TIMEOUT_SECONDS": 5.0,
@@ -783,6 +799,11 @@ _PROFILES["notify_llm_quality_frame"] = replace(
         "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": 100,
         "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE": 0.0,
         "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS": False,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_ENABLED": True,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_FIXTURE_ONLY": True,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES": 10,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES": 20,
+        "EVENT_CATALYST_SEARCH_FIXTURE_PATH": Path("fixtures/event_discovery/evidence_acquisition_search_results.json"),
         "EVENT_ALPHA_SNAPSHOT_POLICY": "all",
         "EVENT_RESEARCH_CARDS_AUTO_WRITE": True,
         "EVENT_RESEARCH_CARDS_WRITE_TIERS": (
@@ -835,4 +856,30 @@ _PROFILES["market_refresh_smoke"] = replace(
     card_write_tiers=("STORE_ONLY", "RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"),
     send=False,
     send_lane_policy="market_refresh_fixture_no_send",
+)
+
+
+_PROFILES["evidence_acquisition_smoke"] = replace(
+    _PROFILES["market_refresh_smoke"],
+    name="evidence_acquisition_smoke",
+    description=(
+        "Offline no-send fixture smoke proving source-pack evidence acquisition "
+        "executes bounded searches, writes artifacts, and enriches Event Alpha "
+        "hypotheses without creating sends or trades."
+    ),
+    config_overrides={
+        **_PROFILES["market_refresh_smoke"].config_overrides,
+        "EVENT_DISCOVERY_EVENTS_PATH": Path("fixtures/event_discovery/catalyst_frame_e2e_events.json"),
+        "EVENT_DISCOVERY_ALIASES_PATH": Path("fixtures/event_discovery/catalyst_frame_e2e_aliases.json"),
+        "EVENT_CATALYST_SEARCH_ENABLED": False,
+        "EVENT_IMPACT_HYPOTHESIS_SEARCH_ENABLED": False,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_ENABLED": True,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_FIXTURE_ONLY": True,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES": 10,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES": 20,
+        "EVENT_ALPHA_EVIDENCE_ACQUISITION_TIMEOUT_SECONDS": 8.0,
+        "EVENT_CATALYST_SEARCH_FIXTURE_PATH": Path("fixtures/event_discovery/evidence_acquisition_search_results.json"),
+    },
+    send=False,
+    send_lane_policy="evidence_acquisition_fixture_no_send",
 )

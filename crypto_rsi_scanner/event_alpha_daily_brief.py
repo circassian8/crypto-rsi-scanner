@@ -15,6 +15,7 @@ from . import (
     event_alpha_notification_runs,
     event_alpha_explain,
     event_core_opportunities,
+    event_evidence_acquisition,
     event_near_miss,
     event_alpha_run_ledger,
     event_alpha_router,
@@ -44,6 +45,7 @@ def build_daily_brief(
     notification_runs: Iterable[Mapping[str, Any]] = (),
     hypothesis_rows: Iterable[Mapping[str, Any]] = (),
     incident_rows: Iterable[Mapping[str, Any]] = (),
+    evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
@@ -99,6 +101,13 @@ def build_daily_brief(
     )
     incidents = event_alpha_artifacts.filter_artifact_rows(
         [dict(row) for row in incident_rows if isinstance(row, Mapping)],
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    acquisition_rows = event_alpha_artifacts.filter_artifact_rows(
+        [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)],
         profile=requested_profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -235,7 +244,7 @@ def build_daily_brief(
         *_provider_health_by_pack_lines(provider_health_rows or {}),
         "",
         "### Evidence Acquisition Results",
-        *_evidence_acquisition_result_lines((*near_miss_candidates, *upgrade_candidates), limit=8),
+        *_evidence_acquisition_result_lines((*near_miss_candidates, *upgrade_candidates), acquisition_rows=acquisition_rows, limit=8),
         "",
         "### Candidates Blocked by Source Coverage",
         *_coverage_blocked_candidate_lines((*near_miss_candidates, *upgrade_candidates), limit=8),
@@ -824,8 +833,33 @@ def _provider_health_by_pack_lines(provider_health_rows: Mapping[str, Mapping[st
 def _evidence_acquisition_result_lines(
     candidates: Iterable[event_near_miss.EventNearMissCandidate],
     *,
+    acquisition_rows: Iterable[Mapping[str, Any]] = (),
     limit: int,
 ) -> list[str]:
+    executed = [dict(row) for row in acquisition_rows if isinstance(row, Mapping)]
+    if executed:
+        lines: list[str] = []
+        status_counts: dict[str, int] = {}
+        for row in executed:
+            status = str(row.get("status") or "unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
+        lines.append(
+            "- Executed source-pack searches: "
+            + ", ".join(f"{key}={value}" for key, value in sorted(status_counts.items()))
+        )
+        for row in executed[:limit]:
+            accepted = row.get("accepted_evidence") if isinstance(row.get("accepted_evidence"), list) else ()
+            rejected = row.get("rejected_evidence_samples") if isinstance(row.get("rejected_evidence_samples"), list) else ()
+            lines.append(
+                f"- {row.get('symbol') or row.get('coin_id') or row.get('hypothesis_id') or 'UNKNOWN'}: "
+                f"pack={row.get('source_pack') or 'unknown'} status={row.get('status') or 'unknown'} "
+                f"accepted={len(accepted or ())} rejected={len(rejected or ())} "
+                f"score={row.get('opportunity_score_before')}->{row.get('opportunity_score_after')} "
+                f"upgrade={row.get('acquisition_upgrade_status') or 'unchanged'}"
+            )
+        if len(executed) > limit:
+            lines.append(f"- +{len(executed) - limit} more acquisition rows in local artifacts")
+        return lines
     rows = [item for item in candidates if item.evidence_acquisition_attempted or item.evidence_acquisition_results]
     if not rows:
         return ["- None."]

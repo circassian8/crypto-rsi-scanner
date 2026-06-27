@@ -262,6 +262,9 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
     needed = plan.get("evidence_needed") if isinstance(plan, Mapping) else merged.get("evidence_needed")
     queries = plan.get("evidence_query_plan") if isinstance(plan, Mapping) else merged.get("evidence_query_plan")
     failures = merged.get("evidence_acquisition_failures") or assessment.warnings
+    acquisition = merged.get("evidence_acquisition_results") if isinstance(merged.get("evidence_acquisition_results"), Mapping) else {}
+    accepted_reasons = merged.get("accepted_evidence_reason_codes") or ()
+    accepted_evidence = merged.get("evidence_acquisition_accepted_evidence") or ()
     if isinstance(needed, str):
         needed = [needed]
     if isinstance(failures, str):
@@ -275,6 +278,14 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
         f"- source quality prior/cap: {merged.get('source_quality_prior') or assessment.source_quality_prior}/{merged.get('source_confidence_cap') or assessment.confidence_cap}",
         f"- evidence needed: {'; '.join(str(item) for item in list(needed or pack.minimum_evidence)[:5])}",
         f"- planned query count: {query_count}",
+        (
+            f"- execution result: status={acquisition.get('status') or merged.get('evidence_acquisition_status') or 'not_executed'} "
+            f"accepted={acquisition.get('accepted', merged.get('evidence_acquisition_accepted_count', 0))} "
+            f"rejected={acquisition.get('rejected', merged.get('evidence_acquisition_rejected_count', 0))} "
+            f"upgrade={acquisition.get('upgrade_status') or merged.get('acquisition_upgrade_status') or 'unchanged'}"
+        ),
+        f"- accepted reason codes: {'; '.join(str(item) for item in list(accepted_reasons or ())[:5]) if accepted_reasons else 'none'}",
+        f"- accepted evidence samples: {'; '.join(str((item or {}).get('title') or (item or {}).get('source_url') or 'evidence')[:120] for item in list(accepted_evidence or ())[:2]) if accepted_evidence else 'none'}",
         f"- provider gaps/failures: {'; '.join(str(item) for item in list(failures or ())[:5]) if failures else 'none'}",
         f"- validation criteria: {'; '.join(pack.validation_requirements[:5])}",
     ]

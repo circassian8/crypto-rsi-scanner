@@ -41,6 +41,8 @@ def format_calibration_report(
         ("feedback by impact path type", "impact_path_type"),
         ("feedback by candidate role", "candidate_role"),
         ("feedback by source class", "source_class"),
+        ("feedback by source pack", "source_pack"),
+        ("feedback by accepted evidence reason", "accepted_evidence_reason_codes"),
         ("feedback by incident id", "incident_id"),
         ("feedback by evidence specificity", "evidence_specificity"),
         ("feedback by market confirmation level", "market_confirmation_level"),
@@ -169,6 +171,9 @@ def _merge_feedback(
                 "opportunity_level",
                 "source_class",
                 "source_domain",
+                "source_pack",
+                "source_provider",
+                "accepted_evidence_reason_codes",
             ):
                 if not merged.get(key) and feedback.get(key):
                     merged[key] = feedback.get(key)
@@ -188,6 +193,9 @@ def _merge_feedback(
             "candidate_role": row.get("candidate_role"),
             "incident_id": row.get("incident_id"),
             "source_class": row.get("source_class"),
+            "source_pack": row.get("source_pack"),
+            "source_provider": row.get("source_provider"),
+            "accepted_evidence_reason_codes": row.get("accepted_evidence_reason_codes"),
             "evidence_specificity": row.get("evidence_specificity"),
             "market_confirmation_level": row.get("market_confirmation_level"),
             "opportunity_level": row.get("opportunity_level"),
@@ -296,8 +304,13 @@ def _prior_group(
 def _group(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, list[Mapping[str, Any]]]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     for row in rows:
-        key = str(row.get(field) or "unknown")
-        grouped.setdefault(key, []).append(row)
+        value = row.get(field)
+        if isinstance(value, Iterable) and not isinstance(value, (str, bytes, Mapping)):
+            keys = tuple(dict.fromkeys(str(item) for item in value if str(item)))
+        else:
+            keys = (str(value or "unknown"),)
+        for key in keys or ("unknown",):
+            grouped.setdefault(key, []).append(row)
     return grouped
 
 
