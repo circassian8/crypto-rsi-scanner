@@ -387,32 +387,46 @@ def _slug(value: str) -> str:
 
 
 def _render_index(paths: list[Path], observed: datetime) -> str:
-    diagnostic_paths = [path for path in paths if "_source_noise_control" in path.name or "_ambiguous_control" in path.name]
-    core_paths = [path for path in paths if path not in diagnostic_paths]
+    grouped: dict[str, list[Path]] = {
+        "Core Opportunity Cards": [],
+        "Near-Miss Cards": [],
+        "Local-Only / Quality-Capped Cards": [],
+        "Diagnostic / Source-Noise / Control Cards": [],
+        "Legacy Cards": [],
+    }
+    for path in paths:
+        grouped[_card_index_group(path)].append(path)
     lines = [
         "# Event Research Cards",
         "",
         f"Generated at: {observed.isoformat()}",
         "",
-        "## Core Opportunity Cards",
-        "",
     ]
-    if not core_paths:
-        lines.append("No cards selected.")
-    else:
-        for path in core_paths:
-            lines.append(f"- [{path.name}]({path.name})")
-    lines.extend([
-        "",
-        "## Diagnostic / Source-Noise / Control Cards",
-        "",
-    ])
-    if diagnostic_paths:
-        for path in diagnostic_paths:
-            lines.append(f"- [{path.name}]({path.name})")
-    else:
-        lines.append("Diagnostics are hidden from the main card list by default; inspect the daily brief or opportunity audit when needed.")
+    for group, group_paths in grouped.items():
+        lines.extend(["", f"## {group}", ""])
+        if group_paths:
+            for path in group_paths:
+                lines.append(f"- [{path.name}]({path.name})")
+        elif group == "Core Opportunity Cards":
+            lines.append("No cards selected.")
+        elif group == "Diagnostic / Source-Noise / Control Cards":
+            lines.append("Diagnostics are hidden from the main card list by default; inspect the daily brief or opportunity audit when needed.")
+        else:
+            lines.append("- none")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _card_index_group(path: Path) -> str:
+    name = path.name.casefold()
+    if "legacy" in name:
+        return "Legacy Cards"
+    if "source_noise_control" in name or "ambiguous_control" in name or "diagnostic" in name:
+        return "Diagnostic / Source-Noise / Control Cards"
+    if "quality_blocked" in name or "local_only" in name or "store_only" in name:
+        return "Local-Only / Quality-Capped Cards"
+    if "near_miss" in name or "near-miss" in name:
+        return "Near-Miss Cards"
+    return "Core Opportunity Cards"
 
 
 def _strip_sensitive(markdown: str) -> str:

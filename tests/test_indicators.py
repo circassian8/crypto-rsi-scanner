@@ -23097,6 +23097,195 @@ def test_daily_brief_core_opportunity_excludes_promoted_supporting_near_miss():
     assert "VELVET/velvet" not in near_section
 
 
+def test_daily_brief_core_sections_hide_promoted_from_exploratory_and_near_miss():
+    from dataclasses import replace
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_alpha_router, event_watchlist
+
+    def decision(symbol, *, state, route, level, score, path, incident):
+        components = {
+            "incident_id": incident,
+            "validated_symbol": symbol,
+            "validated_coin_id": symbol.lower(),
+            "validation_stage": "impact_path_validated",
+            "impact_category": path,
+            "impact_path_type": path,
+            "impact_path_strength": "strong",
+            "candidate_role": "direct_subject",
+            "evidence_quality_score": 82,
+            "source_class": "crypto_native",
+            "evidence_specificity": "asset_and_catalyst",
+            "market_confirmation_score": 72,
+            "market_confirmation_level": "moderate",
+            "opportunity_score_final": score,
+            "opportunity_level": level,
+            "supporting_evidence_quotes": [f"{symbol} catalyst evidence"],
+        }
+        entry = replace(
+            _test_watchlist_entry(state=state, symbol=symbol, coin_id=symbol.lower()),
+            key=f"{incident}|{symbol.lower()}|direct_subject",
+            incident_id=incident,
+            relationship_type="impact_hypothesis",
+            latest_score=score,
+            highest_score=score,
+            latest_score_components=components,
+            latest_event_name=f"{symbol} validated catalyst",
+            suppressed_reason="not suppressed",
+        )
+        return event_alpha_router.EventAlphaRouteDecision(
+            entry=entry,
+            route=route,
+            alertable=event_alpha_router.route_value_is_alertable(route.value),
+            reason=f"{symbol} routed",
+            lane=event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+            final_route_after_quality_gate=route.value,
+            opportunity_level=level,
+            opportunity_score_final=score,
+        )
+
+    velvet = decision(
+        "VELVET",
+        state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH,
+        level="high_priority",
+        score=94,
+        path="venue_value_capture",
+        incident="incident:spacex",
+    )
+    aave = decision(
+        "AAVE",
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        route=event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+        level="validated_digest",
+        score=72,
+        path="strategic_investment_or_valuation",
+        incident="incident:aave",
+    )
+    rune = decision(
+        "RUNE",
+        state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        route=event_alpha_router.EventAlphaRoute.LOCAL_REPORT,
+        level="watchlist",
+        score=78,
+        path="exploit_security_event",
+        incident="incident:rune",
+    )
+    memecore = _notify_suppressed_decision("M", score=63, reason="local-only learning row")
+    result = event_alpha_router.EventAlphaRouterResult(
+        Path("state.jsonl"),
+        4,
+        [velvet, aave, rune, memecore],
+        True,
+    )
+    brief = event_alpha_daily_brief.build_daily_brief(
+        watchlist_entries=[velvet.entry, aave.entry, rune.entry, memecore.entry],
+        router_result=result,
+        requested_profile="fixture",
+    )
+    strong = brief.split("## Strong / High-Priority Core Opportunities", 1)[1].split("## Validated Digest Core Opportunities", 1)[0]
+    digest = brief.split("## Validated Digest Core Opportunities", 1)[1].split("## Watchlist Core Opportunities", 1)[0]
+    watchlist = brief.split("## Watchlist Core Opportunities", 1)[1].split("## Quality-Capped / Local-Only Candidates", 1)[0]
+    near = brief.split("## Near-Miss Candidates", 1)[1].split("## Signal Quality Summary", 1)[0]
+    exploratory = brief.split("## Exploratory Digest", 1)[1].split("## Active Watchlist", 1)[0]
+    assert strong.count("VELVET/velvet") == 1
+    assert digest.count("AAVE/aave") == 1
+    assert watchlist.count("RUNE/rune") == 1
+    assert "VELVET/velvet" not in near
+    assert "AAVE/aave" not in near
+    assert "RUNE/rune" not in near
+    assert "VELVET/velvet" not in exploratory
+    assert "AAVE/aave" not in exploratory
+    assert "RUNE/rune" not in exploratory
+    assert "M/m" in exploratory
+
+
+def test_event_near_miss_dedupes_and_excludes_promoted_or_zero_quality_rows():
+    from crypto_rsi_scanner import event_near_miss
+
+    base = {
+        "incident_id": "incident:memecore",
+        "validated_symbol": "M",
+        "validated_coin_id": "memecore",
+        "candidate_role": "direct_subject",
+        "impact_path_type": "meme_attention",
+        "source_class": "crypto_native",
+        "evidence_specificity": "asset_and_catalyst",
+        "market_confirmation_score": 48,
+        "opportunity_score_final": 61,
+        "opportunity_level": "local_only",
+        "why_not_watchlist": ["needs_market_confirmation"],
+    }
+    rows = [
+        {**base, "hypothesis_id": "hyp:m:1"},
+        {**base, "hypothesis_id": "hyp:m:2", "opportunity_score_final": 62},
+        {**base, "hypothesis_id": "hyp:velvet", "validated_symbol": "VELVET", "validated_coin_id": "velvet", "opportunity_level": "high_priority", "opportunity_score_final": 95},
+        {**base, "hypothesis_id": "hyp:zero", "validated_symbol": "ZERO", "validated_coin_id": "zero", "opportunity_score_final": 0, "why_local_only": ["quality_context_missing"]},
+    ]
+    near = event_near_miss.detect_near_miss_rows(rows)
+    assert [item.symbol for item in near] == ["M"]
+    assert near[0].opportunity_score_before == 62
+
+
+def test_quality_review_possible_false_positives_require_suspicion_reason():
+    from crypto_rsi_scanner import event_alpha_quality_review
+
+    strong = {
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "opportunity_level": "high_priority",
+        "impact_path_type": "venue_value_capture",
+        "candidate_role": "proxy_venue",
+        "source_class": "crypto_native",
+        "evidence_specificity": "asset_and_catalyst",
+        "opportunity_score_final": 94,
+    }
+    noisy = {
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "opportunity_level": "local_only",
+        "impact_path_type": "generic_cooccurrence_only",
+        "candidate_role": "source_noise",
+        "source_class": "publisher_suffix_false_positive",
+        "evidence_specificity": "insufficient_data",
+        "opportunity_score_final": 0,
+    }
+    clean_text = event_alpha_quality_review.format_quality_review(
+        event_alpha_quality_review.build_quality_review(hypothesis_rows=[strong])
+    )
+    clean_fp = clean_text.split("Possible false positives:", 1)[1].split("Quality Gate Conflicts:", 1)[0]
+    assert "- none" in clean_fp
+    assert "VELVET" not in clean_fp
+    mixed_text = event_alpha_quality_review.format_quality_review(
+        event_alpha_quality_review.build_quality_review(hypothesis_rows=[strong, noisy])
+    )
+    mixed_fp = mixed_text.split("Possible false positives:", 1)[1].split("Quality Gate Conflicts:", 1)[0]
+    assert "BTC" in mixed_fp
+    assert "VELVET" not in mixed_fp
+
+
+def test_research_card_index_groups_core_local_near_miss_and_diagnostics():
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_research_cards
+
+    index = event_research_cards._render_index(
+        [
+            Path("card_core_velvet.md"),
+            Path("card_near_miss_m.md"),
+            Path("card_quality_blocked_btc.md"),
+            Path("card_source_noise_control_kcs.md"),
+            Path("legacy_old.md"),
+        ],
+        datetime(2026, 6, 20, tzinfo=timezone.utc),
+    )
+    assert "## Core Opportunity Cards" in index
+    assert "card_core_velvet.md" in index.split("## Core Opportunity Cards", 1)[1].split("## Near-Miss Cards", 1)[0]
+    assert "card_near_miss_m.md" in index.split("## Near-Miss Cards", 1)[1].split("## Local-Only / Quality-Capped Cards", 1)[0]
+    assert "card_quality_blocked_btc.md" in index.split("## Local-Only / Quality-Capped Cards", 1)[1].split("## Diagnostic / Source-Noise / Control Cards", 1)[0]
+    assert "card_source_noise_control_kcs.md" in index.split("## Diagnostic / Source-Noise / Control Cards", 1)[1].split("## Legacy Cards", 1)[0]
+    assert "legacy_old.md" in index.split("## Legacy Cards", 1)[1]
+
+
 def test_opportunity_audit_accepts_core_opportunity_id_and_hides_diagnostics_by_default():
     from crypto_rsi_scanner import event_core_opportunities, event_opportunity_audit
 

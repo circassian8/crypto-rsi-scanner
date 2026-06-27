@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
 from . import (
     event_alpha_calibration,
@@ -52,6 +52,7 @@ def build_daily_brief(
     alert_store_path: str | Path | None = None,
     include_test_artifacts: bool = False,
     include_legacy_artifacts: bool = False,
+    include_diagnostics: bool = False,
     clock_status: Mapping[str, Any] | None = None,
     generated_at: datetime | None = None,
 ) -> str:
@@ -104,6 +105,7 @@ def build_daily_brief(
     decisions = list(router_result.decisions if router_result else ())
     alertable = [decision for decision in list(router_result.alertable_decisions if router_result else ()) if event_alpha_router.alertable_after_quality_gate(decision)]
     core_opportunities = event_core_opportunities.aggregate_core_opportunities([*decisions, *hypotheses])
+    core_sections = _core_opportunity_sections(core_opportunities)
     promoted_core_asset_keys = {
         event_core_opportunities.incident_asset_key_for_opportunity(item)
         for item in core_opportunities
@@ -141,7 +143,29 @@ def build_daily_brief(
         "",
         "Research-only. Not a trade signal, paper trade, live RSI signal, or execution.",
         "",
-        "## Last Run Health",
+        "## Executive Summary",
+        f"- Core opportunities: {len(core_opportunities)} "
+        f"(high_priority={len(core_sections['strong'])}, digest={len(core_sections['digest'])}, "
+        f"watchlist={len(core_sections['watchlist'])}, local_or_capped={len(core_sections['local'])})",
+        f"- Alertable routed decisions: {len(alertable)}",
+        f"- Near-miss candidates: pending calculation below",
+        "",
+        "## Strong / High-Priority Core Opportunities",
+        *_core_opportunity_lines(core_sections["strong"], limit=8),
+        "",
+        "## Validated Digest Core Opportunities",
+        *_core_opportunity_lines(core_sections["digest"], limit=8),
+        "",
+        "## Watchlist Core Opportunities",
+        *_core_opportunity_lines(core_sections["watchlist"], limit=8),
+        "",
+        "## Quality-Capped / Local-Only Candidates",
+        *_core_opportunity_lines(core_sections["local"], limit=8),
+        "",
+        "## Canonical Incidents",
+        *_canonical_incident_lines(incidents),
+        "",
+        "## System Health / Providers / Budget",
     ]
     if mismatch_warning:
         lines.append(f"- Profile warning: {mismatch_warning}")
@@ -191,9 +215,9 @@ def build_daily_brief(
                 f"- Notify delivery failures: {int(latest_notification.get('deliveries_failed') or 0)} "
                 "failed delivery row(s) — run --event-alpha-notification-deliveries-report"
             )
-    lines.extend(["", "## Provider Health"])
+    lines.extend(["", "### Provider Health"])
     lines.extend(_provider_health_lines(provider_health_rows or {}))
-    lines.extend(["", "## LLM Budget"])
+    lines.extend(["", "### LLM Budget"])
     lines.extend(_llm_budget_lines(latest))
     lines.extend(["", "## Impact Hypotheses"])
     if latest:
@@ -292,8 +316,6 @@ def build_daily_brief(
                 lines.append("- Rejected evidence examples: " + " | ".join(titles[:3]))
     elif latest and int(latest.get("impact_hypotheses") or 0) > 0:
         lines.append("- Stored rows: none loaded for this profile; inspect --event-impact-hypotheses-report.")
-    lines.extend(["", "## Canonical Incidents"])
-    lines.extend(_canonical_incident_lines(incidents))
     lines.extend(["", "## Catalyst Search Skip Reasons"])
     if latest:
         skip_reasons = latest.get("catalyst_search_skip_reasons") or {}
@@ -312,14 +334,12 @@ def build_daily_brief(
     lines.extend(_watchlist_hotter_lines(entries))
     lines.extend(["", "## Alertable Decisions"])
     if alertable:
-        for decision in alertable[:10]:
-            entry = decision.entry
-            lines.append(f"- {event_alpha_router.final_route_value(decision)}: {entry.symbol}/{entry.coin_id} state={event_watchlist.final_state_value(entry)} score={entry.latest_score} reason={decision.reason}")
-    else:
-        lines.append("- None.")
-    lines.extend(["", "## Core Opportunities"])
-    if core_opportunities:
-        lines.extend(_core_opportunity_lines(core_opportunities, limit=8))
+        if include_diagnostics:
+            for decision in alertable[:10]:
+                entry = decision.entry
+                lines.append(f"- {event_alpha_router.final_route_value(decision)}: {entry.symbol}/{entry.coin_id} state={event_watchlist.final_state_value(entry)} score={entry.latest_score} reason={decision.reason}")
+        else:
+            lines.append(f"- {len(alertable)} routed alertable decision(s); see core opportunity sections above.")
     else:
         lines.append("- None.")
     lines.extend(["", "## Validated Impact Hypothesis Routing"])
@@ -458,6 +478,16 @@ def build_daily_brief(
         ),
         now=generated,
     )
+    exploratory = tuple(
+        item for item in exploratory
+        if event_core_opportunities.incident_asset_key_for_values(
+            getattr(item.decision.entry, "incident_id", None),
+            item.decision.entry.coin_id,
+            item.decision.entry.symbol,
+        ) not in promoted_core_asset_keys
+        and event_core_opportunities.asset_key_for_values(item.decision.entry.coin_id, item.decision.entry.symbol)
+        not in promoted_core_assets
+    )
     lines.extend(["", "## Exploratory Digest"])
     exploratory_due = _lane_count(latest_notification, "lane_counts_due", event_alpha_notifications.LANE_EXPLORATORY_DIGEST)
     exploratory_sent = _lane_count(latest_notification, "lane_counts_sent", event_alpha_notifications.LANE_EXPLORATORY_DIGEST)
@@ -507,7 +537,7 @@ def build_daily_brief(
     cards = [Path(path) for path in card_paths]
     if cards:
         lines.append("### Core Opportunity Cards")
-        for path in cards[:20]:
+        for path in _card_paths_for_daily_brief(cards, include_diagnostics=include_diagnostics)[:20]:
             lines.append(f"- [{path.name}]({path})")
         diagnostic_count = sum(item.diagnostic_row_count for item in core_opportunities)
         capped_count = sum(item.quality_capped_supporting_rows for item in core_opportunities)
@@ -517,6 +547,10 @@ def build_daily_brief(
                 f"- Hidden from main card list by default: diagnostics={diagnostic_count}, "
                 f"quality_capped_support={capped_count}"
             )
+            if include_diagnostics:
+                for path in cards:
+                    if path not in _card_paths_for_daily_brief(cards, include_diagnostics=False):
+                        lines.append(f"- [{path.name}]({path})")
         else:
             lines.append("- None.")
     else:
@@ -772,6 +806,52 @@ def _core_opportunity_lines(
     if len(rows) > limit:
         lines.append(f"- +{len(rows) - limit} more core opportunities")
     return lines
+
+
+def _core_opportunity_sections(
+    opportunities: Iterable[event_core_opportunities.CoreOpportunity],
+) -> dict[str, list[event_core_opportunities.CoreOpportunity]]:
+    """Partition core opportunities into one operator-facing section each."""
+    remaining = list(opportunities)
+    sections: dict[str, list[event_core_opportunities.CoreOpportunity]] = {}
+
+    def take(
+        name: str,
+        predicate: Callable[[event_core_opportunities.CoreOpportunity], bool],
+    ) -> None:
+        selected: list[event_core_opportunities.CoreOpportunity] = []
+        rest: list[event_core_opportunities.CoreOpportunity] = []
+        for item in remaining:
+            if predicate(item):
+                selected.append(item)
+            else:
+                rest.append(item)
+        sections[name] = selected
+        remaining[:] = rest
+
+    take("strong", lambda item: item.is_high_priority)
+    take("watchlist", lambda item: item.is_watchlist)
+    take("digest", lambda item: item.is_validated_digest or item.alertable)
+    sections["local"] = remaining
+    return sections
+
+
+def _card_paths_for_daily_brief(paths: Iterable[Path], *, include_diagnostics: bool) -> list[Path]:
+    cards = [Path(path) for path in paths]
+    if include_diagnostics:
+        return cards
+    hidden_terms = (
+        "source_noise_control",
+        "ambiguous_control",
+        "quality_blocked",
+        "local_only",
+        "store_only",
+        "diagnostic",
+    )
+    return [
+        path for path in cards
+        if not any(term in path.name.casefold() for term in hidden_terms)
+    ]
 
 
 def _brief_core_opportunities(

@@ -610,6 +610,18 @@ source-noise/control rows stay hidden under diagnostics. Use
 `make event-opportunity-audit TARGET=<core_opportunity_id> INCLUDE_DIAGNOSTICS=1`
 when you need to inspect the hidden support/control rows behind a core
 opportunity.
+The daily brief is intentionally core-first: high-priority, validated digest,
+watchlist, and local/quality-capped opportunities are mutually exclusive
+operator sections. Raw routed decisions are summarized unless diagnostics are
+requested, already-promoted opportunities are excluded from exploratory digest
+and near-miss sections, and near-miss rows are de-duplicated by incident, asset,
+candidate role, and impact path. The quality review's possible-false-positive
+section is suspicion-only; it requires explicit source-noise, ticker-collision,
+generic co-occurrence, identity, missing-impact-path, or rejected-candidate
+reason codes and should not list strong core opportunities merely because they
+have diagnostic support rows. Research-card indexes group cards as core,
+near-miss, local/quality-capped, diagnostic/control, or legacy so Pro-model
+handoffs can inspect the main opportunities first.
 Standalone fixture-report targets such as
 `make event-alpha-daily-brief PROFILE=catalyst_frame_e2e` pass the fixture/test
 artifact include flag automatically, so the generated brief should select the

@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Event Alpha default operator views are core-first
+**Status:** accepted
+**Decision:** Daily briefs, notification inboxes, research-card indexes, and
+quality reviews should present promoted Event Alpha opportunities through a
+single core-opportunity view by default. Already-promoted opportunities must not
+also appear as exploratory digest rows or near-misses. Near-miss rows should be
+deduplicated by incident, asset, candidate role, and impact path. Possible
+false-positive lists should require explicit suspicion reason codes such as
+source noise, ticker collision, generic co-occurrence, low-confidence identity,
+source-origin-only identity, missing direct impact path, common-word collision,
+quality-context-missing, or rejected candidate asset evidence.
+**Why:** Operators need to review actual opportunities, not every support row
+and diagnostic/control artifact as if it were a separate lead. Mixing promoted
+VELVET/AAVE/RUNE/ZEC rows with near-miss, exploratory, or suspicion sections
+creates false workload and obscures which candidates are actionable research
+items versus local learning evidence.
+**Revisit when:** Event Alpha has a typed UI that can render expandable support,
+diagnostic, and control rows under each primary opportunity.
+
 ## 2026-06-27 - Operator reports show core opportunities, not duplicate support rows
 **Status:** accepted
 **Decision:** Event Alpha operator-facing reports should aggregate compatible

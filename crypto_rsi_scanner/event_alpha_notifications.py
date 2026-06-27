@@ -16,7 +16,7 @@ import re
 
 from . import event_alpha_notification_delivery as delivery
 from . import event_alpha_notification_sender as sender
-from . import event_alpha_pipeline, event_alpha_router
+from . import event_alpha_pipeline, event_alpha_router, event_watchlist
 
 LANE_DAILY_DIGEST = "daily_digest"
 LANE_INSTANT_ESCALATION = "instant_escalation"
@@ -221,9 +221,11 @@ def select_exploratory_candidates(
         return ()
     items: list[EventAlphaExploratoryDigestItem] = []
     for decision in decisions:
-        if bool(getattr(decision, "alertable", False)):
+        if bool(getattr(decision, "alertable", False)) or event_alpha_router.alertable_after_quality_gate(decision):
             continue
         entry = decision.entry
+        if _is_promoted_or_validated_exploratory(entry, decision):
+            continue
         if (entry.symbol or entry.coin_id) == "":
             continue
         if not (entry.latest_source or entry.source_count):
@@ -255,6 +257,32 @@ def select_exploratory_candidates(
         reverse=True,
     )
     return tuple(items[: max(0, int(cfg.exploratory_digest_max_items or 0))])
+
+
+def _is_promoted_or_validated_exploratory(
+    entry: event_watchlist.EventWatchlistEntry,
+    decision: event_alpha_router.EventAlphaRouteDecision,
+) -> bool:
+    components = dict(entry.latest_score_components or {})
+    level = str(components.get("opportunity_level") or getattr(decision, "opportunity_level", None) or "")
+    route = event_alpha_router.final_route_value(decision)
+    state = event_watchlist.final_state_value(entry)
+    validation_stage = str(components.get("validation_stage") or "")
+    if level in {"validated_digest", "watchlist", "high_priority"}:
+        return True
+    if route and event_alpha_router.route_value_is_alertable(route):
+        return True
+    if state in {
+        event_watchlist.EventWatchlistState.WATCHLIST.value,
+        event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+    }:
+        return True
+    return validation_stage in {"impact_path_validated", "market_confirmed", "promoted_to_radar"} and level not in {
+        "local_only",
+        "exploratory",
+        "",
+    }
 
 
 def _quality_mode(value: str | None) -> str:

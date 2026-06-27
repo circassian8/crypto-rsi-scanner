@@ -219,7 +219,7 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
     ]
     _append_item_section(
         lines,
-        "delivered research digest items needing feedback / sent notifications without feedback",
+        "delivered core opportunities needing feedback / delivered research digest items needing feedback / sent notifications without feedback",
         result.sent_without_feedback,
         profile=result.profile,
     )
@@ -229,12 +229,12 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
         result.partial_delivered_without_feedback,
         profile=result.profile,
     )
-    _append_item_section(lines, "would-send notifications without feedback", result.would_send_without_feedback, profile=result.profile)
-    _append_item_section(lines, "would-send blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
+    _append_item_section(lines, "would-send core opportunities without feedback / would-send notifications without feedback", result.would_send_without_feedback, profile=result.profile)
+    _append_item_section(lines, "would-send core opportunities blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
     _append_item_section(lines, "quality-gated local-only candidates for optional review", result.quality_gated_local_only, profile=result.profile)
     _append_item_section(lines, "legacy quality conflicts for migration review", result.legacy_quality_conflicts, profile=result.profile)
     _append_item_section(lines, "weak validated local-only hypotheses for optional review", result.weak_validated_local_only, profile=result.profile)
-    _append_item_section(lines, "exploratory digest items needing review", result.exploratory_without_feedback, profile=result.profile)
+    _append_item_section(lines, "exploratory/local-only learning rows needing review / exploratory digest items needing review", result.exploratory_without_feedback, profile=result.profile)
     _append_item_section(lines, "high-priority cards not reviewed", result.high_priority_unreviewed, profile=result.profile)
     _append_item_section(lines, "triggered-fade cards not reviewed", result.triggered_fade_unreviewed, profile=result.profile)
     _append_run_section(lines, "heartbeat-only runs", result.heartbeat_only_runs)

@@ -95,17 +95,20 @@ def detect_near_miss_rows(
     if not cfg.enabled:
         return ()
     route_by_key = _route_by_identity(route_decisions)
-    out: list[EventNearMissCandidate] = []
+    out_by_key: dict[tuple[str, str, str, str], EventNearMissCandidate] = {}
     for item in rows:
         row = _row_from_object(item)
         if not row:
             continue
-        identity = _row_identity(row)
         route = _lookup_route(route_by_key, row)
         candidate = _candidate_from_row(row, route=route, cfg=cfg)
         if candidate is None:
             continue
-        out.append(candidate)
+        key = _near_miss_group_key(row, candidate)
+        existing = out_by_key.get(key)
+        if existing is None or candidate.priority_score > existing.priority_score:
+            out_by_key[key] = candidate
+    out = list(out_by_key.values())
     out.sort(key=lambda item: item.priority_score, reverse=True)
     return tuple(out[: max(1, int(cfg.max_candidates or 1))])
 
@@ -499,19 +502,30 @@ def _candidate_from_row(
         quality.get("why_local_only"),
         quality.get("why_not_watchlist"),
         quality.get("opportunity_verdict_reasons"),
+        quality.get("quality_gate_block_reason"),
         row.get("warnings"),
         row.get("rejection_reasons"),
     )).casefold()
     if "source_noise" in text or "ticker_collision" in text or "ticker_word_collision" in text:
+        return None
+    if "quality_context_missing" in text and (
+        "insufficient_data" in text
+        or "generic_cooccurrence_only" in text
+        or (_float(quality.get("opportunity_score_final")) or 0.0) <= 0
+    ):
         return None
     if str(quality.get("impact_path_type") or "") == "generic_cooccurrence_only":
         return None
     if str(quality.get("candidate_role") or "") in {"source_noise", "ticker_word_collision", "generic_mention"}:
         return None
     score = _float(quality.get("opportunity_score_final")) or 0.0
+    if score <= 0:
+        return None
     level = str(quality.get("opportunity_level") or "local_only")
     final_route = _final_route_for_route(route) if route is not None else str(row.get("final_route_after_quality_gate") or row.get("route") or "")
     alertable = event_alpha_router.route_value_is_alertable(final_route) if final_route else False
+    if alertable or level in {"validated_digest", "watchlist", "high_priority"}:
+        return None
     missing = _missing_evidence(quality, row)
     near_digest = 0 <= cfg.digest_threshold - score <= cfg.near_threshold_points
     near_watchlist = 0 <= cfg.watchlist_threshold - score <= cfg.near_threshold_points
@@ -539,6 +553,15 @@ def _candidate_from_row(
         evidence_quality_before=_float(quality.get("evidence_quality_score")),
         evidence_refresh_queries=queries,
     )
+
+
+def _near_miss_group_key(row: Mapping[str, Any], candidate: EventNearMissCandidate) -> tuple[str, str, str, str]:
+    quality = event_alpha_quality_fields.ensure_quality_fields(row, components=_quality_components_for_row(row))
+    incident = candidate.incident_id or str(row.get("event_cluster_id") or row.get("cluster_id") or row.get("event_id") or "unknown")
+    asset = candidate.coin_id or candidate.symbol
+    path = str(quality.get("impact_path_type") or row.get("impact_path_type") or "unknown")
+    role = str(quality.get("candidate_role") or row.get("candidate_role") or "unknown")
+    return (incident, asset, path, role)
 
 
 def _missing_evidence(quality: Mapping[str, Any], row: Mapping[str, Any]) -> tuple[str, ...]:

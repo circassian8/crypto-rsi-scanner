@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Clean Event Alpha operator output sections · Codex
+**Why:** Core-opportunity aggregation was working, but daily briefs, exploratory
+digests, near-miss lists, quality review, inbox text, and card indexes still
+mixed promoted opportunities with raw/support/control rows in ways that made the
+operator view harder to read.
+**Changes:**
+- Reworked daily briefs to lead with executive summary and one-shot core
+  opportunity sections: high-priority, validated digest, watchlist, local/capped,
+  canonical incidents, and system health.
+- Hid raw routed alertable rows behind summary text by default, filtered
+  exploratory digest rows so already-promoted opportunities do not reappear as
+  learning rows, and kept diagnostic card links hidden unless diagnostics are
+  explicitly requested.
+- Tightened near-miss detection to exclude already-promoted, alertable, zero
+  score, generic/source-noise, and hard quality-context-missing rows while
+  de-duplicating by incident/asset/role/impact path.
+- Restricted quality-review “Possible false positives” to explicit suspicion
+  reason codes instead of broad string matching, and grouped research-card
+  indexes into core, near-miss, local/capped, diagnostic/control, and legacy
+  sections.
+- Adjusted notification inbox section labels toward core-opportunity review
+  while preserving older wording for compatibility.
+**Verify:** `python3 tests/test_indicators.py` passed (482/482); `make
+event-alpha-signal-quality-eval PYTHON=python3` passed; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `make
+event-alpha-quality-validation-cycle PYTHON=python3` passed; manual smokes:
+`make event-alpha-daily-brief PROFILE=catalyst_frame_e2e PYTHON=python3`,
+`make event-alpha-quality-review PROFILE=catalyst_frame_e2e PYTHON=python3`,
+and `make event-opportunity-audit PROFILE=catalyst_frame_e2e TARGET=VELVET
+PYTHON=python3` passed; `make verify PYTHON=python3` passed.
+**Notes/risks:** Presentation/reporting-only. It does not change Event Alpha
+scoring, routing eligibility, Telegram send guards, paper/live trading, normal
+RSI writes, or `TRIGGERED_FADE` creation.
+
 ## 2026-06-27 — Aggregate Event Alpha core opportunities · Codex
 **Why:** The catalyst-frame e2e path correctly classified AAVE/Kraken/KelpDAO
 and VELVET/SpaceX, but operator-facing briefs/cards/audits could still show the

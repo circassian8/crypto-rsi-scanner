@@ -329,11 +329,59 @@ def _rejected_review(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _possible_false_positives(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    needles = ("source_noise", "ticker_collision", "word_collision", "generic_cooccurrence", "identity")
     return [
         row for row in rows
-        if any(needle in str(row).lower() for needle in needles)
+        if _false_positive_suspicion_reason(row) is not None
     ]
+
+
+_FALSE_POSITIVE_SUSPICION_TERMS = {
+    "source_noise",
+    "ticker_collision",
+    "ticker_word_collision",
+    "word_collision_false_positive",
+    "generic_cooccurrence_only",
+    "identity_low_confidence",
+    "source_origin_only_identity",
+    "identity_source_origin_rejected",
+    "missing_direct_impact_path",
+    "common_word_collision",
+    "quality_context_missing",
+    "rejected_candidate_asset",
+    "publisher_suffix_false_positive",
+    "identity_url_only_rejected",
+}
+
+
+def _false_positive_suspicion_reason(row: Mapping[str, Any]) -> str | None:
+    components = row.get("_components") if isinstance(row.get("_components"), Mapping) else {}
+    fields: list[object] = [
+        row.get("candidate_role"),
+        components.get("candidate_role"),
+        row.get("impact_path_type"),
+        components.get("impact_path_type"),
+        row.get("source_class"),
+        components.get("source_class"),
+        row.get("evidence_specificity"),
+        components.get("evidence_specificity"),
+        row.get("quality_gate_block_reason"),
+        row.get("quality_state_block_reason"),
+        row.get("route_block_reason"),
+        row.get("why_local_only"),
+        row.get("why_not_watchlist"),
+        row.get("why_not_promoted"),
+        row.get("rejection_reasons"),
+        row.get("warnings"),
+        row.get("rejected_candidate_assets"),
+        components.get("rejected_candidate_assets"),
+    ]
+    if row.get("rejected_candidate_assets") or components.get("rejected_candidate_assets"):
+        fields.append("rejected_candidate_asset")
+    text = " ".join(str(value or "") for value in fields).casefold()
+    for term in sorted(_FALSE_POSITIVE_SUSPICION_TERMS):
+        if term in text:
+            return term
+    return None
 
 
 def _quality_gate_conflict_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
@@ -428,7 +476,7 @@ def _quality_gate_conflict_reason(row: Mapping[str, Any]) -> str:
 
 
 def _candidate_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
-    rows = _dedupe_core_opportunity_rows(rows)
+    rows = _dedupe_core_opportunity_rows(rows) or list(rows)
     if not rows:
         return ["- none"]
     out = []
