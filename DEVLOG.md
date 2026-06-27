@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Aggregate Event Alpha core opportunities · Codex
+**Why:** The catalyst-frame e2e path correctly classified AAVE/Kraken/KelpDAO
+and VELVET/SpaceX, but operator-facing briefs/cards/audits could still show the
+same opportunity multiple ways: promoted, quality-capped support, near-miss,
+exploratory, and source-noise diagnostics. The system needed one visible core
+opportunity per incident/asset/role/impact family while preserving supporting
+rows for audit.
+**Changes:**
+- Added `event_core_opportunities.py`, a pure presentation helper that
+  aggregates compatible rows into core opportunities and attaches support/control
+  rows as diagnostics instead of separate visible opportunities.
+- Updated daily briefs, quality review, research-card indexes, and opportunity
+  audit to use core opportunities by default, hide diagnostics from main lists,
+  and allow explicit diagnostic review when requested.
+- Added `--event-opportunity-audit-include-diagnostics` and the matching
+  `INCLUDE_DIAGNOSTICS=1` Make option.
+- Extended signal-quality eval output and tests with core-opportunity id,
+  aggregation status, near-miss inclusion, card group, frame-counter status, and
+  VELVET/AAVE/RUNE/ZEC aggregation regressions.
+**Verify:** `python3 tests/test_indicators.py`; `make
+event-alpha-signal-quality-eval PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-quality-validation-cycle PYTHON=python3`; `make verify
+PYTHON=python3`; manual smokes: `make
+event-alpha-notify-llm-quality-frame-smoke PYTHON=python3`, `make
+event-alpha-daily-brief PROFILE=catalyst_frame_e2e PYTHON=python3`, and `make
+event-opportunity-audit PROFILE=catalyst_frame_e2e TARGET=AAVE PYTHON=python3`.
+**Notes/risks:** Research-only presentation/reporting change. It does not change
+Event Alpha scoring, route eligibility, Telegram sends, paper/live trading,
+normal RSI writes, or `TRIGGERED_FADE` creation.
+
 ## 2026-06-27 — Finish Event Alpha catalyst-frame/reporting audit · Codex
 **Why:** The catalyst-frame/profile audit found two remaining operator-facing
 gaps: the standalone daily-brief Make target did not include test artifacts for

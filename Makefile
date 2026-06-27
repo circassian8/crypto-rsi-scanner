@@ -78,6 +78,7 @@ ALL_HISTORY ?= 0
 RUN_ID ?=
 SINCE ?=
 IGNORE_BACKOFF ?= 0
+INCLUDE_DIAGNOSTICS ?= 0
 PROVIDER_KEY ?=
 PROVIDER_SERVICE ?=
 PROVIDER_ROLE ?=
@@ -89,6 +90,7 @@ EVENT_ALPHA_INCLUDE_LEGACY_ARG = $(if $(filter 1 true yes,$(INCLUDE_LEGACY)),--e
 EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG = $(if $(filter 1 true yes,$(STRICT)),--event-alpha-artifact-doctor-strict,)
 EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG = $(if $(filter 1 true yes,$(STRICT_LEGACY)),--event-alpha-artifact-doctor-strict-legacy,)
 EVENT_ALPHA_IGNORE_BACKOFF_ARG = $(if $(filter 1 true yes,$(IGNORE_BACKOFF)),--ignore-provider-backoff,)
+EVENT_ALPHA_INCLUDE_DIAGNOSTICS_ARG = $(if $(filter 1 true yes,$(INCLUDE_DIAGNOSTICS)),--event-opportunity-audit-include-diagnostics,)
 EVENT_ALPHA_PROVIDER_SELECTOR_ARGS = $(if $(strip $(PROVIDER_KEY)),--provider-key $(PROVIDER_KEY),) $(if $(strip $(PROVIDER_SERVICE)),--service $(PROVIDER_SERVICE),) $(if $(strip $(PROVIDER_ROLE)),--role $(PROVIDER_ROLE),) $(if $(filter 1 true yes,$(PROVIDER_ALL)),--all,)
 EVENT_ALPHA_NOTIFY_EVERY_RUN_PROFILES = notify_no_key notify_llm notify_llm_deep notify_llm_quality
 EVENT_ALPHA_NOTIFY_DEDUPE_BY_CONTENT = $(if $(filter $(EVENT_ALPHA_NOTIFY_EVERY_RUN_PROFILES),$(PROFILE)),0,1)
@@ -137,7 +139,7 @@ help:
 	@echo "  make event-alpha-policy-simulate PROFILE=notify_llm  Simulate quality threshold policies without writes"
 	@echo "  make event-alpha-export-signal-quality-cases PROFILE=notify_llm  Export proposed benchmark cases from artifacts"
 	@echo "  make event-alpha-quality-loop PROFILE=notify_llm  Run the local signal-quality review chain (no sends)"
-	@echo "  make event-opportunity-audit TARGET=ea:... PROFILE=notify_llm  Explain one candidate decision path"
+	@echo "  make event-opportunity-audit TARGET=ea:... PROFILE=notify_llm INCLUDE_DIAGNOSTICS=1  Explain one candidate/core opportunity path"
 	@echo "  make event-alpha-no-key-report  Print fixture market-anomaly event alpha radar"
 	@echo "  make event-catalyst-search-fixture-report  Print fixture catalyst-search diagnostics for anomalies"
 	@echo "  make event-alpha-cycle  Run one fixture Event Alpha research cycle"
@@ -535,7 +537,7 @@ event-alpha-quality-loop-llm:
 event-opportunity-audit: PROFILE = notify_llm
 event-opportunity-audit:
 	@if [ -z "$(TARGET)" ]; then echo "Set TARGET=ea:... or TARGET=SYMBOL"; exit 2; fi
-	$(PYTHON) main.py --event-opportunity-audit "$(TARGET)" --event-alpha-profile $(PROFILE)
+	$(PYTHON) main.py --event-opportunity-audit "$(TARGET)" --event-alpha-profile $(PROFILE) $(EVENT_ALPHA_INCLUDE_DIAGNOSTICS_ARG)
 
 event-alpha-no-key-report:
 	env $(EVENT_FIXTURE_NOW_ENV) \

@@ -601,6 +601,15 @@ hypothesis reports, daily brief, strict artifact doctor, and an AAVE
 opportunity audit. It is intended to prove main-catalyst selection, background
 frame rejection, asset-role safety, aggregation, route consistency, and report
 coherence together.
+
+Default operator reports now present core opportunities rather than every
+supporting row. Compatible rows are aggregated by incident, validated asset,
+candidate role, and impact-path family. For example, a single VELVET/SpaceX
+opportunity may carry tokenized-stock-venue and RWA pre-IPO proxy support while
+source-noise/control rows stay hidden under diagnostics. Use
+`make event-opportunity-audit TARGET=<core_opportunity_id> INCLUDE_DIAGNOSTICS=1`
+when you need to inspect the hidden support/control rows behind a core
+opportunity.
 Standalone fixture-report targets such as
 `make event-alpha-daily-brief PROFILE=catalyst_frame_e2e` pass the fixture/test
 artifact include flag automatically, so the generated brief should select the

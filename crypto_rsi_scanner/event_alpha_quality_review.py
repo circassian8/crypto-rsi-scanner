@@ -8,6 +8,7 @@ from typing import Any, Iterable, Mapping
 from . import (
     event_alpha_alert_store,
     event_alpha_artifacts,
+    event_core_opportunities,
     event_alpha_quality_fields,
     event_alpha_router,
     event_opportunity_verdict,
@@ -487,13 +488,7 @@ def _downgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
 
 
 def _dedupe_core_opportunity_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    best: dict[str, dict[str, Any]] = {}
-    for row in rows:
-        key = _core_opportunity_key(row)
-        current = best.get(key)
-        if current is None or _row_rank(row) > _row_rank(current):
-            best[key] = row
-    return list(best.values())
+    return [dict(item.primary_row) for item in event_core_opportunities.aggregate_core_opportunities(rows)]
 
 
 def _core_opportunity_key(row: Mapping[str, Any]) -> str:

@@ -14,6 +14,7 @@ from . import (
     event_alpha_notifications,
     event_alpha_notification_runs,
     event_alpha_explain,
+    event_core_opportunities,
     event_near_miss,
     event_alpha_run_ledger,
     event_alpha_router,
@@ -102,6 +103,17 @@ def build_daily_brief(
     entries = list(watchlist_entries)
     decisions = list(router_result.decisions if router_result else ())
     alertable = [decision for decision in list(router_result.alertable_decisions if router_result else ()) if event_alpha_router.alertable_after_quality_gate(decision)]
+    core_opportunities = event_core_opportunities.aggregate_core_opportunities([*decisions, *hypotheses])
+    promoted_core_asset_keys = {
+        event_core_opportunities.incident_asset_key_for_opportunity(item)
+        for item in core_opportunities
+        if item.alertable or item.is_high_priority or item.is_watchlist or item.is_validated_digest
+    }
+    promoted_core_assets = {
+        event_core_opportunities.asset_key_for_opportunity(item)
+        for item in core_opportunities
+        if item.alertable or item.is_high_priority or item.is_watchlist or item.is_validated_digest
+    }
     latest = event_alpha_run_ledger.latest_run(runs, requested_profile) or {}
     selected_profile = str(latest.get("profile") or "default") if latest else "none"
     selected_namespace = str(latest.get("artifact_namespace") or "legacy") if latest else "none"
@@ -305,6 +317,11 @@ def build_daily_brief(
             lines.append(f"- {event_alpha_router.final_route_value(decision)}: {entry.symbol}/{entry.coin_id} state={event_watchlist.final_state_value(entry)} score={entry.latest_score} reason={decision.reason}")
     else:
         lines.append("- None.")
+    lines.extend(["", "## Core Opportunities"])
+    if core_opportunities:
+        lines.extend(_core_opportunity_lines(core_opportunities, limit=8))
+    else:
+        lines.append("- None.")
     lines.extend(["", "## Validated Impact Hypothesis Routing"])
     alertable_hypotheses = [
         decision for decision in decisions
@@ -372,8 +389,8 @@ def build_daily_brief(
         row for row in hypotheses
         if str(row.get("status") or "") == "rejected" or row.get("why_not_promoted") or row.get("rejection_reasons")
     ]
-    lines.append("- Strong opportunity candidates: " + (_brief_decisions(strong_opportunity_hypotheses[:5]) or "none"))
-    lines.append("- Impact-path validated digest candidates: " + (_brief_decisions(alertable_hypotheses[:5]) or _brief_decisions(impact_path_validated_hypotheses[:5]) or "none"))
+    lines.append("- Strong opportunity candidates: " + (_brief_core_opportunities(core_opportunities, section="strong", limit=5) or "none"))
+    lines.append("- Impact-path validated digest candidates: " + (_brief_core_opportunities(core_opportunities, section="digest", limit=5) or _brief_decisions(alertable_hypotheses[:5]) or _brief_decisions(impact_path_validated_hypotheses[:5]) or "none"))
     lines.append("- Validated but market-unconfirmed: " + (_brief_decisions(market_unconfirmed_hypotheses[:5]) or "none"))
     lines.append("- Weak validated local-only hypotheses: " + (_brief_decisions(weak_local_hypotheses[:5]) or "none"))
     lines.append("- Generic co-occurrence blocked: " + (_brief_decisions(generic_blocked_hypotheses[:5]) or "none"))
@@ -385,6 +402,15 @@ def build_daily_brief(
     near_misses = event_near_miss.detect_near_miss_rows(
         [decision.entry for decision in decisions] + hypotheses,
         route_decisions=decisions,
+    )
+    near_misses = tuple(
+        item for item in near_misses
+        if event_core_opportunities.incident_asset_key_for_values(
+            item.incident_id,
+            item.coin_id,
+            item.symbol,
+        ) not in promoted_core_asset_keys
+        and event_core_opportunities.asset_key_for_values(item.coin_id, item.symbol) not in promoted_core_assets
     )
     lines.extend(["", "## Near-Miss Candidates"])
     if near_misses:
@@ -480,8 +506,19 @@ def build_daily_brief(
     lines.extend(["", "## Research Cards"])
     cards = [Path(path) for path in card_paths]
     if cards:
+        lines.append("### Core Opportunity Cards")
         for path in cards[:20]:
             lines.append(f"- [{path.name}]({path})")
+        diagnostic_count = sum(item.diagnostic_row_count for item in core_opportunities)
+        capped_count = sum(item.quality_capped_supporting_rows for item in core_opportunities)
+        lines.append("### Diagnostic / Source-Noise / Control Cards")
+        if diagnostic_count or capped_count:
+            lines.append(
+                f"- Hidden from main card list by default: diagnostics={diagnostic_count}, "
+                f"quality_capped_support={capped_count}"
+            )
+        else:
+            lines.append("- None.")
     else:
         lines.append("- No cards written for this brief.")
     lines.extend(["", "## Missed Opportunities"])
@@ -698,6 +735,67 @@ def _brief_decisions(rows: Iterable[event_alpha_router.EventAlphaRouteDecision])
             f"path={components.get('impact_path_type') or 'unknown'},role={components.get('candidate_role') or 'unknown'},"
             f"main={components.get('main_frame_type') or 'unknown'},"
             f"route={final_route},requested={decision.requested_route_before_quality_gate or decision.route.value},reason={decision.reason})"
+        )
+    return "; ".join(labels)
+
+
+def _core_opportunity_lines(
+    opportunities: Iterable[event_core_opportunities.CoreOpportunity],
+    *,
+    limit: int,
+) -> list[str]:
+    rows = list(opportunities)
+    if not rows:
+        return ["- None."]
+    lines: list[str] = []
+    for item in rows[:limit]:
+        categories = ", ".join(item.supporting_categories[:4]) or "unknown"
+        paths = ", ".join(item.supporting_impact_paths[:4]) or item.primary_impact_path
+        diagnostics = ""
+        if item.diagnostic_row_count or item.quality_capped_supporting_rows:
+            diagnostics = (
+                f" diagnostics_hidden={item.diagnostic_row_count}"
+                f" quality_capped_support={item.quality_capped_supporting_rows}"
+            )
+        lines.append(
+            f"- {item.core_opportunity_id} {item.symbol}/{item.coin_id}: "
+            f"level={item.opportunity_level} route={item.final_route_after_quality_gate or 'local'} "
+            f"state={item.final_state_after_quality_gate or 'unknown'} "
+            f"score={item.opportunity_score_final:.0f} "
+            f"path={item.primary_impact_path} role={item.candidate_role} "
+            f"categories={categories} paths={paths}{diagnostics}"
+        )
+        if item.supporting_evidence_quotes:
+            lines.append(f"  evidence: {item.supporting_evidence_quotes[0]}")
+        if item.why_other_rows_hidden != "no hidden supporting rows":
+            lines.append(f"  collapsed: {item.why_other_rows_hidden}")
+    if len(rows) > limit:
+        lines.append(f"- +{len(rows) - limit} more core opportunities")
+    return lines
+
+
+def _brief_core_opportunities(
+    rows: Iterable[event_core_opportunities.CoreOpportunity],
+    *,
+    section: str,
+    limit: int,
+) -> str:
+    if section == "strong":
+        selected = [item for item in rows if item.is_high_priority or item.is_watchlist]
+    elif section == "digest":
+        selected = [item for item in rows if item.is_validated_digest and not (item.is_high_priority or item.is_watchlist)]
+    else:
+        selected = list(rows)
+    labels = []
+    for item in selected[:limit]:
+        labels.append(
+            f"{item.symbol}/{item.coin_id}"
+            f"(core={item.core_opportunity_id},level={item.opportunity_level},"
+            f"route={item.final_route_after_quality_gate or 'local'},"
+            f"state={item.final_state_after_quality_gate or 'unknown'},"
+            f"score={item.opportunity_score_final:.0f},"
+            f"path={item.primary_impact_path},role={item.candidate_role},"
+            f"support={len(item.supporting_rows)},diagnostics={item.diagnostic_row_count})"
         )
     return "; ".join(labels)
 

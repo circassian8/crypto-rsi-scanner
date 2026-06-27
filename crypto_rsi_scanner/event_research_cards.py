@@ -9,7 +9,14 @@ import re
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
-from . import event_alpha_router, event_graph, event_opportunity_verdict, event_watchlist, event_watchlist_monitor
+from . import (
+    event_alpha_router,
+    event_core_opportunities,
+    event_graph,
+    event_opportunity_verdict,
+    event_watchlist,
+    event_watchlist_monitor,
+)
 
 
 @dataclass(frozen=True)
@@ -350,6 +357,19 @@ def _selected_entries(
         for decision in decisions:
             if event_alpha_router.alertable_after_quality_gate(decision):
                 selected_by_key[decision.entry.key] = decision.entry
+    if selected_by_key:
+        core = event_core_opportunities.aggregate_core_opportunities([*decisions, *selected_by_key.values()])
+        if core:
+            ordered: list[event_watchlist.EventWatchlistEntry] = []
+            for opportunity in core:
+                key = str(opportunity.primary_row.get("key") or "")
+                entry = selected_by_key.get(key)
+                if entry is not None and entry.key not in {item.key for item in ordered}:
+                    ordered.append(entry)
+            for entry in selected_by_key.values():
+                if entry.key not in {item.key for item in ordered} and not event_core_opportunities.row_is_diagnostic(entry):
+                    ordered.append(entry)
+            return ordered
     return sorted(
         selected_by_key.values(),
         key=lambda entry: (entry.last_seen_at, entry.latest_score, entry.symbol),
@@ -367,17 +387,31 @@ def _slug(value: str) -> str:
 
 
 def _render_index(paths: list[Path], observed: datetime) -> str:
+    diagnostic_paths = [path for path in paths if "_source_noise_control" in path.name or "_ambiguous_control" in path.name]
+    core_paths = [path for path in paths if path not in diagnostic_paths]
     lines = [
         "# Event Research Cards",
         "",
         f"Generated at: {observed.isoformat()}",
         "",
+        "## Core Opportunity Cards",
+        "",
     ]
-    if not paths:
+    if not core_paths:
         lines.append("No cards selected.")
     else:
-        for path in paths:
+        for path in core_paths:
             lines.append(f"- [{path.name}]({path.name})")
+    lines.extend([
+        "",
+        "## Diagnostic / Source-Noise / Control Cards",
+        "",
+    ])
+    if diagnostic_paths:
+        for path in diagnostic_paths:
+            lines.append(f"- [{path.name}]({path.name})")
+    else:
+        lines.append("Diagnostics are hidden from the main card list by default; inspect the daily brief or opportunity audit when needed.")
     return "\n".join(lines).rstrip() + "\n"
 
 

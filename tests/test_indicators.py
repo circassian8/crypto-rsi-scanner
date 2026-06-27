@@ -19877,18 +19877,33 @@ def test_event_alpha_eval_export_from_feedback_and_missed():
 
 
 def test_event_research_cards_write_files_and_index():
+    from dataclasses import replace
     import tempfile
     from pathlib import Path
 
     from crypto_rsi_scanner import event_research_cards
 
     entry = _test_watchlist_entry(state="HIGH_PRIORITY", symbol="VELVET", coin_id="velvet")
+    diagnostic = replace(
+        _test_watchlist_entry(state="HIGH_PRIORITY", symbol="VELVET", coin_id="velvet"),
+        key="cluster|velvet|source_noise_control",
+        latest_playbook_type="source_noise_control",
+        latest_effective_playbook_type="source_noise_control",
+        latest_score_components={
+            **entry.latest_score_components,
+            "candidate_role": "source_noise",
+            "impact_path_type": "generic_cooccurrence_only",
+            "opportunity_level": "local_only",
+            "opportunity_score_final": 0,
+        },
+    )
     out_dir = Path(tempfile.mkdtemp())
-    result = event_research_cards.write_research_cards(out_dir, watchlist_entries=[entry], alert_rows=[], route_decisions=[])
+    result = event_research_cards.write_research_cards(out_dir, watchlist_entries=[entry, diagnostic], alert_rows=[], route_decisions=[])
     assert result.cards_written == 1
     assert result.index_path.exists()
     assert "VELVET" in result.card_paths[0].read_text()
     assert result.card_paths[0].name in result.index_path.read_text()
+    assert "source_noise_control" not in result.index_path.read_text().split("## Core Opportunity Cards", 1)[1].split("## Diagnostic", 1)[0]
 
 
 def test_event_alpha_explain_last_run_paths():
@@ -22935,6 +22950,201 @@ def test_validated_hypothesis_aggregation_preserves_supporting_paths():
     assert set(item.supporting_categories) == {"rwa_preipo_proxy", "tokenized_stock_venue"}
     assert item.supporting_impact_paths == ("venue_value_capture",)
     assert "VELVET users can trade SpaceX pre-IPO exposure." in item.supporting_evidence_quotes
+
+
+def test_event_core_opportunities_aggregate_duplicates_and_hide_controls():
+    from crypto_rsi_scanner import event_alpha_router, event_core_opportunities, event_watchlist
+
+    def row(symbol, *, category, path, role="proxy_venue", route="STORE_ONLY", level="local_only", score=58, playbook="proxy_attention"):
+        return {
+            "incident_id": "incident:spacex",
+            "canonical_incident_name": "SpaceX pre-IPO exposure",
+            "validated_symbol": symbol,
+            "validated_coin_id": symbol.lower(),
+            "candidate_role": role,
+            "impact_category": category,
+            "impact_path_type": path,
+            "opportunity_level": level,
+            "opportunity_score_final": score,
+            "final_route_after_quality_gate": route,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value
+            if level == "high_priority"
+            else event_watchlist.EventWatchlistState.RADAR.value,
+            "latest_effective_playbook_type": playbook,
+            "hypothesis_id": f"hyp:{symbol}:{category}",
+            "evidence_quotes": [f"{symbol} evidence for {category}"],
+        }
+
+    rows = [
+        row(
+            "VELVET",
+            category="tokenized_stock_venue",
+            path="venue_value_capture",
+            route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            level="high_priority",
+            score=94,
+        ),
+        row("VELVET", category="rwa_preipo_proxy", path="proxy_exposure", score=67),
+        {
+            **row("VELVET", category="unknown", path="insufficient_data", role="unknown_with_reason", score=0),
+            "opportunity_level": "local_only",
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value,
+            "state_quality_capped": True,
+            "quality_state_block_reason": "impact_path_type_insufficient_data",
+            "hypothesis_id": "hyp:VELVET:quality-capped-support",
+        },
+        row(
+            "VELVET",
+            category="publisher_noise",
+            path="generic_cooccurrence_only",
+            role="source_noise",
+            playbook="source_noise_control",
+        ),
+        row("AAVE", category="strategic_investment", path="strategic_investment_or_valuation", role="direct_subject", score=72, level="validated_digest", route=event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value),
+        row("RUNE", category="security_or_regulatory_shock", path="exploit_security_event", role="direct_subject", score=80, level="watchlist"),
+        row("ZEC", category="listing_liquidity", path="listing_liquidity_event", role="direct_subject", score=70, level="validated_digest"),
+    ]
+
+    opportunities = event_core_opportunities.aggregate_core_opportunities(rows)
+    velvet = [item for item in opportunities if item.symbol == "VELVET"]
+    assert len(velvet) == 1
+    assert velvet[0].final_route_after_quality_gate == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+    assert {"tokenized_stock_venue", "rwa_preipo_proxy"} <= set(velvet[0].supporting_categories)
+    assert velvet[0].source_noise_control_count == 1
+    assert velvet[0].diagnostic_row_count == 2
+    assert velvet[0].quality_capped_supporting_rows == 1
+    assert len([item for item in opportunities if item.symbol == "AAVE"]) == 1
+    assert len([item for item in opportunities if item.symbol == "RUNE"]) == 1
+    assert len([item for item in opportunities if item.symbol == "ZEC"]) == 1
+
+
+def test_daily_brief_core_opportunity_excludes_promoted_supporting_near_miss():
+    from dataclasses import replace
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_alpha_router, event_watchlist
+
+    components = {
+        "incident_id": "incident:spacex",
+        "validated_symbol": "VELVET",
+        "validated_coin_id": "velvet",
+        "validation_stage": "impact_path_validated",
+        "impact_category": "tokenized_stock_venue",
+        "impact_path_type": "venue_value_capture",
+        "impact_path_strength": "strong",
+        "candidate_role": "proxy_venue",
+        "evidence_quality_score": 90,
+        "source_class": "crypto_native",
+        "evidence_specificity": "asset_and_catalyst",
+        "market_confirmation_score": 90,
+        "market_confirmation_level": "strong",
+        "opportunity_score_final": 94,
+        "opportunity_level": "high_priority",
+        "supporting_categories": ["tokenized_stock_venue", "rwa_preipo_proxy"],
+        "supporting_impact_paths": ["venue_value_capture", "proxy_exposure"],
+        "supporting_evidence_quotes": ["VELVET users can trade SpaceX pre-IPO exposure."],
+    }
+    entry = replace(
+        _test_watchlist_entry(state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value, symbol="VELVET", coin_id="velvet"),
+        key="incident:spacex|velvet|proxy_venue",
+        incident_id="incident:spacex",
+        relationship_type="impact_hypothesis",
+        latest_score=94,
+        highest_score=94,
+        latest_score_components=components,
+        should_alert=True,
+        material_change_reasons=("initial_validated_hypothesis",),
+    )
+    decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH,
+        alertable=True,
+        reason="Validated impact hypothesis reached high-priority opportunity verdict (94).",
+        lane=event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION,
+        final_route_after_quality_gate=event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        opportunity_level="high_priority",
+        opportunity_score_final=94,
+    )
+    near_support_row = {
+        "hypothesis_id": "hyp:velvet:support",
+        "incident_id": "incident:spacex",
+        "validated_symbol": "VELVET",
+        "validated_coin_id": "velvet",
+        "candidate_role": "proxy_venue",
+        "impact_category": "rwa_preipo_proxy",
+        "impact_path_type": "proxy_exposure",
+        "impact_path_strength": "medium",
+        "evidence_quality_score": 70,
+        "source_class": "crypto_native",
+        "evidence_specificity": "asset_and_catalyst",
+        "market_confirmation_score": 40,
+        "market_confirmation_level": "weak",
+        "opportunity_score_final": 61,
+        "opportunity_level": "exploratory",
+        "why_not_watchlist": "needs_market_confirmation",
+        "upgrade_requirements": ["market_confirmation"],
+    }
+    brief = event_alpha_daily_brief.build_daily_brief(
+        run_rows=[],
+        hypothesis_rows=[near_support_row],
+        watchlist_entries=[entry],
+        router_result=event_alpha_router.EventAlphaRouterResult(Path("state.jsonl"), 1, [decision], True),
+        requested_profile="fixture",
+    )
+    assert "core_" in brief
+    assert "VELVET/velvet" in brief
+    near_section = brief.split("## Near-Miss Candidates", 1)[1].split("## Signal Quality Summary", 1)[0]
+    assert "VELVET/velvet" not in near_section
+
+
+def test_opportunity_audit_accepts_core_opportunity_id_and_hides_diagnostics_by_default():
+    from crypto_rsi_scanner import event_core_opportunities, event_opportunity_audit
+
+    primary = {
+        "incident_id": "incident:aave",
+        "canonical_incident_name": "Kraken stake in Aave",
+        "validated_symbol": "AAVE",
+        "validated_coin_id": "aave",
+        "candidate_role": "direct_subject",
+        "impact_category": "strategic_investment",
+        "impact_path_type": "strategic_investment_or_valuation",
+        "opportunity_level": "validated_digest",
+        "opportunity_score_final": 72,
+        "final_route_after_quality_gate": "RESEARCH_DIGEST",
+        "final_state_after_quality_gate": "RADAR",
+        "hypothesis_id": "hyp:aave:kraken",
+        "evidence_quotes": ["Kraken in talks to buy 15% stake in DeFi lender Aave."],
+        "main_frame_type": "acquisition_or_stake",
+        "main_frame_actor": "Kraken",
+    }
+    diagnostic = {
+        **primary,
+        "hypothesis_id": "hyp:aave:kelpdao-background",
+        "candidate_role": "source_noise",
+        "latest_effective_playbook_type": "source_noise_control",
+        "impact_category": "security_or_regulatory_shock",
+        "impact_path_type": "exploit_security_event",
+        "opportunity_level": "local_only",
+        "opportunity_score_final": 0,
+    }
+    core_id = event_core_opportunities.aggregate_core_opportunities([primary, diagnostic])[0].core_opportunity_id
+    audit = event_opportunity_audit.format_opportunity_audit(
+        core_id,
+        hypotheses=[primary, diagnostic],
+        profile="fixture",
+    )
+    assert "## Core Opportunity" in audit
+    assert core_id in audit
+    assert "Kraken" in audit
+    assert "hidden diagnostics: 1" in audit
+    assert "  - diagnostic:" not in audit
+    audit_with_diagnostics = event_opportunity_audit.format_opportunity_audit(
+        core_id,
+        hypotheses=[primary, diagnostic],
+        profile="fixture",
+        include_diagnostics=True,
+    )
+    assert "  - diagnostic:" in audit_with_diagnostics
 
 
 def test_missing_unresolved_catalyst_frame_caps_validated_hypothesis():

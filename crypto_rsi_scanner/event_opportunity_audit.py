@@ -6,6 +6,7 @@ from dataclasses import asdict, is_dataclass
 from typing import Any, Iterable, Mapping
 
 from . import (
+    event_core_opportunities,
     event_alpha_quality_fields,
     event_alpha_router,
     event_near_miss,
@@ -23,13 +24,33 @@ def format_opportunity_audit(
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision | Mapping[str, Any]] = (),
     incident_rows: Iterable[Mapping[str, Any]] = (),
     profile: str | None = None,
+    include_diagnostics: bool = False,
 ) -> str:
     """Explain one candidate's research-only decision path."""
     clean = str(target or "").strip()
     if not clean:
         return "Event opportunity audit failed: target is required."
+    hypothesis_items = list(hypotheses)
+    watchlist_items = list(watchlist_entries)
+    alert_items = list(alert_rows)
+    decision_items = list(route_decisions)
     incidents = [dict(row) for row in incident_rows if isinstance(row, Mapping)]
-    match = _find_match(clean, hypotheses, watchlist_entries, alert_rows, route_decisions, incidents)
+    core_opportunities = event_core_opportunities.aggregate_core_opportunities([
+        *decision_items,
+        *watchlist_items,
+        *alert_items,
+        *hypothesis_items,
+    ])
+    core_match = _find_core_match(clean, core_opportunities)
+    match = (
+        {
+            "source": "core_opportunity",
+            "row": core_match.primary_row,
+            "core_opportunity": core_match,
+        }
+        if core_match is not None
+        else _find_match(clean, hypothesis_items, watchlist_items, alert_items, decision_items, incidents)
+    )
     if match is None:
         return "\n".join([
             "=" * 76,
@@ -61,6 +82,7 @@ def format_opportunity_audit(
         f"- playbook: {_value(row, 'playbook_type', 'latest_playbook_type', components.get('playbook_type'), default='unknown')}",
         f"- state/tier: {_value(row, 'state', default='unknown')} / {_value(row, 'tier', 'latest_tier', default='unknown')}",
         "",
+        *(_core_opportunity_lines(core_match, include_diagnostics=include_diagnostics) if core_match is not None else []),
         "## Evidence chain",
         f"- raw source summary: {_value(row, 'raw_evidence_summary', 'event_name', 'latest_event_name', default='unknown')}",
         f"- source/provider: {_value(row, 'source', 'latest_source', default='unknown')}",
@@ -155,6 +177,68 @@ def _near_miss_lines(
             f"{str(bool(row.get('market_refresh_success'))).lower()} "
             f"verdict={before or near_miss.opportunity_level_before}->{after or row.get('opportunity_level') or near_miss.opportunity_level_before}"
         )
+    return lines
+
+
+def _find_core_match(
+    target: str,
+    opportunities: Iterable[event_core_opportunities.CoreOpportunity],
+) -> event_core_opportunities.CoreOpportunity | None:
+    clean = target[3:] if target.startswith("ea:") else target
+    clean_l = clean.lower()
+    for item in opportunities:
+        identifiers = {
+            item.core_opportunity_id,
+            item.symbol,
+            item.coin_id,
+            item.incident_id or "",
+            item.canonical_incident_name or "",
+        }
+        identifiers.update(str(value) for value in item.supporting_hypothesis_ids)
+        identifiers.update(str(row.get("key") or "") for row in item.supporting_rows)
+        identifiers.update(str(row.get("alert_key") or "") for row in item.supporting_rows)
+        if clean in identifiers or clean_l in {value.lower() for value in identifiers if value}:
+            return item
+    return None
+
+
+def _core_opportunity_lines(
+    item: event_core_opportunities.CoreOpportunity,
+    *,
+    include_diagnostics: bool,
+) -> list[str]:
+    lines = [
+        "## Core Opportunity",
+        f"- core_opportunity_id: {item.core_opportunity_id}",
+        f"- incident: {item.incident_id or 'unknown'} / {item.canonical_incident_name or 'unknown'}",
+        f"- primary impact path: {item.primary_impact_path}",
+        f"- final route/state: {item.final_route_after_quality_gate or 'local'} / {item.final_state_after_quality_gate or 'unknown'}",
+        f"- opportunity: {item.opportunity_level} score={item.opportunity_score_final:.0f}",
+        f"- aggregation reason: {item.why_opportunity_visible}",
+        f"- supporting rows hidden from main view: {item.why_other_rows_hidden}",
+        f"- supporting hypothesis ids: {_list_value(item.supporting_hypothesis_ids)}",
+        f"- supporting categories: {_list_value(item.supporting_categories)}",
+        f"- supporting impact paths: {_list_value(item.supporting_impact_paths)}",
+    ]
+    if item.supporting_evidence_quotes:
+        lines.append("- supporting evidence: " + _list_value(item.supporting_evidence_quotes[:4]))
+    if item.diagnostic_row_count:
+        lines.append(
+            f"- hidden diagnostics: {item.diagnostic_row_count} "
+            f"(source_noise_controls={item.source_noise_control_count})"
+        )
+        if include_diagnostics:
+            for row in item.diagnostic_rows[:6]:
+                lines.append(
+                    "  - diagnostic: "
+                    f"{row.get('symbol') or row.get('validated_symbol') or 'UNKNOWN'}/"
+                    f"{row.get('coin_id') or row.get('validated_coin_id') or 'unknown'} "
+                    f"playbook={row.get('latest_effective_playbook_type') or row.get('playbook_type') or 'unknown'} "
+                    f"reason={row.get('quality_gate_block_reason') or row.get('suppressed_reason') or row.get('why_local_only') or 'diagnostic'}"
+                )
+        else:
+            lines.append("- diagnostics hidden by default; pass include_diagnostics in local tooling to inspect controls.")
+    lines.append("")
     return lines
 
 

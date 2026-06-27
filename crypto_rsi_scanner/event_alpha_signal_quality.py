@@ -11,6 +11,7 @@ from typing import Any, Iterable, Mapping
 
 from . import (
     event_claim_semantics,
+    event_core_opportunities,
     event_evidence_quality,
     event_incident_graph,
     event_incident_store,
@@ -170,6 +171,8 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         hypotheses=(incident_hypothesis_row,) if incident_hypothesis_generated else (),
         watchlist_rows=(),
     )
+    core_opportunities = event_core_opportunities.aggregate_core_opportunities((incident_hypothesis_row,))
+    core = core_opportunities[0] if core_opportunities else None
     reported_impact_path = impact.impact_path_type
     reported_role = impact.candidate_role
     if not symbol and not coin_id:
@@ -230,6 +233,11 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
             .get("llm_catalyst_frame_validation", {})
             .get("resolution")
         ),
+        "core_opportunity_id": core.core_opportunity_id if core is not None else None,
+        "aggregation_status": "core_opportunity" if core is not None else "no_validated_core",
+        "near_miss_inclusion": _near_miss_status(opportunity_level, route_tier, identity_rejection),
+        "card_group": _card_group(opportunity_level, route_tier, identity_rejection),
+        "frame_counter_status": "frame_present" if incident.main_frame_type else "frame_not_required_or_missing",
     }
     expected = _expected(case)
     diffs, stages = _diff_expected(expected, actual)
@@ -269,7 +277,12 @@ def format_signal_quality_eval(result: SignalQualityEvalResult) -> str:
                 "  actual: "
                 f"path={case.actual.get('impact_path_type')} role={case.actual.get('candidate_role')} "
                 f"market={case.actual.get('market_confirmation_level')} "
-                f"level={case.actual.get('opportunity_level')} route={case.actual.get('route_tier')}"
+                f"level={case.actual.get('opportunity_level')} route={case.actual.get('route_tier')} "
+                f"core={case.actual.get('core_opportunity_id') or 'none'} "
+                f"aggregation={case.actual.get('aggregation_status')} "
+                f"near_miss={case.actual.get('near_miss_inclusion')} "
+                f"card_group={case.actual.get('card_group')} "
+                f"frame_counter={case.actual.get('frame_counter_status')}"
             )
             continue
         for diff in case.diffs:
@@ -419,6 +432,11 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "negated_frame_count": "catalyst_frame",
         "frame_rule_disagreement": "catalyst_frame",
         "frame_disagreement_resolution": "catalyst_frame",
+        "core_opportunity_id": "core_aggregation",
+        "aggregation_status": "core_aggregation",
+        "near_miss_inclusion": "near_miss",
+        "card_group": "research_card",
+        "frame_counter_status": "catalyst_frame",
     }
     for key, expected_value in expected.items():
         actual_value = actual.get(key)
@@ -468,6 +486,30 @@ def _route_tier(level: str) -> str:
         "watchlist": "WATCHLIST",
         "high_priority": "HIGH_PRIORITY",
     }.get(level, "STORE_ONLY")
+
+
+def _near_miss_status(level: str, route_tier: str, identity_rejection: str | None) -> str:
+    if identity_rejection:
+        return "diagnostic_not_near_miss"
+    if level in {"validated_digest", "watchlist", "high_priority"} or route_tier in {
+        "RADAR_DIGEST",
+        "WATCHLIST",
+        "HIGH_PRIORITY",
+    }:
+        return "excluded_already_promoted"
+    return "eligible_if_close_to_threshold"
+
+
+def _card_group(level: str, route_tier: str, identity_rejection: str | None) -> str:
+    if identity_rejection:
+        return "diagnostic_control"
+    if level in {"validated_digest", "watchlist", "high_priority"} or route_tier in {
+        "RADAR_DIGEST",
+        "WATCHLIST",
+        "HIGH_PRIORITY",
+    }:
+        return "core_opportunity"
+    return "local_only_quality_capped"
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:

@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Operator reports show core opportunities, not duplicate support rows
+**Status:** accepted
+**Decision:** Event Alpha operator-facing reports should aggregate compatible
+rows by incident, validated asset, candidate role, and impact-path family into a
+single core opportunity. Supporting hypotheses, quality-capped rows, duplicate
+raw observations, source-noise controls, and ticker-collision controls should
+remain available as audit diagnostics, but they should not create separate
+default daily-brief/card/near-miss entries for the same opportunity.
+**Why:** The same VELVET/SpaceX opportunity can legitimately produce several
+supporting rows: venue value capture, RWA pre-IPO proxy, quality-capped support,
+and source-noise controls. Showing each row as a separate operator opportunity
+overstates the number of real leads and makes promoted opportunities look like
+near-misses or junk at the same time.
+**Revisit when:** Event Alpha moves to a typed UI/database that can render a
+primary opportunity with expandable support/control evidence natively.
+
 ## 2026-06-27 - Event Alpha feedback preserves incident context
 **Status:** accepted
 **Decision:** Manual Event Alpha feedback rows should preserve the same

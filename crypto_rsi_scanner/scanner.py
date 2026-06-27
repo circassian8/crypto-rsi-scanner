@@ -4375,6 +4375,7 @@ def event_opportunity_audit_report(
     verbose: bool = False,
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
+    include_diagnostics: bool = False,
 ) -> None:
     """Print a single-candidate decision audit from local Event Alpha artifacts."""
     _setup_event_discovery_logging(verbose)
@@ -4401,6 +4402,7 @@ def event_opportunity_audit_report(
         route_decisions=routed.decisions,
         incident_rows=incidents.rows,
         profile=context.profile,
+        include_diagnostics=include_diagnostics,
     ))
 
 
@@ -8271,6 +8273,11 @@ def cli() -> None:
         help="Compare current Event Alpha alert tiers/scores before and after priors without writing artifacts.",
     )
     parser.add_argument(
+        "--event-opportunity-audit-include-diagnostics",
+        action="store_true",
+        help="With --event-opportunity-audit, include hidden diagnostic/source-noise/control rows in core opportunity audits.",
+    )
+    parser.add_argument(
         "--event-research-card",
         nargs="?",
         const="",
@@ -8761,6 +8768,7 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
+            include_diagnostics=args.event_opportunity_audit_include_diagnostics,
         )
         return
     if args.event_alpha_export_notification_pack:
