@@ -24788,6 +24788,8 @@ def test_event_alpha_quality_make_targets_exist_and_do_not_send():
     assert "TARGET=$(TARGET)" in frame_loop
     assert "event-alpha-cycle-send" not in frame_loop
     assert "event-alert-send" not in frame_loop
+    daily_brief_target = text.split("event-alpha-daily-brief:", 1)[1].split("event-alpha-replay:", 1)[0]
+    assert "$(EVENT_ALPHA_INCLUDE_TEST_ARG)" in daily_brief_target
 
 
 def test_notify_llm_quality_profile_and_make_target_are_no_send():
@@ -25008,6 +25010,7 @@ def test_feedback_and_calibration_include_signal_quality_fields():
         coin_id="velvet",
     )
     entry = __import__("dataclasses").replace(entry, latest_score_components={
+        "incident_id": "incident:velvet-spacex",
         "impact_path_type": "proxy_exposure",
         "candidate_role": "proxy_venue",
         "evidence_specificity": "source_explains_mechanism",
@@ -25026,9 +25029,13 @@ def test_feedback_and_calibration_include_signal_quality_fields():
         )
         loaded = event_feedback.load_feedback(cfg.path)
     assert record.impact_path_type == "proxy_exposure"
+    assert record.incident_id == "incident:velvet-spacex"
+    assert loaded.records[0].incident_id == "incident:velvet-spacex"
     report = event_alpha_calibration.format_calibration_report([], feedback_rows=[r.__dict__ for r in loaded.records])
     assert "feedback by impact path type: proxy_exposure: useful=1" in report
     assert "feedback by candidate role: proxy_venue: useful=1" in report
+    assert "feedback by source class: crypto_native: useful=1" in report
+    assert "feedback by incident id: incident:velvet-spacex: useful=1" in report
 
 
 def test_event_alpha_signal_quality_make_targets_exist():

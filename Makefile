@@ -1054,7 +1054,7 @@ event-alpha-daily-brief:
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
 	RSI_EVENT_ALPHA_DAILY_BRIEF_PATH=$(EVENT_ALPHA_DAILY_BRIEF_PATH) \
-	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
 
 event-alpha-replay:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \

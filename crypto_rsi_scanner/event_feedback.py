@@ -37,6 +37,7 @@ class EventFeedbackRecord:
     target: str
     key: str | None
     event_id: str | None
+    incident_id: str | None
     coin_id: str | None
     symbol: str | None
     relationship_type: str | None
@@ -141,6 +142,7 @@ def format_feedback_record(record: EventFeedbackRecord, *, path: Path | None = N
         f"label: {record.label}",
         f"symbol/coin: {(record.symbol or 'unknown')}/{record.coin_id or 'unknown'}",
         f"event_id: {record.event_id or 'unmatched'}",
+        f"incident_id: {record.incident_id or 'unmatched'}",
         f"state: {record.state or 'unmatched'} · route: {record.route or 'none'}",
         f"playbook: {record.playbook_type or 'unknown'} · score={record.latest_score if record.latest_score is not None else 0}",
         f"marked_by: {record.marked_by} · marked_at: {record.marked_at}",
@@ -228,6 +230,7 @@ def _record_from_entry(
             target=target,
             key=None,
             event_id=None,
+            incident_id=None,
             coin_id=None,
             symbol=None,
             relationship_type=None,
@@ -247,6 +250,7 @@ def _record_from_entry(
         target=target,
         key=entry.key,
         event_id=entry.event_id,
+        incident_id=_optional_str(entry.incident_id or components.get("incident_id")),
         coin_id=entry.coin_id,
         symbol=entry.symbol,
         relationship_type=entry.relationship_type,
@@ -295,6 +299,7 @@ def _record_from_row(row: Mapping[str, Any]) -> EventFeedbackRecord | None:
             target=target,
             key=_optional_str(row.get("key")),
             event_id=_optional_str(row.get("event_id")),
+            incident_id=_optional_str(row.get("incident_id")),
             coin_id=_optional_str(row.get("coin_id")),
             symbol=_optional_str(row.get("symbol")),
             relationship_type=_optional_str(row.get("relationship_type")),

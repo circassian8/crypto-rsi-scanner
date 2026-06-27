@@ -16,6 +16,20 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Event Alpha feedback preserves incident context
+**Status:** accepted
+**Decision:** Manual Event Alpha feedback rows should preserve the same
+artifact context needed for later calibration: `incident_id`, impact path,
+candidate role, opportunity level, evidence specificity, market confirmation,
+and source class. Calibration reports should group feedback-only rows by those
+fields even when no matching alert snapshot exists.
+**Why:** Feedback is useful only if it can be mapped back to the incident spine
+and quality verdict that produced the candidate. Otherwise useful/junk labels
+can tune broad playbook counts while losing the specific incident/source class
+that caused the outcome.
+**Revisit when:** Feedback moves from JSONL artifacts into a typed review
+database with foreign keys to incident, watchlist, alert, and card rows.
+
 ## 2026-06-27 - Sector placeholders are not qualified incident asset links
 **Status:** accepted
 **Decision:** Event Alpha incident relevance must treat taxonomy/sector

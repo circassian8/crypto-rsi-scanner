@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Finish Event Alpha catalyst-frame/reporting audit · Codex
+**Why:** The catalyst-frame/profile audit found two remaining operator-facing
+gaps: the standalone daily-brief Make target did not include test artifacts for
+fixture profiles, and feedback-only calibration rows did not preserve
+`incident_id`/`source_class` grouping. The existing catalyst-frame implementation
+already satisfied the AAVE/Kraken/KelpDAO, VELVET aggregation, frame-counter,
+frame-gating, card/audit, and doctor-wording requirements, so this pass focused
+on report consistency and verification.
+**Changes:**
+- Updated `make event-alpha-daily-brief PROFILE=catalyst_frame_e2e` to pass the
+  same test-artifact inclusion flag as the other catalyst-frame fixture report
+  targets, so the generated brief selects the latest fixture run and shows
+  catalyst-frame coverage instead of “No run ledger rows found.”
+- Added `incident_id` to Event Alpha feedback rows and persisted it from
+  watchlist entries/score components.
+- Extended calibration grouping to include feedback by source class and
+  incident id, including feedback-only rows without matching alert snapshots.
+- Added regression coverage for the daily-brief wrapper and feedback/calibration
+  grouping.
+**Verify:** `python3 tests/test_indicators.py` passed (475/475); `make
+event-alpha-signal-quality-eval PYTHON=python3` passed; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `make
+event-alpha-notify-llm-quality-frame-smoke PYTHON=python3` passed; `make
+event-alpha-quality-validation-cycle PYTHON=python3` passed; `make
+event-opportunity-audit PROFILE=catalyst_frame_e2e TARGET=AAVE PYTHON=python3`
+passed; `make event-llm-eval PYTHON=python3`, `make event-llm-extract-eval
+PYTHON=python3`, `make event-alpha-eval PYTHON=python3`, and `make verify
+PYTHON=python3` passed. Also reran `make event-alpha-near-miss-report
+PROFILE=notify_llm_quality PYTHON=python3`.
+**Notes/risks:** Research-only artifact/report and feedback metadata changes.
+No Telegram sends, paper/live trades, normal RSI rows, or provider/LLM-created
+`TRIGGERED_FADE` paths were used.
+
 ## 2026-06-27 — Add frame-quality loop and sector-link guard · Codex
 **Why:** The catalyst-frame layer needed a single no-send operator loop that
 proves the full artifact chain, and incident relevance needed to stop treating

@@ -577,6 +577,13 @@ candidate examples. It does not modify
 `fixtures/event_discovery/event_alpha_signal_quality_cases.json`; a human must
 review proposed cases before promoting them into the canonical eval.
 
+Feedback rows are calibration artifacts, not controls. They preserve
+`incident_id`, impact path, candidate role, opportunity level, evidence
+specificity, market confirmation, source class, and playbook metadata from the
+matched watchlist row. Calibration reports group feedback-only rows by those
+fields even when no alert snapshot exists, but they only print recommendations;
+they do not alter thresholds or routing.
+
 `event-alpha-quality-loop` runs only local reports:
 
 1. `event-alpha-signal-quality-eval`
@@ -594,6 +601,11 @@ hypothesis reports, daily brief, strict artifact doctor, and an AAVE
 opportunity audit. It is intended to prove main-catalyst selection, background
 frame rejection, asset-role safety, aggregation, route consistency, and report
 coherence together.
+Standalone fixture-report targets such as
+`make event-alpha-daily-brief PROFILE=catalyst_frame_e2e` pass the fixture/test
+artifact include flag automatically, so the generated brief should select the
+latest fixture run and show catalyst-frame counters rather than treating the
+namespace as empty production history.
 
 The report defaults to the latest stored `run_id` while still printing
 total/latest/historical/legacy availability. Use `ALL_HISTORY=1` for the older
