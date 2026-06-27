@@ -18,6 +18,7 @@ from . import (
     event_impact_path_validator,
     event_market_confirmation,
     event_opportunity_verdict,
+    event_alpha_reason_text,
 )
 from .event_models import NormalizedEvent, RawDiscoveredEvent
 
@@ -179,6 +180,19 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         reported_impact_path = "generic_cooccurrence_only"
         reported_role = "generic_mention"
         reason_codes = tuple(dict.fromkeys((*reason_codes, "needs_identity_validation", "candidate_discovery_pending")))
+    false_positive_reason = _false_positive_reason(
+        identity_rejection=identity_rejection,
+        impact_path_type=reported_impact_path,
+        candidate_role=reported_role,
+        incident_relevance_status=incident_relevance["incident_relevance_status"],
+        source_class=evidence.source_class,
+    )
+    brief_section = _brief_section(
+        opportunity_level=opportunity_level,
+        route_tier=route_tier,
+        identity_rejection=identity_rejection,
+        false_positive_reason=false_positive_reason,
+    )
     actual = {
         "impact_path_type": reported_impact_path,
         "candidate_role": reported_role,
@@ -237,6 +251,10 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         "aggregation_status": "core_opportunity" if core is not None else "no_validated_core",
         "near_miss_inclusion": _near_miss_status(opportunity_level, route_tier, identity_rejection),
         "card_group": _card_group(opportunity_level, route_tier, identity_rejection),
+        "brief_section": brief_section,
+        "diagnostic_visibility": _diagnostic_visibility(brief_section),
+        "false_positive_reason": false_positive_reason,
+        "human_readable_reason": _human_readable_reason(blocked, identity_rejection, reason_codes),
         "frame_counter_status": "frame_present" if incident.main_frame_type else "frame_not_required_or_missing",
     }
     expected = _expected(case)
@@ -282,6 +300,10 @@ def format_signal_quality_eval(result: SignalQualityEvalResult) -> str:
                 f"aggregation={case.actual.get('aggregation_status')} "
                 f"near_miss={case.actual.get('near_miss_inclusion')} "
                 f"card_group={case.actual.get('card_group')} "
+                f"brief_section={case.actual.get('brief_section')} "
+                f"diagnostic_visibility={case.actual.get('diagnostic_visibility')} "
+                f"false_positive={case.actual.get('false_positive_reason')} "
+                f"reason=\"{case.actual.get('human_readable_reason')}\" "
                 f"frame_counter={case.actual.get('frame_counter_status')}"
             )
             continue
@@ -436,6 +458,10 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "aggregation_status": "core_aggregation",
         "near_miss_inclusion": "near_miss",
         "card_group": "research_card",
+        "brief_section": "operator_brief",
+        "diagnostic_visibility": "diagnostics",
+        "false_positive_reason": "false_positive_filter",
+        "human_readable_reason": "reason_text",
         "frame_counter_status": "catalyst_frame",
     }
     for key, expected_value in expected.items():
@@ -510,6 +536,77 @@ def _card_group(level: str, route_tier: str, identity_rejection: str | None) -> 
     }:
         return "core_opportunity"
     return "local_only_quality_capped"
+
+
+def _brief_section(
+    *,
+    opportunity_level: str,
+    route_tier: str,
+    identity_rejection: str | None,
+    false_positive_reason: str,
+) -> str:
+    if identity_rejection or false_positive_reason not in {"", "none"}:
+        return "diagnostics"
+    if opportunity_level == "high_priority" or route_tier == "HIGH_PRIORITY":
+        return "high_priority_core"
+    if opportunity_level == "watchlist" or route_tier == "WATCHLIST":
+        return "watchlist_core"
+    if opportunity_level == "validated_digest" or route_tier == "RADAR_DIGEST":
+        return "validated_digest_core"
+    if opportunity_level == "exploratory":
+        return "near_miss"
+    return "local_only_quality_capped"
+
+
+def _diagnostic_visibility(brief_section: str) -> str:
+    if brief_section == "diagnostics":
+        return "hidden_by_default"
+    if brief_section.endswith("_core"):
+        return "main_section"
+    return "review_section"
+
+
+def _false_positive_reason(
+    *,
+    identity_rejection: str | None,
+    impact_path_type: str,
+    candidate_role: str,
+    incident_relevance_status: str,
+    source_class: str,
+) -> str:
+    text = " ".join(str(value or "") for value in (
+        identity_rejection,
+        impact_path_type,
+        candidate_role,
+        incident_relevance_status,
+        source_class,
+    )).casefold()
+    if identity_rejection:
+        if "publisher" in text or "source_name" in text or "source_origin" in text:
+            return "source_noise"
+        if "common" in text or "generic_symbol" in text or "ticker" in text:
+            return "ticker_collision"
+        return "identity_low_confidence"
+    if "source_noise" in text or "publisher_suffix_false_positive" in text:
+        return "source_noise"
+    if "ticker_word_collision" in text:
+        return "ticker_collision"
+    if impact_path_type == "generic_cooccurrence_only":
+        return "generic_cooccurrence_only"
+    return "none"
+
+
+def _human_readable_reason(
+    blocked: Any,
+    identity_rejection: str | None,
+    reason_codes: Iterable[Any],
+) -> str:
+    if blocked not in (None, "", [], ()):
+        values = blocked if isinstance(blocked, (list, tuple, set)) else (blocked,)
+        return event_alpha_reason_text.humanize_event_alpha_reasons(values, limit=2)
+    if identity_rejection:
+        return event_alpha_reason_text.humanize_event_alpha_reason(identity_rejection)
+    return event_alpha_reason_text.humanize_event_alpha_reasons(reason_codes, limit=2) or "qualified core opportunity"
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:

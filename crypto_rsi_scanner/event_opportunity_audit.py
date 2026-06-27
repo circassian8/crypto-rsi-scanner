@@ -11,6 +11,7 @@ from . import (
     event_alpha_router,
     event_near_miss,
     event_opportunity_verdict,
+    event_alpha_reason_text,
     event_watchlist,
 )
 
@@ -127,8 +128,8 @@ def format_opportunity_audit(
         "## Final opportunity verdict",
         f"- level/score: {components.get('opportunity_level') or row.get('opportunity_level') or 'unknown'} / {components.get('opportunity_score_final') or row.get('opportunity_score_final') or 'n/a'}",
         f"- reasons: {_list_value(components.get('opportunity_verdict_reasons') or row.get('opportunity_verdict_reasons'))}",
-        f"- why local-only: {components.get('why_local_only') or row.get('why_local_only') or 'none'}",
-        f"- why not watchlist: {components.get('why_not_watchlist') or row.get('why_not_watchlist') or 'none'}",
+        f"- why local-only: {_human_reason_value(components.get('why_local_only') or row.get('why_local_only')) or 'none'}",
+        f"- why not watchlist: {_human_reason_value(components.get('why_not_watchlist') or row.get('why_not_watchlist')) or 'none'}",
         "",
         "## Near-miss status",
         *_near_miss_lines(near_miss, row),
@@ -148,10 +149,10 @@ def format_opportunity_audit(
         f"- missing requirements: {_list_value(components.get('missing_requirements') or row.get('missing_requirements'))}",
         "",
         "## What would upgrade this candidate",
-        "- " + "; ".join(upgrade.upgrade_requirements[:8]),
+        "- " + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=8) or "manual analyst review"),
         "",
         "## What would downgrade / invalidate this candidate",
-        "- " + "; ".join(upgrade.downgrade_warnings[:8]),
+        "- " + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=8) or "source correction or failed confirmation"),
         "",
         "## Feedback command",
         f"- make event-feedback-watch PROFILE={profile or 'notify_llm'} FEEDBACK_TARGET='{_audit_feedback_target(row, clean)}'",
@@ -254,44 +255,22 @@ def _operator_presentation_reason(
     return f"quality verdict is {level.replace('_', ' ')}; keep as local research evidence"
 
 
-_HUMAN_REASON_LABELS = {
-    "quality_context_missing": "missing enough validated context",
-    "needs_direct_token_mechanism": "needs proof that this event directly affects the token",
-    "needs_market_confirmation": "no convincing market reaction yet",
-    "market_confirmation": "no convincing market reaction yet",
-    "cause_unknown_market_dislocation": "token moved, but the cause is unknown",
-    "generic_cooccurrence_only": "token and event appeared together, but no impact mechanism was proven",
-    "impact_path_type_insufficient_data": "not enough evidence to establish the impact mechanism",
-    "impact_path_not_strong_enough": "impact path is not strong enough yet",
-    "needs_strong_market_confirmation": "needs stronger price/volume confirmation",
-    "blocked_by_low_score": "research score is still too low",
-}
-
-
 def _human_reason_list(values: Iterable[Any]) -> str:
-    out: list[str] = []
-    for value in values:
-        text = str(value or "").strip()
-        if not text:
-            continue
-        out.append(_HUMAN_REASON_LABELS.get(text, text.replace("_", " ")))
-    return "; ".join(dict.fromkeys(out))
+    return event_alpha_reason_text.humanize_event_alpha_reasons(values, limit=8)
+
+
+def _human_reason_value(value: Any) -> str:
+    if value in (None, "", [], ()):
+        return ""
+    if isinstance(value, str):
+        return event_alpha_reason_text.humanize_event_alpha_reason(value)
+    if isinstance(value, Iterable) and not isinstance(value, Mapping):
+        return _human_reason_list(value)
+    return event_alpha_reason_text.humanize_event_alpha_reason(value)
 
 
 def _human_action_list(values: Iterable[Any]) -> str:
-    mapping = {
-        "targeted_market_refresh": "refresh market/volume context",
-        "targeted_derivatives_refresh": "check derivatives crowding",
-        "targeted_supply_refresh": "check supply pressure",
-        "targeted_evidence_refresh": "find independent catalyst evidence",
-        "operator_review": "manual analyst review",
-    }
-    out: list[str] = []
-    for value in values:
-        text = str(value or "").strip()
-        if text:
-            out.append(mapping.get(text, text.replace("_", " ")))
-    return "; ".join(dict.fromkeys(out))
+    return event_alpha_reason_text.humanize_event_alpha_actions(values, limit=8)
 
 
 def _find_core_match(

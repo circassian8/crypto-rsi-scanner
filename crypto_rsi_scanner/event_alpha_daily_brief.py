@@ -19,6 +19,7 @@ from . import (
     event_alpha_run_ledger,
     event_alpha_router,
     event_opportunity_verdict,
+    event_alpha_reason_text,
     event_research_cards,
     event_source_reliability,
     event_watchlist,
@@ -711,36 +712,8 @@ def _near_miss_diagnostic_lines(
     return lines
 
 
-_FRIENDLY_REASONS = {
-    "quality_context_missing": "missing enough validated context",
-    "needs_direct_token_mechanism": "needs proof that this event directly affects the token",
-    "needs_market_confirmation": "no convincing market reaction yet",
-    "market_confirmation": "no convincing market reaction yet",
-    "cause_unknown_market_dislocation": "token moved, but the cause is unknown",
-    "generic_cooccurrence_only": "token and event appeared together, but no impact mechanism was proven",
-    "impact_path_type_insufficient_data": "not enough evidence to establish the impact mechanism",
-    "impact_path_not_strong_enough": "impact path is not strong enough yet",
-    "score_below_promotion_threshold": "research score is below the promotion threshold",
-    "needs_strong_market_confirmation": "needs stronger price/volume confirmation",
-    "market_confirmation_level": "needs clearer market confirmation",
-    "source_low_quality": "needs a stronger independent source",
-    "needs_higher_quality_source": "needs a stronger independent source",
-    "blocked_by_low_score": "research score is still too low",
-    "blocked_by_source_noise": "source/noise risk is still too high",
-    "source_noise": "source text looks like publisher/noise rather than asset evidence",
-    "ticker_collision": "ticker collision risk",
-    "ticker_word_collision": "ticker word collision risk",
-    "source_origin_only_identity": "asset identity came only from source/publisher context",
-    "identity_low_confidence": "asset identity confidence is too low",
-    "rejected_candidate_asset": "candidate asset evidence was rejected",
-}
-
-
 def _friendly_reason(reason: object) -> str:
-    text = str(reason or "").strip()
-    if not text:
-        return ""
-    return _FRIENDLY_REASONS.get(text, text.replace("_", " "))
+    return event_alpha_reason_text.humanize_event_alpha_reason(reason)
 
 
 def _friendly_reason_list(reasons: Iterable[object]) -> str:
@@ -750,15 +723,7 @@ def _friendly_reason_list(reasons: Iterable[object]) -> str:
 
 
 def _friendly_action(action: object) -> str:
-    text = str(action or "").strip()
-    mapping = {
-        "targeted_market_refresh": "refresh market/volume context",
-        "targeted_derivatives_refresh": "check OI/funding/derivatives crowding",
-        "targeted_supply_refresh": "check unlock/supply pressure",
-        "targeted_evidence_refresh": "find independent catalyst evidence",
-        "operator_review": "manual analyst review",
-    }
-    return mapping.get(text, text.replace("_", " "))
+    return event_alpha_reason_text.humanize_event_alpha_action(action)
 
 
 def _friendly_action_list(actions: Iterable[object]) -> str:
@@ -1356,7 +1321,7 @@ def _upgrade_candidate_line(rows: Iterable[event_alpha_router.EventAlphaRouteDec
             continue
         labels.append(
             f"{entry.symbol}/{entry.coin_id}: "
-            + "; ".join(upgrade.upgrade_requirements[:2])
+            + event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=2)
         )
         if len(labels) >= 5:
             break
@@ -1375,7 +1340,7 @@ def _downgrade_risk_line(rows: Iterable[event_alpha_router.EventAlphaRouteDecisi
             continue
         labels.append(
             f"{entry.symbol}/{entry.coin_id}: "
-            + "; ".join(upgrade.downgrade_warnings[:2])
+            + event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=2)
         )
         if len(labels) >= 5:
             break

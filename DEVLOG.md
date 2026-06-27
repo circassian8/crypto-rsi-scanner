@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Lock Event Alpha operator presentation fields · Codex
+**Why:** The operator-facing Event Alpha reports were mostly core-first, but
+reason text still lived in several modules and the signal-quality eval did not
+explicitly guard brief-section, diagnostic-visibility, false-positive, or
+human-readable reason output. A catalyst-frame quality review also showed that
+hidden support rows could still leak into the possible-false-positive section.
+**Changes:**
+- Added `event_alpha_reason_text.py` as the shared translator for Event Alpha
+  reason/action codes used by daily briefs, quality reviews, research cards,
+  opportunity audits, and signal-quality eval output.
+- Extended the signal-quality eval with `brief_section`,
+  `diagnostic_visibility`, `false_positive_reason`, and
+  `human_readable_reason`, and pinned key VELVET/RUNE/MemeCore/HYPE/BTC fixture
+  expectations to those fields.
+- Tightened research-card index content fallback so cards are not classified as
+  diagnostics merely because they contain generic diagnostic wording.
+- Tightened quality-review possible-false-positive filtering so promoted core
+  opportunities and ordinary missing-context/local-only support rows do not
+  appear suspicious unless explicit source-noise, identity collision, generic
+  co-occurrence, or rejected-identity evidence exists.
+- Updated `DECISIONS.md`, `ROADMAP.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md` with the shared operator-presentation
+  contract.
+**Verify:** `python3 tests/test_indicators.py` passed (484/484); `make
+event-alpha-signal-quality-eval PYTHON=python3` passed (32/32); `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `make
+event-alpha-quality-validation-cycle PYTHON=python3` passed; `make verify
+PYTHON=python3` passed; manual smokes `make event-alpha-daily-brief
+PROFILE=catalyst_frame_e2e PYTHON=python3`, `make event-alpha-quality-review
+PROFILE=catalyst_frame_e2e PYTHON=python3`, and `make event-opportunity-audit
+PROFILE=catalyst_frame_e2e TARGET=VELVET PYTHON=python3` passed.
+**Notes/risks:** Presentation/eval/docs only. No Event Alpha scoring, routing
+eligibility, notification send guards, normal RSI alerting, paper/live trading,
+or deterministic `TRIGGERED_FADE` logic changed.
+
 ## 2026-06-27 — Standardize review zip filename · Codex
 **Why:** Repeated Pro-model handoffs had accumulated many timestamped/hash-
 suffixed zip files in the repo root, which made mobile download and handoff

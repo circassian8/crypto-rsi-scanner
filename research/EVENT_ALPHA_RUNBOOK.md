@@ -621,15 +621,20 @@ and near-miss sections, and near-miss rows are de-duplicated by incident, asset,
 candidate role, and impact path. Near-miss/local-only copy should describe
 what is interesting, what evidence is missing, what would upgrade the row, and
 what would invalidate it in human terms rather than exposing raw reason-code
-strings. The quality review's possible-false-positive section is
-suspicion-only; it requires explicit source-noise, ticker-collision, generic
-co-occurrence, identity, missing-impact-path, or rejected-candidate reason codes
-and should not list strong core opportunities merely because they have
-diagnostic support rows. Research-card indexes and daily-brief card links group
-cards as core, near-miss, local/quality-capped, diagnostic/control, or legacy so
-Pro-model handoffs can inspect the main opportunities first. New card indexes
-use the card's watchlist/quality metadata rather than filename hints when
-possible; the filename/content fallback exists only for legacy artifacts.
+strings. Event Alpha uses a shared reason-text helper for daily briefs, quality
+reviews, research cards, opportunity audits, and signal-quality eval output so
+operator-facing explanations stay consistent across reports. The quality
+review's possible-false-positive section is suspicion-only; it requires
+explicit source-noise, ticker-collision, generic co-occurrence, identity, or
+rejected-candidate evidence. Missing context, weak impact paths, and missing
+direct impact paths are local-only blockers, not false-positive labels by
+themselves, and should not make strong core opportunities appear suspicious
+merely because they have diagnostic support rows. Research-card indexes and
+daily-brief card links group cards as core, near-miss, local/quality-capped,
+diagnostic/control, or legacy so Pro-model handoffs can inspect the main
+opportunities first. New card indexes use the card's watchlist/quality metadata
+rather than filename hints when possible; the filename/content fallback exists
+only for legacy artifacts.
 Validated cards also choose playbook and invalidation copy from the impact path
 and catalyst frame: AAVE/Kraken-style strategic investment cards should talk
 about stake/valuation risk, VELVET/SpaceX-style proxy cards should talk about

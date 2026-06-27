@@ -11,6 +11,7 @@ from . import (
     event_core_opportunities,
     event_alpha_quality_fields,
     event_alpha_router,
+    event_alpha_reason_text,
     event_opportunity_verdict,
     event_watchlist,
 )
@@ -329,9 +330,28 @@ def _rejected_review(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _possible_false_positives(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    promoted_core_keys = {
+        event_core_opportunities.incident_asset_key_for_opportunity(item)
+        for item in event_core_opportunities.aggregate_core_opportunities(rows)
+        if item.alertable or item.is_high_priority or item.is_watchlist or item.is_validated_digest
+    }
+    promoted_asset_keys = {
+        event_core_opportunities.asset_key_for_opportunity(item)
+        for item in event_core_opportunities.aggregate_core_opportunities(rows)
+        if item.alertable or item.is_high_priority or item.is_watchlist or item.is_validated_digest
+    }
     return [
         row for row in rows
         if _false_positive_suspicion_reason(row) is not None
+        and event_core_opportunities.incident_asset_key_for_values(
+            row.get("incident_id") or (row.get("_components") or {}).get("incident_id"),
+            row.get("coin_id") or row.get("validated_coin_id") or (row.get("_components") or {}).get("validated_coin_id"),
+            row.get("symbol") or row.get("validated_symbol") or (row.get("_components") or {}).get("validated_symbol"),
+        ) not in promoted_core_keys
+        and event_core_opportunities.asset_key_for_values(
+            row.get("coin_id") or row.get("validated_coin_id") or (row.get("_components") or {}).get("validated_coin_id"),
+            row.get("symbol") or row.get("validated_symbol") or (row.get("_components") or {}).get("validated_symbol"),
+        ) not in promoted_asset_keys
     ]
 
 
@@ -346,9 +366,7 @@ _FALSE_POSITIVE_SUSPICION_TERMS = {
     "identity_low_confidence",
     "source_origin_only_identity",
     "identity_source_origin_rejected",
-    "missing_direct_impact_path",
     "common_word_collision",
-    "quality_context_missing",
     "rejected_candidate_asset",
     "publisher_suffix_false_positive",
     "identity_url_only_rejected",
@@ -560,7 +578,10 @@ def _upgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
         return ["- none"]
     out = []
     for _score, row, upgrade in sorted(candidates, key=lambda item: item[0], reverse=True)[:limit]:
-        out.append(f"- {_label(row)}: {', '.join(upgrade.upgrade_requirements[:3])}")
+        out.append(
+            f"- {_label(row)}: "
+            + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=3) or "manual analyst review")
+        )
     return out
 
 
@@ -575,7 +596,10 @@ def _downgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
         return ["- none"]
     out = []
     for _score, row, upgrade in sorted(candidates, key=lambda item: item[0], reverse=True)[:limit]:
-        out.append(f"- {_label(row)}: {', '.join(upgrade.downgrade_warnings[:3])}")
+        out.append(
+            f"- {_label(row)}: "
+            + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=3) or "source correction or failed confirmation")
+        )
     return out
 
 
@@ -703,7 +727,7 @@ def _common_blockers(rows: list[dict[str, Any]]) -> dict[str, int]:
     for row in rows:
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=row.get("_components") or row)
         for value in (*upgrade.upgrade_requirements, *upgrade.downgrade_warnings):
-            key = str(value or "").strip()
+            key = event_alpha_reason_text.humanize_event_alpha_reason(value)
             if key:
                 counts[key] = counts.get(key, 0) + 1
     return counts

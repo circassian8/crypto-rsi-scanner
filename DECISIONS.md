@@ -28,9 +28,11 @@ validated-routing, signal-quality, suppression, and other row-level dumps belong
 under a Diagnostics Appendix unless explicitly requested. Possible
 false-positive lists should require explicit suspicion reason codes such as
 source noise, ticker collision, generic co-occurrence, low-confidence identity,
-source-origin-only identity, missing direct impact path, common-word collision,
-quality-context-missing, invalid subjects, diagnostic-only rows, or rejected
-candidate asset evidence. Research-card grouping should use stored
+source-origin-only identity, common-word collision, invalid subjects,
+diagnostic-only rows, or rejected candidate asset evidence. Missing context,
+weak impact paths, and missing direct impact paths are local-only blockers by
+themselves, not false-positive suspicion labels unless paired with explicit
+noise/collision/co-occurrence evidence. Research-card grouping should use stored
 watchlist/quality metadata when available, and daily-brief card links should use
 the same core, near-miss, local/quality-capped, diagnostic/control, and legacy
 groups as card indexes. Content/filename fallback exists only for legacy

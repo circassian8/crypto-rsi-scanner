@@ -14,6 +14,7 @@ from . import (
     event_core_opportunities,
     event_graph,
     event_opportunity_verdict,
+    event_alpha_reason_text,
     event_watchlist,
     event_watchlist_monitor,
 )
@@ -157,7 +158,7 @@ def render_research_card(
                 f"{entry.quality_state_block_reason or state_block_reason or 'quality verdict did not allow active watchlist state'}."
             ),
             "- What would upgrade this candidate: " + (
-                "; ".join(entry.upgrade_requirements[:3])
+                event_alpha_reason_text.humanize_event_alpha_reasons(entry.upgrade_requirements, limit=3)
                 if entry.upgrade_requirements
                 else "recompute quality with validated impact path, specific evidence, and market confirmation"
             ),
@@ -501,7 +502,8 @@ def _card_index_group_for_text(text: str) -> str | None:
         "source_noise_control" in text
         or "ticker_word_collision" in text
         or "generic_cooccurrence_only" in text
-        or "diagnostic" in text
+        or "publisher/source name is not asset identity" in text
+        or "ticker/common-word collision risk" in text
     ):
         return "Diagnostic / Source-Noise / Control Cards"
     if "local-only after quality/state gate" in text or "quality_blocked" in text:
@@ -905,13 +907,18 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
             if manual_verification_items
             else "independent catalyst source, asset identity, liquidity/organic volume, and whether the catalyst actually affects this token."
         ),
-        "- What would upgrade this candidate: " + "; ".join(upgrade.upgrade_requirements[:6]),
-        "- What would invalidate this candidate: " + "; ".join(upgrade.downgrade_warnings[:6]),
+        "- What would upgrade this candidate: "
+        + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=6) or "manual analyst review"),
+        "- What would invalidate this candidate: "
+        + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=6) or "source correction or failed confirmation"),
     ]
     if validation_reasons:
         lines.append("- Validation evidence: " + "; ".join(str(item) for item in validation_reasons[:4]))
     if why_not_promoted:
-        lines.append("- Why not promoted diagnostics: " + "; ".join(str(item) for item in why_not_promoted[:4]))
+        lines.append(
+            "- Why not promoted diagnostics: "
+            + event_alpha_reason_text.humanize_event_alpha_reasons(why_not_promoted, limit=4)
+        )
     return lines
 
 

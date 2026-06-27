@@ -28,7 +28,10 @@
         "watchlist_eligible": true,
         "high_priority_eligible": true,
         "triggered_fade": false,
-        "reason_codes": "contains:proxy_market_attention_confirmed"
+        "reason_codes": "contains:proxy_market_attention_confirmed",
+        "brief_section": "high_priority_core",
+        "diagnostic_visibility": "main_section",
+        "false_positive_reason": "none"
       }
     },
     {
@@ -62,7 +65,10 @@
         "qualified_link_count": 1,
         "link_quality_reasons": "contains:qualified_hypothesis_link",
         "diagnostic_hidden_by_default": false,
-        "triggered_fade": false
+        "triggered_fade": false,
+        "brief_section": "high_priority_core",
+        "diagnostic_visibility": "main_section",
+        "false_positive_reason": "none"
       }
     },
     {
@@ -185,7 +191,11 @@
         "route_tier": "STORE_ONLY",
         "digest_eligible": false,
         "watchlist_eligible": false,
-        "triggered_fade": false
+        "triggered_fade": false,
+        "brief_section": "near_miss",
+        "diagnostic_visibility": "review_section",
+        "false_positive_reason": "none",
+        "human_readable_reason": "impact path is too weak for alerting"
       }
     },
     {
@@ -584,7 +594,11 @@
       "expected": {
         "route_tier": "STORE_ONLY",
         "watchlist_eligible": false,
-        "identity_rejection_reason": "generic_symbol_without_project_identity"
+        "identity_rejection_reason": "generic_symbol_without_project_identity",
+        "brief_section": "diagnostics",
+        "diagnostic_visibility": "hidden_by_default",
+        "false_positive_reason": "ticker_collision",
+        "human_readable_reason": "generic ticker word without project identity"
       }
     },
     {
@@ -624,7 +638,11 @@
       "expected": {
         "route_tier": "STORE_ONLY",
         "watchlist_eligible": false,
-        "identity_rejection_reason": "publisher_source_name_not_asset_identity"
+        "identity_rejection_reason": "publisher_source_name_not_asset_identity",
+        "brief_section": "diagnostics",
+        "diagnostic_visibility": "hidden_by_default",
+        "false_positive_reason": "source_noise",
+        "human_readable_reason": "publisher/source name is not asset identity"
       }
     },
     {

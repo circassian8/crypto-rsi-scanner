@@ -21996,6 +21996,10 @@ def test_event_alpha_signal_quality_fixture_passes_and_reports_stage_failure():
     assert result.total_cases >= 13
     text = quality.format_signal_quality_eval(result)
     assert "failures_by_stage: none" in text
+    assert "brief_section=" in text
+    assert "diagnostic_visibility=" in text
+    assert "false_positive=" in text
+    assert "reason=\"" in text
 
     cases = list(quality.load_signal_quality_cases())
     cases[0] = {**cases[0], "expected": {**dict(cases[0]["expected"]), "route_tier": "STORE_ONLY"}}
