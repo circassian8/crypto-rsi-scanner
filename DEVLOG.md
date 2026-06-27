@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Add frame-quality loop and sector-link guard · Codex
+**Why:** The catalyst-frame layer needed a single no-send operator loop that
+proves the full artifact chain, and incident relevance needed to stop treating
+sector placeholder identities such as `SECTOR/sports_fan_proxy` as qualified
+crypto links.
+**Changes:**
+- Added `make event-alpha-frame-quality-loop`, which runs signal-quality eval,
+  regenerates catalyst-frame e2e artifacts, reruns quality review, incident
+  report, impact-hypothesis report, daily brief, strict artifact doctor, and an
+  opportunity audit target.
+- Made test-artifact inclusion apply to catalyst-frame fixture profiles so
+  strict doctor/report targets inspect current fixture rows.
+- Broadened incident sector-placeholder detection for taxonomy identities such
+  as sports fan proxy, political meme proxy, AI/RWA proxy, tokenized-stock
+  venue, and prediction-market infrastructure, and exposed
+  `sector_only_link_count` alongside the legacy generic counter.
+- Extended regression coverage so `notify_llm_quality_frame` proves the
+  AAVE/Kraken strategic-stake frame through live-style run-ledger/incident
+  artifacts, THORChain/RUNE does not leak unrelated direct subjects, and broad
+  sports-sector placeholder rows remain unqualified.
+- Updated `ROADMAP.md`, `DECISIONS.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md`.
+**Verify:** `python3 tests/test_indicators.py` passed (475/475);
+`python3 -m compileall -q crypto_rsi_scanner tests` passed; `make
+event-alpha-signal-quality-eval PYTHON=python3` passed; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `make
+event-alpha-frame-quality-loop PYTHON=python3` passed; `make event-llm-eval
+PYTHON=python3` passed (9/9); `make event-llm-extract-eval PYTHON=python3`
+passed (7/7); `make event-alpha-eval PYTHON=python3` passed (11/11); `make
+event-alpha-quality-validation-cycle PYTHON=python3` passed; `make verify
+PYTHON=python3` passed.
+**Notes/risks:** Research-only artifact/report hardening. The new loop sends
+nothing, opens no paper/live trades, writes no normal RSI rows, and cannot
+create `TRIGGERED_FADE`.
+
 ## 2026-06-27 — Polish catalyst-frame live-style reports · Codex
 **Why:** The LLM catalyst-frame layer needed to be operationally consistent in
 live-style quality profiles, with clear skip reasons, no stale daily-brief

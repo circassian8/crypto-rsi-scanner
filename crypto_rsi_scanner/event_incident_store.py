@@ -104,6 +104,7 @@ class IncidentLinkQuality:
             "quality_blocked_link_count": self.quality_blocked_link_count,
             "unknown_role_link_count": self.unknown_role_link_count,
             "generic_sector_only_link_count": self.generic_sector_only_link_count,
+            "sector_only_link_count": self.generic_sector_only_link_count,
             "link_quality_reasons": self.link_quality_reasons,
             "link_quality_warnings": self.link_quality_warnings,
         }
@@ -1031,7 +1032,23 @@ def _strong_sector_hypothesis(row: Mapping[str, Any], *, incident: event_inciden
 
 
 def _is_sector_identity(*, symbol: str, coin_id: str) -> bool:
-    return symbol.upper() in {"", "SECTOR", "UNKNOWN"} and coin_id.casefold() in {"", "sector", "unknown", "market_anomaly_unknown"}
+    symbol_key = symbol.upper()
+    coin_key = coin_id.casefold()
+    if symbol_key in {"SECTOR", "UNKNOWN"}:
+        return True
+    if not symbol_key and coin_key in {"", "sector", "unknown", "market_anomaly_unknown"}:
+        return True
+    return coin_key in {
+        "sector",
+        "unknown",
+        "market_anomaly_unknown",
+        "sports_fan_proxy",
+        "political_meme_proxy",
+        "ai_ipo_proxy",
+        "rwa_preipo_proxy",
+        "tokenized_stock_venue",
+        "prediction_market_infra",
+    }
 
 
 def _first_text(*values: Any) -> str:
@@ -1650,6 +1667,8 @@ def _row_with_effective_relevance(row: Mapping[str, Any]) -> dict[str, Any]:
 
 def _ensure_existing_link_quality(data: dict[str, Any]) -> None:
     if "qualified_link_count" in data and "link_quality_reasons" in data:
+        if "sector_only_link_count" not in data:
+            data["sector_only_link_count"] = int(data.get("generic_sector_only_link_count") or 0)
         return
     summary = _link_quality_from_existing_row(data)
     data.setdefault("raw_link_count", summary.raw_link_count)
@@ -1660,6 +1679,7 @@ def _ensure_existing_link_quality(data: dict[str, Any]) -> None:
     data.setdefault("quality_blocked_link_count", summary.quality_blocked_link_count)
     data.setdefault("unknown_role_link_count", summary.unknown_role_link_count)
     data.setdefault("generic_sector_only_link_count", summary.generic_sector_only_link_count)
+    data.setdefault("sector_only_link_count", summary.generic_sector_only_link_count)
     data.setdefault("link_quality_reasons", summary.link_quality_reasons)
     data.setdefault("link_quality_warnings", summary.link_quality_warnings)
 

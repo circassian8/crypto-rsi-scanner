@@ -22519,6 +22519,7 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     assert "event-alpha-catalyst-frame-validation-cycle" in text
     assert "event-alpha-catalyst-frame-e2e-cycle" in text
     assert "event-alpha-notify-llm-quality-frame-smoke" in text
+    assert "event-alpha-frame-quality-loop" in text
 
 
 def test_event_alpha_catalyst_frame_e2e_cycle_writes_frame_artifacts():
@@ -22529,42 +22530,11 @@ def test_event_alpha_catalyst_frame_e2e_cycle_writes_frame_artifacts():
     from pathlib import Path
     from crypto_rsi_scanner import config, scanner
 
-    attrs = (
-        "EVENT_DISCOVERY_EVENTS_PATH",
-        "EVENT_DISCOVERY_ALIASES_PATH",
-        "EVENT_DISCOVERY_UNIVERSE_PATH",
-        "EVENT_DISCOVERY_UNIVERSE_LIVE",
-        "EVENT_MARKET_ENRICHMENT_ENABLED",
-        "EVENT_ANOMALY_SCANNER_ENABLED",
-        "EVENT_CATALYST_SEARCH_ENABLED",
-        "EVENT_IMPACT_HYPOTHESIS_SEARCH_ENABLED",
-        "EVENT_IMPACT_HYPOTHESIS_CANDIDATE_DISCOVERY_ENABLED",
-        "EVENT_WATCHLIST_ENABLED",
-        "EVENT_WATCHLIST_STATE_PATH",
-        "EVENT_ALPHA_ROUTER_ENABLED",
-        "EVENT_ALPHA_ALERT_STORE_PATH",
-        "EVENT_ALPHA_RUN_LEDGER_PATH",
-        "EVENT_INCIDENT_STORE_PATH",
-        "EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
-        "EVENT_RESEARCH_CARDS_DIR",
-        "EVENT_ALPHA_DAILY_BRIEF_PATH",
-        "EVENT_ALPHA_RUN_MODE",
-        "EVENT_ALPHA_ARTIFACT_NAMESPACE",
-        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
-        "EVENT_ALERTS_ENABLED",
-        "EVENT_RESEARCH_CARDS_AUTO_WRITE",
-        "EVENT_RESEARCH_CARDS_WRITE_TIERS",
-        "EVENT_LLM_ENABLED",
-        "EVENT_LLM_PROVIDER",
-        "EVENT_LLM_MODE",
-        "EVENT_LLM_EXTRACTOR_ENABLED",
-        "EVENT_LLM_CATALYST_FRAMES_ENABLED",
-        "EVENT_LLM_CATALYST_FRAMES_PROVIDER",
-        "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN",
-        "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE",
-        "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS",
-    )
-    original = {name: getattr(config, name) for name in attrs}
+    original = {
+        name: getattr(config, name)
+        for name in dir(config)
+        if name.startswith(("EVENT_", "TELEGRAM_"))
+    }
 
     def read_jsonl(path):
         return [
@@ -22635,6 +22605,33 @@ def test_event_alpha_catalyst_frame_e2e_cycle_writes_frame_artifacts():
                 "Main catalyst: acquisition_or_stake" in path.read_text(encoding="utf-8")
                 for path in card_files
             )
+
+            notify_out = io.StringIO()
+            with contextlib.redirect_stdout(notify_out):
+                scanner.event_alpha_cycle(
+                    profile_name="notify_llm_quality_frame",
+                    event_now="2026-06-15T16:00:00Z",
+                )
+            notify_text = notify_out.getvalue()
+            assert "catalyst_frames=5/5" in notify_text
+            notify_run_rows = read_jsonl(config.EVENT_ALPHA_RUN_LEDGER_PATH)
+            notify_latest = notify_run_rows[-1]
+            assert notify_latest["profile"] == "notify_llm_quality_frame"
+            assert notify_latest["send_requested"] is False
+            assert isinstance(notify_latest["catalyst_frames_analyzed"], int)
+            assert isinstance(notify_latest["catalyst_frame_validations"], int)
+            assert isinstance(notify_latest["catalyst_frame_disagreements"], int)
+            assert isinstance(notify_latest["catalyst_frame_unresolved"], int)
+            assert isinstance(notify_latest["catalyst_frame_rows_skipped"], int)
+            assert isinstance(notify_latest["catalyst_frame_skip_reasons"], dict)
+            assert notify_latest["catalyst_frames_analyzed"] == 5
+            assert notify_latest["catalyst_frame_validations"] == 5
+            notify_incidents = read_jsonl(config.EVENT_INCIDENT_STORE_PATH)
+            notify_aave = next(row for row in notify_incidents if row.get("main_frame_subject") == "Aave")
+            assert notify_aave["event_archetype"] == "strategic_investment"
+            assert notify_aave["main_frame_type"] == "acquisition_or_stake"
+            assert notify_aave["main_frame_actor"] == "Kraken"
+            assert notify_aave["main_frame_type"] != "exploit_security_event"
         finally:
             for name, value in original.items():
                 setattr(config, name, value)
@@ -24073,6 +24070,49 @@ def test_event_incident_relevance_gates_raw_external_observations():
     assert openai_relevance["qualified_link_count"] == 0
     assert "weak_unqualified_hypothesis_link" in openai_relevance["link_quality_reasons"]
 
+    sports_raw = raw(
+        "sweden_sports_sector_relevance",
+        "Sweden World Cup odds move",
+        "A broad sports event references fan-token sectors, but no concrete crypto asset is validated.",
+        confidence=0.84,
+    )
+    sports_event = NormalizedEvent(
+        "evt_sweden_sports_sector_relevance",
+        (sports_raw.raw_id,),
+        "Sweden World Cup odds move",
+        "sports_event",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (sports_raw.source_url,),
+        "World Cup",
+        sports_raw.body,
+        0.84,
+    )
+    sports_incident = event_incident_graph.build_incidents((sports_event,), {sports_raw.raw_id: sports_raw})[0]
+    sports_relevance = event_incident_store.classify_incident_relevance(
+        sports_incident,
+        raw_by_id={sports_raw.raw_id: sports_raw},
+        watchlist_rows=({
+            "key": "watch:sector:sports",
+            "incident_id": sports_incident.incident_id,
+            "state": "WATCHLIST",
+            "final_state_after_quality_gate": "WATCHLIST",
+            "symbol": "SECTOR",
+            "coin_id": "sports_fan_proxy",
+            "candidate_role": "proxy_instrument",
+            "impact_path_type": "fan_token_attention",
+            "evidence_specificity": "direct_token_mechanism",
+            "opportunity_level": "watchlist",
+            "opportunity_score_final": 82,
+        },),
+    )
+    assert sports_relevance["incident_relevance_status"] != "active_incident"
+    assert sports_relevance["qualified_link_count"] == 0
+    assert sports_relevance["sector_only_link_count"] == 1
+    assert "sector_only_unqualified_link" in sports_relevance["link_quality_reasons"]
+
     fannie_raw = raw(
         "fannie_rwa_candidate",
         "Fannie Mae pre-IPO tokenized stock venue watch",
@@ -24723,6 +24763,7 @@ def test_event_alpha_quality_make_targets_exist_and_do_not_send():
         "event-alpha-export-signal-quality-cases",
         "event-alpha-quality-loop",
         "event-alpha-quality-loop-llm",
+        "event-alpha-frame-quality-loop",
     ):
         assert f"{target}:" in text
     loop = text.split("event-alpha-quality-loop:", 1)[1].split("event-alpha-quality-loop-llm:", 1)[0]
@@ -24734,6 +24775,19 @@ def test_event_alpha_quality_make_targets_exist_and_do_not_send():
     assert "event-alpha-daily-brief" in loop
     assert "event-alpha-cycle-send" not in loop
     assert "event-alert-send" not in loop
+    frame_loop = text.split("event-alpha-frame-quality-loop:", 1)[1].split("event-alpha-signal-quality-eval:", 1)[0]
+    assert "event-alpha-signal-quality-eval" in frame_loop
+    assert "event-alpha-catalyst-frame-e2e-cycle" in frame_loop
+    assert "event-alpha-quality-review" in frame_loop
+    assert "event-incidents-report" in frame_loop
+    assert "event-impact-hypotheses-report" in frame_loop
+    assert "event-alpha-daily-brief" in frame_loop
+    assert "event-alpha-artifact-doctor" in frame_loop
+    assert "STRICT=1" in frame_loop
+    assert "event-opportunity-audit" in frame_loop
+    assert "TARGET=$(TARGET)" in frame_loop
+    assert "event-alpha-cycle-send" not in frame_loop
+    assert "event-alert-send" not in frame_loop
 
 
 def test_notify_llm_quality_profile_and_make_target_are_no_send():

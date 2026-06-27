@@ -176,6 +176,7 @@ weaker deterministic frame. Use:
 make event-alpha-catalyst-frame-validation-cycle PYTHON=python3
 make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3
 make event-alpha-notify-llm-quality-frame-smoke PYTHON=python3
+make event-alpha-frame-quality-loop PROFILE=catalyst_frame_e2e PYTHON=python3
 make event-opportunity-audit TARGET=AAVE PROFILE=catalyst_frame_e2e PYTHON=python3
 make event-alpha-daily-brief PROFILE=catalyst_frame_e2e PYTHON=python3
 ```
@@ -193,6 +194,11 @@ fixture catalyst-frame output, keeps sends disabled, and prints the cycle, daily
 brief, impact-hypothesis report, incident report, quality review, and strict
 artifact doctor. This is the preferred smoke before changing frame counters,
 skip reasons, or `notify_llm_quality` report wiring.
+Use `make event-alpha-frame-quality-loop PROFILE=catalyst_frame_e2e` for the
+full frame-quality review chain: signal-quality eval, regenerated e2e
+artifacts, quality review, incident report, impact-hypothesis report, daily
+brief, strict artifact doctor, and an AAVE opportunity audit. It is no-send and
+fixture-backed by default.
 
 Live-style profiles also record when catalyst-frame analysis was required but
 missing or unresolved. Run ledgers and daily briefs expose analyzed, validated,
@@ -534,6 +540,7 @@ make event-alpha-quality-coverage-report PROFILE=notify_llm_quality
 make event-alpha-policy-simulate PROFILE=notify_llm
 make event-alpha-export-signal-quality-cases PROFILE=notify_llm
 make event-alpha-quality-loop PROFILE=notify_llm
+make event-alpha-frame-quality-loop PROFILE=catalyst_frame_e2e
 ```
 
 `event-alpha-quality-review` groups current artifacts by opportunity level,
@@ -580,6 +587,13 @@ review proposed cases before promoting them into the canonical eval.
 6. `event-alpha-daily-brief`
 
 It intentionally does not run any send target.
+`event-alpha-frame-quality-loop` is the catalyst-frame equivalent for the
+AAVE/Kraken/KelpDAO and VELVET/SpaceX fixture spine. It regenerates the
+`catalyst_frame_e2e` namespace, then reruns quality review, incident and
+hypothesis reports, daily brief, strict artifact doctor, and an AAVE
+opportunity audit. It is intended to prove main-catalyst selection, background
+frame rejection, asset-role safety, aggregation, route consistency, and report
+coherence together.
 
 The report defaults to the latest stored `run_id` while still printing
 total/latest/historical/legacy availability. Use `ALL_HISTORY=1` for the older

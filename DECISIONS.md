@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Sector placeholders are not qualified incident asset links
+**Status:** accepted
+**Decision:** Event Alpha incident relevance must treat taxonomy/sector
+identities such as `SECTOR`, `sports_fan_proxy`, `political_meme_proxy`,
+`ai_ipo_proxy`, `rwa_preipo_proxy`, `tokenized_stock_venue`, and
+`prediction_market_infra` as sector placeholders, not validated affected crypto
+assets. They may keep broad incidents visible as research candidates, but they
+must not qualify an active/linked incident unless a deterministic resolver or
+validated asset row supplies a concrete token/project identity.
+**Why:** Broad external events can mention fan-token, proxy, or venue sectors
+without naming a tradable asset. Treating those taxonomy placeholders as
+qualified crypto links made broad incidents look more actionable than the
+evidence supported.
+**Revisit when:** A typed incident graph distinguishes sector taxonomy nodes
+from validated asset nodes at schema level and reports them separately.
+
 ## 2026-06-27 - Catalyst-frame coverage must be operator-auditable
 **Status:** accepted
 **Decision:** Live-style Event Alpha profiles that depend on catalyst-frame
