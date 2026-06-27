@@ -140,6 +140,15 @@ the stale stored final state. Artifact doctor treats rows loaded from a resolved
 profile namespace as path-scoped current artifacts even if older watchlist rows
 are missing embedded `profile`, `run_mode`, or `artifact_namespace` fields;
 missing metadata must not hide active-state quality conflicts.
+Lifecycle state caps are not automatically route blockers. A row with
+`opportunity_level=watchlist` may be capped from requested `HIGH_PRIORITY` state
+to final `WATCHLIST` state and still remain eligible for digest/watchlist
+research routing. Only route-quality gates such as local-only verdicts,
+insufficient impact/evidence/source, zero final score, source noise, ticker
+collision, missing identity, profile policy, or stale-market caps below the
+route threshold should force `STORE_ONLY`. Artifact doctor similarly separates
+quality-blocked support links that are present for diagnostics from
+quality-blocked links that would be the only active incident support.
 Impact review now also includes claim and incident context. Check
 `cause_status`, `claim_polarities`, `claim_history`, `primary_subject`,
 `affected_ecosystem`, `candidate_role`, `role_confidence`, and

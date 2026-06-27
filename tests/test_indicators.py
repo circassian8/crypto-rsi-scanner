@@ -10513,9 +10513,22 @@ def test_event_alpha_near_miss_refreshes_market_context_without_triggering_fade(
     near = event_near_miss.detect_near_miss_rows((hypothesis,), cfg=event_near_miss.EventNearMissConfig())
     assert len(near) == 1
     assert near[0].symbol == "ENA"
+    assert near[0].core_opportunity_id
     assert "targeted_market_refresh" in near[0].recommended_refresh_actions
     queue = event_near_miss.targeted_market_refresh_queue((hypothesis,), cfg=event_near_miss.EventNearMissConfig())
-    assert queue[0].refresh_id == "refresh:hyp:ena"
+    assert queue[0].refresh_id == f"refresh:{near[0].core_opportunity_id}"
+    duplicate_hypothesis = __import__("dataclasses").replace(
+        hypothesis,
+        hypothesis_id="hyp:ena:support",
+        opportunity_score_final=63,
+        score_components={**hypothesis.score_components, "opportunity_score_final": 63},
+    )
+    deduped_queue = event_near_miss.targeted_market_refresh_queue(
+        (hypothesis, duplicate_hypothesis),
+        cfg=event_near_miss.EventNearMissConfig(),
+    )
+    assert len(deduped_queue) == 1
+    assert deduped_queue[0].core_opportunity_id == near[0].core_opportunity_id
     assert queue[0].reason == "market_confirmation"
 
     generic = event_impact_hypotheses.EventImpactHypothesis(
@@ -10917,7 +10930,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert "weak_impact_path_despite_market_confirmation" in verdict.missing_requirements
     assert verdict.score_components and verdict.score_components["market_confirmation"] > 0
 
-    def entry(symbol, *, state, playbook, q, event_name=None):
+    def entry(symbol, *, state, playbook, q, event_name=None, relationship="proxy_attention", external_asset="World Cup"):
         requested_state = state
         final_state, block_reason = event_watchlist.quality_cap_watchlist_state(requested_state, q)
         capped = bool(block_reason and final_state != requested_state)
@@ -10929,8 +10942,8 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
             event_id=f"event:{symbol}",
             coin_id=symbol.lower(),
             symbol=symbol,
-            relationship_type="proxy_attention",
-            external_asset="World Cup",
+            relationship_type=relationship,
+            external_asset=external_asset,
             event_time="2026-06-25T12:00:00+00:00",
             state=final_state,
             previous_state=event_watchlist.EventWatchlistState.RADAR.value,
@@ -10988,6 +11001,33 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
         playbook=event_playbooks.EventPlaybookType.PROXY_ATTENTION.value,
         q=quality("watchlist", 82),
     )
+    rune_quality = quality(
+        "watchlist",
+        83,
+        path="exploit_security_event",
+        role="direct_subject",
+        source="crypto_news",
+        specificity="direct_token_mechanism",
+    )
+    rune_quality.update({
+        "validated_symbol": "RUNE",
+        "validated_coin_id": "thorchain",
+        "validation_stage": "impact_path_validated",
+        "impact_category": event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK.value,
+        "playbook_type": event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK.value,
+        "impact_path_reason": "exploit_security_event",
+        "market_confirmation_level": "moderate",
+        "market_confirmation_score": 65,
+    })
+    rune = entry(
+        "RUNE",
+        state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        playbook=event_playbooks.EventPlaybookType.SECURITY_OR_REGULATORY_SHOCK.value,
+        q=rune_quality,
+        event_name="THORChain RUNE exploit validated impact hypothesis",
+        relationship="impact_hypothesis",
+        external_asset="THORChain",
+    )
     high = entry(
         "HIGH",
         state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
@@ -11004,16 +11044,24 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     routed = event_alpha_router.route_watchlist(
         event_watchlist.EventWatchlistReadResult(
             state_path=Path("watchlist.jsonl"),
-            rows_read=6,
+            rows_read=7,
             latest_only=True,
-            entries=[btc, zero, digest, watch, high, trigger],
+            entries=[btc, zero, digest, watch, rune, high, trigger],
         ),
-        cfg=event_alpha_router.EventAlphaRouterConfig(enabled=True, score_jump_threshold=10),
+        cfg=event_alpha_router.EventAlphaRouterConfig(
+            enabled=True,
+            score_jump_threshold=10,
+            validated_hypothesis_digest_enabled=True,
+        ),
     )
     by_symbol = {decision.entry.symbol: decision for decision in routed.decisions}
     assert event_watchlist.final_state_value(btc) == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value
     assert event_watchlist.requested_state_value(btc) == event_watchlist.EventWatchlistState.WATCHLIST.value
     assert event_watchlist.state_is_quality_capped(btc) is True
+    assert event_watchlist.requested_state_value(rune) == event_watchlist.EventWatchlistState.HIGH_PRIORITY.value
+    assert event_watchlist.final_state_value(rune) == event_watchlist.EventWatchlistState.WATCHLIST.value
+    assert event_watchlist.state_is_quality_capped(rune) is True
+    assert rune.quality_state_block_reason == "opportunity_level_caps_state:watchlist"
     assert event_watchlist.final_state_value(watch) == event_watchlist.EventWatchlistState.WATCHLIST.value
     assert event_watchlist.final_state_value(high) == event_watchlist.EventWatchlistState.HIGH_PRIORITY.value
     assert event_watchlist.final_state_value(trigger) == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value
@@ -11026,6 +11074,10 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert by_symbol["ZERO"].quality_gate_block_reason == "opportunity_score_final_zero"
     assert by_symbol["DIG"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
     assert by_symbol["WATCH"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+    assert by_symbol["RUNE"].route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+    assert by_symbol["RUNE"].alertable is True
+    assert by_symbol["RUNE"].quality_gate_block_reason in (None, "")
+    assert "opportunity_level_caps_state:watchlist" not in by_symbol["RUNE"].reason
     assert by_symbol["HIGH"].route == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH
     assert by_symbol["FADE"].route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
     assert by_symbol["FADE"].alertable is True
@@ -11067,6 +11119,11 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert snapshots_by_symbol["WATCH"]["state_quality_capped"] is False
     assert snapshots_by_symbol["WATCH"]["final_state_after_quality_gate"] == "WATCHLIST"
     assert snapshots_by_symbol["WATCH"]["final_tier_after_quality_gate"] == "WATCHLIST"
+    assert snapshots_by_symbol["RUNE"]["requested_state_before_quality_gate"] == "HIGH_PRIORITY"
+    assert snapshots_by_symbol["RUNE"]["final_state_after_quality_gate"] == "WATCHLIST"
+    assert snapshots_by_symbol["RUNE"]["final_route_after_quality_gate"] == "RESEARCH_DIGEST"
+    assert snapshots_by_symbol["RUNE"]["quality_state_block_reason"] == "opportunity_level_caps_state:watchlist"
+    assert snapshots_by_symbol["RUNE"]["quality_gate_block_reason"] in (None, "")
     assert snapshots_by_symbol["HIGH"]["final_route_after_quality_gate"] == "HIGH_PRIORITY_RESEARCH"
     assert snapshots_by_symbol["HIGH"]["final_tier_after_quality_gate"] == "HIGH_PRIORITY_WATCH"
     assert snapshots_by_symbol["FADE"]["final_route_after_quality_gate"] == "TRIGGERED_FADE_RESEARCH"
@@ -11094,7 +11151,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{"run_id": "r1", "alertable": 1, "snapshot_write_success": True, "snapshot_rows_written": len(rows)}],
         alert_rows=rows,
-        watchlist_rows=[btc, zero, digest, watch, high, trigger],
+        watchlist_rows=[btc, zero, digest, watch, rune, high, trigger],
         include_legacy_artifacts=True,
     )
     assert doctor.alertable_route_conflicts_with_opportunity_level == 0
@@ -11224,7 +11281,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     )
     assert doctor_missing_final.status == "BLOCKED"
 
-    daily = event_alpha_daily_brief.build_daily_brief(router_result=routed, watchlist_entries=[btc, zero, digest, watch, high, trigger])
+    daily = event_alpha_daily_brief.build_daily_brief(router_result=routed, watchlist_entries=[btc, zero, digest, watch, rune, high, trigger])
     assert "### Quality Gate Downgrades" in daily
     assert "BTC/btc:RESEARCH_DIGEST->STORE_ONLY" in daily
     assert "### Quality-Capped Watchlist Rows" in daily
@@ -24751,6 +24808,39 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         assert doctor.watchlist_hypothesis_rows_missing_incident_id == 0
         assert doctor.alert_hypothesis_rows_missing_incident_id == 0
         assert doctor.status in {"OK", "WARN"}
+        thor_with_blocked_support = dict(thor_row)
+        thor_with_blocked_support["qualified_link_count"] = max(1, int(thor_with_blocked_support.get("qualified_link_count") or 0))
+        thor_with_blocked_support["quality_blocked_link_count"] = 1
+        doctor_with_diagnostic_link = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-incident-test",
+                "profile": "quality_validation",
+                "run_mode": "test",
+                "artifact_namespace": "quality_validation",
+            }],
+            incident_rows=[thor_with_blocked_support],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor_with_diagnostic_link.quality_blocked_links_present == 1
+        assert doctor_with_diagnostic_link.quality_blocked_links_promoting_incident == 0
+        assert doctor_with_diagnostic_link.status in {"OK", "WARN"}
+        assert "quality_blocked_links_present=1" in event_alpha_artifact_doctor.format_artifact_doctor_report(doctor_with_diagnostic_link)
+        thor_only_blocked_support = dict(thor_with_blocked_support)
+        thor_only_blocked_support["qualified_link_count"] = 0
+        doctor_only_blocked_link = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-incident-test",
+                "profile": "quality_validation",
+                "run_mode": "test",
+                "artifact_namespace": "quality_validation",
+            }],
+            incident_rows=[thor_only_blocked_support],
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor_only_blocked_link.quality_blocked_links_promoting_incident == 1
+        assert doctor_only_blocked_link.status == "BLOCKED"
         missing_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{"run_id": "run-incident-test", "alertable": 0}],
             watchlist_rows=[{

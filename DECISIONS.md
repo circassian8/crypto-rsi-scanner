@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Event Alpha lifecycle caps are not route blockers
+**Status:** accepted
+**Decision:** Event Alpha must keep lifecycle state caps and route quality gates
+separate. Lifecycle caps decide the final watchlist state
+(`QUALITY_BLOCKED`, `RADAR`, `WATCHLIST`, `HIGH_PRIORITY`, etc.). Route gates
+decide operator routing (`STORE_ONLY`, local report, digest, high-priority
+research, triggered-fade research). A hard quality block such as local-only,
+insufficient impact/evidence/source, zero final score, source noise, or ticker
+collision may force `STORE_ONLY`. A soft lifecycle cap such as
+`opportunity_level_caps_state:watchlist` or
+`opportunity_level_caps_state:validated_digest` must not by itself force
+`STORE_ONLY`; the row continues through normal route eligibility and route caps.
+Incident artifact health follows the same distinction: quality-blocked support
+links are diagnostic warnings when a qualified link exists, and blockers only
+when blocked links would otherwise be the sole active incident support.
+**Why:** The operator view needs to show a valid RUNE/THORChain-style watchlist
+opportunity as digest/watchlist research even when requested high-priority
+lifecycle state is capped to watchlist. Treating all state caps as route blocks
+hid real validated opportunities and produced misleading block reasons.
+**Revisit when:** Event Alpha moves to a typed lifecycle/router database with
+explicit foreign keys and a UI that can show requested state, final state,
+requested route, final route, and diagnostic support links as separate fields.
+
 ## 2026-06-27 - Targeted market refresh is bounded and validation-first
 **Status:** accepted
 **Decision:** Event Alpha may run targeted market-context refresh for

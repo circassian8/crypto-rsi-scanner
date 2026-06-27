@@ -416,25 +416,29 @@ def _route_entry(
             _quality_for_entry(entry),
         )
         state_block = entry.quality_state_block_reason or state_block or "quality_state_capped"
-        return EventAlphaRouteDecision(
-            entry=entry,
-            route=EventAlphaRoute.STORE_ONLY,
-            alertable=False,
-            reason=(
-                "Quality verdict capped lifecycle state before routing: "
-                f"{state_block}."
-            ),
-            lane=EventAlphaRouteLane.LOCAL_ONLY,
-            warnings=tuple(dict.fromkeys((*warnings, f"quality_state_blocked:{state_block}"))),
-            requested_route_before_quality_gate=requested_route,
-            final_route_after_quality_gate=EventAlphaRoute.STORE_ONLY.value,
-            quality_gate_block_reason=state_block,
-            opportunity_level=entry.opportunity_level,
-            opportunity_score_final=entry.opportunity_score_final,
-            routing_score_used=entry.opportunity_score_final,
-            routing_score_source="opportunity_score_final",
-            routing_verdict_used=entry.opportunity_level,
-        )
+        if state != event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value:
+            warnings.append(f"quality_state_capped:{state_block}")
+        else:
+            route_block = _quality_gate_block_reason(_quality_for_entry(entry)) or state_block
+            return EventAlphaRouteDecision(
+                entry=entry,
+                route=EventAlphaRoute.STORE_ONLY,
+                alertable=False,
+                reason=(
+                    "Quality route gate kept lifecycle-blocked row local-only: "
+                    f"{route_block}."
+                ),
+                lane=EventAlphaRouteLane.LOCAL_ONLY,
+                warnings=tuple(dict.fromkeys((*warnings, f"quality_gate_blocked:{route_block}"))),
+                requested_route_before_quality_gate=requested_route,
+                final_route_after_quality_gate=EventAlphaRoute.STORE_ONLY.value,
+                quality_gate_block_reason=route_block,
+                opportunity_level=entry.opportunity_level,
+                opportunity_score_final=entry.opportunity_score_final,
+                routing_score_used=entry.opportunity_score_final,
+                routing_score_source="opportunity_score_final",
+                routing_verdict_used=entry.opportunity_level,
+            )
 
     if _is_raw_or_terminal(state):
         return EventAlphaRouteDecision(

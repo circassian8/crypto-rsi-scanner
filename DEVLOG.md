@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Separate Event Alpha state caps from route gates · Codex
+**Why:** Targeted market refresh exposed two consistency bugs: watchlist-level
+opportunities capped from requested high-priority state could be routed
+`STORE_ONLY` with a lifecycle cap reason, and artifact doctor treated
+quality-blocked support links as incident-promoting blockers even when a
+qualified primary link existed.
+**Changes:**
+- Router logic now treats `QUALITY_BLOCKED` rows as route-blocked, but lets
+  softer lifecycle caps such as `HIGH_PRIORITY -> WATCHLIST` continue through
+  normal route eligibility and quality-route caps.
+- Artifact doctor now reports `quality_blocked_links_present` separately from
+  `quality_blocked_links_promoting_incident`; strict mode blocks only when a
+  quality-blocked link is the only active/linked incident support, not when it
+  is diagnostic support beside a qualified link.
+- Near-miss and targeted-market-refresh ids now derive from canonical core
+  opportunity ids when available, so duplicate/support rows do not expand the
+  refresh queue.
+- Added regression coverage for RUNE-like watchlist state caps, THORChain
+  qualified-link plus blocked-support incidents, and core-level refresh
+  dedupe.
+**Verify:** `python3 tests/test_indicators.py` passed (488/488);
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (36/36);
+`make event-alpha-market-refresh-smoke PYTHON=python3` passed; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `make
+event-alpha-quality-validation-cycle PYTHON=python3` passed; `make verify
+PYTHON=python3` passed; manual smokes passed for `event-alpha-near-miss-report`,
+strict `event-alpha-artifact-doctor`, and `event-opportunity-audit` on the
+market-refresh profile.
+**Notes/risks:** Research-only artifact/routing metadata. No send, paper, live
+RSI, trading, or `TRIGGERED_FADE` creation paths were added.
+
 ## 2026-06-27 — Add Event Alpha targeted market refresh queue · Codex
 **Why:** Strong Event Alpha candidates could remain validated-digest or
 near-miss rows when their only blocker was stale or missing market context. The

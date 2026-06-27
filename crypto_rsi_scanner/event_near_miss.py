@@ -16,6 +16,7 @@ from typing import Any, Mapping
 from . import (
     event_alpha_router,
     event_alpha_quality_fields,
+    event_core_opportunities,
     event_market_confirmation,
     event_opportunity_verdict,
 )
@@ -723,7 +724,7 @@ def _candidate_from_row(
         refresh_id=_refresh_id(row, symbol=symbol, coin_id=coin_id),
         symbol=symbol,
         coin_id=coin_id,
-        core_opportunity_id=_optional_str(row.get("core_opportunity_id") or row.get("aggregated_candidate_id")),
+        core_opportunity_id=_core_opportunity_id_for_row(row),
         hypothesis_id=_optional_str(row.get("hypothesis_id")),
         incident_id=_optional_str(row.get("incident_id")),
         opportunity_level_before=level,
@@ -743,12 +744,24 @@ def _candidate_from_row(
 
 
 def _near_miss_group_key(row: Mapping[str, Any], candidate: EventNearMissCandidate) -> tuple[str, str, str, str]:
+    if candidate.core_opportunity_id:
+        return ("core_opportunity", candidate.core_opportunity_id, "", "")
     quality = event_alpha_quality_fields.ensure_quality_fields(row, components=_quality_components_for_row(row))
     incident = candidate.incident_id or str(row.get("event_cluster_id") or row.get("cluster_id") or row.get("event_id") or "unknown")
     asset = candidate.coin_id or candidate.symbol
     path = str(quality.get("impact_path_type") or row.get("impact_path_type") or "unknown")
     role = str(quality.get("candidate_role") or row.get("candidate_role") or "unknown")
     return (incident, asset, path, role)
+
+
+def _core_opportunity_id_for_row(row: Mapping[str, Any]) -> str | None:
+    explicit = _optional_str(row.get("core_opportunity_id") or row.get("aggregated_candidate_id"))
+    if explicit:
+        return explicit
+    try:
+        return event_core_opportunities.core_opportunity_id_for_row(row)
+    except Exception:  # noqa: BLE001 - near-miss reports must fail soft
+        return None
 
 
 def _missing_evidence(quality: Mapping[str, Any], row: Mapping[str, Any]) -> tuple[str, ...]:
@@ -997,12 +1010,12 @@ def _row_identity(row: Mapping[str, Any]) -> str:
 
 
 def _near_miss_id(row: Mapping[str, Any], *, symbol: str, coin_id: str) -> str:
-    base = str(row.get("hypothesis_id") or row.get("event_id") or row.get("key") or coin_id or symbol)
+    base = str(_core_opportunity_id_for_row(row) or row.get("hypothesis_id") or row.get("event_id") or row.get("key") or coin_id or symbol)
     return "near:" + base.replace(" ", "_")[:96]
 
 
 def _refresh_id(row: Mapping[str, Any], *, symbol: str, coin_id: str) -> str:
-    base = str(row.get("hypothesis_id") or row.get("core_opportunity_id") or row.get("event_id") or coin_id or symbol)
+    base = str(_core_opportunity_id_for_row(row) or row.get("hypothesis_id") or row.get("event_id") or coin_id or symbol)
     return "refresh:" + base.replace(" ", "_")[:96]
 
 

@@ -62,6 +62,7 @@ class EventAlphaArtifactDoctorResult:
     active_incident_without_qualified_link: int = 0
     linked_incident_without_qualified_link: int = 0
     weak_unqualified_incident_links: int = 0
+    quality_blocked_links_present: int = 0
     quality_blocked_links_promoting_incident: int = 0
     diagnostic_incident_rows: int = 0
     raw_observation_incident_rows: int = 0
@@ -387,6 +388,8 @@ def diagnose_artifacts(
         warnings.append(f"linked_incident_without_qualified_link={incident_linkage['linked_incident_without_qualified_link']}")
     if incident_linkage["weak_unqualified_incident_links"]:
         warnings.append(f"weak_unqualified_incident_links={incident_linkage['weak_unqualified_incident_links']}")
+    if incident_linkage["quality_blocked_links_present"]:
+        warnings.append(f"quality_blocked_links_present={incident_linkage['quality_blocked_links_present']}")
     if incident_linkage["quality_blocked_links_promoting_incident"]:
         message = f"quality_blocked_links_promoting_incident={incident_linkage['quality_blocked_links_promoting_incident']}"
         (blockers if strict else warnings).append(message)
@@ -453,6 +456,7 @@ def diagnose_artifacts(
         active_incident_without_qualified_link=incident_linkage["active_incident_without_qualified_link"],
         linked_incident_without_qualified_link=incident_linkage["linked_incident_without_qualified_link"],
         weak_unqualified_incident_links=incident_linkage["weak_unqualified_incident_links"],
+        quality_blocked_links_present=incident_linkage["quality_blocked_links_present"],
         quality_blocked_links_promoting_incident=incident_linkage["quality_blocked_links_promoting_incident"],
         diagnostic_incident_rows=incident_linkage["diagnostic_incident_rows"],
         raw_observation_incident_rows=incident_linkage["raw_observation_incident_rows"],
@@ -764,6 +768,7 @@ def _incident_linkage_summary(
         "active_incident_without_qualified_link": 0,
         "linked_incident_without_qualified_link": 0,
         "weak_unqualified_incident_links": 0,
+        "quality_blocked_links_present": 0,
         "quality_blocked_links_promoting_incident": 0,
         "fresh_missing_hypotheses": 0,
         "fresh_missing_watchlist": 0,
@@ -848,7 +853,9 @@ def _incident_linkage_summary(
             out["linked_incident_without_qualified_link"] += 1
         if weak_links > 0:
             out["weak_unqualified_incident_links"] += weak_links
-        if relevance in {"linked_incident", "active_incident"} and quality_blocked_links > 0:
+        if quality_blocked_links > 0:
+            out["quality_blocked_links_present"] += quality_blocked_links
+        if relevance in {"linked_incident", "active_incident"} and quality_blocked_links > 0 and qualified_links <= 0:
             out["quality_blocked_links_promoting_incident"] += quality_blocked_links
         if operational and not row.get("linked_hypothesis_ids"):
             out["incident_rows_without_linked_hypotheses"] += 1
@@ -1040,6 +1047,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"active_incident_without_qualified_link={result.active_incident_without_qualified_link} "
             f"linked_incident_without_qualified_link={result.linked_incident_without_qualified_link} "
             f"weak_unqualified_incident_links={result.weak_unqualified_incident_links} "
+            f"quality_blocked_links_present={result.quality_blocked_links_present} "
             f"quality_blocked_links_promoting_incident={result.quality_blocked_links_promoting_incident} "
             f"diagnostic_incident_rows={result.diagnostic_incident_rows} "
             f"raw_observation_incident_rows={result.raw_observation_incident_rows} "
