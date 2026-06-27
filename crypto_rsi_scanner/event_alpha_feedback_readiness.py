@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_notification_inbox, event_research_cards, event_watchlist
+from . import event_alpha_notification_inbox, event_core_opportunities, event_research_cards, event_watchlist
 
 
 @dataclass(frozen=True)
@@ -24,8 +24,13 @@ class EventAlphaFeedbackReadinessResult:
     inbox_review_items: int
     feedback_rows: int
     calibration_ready_rows: int
-    blockers: tuple[str, ...]
-    warnings: tuple[str, ...]
+    visible_core_opportunities: int = 0
+    visible_core_opportunities_with_cards: int = 0
+    visible_core_opportunities_with_feedback_targets: int = 0
+    visible_core_opportunities_missing_cards: int = 0
+    visible_core_opportunities_missing_feedback_targets: int = 0
+    blockers: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
 
     @property
     def ready(self) -> bool:
@@ -48,12 +53,35 @@ def build_feedback_readiness(
     feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
     entries = list(watchlist_entries)
     research_cards = [path for path in cards if path.name != "index.md"]
+    card_core_ids = {value for path in research_cards for value in (event_research_cards.card_core_opportunity_id(path),) if value}
+    card_feedback_targets = {value for path in research_cards for value in (event_research_cards.card_feedback_target(path),) if value}
     cards_with_lineage = sum(1 for path in research_cards if event_research_cards.card_has_current_lineage(path))
     cards_with_target = sum(1 for path in research_cards if event_research_cards.card_feedback_target(path))
     ready_by_group = _ready_card_groups(research_cards)
     alert_targets = sum(1 for row in alerts if _alert_has_feedback_target(row))
     calibration_ready = sum(1 for row in [*alerts, *(_entry_row(entry) for entry in entries)] if _row_has_calibration_fields(row))
     inbox_items = _inbox_review_count(inbox_result)
+    visible_core = event_core_opportunities.visible_core_opportunities([*entries, *alerts])
+    alert_core_targets = {
+        str(row.get("core_opportunity_id") or "")
+        for row in alerts
+        if str(row.get("core_opportunity_id") or "")
+    }
+    alert_feedback_targets = {
+        str(row.get("feedback_target") or "")
+        for row in alerts
+        if str(row.get("feedback_target") or "")
+    }
+    visible_with_cards = sum(1 for item in visible_core if item.core_opportunity_id in card_core_ids)
+    visible_with_targets = sum(
+        1
+        for item in visible_core
+        if item.core_opportunity_id in card_feedback_targets
+        or item.core_opportunity_id in alert_core_targets
+        or item.core_opportunity_id in alert_feedback_targets
+    )
+    missing_cards = max(0, len(visible_core) - visible_with_cards)
+    missing_targets = max(0, len(visible_core) - visible_with_targets)
     blockers: list[str] = []
     warnings: list[str] = []
     if research_cards and cards_with_lineage < len(research_cards):
@@ -62,6 +90,10 @@ def build_feedback_readiness(
         blockers.append("research_cards_missing_feedback_target")
     if alerts and alert_targets < len(alerts):
         blockers.append("alert_snapshots_missing_feedback_targets")
+    if missing_cards:
+        blockers.append("visible_core_opportunities_missing_cards")
+    if missing_targets:
+        blockers.append("visible_core_opportunities_missing_feedback_targets")
     if inbox_result is not None and inbox_items <= 0 and (alerts or cards):
         warnings.append("inbox_has_no_review_items")
     if alerts and calibration_ready <= 0:
@@ -84,6 +116,11 @@ def build_feedback_readiness(
         inbox_review_items=inbox_items,
         feedback_rows=len(feedback),
         calibration_ready_rows=calibration_ready,
+        visible_core_opportunities=len(visible_core),
+        visible_core_opportunities_with_cards=visible_with_cards,
+        visible_core_opportunities_with_feedback_targets=visible_with_targets,
+        visible_core_opportunities_missing_cards=missing_cards,
+        visible_core_opportunities_missing_feedback_targets=missing_targets,
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
     )
@@ -106,6 +143,17 @@ def format_feedback_readiness(result: EventAlphaFeedbackReadinessResult) -> str:
             f"local_only={result.local_only_cards_ready}"
         ),
         f"alert_feedback_targets: {result.alert_rows_with_feedback_targets}/{result.alert_rows_checked}",
+        (
+            "visible_core_opportunities: "
+            f"{result.visible_core_opportunities} "
+            f"cards={result.visible_core_opportunities_with_cards}/{result.visible_core_opportunities} "
+            f"feedback_targets={result.visible_core_opportunities_with_feedback_targets}/{result.visible_core_opportunities}"
+        ),
+        (
+            "visible_core_missing: "
+            f"cards={result.visible_core_opportunities_missing_cards}, "
+            f"feedback_targets={result.visible_core_opportunities_missing_feedback_targets}"
+        ),
         f"inbox_review_items: {result.inbox_review_items}",
         f"feedback_rows: {result.feedback_rows}",
         f"calibration_ready_rows: {result.calibration_ready_rows}",
@@ -135,7 +183,14 @@ def _ready_card_groups(paths: Iterable[Path]) -> dict[str, int]:
 
 
 def _alert_has_feedback_target(row: Mapping[str, Any]) -> bool:
-    return any(str(row.get(key) or "").strip() for key in ("alert_id", "card_id", "alert_key", "snapshot_id"))
+    return any(str(row.get(key) or "").strip() for key in (
+        "feedback_target",
+        "core_opportunity_id",
+        "alert_id",
+        "card_id",
+        "alert_key",
+        "snapshot_id",
+    ))
 
 
 def _row_has_calibration_fields(row: Mapping[str, Any]) -> bool:

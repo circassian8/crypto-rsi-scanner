@@ -120,26 +120,44 @@ def build_daily_brief(
         for item in core_opportunities
         if item.alertable or item.is_high_priority or item.is_watchlist or item.is_validated_digest
     }
+    high_priority_core_asset_keys = {
+        event_core_opportunities.asset_key_for_opportunity(item)
+        for item in core_sections["strong"]
+    }
     near_misses = event_near_miss.detect_near_miss_rows(
         [decision.entry for decision in decisions] + hypotheses,
         route_decisions=decisions,
     )
-    near_misses = tuple(
+    _, raw_upgrade_candidates = event_near_miss.split_near_miss_candidates(near_misses)
+    near_miss_candidates = tuple(
         item for item in near_misses
-        if event_core_opportunities.incident_asset_key_for_values(
+        if not event_near_miss.is_upgrade_candidate(item)
+        and event_core_opportunities.incident_asset_key_for_values(
             item.incident_id,
             item.coin_id,
             item.symbol,
         ) not in promoted_core_asset_keys
         and event_core_opportunities.asset_key_for_values(item.coin_id, item.symbol) not in promoted_core_assets
     )
+    upgrade_candidates = tuple(
+        item for item in raw_upgrade_candidates
+        if event_core_opportunities.incident_asset_key_for_values(
+            item.incident_id,
+            item.coin_id,
+            item.symbol,
+        ) not in {
+            event_core_opportunities.incident_asset_key_for_opportunity(core)
+            for core in core_sections["strong"]
+        }
+        and event_core_opportunities.asset_key_for_values(item.coin_id, item.symbol) not in high_priority_core_asset_keys
+    )
     near_miss_asset_keys = {
         event_core_opportunities.asset_key_for_values(item.coin_id, item.symbol)
-        for item in near_misses
+        for item in near_miss_candidates
     }
     near_miss_incident_asset_keys = {
         event_core_opportunities.incident_asset_key_for_values(item.incident_id, item.coin_id, item.symbol)
-        for item in near_misses
+        for item in near_miss_candidates
     }
     local_core_rows = [
         item for item in core_sections["local"]
@@ -177,10 +195,12 @@ def build_daily_brief(
         "## Executive Summary",
         f"- Core opportunities: {len(core_opportunities)} "
         f"(high_priority={len(core_sections['strong'])}, digest={len(core_sections['digest'])}, "
-        f"watchlist={len(core_sections['watchlist'])}, near_miss={len(near_misses)}, "
+        f"watchlist={len(core_sections['watchlist'])}, near_miss={len(near_miss_candidates)}, "
+        f"upgrade={len(upgrade_candidates)}, "
         f"local_or_capped={len(local_core_rows)})",
         f"- Alertable routed decisions: {len(alertable)}",
-        f"- Near-miss candidates: {len(near_misses)}",
+        f"- Near-miss candidates: {len(near_miss_candidates)}",
+        f"- Upgrade candidates: {len(upgrade_candidates)}",
         "",
         "## High-Priority Core Opportunities",
         *_core_opportunity_lines(core_sections["strong"], limit=8),
@@ -192,7 +212,10 @@ def build_daily_brief(
         *_core_opportunity_lines(core_sections["watchlist"], limit=8),
         "",
         "## Near-Miss Candidates",
-        *_near_miss_daily_lines(near_misses, limit=8),
+        *_near_miss_daily_lines(near_miss_candidates, limit=8),
+        "",
+        "## Upgrade Candidates",
+        *_near_miss_daily_lines(upgrade_candidates, limit=8),
         "",
         "## Quality-Capped / Local-Only Candidates",
         *_core_opportunity_lines(local_core_rows, limit=8),
@@ -475,7 +498,9 @@ def build_daily_brief(
     lines.append("- Top upgrade candidates: " + (_upgrade_candidate_line(decisions) or "none"))
     lines.append("- Top downgrade risks: " + (_downgrade_risk_line(decisions) or "none"))
     lines.extend(["", "### Near-Miss Diagnostics"])
-    lines.extend(_near_miss_diagnostic_lines(near_misses, limit=8))
+    lines.extend(_near_miss_diagnostic_lines(near_miss_candidates, limit=8))
+    lines.extend(["", "### Upgrade Candidate Diagnostics"])
+    lines.extend(_near_miss_diagnostic_lines(upgrade_candidates, limit=8))
     lines.extend(["", "### Signal Quality Summary"])
     lines.append("- Opportunity Verdict Distribution: " + _quality_decision_counts(decisions, "opportunity_level"))
     lines.append("- Impact Path Distribution: " + _quality_decision_counts(decisions, "impact_path_type"))
@@ -1025,6 +1050,7 @@ def _market_freshness_readiness_lines(
     limit: int = 8,
 ) -> list[str]:
     normalized = [_row_mapping(row) for row in rows]
+    visible_core = event_core_opportunities.visible_core_opportunities(normalized)
     statuses: dict[str, int] = {}
     capped: list[Mapping[str, Any]] = []
     missing: list[Mapping[str, Any]] = []
@@ -1054,20 +1080,58 @@ def _market_freshness_readiness_lines(
         f"- Needs targeted market refresh: {len(refresh_needed)}",
         f"- Live profile can perform refresh: {str(can_refresh).lower()}",
     ]
-    for row in refresh_needed[:limit]:
-        components = _components_for_row(row)
-        label = _label_for_row(row, components)
-        status = row.get("market_context_freshness_status") or components.get("market_context_freshness_status") or "missing"
-        source = row.get("market_context_source") or components.get("market_context_source") or "unknown"
-        cap = row.get("market_context_freshness_cap_applied")
-        if cap is None:
-            cap = components.get("market_context_freshness_cap_applied")
-        lines.append(
-            f"  - {label}: status={status} source={source} age={_market_age_label(row, components)} cap_applied={str(_truthy(cap)).lower()}"
-        )
-    if len(refresh_needed) > limit:
-        lines.append(f"  - +{len(refresh_needed) - limit} more rows need refresh")
+    if visible_core:
+        lines.append("- Core opportunity freshness:")
+        for item in visible_core[:limit]:
+            line = _core_market_freshness_line(item)
+            if line:
+                lines.append(line)
+        if len(visible_core) > limit:
+            lines.append(f"  - +{len(visible_core) - limit} more core opportunities in diagnostics")
+    else:
+        for row in refresh_needed[:limit]:
+            components = _components_for_row(row)
+            label = _label_for_row(row, components)
+            status = row.get("market_context_freshness_status") or components.get("market_context_freshness_status") or "missing"
+            source = row.get("market_context_source") or components.get("market_context_source") or "unknown"
+            cap = row.get("market_context_freshness_cap_applied")
+            if cap is None:
+                cap = components.get("market_context_freshness_cap_applied")
+            lines.append(
+                f"  - {label}: status={status} source={source} age={_market_age_label(row, components)} cap_applied={str(_truthy(cap)).lower()}"
+            )
+        if len(refresh_needed) > limit:
+            lines.append(f"  - +{len(refresh_needed) - limit} more rows need refresh")
     return lines
+
+
+def _core_market_freshness_line(item: event_core_opportunities.CoreOpportunity) -> str:
+    rows = [item.primary_row, *item.supporting_rows]
+    row_infos: list[tuple[str, str, str, bool, bool]] = []
+    for row in rows:
+        components = _components_for_row(row)
+        status = str(row.get("market_context_freshness_status") or components.get("market_context_freshness_status") or "missing")
+        source = str(row.get("market_context_source") or components.get("market_context_source") or "unknown")
+        age = _market_age_label(row, components)
+        cap_raw = row.get("market_context_freshness_cap_applied")
+        if cap_raw is None:
+            cap_raw = components.get("market_context_freshness_cap_applied")
+        refresh_attempted = _truthy(row.get("market_refresh_attempted") or components.get("market_refresh_attempted"))
+        row_infos.append((status, source, age, _truthy(cap_raw), refresh_attempted))
+    if not row_infos:
+        row_infos.append(("missing", "unknown", "unknown", False, False))
+    status_rank = {"fresh": 0, "fixture_allowed_stale": 1, "stale": 2, "unknown": 3, "missing": 4}
+    best = sorted(row_infos, key=lambda item_info: status_rank.get(item_info[0], 5))[0]
+    stale_or_missing = sum(1 for status, _, _, cap, _ in row_infos if cap or status in {"stale", "unknown", "missing"})
+    refresh_attempted = any(info[4] for info in row_infos)
+    refresh_needed = stale_or_missing > 0
+    return (
+        f"  - {item.core_opportunity_id} {item.symbol}/{item.coin_id}: "
+        f"status={best[0]} source={best[1]} age={best[2]} "
+        f"refresh_attempted={str(refresh_attempted).lower()} "
+        f"refresh_needed={str(refresh_needed).lower()} "
+        f"support_rows_stale_or_missing={stale_or_missing}"
+    )
 
 
 def _row_mapping(row: Any) -> Mapping[str, Any]:

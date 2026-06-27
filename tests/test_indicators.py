@@ -10619,6 +10619,15 @@ def test_event_alpha_near_miss_refreshes_market_context_without_triggering_fade(
     stale_near = event_near_miss.detect_near_miss_rows((stale_velvet,), cfg=event_near_miss.EventNearMissConfig())
     assert len(stale_near) == 1
     assert stale_near[0].opportunity_level_before == "validated_digest"
+    assert event_near_miss.is_upgrade_candidate(stale_near[0]) is True
+    near_section, upgrade_section = event_near_miss.split_near_miss_candidates((*near, *stale_near))
+    assert [item.symbol for item in near_section] == ["ENA"]
+    assert [item.symbol for item in upgrade_section] == ["VELVET"]
+    split_report = event_near_miss.format_near_miss_report((*near, *stale_near), profile="fixture")
+    assert "## Near-Miss Candidates" in split_report
+    assert "## Upgrade Candidates" in split_report
+    assert "- ENA/ethena" in split_report.split("## Upgrade Candidates", 1)[0]
+    assert "- VELVET/velvet" in split_report.split("## Upgrade Candidates", 1)[1]
     assert "targeted_market_refresh" in stale_near[0].recommended_refresh_actions
     stale_queue = event_near_miss.targeted_market_refresh_queue((stale_velvet,), cfg=event_near_miss.EventNearMissConfig())
     assert stale_queue[0].symbol == "VELVET"
@@ -11124,6 +11133,9 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert snapshots_by_symbol["RUNE"]["final_route_after_quality_gate"] == "RESEARCH_DIGEST"
     assert snapshots_by_symbol["RUNE"]["quality_state_block_reason"] == "opportunity_level_caps_state:watchlist"
     assert snapshots_by_symbol["RUNE"]["quality_gate_block_reason"] in (None, "")
+    assert snapshots_by_symbol["RUNE"]["core_opportunity_id"]
+    assert snapshots_by_symbol["RUNE"]["feedback_target"] == snapshots_by_symbol["RUNE"]["core_opportunity_id"]
+    assert snapshots_by_symbol["RUNE"]["feedback_target_type"] == "core_opportunity_id"
     assert snapshots_by_symbol["HIGH"]["final_route_after_quality_gate"] == "HIGH_PRIORITY_RESEARCH"
     assert snapshots_by_symbol["HIGH"]["final_tier_after_quality_gate"] == "HIGH_PRIORITY_WATCH"
     assert snapshots_by_symbol["FADE"]["final_route_after_quality_gate"] == "TRIGGERED_FADE_RESEARCH"
@@ -11290,6 +11302,9 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert "BTC/btc" not in active_section
     assert "WATCH/watch" in active_section
     assert "### Legacy Quality Conflicts" in daily
+    freshness_section = daily.split("## Market Freshness Readiness", 1)[1].split("## Diagnostics Appendix", 1)[0]
+    assert "Core opportunity freshness:" in freshness_section
+    assert freshness_section.count("RUNE/thorchain") == 1
     card = event_research_cards.render_research_card(
         "BTC",
         watchlist_entries=[btc],
@@ -20142,9 +20157,43 @@ def test_event_research_cards_write_files_and_index():
     import tempfile
     from pathlib import Path
 
-    from crypto_rsi_scanner import event_research_cards
+    from crypto_rsi_scanner import event_alpha_router, event_research_cards, event_watchlist
 
     entry = _test_watchlist_entry(state="HIGH_PRIORITY", symbol="VELVET", coin_id="velvet")
+    rune = replace(
+        _test_watchlist_entry(state="WATCHLIST", symbol="RUNE", coin_id="thorchain"),
+        key="incident:rune|thorchain|security",
+        relationship_type="impact_hypothesis",
+        external_asset="THORChain",
+        latest_event_name="THORChain exploit and RUNE resumes trading",
+        latest_playbook_type="security_or_regulatory_shock",
+        latest_effective_playbook_type="security_or_regulatory_shock",
+        requested_state_before_quality_gate=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        final_state_after_quality_gate=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        state_quality_capped=True,
+        quality_state_block_reason="opportunity_level_caps_state:watchlist",
+        latest_score_components={
+            **entry.latest_score_components,
+            "incident_id": "incident:rune",
+            "validated_symbol": "RUNE",
+            "validated_coin_id": "thorchain",
+            "impact_path_type": "exploit_security_event",
+            "impact_path_reason": "exploit_security_event",
+            "candidate_role": "direct_subject",
+            "impact_category": "security_or_regulatory_shock",
+            "opportunity_level": "watchlist",
+            "opportunity_score_final": 83,
+        },
+    )
+    rune_suppressed = event_alpha_router.EventAlphaRouteDecision(
+        entry=rune,
+        route=event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE,
+        alertable=False,
+        reason="duplicate digest already sent",
+        final_route_after_quality_gate=event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+        opportunity_level="watchlist",
+        opportunity_score_final=83,
+    )
     diagnostic = replace(
         _test_watchlist_entry(state="HIGH_PRIORITY", symbol="VELVET", coin_id="velvet"),
         key="cluster|velvet|source_noise_control",
@@ -20159,12 +20208,122 @@ def test_event_research_cards_write_files_and_index():
         },
     )
     out_dir = Path(tempfile.mkdtemp())
-    result = event_research_cards.write_research_cards(out_dir, watchlist_entries=[entry, diagnostic], alert_rows=[], route_decisions=[])
-    assert result.cards_written == 1
+    result = event_research_cards.write_research_cards(
+        out_dir,
+        watchlist_entries=[entry, rune, diagnostic],
+        alert_rows=[],
+        route_decisions=[rune_suppressed],
+    )
+    assert result.cards_written == 2
     assert result.index_path.exists()
-    assert "VELVET" in result.card_paths[0].read_text()
-    assert result.card_paths[0].name in result.index_path.read_text()
+    card_text = "\n".join(path.read_text() for path in result.card_paths)
+    assert "VELVET" in card_text
+    assert "RUNE" in card_text
+    rune_card = next(path for path in result.card_paths if "RUNE" in path.read_text())
+    assert event_research_cards.card_core_opportunity_id(rune_card)
+    assert event_research_cards.card_feedback_target(rune_card) == event_research_cards.card_core_opportunity_id(rune_card)
+    assert rune_card.name in result.index_path.read_text()
+    assert "Core Opportunity Cards" in result.index_path.read_text()
     assert "source_noise_control" not in result.index_path.read_text().split("## Core Opportunity Cards", 1)[1].split("## Diagnostic", 1)[0]
+
+
+def test_event_alpha_visible_core_coverage_readiness_and_doctor():
+    import tempfile
+    from pathlib import Path
+
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_feedback_readiness,
+        event_core_opportunities,
+    )
+
+    visible_row = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "run-core",
+        "profile": "market_refresh_smoke",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "market_refresh_smoke",
+        "alert_key": "incident:rune|thorchain|security",
+        "event_id": "event:rune",
+        "incident_id": "incident:rune",
+        "symbol": "RUNE",
+        "coin_id": "thorchain",
+        "validated_symbol": "RUNE",
+        "validated_coin_id": "thorchain",
+        "candidate_role": "direct_subject",
+        "impact_path_type": "exploit_security_event",
+        "opportunity_level": "watchlist",
+        "opportunity_score_final": 83,
+        "final_route_after_quality_gate": "RESEARCH_DIGEST",
+        "final_state_after_quality_gate": "WATCHLIST",
+        "route": "RESEARCH_DIGEST",
+        "tier": "WATCHLIST",
+        "core_opportunity_id": None,
+    }
+    core_id = event_core_opportunities.core_opportunity_id_for_row(visible_row)
+    visible_row["core_opportunity_id"] = core_id
+    visible_row["feedback_target"] = core_id
+    visible_row["feedback_target_type"] = "core_opportunity_id"
+    readiness_missing = event_alpha_feedback_readiness.build_feedback_readiness(
+        profile="market_refresh_smoke",
+        artifact_namespace="market_refresh_smoke",
+        card_paths=[],
+        alert_rows=[visible_row],
+        feedback_rows=[],
+        watchlist_entries=[],
+    )
+    assert readiness_missing.visible_core_opportunities == 1
+    assert readiness_missing.visible_core_opportunities_missing_cards == 1
+    assert "visible_core_opportunities_missing_cards" in readiness_missing.blockers
+    doctor_missing = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{"run_id": "run-core", "profile": "market_refresh_smoke", "run_mode": "notification_burn_in", "artifact_namespace": "market_refresh_smoke", "alertable": 0}],
+        alert_rows=[visible_row],
+        strict=True,
+        profile="market_refresh_smoke",
+        artifact_namespace="market_refresh_smoke",
+    )
+    assert doctor_missing.status == "BLOCKED"
+    assert doctor_missing.visible_core_opportunities_missing_cards == 1
+    assert doctor_missing.alert_snapshots_missing_core_opportunity_id == 0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        card_path = Path(tmp) / "rune.md"
+        card_path.write_text(
+            "\n".join([
+                "# RUNE Event Research Card",
+                "- Generated at: 2026-06-28T00:00:00+00:00",
+                "- Lineage status: current",
+                "- legacy_lineage_missing: false",
+                "- Run ID: run-core",
+                "- Profile: market_refresh_smoke",
+                "- Namespace: market_refresh_smoke",
+                f"- Core opportunity ID: {core_id}",
+                f"- Feedback target: {core_id}",
+                "- Feedback target type: core_opportunity_id",
+            ]),
+            encoding="utf-8",
+        )
+        readiness_ready = event_alpha_feedback_readiness.build_feedback_readiness(
+            profile="market_refresh_smoke",
+            artifact_namespace="market_refresh_smoke",
+            card_paths=[card_path],
+            alert_rows=[visible_row],
+            feedback_rows=[],
+            watchlist_entries=[],
+        )
+        assert readiness_ready.visible_core_opportunities_with_cards == 1
+        assert readiness_ready.visible_core_opportunities_missing_cards == 0
+        assert "visible_core_opportunities_missing_cards" not in readiness_ready.blockers
+        doctor_ready = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-core", "profile": "market_refresh_smoke", "run_mode": "notification_burn_in", "artifact_namespace": "market_refresh_smoke", "alertable": 0}],
+            alert_rows=[visible_row],
+            card_paths=[card_path],
+            strict=True,
+            profile="market_refresh_smoke",
+            artifact_namespace="market_refresh_smoke",
+        )
+        assert doctor_ready.visible_core_opportunities_missing_cards == 0
+        assert "visible_core_opportunities_missing_cards=1" not in event_alpha_artifact_doctor.format_artifact_doctor_report(doctor_ready)
 
 
 def test_event_alpha_explain_last_run_paths():
@@ -23479,7 +23638,8 @@ def test_daily_brief_core_sections_hide_promoted_from_exploratory_and_near_miss(
     strong = brief.split("## High-Priority Core Opportunities", 1)[1].split("## Validated Digest Core Opportunities", 1)[0]
     digest = brief.split("## Validated Digest Core Opportunities", 1)[1].split("## Watchlist Core Opportunities", 1)[0]
     watchlist = brief.split("## Watchlist Core Opportunities", 1)[1].split("## Near-Miss Candidates", 1)[0]
-    near = brief.split("## Near-Miss Candidates", 1)[1].split("## Quality-Capped / Local-Only Candidates", 1)[0]
+    near = brief.split("## Near-Miss Candidates", 1)[1].split("## Upgrade Candidates", 1)[0]
+    upgrades = brief.split("## Upgrade Candidates", 1)[1].split("## Quality-Capped / Local-Only Candidates", 1)[0]
     exploratory = brief.split("### Exploratory Digest", 1)[1].split("### Active Watchlist", 1)[0]
     diagnostics = brief.split("## Diagnostics Appendix", 1)[1]
     assert strong.count("VELVET/velvet") == 1
@@ -23488,6 +23648,9 @@ def test_daily_brief_core_sections_hide_promoted_from_exploratory_and_near_miss(
     assert "VELVET/velvet" not in near
     assert "AAVE/aave" not in near
     assert "RUNE/rune" not in near
+    assert "AAVE/aave" in upgrades
+    assert "RUNE/rune" in upgrades
+    assert "VELVET/velvet" not in upgrades
     assert "VELVET/velvet" not in exploratory
     assert "AAVE/aave" not in exploratory
     assert "RUNE/rune" not in exploratory
@@ -23929,17 +24092,27 @@ def test_event_alpha_feedback_readiness_and_core_feedback_target():
         entry.key,
         watchlist_entries=[entry],
         card_path="/tmp/card_aave.md",
+        lineage_context={
+            "run_id": "run-aave",
+            "profile": "notify_llm_quality_frame",
+            "artifact_namespace": "notify_llm_quality_frame",
+        },
     )
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         card_path = tmp_path / "card_aave.md"
         card_path.write_text(card.markdown, encoding="utf-8")
+        core_id = __import__("crypto_rsi_scanner.event_core_opportunities", fromlist=["core_opportunity_id_for_row"]).core_opportunity_id_for_row(entry)
         alert = {
             "alert_id": "ea:aave",
             "card_id": "card_aave",
             "alert_key": entry.key,
             "symbol": "AAVE",
             "coin_id": "aave",
+            "incident_id": "incident:aave",
+            "core_opportunity_id": core_id,
+            "feedback_target": core_id,
+            "feedback_target_type": "core_opportunity_id",
             "impact_path_type": "strategic_investment_or_valuation",
             "candidate_role": "direct_subject",
             "opportunity_level": "validated_digest",
@@ -23959,7 +24132,6 @@ def test_event_alpha_feedback_readiness_and_core_feedback_target():
         text = event_alpha_feedback_readiness.format_feedback_readiness(ready)
         assert "ready: true" in text
         assert "cards_with_feedback_target: 1/1" in text
-        core_id = __import__("crypto_rsi_scanner.event_core_opportunities", fromlist=["core_opportunity_id_for_row"]).core_opportunity_id_for_row(entry)
         cfg = event_feedback.EventFeedbackConfig(path=tmp_path / "feedback.jsonl")
         record = event_feedback.mark_feedback(core_id, "useful", watchlist_entries=[entry], cfg=cfg)
         assert record.key == entry.key
@@ -24124,6 +24296,7 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         event_impact_hypotheses,
         event_incident_graph,
         event_incident_store,
+        event_research_cards,
         event_watchlist,
     )
     from crypto_rsi_scanner.event_models import (
@@ -24756,6 +24929,26 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
         assert snap["hypothesis_id"] == thor_hyp.hypothesis_id
         assert snap["incident_canonical_name"] == thor_hyp.incident_canonical_name
         assert snap["incident_primary_subject"] == "THORChain"
+        card_path = Path(tmp) / "rune_card.md"
+        card_index_path = Path(tmp) / "index.md"
+        core_id = snap.get("core_opportunity_id")
+        card_path.write_text(
+            "\n".join([
+                "# RUNE Event Research Card",
+                "- Generated at: 2026-06-28T00:00:00+00:00",
+                "- Lineage status: current",
+                "- legacy_lineage_missing: false",
+                "- Run ID: run-incident-test",
+                "- Profile: quality_validation",
+                "- Namespace: quality_validation",
+                f"- Core opportunity ID: {core_id}",
+                f"- Feedback target: {core_id}",
+                "- Feedback target type: core_opportunity_id",
+            ]),
+            encoding="utf-8",
+        )
+        card_index_path.write_text(f"# Event Research Cards\n\n- [rune_card.md](rune_card.md) · feedback target: `{core_id}`\n", encoding="utf-8")
+        assert event_research_cards.card_core_opportunity_id(card_path) == core_id
         clean_quality = {
             "impact_path_type": "exploit_security_event",
             "impact_path_strength": "strong",
@@ -24801,6 +24994,7 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
             watchlist_rows=[thor_entry],
             alert_rows=[snap],
             incident_rows=loaded.rows,
+            card_paths=[card_path, card_index_path],
             include_test_artifacts=True,
             strict=True,
         )

@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - CoreOpportunity is the operator-visible artifact contract
+**Status:** accepted
+**Decision:** Event Alpha operator-facing output should be keyed by
+`core_opportunity_id` whenever a row is visible in high-priority, validated
+digest, watchlist, near-miss, upgrade-candidate, or non-diagnostic local/capped
+sections. Visible core opportunities must keep a research card, stable feedback
+target, and audit target even when route or duplicate suppression prevents a
+send. Alert snapshots written from core opportunities should carry
+`core_opportunity_id`, `feedback_target`, `feedback_target_type`, card path, and
+card group when available. Artifact doctor and feedback readiness should treat
+missing coverage for fresh visible core opportunities as a blocker. Near-miss
+reports should separate local near-misses from already-valid upgrade candidates,
+and market-freshness readiness should summarize by core opportunity by default.
+**Why:** Operators and Pro-model reviews need one visible object per real
+opportunity, with supporting rows preserved as diagnostics. Suppressing duplicate
+sends must not remove the review card or feedback handle for a RUNE/THORChain-
+style watchlist opportunity, and row-level market/readiness output was too noisy
+to use safely.
+**Revisit when:** Event Alpha artifacts move into a typed store where core
+opportunities, cards, snapshots, feedback labels, and market-refresh attempts
+are enforced by schema-level relationships.
+
 ## 2026-06-27 - Event Alpha lifecycle caps are not route blockers
 **Status:** accepted
 **Decision:** Event Alpha must keep lifecycle state caps and route quality gates

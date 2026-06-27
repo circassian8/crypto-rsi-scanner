@@ -15,6 +15,8 @@ from . import (
     event_alpha_outcomes,
     event_alpha_quality_fields,
     event_alpha_router,
+    event_core_opportunities,
+    event_research_cards,
     event_watchlist,
     event_graph,
     event_playbooks,
@@ -460,6 +462,10 @@ def _snapshot_from_alert(alert: event_alerts.EventAlertCandidate, observed: date
         "delivered_status": None,
         "feedback_status": "pending",
     }
+    core_id = alert.score_components.get("core_opportunity_id") or event_core_opportunities.core_opportunity_id_for_row(row)
+    row["core_opportunity_id"] = core_id
+    row["feedback_target"] = core_id or row["alert_key"]
+    row["feedback_target_type"] = "core_opportunity_id" if core_id else "alert_key"
     return _with_canonical_quality_route(row)
 
 
@@ -490,6 +496,13 @@ def _snapshot_from_route_decision(
     final_lane = event_alpha_router.final_lane_value(decision)
     alertable_after_quality = event_alpha_router.alertable_after_quality_gate(decision)
     tier = entry.latest_tier if alertable_after_quality else event_alerts.EventAlertTier.STORE_ONLY.value
+    core_id = (
+        components.get("core_opportunity_id")
+        or components.get("aggregated_candidate_id")
+        or event_core_opportunities.core_opportunity_id_for_row(entry)
+    )
+    feedback_target = str(core_id or decision.alert_id or alert_key)
+    feedback_target_type = "core_opportunity_id" if core_id else "alert_id"
     row = {
         "schema_version": ALERT_STORE_SCHEMA_VERSION,
         "row_type": "event_alpha_alert_snapshot",
@@ -542,6 +555,9 @@ def _snapshot_from_route_decision(
         "quality_gate_block_reason": decision.quality_gate_block_reason,
         "alert_id": decision.alert_id,
         "card_id": decision.card_id,
+        "core_opportunity_id": core_id,
+        "feedback_target": feedback_target,
+        "feedback_target_type": feedback_target_type,
         "route_alertable": alertable_after_quality,
         "alertable_after_quality_gate": alertable_after_quality,
         "route_reason": decision.reason,
@@ -665,9 +681,17 @@ def _route_context_by_key(router_result: Any | None) -> dict[str, dict[str, Any]
             if getattr(entry, quality_key, None) not in (None, "", [], {}, ())
         }
         quality = event_alpha_quality_fields.ensure_quality_fields(entry_quality, components=components)
+        core_id = (
+            components.get("core_opportunity_id")
+            or components.get("aggregated_candidate_id")
+            or event_core_opportunities.core_opportunity_id_for_row(entry)
+        )
         out[key] = {
             "alert_id": getattr(decision, "alert_id", f"ea:{key}"),
             "card_id": getattr(decision, "card_id", ""),
+            "core_opportunity_id": core_id,
+            "feedback_target": core_id or getattr(decision, "alert_id", f"ea:{key}"),
+            "feedback_target_type": "core_opportunity_id" if core_id else "alert_id",
             "route": final_route,
             "lane": final_lane,
             "requested_route_before_quality_gate": getattr(decision, "requested_route_before_quality_gate", None)
@@ -881,25 +905,53 @@ def _with_delivery_context(row: dict[str, Any], context: Mapping[str, Mapping[st
     return row
 
 
-def _card_context_by_card_id(paths: Iterable[str | Path]) -> dict[str, str]:
-    out: dict[str, str] = {}
+def _card_context_by_card_id(paths: Iterable[str | Path]) -> dict[str, dict[str, str]]:
+    out: dict[str, dict[str, str]] = {}
     for raw in paths:
         path = Path(raw).expanduser()
         if path.name == "index.md":
             continue
+        context = {
+            "research_card_path": str(path),
+        }
+        core_id = event_research_cards.card_core_opportunity_id(path)
+        feedback_target = event_research_cards.card_feedback_target(path)
+        if core_id:
+            context["core_opportunity_id"] = core_id
+            context.setdefault("feedback_target", core_id)
+            context.setdefault("feedback_target_type", "core_opportunity_id")
+        if feedback_target:
+            context["feedback_target"] = feedback_target
+            context.setdefault(
+                "feedback_target_type",
+                "core_opportunity_id" if feedback_target.startswith("core_") else "card_feedback_target",
+            )
         stem = path.stem
-        if stem:
-            out[stem] = str(path)
-            if stem.startswith("card_"):
-                out[stem[5:]] = str(path)
+        identifiers = {stem, core_id or "", feedback_target or ""}
+        if stem.startswith("card_"):
+            identifiers.add(stem[5:])
+        for identifier in identifiers:
+            if identifier:
+                out[identifier] = dict(context)
     return out
 
 
-def _with_card_context(row: dict[str, Any], context: Mapping[str, str]) -> dict[str, Any]:
-    for value in (str(row.get("card_id") or ""), str(row.get("alert_id") or "").replace("ea:", "card_")):
+def _with_card_context(row: dict[str, Any], context: Mapping[str, Mapping[str, str]]) -> dict[str, Any]:
+    for value in (
+        str(row.get("card_id") or ""),
+        str(row.get("alert_id") or "").replace("ea:", "card_"),
+        str(row.get("core_opportunity_id") or ""),
+        str(row.get("feedback_target") or ""),
+    ):
         if value and value in context:
             out = dict(row)
-            out["research_card_path"] = context[value]
+            card = context[value]
+            out["research_card_path"] = card.get("research_card_path")
+            if card.get("core_opportunity_id") and not out.get("core_opportunity_id"):
+                out["core_opportunity_id"] = card.get("core_opportunity_id")
+            if card.get("feedback_target") and not out.get("feedback_target"):
+                out["feedback_target"] = card.get("feedback_target")
+                out["feedback_target_type"] = card.get("feedback_target_type")
             return out
     return row
 

@@ -248,6 +248,26 @@ row with supporting proxy categories. Treat this as presentation de-duplication
 only; raw hypotheses, supporting impact paths, and source evidence remain in the
 JSONL artifacts and cards for review.
 
+Core opportunities are the default operator contract. A core opportunity is
+visible when it appears in high-priority, validated digest, watchlist,
+near-miss, upgrade-candidate, or non-diagnostic quality-capped/local sections.
+Every fresh visible core opportunity should have a research card, a stable
+feedback target, and an audit target keyed by `core_opportunity_id`. Duplicate
+or route suppression means "do not send again"; it must not suppress card
+creation, feedback readiness, or opportunity audit coverage. Alert snapshots
+for visible rows should carry `core_opportunity_id`, `feedback_target`,
+`feedback_target_type`, card path, and card group when available, so daily
+briefs, inboxes, cards, audits, feedback labels, and Pro-model review bundles
+join on the same object.
+
+Near-miss reporting has two operator buckets. `Near-Miss Candidates` are
+currently non-alertable/local candidates close to promotion but missing fixable
+evidence. `Upgrade Candidates` are already validated digest or watchlist rows
+that are not yet high-priority and are missing market, derivative, source, or
+freshness evidence for the next tier. Market-freshness readiness should summarize
+the best and worst freshness by core opportunity by default, with row-level
+support details left to diagnostics.
+
 The feature is research metadata only. It cannot send notifications, create
 paper/live rows, write normal RSI signals, execute trades, or create
 `TRIGGERED_FADE`.

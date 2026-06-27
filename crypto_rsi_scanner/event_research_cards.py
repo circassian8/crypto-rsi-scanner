@@ -291,9 +291,11 @@ def write_research_cards(
     target = Path(out_dir).expanduser()
     target.mkdir(parents=True, exist_ok=True)
     observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    alert_row_list = list(alert_rows)
     entries = _selected_entries(
         list(watchlist_entries),
         list(route_decisions),
+        alert_rows=alert_row_list,
         include_all_alertable=include_all_alertable,
         selected_tiers=selected_tiers,
     )
@@ -304,7 +306,7 @@ def write_research_cards(
         card = render_research_card(
             entry.key,
             watchlist_entries=entries,
-            alert_rows=alert_rows,
+            alert_rows=alert_row_list,
             route_decisions=route_decisions,
             clusters=clusters,
             monitor_rows=monitor_rows,
@@ -413,6 +415,19 @@ def card_feedback_target(path: str | Path) -> str | None:
         return None
     target = match.group(1).strip()
     return target if target and target.lower() != "none" else None
+
+
+def card_core_opportunity_id(path: str | Path) -> str | None:
+    """Return the embedded core opportunity id from a research card, if present."""
+    p = Path(path)
+    if not p.exists() or p.name == "index.md":
+        return None
+    text = p.read_text(encoding="utf-8", errors="replace")
+    match = re.search(r"^- Core opportunity ID:\s*(.+?)\s*$", text, flags=re.MULTILINE)
+    if not match:
+        return None
+    value = match.group(1).strip()
+    return value if value and value.lower() != "none" else None
 
 
 def card_has_current_lineage(path: str | Path) -> bool:
@@ -593,10 +608,12 @@ def _selected_entries(
     entries: list[event_watchlist.EventWatchlistEntry],
     decisions: list[event_alpha_router.EventAlphaRouteDecision],
     *,
+    alert_rows: Iterable[Mapping[str, Any]] = (),
     include_all_alertable: bool,
     selected_tiers: Iterable[str] | None,
 ) -> list[event_watchlist.EventWatchlistEntry]:
     selected_by_key: dict[str, event_watchlist.EventWatchlistEntry] = {}
+    all_by_key = {entry.key: entry for entry in entries}
     states = set(selected_tiers or {
         event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
         event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
@@ -607,12 +624,40 @@ def _selected_entries(
         if (
             event_watchlist.final_state_value(entry) in states
             or entry.latest_tier in states
-        ) and not event_watchlist.state_is_quality_capped(entry):
+        ) and (
+            not event_watchlist.state_is_quality_capped(entry)
+            or event_watchlist.final_state_value(entry) in {
+                event_watchlist.EventWatchlistState.WATCHLIST.value,
+                event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+                event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+            }
+        ):
             selected_by_key[entry.key] = entry
     if include_all_alertable:
         for decision in decisions:
             if event_alpha_router.alertable_after_quality_gate(decision):
                 selected_by_key[decision.entry.key] = decision.entry
+    core_rows = [*decisions, *entries, *list(alert_rows)]
+    visible_core = event_core_opportunities.visible_core_opportunities(core_rows)
+    if visible_core:
+        ordered: list[event_watchlist.EventWatchlistEntry] = []
+        seen_core: set[str] = set()
+        for opportunity in visible_core:
+            if opportunity.core_opportunity_id in seen_core:
+                continue
+            entry = _entry_for_core_opportunity(opportunity, all_by_key)
+            if entry is None:
+                continue
+            selected_by_key.setdefault(entry.key, entry)
+            ordered.append(entry)
+            seen_core.add(opportunity.core_opportunity_id)
+            if len(ordered) >= max(len(visible_core), 1):
+                break
+        for entry in selected_by_key.values():
+            if entry.key not in {item.key for item in ordered} and not event_core_opportunities.row_is_diagnostic(entry):
+                ordered.append(entry)
+        if ordered:
+            return ordered
     if selected_by_key:
         core = event_core_opportunities.aggregate_core_opportunities([*decisions, *selected_by_key.values()])
         if core:
@@ -631,6 +676,197 @@ def _selected_entries(
         key=lambda entry: (entry.last_seen_at, entry.latest_score, entry.symbol),
         reverse=True,
     )
+
+
+def _entry_for_core_opportunity(
+    opportunity: event_core_opportunities.CoreOpportunity,
+    entries_by_key: Mapping[str, event_watchlist.EventWatchlistEntry],
+) -> event_watchlist.EventWatchlistEntry | None:
+    for key in event_core_opportunities.row_key_candidates_for_opportunity(opportunity):
+        entry = entries_by_key.get(key)
+        if entry is not None and _entry_matches_core_identity(entry, opportunity):
+            return entry
+    symbol = opportunity.symbol.upper()
+    coin = opportunity.coin_id.casefold()
+    for entry in entries_by_key.values():
+        if (
+            (symbol and entry.symbol.upper() == symbol)
+            or (coin and entry.coin_id.casefold() == coin)
+        ) and _entry_matches_core_identity(entry, opportunity):
+            return entry
+    return _entry_from_core_opportunity(opportunity)
+
+
+def _entry_matches_core_identity(
+    entry: event_watchlist.EventWatchlistEntry,
+    opportunity: event_core_opportunities.CoreOpportunity,
+) -> bool:
+    symbol_match = bool(opportunity.symbol and entry.symbol.upper() == opportunity.symbol.upper())
+    coin_match = bool(opportunity.coin_id and entry.coin_id.casefold() == opportunity.coin_id.casefold())
+    if not (symbol_match or coin_match):
+        return False
+    if opportunity.supporting_hypothesis_ids:
+        entry_hypothesis_ids = {
+            str(value or "")
+            for value in (
+                entry.hypothesis_id,
+                entry.latest_score_components.get("hypothesis_id") if isinstance(entry.latest_score_components, Mapping) else None,
+            )
+            if str(value or "")
+        }
+        if not entry_hypothesis_ids.intersection(opportunity.supporting_hypothesis_ids):
+            return False
+    if event_core_opportunities.row_is_diagnostic(entry):
+        return opportunity.primary_impact_path in {
+            "generic_cooccurrence_only",
+            "insufficient_data",
+            "source_noise_control",
+        } or opportunity.candidate_role in {"unknown", "unknown_with_reason", "source_noise"}
+    return True
+
+
+def _entry_from_core_opportunity(
+    opportunity: event_core_opportunities.CoreOpportunity,
+) -> event_watchlist.EventWatchlistEntry:
+    row = opportunity.primary_row
+    observed = _first_text(row, "last_seen_at", "observed_at", "updated_at", "created_at") or datetime.now(timezone.utc).isoformat()
+    final_state = (
+        opportunity.final_state_after_quality_gate
+        or _first_text(row, "final_state_after_quality_gate", "state")
+        or event_watchlist.EventWatchlistState.RADAR.value
+    )
+    components = _core_score_components(opportunity)
+    latest_score = int(round(_float_value(opportunity.opportunity_score_final) or _float_value(row.get("latest_score")) or _float_value(row.get("score")) or 0.0))
+    return event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_card_synthetic",
+        key=_first_text(row, "key", "alert_key", "watchlist_key") or opportunity.core_opportunity_id,
+        cluster_id=_first_text(row, "cluster_id") or opportunity.incident_id,
+        event_id=_first_text(row, "event_id", "hypothesis_id", "alert_id") or opportunity.core_opportunity_id,
+        coin_id=opportunity.coin_id or _first_text(row, "coin_id", "validated_coin_id") or "unknown",
+        symbol=opportunity.symbol or _first_text(row, "symbol", "validated_symbol") or "UNKNOWN",
+        relationship_type=opportunity.primary_impact_path or _first_text(row, "relationship_type", "effective_playbook_type") or "event_alpha",
+        external_asset=_first_text(row, "external_asset", "external_catalyst", "external_asset_name") or opportunity.canonical_incident_name,
+        event_time=_first_text(row, "event_time"),
+        state=final_state,
+        previous_state=_first_text(row, "previous_state"),
+        first_seen_at=_first_text(row, "first_seen_at") or observed,
+        last_seen_at=observed,
+        incident_id=opportunity.incident_id or _first_text(row, "incident_id"),
+        hypothesis_id=_first_text(row, "hypothesis_id"),
+        incident_canonical_name=opportunity.canonical_incident_name or _first_text(row, "incident_canonical_name"),
+        requested_state_before_quality_gate=_first_text(row, "requested_state_before_quality_gate", "state"),
+        final_state_after_quality_gate=final_state,
+        quality_state_block_reason=_first_text(row, "quality_state_block_reason"),
+        state_quality_capped=_bool_value(row.get("state_quality_capped")),
+        source_count=int(_float_value(row.get("source_count")) or 0),
+        highest_score=latest_score,
+        latest_score=latest_score,
+        latest_tier=_first_text(row, "latest_tier", "tier", "final_tier_after_quality_gate") or "",
+        latest_event_name=_first_text(row, "latest_event_name", "event_name", "canonical_incident_name") or opportunity.canonical_incident_name,
+        latest_source=_first_text(row, "latest_source", "source", "provider"),
+        latest_playbook_type=_first_text(row, "effective_playbook_type", "playbook_type"),
+        latest_rule_playbook_type=_first_text(row, "rule_playbook_type"),
+        latest_effective_playbook_type=_first_text(row, "effective_playbook_type", "playbook_type"),
+        latest_playbook_score=latest_score,
+        latest_playbook_action=_first_text(row, "playbook_action"),
+        latest_market_snapshot=_mapping_value(row.get("latest_market_snapshot")) or _mapping_value(row.get("market_snapshot")) or {},
+        latest_score_components=components,
+        impact_path_type=opportunity.primary_impact_path or _first_text(row, "impact_path_type"),
+        impact_path_strength=_first_text(row, "impact_path_strength"),
+        candidate_role=opportunity.candidate_role or _first_text(row, "candidate_role"),
+        evidence_quality_score=_float_value(row.get("evidence_quality_score")),
+        source_class=_first_text(row, "source_class"),
+        evidence_specificity=_first_text(row, "evidence_specificity"),
+        market_confirmation_score=_float_value(row.get("market_confirmation_score")),
+        market_confirmation_level=_first_text(row, "market_confirmation_level"),
+        market_context_freshness_status=_first_text(row, "market_context_freshness_status"),
+        market_context_age_hours=row.get("market_context_age_hours"),
+        market_context_stale=row.get("market_context_stale") if isinstance(row.get("market_context_stale"), bool) else None,
+        market_context_freshness_cap_applied=row.get("market_context_freshness_cap_applied") if isinstance(row.get("market_context_freshness_cap_applied"), bool) else None,
+        opportunity_score_final=_float_value(opportunity.opportunity_score_final) or _float_value(row.get("opportunity_score_final")),
+        opportunity_level=opportunity.opportunity_level or _first_text(row, "opportunity_level"),
+        opportunity_verdict_reasons=_list_value(row.get("opportunity_verdict_reasons")),
+        why_local_only=_first_text(row, "why_local_only"),
+        why_not_watchlist=_first_text(row, "why_not_watchlist"),
+        manual_verification_items=_list_value(row.get("manual_verification_items")),
+        upgrade_requirements=_list_value(row.get("upgrade_requirements")),
+        downgrade_warnings=_list_value(row.get("downgrade_warnings")),
+        should_alert=_bool_value(row.get("should_alert")),
+        suppressed_reason=_first_text(row, "suppressed_reason"),
+        warnings=tuple(_list_value(row.get("warnings"))),
+    )
+
+
+def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity) -> dict[str, Any]:
+    row = opportunity.primary_row
+    components: dict[str, Any] = {}
+    for key in ("latest_score_components", "score_components"):
+        value = row.get(key)
+        if isinstance(value, Mapping):
+            components.update(value)
+    for key in (
+        "core_opportunity_id",
+        "incident_id",
+        "hypothesis_id",
+        "validated_symbol",
+        "validated_coin_id",
+        "candidate_role",
+        "impact_path_type",
+        "opportunity_level",
+        "opportunity_score_final",
+        "final_route_after_quality_gate",
+        "final_state_after_quality_gate",
+        "quality_state_block_reason",
+        "feedback_target",
+        "feedback_target_type",
+    ):
+        value = row.get(key)
+        if value not in (None, "", [], {}, ()):
+            components[key] = value
+    components.setdefault("core_opportunity_id", opportunity.core_opportunity_id)
+    components.setdefault("feedback_target", opportunity.core_opportunity_id)
+    components.setdefault("feedback_target_type", "core_opportunity_id")
+    components.setdefault("incident_id", opportunity.incident_id)
+    components.setdefault("validated_symbol", opportunity.symbol)
+    components.setdefault("validated_coin_id", opportunity.coin_id)
+    components.setdefault("candidate_role", opportunity.candidate_role)
+    components.setdefault("impact_path_type", opportunity.primary_impact_path)
+    components.setdefault("opportunity_level", opportunity.opportunity_level)
+    components.setdefault("opportunity_score_final", opportunity.opportunity_score_final)
+    components.setdefault("final_route_after_quality_gate", opportunity.final_route_after_quality_gate)
+    components.setdefault("final_state_after_quality_gate", opportunity.final_state_after_quality_gate)
+    return components
+
+
+def _first_text(row: Mapping[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        value = row.get(key)
+        if value not in (None, "", [], {}, ()):
+            return str(value)
+    return None
+
+
+def _mapping_value(value: object) -> dict[str, Any] | None:
+    return dict(value) if isinstance(value, Mapping) else None
+
+
+def _list_value(value: object) -> list[str]:
+    if value in (None, "", [], {}, ()):
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(";") if item.strip()]
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes, Mapping)):
+        return [str(item) for item in value if str(item or "")]
+    return [str(value)]
+
+
+def _bool_value(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y"}
+    return bool(value)
 
 
 def _card_filename(entry: event_watchlist.EventWatchlistEntry) -> str:
@@ -729,8 +965,6 @@ def _card_index_group_for_entry(
     )).casefold()
     if "source_noise" in text or "ticker_word_collision" in text or "generic_cooccurrence_only" in text:
         return "Diagnostic / Source-Noise / Control Cards"
-    if event_watchlist.state_is_quality_capped(entry) or event_watchlist.final_state_value(entry) == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value:
-        return "Local-Only / Quality-Capped Cards"
     level = str(entry.opportunity_level or components.get("opportunity_level") or "").casefold()
     final_route = str(components.get("final_route_after_quality_gate") or components.get("route") or "")
     for decision in decisions:
@@ -739,6 +973,8 @@ def _card_index_group_for_entry(
             break
     if level in {"validated_digest", "watchlist", "high_priority"} or event_alpha_router.route_value_is_alertable(final_route):
         return "Core Opportunity Cards"
+    if event_watchlist.state_is_quality_capped(entry) or event_watchlist.final_state_value(entry) == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value:
+        return "Local-Only / Quality-Capped Cards"
     score = _float(components.get("opportunity_score_final") or entry.opportunity_score_final) or 0.0
     if level == "exploratory" or score >= 50:
         return "Near-Miss Cards"

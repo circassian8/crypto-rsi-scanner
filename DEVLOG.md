@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Make CoreOpportunity the Event Alpha operator artifact spine · Codex
+**Why:** `market_refresh_smoke` could show a visible RUNE watchlist core
+opportunity without a research card, snapshots lacked core-opportunity linkage,
+near-miss output mixed already-validated upgrade candidates with local
+near-misses, and artifact doctor/readiness did not enforce visible core
+coverage.
+**Changes:**
+- Added shared visible-core helpers and row-key candidates in
+  `event_core_opportunities.py`, preserving explicit aggregate ids when present.
+- Research card writing now covers every visible core opportunity, including
+  duplicate-suppressed rows and visible hypothesis-only cores, while preserving
+  diagnostics/source-noise rows outside the main operator card set.
+- Alert snapshots and card lookup now carry/link `core_opportunity_id`,
+  `feedback_target`, `feedback_target_type`, card path, and card group where
+  available.
+- Feedback readiness and artifact doctor now report/block missing visible-core
+  card/feedback coverage and missing snapshot linkage on fresh rows.
+- Near-miss reporting and daily briefs now split true local near-misses from
+  already-validated upgrade candidates, and market freshness readiness is
+  summarized by core opportunity in default operator output.
+- Updated ROADMAP, DECISIONS, and the Event Alpha runbook with the durable
+  core-opportunity coverage contract.
+**Verify:** `python3 tests/test_indicators.py` passed (489/489);
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (36/36);
+`make event-alpha-market-refresh-smoke PYTHON=python3` passed and refreshed
+`market_refresh_smoke` with 6 cards plus zero visible-core coverage blockers;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed with 6
+cards and strict doctor no blockers; `make event-alpha-quality-validation-cycle
+PYTHON=python3` passed with strict doctor no blockers; `make verify
+PYTHON=python3` passed; `python3 -m compileall -q crypto_rsi_scanner tests`
+passed; manual `market_refresh_smoke` readiness, strict doctor, near-miss
+report, and RUNE `core_08d464045bca` opportunity audit all passed.
+**Notes/risks:** Research-only artifact/report/card linkage. No Telegram send,
+paper/live rows, normal RSI writes, trading, or provider/LLM-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-27 — Separate Event Alpha state caps from route gates · Codex
 **Why:** Targeted market refresh exposed two consistency bugs: watchlist-level
 opportunities capped from requested high-priority state could be routed

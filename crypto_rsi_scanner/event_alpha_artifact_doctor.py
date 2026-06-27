@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_research_cards, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_research_cards, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 
@@ -24,6 +24,11 @@ class EventAlphaArtifactDoctorResult:
     research_card_index_present: bool = False
     cards_missing_lineage: int = 0
     cards_missing_feedback_target: int = 0
+    visible_core_opportunities: int = 0
+    visible_core_opportunities_missing_cards: int = 0
+    visible_core_opportunities_missing_feedback_targets: int = 0
+    alert_snapshots_missing_core_opportunity_id: int = 0
+    alert_snapshots_missing_feedback_target: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -262,6 +267,26 @@ def diagnose_artifacts(
     index_present = any(path.name == "index.md" for path in card_file_paths)
     cards_missing_lineage = sum(1 for path in research_card_paths if not event_research_cards.card_has_current_lineage(path))
     cards_missing_feedback_target = sum(1 for path in research_card_paths if not event_research_cards.card_feedback_target(path))
+    card_core_ids = {value for path in research_card_paths for value in (event_research_cards.card_core_opportunity_id(path),) if value}
+    card_feedback_targets = {value for path in research_card_paths for value in (event_research_cards.card_feedback_target(path),) if value}
+    visible_core = event_core_opportunities.visible_core_opportunities([*watchlist, *alerts, *hypotheses])
+    visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids)
+    visible_missing_targets = sum(
+        1
+        for item in visible_core
+        if item.core_opportunity_id not in card_feedback_targets
+        and not any(str(row.get("core_opportunity_id") or "") == item.core_opportunity_id and _alert_has_feedback_target(row) for row in alerts)
+    )
+    fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
+    fresh_visible_missing_targets = sum(
+        1
+        for item in visible_core
+        if item.core_opportunity_id not in card_feedback_targets
+        and not any(str(row.get("core_opportunity_id") or "") == item.core_opportunity_id and _alert_has_feedback_target(row) for row in alerts)
+        and _core_has_fresh_rows(item)
+    )
+    snapshots_missing_core = sum(1 for row in alerts if _alert_snapshot_should_have_core_id(row) and not str(row.get("core_opportunity_id") or "").strip())
+    snapshots_missing_feedback = sum(1 for row in alerts if _alert_snapshot_should_have_core_id(row) and not _alert_has_feedback_target(row))
     if card_count and not index_present:
         message = "research cards exist but index.md was not found"
         (blockers if strict else warnings).append(message)
@@ -270,6 +295,17 @@ def diagnose_artifacts(
         (blockers if strict else warnings).append(message)
     if cards_missing_feedback_target:
         message = f"research cards missing feedback target: {cards_missing_feedback_target}"
+        (blockers if strict else warnings).append(message)
+    if visible_missing_cards:
+        message = f"visible_core_opportunities_missing_cards={visible_missing_cards}"
+        (blockers if strict and fresh_visible_missing_cards else warnings).append(message)
+    if visible_missing_targets:
+        message = f"visible_core_opportunities_missing_feedback_targets={visible_missing_targets}"
+        (blockers if strict and fresh_visible_missing_targets else warnings).append(message)
+    if snapshots_missing_core:
+        warnings.append(f"alert_snapshots_missing_core_opportunity_id={snapshots_missing_core}")
+    if snapshots_missing_feedback:
+        message = f"alert_snapshots_missing_feedback_target={snapshots_missing_feedback}"
         (blockers if strict else warnings).append(message)
     if alerts and not card_count and any(str(row.get("tier") or "") in {"HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"} for row in alerts):
         warnings.append("high-priority/triggered snapshots exist but no research cards were found")
@@ -415,6 +451,11 @@ def diagnose_artifacts(
         research_card_index_present=index_present,
         cards_missing_lineage=cards_missing_lineage,
         cards_missing_feedback_target=cards_missing_feedback_target,
+        visible_core_opportunities=len(visible_core),
+        visible_core_opportunities_missing_cards=visible_missing_cards,
+        visible_core_opportunities_missing_feedback_targets=visible_missing_targets,
+        alert_snapshots_missing_core_opportunity_id=snapshots_missing_core,
+        alert_snapshots_missing_feedback_target=snapshots_missing_feedback,
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -488,6 +529,43 @@ def _row(value: Mapping[str, Any] | object) -> dict[str, Any]:
     if is_dataclass(value):
         return asdict(value)
     return dict(getattr(value, "__dict__", {}) or {})
+
+
+def _alert_has_feedback_target(row: Mapping[str, Any]) -> bool:
+    return any(str(row.get(key) or "").strip() for key in (
+        "feedback_target",
+        "core_opportunity_id",
+        "alert_id",
+        "card_id",
+        "alert_key",
+        "snapshot_id",
+    ))
+
+
+def _alert_snapshot_should_have_core_id(row: Mapping[str, Any]) -> bool:
+    if str(row.get("row_type") or "") not in {"", "event_alpha_alert_snapshot"}:
+        return False
+    route = str(row.get("final_route_after_quality_gate") or row.get("route") or "")
+    level = str(row.get("opportunity_level") or "").casefold()
+    state = str(row.get("final_state_after_quality_gate") or row.get("state") or "")
+    if event_alpha_router.route_value_is_alertable(route):
+        return True
+    if route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value:
+        return True
+    if level in {"validated_digest", "watchlist", "high_priority"}:
+        return True
+    return state in {
+        event_watchlist.EventWatchlistState.WATCHLIST.value,
+        event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+    }
+
+
+def _core_has_fresh_rows(opportunity: event_core_opportunities.CoreOpportunity) -> bool:
+    return any(
+        not event_alpha_artifacts.is_legacy_row(row)
+        for row in (opportunity.primary_row, *opportunity.supporting_rows)
+    )
 
 
 def _quality_missing_summary(
@@ -991,6 +1069,14 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"research_card_index_present={str(result.research_card_index_present).lower()} "
             f"cards_missing_lineage={result.cards_missing_lineage} "
             f"cards_missing_feedback_target={result.cards_missing_feedback_target}"
+        ),
+        (
+            "core opportunity coverage: "
+            f"visible_core_opportunities={result.visible_core_opportunities} "
+            f"visible_core_opportunities_missing_cards={result.visible_core_opportunities_missing_cards} "
+            f"visible_core_opportunities_missing_feedback_targets={result.visible_core_opportunities_missing_feedback_targets} "
+            f"alert_snapshots_missing_core_opportunity_id={result.alert_snapshots_missing_core_opportunity_id} "
+            f"alert_snapshots_missing_feedback_target={result.alert_snapshots_missing_feedback_target}"
         ),
         (
             "snapshot lineage: "

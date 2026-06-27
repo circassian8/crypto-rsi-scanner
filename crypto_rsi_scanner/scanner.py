@@ -5887,6 +5887,10 @@ def event_alpha_daily_brief_report(
         _event_alpha_alert_store_config_from_runtime().path,
         latest_only=True,
     )
+    hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
+        context.impact_hypothesis_store_path,
+        limit=100,
+    )
     feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
     missed_rows = event_alpha_missed.load_missed_rows(config.EVENT_ALPHA_MISSED_PATH)
     watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
@@ -5895,7 +5899,7 @@ def event_alpha_daily_brief_report(
     card_write = event_research_cards.write_research_cards(
         config.EVENT_RESEARCH_CARDS_DIR,
         watchlist_entries=watchlist.entries,
-        alert_rows=alerts.rows,
+        alert_rows=[*alerts.rows, *hypotheses.rows],
         route_decisions=router_result.decisions,
         monitor_rows=monitor_result.rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
@@ -5913,7 +5917,7 @@ def event_alpha_daily_brief_report(
         feedback_rows=[record.__dict__ for record in feedback.records],
         missed_rows=missed_rows,
         notification_runs=event_alpha_notification_runs.load_notification_runs(context.notification_runs_path).rows,
-        hypothesis_rows=event_impact_hypothesis_store.load_impact_hypotheses(context.impact_hypothesis_store_path, limit=100).rows,
+        hypothesis_rows=hypotheses.rows,
         incident_rows=event_incident_store.load_incidents(context.incident_store_path, limit=100, include_legacy=True).rows,
         watchlist_entries=watchlist.entries,
         router_result=router_result,

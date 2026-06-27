@@ -68,6 +68,15 @@ class CoreOpportunity:
         )
 
 
+VISIBLE_CORE_GROUPS = {
+    "High-Priority Core Opportunities",
+    "Validated Digest Core Opportunities",
+    "Watchlist Core Opportunities",
+    "Near-Miss Candidates",
+    "Quality-Capped / Local-Only Candidates",
+}
+
+
 def aggregate_core_opportunities(rows: Iterable[Any]) -> tuple[CoreOpportunity, ...]:
     """Aggregate compatible rows into operator-facing core opportunities."""
     normalized = [_normalize_row(item) for item in rows]
@@ -138,12 +147,69 @@ def aggregate_core_opportunities(rows: Iterable[Any]) -> tuple[CoreOpportunity, 
     return tuple(sorted(opportunities, key=lambda item: _opportunity_rank(item), reverse=True))
 
 
+def core_opportunity_visibility_group(
+    opportunity: CoreOpportunity,
+    *,
+    include_diagnostics: bool = False,
+) -> str | None:
+    """Return the default operator-visible group for a core opportunity.
+
+    This is presentation-only: it does not route, score, send, or mutate rows.
+    """
+    if not include_diagnostics and _core_is_diagnostic_only(opportunity):
+        return None
+    if opportunity.is_high_priority:
+        return "High-Priority Core Opportunities"
+    if opportunity.is_validated_digest:
+        return "Validated Digest Core Opportunities"
+    if opportunity.is_watchlist:
+        return "Watchlist Core Opportunities"
+    if _core_is_near_miss_like(opportunity):
+        return "Near-Miss Candidates"
+    if not _core_is_diagnostic_only(opportunity):
+        return "Quality-Capped / Local-Only Candidates"
+    return "Diagnostics / Source-Noise / Controls" if include_diagnostics else None
+
+
+def core_opportunity_is_visible(
+    opportunity: CoreOpportunity,
+    *,
+    include_diagnostics: bool = False,
+) -> bool:
+    return core_opportunity_visibility_group(opportunity, include_diagnostics=include_diagnostics) in VISIBLE_CORE_GROUPS
+
+
+def visible_core_opportunities(
+    rows: Iterable[Any],
+    *,
+    include_diagnostics: bool = False,
+) -> tuple[CoreOpportunity, ...]:
+    return tuple(
+        item
+        for item in aggregate_core_opportunities(rows)
+        if core_opportunity_is_visible(item, include_diagnostics=include_diagnostics)
+    )
+
+
 def core_opportunity_id_for_row(row: Any) -> str | None:
     normalized = _normalize_row(row)
+    explicit = _clean(normalized.get("core_opportunity_id") or normalized.get("aggregated_candidate_id"))
+    if explicit:
+        return explicit
     key = _core_key(normalized)
     if not key:
         return None
     return _core_id(key)
+
+
+def row_key_candidates_for_opportunity(opportunity: CoreOpportunity) -> tuple[str, ...]:
+    values: list[str] = []
+    for row in (opportunity.primary_row, *opportunity.supporting_rows):
+        for key in ("key", "alert_key", "event_id", "hypothesis_id", "watchlist_key"):
+            value = str(row.get(key) or "").strip()
+            if value:
+                values.append(value)
+    return tuple(dict.fromkeys(values))
 
 
 def incident_asset_key_for_values(incident_id: object, coin_id: object, symbol: object) -> tuple[str, str]:
@@ -192,7 +258,7 @@ def _build_core_opportunity(
     visible_reason = _visible_reason(primary, route, state, level)
     hidden_reason = _hidden_reason(len(supporting), len(diagnostics), capped_count)
     return CoreOpportunity(
-        core_opportunity_id=_core_id(key),
+        core_opportunity_id=_explicit_core_id(supporting) or _core_id(key),
         incident_id=_optional(_value(primary, components, "incident_id", "event_cluster_id", "cluster_id")),
         canonical_incident_name=_optional(_value(primary, components, "canonical_incident_name", "incident_canonical_name", "canonical_name")),
         symbol=symbol,
@@ -384,6 +450,45 @@ def _is_source_noise_control(row: Mapping[str, Any]) -> bool:
     } or role in {"source_noise", "ticker_word_collision"}
 
 
+def _core_is_diagnostic_only(opportunity: CoreOpportunity) -> bool:
+    primary = opportunity.primary_row
+    if _is_diagnostic_row(primary):
+        return True
+    text = " ".join(str(value or "") for value in (
+        opportunity.candidate_role,
+        opportunity.primary_impact_path,
+        opportunity.opportunity_level,
+        opportunity.final_route_after_quality_gate,
+        primary.get("warnings"),
+        primary.get("rejection_reasons"),
+    )).casefold()
+    return any(term in text for term in (
+        "source_noise",
+        "ticker_word_collision",
+        "ticker_collision",
+        "word_collision",
+        "generic_cooccurrence_only",
+    ))
+
+
+def _core_is_near_miss_like(opportunity: CoreOpportunity) -> bool:
+    if opportunity.alertable or opportunity.is_high_priority or opportunity.is_watchlist or opportunity.is_validated_digest:
+        return False
+    score = opportunity.opportunity_score_final
+    level = str(opportunity.opportunity_level or "").casefold()
+    if level == "exploratory":
+        return True
+    if score >= 50:
+        return True
+    text = " ".join(str(value or "") for value in (
+        opportunity.primary_row.get("why_not_watchlist"),
+        opportunity.primary_row.get("why_local_only"),
+        opportunity.primary_row.get("missing_requirements"),
+        opportunity.primary_row.get("upgrade_requirements"),
+    )).casefold()
+    return any(term in text for term in ("market", "evidence", "impact_path", "source", "refresh"))
+
+
 def _is_promoted_row(row: Mapping[str, Any]) -> bool:
     route = _final_route(row)
     state = _final_state(row)
@@ -537,6 +642,14 @@ def _dedupe_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _core_id(key: str) -> str:
     return "core_" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
+
+
+def _explicit_core_id(rows: Iterable[Mapping[str, Any]]) -> str | None:
+    for row in rows:
+        value = _clean(row.get("core_opportunity_id") or row.get("aggregated_candidate_id"))
+        if value:
+            return value
+    return None
 
 
 def _value(row: Mapping[str, Any], components: Mapping[str, Any], *keys: str) -> Any:
