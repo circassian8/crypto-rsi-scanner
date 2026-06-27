@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Operationalize catalyst-frame coverage and route caps · Codex
+**Why:** The catalyst-frame layer worked in fixtures, but live-style quality
+profiles needed explicit missing/unresolved frame state so ambiguous articles
+cannot be silently routed as validated opportunities when the frame analyzer is
+disabled, unavailable, skipped by budget, or returns unresolved output.
+**Changes:**
+- Added deterministic catalyst-frame requirement detection and propagated
+  `catalyst_frame_required`, status, skip reason, and required-reason metadata
+  onto transformed raw events and run-ledger rows.
+- Capped validated impact hypotheses to exploratory/store-only research when a
+  required catalyst frame is missing or unresolved, while allowing deterministic
+  direct-event cases such as confirmed exploit/listing/strategic-stake paths to
+  remain sufficient.
+- Hardened incident linked-asset roles so taxonomy/search suggestions are
+  stored as candidate suggestions instead of direct incident subjects until
+  resolver/identity validation confirms the asset.
+- Aggregated compatible validated hypotheses by incident, validated asset,
+  role, and impact-path family, preserving supporting categories, hypothesis
+  ids, and evidence quotes for audit.
+- Fixed validated high-priority hypothesis routing so canonical validated
+  fields can route `HIGH_PRIORITY_RESEARCH` instead of falling through to
+  generic store-only block reasons.
+**Verify:** `python3 tests/test_indicators.py` passed (474/474); `make
+event-llm-eval PYTHON=python3` passed (9/9); `make event-llm-extract-eval
+PYTHON=python3` passed (7/7); `make event-alpha-eval PYTHON=python3` passed
+(11/11); `make event-alpha-signal-quality-eval PYTHON=python3` passed (32/32);
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed with no
+blockers; `make event-alpha-quality-validation-cycle PYTHON=python3` passed;
+`python3 -m compileall -q crypto_rsi_scanner tests` passed; manual smoke
+reports for `event-opportunity-audit TARGET=AAVE`, `event-incidents-report`,
+and `event-alpha-daily-brief` under `PROFILE=catalyst_frame_e2e` passed; `make
+verify PYTHON=python3` passed.
+**Notes/risks:** Research-only artifact and routing-quality hardening. Missing
+or unresolved LLM frames can cap ambiguous research routes, but they still
+cannot create `TRIGGERED_FADE`, send notifications, open paper/live rows, write
+normal RSI signals, bypass resolver/quality/event-fade gates, or execute trades.
+
 
 ## 2026-06-27 — Prove catalyst-frame semantics through Event Alpha artifacts · Codex
 **Why:** The LLM catalyst-frame eval proved AAVE/Kraken/KelpDAO in isolation, but the operational artifacts could still be generated from pre-LLM raw rows. The proof needed to run through the full Event Alpha pipeline so cards, audits, incidents, hypotheses, watchlist state, daily brief, and run ledger all agree.

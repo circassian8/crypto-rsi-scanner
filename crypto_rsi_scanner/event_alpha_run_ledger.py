@@ -170,6 +170,12 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
         hypothesis_skip_reasons = row.get("hypothesis_search_skip_reasons") or {}
         if isinstance(hypothesis_skip_reasons, Mapping) and hypothesis_skip_reasons:
             rows.append("  hypothesis_search_skip_reasons: " + _format_reason_counts(hypothesis_skip_reasons))
+        catalyst_frame_skip_reasons = row.get("catalyst_frame_skip_reasons") or {}
+        if isinstance(catalyst_frame_skip_reasons, Mapping) and catalyst_frame_skip_reasons:
+            rows.append(
+                "  catalyst_frame_skip_reasons: "
+                + _format_reason_counts(catalyst_frame_skip_reasons)
+            )
         lane_attempted = row.get("send_lane_items_attempted") or {}
         lane_delivered = row.get("send_lane_items_delivered") or {}
         if lane_attempted or lane_delivered:
@@ -290,6 +296,8 @@ def _run_record(
         "catalyst_frame_validations": catalyst_frame_counts["validations"],
         "catalyst_frame_disagreements": catalyst_frame_counts["disagreements"],
         "catalyst_frame_unresolved": catalyst_frame_counts["unresolved"],
+        "catalyst_frame_rows_skipped": catalyst_frame_counts["skipped"],
+        "catalyst_frame_skip_reasons": catalyst_frame_counts["skip_reasons"],
         "impact_hypotheses": len(tuple(getattr(result, "impact_hypotheses", ()) or ())),
         "hypotheses_validated": _int(getattr(result, "hypotheses_validated", 0)),
         "hypothesis_search_queries": _int(getattr(result, "hypothesis_search_queries", 0)),
@@ -528,12 +536,19 @@ def _catalyst_frame_counts(
     validations = _int(getattr(result, "catalyst_frame_validations_applied", 0))
     disagreements = 0
     unresolved = 0
+    skipped = 0
+    skip_reasons: dict[str, int] = {}
     discovery = getattr(result, "discovery_result", None)
     raw_events = getattr(discovery, "raw_events", ()) if discovery is not None else ()
     for raw in raw_events or ():
         payload = getattr(raw, "raw_json", None)
         if not isinstance(payload, Mapping):
             continue
+        status = str(payload.get("catalyst_frame_status") or "").strip()
+        if status in {"missing_required_frame_analysis", "not_required"}:
+            skipped += 1
+            reason = str(payload.get("catalyst_frame_skip_reason") or status or "unknown").strip()
+            skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
         validation = payload.get("llm_catalyst_frame_validation")
         if not isinstance(validation, Mapping):
             continue
@@ -546,6 +561,8 @@ def _catalyst_frame_counts(
         "validations": validations,
         "disagreements": disagreements,
         "unresolved": unresolved,
+        "skipped": skipped,
+        "skip_reasons": skip_reasons,
     }
 
 

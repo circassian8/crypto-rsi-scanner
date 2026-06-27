@@ -186,6 +186,26 @@ fixture raw events and fixture LLM catalyst frames, disables live providers and
 sends, and proves that AAVE/Kraken remains a strategic investment while KelpDAO
 exploit language stays background/corrective context.
 
+Live-style profiles also record when catalyst-frame analysis was required but
+missing or unresolved. Run ledgers and daily briefs expose analyzed, validated,
+unresolved, skipped, and skip-reason counts so a provider outage, disabled
+profile, budget skip, or prefilter miss is visible. Rows with ambiguous
+multi-catalyst/proxy/security-background language may be capped to local or
+exploratory research when a required frame is missing or unresolved. A
+deterministic direct-event path can still be sufficient for clear listings,
+unlocks, strategic-stake/valuation reports, and confirmed direct exploits, but
+generic or ambiguous co-occurrence should not route as validated merely because
+the LLM frame layer did not run.
+
+Incident asset roles are provenance-sensitive. Resolver-validated affected
+assets can be direct subjects; taxonomy/search suggestions are candidate
+suggestions until identity validation confirms them. For example, a THORChain
+exploit can validate RUNE as the direct subject while LINK/PYTH taxonomy terms
+remain search candidates rather than affected assets. Compatible validated
+hypotheses may aggregate by incident, validated asset, role, and impact-path
+family, but supporting categories, hypothesis ids, and evidence quotes should
+remain visible for audit.
+
 The feature is research metadata only. It cannot send notifications, create
 paper/live rows, write normal RSI signals, execute trades, or create
 `TRIGGERED_FADE`.

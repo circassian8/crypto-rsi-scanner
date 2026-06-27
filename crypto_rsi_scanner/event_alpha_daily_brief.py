@@ -146,7 +146,14 @@ def build_daily_brief(
             f"{int(latest.get('catalyst_frame_validations') or latest.get('catalyst_frame_validations_applied') or 0)} / "
             f"{int(latest.get('catalyst_frame_disagreements') or 0)} / "
             f"{int(latest.get('catalyst_frame_unresolved') or 0)}",
+            f"- Catalyst frame rows skipped/missing: {int(latest.get('catalyst_frame_rows_skipped') or 0)}",
         ])
+        catalyst_frame_skip = latest.get("catalyst_frame_skip_reasons") or {}
+        if isinstance(catalyst_frame_skip, Mapping) and catalyst_frame_skip:
+            lines.append(
+                "- Catalyst frame skip reasons: "
+                + ", ".join(f"{key}={int(value or 0)}" for key, value in sorted(catalyst_frame_skip.items()))
+            )
         warnings = [str(w) for w in latest.get("warnings") or [] if str(w)]
         if warnings:
             lines.append("- Warnings: " + "; ".join(warnings[:6]))

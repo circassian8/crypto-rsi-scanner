@@ -1176,6 +1176,7 @@ def _linked_assets(
         validated_asset = row.get("validated_asset") if isinstance(row.get("validated_asset"), Mapping) else {}
         symbol = _value(row, "validated_symbol") or _value(validated_asset, "symbol")
         coin_id = _value(row, "validated_coin_id") or _value(validated_asset, "coin_id")
+        validated_identity = bool(symbol or coin_id or validated_asset.get("validated"))
         if not symbol:
             symbols = row.get("candidate_symbols") or ()
             symbol = str(symbols[0]).upper() if symbols else ""
@@ -1183,6 +1184,8 @@ def _linked_assets(
             coin_ids = row.get("candidate_coin_ids") or ()
             coin_id = str(coin_ids[0]) if coin_ids else ""
         if symbol or coin_id:
+            if not validated_identity:
+                role = _safe_unvalidated_incident_asset_role(row, role)
             role = _incident_asset_role(
                 symbol=symbol,
                 coin_id=coin_id,
@@ -1194,7 +1197,7 @@ def _linked_assets(
                 "coin_id": coin_id,
                 "role": role or "unknown",
                 "role_confidence": row.get("role_confidence"),
-                "source": "hypothesis",
+                "source": "hypothesis" if validated_identity else "hypothesis_candidate_suggestion",
             })
     for row in w_rows:
         components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else {}
@@ -1232,6 +1235,24 @@ def _incident_asset_role(
     if clean_symbol == "sector" or clean_coin in {"market_anomaly_unknown", "sector", "unknown"}:
         return "sector_context"
     return role
+
+
+def _safe_unvalidated_incident_asset_role(row: Mapping[str, Any], role: str) -> str:
+    strong_roles = {
+        "direct_subject",
+        "ecosystem_affected_asset",
+        "proxy_venue",
+        "proxy_instrument",
+    }
+    if role not in strong_roles:
+        return role or "candidate_suggestion"
+    source = str(row.get("candidate_source") or "").casefold()
+    assets = row.get("crypto_candidate_assets") or ()
+    has_taxonomy = "taxonomy" in source or any(
+        isinstance(asset, Mapping) and str(asset.get("source") or "").casefold() == "taxonomy"
+        for asset in assets
+    )
+    return "taxonomy_candidate" if has_taxonomy else "candidate_suggestion"
 
 
 def _asset_roles(linked_assets: Iterable[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:

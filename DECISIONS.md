@@ -16,6 +16,34 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Required catalyst frames cap ambiguous research routes
+**Status:** accepted
+**Decision:** Event Alpha rows that contain ambiguous, multi-catalyst, proxy,
+investment/valuation, or background/security language should record whether
+catalyst-frame analysis was required, performed, validated, unresolved, skipped,
+or missing. If a required frame is missing or unresolved, validated hypotheses
+must stay local/exploratory unless deterministic evidence is independently
+sufficient for the direct event path. Missing/unresolved frame reasons such as
+`catalyst_frame_required`, `catalyst_frame_missing`,
+`catalyst_frame_unresolved`, and `catalyst_frame_conflict_caps_route` are route
+quality-control metadata only; they cannot create candidates or triggers.
+Incident asset roles must also distinguish validated affected assets from
+taxonomy/search suggestions: unvalidated LINK/PYTH-style taxonomy suggestions
+in a THORChain/RUNE exploit article are candidate suggestions, not direct
+incident subjects. Compatible validated hypotheses may aggregate by incident,
+validated asset, role, and impact-path family, but supporting categories and
+quotes must remain auditable.
+**Why:** A live-style run can have the catalyst-frame feature configured but
+fail to receive validated LLM output because of provider availability, budget,
+prefiltering, or unresolved analysis. Treating those rows as if no frame was
+needed would overstate ambiguous evidence. Separately, taxonomy expansion is
+useful for search, but it must not turn infrastructure-adjacent tokens into
+directly affected assets.
+**Revisit when:** A reviewed incident/hypothesis dataset proves that specific
+missing-frame categories can be safely promoted without LLM support, or when a
+typed research database enforces frame status and asset-role provenance at
+schema level.
+
 ## 2026-06-27 - LLM catalyst frames are validated research metadata only
 **Status:** accepted
 **Decision:** Event Alpha may use a constrained LLM catalyst-frame analyzer to

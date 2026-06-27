@@ -26,6 +26,7 @@ from . import (
     event_incident_graph,
     event_incident_store,
     event_impact_path_validator,
+    event_llm_catalyst_frames,
     event_market_confirmation,
     event_opportunity_verdict,
 )
@@ -204,6 +205,18 @@ class EventImpactHypothesis:
     llm_predicted_main_frame_type: str | None = None
     frame_rule_disagreement: bool | None = None
     disagreement_resolution: str | None = None
+    frame_required: bool = False
+    frame_status: str | None = None
+    frame_required_reason: str | None = None
+    frame_gate_reason: str | None = None
+    route_block_reason: str | None = None
+    aggregated_candidate_id: str | None = None
+    primary_impact_path: str | None = None
+    supporting_categories: tuple[str, ...] = ()
+    supporting_hypothesis_ids: tuple[str, ...] = ()
+    supporting_evidence_quotes: tuple[str, ...] = ()
+    supporting_hypothesis_count: int = 1
+    asset_role_source: str | None = None
     independent_source_domains: tuple[str, ...] = ()
     conflicting_claims: tuple[str, ...] = ()
     opportunity_score_final: float | None = None
@@ -959,6 +972,7 @@ def _with_promotion_diagnostics(
     *,
     search_result: object | None = None,
 ) -> EventImpactHypothesis:
+    hypothesis = _apply_frame_route_cap(hypothesis)
     reasons: list[str] = []
     path_digest_eligible = bool(getattr(hypothesis, "digest_eligible_by_impact_path", False))
     path_strength = str(getattr(hypothesis, "impact_path_strength", "") or "")
@@ -1282,6 +1296,8 @@ def _hypothesis_from_rule(
     confidence = max(0.0, min(1.0, round(hypothesis_score / 100.0, 4)))
     quotes = _evidence_quotes(text, (*rule.get("keywords", ()), *rule.get("secondary", ())))
     validation_stage = _initial_validation_stage(category_value, crypto_candidate_assets, validated_assets)
+    frame_gate = _frame_gate_metadata(raws, category_value=category_value, incident=incident)
+    score_components.update(frame_gate)
     status = (
         HypothesisStatus.VALIDATION_SEARCH_PENDING.value
         if category != ImpactCategory.MARKET_ANOMALY_UNKNOWN and crypto_candidate_assets
@@ -1363,6 +1379,13 @@ def _hypothesis_from_rule(
         llm_predicted_main_frame_type=incident.llm_predicted_main_frame_type if incident else None,
         frame_rule_disagreement=incident.frame_rule_disagreement if incident else None,
         disagreement_resolution=incident.disagreement_resolution if incident else None,
+        frame_required=bool(frame_gate.get("frame_required")),
+        frame_status=str(frame_gate.get("frame_status") or "") or None,
+        frame_required_reason=str(frame_gate.get("frame_required_reason") or "") or None,
+        frame_gate_reason=str(frame_gate.get("frame_gate_reason") or "") or None,
+        route_block_reason=str(frame_gate.get("route_block_reason") or "") or None,
+        primary_impact_path=str(frame_gate.get("primary_impact_path") or "") or None,
+        asset_role_source=str(frame_gate.get("asset_role_source") or "") or None,
         independent_source_domains=incident.independent_source_domains if incident else (),
         conflicting_claims=incident.conflicting_claims if incident else (),
         created_at=now.isoformat(),
@@ -1621,6 +1644,114 @@ def _incident_frame_components(incident: event_incident_graph.CanonicalIncident)
         "frame_rule_disagreement": incident.frame_rule_disagreement,
         "disagreement_resolution": incident.disagreement_resolution,
     }
+
+
+def _frame_gate_metadata(
+    raws: tuple[RawDiscoveredEvent, ...],
+    *,
+    category_value: str,
+    incident: event_incident_graph.CanonicalIncident | None,
+) -> dict[str, Any]:
+    required_reasons: list[str] = []
+    statuses: list[str] = []
+    skip_reasons: list[str] = []
+    for raw in raws:
+        payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+        required, reason = event_llm_catalyst_frames.frame_requirement_for_raw(raw)
+        if bool(payload.get("catalyst_frame_required")) or required:
+            required_reasons.append(str(payload.get("catalyst_frame_required_reason") or reason or "catalyst_frame_required"))
+        status = str(payload.get("catalyst_frame_status") or "").strip()
+        if status:
+            statuses.append(status)
+        skip = str(payload.get("catalyst_frame_skip_reason") or "").strip()
+        if skip:
+            skip_reasons.append(skip)
+    main_type = incident.main_frame_type if incident else None
+    deterministic_sufficient = _deterministic_frame_sufficient(incident, category_value=category_value)
+    required = bool(required_reasons)
+    if any(status == "validated" for status in statuses):
+        status = "validated"
+    elif any(status == "unresolved" for status in statuses):
+        status = "unresolved"
+    elif required and deterministic_sufficient:
+        status = "deterministic_frame_sufficient"
+    elif required:
+        status = "missing_required_frame_analysis"
+    else:
+        status = "not_required"
+    block_reason = None
+    if required and status == "unresolved":
+        block_reason = "catalyst_frame_unresolved"
+    elif required and status == "missing_required_frame_analysis":
+        block_reason = "catalyst_frame_missing"
+    return {
+        "frame_required": required,
+        "frame_status": status,
+        "frame_required_reason": required_reasons[0] if required_reasons else None,
+        "frame_skip_reasons": tuple(dict.fromkeys(skip_reasons)),
+        "frame_gate_reason": block_reason,
+        "route_block_reason": block_reason,
+        "primary_impact_path": main_type,
+        "asset_role_source": "validated_asset" if incident is not None else "unknown",
+    }
+
+
+def _deterministic_frame_sufficient(
+    incident: event_incident_graph.CanonicalIncident | None,
+    *,
+    category_value: str,
+) -> bool:
+    if incident is None:
+        return False
+    main_type = str(incident.main_frame_type or "")
+    main_role = str(incident.main_frame_role or "")
+    if main_role not in {event_catalyst_frames.ROLE_MAIN, event_catalyst_frames.ROLE_MARKET_REACTION}:
+        return False
+    if main_type in {
+        event_catalyst_frames.TYPE_ACQUISITION_OR_STAKE,
+        event_catalyst_frames.TYPE_STRATEGIC_INVESTMENT,
+        event_catalyst_frames.TYPE_VALUATION_EVENT,
+        event_catalyst_frames.TYPE_LISTING_LIQUIDITY,
+        event_catalyst_frames.TYPE_UNLOCK_SUPPLY,
+    }:
+        return True
+    if main_type == event_catalyst_frames.TYPE_EXPLOIT_SECURITY:
+        return (
+            str(incident.current_cause_status or "") == event_claim_semantics.CauseStatus.CONFIRMED.value
+            and not incident.frame_rule_disagreement
+        )
+    if main_type == event_catalyst_frames.TYPE_PROXY_ATTENTION and category_value in {
+        ImpactCategory.RWA_PREIPO_PROXY.value,
+        ImpactCategory.AI_IPO_PROXY.value,
+        ImpactCategory.TOKENIZED_STOCK_VENUE.value,
+    }:
+        return True
+    return False
+
+
+def _apply_frame_route_cap(hypothesis: EventImpactHypothesis) -> EventImpactHypothesis:
+    block = str(hypothesis.route_block_reason or hypothesis.frame_gate_reason or "").strip()
+    if not block:
+        return hypothesis
+    if hypothesis.status != HypothesisStatus.VALIDATED.value:
+        return hypothesis
+    if hypothesis.opportunity_level in {"local_only", "exploratory"}:
+        return hypothesis
+    current_score = _optional_score(hypothesis.opportunity_score_final)
+    capped_score = min(current_score if current_score is not None else float(hypothesis.hypothesis_score or 0.0), 54.0)
+    components = dict(hypothesis.score_components or {})
+    components["frame_gate_route_blocked"] = 1.0
+    components["route_block_reason"] = block
+    return replace(
+        hypothesis,
+        opportunity_score_final=round(capped_score, 2),
+        opportunity_level="exploratory",
+        why_local_only=block,
+        why_not_watchlist=block,
+        route_block_reason=block,
+        score_components=components,
+        warnings=tuple(dict.fromkeys((*hypothesis.warnings, f"catalyst_frame_route_blocked:{block}"))),
+    )
 
 
 def _rejected_impact_paths_from_frames(incident: event_incident_graph.CanonicalIncident | None) -> tuple[str, ...]:
@@ -3268,7 +3399,119 @@ def _dedupe_hypotheses(items: Iterable[EventImpactHypothesis]) -> list[EventImpa
             continue
         merged = _merge_duplicate_hypotheses(current, item)
         by_key[item.hypothesis_id] = merged
-    return sorted(by_key.values(), key=lambda item: (item.status != HypothesisStatus.VALIDATED.value, -item.confidence, item.hypothesis_id))
+    aggregated = _aggregate_validated_hypotheses(by_key.values())
+    return sorted(aggregated, key=lambda item: (item.status != HypothesisStatus.VALIDATED.value, -item.confidence, item.hypothesis_id))
+
+
+def _aggregate_validated_hypotheses(items: Iterable[EventImpactHypothesis]) -> list[EventImpactHypothesis]:
+    grouped: dict[str, EventImpactHypothesis] = {}
+    passthrough: list[EventImpactHypothesis] = []
+    for item in items:
+        key = _validated_hypothesis_aggregation_key(item)
+        if key is None:
+            passthrough.append(item)
+            continue
+        current = grouped.get(key)
+        grouped[key] = item if current is None else _merge_aggregated_hypotheses(current, item)
+    return [*passthrough, *grouped.values()]
+
+
+def _validated_hypothesis_aggregation_key(item: EventImpactHypothesis) -> str | None:
+    if item.status != HypothesisStatus.VALIDATED.value:
+        return None
+    asset = _validated_asset_key(item)
+    if not asset:
+        return None
+    incident = item.incident_id or item.event_cluster_id
+    if not incident:
+        return None
+    role = item.candidate_role or "unknown"
+    family = _impact_path_family(item.impact_path_type or item.impact_path_reason or item.impact_category)
+    return "|".join((incident, asset, role, family))
+
+
+def _validated_asset_key(item: EventImpactHypothesis) -> str | None:
+    for row in item.validated_candidate_assets:
+        if not isinstance(row, Mapping):
+            continue
+        symbol = str(row.get("symbol") or "").strip().upper()
+        coin_id = str(row.get("coin_id") or "").strip()
+        if symbol or coin_id:
+            return coin_id or symbol
+    symbols = tuple(str(value).strip().upper() for value in item.candidate_symbols if str(value).strip())
+    coin_ids = tuple(str(value).strip() for value in item.candidate_coin_ids if str(value).strip())
+    if item.validation_stage in _PROMOTABLE_VALIDATION_STAGES and (symbols or coin_ids):
+        return coin_ids[0] if coin_ids else symbols[0]
+    return None
+
+
+def _impact_path_family(value: str | None) -> str:
+    text = clean_text(value or "")
+    if any(term in text for term in ("proxy", "venue", "preipo", "pre ipo", "tokenized", "value capture", "exposure")):
+        return "proxy_value_capture"
+    if any(term in text for term in ("exploit", "security")):
+        return "security"
+    if any(term in text for term in ("listing", "liquidity")):
+        return "listing_liquidity"
+    if any(term in text for term in ("investment", "valuation", "stake", "acquisition")):
+        return "strategic_investment"
+    return text or "unknown"
+
+
+def _merge_aggregated_hypotheses(
+    current: EventImpactHypothesis,
+    item: EventImpactHypothesis,
+) -> EventImpactHypothesis:
+    winner = item if (
+        float(item.opportunity_score_final or item.hypothesis_score or 0.0),
+        float(item.confidence or 0.0),
+    ) > (
+        float(current.opportunity_score_final or current.hypothesis_score or 0.0),
+        float(current.confidence or 0.0),
+    ) else current
+    other = current if winner is item else item
+    aggregate_id = _aggregated_candidate_id(winner)
+    supporting_ids = tuple(dict.fromkeys((
+        *(current.supporting_hypothesis_ids or (current.hypothesis_id,)),
+        *(item.supporting_hypothesis_ids or (item.hypothesis_id,)),
+    )))
+    supporting_categories = tuple(dict.fromkeys((
+        *(current.supporting_categories or (current.impact_category,)),
+        *(item.supporting_categories or (item.impact_category,)),
+    )))
+    supporting_quotes = tuple(dict.fromkeys((
+        *current.supporting_evidence_quotes,
+        *current.evidence_quotes,
+        *item.supporting_evidence_quotes,
+        *item.evidence_quotes,
+    )))[:12]
+    components = dict(other.score_components or {})
+    components.update(dict(winner.score_components or {}))
+    components.update({
+        "aggregated_candidate_id": aggregate_id,
+        "supporting_hypothesis_count": float(len(supporting_ids)),
+        "supporting_categories": supporting_categories,
+    })
+    return replace(
+        winner,
+        aggregated_candidate_id=aggregate_id,
+        primary_impact_path=winner.primary_impact_path or winner.impact_path_type or winner.impact_path_reason or winner.impact_category,
+        supporting_categories=supporting_categories,
+        supporting_hypothesis_ids=supporting_ids,
+        supporting_evidence_quotes=supporting_quotes,
+        supporting_hypothesis_count=len(supporting_ids),
+        source_raw_ids=tuple(dict.fromkeys((*current.source_raw_ids, *item.source_raw_ids))),
+        source_event_ids=tuple(dict.fromkeys((*current.source_event_ids, *item.source_event_ids))),
+        evidence_quotes=tuple(dict.fromkeys((*current.evidence_quotes, *item.evidence_quotes))),
+        validation_reasons=tuple(dict.fromkeys((*current.validation_reasons, *item.validation_reasons))),
+        warnings=tuple(dict.fromkeys((*current.warnings, *item.warnings, "aggregated_validated_hypothesis"))),
+        score_components=components,
+    )
+
+
+def _aggregated_candidate_id(item: EventImpactHypothesis) -> str:
+    key = _validated_hypothesis_aggregation_key(item) or item.hypothesis_id
+    return "agg:" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
 
 
 def _merge_duplicate_hypotheses(

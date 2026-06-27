@@ -592,6 +592,19 @@ def run_event_alpha_operating_cycle(
         if catalyst_frame_cfg is not None and catalyst_frame_cfg.enabled:
             if catalyst_frame_provider is None:
                 warnings.append("Event LLM catalyst-frame analysis skipped: no provider available")
+                def _mark_missing_llm_catalyst_frames(
+                    raw_events: tuple[RawDiscoveredEvent, ...],
+                ) -> tuple[RawDiscoveredEvent, ...]:
+                    return tuple(
+                        _raw_with_catalyst_frame_status(
+                            raw,
+                            status="missing_required_frame_analysis" if event_llm_catalyst_frames.frame_requirement_for_raw(raw)[0] else "not_required",
+                            skip_reason="provider_unavailable",
+                        )
+                        for raw in raw_events
+                    )
+
+                catalyst_frame_transform = _mark_missing_llm_catalyst_frames
             else:
                 def _enrich_with_llm_catalyst_frames(
                     raw_events: tuple[RawDiscoveredEvent, ...],
@@ -608,10 +621,29 @@ def run_event_alpha_operating_cycle(
                         for row in catalyst_frame_rows
                         if row.analysis is not None
                     }
+                    row_warnings_by_raw_id = {
+                        row.raw_event.raw_id: tuple(row.warnings)
+                        for row in catalyst_frame_rows
+                    }
+                    selected_raw_ids = {row.raw_event.raw_id for row in catalyst_frame_rows}
                     for raw in raw_events:
+                        required, required_reason = event_llm_catalyst_frames.frame_requirement_for_raw(raw)
                         analysis = analyses_by_raw_id.get(raw.raw_id)
                         if analysis is None:
-                            enriched.append(raw)
+                            status = "missing_required_frame_analysis" if required else "not_required"
+                            skip_reason = (
+                                "provider_returned_no_analysis"
+                                if raw.raw_id in selected_raw_ids
+                                else "not_selected_by_catalyst_frame_prefilter_or_limit"
+                            )
+                            enriched.append(_raw_with_catalyst_frame_status(
+                                raw,
+                                status=status,
+                                required=required,
+                                required_reason=required_reason,
+                                skip_reason=skip_reason,
+                                warnings=row_warnings_by_raw_id.get(raw.raw_id, ()),
+                            ))
                             continue
                         rule_frames = event_catalyst_frames.build_catalyst_frames((raw,))
                         validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(
@@ -619,14 +651,36 @@ def run_event_alpha_operating_cycle(
                             (raw,),
                             rule_frames=rule_frames,
                         )
-                        enriched.append(event_catalyst_frame_validator.apply_validation_to_raw_event(
+                        status = "unresolved" if validation.resolution == event_catalyst_frame_validator.RESOLUTION_UNRESOLVED else "validated"
+                        enriched.append(_raw_with_catalyst_frame_status(
+                            event_catalyst_frame_validator.apply_validation_to_raw_event(
                             raw,
                             analysis,
                             validation,
+                            ),
+                            status=status,
+                            required=required,
+                            required_reason=required_reason,
+                            skip_reason=None,
+                            warnings=validation.frame_warnings,
                         ))
                     return tuple(enriched)
 
                 catalyst_frame_transform = _enrich_with_llm_catalyst_frames
+        elif catalyst_frame_cfg is not None and not catalyst_frame_cfg.enabled:
+            def _mark_disabled_llm_catalyst_frames(
+                raw_events: tuple[RawDiscoveredEvent, ...],
+            ) -> tuple[RawDiscoveredEvent, ...]:
+                return tuple(
+                    _raw_with_catalyst_frame_status(
+                        raw,
+                        status="missing_required_frame_analysis" if event_llm_catalyst_frames.frame_requirement_for_raw(raw)[0] else "not_required",
+                        skip_reason="disabled",
+                    )
+                    for raw in raw_events
+                )
+
+            catalyst_frame_transform = _mark_disabled_llm_catalyst_frames
         if relationship_cfg is not None and relationship_provider is not None:
             if relationship_cfg.mode in {"shadow", "advisory"}:
                 relationship_provider_to_use = relationship_provider
@@ -1057,6 +1111,30 @@ def _llm_budget_warnings(rows: Iterable[object], *, label: str) -> list[str]:
     if not skipped:
         return []
     return [f"LLM {label} budget exhausted; skipped {len(skipped)} lower-priority row(s)"]
+
+
+def _raw_with_catalyst_frame_status(
+    raw: RawDiscoveredEvent,
+    *,
+    status: str,
+    required: bool | None = None,
+    required_reason: str | None = None,
+    skip_reason: str | None = None,
+    warnings: Iterable[str] = (),
+) -> RawDiscoveredEvent:
+    payload = dict(raw.raw_json or {})
+    if required is None or required_reason is None:
+        detected_required, detected_reason = event_llm_catalyst_frames.frame_requirement_for_raw(raw)
+        required = detected_required if required is None else required
+        required_reason = required_reason or detected_reason
+    payload["catalyst_frame_required"] = bool(required)
+    payload["catalyst_frame_required_reason"] = required_reason
+    payload["catalyst_frame_status"] = status
+    if skip_reason:
+        payload["catalyst_frame_skip_reason"] = skip_reason
+    if warnings:
+        payload["catalyst_frame_warnings"] = list(dict.fromkeys(str(item) for item in warnings if str(item)))
+    return replace(raw, raw_json=payload)
 
 
 def _as_utc(dt: datetime) -> datetime:

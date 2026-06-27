@@ -10098,6 +10098,7 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
         opportunity_level="validated_digest",
         market_confirmation_level="moderate",
         digest_eligible_by_impact_path=True,
+        state=None,
     ):
         impact_path_type = impact_path_type or impact_path_reason
         opportunity_score_v2 = opportunity_score_v2 if opportunity_score_v2 is not None else score
@@ -10114,20 +10115,20 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
             relationship_type="impact_hypothesis",
             external_asset=external_asset,
             event_time=None,
-            state=event_watchlist.EventWatchlistState.RADAR.value,
+            state=state or event_watchlist.EventWatchlistState.RADAR.value,
             previous_state=event_watchlist.EventWatchlistState.HYPOTHESIS.value,
             first_seen_at="2026-06-23T12:00:00+00:00",
             last_seen_at="2026-06-23T12:30:00+00:00",
             source_count=1,
             highest_score=score,
             latest_score=score,
-            latest_tier="RADAR_DIGEST",
+            latest_tier="HIGH_PRIORITY_WATCH" if state == event_watchlist.EventWatchlistState.HIGH_PRIORITY.value else "RADAR_DIGEST",
             latest_event_name=f"{symbol} validated impact hypothesis",
             latest_source="impact_hypothesis",
             latest_playbook_type=playbook,
             latest_effective_playbook_type=playbook,
             latest_playbook_score=score,
-            latest_playbook_action="radar_digest",
+            latest_playbook_action="high_priority_watch" if state == event_watchlist.EventWatchlistState.HIGH_PRIORITY.value else "radar_digest",
             latest_score_components={
                 "hypothesis_id": f"hyp:{symbol}",
                 "impact_category": impact_category,
@@ -10282,6 +10283,7 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
             latest_only=True,
             entries=[
                 entry("AAVE", 72, opportunity_score_v2=64, opportunity_score_final=72, opportunity_level="validated_digest"),
+                entry("VELVET", 96, opportunity_score_final=96, opportunity_level="high_priority", impact_category="tokenized_stock_venue", playbook="proxy_attention", impact_path_reason="venue_value_capture", impact_path_type="venue_value_capture", candidate_role="proxy_venue", external_asset="SpaceX", state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value),
                 entry("BAD", 88, opportunity_score_v2=88, opportunity_score_final=40, opportunity_level="local_only"),
             ],
         ),
@@ -10297,6 +10299,9 @@ def test_event_alpha_router_daily_digest_for_validated_impact_hypotheses():
     assert canonical_by_symbol["AAVE"].routing_score_used == 72
     assert canonical_by_symbol["AAVE"].routing_score_source == "opportunity_score_final"
     assert canonical_by_symbol["AAVE"].routing_verdict_used == "validated_digest"
+    assert canonical_by_symbol["VELVET"].route == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+    assert canonical_by_symbol["VELVET"].alertable is True
+    assert "Validated impact hypothesis reached high-priority opportunity verdict" in canonical_by_symbol["VELVET"].reason
     assert canonical_by_symbol["BAD"].route == event_alpha_router.EventAlphaRoute.STORE_ONLY
     assert canonical_by_symbol["BAD"].alertable is False
     canonical_report = event_alpha_router.format_router_report(canonical)
@@ -22608,6 +22613,222 @@ def test_event_alpha_catalyst_frame_e2e_cycle_writes_frame_artifacts():
         finally:
             for name, value in original.items():
                 setattr(config, name, value)
+
+
+def test_catalyst_frame_missing_provider_records_skip_and_status():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_pipeline, event_alpha_run_ledger, event_llm_catalyst_frames
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="aave_kraken",
+        provider="fixture_news",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://alpha.example/aave",
+        title="Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+        body="The article also references the fallout from a prior KelpDAO exploit despite Aave itself not being hacked.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="aave",
+    )
+    event = NormalizedEvent(
+        "evt_aave",
+        ("aave_kraken",),
+        raw.title,
+        "news",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (raw.source_url or "",),
+        "Aave",
+        raw.body,
+        0.90,
+    )
+
+    def load_discovery_result(observed, raw_event_transform):
+        raws = (raw,)
+        if raw_event_transform is not None:
+            raws = tuple(raw_event_transform(raws))
+        return EventDiscoveryResult(raws, (event,), (), (), ())
+
+    result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=load_discovery_result,
+        now=now,
+        with_llm=True,
+        catalyst_frame_provider=None,
+        catalyst_frame_cfg=event_llm_catalyst_frames.EventLLMCatalystFrameConfig(
+            enabled=True,
+            provider="openai",
+            only_ambiguous=True,
+        ),
+        refresh_watchlist=False,
+        route=False,
+    )
+    payload = result.discovery_result.raw_events[0].raw_json
+    assert payload["catalyst_frame_required"] is True
+    assert payload["catalyst_frame_status"] == "missing_required_frame_analysis"
+    assert payload["catalyst_frame_skip_reason"] == "provider_unavailable"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        row = event_alpha_run_ledger.append_run_record(
+            result,
+            cfg=event_alpha_run_ledger.EventAlphaRunLedgerConfig(Path(tmp) / "runs.jsonl"),
+            profile="notify_llm_quality",
+            started_at=now,
+            finished_at=now,
+            with_llm=True,
+            send_requested=False,
+        )
+    assert row["catalyst_frames_analyzed"] == 0
+    assert row["catalyst_frame_validations"] == 0
+    assert row["catalyst_frame_rows_skipped"] == 1
+    assert row["catalyst_frame_skip_reasons"]["provider_unavailable"] == 1
+
+
+def test_incident_asset_roles_demote_unvalidated_taxonomy_candidates():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_incident_graph, event_incident_store
+    from crypto_rsi_scanner.event_models import NormalizedEvent, RawDiscoveredEvent
+
+    now = datetime(2026, 6, 27, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        "thor_exploit",
+        "fixture_news",
+        now,
+        now,
+        "https://alpha.example/thor",
+        "THORChain confirms RUNE exploit after attack",
+        "THORChain confirms a RUNE exploit and security incident after an attack; RUNE trading reacts sharply.",
+        {},
+        0.90,
+        "thor",
+    )
+    event = NormalizedEvent(
+        "evt_thor",
+        ("thor_exploit",),
+        "THORChain RUNE exploit",
+        "news",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (raw.source_url or "",),
+        "THORChain",
+        raw.body,
+        0.90,
+    )
+    incident = event_incident_graph.build_incidents((event,), {raw.raw_id: raw})[0]
+    rows = event_incident_store._linked_assets(
+        [
+            {
+                "candidate_symbols": ["LINK", "PYTH", "RUNE"],
+                "candidate_coin_ids": ["chainlink", "pyth-network", "thorchain"],
+                "candidate_role": "direct_subject",
+                "candidate_source": "taxonomy",
+                "crypto_candidate_assets": [
+                    {"symbol": "LINK", "coin_id": "chainlink", "source": "taxonomy", "validated": False},
+                    {"symbol": "PYTH", "coin_id": "pyth-network", "source": "taxonomy", "validated": False},
+                ],
+            },
+            {
+                "validated_symbol": "RUNE",
+                "validated_coin_id": "thorchain",
+                "candidate_role": "direct_subject",
+                "validated_asset": {"symbol": "RUNE", "coin_id": "thorchain", "validated": True},
+            },
+        ],
+        [],
+        incident=incident,
+    )
+    assert any(asset["symbol"] == "RUNE" and asset["role"] == "direct_subject" for asset in rows)
+    assert not any(asset["symbol"] == "LINK" and asset["role"] == "direct_subject" for asset in rows)
+    assert any(asset["symbol"] == "LINK" and asset["role"] == "taxonomy_candidate" for asset in rows)
+
+
+def test_validated_hypothesis_aggregation_preserves_supporting_paths():
+    from crypto_rsi_scanner import event_impact_hypotheses
+
+    base = dict(
+        event_cluster_id="incident:spacex",
+        event_type="news",
+        external_asset="SpaceX",
+        candidate_sectors=("tokenized_stock_venues",),
+        candidate_symbols=("VELVET",),
+        candidate_coin_ids=("velvet",),
+        validated_candidate_assets=({"symbol": "VELVET", "coin_id": "velvet", "validated": True},),
+        crypto_candidate_assets=({"symbol": "VELVET", "coin_id": "velvet", "validated": True},),
+        candidate_source="hypothesis_search",
+        hypothesis_scope="token",
+        direction_hint="up_then_fade",
+        confidence=0.86,
+        hypothesis_score=86.0,
+        validation_stage="impact_path_validated",
+        status="validated",
+        incident_id="incident:spacex",
+        candidate_role="proxy_venue",
+        impact_path_type="venue_value_capture",
+        impact_path_reason="venue_value_capture",
+        opportunity_score_final=88,
+        opportunity_level="high_priority",
+    )
+    first = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:velvet:rwa",
+        impact_category="rwa_preipo_proxy",
+        evidence_quotes=("VELVET users can trade SpaceX pre-IPO exposure.",),
+        **base,
+    )
+    second = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:velvet:venue",
+        impact_category="tokenized_stock_venue",
+        evidence_quotes=("Velvet is the venue for tokenized SpaceX exposure.",),
+        **base,
+    )
+    out = event_impact_hypotheses._dedupe_hypotheses((first, second))
+    assert len(out) == 1
+    item = out[0]
+    assert item.aggregated_candidate_id
+    assert item.supporting_hypothesis_count == 2
+    assert set(item.supporting_categories) == {"rwa_preipo_proxy", "tokenized_stock_venue"}
+    assert "VELVET users can trade SpaceX pre-IPO exposure." in item.supporting_evidence_quotes
+
+
+def test_missing_unresolved_catalyst_frame_caps_validated_hypothesis():
+    from crypto_rsi_scanner import event_impact_hypotheses
+
+    hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:aave:bad",
+        event_cluster_id="incident:aave",
+        event_type="news",
+        external_asset="Aave",
+        impact_category="security_or_regulatory_shock",
+        candidate_sectors=("defi",),
+        candidate_symbols=("AAVE",),
+        candidate_coin_ids=("aave",),
+        validated_candidate_assets=({"symbol": "AAVE", "coin_id": "aave", "validated": True},),
+        confidence=0.90,
+        hypothesis_score=90.0,
+        validation_stage="impact_path_validated",
+        status="validated",
+        impact_path_type="exploit_security_event",
+        impact_path_reason="exploit_security_event",
+        candidate_role="direct_subject",
+        opportunity_score_final=88,
+        opportunity_level="high_priority",
+        frame_required=True,
+        frame_status="unresolved",
+        frame_gate_reason="catalyst_frame_unresolved",
+        route_block_reason="catalyst_frame_unresolved",
+    )
+    capped = event_impact_hypotheses._with_promotion_diagnostics(hypothesis)
+    assert capped.opportunity_level == "exploratory"
+    assert capped.opportunity_score_final <= 54
+    assert capped.route_block_reason == "catalyst_frame_unresolved"
+    assert "catalyst_frame_unresolved" in capped.why_not_promoted
 
 
 def test_event_alpha_claim_semantics_incidents_roles_and_market_context():

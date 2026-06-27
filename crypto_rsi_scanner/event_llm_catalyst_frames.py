@@ -119,6 +119,8 @@ class EventLLMCatalystFrameReportRow:
     analysis: EventLLMCatalystFrameAnalysis | None
     warnings: tuple[str, ...] = ()
     selected: bool = False
+    frame_required: bool = False
+    frame_required_reason: str | None = None
 
 
 def structured_output_schema() -> dict[str, Any]:
@@ -214,7 +216,15 @@ def analyze_raw_events(
                 )
             except EventLLMCatalystFrameValidationError as exc:
                 warnings.append(str(exc))
-        rows.append(EventLLMCatalystFrameReportRow(raw_event=raw, analysis=analysis, warnings=tuple(warnings), selected=True))
+        required, required_reason = frame_requirement_for_raw(raw)
+        rows.append(EventLLMCatalystFrameReportRow(
+            raw_event=raw,
+            analysis=analysis,
+            warnings=tuple(warnings),
+            selected=True,
+            frame_required=required,
+            frame_required_reason=required_reason,
+        ))
     return tuple(rows)
 
 
@@ -381,12 +391,34 @@ def _frame_to_dict(frame: EventLLMCatalystFrame | None) -> dict[str, Any] | None
     }
 
 
+def frame_requirement_for_raw(raw: RawDiscoveredEvent) -> tuple[bool, str | None]:
+    """Return whether catalyst-frame analysis is required for this raw source."""
+    text = clean_text(" ".join((raw.title or "", raw.body or "", _enriched_text(raw))))
+    if not text:
+        return False, None
+    exploit_terms = any(term in text for term in ("exploit", "hack", "hacked", "breach", "attack", "security incident"))
+    background_terms = any(term in text for term in ("fallout", "despite", "background", "after the", "previously", "earlier", "not hacked", "no exploit", "no hack"))
+    investment_terms = any(term in text for term in ("stake", "investment", "valuation", "acquisition", "acquire", "buy"))
+    proxy_terms = any(term in text for term in ("pre ipo", "pre-ipo", "tokenized", "synthetic exposure", "prediction market"))
+    competing = sum(1 for flag in (exploit_terms, investment_terms, proxy_terms) if flag)
+    if exploit_terms and background_terms:
+        return True, "security_background_or_negation_terms"
+    if investment_terms:
+        return True, "investment_or_valuation_terms"
+    if proxy_terms:
+        return True, "proxy_or_tokenized_exposure_terms"
+    if competing >= 2:
+        return True, "multiple_plausible_catalysts"
+    return False, None
+
+
 def _select_raw_events(raw_events: Iterable[RawDiscoveredEvent], *, cfg: EventLLMCatalystFrameConfig) -> tuple[RawDiscoveredEvent, ...]:
     selected: list[RawDiscoveredEvent] = []
     for raw in raw_events:
         if float(raw.source_confidence or 0.0) < cfg.min_source_score:
             continue
-        if cfg.only_ambiguous and not _needs_frame_analysis(raw):
+        required, _reason = frame_requirement_for_raw(raw)
+        if cfg.only_ambiguous and not required:
             continue
         selected.append(raw)
         if len(selected) >= max(0, cfg.max_rows_per_run):
@@ -395,14 +427,8 @@ def _select_raw_events(raw_events: Iterable[RawDiscoveredEvent], *, cfg: EventLL
 
 
 def _needs_frame_analysis(raw: RawDiscoveredEvent) -> bool:
-    text = clean_text(" ".join((raw.title or "", raw.body or "", _enriched_text(raw))))
-    keywords = (
-        "exploit", "hack", "hacked", "not hacked", "not being hacked",
-        "stake", "investment", "valuation", "acquisition", "buy",
-        "pre ipo", "pre-ipo", "tokenized", "synthetic exposure",
-        "fallout", "despite", "background", "after the",
-    )
-    return any(term in text for term in keywords)
+    required, _reason = frame_requirement_for_raw(raw)
+    return required
 
 
 def _packet_source_text(packet: Mapping[str, Any]) -> str:

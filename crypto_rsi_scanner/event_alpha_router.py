@@ -969,7 +969,11 @@ def _is_validated_hypothesis_digest_entry(entry: event_watchlist.EventWatchlistE
 def _looks_like_validated_hypothesis(entry: event_watchlist.EventWatchlistEntry) -> bool:
     if entry.relationship_type != "impact_hypothesis":
         return False
-    if event_watchlist.final_state_value(entry) != event_watchlist.EventWatchlistState.RADAR.value:
+    if event_watchlist.final_state_value(entry) not in {
+        event_watchlist.EventWatchlistState.RADAR.value,
+        event_watchlist.EventWatchlistState.WATCHLIST.value,
+        event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+    }:
         return False
     if (entry.symbol or "").upper() == "SECTOR":
         return False
@@ -1010,8 +1014,12 @@ def _validated_hypothesis_digest_block_reason(
 ) -> str | None:
     if entry.relationship_type != "impact_hypothesis":
         return "not_impact_hypothesis"
-    if event_watchlist.final_state_value(entry) != event_watchlist.EventWatchlistState.RADAR.value:
-        return "not_radar_state"
+    if event_watchlist.final_state_value(entry) not in {
+        event_watchlist.EventWatchlistState.RADAR.value,
+        event_watchlist.EventWatchlistState.WATCHLIST.value,
+        event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+    }:
+        return "not_validated_hypothesis_route_state"
     if (entry.symbol or "").upper() == "SECTOR":
         return "missing_validated_token_identity"
     components = dict(entry.latest_score_components or {})
