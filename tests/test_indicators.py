@@ -10514,6 +10514,9 @@ def test_event_alpha_near_miss_refreshes_market_context_without_triggering_fade(
     assert len(near) == 1
     assert near[0].symbol == "ENA"
     assert "targeted_market_refresh" in near[0].recommended_refresh_actions
+    queue = event_near_miss.targeted_market_refresh_queue((hypothesis,), cfg=event_near_miss.EventNearMissConfig())
+    assert queue[0].refresh_id == "refresh:hyp:ena"
+    assert queue[0].reason == "market_confirmation"
 
     generic = event_impact_hypotheses.EventImpactHypothesis(
         hypothesis_id="hyp:generic",
@@ -10540,6 +10543,103 @@ def test_event_alpha_near_miss_refreshes_market_context_without_triggering_fade(
     )
     assert event_near_miss.detect_near_miss_rows((generic,), cfg=event_near_miss.EventNearMissConfig()) == ()
 
+    stale_velvet = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:velvet-stale",
+        event_cluster_id="cluster:spacex",
+        event_type="ipo_proxy",
+        external_asset="SpaceX",
+        impact_category="tokenized_stock_venue",
+        candidate_sectors=("rwa",),
+        candidate_symbols=("VELVET",),
+        candidate_coin_ids=("velvet",),
+        validated_candidate_assets=({"symbol": "VELVET", "coin_id": "velvet", "validated": True},),
+        crypto_candidate_assets=({"symbol": "VELVET", "coin_id": "velvet", "accepted": True},),
+        playbook_hint="proxy_attention",
+        confidence=0.91,
+        hypothesis_score=90,
+        score_components={
+            **base_components,
+            "validated_symbol": "VELVET",
+            "validated_coin_id": "velvet",
+            "impact_category": "tokenized_stock_venue",
+            "playbook_type": "proxy_attention",
+            "impact_path_type": "venue_value_capture",
+            "candidate_role": "proxy_venue",
+            "external_asset": "SpaceX",
+            "market_confirmation": 49,
+            "market_confirmation_score": 49,
+            "market_confirmation_level": "weak",
+            "market_context_freshness_status": "stale",
+            "market_context_freshness_cap_applied": True,
+            "market_context_timestamp": "2026-06-14T00:00:00+00:00",
+            "market_confirmation_warnings": ("market_context_stale_capped",),
+            "market_confirmation_missing_fields": ("needs_fresh_market_confirmation",),
+            "opportunity_score_final": 70,
+            "opportunity_level": "validated_digest",
+            "missing_requirements": ("needs_fresh_market_confirmation",),
+            "why_not_watchlist": "needs_fresh_market_confirmation",
+            "opportunity_score_v2": 88,
+        },
+        validation_stage="impact_path_validated",
+        status="validated",
+        evidence_quotes=("VELVET gives users SpaceX pre-IPO exposure.",),
+        impact_path_reason="venue_value_capture",
+        impact_path_type="venue_value_capture",
+        impact_path_strength="strong",
+        candidate_role="proxy_venue",
+        evidence_quality_score=86,
+        source_class="crypto_native",
+        evidence_specificity="asset_and_catalyst",
+        market_confirmation_score=49,
+        market_confirmation_level="weak",
+        market_confirmation_warnings=("market_context_stale_capped",),
+        market_confirmation_missing_fields=("needs_fresh_market_confirmation",),
+        market_context_timestamp="2026-06-14T00:00:00+00:00",
+        market_context_freshness_status="stale",
+        market_context_freshness_cap_applied=True,
+        opportunity_score_v2=88,
+        opportunity_score_final=70,
+        opportunity_level="validated_digest",
+        missing_requirements=("needs_fresh_market_confirmation",),
+        why_not_watchlist="needs_fresh_market_confirmation",
+    )
+    stale_near = event_near_miss.detect_near_miss_rows((stale_velvet,), cfg=event_near_miss.EventNearMissConfig())
+    assert len(stale_near) == 1
+    assert stale_near[0].opportunity_level_before == "validated_digest"
+    assert "targeted_market_refresh" in stale_near[0].recommended_refresh_actions
+    stale_queue = event_near_miss.targeted_market_refresh_queue((stale_velvet,), cfg=event_near_miss.EventNearMissConfig())
+    assert stale_queue[0].symbol == "VELVET"
+    probe = event_near_miss.refresh_market_context_for_candidates(
+        stale_queue,
+        market_rows=({
+            "coin_id": "velvet",
+            "symbol": "VELVET",
+            "return_24h": 82,
+            "return_72h": 148,
+            "volume_zscore_24h": 5.4,
+            "volume_to_market_cap": 0.44,
+            "timestamp": "2026-06-15T15:30:00+00:00",
+            "source": "fixture_targeted_market_refresh",
+        },),
+        now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+    )
+    assert probe[0]["success"] is True
+    assert probe[0]["market_context_after"]["data_quality"] == "fresh"
+
+    class FailingProvider:
+        name = "failing_provider"
+
+        def fetch_market_rows(self, coin_ids, *, max_assets=50):
+            raise RuntimeError("boom")
+
+    failed_probe = event_near_miss.refresh_market_context_for_candidates(
+        stale_queue,
+        targeted_market_provider=FailingProvider(),
+        now=datetime(2026, 6, 15, 16, 0, tzinfo=timezone.utc),
+    )
+    assert failed_probe[0]["success"] is False
+    assert failed_probe[0]["error_class"] == "RuntimeError"
+
     refreshed = event_near_miss.refresh_near_miss_hypotheses(
         (hypothesis,),
         cfg=event_near_miss.EventNearMissConfig(market_refresh_enabled=True, max_market_refresh_assets=5),
@@ -10559,19 +10659,25 @@ def test_event_alpha_near_miss_refreshes_market_context_without_triggering_fade(
     refreshed_near = refreshed.near_misses[0]
     assert refreshed_near.market_refresh_attempted is True
     assert refreshed_near.market_refresh_success is True
+    assert refreshed_near.market_refresh_provider == "cycle_rows"
+    assert refreshed_near.refresh_upgrade_status in {"upgraded", "improved_score"}
     assert refreshed_near.opportunity_score_after > refreshed_near.opportunity_score_before
     assert updated.opportunity_level in {"validated_digest", "watchlist", "high_priority"}
     assert updated.opportunity_score_final >= 65
     assert updated.market_context_data_quality == "fresh"
+    assert updated.opportunity_level_before_refresh == "exploratory"
+    assert updated.opportunity_level_after_refresh == updated.opportunity_level
+    assert updated.market_confirmation_after_refresh == updated.market_confirmation_score
     assert updated.score_components["opportunity_score_v2"] == 80
     assert "TRIGGERED_FADE" not in event_near_miss.format_near_miss_report(refreshed.near_misses)
 
     report = event_near_miss.format_near_miss_report(refreshed.near_misses, profile="quality_validation")
     assert "ENA/ethena" in report
     assert "market_refresh: attempted=true success=true" in report
+    assert "provider=cycle_rows" in report
 
     hypothesis_row = {
-        **hypothesis.__dict__,
+        **updated.__dict__,
         "profile": "quality_validation",
         "run_mode": "notification_burn_in",
         "artifact_namespace": "quality_validation",
@@ -10584,9 +10690,11 @@ def test_event_alpha_near_miss_refreshes_market_context_without_triggering_fade(
     assert "## Near-Miss Candidates" in daily
     assert "ENA/ethena" in daily
 
-    audit = event_opportunity_audit.format_opportunity_audit("ENA", hypotheses=[hypothesis], profile="quality_validation")
+    audit = event_opportunity_audit.format_opportunity_audit("ENA", hypotheses=[updated], profile="quality_validation")
     assert "## Near-miss status" in audit
-    assert "status: near-miss candidate" in audit
+    assert "status: targeted refresh previously applied" in audit
+    assert "targeted refresh:" in audit
+    assert "market_confirmation=" in audit
 
     entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -22612,6 +22720,7 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     assert event_alpha_profiles.get_profile("notify_llm_quality").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
     assert event_alpha_profiles.get_profile("notify_llm_deep").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
     assert event_alpha_profiles.get_profile("notify_llm_deep").config_overrides["EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN"] == 60
+    assert event_alpha_profiles.get_profile("notify_llm_deep").config_overrides["EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED"] is True
     assert event_alpha_profiles.get_profile("full_llm_live").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
     assert event_alpha_profiles.get_profile("catalyst_frame_validation").config_overrides["EVENT_LLM_CATALYST_FRAMES_PROVIDER"] == "fixture"
     assert event_alpha_profiles.get_profile("catalyst_frame_validation").with_llm is True
@@ -22627,11 +22736,17 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     assert quality_frame.send is False
     assert quality_frame.config_overrides["EVENT_LLM_CATALYST_FRAMES_PROVIDER"] == "fixture"
     assert quality_frame.config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
+    assert quality_frame.config_overrides["EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED"] is True
     assert quality_frame.config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "all"
     quality_frame_report = event_alpha_profiles.format_profile_report(quality_frame)
     assert "catalyst-frame behavior:" in quality_frame_report
     assert "- provider=fixture" in quality_frame_report
     assert "official fixture/no-send proof profile" in quality_frame_report
+    market_refresh = event_alpha_profiles.get_profile("market_refresh_smoke")
+    assert market_refresh.send is False
+    assert market_refresh.config_overrides["EVENT_ALPHA_TARGETED_MARKET_REFRESH_ENABLED"] is True
+    assert market_refresh.config_overrides["EVENT_WATCHLIST_MONITOR_MARKET_SOURCE"] == "fixture"
+    assert str(market_refresh.config_overrides["EVENT_WATCHLIST_MONITOR_MARKET_PATH"]).endswith("market_refresh_smoke_markets.json")
     quality_live_report = event_alpha_profiles.format_profile_report(event_alpha_profiles.get_profile("notify_llm_quality"))
     assert "official live-style frame-enabled quality profile" in quality_live_report
     report = event_alpha_profiles.format_profile_report(event_alpha_profiles.get_profile("notify_llm_deep"))
@@ -22645,6 +22760,7 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     assert "event-alpha-catalyst-frame-validation-cycle" in text
     assert "event-alpha-catalyst-frame-e2e-cycle" in text
     assert "event-alpha-notify-llm-quality-frame-smoke" in text
+    assert "event-alpha-market-refresh-smoke" in text
     assert "event-alpha-quality-frame-live-smoke" in text
     assert "event-alpha-feedback-readiness" in text
     assert "event-alpha-frame-quality-loop" in text
@@ -23399,7 +23515,17 @@ def test_event_near_miss_dedupes_and_excludes_promoted_or_zero_quality_rows():
     rows = [
         {**base, "hypothesis_id": "hyp:m:1"},
         {**base, "hypothesis_id": "hyp:m:2", "opportunity_score_final": 62},
-        {**base, "hypothesis_id": "hyp:velvet", "validated_symbol": "VELVET", "validated_coin_id": "velvet", "opportunity_level": "high_priority", "opportunity_score_final": 95},
+        {
+            **base,
+            "hypothesis_id": "hyp:velvet",
+            "validated_symbol": "VELVET",
+            "validated_coin_id": "velvet",
+            "opportunity_level": "high_priority",
+            "opportunity_score_final": 95,
+            "market_confirmation_score": 82,
+            "market_context_freshness_status": "fresh",
+            "why_not_watchlist": [],
+        },
         {**base, "hypothesis_id": "hyp:zero", "validated_symbol": "ZERO", "validated_coin_id": "zero", "opportunity_score_final": 0, "why_local_only": ["quality_context_missing"]},
     ]
     near = event_near_miss.detect_near_miss_rows(rows)

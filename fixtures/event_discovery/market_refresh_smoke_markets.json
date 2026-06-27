@@ -1,0 +1,46 @@
+[
+  {
+    "coin_id": "velvet",
+    "symbol": "VELVET",
+    "return_24h": 82.5,
+    "return_72h": 148.0,
+    "return_7d": 220.0,
+    "volume_zscore_24h": 5.4,
+    "volume_to_market_cap": 0.44,
+    "relative_strength_vs_btc": 76.0,
+    "timestamp": "2026-06-15T15:30:00+00:00",
+    "source": "fixture_targeted_market_refresh"
+  },
+  {
+    "coin_id": "aave",
+    "symbol": "AAVE",
+    "return_24h": 4.2,
+    "return_72h": 8.8,
+    "volume_zscore_24h": 0.8,
+    "volume_to_market_cap": 0.06,
+    "relative_strength_vs_btc": 3.1,
+    "timestamp": "2026-06-15T15:30:00+00:00",
+    "source": "fixture_targeted_market_refresh"
+  },
+  {
+    "coin_id": "thorchain",
+    "symbol": "RUNE",
+    "return_24h": -36.0,
+    "return_72h": -54.0,
+    "volume_zscore_24h": 4.2,
+    "volume_to_market_cap": 0.31,
+    "relative_strength_vs_btc": -42.0,
+    "timestamp": "2026-06-15T15:30:00+00:00",
+    "source": "fixture_targeted_market_refresh"
+  },
+  {
+    "coin_id": "memecore",
+    "symbol": "M",
+    "return_24h": 18.0,
+    "return_72h": 29.0,
+    "volume_zscore_24h": 1.2,
+    "volume_to_market_cap": 0.09,
+    "timestamp": "2026-06-15T15:30:00+00:00",
+    "source": "fixture_targeted_market_refresh"
+  }
+]

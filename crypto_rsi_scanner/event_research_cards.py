@@ -1147,6 +1147,8 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Evidence quality: {source_class}/{evidence_specificity_class} / {evidence_quality_score if evidence_quality_score is not None else 'n/a'}",
         f"- Market confirmation: {market_confirmation_level} / {market_confirmation_score if market_confirmation_score is not None else 'n/a'}",
         f"- Market context source: {market_context_source} ({market_context_quality}; age={market_context_age}; cap_applied={str(bool(freshness_cap)).lower()})",
+        "- Targeted market refresh: "
+        + _targeted_market_refresh_line(components),
         f"- Market reaction confirmed: {str(bool(market_reaction_confirmed)).lower() if market_reaction_confirmed is not None else 'unknown'}",
         f"- Causal mechanism confirmed: {str(bool(causal_mechanism_confirmed)).lower() if causal_mechanism_confirmed is not None else 'unknown'}",
         f"- Market summary: {market_confirmation_summary}",
@@ -1204,6 +1206,34 @@ def _format_market_context_age(components: Mapping[str, Any]) -> str:
     if age_hours < 1:
         return f"{age_hours * 60:.0f}m"
     return f"{age_hours:.1f}h"
+
+
+def _targeted_market_refresh_line(components: Mapping[str, Any]) -> str:
+    attempted = components.get("market_refresh_attempted")
+    if attempted in (None, "", [], {}):
+        return "not attempted"
+    success = bool(components.get("market_refresh_success"))
+    provider = components.get("market_refresh_provider") or components.get("market_context_source") or "unknown"
+    before_level = components.get("opportunity_level_before_refresh") or components.get("opportunity_level_before") or "unknown"
+    after_level = components.get("opportunity_level_after_refresh") or components.get("opportunity_level_after") or components.get("opportunity_level") or "unknown"
+    before_score = components.get("opportunity_score_before_refresh") or components.get("opportunity_score_before")
+    after_score = components.get("opportunity_score_after_refresh") or components.get("opportunity_score_after") or components.get("opportunity_score_final")
+    before_market = components.get("market_confirmation_before_refresh") or components.get("market_confirmation_before")
+    after_market = components.get("market_confirmation_after_refresh") or components.get("market_confirmation_after") or components.get("market_confirmation_score")
+    status = (
+        components.get("refresh_upgrade_status")
+        or components.get("refresh_upgrade_reason")
+        or components.get("upgrade_reason")
+        or components.get("no_upgrade_reason")
+        or "pending"
+    )
+    return (
+        f"attempted={str(bool(attempted)).lower()} success={str(success).lower()} "
+        f"provider={provider} verdict={before_level}->{after_level} "
+        f"score={before_score if before_score is not None else 'n/a'}->{after_score if after_score is not None else 'n/a'} "
+        f"market={before_market if before_market is not None else 'n/a'}->{after_market if after_market is not None else 'n/a'} "
+        f"status={status}"
+    )
 
 
 def _float_value(value: object) -> float | None:

@@ -686,10 +686,33 @@ def _near_miss_daily_lines(
         invalidate = _near_miss_invalidation(item)
         lines.append(
             f"- {item.symbol}/{item.coin_id}: {interesting} "
-            f"Score {item.opportunity_score_before:.0f}, level={_friendly_level(item.opportunity_level_before)}."
+            f"Score {item.opportunity_score_before:.0f}"
+            + (
+                f"->{item.opportunity_score_after:.0f}"
+                if item.opportunity_score_after is not None
+                and round(item.opportunity_score_after, 2) != round(item.opportunity_score_before, 2)
+                else ""
+            )
+            + f", level={_friendly_level(item.opportunity_level_before)}"
+            + (
+                f"->{_friendly_level(item.opportunity_level_after)}"
+                if item.opportunity_level_after
+                and item.opportunity_level_after != item.opportunity_level_before
+                else ""
+            )
+            + "."
         )
         lines.append(f"  missing: {missing}")
         lines.append(f"  would upgrade: {upgrade}")
+        if item.market_refresh_attempted or item.refresh_upgrade_status:
+            lines.append(
+                "  targeted market refresh: "
+                f"{str(item.market_refresh_success).lower()} "
+                f"provider={item.market_refresh_provider or item.market_context_source or 'unknown'} "
+                f"market={item.market_confirmation_before if item.market_confirmation_before is not None else 'n/a'}"
+                f"->{item.market_confirmation_after if item.market_confirmation_after is not None else 'n/a'} "
+                f"status={item.refresh_upgrade_status or item.upgrade_reason or item.no_upgrade_reason or 'pending'}"
+            )
         lines.append(f"  would invalidate: {invalidate}")
     if len(rows) > limit:
         lines.append(f"- +{len(rows) - limit} more near-miss candidates")
@@ -712,9 +735,12 @@ def _near_miss_diagnostic_lines(
         )
         lines.append(
             f"- {item.symbol}/{item.coin_id}: score={item.opportunity_score_before:.0f} "
-            f"level={item.opportunity_level_before} route={item.final_route_before or 'unknown'} "
+            f"level={item.opportunity_level_before}->{item.opportunity_level_after or item.opportunity_level_before} "
+            f"route={item.final_route_before or 'unknown'}->{item.final_route_after or item.final_route_before or 'unknown'} "
             f"raw_missing={', '.join(item.missing_evidence[:4]) or 'none'}; "
             f"actions={', '.join(item.recommended_refresh_actions[:4]) or 'operator_review'}; {refresh}"
+            f" provider={item.market_refresh_provider or item.market_context_source or 'unknown'}"
+            f" upgrade_status={item.refresh_upgrade_status or item.upgrade_reason or item.no_upgrade_reason or 'pending'}"
         )
     return lines
 

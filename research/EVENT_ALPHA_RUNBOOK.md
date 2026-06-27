@@ -505,6 +505,22 @@ before/after fields and a recomputed final opportunity verdict, but it does not
 send notifications, trade, paper trade, write normal RSI rows, or create
 `TRIGGERED_FADE`.
 
+For a deterministic proof that stale market context can be refreshed without
+live providers or sends, run:
+
+```bash
+make event-alpha-market-refresh-smoke
+```
+
+This uses the `market_refresh_smoke` profile plus
+`fixtures/event_discovery/market_refresh_smoke_markets.json`. It should show the
+VELVET/SpaceX validated-digest candidate upgrading to high priority from fresh
+fixture market confirmation, while weaker/no-reaction rows remain lower. The
+same reports and cards include `market_refresh_attempted`,
+`market_refresh_success`, provider/error details, before/after market
+confirmation, before/after opportunity score/level, and the refresh upgrade
+status.
+
 ### Reproducible quality-validation cycle
 
 To validate the signal-quality layer end-to-end against *fresh* artifacts (rather

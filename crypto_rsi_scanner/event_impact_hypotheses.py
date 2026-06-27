@@ -237,8 +237,14 @@ class EventImpactHypothesis:
     downgrade_warnings: tuple[str, ...] = ()
     market_refresh_attempted: bool | None = None
     market_refresh_success: bool | None = None
+    market_refresh_provider: str | None = None
+    market_refresh_error_class: str | None = None
+    market_context_before: Mapping[str, Any] = field(default_factory=dict)
+    market_context_after: Mapping[str, Any] = field(default_factory=dict)
     market_confirmation_before: float | None = None
     market_confirmation_after: float | None = None
+    market_confirmation_before_refresh: float | None = None
+    market_confirmation_after_refresh: float | None = None
     derivatives_refresh_attempted: bool | None = None
     derivatives_refresh_success: bool | None = None
     supply_refresh_attempted: bool | None = None
@@ -253,6 +259,12 @@ class EventImpactHypothesis:
     opportunity_level_after: str | None = None
     opportunity_score_before: float | None = None
     opportunity_score_after: float | None = None
+    opportunity_level_before_refresh: str | None = None
+    opportunity_level_after_refresh: str | None = None
+    opportunity_score_before_refresh: float | None = None
+    opportunity_score_after_refresh: float | None = None
+    refresh_upgrade_status: str | None = None
+    refresh_upgrade_reason: str | None = None
     upgrade_reason: str | None = None
     no_upgrade_reason: str | None = None
     created_at: str | None = None

@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Add Event Alpha targeted market refresh queue · Codex
+**Why:** Strong Event Alpha candidates could remain validated-digest or
+near-miss rows when their only blocker was stale or missing market context. The
+operator view needed a bounded way to refresh already-validated assets before
+final research routing.
+**Changes:**
+- Added explicit targeted market-refresh queue/result models and helpers in
+  `event_near_miss.py`, including refresh ids, provider/error metadata,
+  before/after market context, before/after opportunity verdicts, and
+  refresh-upgrade status.
+- Hardened near-miss eligibility so validated-digest rows blocked by stale,
+  missing, or unknown market context can refresh, while already-promoted
+  WATCHLIST/HIGH_PRIORITY rows with fresh context stay out of the queue.
+- Persisted refresh before/after fields on impact hypotheses; cards, audits,
+  daily briefs, and near-miss reports now show the targeted-refresh trail.
+- Added targeted-refresh config aliases and made the live-style LLM quality/deep
+  profile defaults explicit while preserving the older near-miss refresh names.
+- Added `market_refresh_smoke` plus `make event-alpha-market-refresh-smoke`
+  using fresh fixture market rows for VELVET/RUNE/AAVE/M so upgrades can be
+  proved offline without sends.
+**Verify:** `python3 tests/test_indicators.py` passed (488/488);
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (36/36);
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `make
+event-alpha-market-refresh-smoke PYTHON=python3` passed and showed VELVET
+upgrading from stale validated digest to high priority plus RUNE to watchlist;
+`make event-alpha-quality-validation-cycle PYTHON=python3` passed; `make
+event-llm-eval PYTHON=python3` passed (9/9); `make event-llm-extract-eval
+PYTHON=python3` passed (7/7); `python3 -m compileall -q crypto_rsi_scanner
+tests` passed; `make verify PYTHON=python3` passed.
+**Notes/risks:** Research-only artifact/routing metadata. The refresh path only
+rechecks already-validated assets and cannot send notifications, trade, paper
+trade, write normal RSI rows, or create `TRIGGERED_FADE`.
+
 ## 2026-06-27 — Fix Event Alpha feedback readiness lineage · Codex
 **Why:** The `catalyst_frame_e2e` feedback-readiness check could fail even
 after the e2e artifacts were regenerated because research cards lacked current

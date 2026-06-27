@@ -185,6 +185,24 @@ def _near_miss_lines(
     row: Mapping[str, Any],
 ) -> list[str]:
     if near_miss is None:
+        if row.get("market_refresh_attempted") is not None:
+            score_components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+            before = row.get("opportunity_level_before_refresh") or row.get("opportunity_level_before") or score_components.get("opportunity_level_before_refresh") or score_components.get("opportunity_level_before") or "unknown"
+            after = row.get("opportunity_level_after_refresh") or row.get("opportunity_level_after") or score_components.get("opportunity_level_after_refresh") or score_components.get("opportunity_level_after") or row.get("opportunity_level") or "unknown"
+            market_before = row.get("market_confirmation_before_refresh") or row.get("market_confirmation_before") or score_components.get("market_confirmation_before_refresh") or score_components.get("market_confirmation_before")
+            market_after = row.get("market_confirmation_after_refresh") or row.get("market_confirmation_after") or score_components.get("market_confirmation_after_refresh") or score_components.get("market_confirmation_after") or row.get("market_confirmation_score")
+            provider = row.get("market_refresh_provider") or score_components.get("market_refresh_provider") or row.get("market_context_source") or score_components.get("market_context_source")
+            status = row.get("refresh_upgrade_status") or score_components.get("refresh_upgrade_status") or row.get("upgrade_reason") or score_components.get("upgrade_reason") or row.get("no_upgrade_reason") or score_components.get("no_upgrade_reason")
+            return [
+                "- status: targeted refresh previously applied",
+                "- targeted refresh: "
+                f"market={str(bool(row.get('market_refresh_attempted'))).lower()}/"
+                f"{str(bool(row.get('market_refresh_success'))).lower()} "
+                f"provider={provider or 'unknown'} "
+                f"verdict={before}->{after} "
+                f"market_confirmation={market_before if market_before is not None else 'n/a'}->{market_after if market_after is not None else 'n/a'} "
+                f"status={status or 'pending'}",
+            ]
         return ["- status: not close to promotion by current quality gates"]
     lines = [
         "- status: near-miss candidate",
@@ -194,14 +212,25 @@ def _near_miss_lines(
         "- recommended refresh: " + (_human_action_list(near_miss.recommended_refresh_actions) or "manual analyst review"),
     ]
     score_components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
-    before = row.get("opportunity_level_before") or score_components.get("opportunity_level_before")
-    after = row.get("opportunity_level_after") or score_components.get("opportunity_level_after")
+    before = row.get("opportunity_level_before_refresh") or row.get("opportunity_level_before") or score_components.get("opportunity_level_before_refresh") or score_components.get("opportunity_level_before")
+    after = row.get("opportunity_level_after_refresh") or row.get("opportunity_level_after") or score_components.get("opportunity_level_after_refresh") or score_components.get("opportunity_level_after")
+    score_before = row.get("opportunity_score_before_refresh") or row.get("opportunity_score_before") or score_components.get("opportunity_score_before_refresh") or score_components.get("opportunity_score_before")
+    score_after = row.get("opportunity_score_after_refresh") or row.get("opportunity_score_after") or score_components.get("opportunity_score_after_refresh") or score_components.get("opportunity_score_after")
+    market_before = row.get("market_confirmation_before_refresh") or row.get("market_confirmation_before") or score_components.get("market_confirmation_before_refresh") or score_components.get("market_confirmation_before")
+    market_after = row.get("market_confirmation_after_refresh") or row.get("market_confirmation_after") or score_components.get("market_confirmation_after_refresh") or score_components.get("market_confirmation_after")
+    provider = row.get("market_refresh_provider") or score_components.get("market_refresh_provider") or row.get("market_context_source") or score_components.get("market_context_source")
+    status = row.get("refresh_upgrade_status") or score_components.get("refresh_upgrade_status") or row.get("upgrade_reason") or score_components.get("upgrade_reason") or row.get("no_upgrade_reason") or score_components.get("no_upgrade_reason")
     if before or after or row.get("market_refresh_attempted") is not None:
         lines.append(
             "- targeted refresh: "
             f"market={str(bool(row.get('market_refresh_attempted'))).lower()}/"
             f"{str(bool(row.get('market_refresh_success'))).lower()} "
-            f"verdict={before or near_miss.opportunity_level_before}->{after or row.get('opportunity_level') or near_miss.opportunity_level_before}"
+            f"provider={provider or 'unknown'} "
+            f"verdict={before or near_miss.opportunity_level_before}->{after or row.get('opportunity_level') or near_miss.opportunity_level_before} "
+            f"score={score_before if score_before is not None else near_miss.opportunity_score_before}"
+            f"->{score_after if score_after is not None else row.get('opportunity_score_final') or 'n/a'} "
+            f"market_confirmation={market_before if market_before is not None else 'n/a'}->{market_after if market_after is not None else 'n/a'} "
+            f"status={status or 'pending'}"
         )
     return lines
 

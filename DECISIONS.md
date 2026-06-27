@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Targeted market refresh is bounded and validation-first
+**Status:** accepted
+**Decision:** Event Alpha may run targeted market-context refresh for
+already-validated candidates whose promotion is blocked by stale, missing, or
+unknown market context. The queue must be auditable by refresh id, validated
+symbol/coin id, incident/hypothesis/core opportunity ids, reason, current market
+source/age, and priority score. Refresh may use current-cycle rows, fresh
+fixture rows in explicit proof profiles, active-watchlist market snapshots, or
+configured fail-soft providers, and must persist attempted/success/provider/error
+metadata plus before/after market confirmation and opportunity verdict fields.
+It must not run for source-noise, ticker-collision, generic co-occurrence, or
+unvalidated assets, and it must not reprocess already-promoted watchlist/high
+priority candidates with fresh market context.
+**Why:** Strong candidates such as VELVET/SpaceX can be semantically correct but
+stuck below watchlist/high-priority because market evidence is stale. A bounded
+validation-first refresh lets the radar use fresh market context without turning
+market anomalies or provider/LLM output into trades or triggers.
+**Revisit when:** Event Alpha has durable point-in-time market snapshots with
+provider SLAs and reviewed outcome evidence for refresh-driven promotions.
+
 ## 2026-06-27 - Event Alpha operator artifacts need joinable lineage
 **Status:** accepted
 **Decision:** Operator-facing Event Alpha artifacts must preserve enough

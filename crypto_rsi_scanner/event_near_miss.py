@@ -37,10 +37,26 @@ class EventNearMissConfig:
 
 
 @dataclass(frozen=True)
-class EventNearMissCandidate:
-    near_miss_id: str
+class EventTargetedMarketRefreshQueueItem:
+    refresh_id: str
     symbol: str
     coin_id: str
+    core_opportunity_id: str | None
+    hypothesis_id: str | None
+    incident_id: str | None
+    reason: str
+    current_market_source: str | None
+    current_market_age_seconds: float | None
+    priority_score: float
+
+
+@dataclass(frozen=True)
+class EventNearMissCandidate:
+    near_miss_id: str
+    refresh_id: str | None
+    symbol: str
+    coin_id: str
+    core_opportunity_id: str | None
     hypothesis_id: str | None
     incident_id: str | None
     opportunity_level_before: str
@@ -54,11 +70,16 @@ class EventNearMissCandidate:
     priority_score: float = 0.0
     market_refresh_attempted: bool = False
     market_refresh_success: bool = False
+    market_refresh_provider: str | None = None
+    market_refresh_error_class: str | None = None
     market_context_source: str | None = None
     market_context_age_seconds: float | None = None
     market_context_data_quality: str | None = None
+    market_context_before: Mapping[str, Any] | None = None
+    market_context_after: Mapping[str, Any] | None = None
     market_confirmation_before: float | None = None
     market_confirmation_after: float | None = None
+    refresh_upgrade_status: str | None = None
     derivatives_refresh_attempted: bool = False
     derivatives_refresh_success: bool = False
     supply_refresh_attempted: bool = False
@@ -111,6 +132,87 @@ def detect_near_miss_rows(
     out = list(out_by_key.values())
     out.sort(key=lambda item: item.priority_score, reverse=True)
     return tuple(out[: max(1, int(cfg.max_candidates or 1))])
+
+
+def targeted_market_refresh_queue(
+    rows: Iterable[Mapping[str, Any] | object],
+    *,
+    route_decisions: Iterable[object] = (),
+    cfg: EventNearMissConfig | None = None,
+) -> tuple[EventTargetedMarketRefreshQueueItem, ...]:
+    """Build a bounded, auditable queue for targeted market-context refreshes."""
+    out: list[EventTargetedMarketRefreshQueueItem] = []
+    for item in detect_near_miss_rows(rows, route_decisions=route_decisions, cfg=cfg):
+        if "targeted_market_refresh" not in item.recommended_refresh_actions:
+            continue
+        reason = next((_clean_reason(value) for value in item.missing_evidence if _refreshable_market_reason(value)), "needs_fresh_market_confirmation")
+        before = dict(item.market_context_before or {})
+        out.append(EventTargetedMarketRefreshQueueItem(
+            refresh_id=item.refresh_id or item.near_miss_id,
+            symbol=item.symbol,
+            coin_id=item.coin_id,
+            core_opportunity_id=item.core_opportunity_id,
+            hypothesis_id=item.hypothesis_id,
+            incident_id=item.incident_id,
+            reason=reason,
+            current_market_source=str(before.get("source") or item.market_context_source or "") or None,
+            current_market_age_seconds=_float(before.get("age_seconds")) if before else item.market_context_age_seconds,
+            priority_score=item.priority_score,
+        ))
+    return tuple(out)
+
+
+def refresh_market_context_for_candidates(
+    queue: Iterable[EventTargetedMarketRefreshQueueItem],
+    *,
+    market_rows: Iterable[Mapping[str, Any]] = (),
+    targeted_market_provider: object | None = None,
+    now: datetime | None = None,
+    cfg: EventNearMissConfig | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """Fetch market rows for queued candidates without mutating hypotheses.
+
+    The unified pipeline uses :func:`refresh_near_miss_hypotheses` for mutation,
+    but this helper gives reports/tests a pure view of attempted/success/failure
+    provider details for the targeted refresh queue.
+    """
+    cfg = cfg or EventNearMissConfig()
+    observed = _as_utc(now or datetime.now(timezone.utc))
+    fixture_rows = [dict(row) for row in market_rows if isinstance(row, Mapping)]
+    results: list[dict[str, Any]] = []
+    for item in queue:
+        before = {
+            "source": item.current_market_source,
+            "age_seconds": item.current_market_age_seconds,
+        }
+        provider_name = getattr(targeted_market_provider, "name", None) or ("fixture_rows" if fixture_rows else "none")
+        error_class = None
+        warnings: list[str] = []
+        row = _find_asset_row(fixture_rows, symbol=item.symbol, coin_id=item.coin_id)
+        attempted = bool(row or targeted_market_provider)
+        if row is None and targeted_market_provider is not None:
+            try:
+                fetched = targeted_market_provider.fetch_market_rows((item.coin_id,), max_assets=1)  # type: ignore[attr-defined]
+                fetched_rows, fetched_warnings = _normalize_provider_rows(fetched)
+                warnings.extend(fetched_warnings)
+                row = _find_asset_row(fetched_rows, symbol=item.symbol, coin_id=item.coin_id)
+            except Exception as exc:  # noqa: BLE001 - fail-soft research helper
+                error_class = type(exc).__name__
+                warnings.append(f"targeted_market_refresh_failed:{error_class}")
+        after = _market_context(row, source=str(provider_name), now=observed, cfg=cfg)
+        results.append({
+            "refresh_id": item.refresh_id,
+            "symbol": item.symbol,
+            "coin_id": item.coin_id,
+            "attempted": attempted,
+            "success": bool(row),
+            "provider": provider_name,
+            "error_class": error_class,
+            "market_context_before": before,
+            "market_context_after": after,
+            "warnings": tuple(dict.fromkeys(warnings)),
+        })
+    return tuple(results)
 
 
 def refresh_near_miss_hypotheses(
@@ -224,11 +326,12 @@ def format_near_miss_report(
             "  market_refresh: "
             f"attempted={str(item.market_refresh_attempted).lower()} "
             f"success={str(item.market_refresh_success).lower()} "
-            f"source={item.market_context_source or 'none'} "
+            f"provider={item.market_refresh_provider or item.market_context_source or 'none'} "
             f"score={item.market_confirmation_before if item.market_confirmation_before is not None else 'n/a'}"
             f"->{item.market_confirmation_after if item.market_confirmation_after is not None else 'n/a'} "
             f"age={_format_age(item.market_context_age_seconds)} "
-            f"quality={item.market_context_data_quality or 'unknown'}"
+            f"quality={item.market_context_data_quality or 'unknown'} "
+            f"status={item.refresh_upgrade_status or item.upgrade_reason or item.no_upgrade_reason or 'pending'}"
         )
         if item.derivatives_refresh_attempted or item.supply_refresh_attempted:
             rows.append(
@@ -268,17 +371,22 @@ def _refresh_one_hypothesis(
     coin_id = near.coin_id
     market_before = _float(row.get("market_confirmation_score"))
     evidence_before = _float(row.get("evidence_quality_score"))
+    context_before = _market_context(row, source=str(row.get("market_context_source") or "existing"), now=now, cfg=cfg)
     market_row = _find_asset_row(market_rows, symbol=symbol, coin_id=coin_id)
     provider_warnings: list[str] = []
     attempted_market = market_refresh_allowed
+    provider_name = "cycle_rows" if market_row else None
+    provider_error_class = None
     if market_refresh_allowed and not market_row and targeted_market_provider is not None and coin_id:
         try:
+            provider_name = str(getattr(targeted_market_provider, "name", None) or "targeted_provider")
             fetched = targeted_market_provider.fetch_market_rows((coin_id,), max_assets=1)  # type: ignore[attr-defined]
             fetched_rows, fetched_warnings = _normalize_provider_rows(fetched)
             provider_warnings.extend(fetched_warnings)
             market_row = _find_asset_row(fetched_rows, symbol=symbol, coin_id=coin_id)
         except Exception as exc:  # noqa: BLE001 - fail-soft research refresh
-            provider_warnings.append(f"targeted_market_refresh_failed:{type(exc).__name__}")
+            provider_error_class = type(exc).__name__
+            provider_warnings.append(f"targeted_market_refresh_failed:{provider_error_class}")
     derivatives_row = _find_asset_row(derivatives_rows, symbol=symbol, coin_id=coin_id)
     supply_row = _find_asset_row(supply_rows, symbol=symbol, coin_id=coin_id)
     source_row = _find_asset_row(source_rows, symbol=symbol, coin_id=coin_id)
@@ -294,18 +402,27 @@ def _refresh_one_hypothesis(
             near,
             market_refresh_attempted=attempted_market,
             market_refresh_success=False,
+            market_refresh_provider=provider_name,
+            market_refresh_error_class=provider_error_class,
+            market_context_before=context_before,
             evidence_refresh_attempted=bool(cfg.source_refresh_enabled and near.evidence_refresh_queries),
             evidence_refresh_success=False,
+            refresh_upgrade_status="failed" if attempted_market else "not_attempted",
             no_upgrade_reason="no_new_refresh_evidence",
             warnings=tuple(dict.fromkeys((*near.warnings, *provider_warnings))),
         ), tuple(provider_warnings)
-    market_context = _market_context(market_row, source="near_miss_market_refresh", now=now, cfg=cfg)
+    market_context = _market_context(market_row, source=provider_name or "near_miss_market_refresh", now=now, cfg=cfg)
     market_input = event_market_confirmation.EventMarketConfirmationInput(
         market_snapshot=market_context["market_snapshot"],
         derivatives_snapshot=derivatives_row,
         supply_snapshot=supply_row,
         playbook_type=str(row.get("playbook_hint") or row.get("playbook_type") or ""),
         impact_category=str(row.get("impact_category") or ""),
+        now=now,
+        market_context_observed_at=market_context["timestamp"],
+        market_context_source=market_context["source"],
+        market_context_max_age_hours=max(0.0, float(cfg.stale_after_seconds or 0.0)) / 3600.0,
+        allow_stale_fixture_market_context=False,
     )
     market_result = event_market_confirmation.evaluate_market_confirmation(market_input)
     market_success = bool(market_row)
@@ -317,9 +434,21 @@ def _refresh_one_hypothesis(
         "market_context_source": market_context["source"],
         "market_context_timestamp": market_context["timestamp"],
         "market_context_age_seconds": market_context["age_seconds"],
+        "market_context_age_hours": (
+            round(float(market_context["age_seconds"]) / 3600.0, 4)
+            if market_context["age_seconds"] is not None
+            else None
+        ),
         "market_context_data_quality": market_context["data_quality"],
+        "market_context_freshness_status": market_result.market_context_freshness_status,
+        "market_context_observed_at": market_result.market_context_observed_at,
+        "market_context_freshness_cap_applied": market_result.freshness_cap_applied,
         "market_refresh_attempted": attempted_market,
         "market_refresh_success": market_success,
+        "market_refresh_provider": provider_name or ("cycle_rows" if market_row else None),
+        "market_refresh_error_class": provider_error_class,
+        "market_context_before": context_before,
+        "market_context_after": market_context,
         "market_confirmation_before": market_before,
         "market_confirmation_after": market_result.market_confirmation_score,
         "derivatives_refresh_attempted": _playbook_needs_derivatives(row),
@@ -361,13 +490,16 @@ def _refresh_one_hypothesis(
     upgrade_reason = None
     no_upgrade_reason = None
     if upgraded:
+        refresh_upgrade_status = "upgraded"
         upgrade_reason = f"near_miss_refresh_upgraded:{near.opportunity_level_before}->{verdict.opportunity_level}"
     elif score_changed and verdict.opportunity_score_final > near.opportunity_score_before:
+        refresh_upgrade_status = "improved_score"
         upgrade_reason = "near_miss_refresh_improved_score"
     else:
+        refresh_upgrade_status = "unchanged"
         if not market_success and not evidence_success and not derivatives_row and not supply_row:
             no_upgrade_reason = "no_new_refresh_evidence"
-        elif market_context["data_quality"] == "stale":
+        elif market_context["data_quality"] in {"stale", "unknown", "missing"}:
             no_upgrade_reason = "market_refresh_stale"
         else:
             no_upgrade_reason = "refreshed_evidence_below_upgrade_threshold"
@@ -392,6 +524,14 @@ def _refresh_one_hypothesis(
         "opportunity_level_after": verdict.opportunity_level,
         "opportunity_score_before": near.opportunity_score_before,
         "opportunity_score_after": verdict.opportunity_score_final,
+        "opportunity_level_before_refresh": near.opportunity_level_before,
+        "opportunity_level_after_refresh": verdict.opportunity_level,
+        "opportunity_score_before_refresh": near.opportunity_score_before,
+        "opportunity_score_after_refresh": verdict.opportunity_score_final,
+        "market_confirmation_before_refresh": market_before,
+        "market_confirmation_after_refresh": market_result.market_confirmation_score,
+        "refresh_upgrade_status": refresh_upgrade_status,
+        "refresh_upgrade_reason": upgrade_reason,
         "upgrade_reason": upgrade_reason,
         "no_upgrade_reason": no_upgrade_reason,
     }
@@ -407,6 +547,10 @@ def _refresh_one_hypothesis(
         "market_context_source": market_context["source"],
         "market_context_timestamp": market_context["timestamp"],
         "market_context_age_seconds": market_context["age_seconds"],
+        "market_context_age_hours": metadata["market_context_age_hours"],
+        "market_context_observed_at": market_result.market_context_observed_at,
+        "market_context_freshness_status": market_result.market_context_freshness_status,
+        "market_context_freshness_cap_applied": market_result.freshness_cap_applied,
         "market_context_data_quality": market_context["data_quality"],
         "market_context_snapshot": dict(market_context["market_snapshot"]),
         "market_reaction_confirmed": market_result.level in {"weak", "moderate", "strong"},
@@ -434,11 +578,16 @@ def _refresh_one_hypothesis(
         opportunity_score_after=verdict.opportunity_score_final,
         market_refresh_attempted=attempted_market,
         market_refresh_success=market_success,
+        market_refresh_provider=metadata["market_refresh_provider"],
+        market_refresh_error_class=provider_error_class,
         market_context_source=market_context["source"],
         market_context_age_seconds=market_context["age_seconds"],
         market_context_data_quality=market_context["data_quality"],
+        market_context_before=context_before,
+        market_context_after=market_context,
         market_confirmation_before=market_before,
         market_confirmation_after=market_result.market_confirmation_score,
+        refresh_upgrade_status=refresh_upgrade_status,
         derivatives_refresh_attempted=_playbook_needs_derivatives(row),
         derivatives_refresh_success=bool(derivatives_row),
         supply_refresh_attempted=_playbook_needs_supply(row),
@@ -460,6 +609,10 @@ def _refresh_one_hypothesis(
 _OPTIONAL_HYPOTHESIS_FIELDS = {
     "market_refresh_attempted",
     "market_refresh_success",
+    "market_refresh_provider",
+    "market_refresh_error_class",
+    "market_context_before",
+    "market_context_after",
     "market_confirmation_before",
     "market_confirmation_after",
     "derivatives_refresh_attempted",
@@ -476,6 +629,14 @@ _OPTIONAL_HYPOTHESIS_FIELDS = {
     "opportunity_level_after",
     "opportunity_score_before",
     "opportunity_score_after",
+    "opportunity_level_before_refresh",
+    "opportunity_level_after_refresh",
+    "opportunity_score_before_refresh",
+    "opportunity_score_after_refresh",
+    "market_confirmation_before_refresh",
+    "market_confirmation_after_refresh",
+    "refresh_upgrade_status",
+    "refresh_upgrade_reason",
     "upgrade_reason",
     "no_upgrade_reason",
 }
@@ -490,8 +651,7 @@ def _candidate_from_row(
     if not row:
         return None
     quality = event_alpha_quality_fields.ensure_quality_fields(row, components=_quality_components_for_row(row))
-    symbol = str(row.get("validated_symbol") or row.get("symbol") or "").strip().upper()
-    coin_id = str(row.get("validated_coin_id") or row.get("coin_id") or "").strip()
+    symbol, coin_id = _asset_identity_from_row(row)
     if not symbol or symbol == "SECTOR" or not coin_id:
         return None
     text = " ".join(str(value or "") for value in (
@@ -524,13 +684,34 @@ def _candidate_from_row(
     level = str(quality.get("opportunity_level") or "local_only")
     final_route = _final_route_for_route(route) if route is not None else str(row.get("final_route_after_quality_gate") or row.get("route") or "")
     alertable = event_alpha_router.route_value_is_alertable(final_route) if final_route else False
-    if alertable or level in {"validated_digest", "watchlist", "high_priority"}:
+    market_refresh_reasons = _market_refresh_reasons(quality, row)
+    if level in {"watchlist", "high_priority"} and not market_refresh_reasons:
         return None
     missing = _missing_evidence(quality, row)
+    if market_refresh_reasons:
+        missing = tuple(dict.fromkeys((*missing, *market_refresh_reasons)))
     near_digest = 0 <= cfg.digest_threshold - score <= cfg.near_threshold_points
     near_watchlist = 0 <= cfg.watchlist_threshold - score <= cfg.near_threshold_points
     route_inconsistent = level in {"validated_digest", "watchlist", "high_priority"} and not alertable
     blocked_by_refreshable = any(_refreshable_missing_reason(value) for value in missing)
+    blocked_by_market_refresh = any(_refreshable_market_reason(value) for value in missing)
+    promoted_with_fresh_context = (
+        level in {"watchlist", "high_priority"}
+        and not blocked_by_refreshable
+        and not blocked_by_market_refresh
+        and not route_inconsistent
+    )
+    digest_with_fresh_context = (
+        level == "validated_digest"
+        and not near_watchlist
+        and not blocked_by_refreshable
+        and not blocked_by_market_refresh
+        and not route_inconsistent
+    )
+    if alertable and not (blocked_by_refreshable or near_watchlist or route_inconsistent):
+        return None
+    if promoted_with_fresh_context or digest_with_fresh_context:
+        return None
     if not (near_digest or near_watchlist or route_inconsistent or blocked_by_refreshable):
         return None
     if level == "local_only" and score < cfg.digest_threshold - cfg.near_threshold_points and not blocked_by_refreshable:
@@ -539,8 +720,10 @@ def _candidate_from_row(
     queries = _evidence_refresh_queries(row, max_queries=cfg.max_source_queries)
     return EventNearMissCandidate(
         near_miss_id=_near_miss_id(row, symbol=symbol, coin_id=coin_id),
+        refresh_id=_refresh_id(row, symbol=symbol, coin_id=coin_id),
         symbol=symbol,
         coin_id=coin_id,
+        core_opportunity_id=_optional_str(row.get("core_opportunity_id") or row.get("aggregated_candidate_id")),
         hypothesis_id=_optional_str(row.get("hypothesis_id")),
         incident_id=_optional_str(row.get("incident_id")),
         opportunity_level_before=level,
@@ -549,6 +732,10 @@ def _candidate_from_row(
         missing_evidence=missing,
         recommended_refresh_actions=_recommended_refresh_actions(missing, row),
         priority_score=priority,
+        market_context_before=_market_context(row, source=str(row.get("market_context_source") or "existing"), now=datetime.now(timezone.utc), cfg=cfg),
+        market_context_source=str(row.get("market_context_source") or quality.get("market_context_source") or "") or None,
+        market_context_age_seconds=_float(row.get("market_context_age_seconds") or quality.get("market_context_age_seconds")),
+        market_context_data_quality=str(row.get("market_context_freshness_status") or quality.get("market_context_freshness_status") or row.get("market_context_data_quality") or quality.get("market_context_data_quality") or "") or None,
         market_confirmation_before=_float(quality.get("market_confirmation_score")),
         evidence_quality_before=_float(quality.get("evidence_quality_score")),
         evidence_refresh_queries=queries,
@@ -584,9 +771,41 @@ def _missing_evidence(quality: Mapping[str, Any], row: Mapping[str, Any]) -> tup
     return tuple(dict.fromkeys(_clean_reason(value) for value in values if _clean_reason(value)))
 
 
+def _market_refresh_reasons(quality: Mapping[str, Any], row: Mapping[str, Any]) -> tuple[str, ...]:
+    status = str(
+        row.get("market_context_freshness_status")
+        or quality.get("market_context_freshness_status")
+        or row.get("market_context_data_quality")
+        or quality.get("market_context_data_quality")
+        or ""
+    ).casefold()
+    cap = _truthy(
+        row.get("market_context_freshness_cap_applied")
+        if row.get("market_context_freshness_cap_applied") is not None
+        else quality.get("market_context_freshness_cap_applied")
+    )
+    warnings = _iter_texts(row.get("market_confirmation_warnings") or quality.get("market_confirmation_warnings"))
+    missing = _iter_texts(row.get("market_confirmation_missing_fields") or quality.get("market_confirmation_missing_fields"))
+    out: list[str] = []
+    if status in {"stale", "missing", "unknown"}:
+        out.append(f"market_context_{status}")
+    if cap:
+        out.append("market_context_freshness_cap_applied")
+    for value in (*warnings, *missing):
+        text = _clean_reason(value)
+        if text in {
+            "market_context_stale_capped",
+            "market_context_missing",
+            "market_context_unknown_timestamp",
+            "needs_fresh_market_confirmation",
+        }:
+            out.append(text)
+    return tuple(dict.fromkeys(out))
+
+
 def _recommended_refresh_actions(missing: Iterable[str], row: Mapping[str, Any]) -> tuple[str, ...]:
     actions: list[str] = []
-    if any("market" in reason or "volume" in reason or "liquidity" in reason for reason in missing):
+    if any(_refreshable_market_reason(reason) for reason in missing):
         actions.append("targeted_market_refresh")
     if _playbook_needs_derivatives(row):
         actions.append("targeted_derivatives_refresh")
@@ -600,6 +819,11 @@ def _recommended_refresh_actions(missing: Iterable[str], row: Mapping[str, Any])
 def _refreshable_missing_reason(reason: str) -> bool:
     text = reason.casefold()
     return any(part in text for part in ("market", "volume", "liquidity", "source", "evidence", "impact_path", "derivatives", "supply"))
+
+
+def _refreshable_market_reason(reason: str) -> bool:
+    text = reason.casefold()
+    return any(part in text for part in ("market", "volume", "liquidity", "fresh", "stale"))
 
 
 def _quality_components_for_row(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -636,9 +860,25 @@ def _market_context(row: Mapping[str, Any] | None, *, source: str, now: datetime
             "age_seconds": None,
             "data_quality": "missing",
         }
-    timestamp = row.get("timestamp") or row.get("market_timestamp") or row.get("observed_at") or row.get("fetched_at")
+    timestamp = (
+        row.get("market_context_observed_at")
+        or row.get("market_context_timestamp")
+        or row.get("watchlist_market_observed_at")
+        or row.get("timestamp")
+        or row.get("market_timestamp")
+        or row.get("observed_at")
+        or row.get("fetched_at")
+        or row.get("updated_at")
+    )
     age = _age_seconds(timestamp, now)
-    quality = "fresh" if age is None or age <= cfg.stale_after_seconds else "stale"
+    if timestamp in (None, ""):
+        quality = "unknown"
+    elif age is None:
+        quality = "unknown"
+    elif age <= cfg.stale_after_seconds:
+        quality = "fresh"
+    else:
+        quality = "stale"
     return {
         "market_snapshot": dict(row),
         "source": str(row.get("watchlist_market_source") or row.get("source") or source),
@@ -659,6 +899,34 @@ def _find_asset_row(rows: Iterable[Mapping[str, Any]], *, symbol: str, coin_id: 
         if (clean_coin and row_coin == clean_coin) or (clean_symbol and row_symbol == clean_symbol):
             return dict(row)
     return None
+
+
+def _asset_identity_from_row(row: Mapping[str, Any]) -> tuple[str, str]:
+    symbol = str(row.get("validated_symbol") or row.get("symbol") or "").strip().upper()
+    coin_id = str(row.get("validated_coin_id") or row.get("coin_id") or "").strip()
+    if symbol and coin_id:
+        return symbol, coin_id
+    for key in ("validated_candidate_assets", "crypto_candidate_assets"):
+        raw_assets = row.get(key)
+        if not isinstance(raw_assets, Iterable) or isinstance(raw_assets, (str, bytes, Mapping)):
+            continue
+        for asset in raw_assets:
+            if not isinstance(asset, Mapping):
+                continue
+            accepted = asset.get("validated")
+            if accepted is False:
+                continue
+            asset_symbol = str(asset.get("symbol") or "").strip().upper()
+            asset_coin = str(asset.get("coin_id") or asset.get("id") or "").strip()
+            if asset_symbol and asset_coin:
+                return asset_symbol, asset_coin
+    symbols = row.get("candidate_symbols")
+    coins = row.get("candidate_coin_ids")
+    if not symbol and isinstance(symbols, Iterable) and not isinstance(symbols, (str, bytes, Mapping)):
+        symbol = str(next((item for item in symbols if str(item or "").strip()), "")).strip().upper()
+    if not coin_id and isinstance(coins, Iterable) and not isinstance(coins, (str, bytes, Mapping)):
+        coin_id = str(next((item for item in coins if str(item or "").strip()), "")).strip()
+    return symbol, coin_id
 
 
 def _normalize_provider_rows(raw: Any) -> tuple[list[dict[str, Any]], list[str]]:
@@ -716,8 +984,7 @@ def _identity_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
         value = str(row.get(key) or "").strip()
         if value:
             keys.append(f"{key}:{value}")
-    symbol = str(row.get("validated_symbol") or row.get("symbol") or "").strip().upper()
-    coin_id = str(row.get("validated_coin_id") or row.get("coin_id") or "").strip()
+    symbol, coin_id = _asset_identity_from_row(row)
     if symbol:
         keys.append(f"symbol:{symbol}")
     if coin_id:
@@ -732,6 +999,11 @@ def _row_identity(row: Mapping[str, Any]) -> str:
 def _near_miss_id(row: Mapping[str, Any], *, symbol: str, coin_id: str) -> str:
     base = str(row.get("hypothesis_id") or row.get("event_id") or row.get("key") or coin_id or symbol)
     return "near:" + base.replace(" ", "_")[:96]
+
+
+def _refresh_id(row: Mapping[str, Any], *, symbol: str, coin_id: str) -> str:
+    base = str(row.get("hypothesis_id") or row.get("core_opportunity_id") or row.get("event_id") or coin_id or symbol)
+    return "refresh:" + base.replace(" ", "_")[:96]
 
 
 def _final_route_for_route(route: Mapping[str, Any]) -> str:
@@ -791,6 +1063,24 @@ def _level_rank(level: str) -> int:
 
 def _clean_reason(value: str) -> str:
     return str(value or "").strip().replace(" ", "_")
+
+
+def _iter_texts(value: Any) -> tuple[str, ...]:
+    if value in (None, "", [], {}, ()):
+        return ()
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, Mapping):
+        return tuple(str(key) for key in value)
+    if isinstance(value, Iterable):
+        return tuple(str(item) for item in value if str(item))
+    return (str(value),)
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
 
 
 def _optional_str(value: Any) -> str | None:
