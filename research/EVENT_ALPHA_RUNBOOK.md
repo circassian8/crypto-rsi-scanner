@@ -621,7 +621,14 @@ generic co-occurrence, identity, missing-impact-path, or rejected-candidate
 reason codes and should not list strong core opportunities merely because they
 have diagnostic support rows. Research-card indexes group cards as core,
 near-miss, local/quality-capped, diagnostic/control, or legacy so Pro-model
-handoffs can inspect the main opportunities first.
+handoffs can inspect the main opportunities first. New card indexes use the
+card's watchlist/quality metadata rather than filename hints when possible; the
+filename/content fallback exists only for legacy artifacts. Validated cards also
+choose playbook and invalidation copy from the impact path and catalyst frame:
+AAVE/Kraken-style strategic investment cards should talk about stake/valuation
+risk, VELVET/SpaceX-style proxy cards should talk about venue/exposure
+validation, and MemeCore-style unknown market dislocations should remain
+local-only until a causal catalyst is found.
 Standalone fixture-report targets such as
 `make event-alpha-daily-brief PROFILE=catalyst_frame_e2e` pass the fixture/test
 artifact include flag automatically, so the generated brief should select the

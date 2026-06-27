@@ -111,7 +111,7 @@ def render_research_card(
     lines.extend([
         "",
         "## Playbook",
-        _playbook_copy(playbook, alert),
+        _playbook_copy(playbook, alert, entry),
         "",
         "## External Catalyst",
         f"- External asset: {_value(entry, alert, 'external_asset', 'external_asset') or 'unknown'}",
@@ -180,7 +180,7 @@ def render_research_card(
     lines.extend([
         "",
         "## Why This Matters",
-        _why_it_matters(playbook),
+        _why_it_matters(playbook, entry, alert),
         "",
         "## What To Verify",
     ])
@@ -193,7 +193,7 @@ def render_research_card(
     lines.extend([
         "",
         "## Invalidation / Why Wrong",
-        f"- {_value(None, alert, '', 'playbook_invalidation') or _default_invalidation(playbook)}",
+        f"- {_value(None, alert, '', 'playbook_invalidation') or _default_invalidation(playbook, alert, entry)}",
         "",
         "## Alert History",
     ])
@@ -279,6 +279,7 @@ def write_research_cards(
         selected_tiers=selected_tiers,
     )
     card_paths: list[Path] = []
+    card_groups: dict[Path, str] = {}
     for entry in entries[: max(1, limit)]:
         card = render_research_card(
             entry.key,
@@ -296,7 +297,8 @@ def write_research_cards(
         path = target / _card_filename(entry)
         path.write_text(_strip_sensitive(card.markdown), encoding="utf-8")
         card_paths.append(path)
-    index = _render_index(card_paths, observed)
+        card_groups[path] = _card_index_group_for_entry(entry, route_decisions)
+    index = _render_index(card_paths, observed, card_groups=card_groups)
     index_path = target / "index.md"
     index_path.write_text(index, encoding="utf-8")
     return EventResearchCardWriteResult(
@@ -386,7 +388,12 @@ def _slug(value: str) -> str:
     return re.sub(r"_+", "_", re.sub(r"[^A-Za-z0-9._-]+", "_", value)).strip("._") or "event_card"
 
 
-def _render_index(paths: list[Path], observed: datetime) -> str:
+def _render_index(
+    paths: list[Path],
+    observed: datetime,
+    *,
+    card_groups: Mapping[Path | str, str] | None = None,
+) -> str:
     grouped: dict[str, list[Path]] = {
         "Core Opportunity Cards": [],
         "Near-Miss Cards": [],
@@ -395,7 +402,7 @@ def _render_index(paths: list[Path], observed: datetime) -> str:
         "Legacy Cards": [],
     }
     for path in paths:
-        grouped[_card_index_group(path)].append(path)
+        grouped[_card_index_group(path, card_groups=card_groups)].append(path)
     lines = [
         "# Event Research Cards",
         "",
@@ -416,7 +423,17 @@ def _render_index(paths: list[Path], observed: datetime) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _card_index_group(path: Path) -> str:
+def _card_index_group(path: Path, *, card_groups: Mapping[Path | str, str] | None = None) -> str:
+    if card_groups:
+        mapped = card_groups.get(path) or card_groups.get(str(path)) or card_groups.get(path.name)
+        if mapped in {
+            "Core Opportunity Cards",
+            "Near-Miss Cards",
+            "Local-Only / Quality-Capped Cards",
+            "Diagnostic / Source-Noise / Control Cards",
+            "Legacy Cards",
+        }:
+            return str(mapped)
     name = path.name.casefold()
     if "legacy" in name:
         return "Legacy Cards"
@@ -426,7 +443,75 @@ def _card_index_group(path: Path) -> str:
         return "Local-Only / Quality-Capped Cards"
     if "near_miss" in name or "near-miss" in name:
         return "Near-Miss Cards"
+    if path.exists():
+        text = path.read_text(encoding="utf-8", errors="replace").casefold()
+        content_group = _card_index_group_for_text(text)
+        if content_group is not None:
+            return content_group
     return "Core Opportunity Cards"
+
+
+def _card_index_group_for_entry(
+    entry: event_watchlist.EventWatchlistEntry,
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+) -> str:
+    components = dict(entry.latest_score_components or {})
+    text = " ".join(str(value or "") for value in (
+        entry.latest_effective_playbook_type,
+        entry.latest_playbook_type,
+        entry.candidate_role,
+        entry.impact_path_type,
+        entry.source_class,
+        entry.evidence_specificity,
+        entry.quality_state_block_reason,
+        components.get("candidate_role"),
+        components.get("impact_path_type"),
+        components.get("source_class"),
+        components.get("evidence_specificity"),
+        components.get("quality_gate_block_reason"),
+    )).casefold()
+    if "source_noise" in text or "ticker_word_collision" in text or "generic_cooccurrence_only" in text:
+        return "Diagnostic / Source-Noise / Control Cards"
+    if event_watchlist.state_is_quality_capped(entry) or event_watchlist.final_state_value(entry) == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value:
+        return "Local-Only / Quality-Capped Cards"
+    level = str(entry.opportunity_level or components.get("opportunity_level") or "").casefold()
+    final_route = str(components.get("final_route_after_quality_gate") or components.get("route") or "")
+    for decision in decisions:
+        if decision.entry.key == entry.key:
+            final_route = event_alpha_router.final_route_value(decision)
+            break
+    if level in {"validated_digest", "watchlist", "high_priority"} or event_alpha_router.route_value_is_alertable(final_route):
+        return "Core Opportunity Cards"
+    score = _float(components.get("opportunity_score_final") or entry.opportunity_score_final) or 0.0
+    if level == "exploratory" or score >= 50:
+        return "Near-Miss Cards"
+    return "Local-Only / Quality-Capped Cards"
+
+
+def _card_index_group_for_text(text: str) -> str | None:
+    if (
+        "source_noise_control" in text
+        or "ticker_word_collision" in text
+        or "generic_cooccurrence_only" in text
+        or "diagnostic" in text
+    ):
+        return "Diagnostic / Source-Noise / Control Cards"
+    if "local-only after quality/state gate" in text or "final route: store_only" in text or "quality_blocked" in text:
+        return "Local-Only / Quality-Capped Cards"
+    if "final opportunity verdict: exploratory" in text:
+        return "Near-Miss Cards"
+    if (
+        "final opportunity verdict: high_priority" in text
+        or "final opportunity verdict: watchlist" in text
+        or "final opportunity verdict: validated_digest" in text
+        or "final route: high_priority_research" in text
+        or "final route: research_digest" in text
+        or "final route: watchlist" in text
+        or "route: high_priority_research" in text
+        or "route: research_digest" in text
+    ):
+        return "Core Opportunity Cards"
+    return None
 
 
 def _strip_sensitive(markdown: str) -> str:
@@ -803,7 +888,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Local-only due to weak co-occurrence: {str('impact_path_not_validated' in gate_line or 'weak_validated_local_only' in gate_line or why_digest_ineligible != 'none').lower()}",
         f"- Why promoted/local-only: {entry.suppressed_reason or 'validated impact hypothesis promoted to RADAR'}",
         "- Safety label: catalyst link validated, but this is not a calibrated strategy or trade signal.",
-        "- Why it may be wrong: validation may be source-thin, asset link may be narrative-only, and the catalyst impact may not move this token.",
+        "- Why it may be wrong: " + _impact_hypothesis_wrong_line(components),
         "- What to verify manually: "
         + (
             "; ".join(str(item) for item in manual_verification_items[:4])
@@ -818,6 +903,19 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     if why_not_promoted:
         lines.append("- Why not promoted diagnostics: " + "; ".join(str(item) for item in why_not_promoted[:4]))
     return lines
+
+
+def _impact_hypothesis_wrong_line(components: Mapping[str, Any]) -> str:
+    impact_path = str(components.get("impact_path_type") or "").casefold()
+    frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
+    role = str(components.get("candidate_role") or "").casefold()
+    if impact_path == "strategic_investment_or_valuation" or frame == "acquisition_or_stake":
+        return "talks are denied, the source is corrected, no market reaction appears, or the valuation is not relevant to token value."
+    if impact_path in {"venue_value_capture", "proxy_exposure"} or role == "proxy_venue":
+        return "the venue/exposure claim is denied, source evidence is corrected, or attention and market confirmation fade."
+    if impact_path == "market_dislocation_unknown" or frame == "market_dislocation_unknown":
+        return "cause remains unknown, no exploit/catalyst is confirmed, or the move mean-reverts without independent evidence."
+    return "validation may be source-thin, asset link may be narrative-only, and the catalyst impact may not move this token."
 
 
 def _quality_gate_lines(
@@ -1058,7 +1156,27 @@ def _score(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str
     return "n/a"
 
 
-def _playbook_copy(playbook: str, alert: Mapping[str, Any] | None) -> str:
+def _playbook_copy(
+    playbook: str,
+    alert: Mapping[str, Any] | None,
+    entry: event_watchlist.EventWatchlistEntry | None = None,
+) -> str:
+    components = _card_components(entry, alert)
+    impact_path = str(components.get("impact_path_type") or "").casefold()
+    frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
+    level = str(components.get("opportunity_level") or "").casefold()
+    role = str(components.get("candidate_role") or "").casefold()
+    if impact_path == "strategic_investment_or_valuation" or frame == "acquisition_or_stake":
+        return "- Hypothesis: validated strategic investment / valuation catalyst may change market expectations for the token or protocol."
+    if impact_path in {"venue_value_capture", "proxy_exposure"} or role == "proxy_venue":
+        priority = "high-priority " if level == "high_priority" else ""
+        return f"- Hypothesis: validated {priority}proxy venue/exposure narrative may concentrate attention around the external catalyst."
+    if impact_path == "exploit_security_event":
+        return "- Hypothesis: validated security or exploit catalyst may change risk appetite, liquidity, and volatility for the affected asset."
+    if impact_path == "listing_liquidity_event":
+        return "- Hypothesis: validated listing or liquidity catalyst may change venue access, treasury demand, or short-term volatility."
+    if impact_path == "market_dislocation_unknown" or frame == "market_dislocation_unknown":
+        return "- Hypothesis: market dislocation is real, but the cause is still unconfirmed; keep it local until causal evidence appears."
     if alert is not None and alert.get("playbook_hypothesis"):
         return f"- Hypothesis: {alert.get('playbook_hypothesis')}"
     if "listing" in playbook:
@@ -1072,7 +1190,22 @@ def _playbook_copy(playbook: str, alert: Mapping[str, Any] | None) -> str:
     return "- Hypothesis: event/catalyst relationship needs manual review."
 
 
-def _why_it_matters(playbook: str) -> str:
+def _why_it_matters(
+    playbook: str,
+    entry: event_watchlist.EventWatchlistEntry | None = None,
+    alert: Mapping[str, Any] | None = None,
+) -> str:
+    components = _card_components(entry, alert)
+    impact_path = str(components.get("impact_path_type") or "").casefold()
+    frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
+    if impact_path == "strategic_investment_or_valuation" or frame == "acquisition_or_stake":
+        return "Strategic investment or valuation news can alter perceived protocol value, governance expectations, and token risk appetite."
+    if impact_path == "exploit_security_event":
+        return "Confirmed exploit or security events can affect liquidity access, confidence, volatility, and direct token risk."
+    if impact_path == "listing_liquidity_event":
+        return "Listing and liquidity events can change venue access, available demand, spreads, and realized volatility."
+    if impact_path == "market_dislocation_unknown" or frame == "market_dislocation_unknown":
+        return "Large unexplained moves are useful only as catalyst-search and missed-opportunity evidence until a causal mechanism is found."
     if "listing" in playbook:
         return "Listings can change venue access, liquidity, spreads, and short-term volatility."
     if "unlock" in playbook:
@@ -1084,7 +1217,25 @@ def _why_it_matters(playbook: str) -> str:
     return "The row helps calibrate source quality, resolver precision, and playbook thresholds."
 
 
-def _default_invalidation(playbook: str) -> str:
+def _default_invalidation(
+    playbook: str,
+    alert: Mapping[str, Any] | None = None,
+    entry: event_watchlist.EventWatchlistEntry | None = None,
+) -> str:
+    components = _card_components(entry, alert)
+    impact_path = str(components.get("impact_path_type") or "").casefold()
+    frame = str(components.get("main_frame_type") or components.get("event_archetype") or "").casefold()
+    role = str(components.get("candidate_role") or "").casefold()
+    if impact_path == "strategic_investment_or_valuation" or frame == "acquisition_or_stake":
+        return "Talks are denied, the source is corrected, no market reaction appears, or the valuation/stake is not relevant to token value."
+    if impact_path in {"venue_value_capture", "proxy_exposure"} or role == "proxy_venue":
+        return "Proxy venue/exposure is denied, source evidence is corrected, attention shifts away, or the market fails to confirm the narrative."
+    if impact_path == "exploit_security_event":
+        return "The exploit/security claim is denied or corrected, the incident is unrelated to the asset, liquidity normalizes, or market impact fades."
+    if impact_path == "listing_liquidity_event":
+        return "The listing/liquidity event is stale, denied, already priced, too small to matter, or fails to change trading conditions."
+    if impact_path == "market_dislocation_unknown" or frame == "market_dislocation_unknown":
+        return "No exploit/catalyst is confirmed, the move mean-reverts without new evidence, or the asset link remains unexplained."
     if "listing" in playbook:
         return "Listing is stale, liquidity is deep, or volatility does not expand."
     if "unlock" in playbook:
@@ -1106,7 +1257,7 @@ def _trade_readiness_lines(
     timing = _value(entry, alert, "event_time", "event_time") or "unknown"
     direction = _value(None, alert, "", "expected_direction") or _playbook_direction(playbook)
     horizon = _value(None, alert, "", "primary_horizon") or "manual"
-    invalidation = _value(None, alert, "", "playbook_invalidation") or _default_invalidation(playbook)
+    invalidation = _value(None, alert, "", "playbook_invalidation") or _default_invalidation(playbook, alert, entry)
     lines = [
         f"- Catalyst clarity: {_check_value(components, 'external_catalyst')}",
         f"- Event timing quality: {timing} / {_check_value(components, 'event_time_quality')}",
@@ -1134,6 +1285,44 @@ def _trade_readiness_lines(
 def _check_value(components: Mapping[str, Any], key: str) -> str:
     value = components.get(key)
     return "n/a" if value is None else str(value)
+
+
+def _card_components(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    components: dict[str, Any] = {}
+    if entry is not None:
+        components.update(entry.latest_score_components or {})
+        for key in (
+            "impact_path_type",
+            "candidate_role",
+            "source_class",
+            "evidence_specificity",
+            "opportunity_level",
+            "opportunity_score_final",
+            "market_confirmation_level",
+            "main_frame_type",
+            "event_archetype",
+        ):
+            value = getattr(entry, key, None)
+            if value not in (None, ""):
+                components.setdefault(key, value)
+    if alert is not None:
+        raw = alert.get("score_components")
+        if isinstance(raw, Mapping):
+            components.update({key: value for key, value in raw.items() if value not in (None, "")})
+        for key, value in alert.items():
+            if key not in components and value not in (None, "", [], {}):
+                components[key] = value
+    return components
+
+
+def _float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _playbook_direction(playbook: str) -> str:

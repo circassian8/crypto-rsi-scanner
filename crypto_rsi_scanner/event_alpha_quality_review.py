@@ -336,7 +336,9 @@ def _possible_false_positives(rows: list[dict[str, Any]]) -> list[dict[str, Any]
 
 
 _FALSE_POSITIVE_SUSPICION_TERMS = {
+    "diagnostic_only",
     "source_noise",
+    "invalid_subject",
     "ticker_collision",
     "ticker_word_collision",
     "word_collision_false_positive",
@@ -355,13 +357,21 @@ _FALSE_POSITIVE_SUSPICION_TERMS = {
 
 def _false_positive_suspicion_reason(row: Mapping[str, Any]) -> str | None:
     components = row.get("_components") if isinstance(row.get("_components"), Mapping) else {}
+    level = str(row.get("opportunity_level") or components.get("opportunity_level") or "").casefold()
+    role = str(row.get("candidate_role") or components.get("candidate_role") or "").casefold()
+    impact = str(row.get("impact_path_type") or components.get("impact_path_type") or "").casefold()
+    source_class = str(row.get("source_class") or components.get("source_class") or "").casefold()
+    if (
+        level in {"validated_digest", "watchlist", "high_priority"}
+        and role not in {"source_noise", "ticker_word_collision", "ambiguous", "generic_mention"}
+        and impact != "generic_cooccurrence_only"
+        and source_class not in {"publisher_suffix_false_positive", "source_noise"}
+    ):
+        return None
     fields: list[object] = [
-        row.get("candidate_role"),
-        components.get("candidate_role"),
-        row.get("impact_path_type"),
-        components.get("impact_path_type"),
-        row.get("source_class"),
-        components.get("source_class"),
+        role,
+        impact,
+        source_class,
         row.get("evidence_specificity"),
         components.get("evidence_specificity"),
         row.get("quality_gate_block_reason"),

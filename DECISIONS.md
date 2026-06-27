@@ -26,7 +26,12 @@ deduplicated by incident, asset, candidate role, and impact path. Possible
 false-positive lists should require explicit suspicion reason codes such as
 source noise, ticker collision, generic co-occurrence, low-confidence identity,
 source-origin-only identity, missing direct impact path, common-word collision,
-quality-context-missing, or rejected candidate asset evidence.
+quality-context-missing, invalid subjects, diagnostic-only rows, or rejected
+candidate asset evidence. Research-card grouping should use stored
+watchlist/quality metadata when available, with content/filename fallback only
+for legacy artifacts. Card copy should be verdict-aware: validated strategic
+investment, proxy venue/exposure, and unknown market-dislocation rows should not
+fall back to stale generic source-identity failure language.
 **Why:** Operators need to review actual opportunities, not every support row
 and diagnostic/control artifact as if it were a separate lead. Mixing promoted
 VELVET/AAVE/RUNE/ZEC rows with near-miss, exploratory, or suspicion sections

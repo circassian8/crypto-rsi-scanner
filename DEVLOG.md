@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Harden Event Alpha card and diagnostics UX · Codex
+**Why:** The core-opportunity output was mostly clean, but card indexes still
+depended on filename hints, verdict-backed cards could fall back to generic
+manual-review language, and the daily brief did not explicitly account for
+hidden diagnostic/control support near the top.
+**Changes:**
+- Added an explicit daily-brief Diagnostics / Source-Noise / Controls section
+  that reports collapsed diagnostic, source-noise, and quality-capped support
+  rows without promoting them into the main opportunity list.
+- Made research-card indexes use watchlist/quality metadata when cards are
+  written, with content-based fallback for existing card files, so local-only,
+  exploratory, diagnostic, and core cards group correctly even when filenames
+  are ambiguous.
+- Made research-card Playbook, Why This Matters, and Invalidation copy aware of
+  validated impact path and catalyst frame status for strategic investment,
+  proxy venue/exposure, and unknown market-dislocation cases.
+- Expanded false-positive suspicion reason coverage for diagnostic-only and
+  invalid-subject cases while continuing to keep promoted strong opportunities
+  out of the false-positive list unless the row itself is a noise/collision
+  diagnostic.
+**Verify:** `python3 tests/test_indicators.py` passed (483/483); `python3 -m
+compileall -q crypto_rsi_scanner tests` passed; `make
+event-alpha-signal-quality-eval PYTHON=python3` passed (32/32); `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `make
+event-alpha-quality-validation-cycle PYTHON=python3` passed; `make
+event-alpha-notify-llm-quality-frame-smoke PYTHON=python3` passed; `make verify
+PYTHON=python3` passed; manual `python3 main.py --event-opportunity-audit VELVET
+--event-alpha-profile catalyst_frame_e2e --event-alpha-artifact-namespace
+catalyst_frame_e2e` passed.
+**Notes/risks:** Reporting/card-copy-only. It does not change Event Alpha
+scoring, route eligibility, Telegram send guards, paper/live trading, normal
+RSI writes, or deterministic `TRIGGERED_FADE` creation.
+
 ## 2026-06-27 — Clean Event Alpha operator output sections · Codex
 **Why:** Core-opportunity aggregation was working, but daily briefs, exploratory
 digests, near-miss lists, quality review, inbox text, and card indexes still

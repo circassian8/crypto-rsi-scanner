@@ -106,6 +106,9 @@ def build_daily_brief(
     alertable = [decision for decision in list(router_result.alertable_decisions if router_result else ()) if event_alpha_router.alertable_after_quality_gate(decision)]
     core_opportunities = event_core_opportunities.aggregate_core_opportunities([*decisions, *hypotheses])
     core_sections = _core_opportunity_sections(core_opportunities)
+    diagnostic_core_rows = sum(item.diagnostic_row_count for item in core_opportunities)
+    diagnostic_control_rows = sum(item.source_noise_control_count for item in core_opportunities)
+    diagnostic_capped_rows = sum(item.quality_capped_supporting_rows for item in core_opportunities)
     promoted_core_asset_keys = {
         event_core_opportunities.incident_asset_key_for_opportunity(item)
         for item in core_opportunities
@@ -164,6 +167,19 @@ def build_daily_brief(
         "",
         "## Canonical Incidents",
         *_canonical_incident_lines(incidents),
+        "",
+        "## Diagnostics / Source-Noise / Controls",
+        (
+            "- Hidden from main opportunity sections by default: "
+            f"diagnostic_rows={diagnostic_core_rows}, "
+            f"source_noise_controls={diagnostic_control_rows}, "
+            f"quality_capped_support={diagnostic_capped_rows}"
+        ),
+        (
+            "- Pass include_diagnostics in local tooling to inspect collapsed controls."
+            if diagnostic_core_rows or diagnostic_control_rows or diagnostic_capped_rows
+            else "- None."
+        ),
         "",
         "## System Health / Providers / Budget",
     ]
@@ -539,13 +555,11 @@ def build_daily_brief(
         lines.append("### Core Opportunity Cards")
         for path in _card_paths_for_daily_brief(cards, include_diagnostics=include_diagnostics)[:20]:
             lines.append(f"- [{path.name}]({path})")
-        diagnostic_count = sum(item.diagnostic_row_count for item in core_opportunities)
-        capped_count = sum(item.quality_capped_supporting_rows for item in core_opportunities)
         lines.append("### Diagnostic / Source-Noise / Control Cards")
-        if diagnostic_count or capped_count:
+        if diagnostic_core_rows or diagnostic_capped_rows:
             lines.append(
-                f"- Hidden from main card list by default: diagnostics={diagnostic_count}, "
-                f"quality_capped_support={capped_count}"
+                f"- Hidden from main card list by default: diagnostics={diagnostic_core_rows}, "
+                f"quality_capped_support={diagnostic_capped_rows}"
             )
             if include_diagnostics:
                 for path in cards:

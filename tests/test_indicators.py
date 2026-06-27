@@ -22182,6 +22182,10 @@ def test_aave_kraken_hypothesis_uses_strategic_frame_in_cards_and_audit():
     assert "prior_exploit_context(KelpDAO)" in card.markdown
     assert "denied_or_negated_exploit" in card.markdown
     assert "Rejected/background impact paths:" in card.markdown
+    assert "validated strategic investment / valuation catalyst" in card.markdown
+    assert "Talks are denied" in card.markdown
+    assert "event/catalyst relationship needs manual review" not in card.markdown
+    assert "Source evidence fails identity/catalyst review" not in card.markdown
     audit = event_opportunity_audit.format_opportunity_audit(
         entry.key,
         hypotheses=[hypothesis],
@@ -23262,28 +23266,84 @@ def test_quality_review_possible_false_positives_require_suspicion_reason():
     assert "BTC" in mixed_fp
     assert "VELVET" not in mixed_fp
 
+    explicit_text = event_alpha_quality_review.format_quality_review(
+        event_alpha_quality_review.build_quality_review(hypothesis_rows=[
+            {**strong, "symbol": "RUNE", "coin_id": "thorchain", "opportunity_level": "watchlist"},
+            {"symbol": "HYPE", "coin_id": "hyperliquid", "warnings": ["invalid_subject"]},
+            {"symbol": "KCS", "coin_id": "kucoin-shares", "why_local_only": "diagnostic_only"},
+        ])
+    )
+    explicit_fp = explicit_text.split("Possible false positives:", 1)[1].split("Quality Gate Conflicts:", 1)[0]
+    assert "RUNE" not in explicit_fp
+    assert "HYPE" in explicit_fp
+    assert "KCS" in explicit_fp
+
 
 def test_research_card_index_groups_core_local_near_miss_and_diagnostics():
     from datetime import datetime, timezone
     from pathlib import Path
+    import tempfile
     from crypto_rsi_scanner import event_research_cards
 
-    index = event_research_cards._render_index(
-        [
-            Path("card_core_velvet.md"),
-            Path("card_near_miss_m.md"),
-            Path("card_quality_blocked_btc.md"),
-            Path("card_source_noise_control_kcs.md"),
-            Path("legacy_old.md"),
-        ],
-        datetime(2026, 6, 20, tzinfo=timezone.utc),
-    )
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core = root / "card_velvet.md"
+        near = root / "card_memecore.md"
+        local = root / "card_btc.md"
+        diagnostic = root / "card_kcs.md"
+        legacy = root / "legacy_old.md"
+        core.write_text("Final opportunity verdict: high_priority\nFinal route: HIGH_PRIORITY_RESEARCH\n", encoding="utf-8")
+        near.write_text("Final opportunity verdict: exploratory\nFinal route: LOCAL_REPORT\n", encoding="utf-8")
+        local.write_text("Final route: STORE_ONLY\nLocal-only after quality/state gate.\n", encoding="utf-8")
+        diagnostic.write_text("Playbook: source_noise_control\nImpact path type: generic_cooccurrence_only\n", encoding="utf-8")
+        legacy.write_text("legacy card\n", encoding="utf-8")
+        index = event_research_cards._render_index(
+            [core, near, local, diagnostic, legacy],
+            datetime(2026, 6, 20, tzinfo=timezone.utc),
+        )
     assert "## Core Opportunity Cards" in index
-    assert "card_core_velvet.md" in index.split("## Core Opportunity Cards", 1)[1].split("## Near-Miss Cards", 1)[0]
-    assert "card_near_miss_m.md" in index.split("## Near-Miss Cards", 1)[1].split("## Local-Only / Quality-Capped Cards", 1)[0]
-    assert "card_quality_blocked_btc.md" in index.split("## Local-Only / Quality-Capped Cards", 1)[1].split("## Diagnostic / Source-Noise / Control Cards", 1)[0]
-    assert "card_source_noise_control_kcs.md" in index.split("## Diagnostic / Source-Noise / Control Cards", 1)[1].split("## Legacy Cards", 1)[0]
+    assert "card_velvet.md" in index.split("## Core Opportunity Cards", 1)[1].split("## Near-Miss Cards", 1)[0]
+    assert "card_memecore.md" in index.split("## Near-Miss Cards", 1)[1].split("## Local-Only / Quality-Capped Cards", 1)[0]
+    assert "card_btc.md" in index.split("## Local-Only / Quality-Capped Cards", 1)[1].split("## Diagnostic / Source-Noise / Control Cards", 1)[0]
+    assert "card_kcs.md" in index.split("## Diagnostic / Source-Noise / Control Cards", 1)[1].split("## Legacy Cards", 1)[0]
     assert "legacy_old.md" in index.split("## Legacy Cards", 1)[1]
+
+
+def test_research_card_copy_is_verdict_aware_for_market_dislocation():
+    from dataclasses import replace
+    from crypto_rsi_scanner import event_research_cards, event_watchlist
+
+    entry = replace(
+        _test_watchlist_entry(state=event_watchlist.EventWatchlistState.RADAR.value, symbol="M", coin_id="memecore"),
+        relationship_type="impact_hypothesis",
+        latest_score_components={
+            "impact_path_type": "market_dislocation_unknown",
+            "event_archetype": "market_dislocation_unknown",
+            "opportunity_level": "exploratory",
+            "opportunity_score_final": 58,
+            "candidate_role": "direct_subject",
+        },
+    )
+    card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    assert "cause is still unconfirmed" in card.markdown
+    assert "No exploit/catalyst is confirmed" in card.markdown
+    assert "event/catalyst relationship needs manual review" not in card.markdown
+
+    rune = replace(
+        _test_watchlist_entry(state=event_watchlist.EventWatchlistState.RADAR.value, symbol="RUNE", coin_id="thorchain"),
+        relationship_type="impact_hypothesis",
+        latest_score_components={
+            "impact_path_type": "exploit_security_event",
+            "event_archetype": "exploit_security_event",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 72,
+            "candidate_role": "direct_subject",
+        },
+    )
+    rune_card = event_research_cards.render_research_card(rune.key, watchlist_entries=[rune])
+    assert "validated security or exploit catalyst" in rune_card.markdown
+    assert "The exploit/security claim is denied or corrected" in rune_card.markdown
+    assert "Source evidence fails identity/catalyst review" not in rune_card.markdown
 
 
 def test_opportunity_audit_accepts_core_opportunity_id_and_hides_diagnostics_by_default():
