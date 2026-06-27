@@ -482,6 +482,7 @@ def build_daily_brief(
     lines.append("- Causal Mechanism Confirmed: " + _quality_decision_counts(decisions, "causal_mechanism_confirmed"))
     lines.append("- Evidence Specificity Distribution: " + _quality_decision_counts(decisions, "evidence_specificity"))
     lines.append("- Market Confirmation Distribution: " + _quality_decision_counts(decisions, "market_confirmation_level"))
+    lines.append("- Market Context Freshness: " + _quality_decision_counts(decisions, "market_context_freshness_status"))
     lines.append("- Top Upgrade Candidates: " + (_upgrade_candidate_line(decisions) or "none"))
     lines.append("- Top Downgrade Risks: " + (_downgrade_risk_line(decisions) or "none"))
     lines.append("- Candidate Discovery Funnel: " + _candidate_discovery_funnel_line(hypotheses))

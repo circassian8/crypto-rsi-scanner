@@ -122,6 +122,9 @@ def format_opportunity_audit(
         "",
         "## Market confirmation decision",
         f"- market level/score: {components.get('market_confirmation_level') or row.get('market_confirmation_level') or 'unknown'} / {components.get('market_confirmation_score') or row.get('market_confirmation_score') or 'n/a'}",
+        f"- market freshness: {components.get('market_context_freshness_status') or row.get('market_context_freshness_status') or 'unknown'} "
+        f"age={_market_age_value(components, row)} "
+        f"cap_applied={components.get('market_context_freshness_cap_applied') if components.get('market_context_freshness_cap_applied') is not None else row.get('market_context_freshness_cap_applied')}",
         f"- market reasons: {_list_value(components.get('market_confirmation_reasons') or row.get('market_confirmation_reasons'))}",
         f"- market missing: {_list_value(components.get('market_confirmation_missing_fields') or row.get('market_confirmation_missing_fields'))}",
         "",
@@ -584,6 +587,34 @@ def _list_value(value: Any) -> str:
     if isinstance(value, Mapping):
         return ", ".join(f"{key}={child}" for key, child in list(value.items())[:6])
     return "; ".join(str(item) for item in list(value)[:6])
+
+
+def _market_age_value(components: Mapping[str, Any], row: Mapping[str, Any]) -> str:
+    age_hours = _float_value(
+        components.get("market_context_age_hours")
+        if components.get("market_context_age_hours") is not None
+        else row.get("market_context_age_hours")
+    )
+    if age_hours is None:
+        age_seconds = _float_value(
+            components.get("market_context_age_seconds")
+            if components.get("market_context_age_seconds") is not None
+            else row.get("market_context_age_seconds")
+        )
+        if age_seconds is not None:
+            age_hours = age_seconds / 3600.0
+    if age_hours is None:
+        return "n/a"
+    if age_hours < 1:
+        return f"{age_hours * 60:.0f}m"
+    return f"{age_hours:.1f}h"
+
+
+def _float_value(value: object) -> float | None:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
 
 
 def _asset_list(value: Any) -> str:

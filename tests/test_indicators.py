@@ -6800,7 +6800,7 @@ def test_event_graph_accepts_direct_supply_and_derivatives_without_boosting_infr
 
 def test_event_impact_hypotheses_generate_seed_categories_and_queries():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_impact_hypotheses
+    from crypto_rsi_scanner import config, event_impact_hypotheses
     from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 
     now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
@@ -7183,12 +7183,15 @@ def test_event_impact_hypothesis_validation_is_identity_safe():
 
 def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrence():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_impact_hypotheses
+    from crypto_rsi_scanner import config, event_impact_hypotheses
     from crypto_rsi_scanner.event_models import RawDiscoveredEvent
 
     now = datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)
 
     def raw(raw_id, title, body, market=None, provider="fixture_search"):
+        market_payload = dict(market or {}) if market is not None else None
+        if market_payload is not None:
+            market_payload.setdefault("observed_at", now.isoformat())
         return RawDiscoveredEvent(
             raw_id=raw_id,
             provider=provider,
@@ -7197,7 +7200,7 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
             source_url=f"https://example.test/{raw_id}",
             title=title,
             body=body,
-            raw_json={"market": market or {}} if market is not None else {},
+            raw_json={"market": market_payload or {}} if market is not None else {},
             source_confidence=0.9,
             content_hash=raw_id,
         )
@@ -7297,29 +7300,34 @@ def test_event_impact_path_validation_distinguishes_real_impact_from_cooccurrenc
             "local_only",
         ),
     ]
-    for hypothesis, source, reason, stage, path_type, role, strength, expected_level in cases:
-        validated = event_impact_hypotheses.validate_hypotheses_with_raw_events((hypothesis,), (source,))[0]
-        assert validated.status == event_impact_hypotheses.HypothesisStatus.VALIDATED.value
-        assert validated.impact_path_reason == reason
-        assert validated.validation_stage == stage
-        assert validated.impact_path_type == path_type
-        assert validated.candidate_role == role
-        assert validated.impact_path_strength == strength
-        assert validated.opportunity_score_v2 is not None
-        assert "impact_path_strength" in validated.opportunity_score_components
-        assert validated.evidence_quality_score is not None
-        assert validated.source_class
-        assert validated.evidence_specificity
-        assert validated.market_confirmation_level
-        assert validated.opportunity_score_final is not None
-        assert validated.opportunity_level == expected_level
-        assert validated.manual_verification_items
-        if strength == "weak":
-            assert validated.digest_eligible_by_impact_path is False
-            assert validated.why_digest_ineligible
-            assert validated.why_local_only or validated.why_not_watchlist
-        else:
-            assert validated.digest_eligible_by_impact_path is True
+    original_allow_stale_fixture = config.EVENT_MARKET_CONTEXT_ALLOW_STALE_FIXTURE
+    config.EVENT_MARKET_CONTEXT_ALLOW_STALE_FIXTURE = True
+    try:
+        for hypothesis, source, reason, stage, path_type, role, strength, expected_level in cases:
+            validated = event_impact_hypotheses.validate_hypotheses_with_raw_events((hypothesis,), (source,))[0]
+            assert validated.status == event_impact_hypotheses.HypothesisStatus.VALIDATED.value
+            assert validated.impact_path_reason == reason
+            assert validated.validation_stage == stage
+            assert validated.impact_path_type == path_type
+            assert validated.candidate_role == role
+            assert validated.impact_path_strength == strength
+            assert validated.opportunity_score_v2 is not None
+            assert "impact_path_strength" in validated.opportunity_score_components
+            assert validated.evidence_quality_score is not None
+            assert validated.source_class
+            assert validated.evidence_specificity
+            assert validated.market_confirmation_level
+            assert validated.opportunity_score_final is not None
+            assert validated.opportunity_level == expected_level
+            assert validated.manual_verification_items
+            if strength == "weak":
+                assert validated.digest_eligible_by_impact_path is False
+                assert validated.why_digest_ineligible
+                assert validated.why_local_only or validated.why_not_watchlist
+            else:
+                assert validated.digest_eligible_by_impact_path is True
+    finally:
+        config.EVENT_MARKET_CONTEXT_ALLOW_STALE_FIXTURE = original_allow_stale_fixture
 
 
 def test_event_impact_hypothesis_persists_upgrade_and_downgrade_paths():
@@ -7421,6 +7429,10 @@ def test_event_market_evidence_and_opportunity_verdict_quality_layers():
         event_market_confirmation.EventMarketConfirmationInput(
             market_snapshot=raw.raw_json["market"],
             playbook_type="rwa_preipo_proxy",
+            now=now,
+            market_context_observed_at=now,
+            market_context_source="unit_test_live_market",
+            allow_stale_fixture_market_context=False,
         )
     )
     evidence = event_evidence_quality.evaluate_evidence_quality(raw, hypothesis=hypothesis, symbol="VELVET", coin_id="velvet")
@@ -7433,6 +7445,8 @@ def test_event_market_evidence_and_opportunity_verdict_quality_layers():
         score_components=hypothesis.score_components,
     )
     assert market.level == "strong"
+    assert market.market_context_freshness_status == "fresh"
+    assert market.freshness_cap_applied is False
     assert "price_momentum" in market.reasons
     assert "volume_expansion" in market.reasons
     assert evidence.source_class == "cryptopanic_tagged"
@@ -7440,9 +7454,48 @@ def test_event_market_evidence_and_opportunity_verdict_quality_layers():
     assert verdict.opportunity_level in {"watchlist", "high_priority"}
     assert verdict.watchlist_eligible is True
 
+    stale_market = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot=raw.raw_json["market"],
+            playbook_type="rwa_preipo_proxy",
+            now=now,
+            market_context_observed_at="2026-06-24T00:00:00Z",
+            market_context_source="live_market_enrichment",
+            allow_stale_fixture_market_context=False,
+        )
+    )
+    stale_verdict = event_opportunity_verdict.evaluate_opportunity(
+        impact_path=path,
+        market_confirmation=stale_market,
+        evidence_quality=evidence,
+        hypothesis=hypothesis,
+        score_components=hypothesis.score_components,
+    )
+    assert stale_market.market_context_freshness_status == "stale"
+    assert stale_market.level == "weak"
+    assert stale_market.freshness_cap_applied is True
+    assert stale_verdict.watchlist_eligible is False
+    assert "needs_fresh_market_confirmation" in stale_verdict.missing_requirements
+
+    stale_fixture_market = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot=raw.raw_json["market"],
+            playbook_type="rwa_preipo_proxy",
+            now=now,
+            market_context_observed_at="2026-06-24T00:00:00Z",
+            market_context_source="fixture_signal_quality",
+            allow_stale_fixture_market_context=True,
+        )
+    )
+    assert stale_fixture_market.market_context_freshness_status == "fixture_allowed_stale"
+    assert stale_fixture_market.level == "strong"
+    assert stale_fixture_market.freshness_cap_applied is False
+
     weak_market = event_market_confirmation.evaluate_market_confirmation(
         event_market_confirmation.EventMarketConfirmationInput(playbook_type="market_anomaly_unknown")
     )
+    assert weak_market.market_context_freshness_status == "missing"
+    assert "market_context_missing" in weak_market.reasons
     assert weak_market.level == "none"
     assert "insufficient_data" in weak_market.reasons
     low_quality = event_evidence_quality.evaluate_evidence_quality(
@@ -8045,7 +8098,7 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
         provider="rss",
         fetched_at=now,
         published_at=now,
-        source_url="https://example.test/article",
+        source_url="https://news.example/article",
         title="SpaceX pre-IPO exposure",
         body="Short RSS summary.",
         raw_json={},
@@ -8064,7 +8117,7 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
 
     def fetch(url, timeout):
         calls["count"] += 1
-        assert url == "https://example.test/article"
+        assert url == "https://news.example/article"
         assert timeout == 2
         return html
 
@@ -8108,6 +8161,38 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
     )
     assert failed.warning == "source enrichment failed: RuntimeError"
     assert "Short RSS summary" in failed.enriched_text
+
+
+def test_event_source_enrichment_uses_fixture_text_for_example_test_urls():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_source_enrichment
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="fixture_article",
+        provider="fixture_rss",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://example.test/article?fixture=VELVET",
+        title="SpaceX pre-IPO exposure",
+        body="Fixture body mentions Velvet Capital and SpaceX pre-IPO exposure.",
+        raw_json={},
+        source_confidence=0.9,
+        content_hash="fixture_article",
+    )
+
+    result = event_source_enrichment.enrich_source_text(
+        raw,
+        cfg=event_source_enrichment.EventSourceEnrichmentConfig(enabled=True),
+        fetch_fn=lambda *_: (_ for _ in ()).throw(RuntimeError("should not fetch fixture URL")),
+    )
+
+    assert result.status == "fixture_text_used"
+    assert result.fetched is False
+    assert "Velvet Capital" in result.enriched_text
+    annotated = event_source_enrichment.annotate_raw_event_with_enrichment(result)
+    assert annotated.raw_json["source_enrichment"]["status"] == "fixture_text_used"
 
 
 def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
@@ -9071,7 +9156,7 @@ def test_event_alpha_pipeline_source_enrichment_runs_before_llm_extraction():
         provider="rss",
         fetched_at=now,
         published_at=now,
-        source_url="https://example.test/enrich",
+        source_url="https://news.example/enrich",
         title="SpaceX pre-IPO exposure opens",
         body="Short summary without the asset name.",
         raw_json={},
@@ -24205,6 +24290,10 @@ def test_event_alpha_claim_semantics_incidents_roles_and_market_context():
             "evidence_specificity": "direct_token_mechanism",
             "market_confirmation_score": 80,
             "market_confirmation_level": "confirmed",
+            "market_context_freshness_status": "fresh",
+            "market_context_age_hours": 0.2,
+            "market_context_stale": False,
+            "market_context_freshness_cap_applied": False,
             "opportunity_score_final": 75,
             "opportunity_level": "validated_digest",
             "opportunity_verdict_reasons": ["incident_linked"],
@@ -24969,7 +25058,7 @@ def test_event_incident_context_appears_in_daily_brief_and_cards():
     assert "## Impact Hypothesis Context" in card.markdown
     assert "Incident confidence: 91" in card.markdown
     assert "Claim history: exploit:asserted/confirmed" in card.markdown
-    assert "Market context source: candidate_event_market_snapshot (fresh; age=600)" in card.markdown
+    assert "Market context source: candidate_event_market_snapshot (fresh; age=10m; cap_applied=false)" in card.markdown
 
 
 def test_event_watchlist_validated_hypothesis_market_confirmation_promotes_state():

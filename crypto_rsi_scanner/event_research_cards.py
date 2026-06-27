@@ -813,8 +813,13 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     role_confidence = components.get("role_confidence")
     role_evidence = components.get("role_evidence") or []
     market_context_source = components.get("market_context_source") or "unknown"
-    market_context_age = components.get("market_context_age_seconds") or components.get("market_context_age")
-    market_context_quality = components.get("market_context_data_quality") or "unknown"
+    market_context_age = _format_market_context_age(components)
+    market_context_quality = (
+        components.get("market_context_freshness_status")
+        or components.get("market_context_data_quality")
+        or "unknown"
+    )
+    freshness_cap = components.get("market_context_freshness_cap_applied")
     market_reaction_confirmed = components.get("market_reaction_confirmed")
     causal_mechanism_confirmed = components.get("causal_mechanism_confirmed")
     incident_confidence = components.get("incident_confidence")
@@ -888,7 +893,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Source/evidence specificity: {evidence_specificity if evidence_specificity is not None else 'n/a'}",
         f"- Evidence quality: {source_class}/{evidence_specificity_class} / {evidence_quality_score if evidence_quality_score is not None else 'n/a'}",
         f"- Market confirmation: {market_confirmation_level} / {market_confirmation_score if market_confirmation_score is not None else 'n/a'}",
-        f"- Market context source: {market_context_source} ({market_context_quality}; age={market_context_age if market_context_age is not None else 'n/a'})",
+        f"- Market context source: {market_context_source} ({market_context_quality}; age={market_context_age}; cap_applied={str(bool(freshness_cap)).lower()})",
         f"- Market reaction confirmed: {str(bool(market_reaction_confirmed)).lower() if market_reaction_confirmed is not None else 'unknown'}",
         f"- Causal mechanism confirmed: {str(bool(causal_mechanism_confirmed)).lower() if causal_mechanism_confirmed is not None else 'unknown'}",
         f"- Market summary: {market_confirmation_summary}",
@@ -933,6 +938,26 @@ def _impact_hypothesis_wrong_line(components: Mapping[str, Any]) -> str:
     if impact_path == "market_dislocation_unknown" or frame == "market_dislocation_unknown":
         return "cause remains unknown, no exploit/catalyst is confirmed, or the move mean-reverts without independent evidence."
     return "validation may be source-thin, asset link may be narrative-only, and the catalyst impact may not move this token."
+
+
+def _format_market_context_age(components: Mapping[str, Any]) -> str:
+    age_hours = _float_value(components.get("market_context_age_hours"))
+    if age_hours is None:
+        age_seconds = _float_value(components.get("market_context_age_seconds") or components.get("market_context_age"))
+        if age_seconds is not None:
+            age_hours = age_seconds / 3600.0
+    if age_hours is None:
+        return "n/a"
+    if age_hours < 1:
+        return f"{age_hours * 60:.0f}m"
+    return f"{age_hours:.1f}h"
+
+
+def _float_value(value: object) -> float | None:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
 
 
 def _quality_gate_lines(

@@ -898,6 +898,132 @@
         "diagnostic_hidden_by_default": false,
         "triggered_fade": false
       }
+    },
+    {
+      "case_id": "velvet_fresh_market_context_high_priority",
+      "title": "VELVET fresh market context can be high priority",
+      "impact_category": "rwa_preipo_proxy",
+      "external_asset": "SpaceX",
+      "candidate_symbol": "VELVET",
+      "candidate_coin_id": "velvet",
+      "now": "2026-06-15T16:00:00Z",
+      "market_context_observed_at": "2026-06-15T15:30:00Z",
+      "market_context_source": "live_market_enrichment",
+      "allow_stale_fixture_market_context": false,
+      "raw_event": {
+        "raw_id": "sq_velvet_fresh_market",
+        "provider": "fixture_project_blog",
+        "source_url": "https://velvet.example/blog/spacex-fresh",
+        "title": "Velvet lets users trade SpaceX pre-IPO exposure",
+        "body": "Velvet users can trade tokenized stock-style SpaceX pre-IPO exposure through its crypto venue before the IPO window.",
+        "source_confidence": 0.94
+      },
+      "market_snapshot": {"return_24h": 38, "return_72h": 94, "volume_zscore_24h": 4.2, "volume_to_market_cap": 0.36},
+      "score_components": {"event_clarity": 82, "event_time_quality": 70},
+      "expected": {
+        "market_context_freshness_status": "fresh",
+        "freshness_cap_applied": false,
+        "market_confirmation_level": ["moderate", "strong"],
+        "opportunity_level": "high_priority",
+        "route_tier": "HIGH_PRIORITY",
+        "high_priority_eligible": true,
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "velvet_stale_fixture_market_context_allowed",
+      "title": "VELVET stale fixture market context remains allowed but labeled",
+      "impact_category": "rwa_preipo_proxy",
+      "external_asset": "SpaceX",
+      "candidate_symbol": "VELVET",
+      "candidate_coin_id": "velvet",
+      "now": "2026-06-15T16:00:00Z",
+      "market_context_observed_at": "2026-06-14T00:00:00Z",
+      "market_context_source": "fixture_signal_quality",
+      "allow_stale_fixture_market_context": true,
+      "raw_event": {
+        "raw_id": "sq_velvet_stale_fixture_market",
+        "provider": "fixture_project_blog",
+        "source_url": "https://velvet.example/blog/spacex-stale-fixture",
+        "title": "Velvet lets users trade SpaceX pre-IPO exposure",
+        "body": "Velvet users can trade tokenized stock-style SpaceX pre-IPO exposure through its crypto venue before the IPO window.",
+        "source_confidence": 0.94
+      },
+      "market_snapshot": {"return_24h": 38, "return_72h": 94, "volume_zscore_24h": 4.2, "volume_to_market_cap": 0.36},
+      "score_components": {"event_clarity": 82, "event_time_quality": 70},
+      "expected": {
+        "market_context_freshness_status": "fixture_allowed_stale",
+        "freshness_cap_applied": false,
+        "market_confirmation_level": ["moderate", "strong"],
+        "opportunity_level": "high_priority",
+        "route_tier": "HIGH_PRIORITY",
+        "reason_codes": "contains:fixture_market_context_allowed",
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "velvet_stale_live_market_context_capped",
+      "title": "VELVET stale live market context cannot be high priority",
+      "impact_category": "rwa_preipo_proxy",
+      "external_asset": "SpaceX",
+      "candidate_symbol": "VELVET",
+      "candidate_coin_id": "velvet",
+      "now": "2026-06-15T16:00:00Z",
+      "market_context_observed_at": "2026-06-14T00:00:00Z",
+      "market_context_source": "live_market_enrichment",
+      "allow_stale_fixture_market_context": false,
+      "raw_event": {
+        "raw_id": "sq_velvet_stale_live_market",
+        "provider": "fixture_project_blog",
+        "source_url": "https://velvet.example/blog/spacex-stale-live",
+        "title": "Velvet lets users trade SpaceX pre-IPO exposure",
+        "body": "Velvet users can trade tokenized stock-style SpaceX pre-IPO exposure through its crypto venue before the IPO window.",
+        "source_confidence": 0.94
+      },
+      "market_snapshot": {"return_24h": 38, "return_72h": 94, "volume_zscore_24h": 4.2, "volume_to_market_cap": 0.36},
+      "score_components": {"event_clarity": 82, "event_time_quality": 70},
+      "expected": {
+        "market_context_freshness_status": "stale",
+        "freshness_cap_applied": true,
+        "market_confirmation_level": "weak",
+        "opportunity_level": ["validated_digest", "exploratory", "local_only"],
+        "route_tier": ["RADAR_DIGEST", "STORE_ONLY"],
+        "watchlist_eligible": false,
+        "high_priority_eligible": false,
+        "reason_codes": "contains:market_context_stale_capped",
+        "triggered_fade": false
+      }
+    },
+    {
+      "case_id": "velvet_missing_market_timestamp_capped",
+      "title": "VELVET missing market timestamp needs fresh market confirmation",
+      "impact_category": "rwa_preipo_proxy",
+      "external_asset": "SpaceX",
+      "candidate_symbol": "VELVET",
+      "candidate_coin_id": "velvet",
+      "now": "2026-06-15T16:00:00Z",
+      "market_context_observed_at": null,
+      "market_context_source": "live_market_enrichment",
+      "allow_stale_fixture_market_context": false,
+      "raw_event": {
+        "raw_id": "sq_velvet_missing_market_timestamp",
+        "provider": "fixture_project_blog",
+        "source_url": "https://velvet.example/blog/spacex-missing-ts",
+        "title": "Velvet lets users trade SpaceX pre-IPO exposure",
+        "body": "Velvet users can trade tokenized stock-style SpaceX pre-IPO exposure through its crypto venue before the IPO window.",
+        "source_confidence": 0.94
+      },
+      "market_snapshot": {"return_24h": 38, "return_72h": 94, "volume_zscore_24h": 4.2, "volume_to_market_cap": 0.36},
+      "score_components": {"event_clarity": 82, "event_time_quality": 70},
+      "expected": {
+        "market_context_freshness_status": "unknown",
+        "freshness_cap_applied": true,
+        "market_confirmation_level": "weak",
+        "watchlist_eligible": false,
+        "high_priority_eligible": false,
+        "reason_codes": "contains:market_context_unknown_timestamp",
+        "triggered_fade": false
+      }
     }
   ]
 }

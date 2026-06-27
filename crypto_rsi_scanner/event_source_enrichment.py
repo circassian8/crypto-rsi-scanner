@@ -11,6 +11,7 @@ from dataclasses import replace
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable, Iterable
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from . import config
@@ -39,6 +40,7 @@ class EventSourceEnrichmentResult:
     used_cache: bool = False
     fetched: bool = False
     warning: str | None = None
+    status: str | None = None
 
 
 def should_enrich_source(raw_event: RawDiscoveredEvent, *, min_source_confidence: float = 0.55) -> bool:
@@ -82,6 +84,13 @@ def enrich_source_text(
         return EventSourceEnrichmentResult(raw_event=raw_event, enriched_text=original, warning="source not selected for enrichment")
     if not raw_event.source_url:
         return EventSourceEnrichmentResult(raw_event=raw_event, enriched_text=original, warning="missing source URL")
+    if _fixture_source_url(raw_event.source_url):
+        return EventSourceEnrichmentResult(
+            raw_event=raw_event,
+            enriched_text=original,
+            warning=None,
+            status="fixture_text_used",
+        )
 
     cache_path = _cache_path(cfg.cache_dir, raw_event.source_url)
     if cache_path and cache_path.exists():
@@ -93,6 +102,7 @@ def enrich_source_text(
                     raw_event=raw_event,
                     enriched_text=text[: max(1, int(cfg.max_chars or 1))],
                     used_cache=True,
+                    status="cache_hit",
                 )
         except Exception:  # noqa: BLE001 - broken cache should fail soft and refetch.
             pass
@@ -118,12 +128,13 @@ def enrich_source_text(
                 ),
                 encoding="utf-8",
             )
-        return EventSourceEnrichmentResult(raw_event=raw_event, enriched_text=enriched, fetched=True)
+        return EventSourceEnrichmentResult(raw_event=raw_event, enriched_text=enriched, fetched=True, status="fetched")
     except Exception as exc:  # noqa: BLE001 - live source fetch must never crash a research cycle.
         return EventSourceEnrichmentResult(
             raw_event=raw_event,
             enriched_text=original,
             warning=f"source enrichment failed: {type(exc).__name__}",
+            status="fetch_failed",
         )
 
 
@@ -136,6 +147,7 @@ def annotate_raw_event_with_enrichment(result: EventSourceEnrichmentResult) -> R
         "used_cache": result.used_cache,
         "fetched": result.fetched,
         "warning": result.warning,
+        "status": result.status,
         "research_only": True,
     }
     return replace(result.raw_event, raw_json=payload)
@@ -159,6 +171,21 @@ def _fetch(url: str, timeout: float, fetch_fn: FetchFn | None) -> str | bytes:
     request = Request(url, headers={"User-Agent": "crypto-rsi-scanner-event-alpha/1.0"})
     with urlopen(request, timeout=timeout) as response:  # noqa: S310 - explicit opt-in research fetch.
         return response.read()
+
+
+def _fixture_source_url(url: str) -> bool:
+    try:
+        parsed = urlparse(str(url or ""))
+    except Exception:  # noqa: BLE001 - malformed fixture URLs should fail soft.
+        return False
+    host = (parsed.hostname or "").casefold()
+    path = (parsed.path or "").casefold()
+    return (
+        host in {"example.test", "fixture.test", "test.local"}
+        or host.endswith(".example.test")
+        or host.endswith(".fixture.test")
+        or "/fixtures/" in path
+    )
 
 
 def _summary_text(raw_event: RawDiscoveredEvent) -> str:

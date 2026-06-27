@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Stale market context cannot promote Event Alpha candidates
+**Status:** accepted
+**Decision:** Event Alpha market confirmation must carry source, observed-at
+timestamp, age, and freshness status through hypotheses, watchlist rows, alert
+snapshots, cards, audits, daily briefs, and signal-quality eval output. Live or
+notify-style profiles treat stale, missing, or unknown-timestamp market context
+as capped evidence: it may support local review, radar, or validated digest
+context when other evidence is strong, but it must not by itself promote a
+candidate to `WATCHLIST` or `HIGH_PRIORITY`. Fixture/e2e profiles may opt in to
+stale fixture market context only when it is explicitly configured and clearly
+labeled `fixture_allowed_stale`. Source enrichment must also treat fixture or
+example URLs as local fixture text and must not fetch those URLs over the
+network.
+**Why:** Event Alpha's operator view depends on market confirmation being
+current enough to justify escalation. Reusing old market snapshots or fetching
+fixture URLs made offline artifacts look more live than they were and could
+overstate stale evidence in Pro-model review packages.
+**Revisit when:** Market enrichment stores point-in-time snapshots in a typed
+database with enforced source timestamps and provider freshness SLAs.
+
 ## 2026-06-27 - Event Alpha default operator views are core-first
 **Status:** accepted
 **Decision:** Daily briefs, notification inboxes, research-card indexes, and

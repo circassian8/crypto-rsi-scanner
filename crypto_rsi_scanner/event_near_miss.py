@@ -227,7 +227,7 @@ def format_near_miss_report(
             f"source={item.market_context_source or 'none'} "
             f"score={item.market_confirmation_before if item.market_confirmation_before is not None else 'n/a'}"
             f"->{item.market_confirmation_after if item.market_confirmation_after is not None else 'n/a'} "
-            f"age={item.market_context_age_seconds if item.market_context_age_seconds is not None else 'n/a'} "
+            f"age={_format_age(item.market_context_age_seconds)} "
             f"quality={item.market_context_data_quality or 'unknown'}"
         )
         if item.derivatives_refresh_attempted or item.supply_refresh_attempted:
@@ -805,6 +805,16 @@ def _float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _format_age(age_seconds: Any) -> str:
+    value = _float(age_seconds)
+    if value is None:
+        return "n/a"
+    age_hours = value / 3600.0
+    if age_hours < 1:
+        return f"{age_hours * 60:.0f}m"
+    return f"{age_hours:.1f}h"
 
 
 def _age_seconds(timestamp: Any, now: datetime) -> float | None:

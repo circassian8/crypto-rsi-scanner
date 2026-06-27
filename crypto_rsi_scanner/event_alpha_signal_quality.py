@@ -101,6 +101,16 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
             sector_benchmark=_mapping(case.get("sector_benchmark")),
             playbook_type=str(case.get("playbook_hint") or case.get("impact_category") or ""),
             impact_category=str(case.get("impact_category") or ""),
+            now=case.get("now") or "2026-06-15T16:00:00Z",
+            market_context_observed_at=(
+                case.get("market_context_observed_at")
+                if "market_context_observed_at" in case
+                else raw.fetched_at.isoformat()
+            ),
+            market_context_source=str(case.get("market_context_source") or "fixture_signal_quality"),
+            market_context_max_age_hours=float(case.get("market_context_max_age_hours") or 6.0),
+            allow_stale_fixture_market_context=bool(case.get("allow_stale_fixture_market_context", True)),
+            stale_cap_level=str(case.get("stale_cap_level") or "weak"),
         )
     )
     evidence = event_evidence_quality.evaluate_evidence_quality(
@@ -209,6 +219,9 @@ def evaluate_signal_quality_case(case: Mapping[str, Any]) -> SignalQualityCaseRe
         ),
         "evidence_specificity": evidence.evidence_specificity,
         "market_confirmation_level": market.level,
+        "market_context_freshness_status": market.market_context_freshness_status,
+        "market_context_age_hours": market.market_context_age_hours,
+        "freshness_cap_applied": market.freshness_cap_applied,
         "opportunity_level": opportunity_level,
         "route_tier": route_tier,
         "digest_eligible": digest,
@@ -295,6 +308,9 @@ def format_signal_quality_eval(result: SignalQualityEvalResult) -> str:
                 "  actual: "
                 f"path={case.actual.get('impact_path_type')} role={case.actual.get('candidate_role')} "
                 f"market={case.actual.get('market_confirmation_level')} "
+                f"freshness={case.actual.get('market_context_freshness_status')} "
+                f"age_h={case.actual.get('market_context_age_hours')} "
+                f"cap={case.actual.get('freshness_cap_applied')} "
                 f"level={case.actual.get('opportunity_level')} route={case.actual.get('route_tier')} "
                 f"core={case.actual.get('core_opportunity_id') or 'none'} "
                 f"aggregation={case.actual.get('aggregation_status')} "
@@ -423,6 +439,9 @@ def _diff_expected(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> tu
         "candidate_role": "candidate_role",
         "evidence_specificity": "evidence_quality",
         "market_confirmation_level": "market_confirmation",
+        "market_context_freshness_status": "market_freshness",
+        "market_context_age_hours": "market_freshness",
+        "freshness_cap_applied": "market_freshness",
         "opportunity_level": "opportunity_verdict",
         "route_tier": "routing",
         "digest_eligible": "routing",

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import (
+    config,
     event_catalyst_frames,
     event_claim_semantics,
     event_evidence_quality,
@@ -155,7 +156,12 @@ class EventImpactHypothesis:
     market_confirmation_summary: str | None = None
     market_context_source: str | None = None
     market_context_timestamp: str | None = None
+    market_context_observed_at: str | None = None
     market_context_age_seconds: float | None = None
+    market_context_age_hours: float | None = None
+    market_context_stale: bool | None = None
+    market_context_freshness_status: str | None = None
+    market_context_freshness_cap_applied: bool | None = None
     market_context_data_quality: str | None = None
     market_context_snapshot: Mapping[str, Any] = field(default_factory=dict)
     market_reaction_confirmed: bool | None = None
@@ -2673,6 +2679,8 @@ def _quality_verdict_replace_kwargs(
             sector_benchmark=_payload_mapping(payload, "sector_benchmark"),
             playbook_type=hypothesis.playbook_hint or hypothesis.impact_category,
             impact_category=hypothesis.impact_category,
+            market_context_observed_at=market_context.get("timestamp"),
+            market_context_source=market_context.get("source"),
         )
     )
     evidence_result = event_evidence_quality.evaluate_evidence_quality(
@@ -2740,7 +2748,12 @@ def _quality_verdict_replace_kwargs(
         "market_confirmation_summary": market_result.confirmation_summary,
         "market_context_source": market_context.get("source"),
         "market_context_timestamp": market_context.get("timestamp"),
+        "market_context_observed_at": market_result.market_context_observed_at or market_context.get("timestamp"),
         "market_context_age_seconds": market_context.get("age_seconds"),
+        "market_context_age_hours": market_result.market_context_age_hours,
+        "market_context_stale": market_result.market_context_stale,
+        "market_context_freshness_status": market_result.market_context_freshness_status,
+        "market_context_freshness_cap_applied": market_result.freshness_cap_applied,
         "market_context_data_quality": market_context.get("data_quality"),
         "market_context_snapshot": dict(market_context.get("market_snapshot") or {}),
         "incident_market_reaction_observed": (
@@ -2820,6 +2833,9 @@ def resolve_hypothesis_market_context(
         "source": "missing",
         "timestamp": None,
         "age_seconds": None,
+        "age_hours": None,
+        "freshness_status": "missing",
+        "stale": False,
         "data_quality": "missing",
         "missing_fields": ("market_snapshot", "current_cycle_market_row", "targeted_market_lookup"),
     }
@@ -2832,23 +2848,47 @@ def _market_snapshot_from_raw(raw: RawDiscoveredEvent) -> dict[str, Any]:
     snapshot = dict(market)
     for key, value in anomaly.items():
         snapshot.setdefault(key, value)
+    if snapshot:
+        snapshot.setdefault("market_context_source", f"{raw.provider or 'raw'}_market_snapshot")
+        if not any(
+            key in snapshot
+            for key in (
+                "market_context_observed_at",
+                "market_context_timestamp",
+                "timestamp",
+                "market_timestamp",
+                "observed_at",
+                "fetched_at",
+            )
+        ):
+            snapshot["observed_at"] = raw.fetched_at.isoformat() if raw.fetched_at else None
     return {key: value for key, value in snapshot.items() if value not in (None, "", [], {})}
 
 
 def _market_context_row(snapshot: Mapping[str, Any], *, source: str, now: datetime) -> dict[str, Any]:
     timestamp = (
-        snapshot.get("timestamp")
+        snapshot.get("market_context_observed_at")
+        or snapshot.get("market_context_timestamp")
+        or snapshot.get("timestamp")
         or snapshot.get("market_timestamp")
         or snapshot.get("observed_at")
         or snapshot.get("fetched_at")
     )
     age = _age_seconds(timestamp, now)
-    quality = "fresh" if age is None or age <= 6 * 3600 else "stale"
+    if age is None:
+        quality = "unknown"
+    elif age <= config.EVENT_MARKET_CONTEXT_MAX_AGE_HOURS * 3600:
+        quality = "fresh"
+    else:
+        quality = "stale"
     return {
         "market_snapshot": dict(snapshot),
         "source": source,
         "timestamp": str(timestamp) if timestamp not in (None, "") else None,
         "age_seconds": age,
+        "age_hours": None if age is None else round(age / 3600.0, 4),
+        "freshness_status": quality,
+        "stale": quality == "stale",
         "data_quality": quality,
         "missing_fields": tuple(_market_missing_fields(snapshot)),
     }
@@ -2929,7 +2969,12 @@ def _quality_score_components(values: Mapping[str, Any]) -> dict[str, Any]:
         "market_confirmation_level": "market_confirmation_level",
         "market_context_source": "market_context_source",
         "market_context_timestamp": "market_context_timestamp",
+        "market_context_observed_at": "market_context_observed_at",
         "market_context_age_seconds": "market_context_age_seconds",
+        "market_context_age_hours": "market_context_age_hours",
+        "market_context_stale": "market_context_stale",
+        "market_context_freshness_status": "market_context_freshness_status",
+        "market_context_freshness_cap_applied": "market_context_freshness_cap_applied",
         "market_context_data_quality": "market_context_data_quality",
         "incident_market_reaction_observed": "incident_market_reaction_observed",
         "market_reaction_confirmed": "market_reaction_confirmed",

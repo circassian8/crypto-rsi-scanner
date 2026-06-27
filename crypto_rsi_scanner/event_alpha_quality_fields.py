@@ -14,6 +14,10 @@ REQUIRED_QUALITY_FIELDS: tuple[str, ...] = (
     "evidence_specificity",
     "market_confirmation_score",
     "market_confirmation_level",
+    "market_context_freshness_status",
+    "market_context_age_hours",
+    "market_context_stale",
+    "market_context_freshness_cap_applied",
     "opportunity_score_final",
     "opportunity_level",
     "opportunity_verdict_reasons",
@@ -37,6 +41,11 @@ _LIST_DEFAULTS = {
     "downgrade_warnings",
 }
 
+_BOOL_DEFAULTS = {
+    "market_context_stale",
+    "market_context_freshness_cap_applied",
+}
+
 _CONSERVATIVE_STRING_DEFAULTS = {
     "impact_path_type": "insufficient_data",
     "impact_path_strength": "none",
@@ -44,6 +53,7 @@ _CONSERVATIVE_STRING_DEFAULTS = {
     "source_class": "insufficient_data",
     "evidence_specificity": "insufficient_data",
     "market_confirmation_level": "insufficient_data",
+    "market_context_freshness_status": "missing",
     "opportunity_level": "local_only",
 }
 
@@ -65,6 +75,8 @@ def quality_field_defaults() -> dict[str, Any]:
             defaults[key] = 0.0
         elif key in _LIST_DEFAULTS:
             defaults[key] = list(_CONSERVATIVE_LIST_DEFAULTS[key])
+        elif key in _BOOL_DEFAULTS:
+            defaults[key] = False
         elif key in {"why_local_only", "why_not_watchlist"}:
             defaults[key] = "quality_context_missing"
         elif key in _CONSERVATIVE_STRING_DEFAULTS:

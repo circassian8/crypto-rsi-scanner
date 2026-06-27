@@ -8,9 +8,11 @@ watchlist states, alerts, paper rows, live signal rows, or event-fade triggers.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Mapping
+
+from . import config
 
 
 class MarketConfirmationLevel(str, Enum):
@@ -33,6 +35,11 @@ class MarketConfirmationReason(str, Enum):
     SUPPLY_PRESSURE = "supply_pressure"
     NO_MARKET_REACTION = "no_market_reaction"
     INSUFFICIENT_DATA = "insufficient_data"
+    MARKET_CONTEXT_FRESH = "market_context_fresh"
+    MARKET_CONTEXT_STALE_CAPPED = "market_context_stale_capped"
+    FIXTURE_MARKET_CONTEXT_ALLOWED = "fixture_market_context_allowed"
+    MARKET_CONTEXT_MISSING = "market_context_missing"
+    MARKET_CONTEXT_UNKNOWN_TIMESTAMP = "market_context_unknown_timestamp"
 
 
 @dataclass(frozen=True)
@@ -47,6 +54,12 @@ class EventMarketConfirmationInput:
     event_time: datetime | str | None = None
     playbook_type: str | None = None
     impact_category: str | None = None
+    now: datetime | str | None = None
+    market_context_observed_at: datetime | str | None = None
+    market_context_source: str | None = None
+    market_context_max_age_hours: float | None = None
+    allow_stale_fixture_market_context: bool | None = None
+    stale_cap_level: str | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +72,13 @@ class EventMarketConfirmationResult:
     missing_fields: tuple[str, ...] = ()
     confirmation_summary: str = ""
     score_components: Mapping[str, float] = field(default_factory=dict)
+    market_context_observed_at: str | None = None
+    market_context_age_seconds: float | None = None
+    market_context_age_hours: float | None = None
+    market_context_stale: bool = False
+    market_context_freshness_status: str = ""
+    market_context_source: str | None = None
+    freshness_cap_applied: bool = False
 
 
 def evaluate_market_confirmation(
@@ -71,12 +91,24 @@ def evaluate_market_confirmation(
         data = EventMarketConfirmationInput(
             market_snapshot=_mapping(data.get("market") or data.get("market_snapshot") or data),
             market_anomaly_row=_mapping(data.get("anomaly") or data.get("market_anomaly")),
+            watchlist_market_row=_mapping(data.get("watchlist_market") or data.get("watchlist_market_row")),
             derivatives_snapshot=_mapping(data.get("derivatives")),
             supply_snapshot=_mapping(data.get("supply")),
             btc_context=_mapping(data.get("btc_context")),
             sector_benchmark=_mapping(data.get("sector_benchmark")),
             playbook_type=str(data.get("playbook_type") or data.get("playbook") or ""),
             impact_category=str(data.get("impact_category") or ""),
+            now=data.get("now"),
+            market_context_observed_at=data.get("market_context_observed_at") or data.get("market_context_timestamp"),
+            market_context_source=str(data.get("market_context_source") or "") or None,
+            market_context_max_age_hours=_float(data.get("market_context_max_age_hours"))
+            or config.EVENT_MARKET_CONTEXT_MAX_AGE_HOURS,
+            allow_stale_fixture_market_context=bool(
+                data.get("allow_stale_fixture_market_context")
+                if data.get("allow_stale_fixture_market_context") is not None
+                else config.EVENT_MARKET_CONTEXT_ALLOW_STALE_FIXTURE
+            ),
+            stale_cap_level=str(data.get("stale_cap_level") or "") or None,
         )
 
     market = _merge_mappings(data.market_snapshot, data.market_anomaly_row, data.watchlist_market_row)
@@ -85,6 +117,7 @@ def evaluate_market_confirmation(
     btc = _mapping(data.btc_context)
     sector = _mapping(data.sector_benchmark)
     playbook = str(data.playbook_type or data.impact_category or "").casefold()
+    freshness = _market_context_freshness(data, market)
 
     components: dict[str, float] = {}
     reasons: list[str] = []
@@ -216,16 +249,42 @@ def evaluate_market_confirmation(
 
     score = max(0.0, min(100.0, raw_score))
     if observed_fields == 0:
-        return _insufficient(tuple(dict.fromkeys(missing or ("market_snapshot", "derivatives_snapshot"))))
+        return _insufficient_with_freshness(
+            tuple(dict.fromkeys(missing or ("market_snapshot", "derivatives_snapshot"))),
+            freshness,
+        )
     if not reasons:
         reasons.append(MarketConfirmationReason.NO_MARKET_REACTION.value)
     data_quality = min(100.0, observed_fields * 16.0)
     if score > 50 and data_quality < 35:
         score = min(score, 50.0)
         warnings.append("market_confirmation_capped_by_sparse_data")
+    if freshness["status"] == "fresh":
+        reasons.append(MarketConfirmationReason.MARKET_CONTEXT_FRESH.value)
+    elif freshness["status"] == "fixture_allowed_stale":
+        reasons.append(MarketConfirmationReason.FIXTURE_MARKET_CONTEXT_ALLOWED.value)
+        warnings.append("fixture_market_context_allowed_stale")
+    elif freshness["status"] == "stale":
+        score = min(score, _cap_score_for_level(data.stale_cap_level or config.EVENT_MARKET_CONTEXT_STALE_CAP_LEVEL))
+        reasons.append(MarketConfirmationReason.MARKET_CONTEXT_STALE_CAPPED.value)
+        warnings.append("market_context_stale_capped")
+        if "needs_fresh_market_confirmation" not in missing:
+            missing.append("needs_fresh_market_confirmation")
+    elif freshness["status"] == "missing":
+        score = min(score, _cap_score_for_level("none"))
+        reasons.append(MarketConfirmationReason.MARKET_CONTEXT_MISSING.value)
+        warnings.append("market_context_missing")
+        missing.append("market_context_missing")
+        missing.append("needs_fresh_market_confirmation")
+    elif freshness["status"] == "unknown":
+        score = min(score, _cap_score_for_level(data.stale_cap_level or config.EVENT_MARKET_CONTEXT_STALE_CAP_LEVEL))
+        reasons.append(MarketConfirmationReason.MARKET_CONTEXT_UNKNOWN_TIMESTAMP.value)
+        warnings.append("market_context_unknown_timestamp")
+        missing.append("market_context_unknown_timestamp")
+        missing.append("needs_fresh_market_confirmation")
     level = _level(score)
     summary = _summary(level, score, reasons)
-    return EventMarketConfirmationResult(
+    return _with_freshness(EventMarketConfirmationResult(
         market_confirmation_score=round(score, 2),
         level=level,
         reasons=tuple(dict.fromkeys(reasons)),
@@ -234,7 +293,8 @@ def evaluate_market_confirmation(
         missing_fields=tuple(dict.fromkeys(missing)),
         confirmation_summary=summary,
         score_components={key: round(value, 2) for key, value in components.items()},
-    )
+        freshness_cap_applied=freshness["status"] in {"stale", "missing", "unknown"},
+    ), freshness)
 
 
 def _insufficient(missing: tuple[str, ...]) -> EventMarketConfirmationResult:
@@ -246,6 +306,70 @@ def _insufficient(missing: tuple[str, ...]) -> EventMarketConfirmationResult:
         data_quality=0.0,
         missing_fields=missing,
         confirmation_summary="insufficient market data",
+    )
+
+
+def _insufficient_with_freshness(missing: tuple[str, ...], freshness: Mapping[str, Any]) -> EventMarketConfirmationResult:
+    result = _insufficient(missing)
+    reasons = list(result.reasons)
+    warnings = list(result.warnings)
+    missing_fields = list(result.missing_fields)
+    status = str(freshness.get("status") or "unknown")
+    if status == "fresh":
+        reasons.append(MarketConfirmationReason.MARKET_CONTEXT_FRESH.value)
+    elif status == "fixture_allowed_stale":
+        reasons.append(MarketConfirmationReason.FIXTURE_MARKET_CONTEXT_ALLOWED.value)
+        warnings.append("fixture_market_context_allowed_stale")
+    elif status == "stale":
+        reasons.append(MarketConfirmationReason.MARKET_CONTEXT_STALE_CAPPED.value)
+        warnings.append("market_context_stale_capped")
+        missing_fields.append("needs_fresh_market_confirmation")
+    elif status == "missing":
+        reasons.append(MarketConfirmationReason.MARKET_CONTEXT_MISSING.value)
+        warnings.append("market_context_missing")
+        missing_fields.append("market_context_missing")
+        missing_fields.append("needs_fresh_market_confirmation")
+    else:
+        reasons.append(MarketConfirmationReason.MARKET_CONTEXT_UNKNOWN_TIMESTAMP.value)
+        warnings.append("market_context_unknown_timestamp")
+        missing_fields.append("market_context_unknown_timestamp")
+        missing_fields.append("needs_fresh_market_confirmation")
+    return _with_freshness(
+        EventMarketConfirmationResult(
+            market_confirmation_score=result.market_confirmation_score,
+            level=result.level,
+            reasons=tuple(dict.fromkeys(reasons)),
+            warnings=tuple(dict.fromkeys(warnings)),
+            data_quality=result.data_quality,
+            missing_fields=tuple(dict.fromkeys(missing_fields)),
+            confirmation_summary=result.confirmation_summary,
+            score_components=result.score_components,
+            freshness_cap_applied=status in {"stale", "missing", "unknown"},
+        ),
+        freshness,
+    )
+
+
+def _with_freshness(
+    result: EventMarketConfirmationResult,
+    freshness: Mapping[str, Any],
+) -> EventMarketConfirmationResult:
+    return EventMarketConfirmationResult(
+        market_confirmation_score=result.market_confirmation_score,
+        level=result.level,
+        reasons=result.reasons,
+        warnings=result.warnings,
+        data_quality=result.data_quality,
+        missing_fields=result.missing_fields,
+        confirmation_summary=result.confirmation_summary,
+        score_components=result.score_components,
+        market_context_observed_at=freshness.get("observed_at"),
+        market_context_age_seconds=_round_optional(freshness.get("age_seconds")),
+        market_context_age_hours=_round_optional(freshness.get("age_hours")),
+        market_context_stale=bool(freshness.get("stale")),
+        market_context_freshness_status=str(freshness.get("status") or "unknown"),
+        market_context_source=str(freshness.get("source") or "") or None,
+        freshness_cap_applied=bool(result.freshness_cap_applied or freshness.get("cap_applied")),
     )
 
 
@@ -262,6 +386,129 @@ def _level(score: float) -> str:
 def _summary(level: str, score: float, reasons: list[str]) -> str:
     label = ", ".join(reason.replace("_", " ") for reason in reasons[:3]) or "no market reaction"
     return f"{level} market confirmation ({score:.0f}/100): {label}"
+
+
+def _market_context_freshness(data: EventMarketConfirmationInput, market: Mapping[str, Any]) -> dict[str, Any]:
+    source = str(
+        data.market_context_source
+        or _first(market, "market_context_source", "watchlist_market_source", "source", "provider")
+        or ""
+    ).strip()
+    observed_raw = (
+        data.market_context_observed_at
+        or _first(
+            market,
+            "market_context_observed_at",
+            "market_context_timestamp",
+            "timestamp",
+            "market_timestamp",
+            "observed_at",
+            "fetched_at",
+            "updated_at",
+        )
+    )
+    now = _parse_datetime(data.now) or datetime.now(timezone.utc)
+    now = _as_utc(now)
+    if not market:
+        return {
+            "status": "missing",
+            "source": source or "missing",
+            "observed_at": None,
+            "age_seconds": None,
+            "age_hours": None,
+            "stale": False,
+            "cap_applied": True,
+        }
+    observed = _parse_datetime(observed_raw)
+    if observed is None:
+        return {
+            "status": "unknown",
+            "source": source or "unknown",
+            "observed_at": None,
+            "age_seconds": None,
+            "age_hours": None,
+            "stale": False,
+            "cap_applied": True,
+        }
+    observed = _as_utc(observed)
+    age_seconds = max(0.0, (now - observed).total_seconds())
+    max_age_hours = (
+        data.market_context_max_age_hours
+        if data.market_context_max_age_hours is not None
+        else config.EVENT_MARKET_CONTEXT_MAX_AGE_HOURS
+    )
+    max_age = max(0.0, float(max_age_hours or 0.0)) * 3600.0
+    stale = max_age > 0 and age_seconds > max_age
+    fixture_like = _fixture_like_source(source, market)
+    allow_stale_fixture = (
+        data.allow_stale_fixture_market_context
+        if data.allow_stale_fixture_market_context is not None
+        else config.EVENT_MARKET_CONTEXT_ALLOW_STALE_FIXTURE
+    )
+    if stale and fixture_like and allow_stale_fixture:
+        status = "fixture_allowed_stale"
+    elif stale:
+        status = "stale"
+    else:
+        status = "fresh"
+    return {
+        "status": status,
+        "source": source or ("fixture" if fixture_like else "market_context"),
+        "observed_at": observed.isoformat(),
+        "age_seconds": age_seconds,
+        "age_hours": age_seconds / 3600.0,
+        "stale": stale,
+        "cap_applied": status in {"stale", "missing", "unknown"},
+    }
+
+
+def _cap_score_for_level(level: str) -> float:
+    normalized = str(level or "").strip().casefold()
+    if normalized == MarketConfirmationLevel.NONE.value:
+        return 24.0
+    if normalized == MarketConfirmationLevel.MODERATE.value:
+        return 74.0
+    if normalized == MarketConfirmationLevel.STRONG.value:
+        return 100.0
+    return 49.0
+
+
+def _fixture_like_source(source: str, market: Mapping[str, Any]) -> bool:
+    text = " ".join(
+        str(value or "")
+        for value in (
+            source,
+            market.get("market_context_source"),
+            market.get("source"),
+            market.get("provider"),
+            market.get("fixture"),
+        )
+    ).casefold()
+    return any(term in text for term in ("fixture", "test", "replay", "e2e"))
+
+
+def _parse_datetime(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if value in (None, ""):
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _round_optional(value: object) -> float | None:
+    number = _float(value)
+    if number is None:
+        return None
+    return round(number, 4)
 
 
 def _playbook_needs_attention(playbook: str) -> bool:

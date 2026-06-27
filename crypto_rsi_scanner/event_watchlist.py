@@ -113,6 +113,10 @@ class EventWatchlistEntry:
     evidence_specificity: str | None = None
     market_confirmation_score: float | None = None
     market_confirmation_level: str | None = None
+    market_context_freshness_status: str | None = None
+    market_context_age_hours: float | str | None = None
+    market_context_stale: bool | None = None
+    market_context_freshness_cap_applied: bool | None = None
     opportunity_score_final: float | None = None
     opportunity_level: str | None = None
     opportunity_verdict_reasons: list[str] = field(default_factory=list)
@@ -594,6 +598,10 @@ def _entry_from_alert(
         evidence_specificity=_optional_str(quality.get("evidence_specificity")),
         market_confirmation_score=_optional_float(quality.get("market_confirmation_score")),
         market_confirmation_level=_optional_str(quality.get("market_confirmation_level")),
+        market_context_freshness_status=_optional_str(quality.get("market_context_freshness_status")),
+        market_context_age_hours=quality.get("market_context_age_hours"),
+        market_context_stale=_optional_bool(quality.get("market_context_stale")),
+        market_context_freshness_cap_applied=_optional_bool(quality.get("market_context_freshness_cap_applied")),
         opportunity_score_final=_optional_float(quality.get("opportunity_score_final")),
         opportunity_level=_optional_str(quality.get("opportunity_level")),
         opportunity_verdict_reasons=list(quality.get("opportunity_verdict_reasons") or []),
@@ -699,6 +707,11 @@ def _entry_from_hypothesis(
         "evidence_specificity": _optional_str(getattr(hypothesis, "evidence_specificity", None)),
         "market_confirmation_score": _optional_float(getattr(hypothesis, "market_confirmation_score", None)),
         "market_confirmation_level": _optional_str(getattr(hypothesis, "market_confirmation_level", None)),
+        "market_context_observed_at": _optional_str(getattr(hypothesis, "market_context_observed_at", None)),
+        "market_context_age_hours": _optional_float(getattr(hypothesis, "market_context_age_hours", None)),
+        "market_context_stale": getattr(hypothesis, "market_context_stale", None),
+        "market_context_freshness_status": _optional_str(getattr(hypothesis, "market_context_freshness_status", None)),
+        "market_context_freshness_cap_applied": getattr(hypothesis, "market_context_freshness_cap_applied", None),
         "opportunity_score_final": _optional_float(getattr(hypothesis, "opportunity_score_final", None)),
         "opportunity_level": _optional_str(getattr(hypothesis, "opportunity_level", None)),
         "opportunity_verdict_reasons": list(getattr(hypothesis, "opportunity_verdict_reasons", ()) or ())[:8],
@@ -837,7 +850,12 @@ def _entry_from_hypothesis(
             "market_confirmation_summary": _optional_str(getattr(hypothesis, "market_confirmation_summary", None)),
             "market_context_source": _optional_str(getattr(hypothesis, "market_context_source", None)),
             "market_context_timestamp": _optional_str(getattr(hypothesis, "market_context_timestamp", None)),
+            "market_context_observed_at": _optional_str(getattr(hypothesis, "market_context_observed_at", None)),
             "market_context_age_seconds": _optional_float(getattr(hypothesis, "market_context_age_seconds", None)),
+            "market_context_age_hours": _optional_float(getattr(hypothesis, "market_context_age_hours", None)),
+            "market_context_stale": getattr(hypothesis, "market_context_stale", None),
+            "market_context_freshness_status": _optional_str(getattr(hypothesis, "market_context_freshness_status", None)),
+            "market_context_freshness_cap_applied": getattr(hypothesis, "market_context_freshness_cap_applied", None),
             "market_context_data_quality": _optional_str(getattr(hypothesis, "market_context_data_quality", None)),
             "market_context_snapshot": dict(getattr(hypothesis, "market_context_snapshot", {}) or {}),
             "market_reaction_confirmed": getattr(hypothesis, "market_reaction_confirmed", None),
@@ -920,6 +938,10 @@ def _entry_from_hypothesis(
         evidence_specificity=_optional_str(hypothesis_quality.get("evidence_specificity")),
         market_confirmation_score=_optional_float(hypothesis_quality.get("market_confirmation_score")),
         market_confirmation_level=_optional_str(hypothesis_quality.get("market_confirmation_level")),
+        market_context_freshness_status=_optional_str(hypothesis_quality.get("market_context_freshness_status")),
+        market_context_age_hours=hypothesis_quality.get("market_context_age_hours"),
+        market_context_stale=_optional_bool(hypothesis_quality.get("market_context_stale")),
+        market_context_freshness_cap_applied=_optional_bool(hypothesis_quality.get("market_context_freshness_cap_applied")),
         opportunity_score_final=_optional_float(hypothesis_quality.get("opportunity_score_final")),
         opportunity_level=_optional_str(hypothesis_quality.get("opportunity_level")),
         opportunity_verdict_reasons=list(hypothesis_quality.get("opportunity_verdict_reasons") or []),
@@ -1511,6 +1533,10 @@ def _entry_from_row(row: Mapping[str, Any]) -> EventWatchlistEntry | None:
             evidence_specificity=_optional_str(quality.get("evidence_specificity")),
             market_confirmation_score=_optional_float(quality.get("market_confirmation_score")),
             market_confirmation_level=_optional_str(quality.get("market_confirmation_level")),
+            market_context_freshness_status=_optional_str(quality.get("market_context_freshness_status")),
+            market_context_age_hours=quality.get("market_context_age_hours"),
+            market_context_stale=_optional_bool(quality.get("market_context_stale")),
+            market_context_freshness_cap_applied=_optional_bool(quality.get("market_context_freshness_cap_applied")),
             opportunity_score_final=_optional_float(quality.get("opportunity_score_final")),
             opportunity_level=_optional_str(quality.get("opportunity_level")),
             opportunity_verdict_reasons=list(quality.get("opportunity_verdict_reasons") or []),

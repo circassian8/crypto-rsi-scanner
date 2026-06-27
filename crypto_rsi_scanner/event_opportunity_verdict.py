@@ -109,6 +109,12 @@ def evaluate_opportunity(
         "market_reaction_confirmed": 100.0 if market_reaction_confirmed else 0.0,
         "causal_mechanism_confirmed": 100.0 if causal_mechanism_confirmed else 0.0,
     }
+    market_freshness_status = str(getattr(market_confirmation, "market_context_freshness_status", "") or components.get("market_context_freshness_status") or "")
+    market_freshness_cap_applied = bool(
+        getattr(market_confirmation, "freshness_cap_applied", False)
+        or components.get("freshness_cap_applied")
+        or components.get("market_context_freshness_cap_applied")
+    )
     score = (
         impact_score * 0.30
         + market_score * 0.25
@@ -225,6 +231,16 @@ def evaluate_opportunity(
     if market_score < 40:
         missing.append("market_confirmation")
         verify.append("check price, volume, OI/funding, and liquidity before treating as watchlist")
+    if market_freshness_status in {"stale", "missing", "unknown"} or market_freshness_cap_applied:
+        reasons.append(
+            {
+                "stale": "market_context_stale_capped",
+                "missing": "market_context_missing",
+                "unknown": "market_context_unknown_timestamp",
+            }.get(market_freshness_status, "market_context_stale_capped")
+        )
+        missing.append("needs_fresh_market_confirmation")
+        verify.append("refresh market context before watchlist/high-priority treatment")
     if evidence_score < 60:
         missing.append("higher_quality_source")
         verify.append("find official, structured, or crypto-native evidence linking token and catalyst")
@@ -244,6 +260,15 @@ def evaluate_opportunity(
         level = OpportunityLevel.EXPLORATORY.value
     else:
         level = OpportunityLevel.LOCAL_ONLY.value
+
+    if (
+        market_freshness_status in {"stale", "missing", "unknown"}
+        or market_freshness_cap_applied
+    ) and level in {OpportunityLevel.WATCHLIST.value, OpportunityLevel.HIGH_PRIORITY.value}:
+        reasons.append("market_context_freshness_watchlist_cap")
+        missing.append("needs_fresh_market_confirmation")
+        verify.append("run a targeted market refresh before treating this as watchlist/high-priority")
+        level = OpportunityLevel.VALIDATED_DIGEST.value if score >= 65 and evidence_score >= 60 and impact_score >= 60 else OpportunityLevel.EXPLORATORY.value
 
     why_local = None if level != OpportunityLevel.LOCAL_ONLY.value else (missing[0] if missing else "score_below_digest_threshold")
     why_not_watchlist = None if level in {OpportunityLevel.WATCHLIST.value, OpportunityLevel.HIGH_PRIORITY.value} else (
@@ -398,6 +423,10 @@ def explain_upgrade_path(
     if market_score < 50 or market_level in {"", "none", "weak"}:
         upgrades.append("needs_market_confirmation")
         downgrades.append("market_reaction_absent")
+    freshness_status = str(data.get("market_context_freshness_status") or data.get("market_market_context_freshness_status") or "")
+    if freshness_status in {"stale", "missing", "unknown"} or bool(data.get("freshness_cap_applied") or data.get("market_freshness_cap_applied")):
+        upgrades.append("needs_fresh_market_confirmation")
+        downgrades.append("market_context_stale")
     if evidence_score < 65:
         upgrades.append("needs_higher_quality_source")
         downgrades.append("source_low_quality")
@@ -447,6 +476,9 @@ def _object_mapping(prefix: str, value: object | Mapping[str, Any] | None) -> di
         "candidate_role",
         "market_confirmation_score",
         "level",
+        "market_context_freshness_status",
+        "market_context_age_hours",
+        "freshness_cap_applied",
         "evidence_quality_score",
         "source_class",
         "evidence_specificity",

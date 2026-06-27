@@ -154,6 +154,17 @@ incident subject. Market fields also carry `market_context_source`,
 `market_context_data_quality`, `market_reaction_observed`,
 `market_reaction_confirmed`, and `causal_mechanism_confirmed`; market reaction
 is evidence to inspect, not proof that the source explains the causal path.
+Market confirmation also carries a freshness verdict:
+`market_context_freshness_status` is one of `fresh`, `stale`,
+`fixture_allowed_stale`, `missing`, `unknown`, and local reports/cards show a
+human-readable age. Live-style profiles cap stale, missing, or unknown-timestamp
+market context so it cannot by itself promote a candidate to `WATCHLIST` or
+`HIGH_PRIORITY`. Fixture/e2e profiles may explicitly allow stale fixture
+snapshots, but those rows must say `fixture_allowed_stale`; treat that as an
+offline test allowance, not live market confirmation. The freshness policy is
+controlled by `RSI_EVENT_MARKET_CONTEXT_MAX_AGE_HOURS`,
+`RSI_EVENT_MARKET_CONTEXT_ALLOW_STALE_FIXTURE`, and
+`RSI_EVENT_MARKET_CONTEXT_STALE_CAP_LEVEL`.
 Incident and hypothesis rows also carry catalyst-frame metadata when source
 text contains multiple event claims. `main_frame_type` and
 `main_catalyst_frame_id` describe the event the source is primarily about;
@@ -463,7 +474,10 @@ make event-alpha-signal-quality-eval
 
 The fixture covers positive proxy/direct cases, weak co-occurrence controls,
 market anomalies without catalysts, token unlock/listing cases, and known
-source-noise/word-collision failures. It is offline and research-only.
+source-noise/word-collision failures. It also covers market-context freshness:
+fresh market confirmation, stale fixture context allowed only for fixture
+profiles, stale live context capped, and missing/unknown market timestamps
+capped. It is offline and research-only.
 
 To inspect one candidate from the current artifacts, use:
 
