@@ -611,24 +611,30 @@ source-noise/control rows stay hidden under diagnostics. Use
 when you need to inspect the hidden support/control rows behind a core
 opportunity.
 The daily brief is intentionally core-first: high-priority, validated digest,
-watchlist, and local/quality-capped opportunities are mutually exclusive
-operator sections. Raw routed decisions are summarized unless diagnostics are
-requested, already-promoted opportunities are excluded from exploratory digest
+watchlist, near-miss, and local/quality-capped opportunities are mutually
+exclusive operator sections, followed by canonical incidents and a short system
+health summary. Raw routed decisions, active watchlist dumps, validated routing
+details, signal-quality distributions, suppression reasons, research-card
+plumbing, and why-alerts-sent details live under the Diagnostics Appendix by
+default. Already-promoted opportunities are excluded from exploratory digest
 and near-miss sections, and near-miss rows are de-duplicated by incident, asset,
-candidate role, and impact path. The quality review's possible-false-positive
-section is suspicion-only; it requires explicit source-noise, ticker-collision,
-generic co-occurrence, identity, missing-impact-path, or rejected-candidate
-reason codes and should not list strong core opportunities merely because they
-have diagnostic support rows. Research-card indexes group cards as core,
-near-miss, local/quality-capped, diagnostic/control, or legacy so Pro-model
-handoffs can inspect the main opportunities first. New card indexes use the
-card's watchlist/quality metadata rather than filename hints when possible; the
-filename/content fallback exists only for legacy artifacts. Validated cards also
-choose playbook and invalidation copy from the impact path and catalyst frame:
-AAVE/Kraken-style strategic investment cards should talk about stake/valuation
-risk, VELVET/SpaceX-style proxy cards should talk about venue/exposure
-validation, and MemeCore-style unknown market dislocations should remain
-local-only until a causal catalyst is found.
+candidate role, and impact path. Near-miss/local-only copy should describe
+what is interesting, what evidence is missing, what would upgrade the row, and
+what would invalidate it in human terms rather than exposing raw reason-code
+strings. The quality review's possible-false-positive section is
+suspicion-only; it requires explicit source-noise, ticker-collision, generic
+co-occurrence, identity, missing-impact-path, or rejected-candidate reason codes
+and should not list strong core opportunities merely because they have
+diagnostic support rows. Research-card indexes and daily-brief card links group
+cards as core, near-miss, local/quality-capped, diagnostic/control, or legacy so
+Pro-model handoffs can inspect the main opportunities first. New card indexes
+use the card's watchlist/quality metadata rather than filename hints when
+possible; the filename/content fallback exists only for legacy artifacts.
+Validated cards also choose playbook and invalidation copy from the impact path
+and catalyst frame: AAVE/Kraken-style strategic investment cards should talk
+about stake/valuation risk, VELVET/SpaceX-style proxy cards should talk about
+venue/exposure validation, and MemeCore-style unknown market dislocations
+should remain local-only until a causal catalyst is found.
 Standalone fixture-report targets such as
 `make event-alpha-daily-brief PROFILE=catalyst_frame_e2e` pass the fixture/test
 artifact include flag automatically, so the generated brief should select the

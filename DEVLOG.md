@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Polish Event Alpha operator-facing opportunity reports · Codex
+**Why:** The catalyst-frame e2e output was correct but still too noisy for an
+operator: default daily briefs mixed core opportunities, near-misses,
+local-only rows, raw watchlist dumps, and card links in a way that made the same
+opportunity look duplicated or contradictory.
+**Changes:**
+- Reordered daily briefs into a core-first operator flow: executive summary,
+  high-priority, validated digest, watchlist, near-miss, local/quality-capped,
+  canonical incidents, system health, then a Diagnostics Appendix for raw row
+  dumps and lower-level details.
+- Added human-readable near-miss/local-only copy that explains what is
+  interesting, what is missing, what would upgrade the candidate, and what would
+  invalidate it without leaking internal reason-code strings into the main
+  operator section.
+- Grouped daily-brief research-card links using the same core/near-miss/local/
+  diagnostic/legacy taxonomy as the card index, hiding source-noise/control
+  cards from the main card list by default.
+- Tightened quality-review false-positive reporting so normal
+  market-dislocation rows are not flagged unless explicit source-noise,
+  collision, invalid identity, or missing-impact-path suspicion evidence exists.
+- Aligned notification-inbox labels and opportunity audits with the
+  core-opportunity presentation model, including explicit operator-presentation
+  sections for audit targets.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed (484/484); `make
+event-alpha-signal-quality-eval PYTHON=python3` passed (32/32); `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `make
+event-alpha-quality-validation-cycle PYTHON=python3` passed; `make verify
+PYTHON=python3` passed; manual `python3 main.py --event-opportunity-audit
+VELVET --event-alpha-profile catalyst_frame_e2e
+--event-alpha-artifact-namespace catalyst_frame_e2e` passed.
+**Notes/risks:** Presentation/reporting-only. It does not change Event Alpha
+scoring, route eligibility, send guards, normal RSI alerts, paper/live trading,
+or deterministic `TRIGGERED_FADE` creation.
+
 ## 2026-06-27 — Harden Event Alpha card and diagnostics UX · Codex
 **Why:** The core-opportunity output was mostly clean, but card indexes still
 depended on filename hints, verdict-backed cards could fall back to generic

@@ -22,16 +22,22 @@ decision, rationale, and revisit condition.
 quality reviews should present promoted Event Alpha opportunities through a
 single core-opportunity view by default. Already-promoted opportunities must not
 also appear as exploratory digest rows or near-misses. Near-miss rows should be
-deduplicated by incident, asset, candidate role, and impact path. Possible
+deduplicated by incident, asset, candidate role, and impact path. The daily
+brief's default top-level sections are for operator decisions; raw watchlist,
+validated-routing, signal-quality, suppression, and other row-level dumps belong
+under a Diagnostics Appendix unless explicitly requested. Possible
 false-positive lists should require explicit suspicion reason codes such as
 source noise, ticker collision, generic co-occurrence, low-confidence identity,
 source-origin-only identity, missing direct impact path, common-word collision,
 quality-context-missing, invalid subjects, diagnostic-only rows, or rejected
 candidate asset evidence. Research-card grouping should use stored
-watchlist/quality metadata when available, with content/filename fallback only
-for legacy artifacts. Card copy should be verdict-aware: validated strategic
+watchlist/quality metadata when available, and daily-brief card links should use
+the same core, near-miss, local/quality-capped, diagnostic/control, and legacy
+groups as card indexes. Content/filename fallback exists only for legacy
+artifacts. Card and near-miss copy should be verdict-aware: validated strategic
 investment, proxy venue/exposure, and unknown market-dislocation rows should not
-fall back to stale generic source-identity failure language.
+fall back to stale generic source-identity failure language or expose raw
+internal reason codes as the main operator explanation.
 **Why:** Operators need to review actual opportunities, not every support row
 and diagnostic/control artifact as if it were a separate lead. Mixing promoted
 VELVET/AAVE/RUNE/ZEC rows with near-miss, exploratory, or suspicion sections

@@ -66,6 +66,8 @@ def format_opportunity_audit(
     incident = _incident_context(row, components, incidents)
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
     near_miss = event_near_miss.near_miss_metadata_for_row(row)
+    daily_section = _daily_brief_section(row, components, core_match, near_miss)
+    card_group = _card_group_for_audit(row, components, core_match, near_miss)
     lines = [
         "=" * 76,
         "EVENT OPPORTUNITY AUDIT (research-only)",
@@ -83,6 +85,11 @@ def format_opportunity_audit(
         f"- state/tier: {_value(row, 'state', default='unknown')} / {_value(row, 'tier', 'latest_tier', default='unknown')}",
         "",
         *(_core_opportunity_lines(core_match, include_diagnostics=include_diagnostics) if core_match is not None else []),
+        "## Operator Presentation",
+        f"- Daily brief section: {daily_section}",
+        f"- Research card group: {card_group}",
+        "- Reason: " + _operator_presentation_reason(row, components, core_match, near_miss),
+        "",
         "## Evidence chain",
         f"- raw source summary: {_value(row, 'raw_evidence_summary', 'event_name', 'latest_event_name', default='unknown')}",
         f"- source/provider: {_value(row, 'source', 'latest_source', default='unknown')}",
@@ -164,8 +171,8 @@ def _near_miss_lines(
         "- status: near-miss candidate",
         f"- near_miss_id: {near_miss.near_miss_id}",
         f"- score/level before refresh: {near_miss.opportunity_score_before:.0f} / {near_miss.opportunity_level_before}",
-        "- missing evidence: " + (_list_value(near_miss.missing_evidence) or "none"),
-        "- recommended refresh: " + (_list_value(near_miss.recommended_refresh_actions) or "operator_review"),
+        "- missing evidence: " + (_human_reason_list(near_miss.missing_evidence) or "none"),
+        "- recommended refresh: " + (_human_action_list(near_miss.recommended_refresh_actions) or "manual analyst review"),
     ]
     score_components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
     before = row.get("opportunity_level_before") or score_components.get("opportunity_level_before")
@@ -178,6 +185,113 @@ def _near_miss_lines(
             f"verdict={before or near_miss.opportunity_level_before}->{after or row.get('opportunity_level') or near_miss.opportunity_level_before}"
         )
     return lines
+
+
+def _daily_brief_section(
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    core: event_core_opportunities.CoreOpportunity | None,
+    near_miss: event_near_miss.EventNearMissCandidate | None,
+) -> str:
+    if core is not None:
+        if core.is_high_priority:
+            return "High-Priority Core Opportunities"
+        if core.is_watchlist:
+            return "Watchlist Core Opportunities"
+        if core.is_validated_digest or core.alertable:
+            return "Validated Digest Core Opportunities"
+    level = str(components.get("opportunity_level") or row.get("opportunity_level") or "").casefold()
+    route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").upper()
+    if "HIGH_PRIORITY" in route or level == "high_priority":
+        return "High-Priority Core Opportunities"
+    if "WATCHLIST" in route or level == "watchlist":
+        return "Watchlist Core Opportunities"
+    if "RESEARCH_DIGEST" in route or level == "validated_digest":
+        return "Validated Digest Core Opportunities"
+    if near_miss is not None:
+        return "Near-Miss Candidates"
+    return "Quality-Capped / Local-Only Candidates"
+
+
+def _card_group_for_audit(
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    core: event_core_opportunities.CoreOpportunity | None,
+    near_miss: event_near_miss.EventNearMissCandidate | None,
+) -> str:
+    text = " ".join(str(value or "") for value in (
+        row.get("candidate_role"),
+        components.get("candidate_role"),
+        row.get("impact_path_type"),
+        components.get("impact_path_type"),
+        row.get("source_class"),
+        components.get("source_class"),
+        row.get("latest_effective_playbook_type"),
+        row.get("playbook_type"),
+    )).casefold()
+    if "source_noise" in text or "ticker_word_collision" in text or "generic_cooccurrence_only" in text:
+        return "Diagnostic / Source-Noise / Control Cards"
+    if core is not None and (core.is_high_priority or core.is_watchlist or core.is_validated_digest or core.alertable):
+        return "Core Opportunity Cards"
+    if near_miss is not None:
+        return "Near-Miss Cards"
+    if str(row.get("final_state_after_quality_gate") or row.get("state") or "").upper() == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value:
+        return "Local-Only / Quality-Capped Cards"
+    return "Local-Only / Quality-Capped Cards"
+
+
+def _operator_presentation_reason(
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    core: event_core_opportunities.CoreOpportunity | None,
+    near_miss: event_near_miss.EventNearMissCandidate | None,
+) -> str:
+    if core is not None:
+        return core.why_opportunity_visible
+    if near_miss is not None:
+        return "close to promotion but still missing " + (_human_reason_list(near_miss.missing_evidence) or "confirmation")
+    level = str(components.get("opportunity_level") or row.get("opportunity_level") or "local_only")
+    return f"quality verdict is {level.replace('_', ' ')}; keep as local research evidence"
+
+
+_HUMAN_REASON_LABELS = {
+    "quality_context_missing": "missing enough validated context",
+    "needs_direct_token_mechanism": "needs proof that this event directly affects the token",
+    "needs_market_confirmation": "no convincing market reaction yet",
+    "market_confirmation": "no convincing market reaction yet",
+    "cause_unknown_market_dislocation": "token moved, but the cause is unknown",
+    "generic_cooccurrence_only": "token and event appeared together, but no impact mechanism was proven",
+    "impact_path_type_insufficient_data": "not enough evidence to establish the impact mechanism",
+    "impact_path_not_strong_enough": "impact path is not strong enough yet",
+    "needs_strong_market_confirmation": "needs stronger price/volume confirmation",
+    "blocked_by_low_score": "research score is still too low",
+}
+
+
+def _human_reason_list(values: Iterable[Any]) -> str:
+    out: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if not text:
+            continue
+        out.append(_HUMAN_REASON_LABELS.get(text, text.replace("_", " ")))
+    return "; ".join(dict.fromkeys(out))
+
+
+def _human_action_list(values: Iterable[Any]) -> str:
+    mapping = {
+        "targeted_market_refresh": "refresh market/volume context",
+        "targeted_derivatives_refresh": "check derivatives crowding",
+        "targeted_supply_refresh": "check supply pressure",
+        "targeted_evidence_refresh": "find independent catalyst evidence",
+        "operator_review": "manual analyst review",
+    }
+    out: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            out.append(mapping.get(text, text.replace("_", " ")))
+    return "; ".join(dict.fromkeys(out))
 
 
 def _find_core_match(

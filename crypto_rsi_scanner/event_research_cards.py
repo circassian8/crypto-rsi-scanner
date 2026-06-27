@@ -34,6 +34,20 @@ class EventResearchCardWriteResult:
     card_paths: tuple[Path, ...]
 
 
+CARD_INDEX_GROUPS = (
+    "Core Opportunity Cards",
+    "Near-Miss Cards",
+    "Local-Only / Quality-Capped Cards",
+    "Diagnostic / Source-Noise / Control Cards",
+    "Legacy Cards",
+)
+
+
+def card_index_group(path: Path, *, card_groups: Mapping[Path | str, str] | None = None) -> str:
+    """Return the operator-facing research-card group for an existing card file."""
+    return _card_index_group(Path(path), card_groups=card_groups)
+
+
 def render_research_card(
     key: str,
     *,
@@ -426,13 +440,7 @@ def _render_index(
 def _card_index_group(path: Path, *, card_groups: Mapping[Path | str, str] | None = None) -> str:
     if card_groups:
         mapped = card_groups.get(path) or card_groups.get(str(path)) or card_groups.get(path.name)
-        if mapped in {
-            "Core Opportunity Cards",
-            "Near-Miss Cards",
-            "Local-Only / Quality-Capped Cards",
-            "Diagnostic / Source-Noise / Control Cards",
-            "Legacy Cards",
-        }:
+        if mapped in CARD_INDEX_GROUPS:
             return str(mapped)
     name = path.name.casefold()
     if "legacy" in name:
@@ -496,10 +504,12 @@ def _card_index_group_for_text(text: str) -> str | None:
         or "diagnostic" in text
     ):
         return "Diagnostic / Source-Noise / Control Cards"
-    if "local-only after quality/state gate" in text or "final route: store_only" in text or "quality_blocked" in text:
+    if "local-only after quality/state gate" in text or "quality_blocked" in text:
         return "Local-Only / Quality-Capped Cards"
     if "final opportunity verdict: exploratory" in text:
         return "Near-Miss Cards"
+    if "final route: store_only" in text:
+        return "Local-Only / Quality-Capped Cards"
     if (
         "final opportunity verdict: high_priority" in text
         or "final opportunity verdict: watchlist" in text

@@ -9356,7 +9356,7 @@ def test_event_alpha_alert_store_persists_validated_route_snapshots_for_inbox_fe
         assert inbox.sent_without_feedback[0].symbol == "RUNE"
         assert inbox.sent_without_feedback[0].coin_id == "thorchain"
         text = event_alpha_notification_inbox.format_notification_inbox(inbox)
-        assert "delivered research digest items needing feedback" in text
+        assert "delivered core opportunities needing feedback" in text
         assert "RUNE/thorchain" in text
 
         reviewed = event_alpha_notification_inbox.build_notification_inbox(
@@ -10881,7 +10881,7 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert "BTC" in {item.symbol for item in inbox.quality_gated_local_only}
     assert "BTC" not in {item.symbol for item in inbox.would_send_without_feedback}
     inbox_text = event_alpha_notification_inbox.format_notification_inbox(inbox)
-    assert "quality-gated local-only candidates" in inbox_text
+    assert "local-only learning rows for optional review" in inbox_text
     review = event_alpha_quality_review.format_quality_review(
         event_alpha_quality_review.build_quality_review(profile="fixture", alert_rows=rows)
     )
@@ -11021,14 +11021,14 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     assert doctor_missing_final.status == "BLOCKED"
 
     daily = event_alpha_daily_brief.build_daily_brief(router_result=routed, watchlist_entries=[btc, zero, digest, watch, high, trigger])
-    assert "## Quality Gate Downgrades" in daily
+    assert "### Quality Gate Downgrades" in daily
     assert "BTC/btc:RESEARCH_DIGEST->STORE_ONLY" in daily
-    assert "## Quality-Capped Watchlist Rows" in daily
+    assert "### Quality-Capped Watchlist Rows" in daily
     assert "BTC/btc: requested=WATCHLIST final=QUALITY_BLOCKED" in daily
-    active_section = daily.split("## Active Watchlist", 1)[1].split("## Quality-Capped Watchlist Rows", 1)[0]
+    active_section = daily.split("### Active Watchlist", 1)[1].split("### Quality-Capped Watchlist Rows", 1)[0]
     assert "BTC/btc" not in active_section
     assert "WATCH/watch" in active_section
-    assert "## Legacy Quality Conflicts" in daily
+    assert "### Legacy Quality Conflicts" in daily
     card = event_research_cards.render_research_card(
         "BTC",
         watchlist_entries=[btc],
@@ -12231,9 +12231,9 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
         assert len(result.heartbeat_only_runs) == 1
         assert len(result.provider_degraded_runs) == 1
         text = event_alpha_notification_inbox.format_notification_inbox(result)
-        assert "sent notifications without feedback: 1" in text
-        assert "partial-delivered notifications needing delivery review: 1" in text
-        assert "would-send notifications without feedback: 1" in text
+        assert "delivered core opportunities needing feedback: 1" in text
+        assert "partial-delivered core opportunities needing delivery review: 1" in text
+        assert "would-send core opportunities blocked by preview mode: 1" in text
         assert "card_high.md" in text
         assert "make event-feedback-useful PROFILE=notify_no_key FEEDBACK_TARGET='ea:high-key'" in text
 
@@ -12278,7 +12278,7 @@ def test_event_alpha_inbox_and_daily_brief_show_exploratory_digest_separately():
     assert len(inbox.exploratory_without_feedback) == 1
     assert inbox.exploratory_without_feedback[0].alert_id == decision.alert_id
     inbox_text = event_alpha_notification_inbox.format_notification_inbox(inbox)
-    assert "exploratory digest items needing review: 1" in inbox_text
+    assert "near-misses for optional review: 1" in inbox_text
     assert "FEEDBACK_TARGET='ea:PUMP|proxy'" in inbox_text
 
     router_result = event_alpha_router.EventAlphaRouterResult(
@@ -23097,7 +23097,7 @@ def test_daily_brief_core_opportunity_excludes_promoted_supporting_near_miss():
     )
     assert "core_" in brief
     assert "VELVET/velvet" in brief
-    near_section = brief.split("## Near-Miss Candidates", 1)[1].split("## Signal Quality Summary", 1)[0]
+    near_section = brief.split("## Near-Miss Candidates", 1)[1].split("## Quality-Capped / Local-Only Candidates", 1)[0]
     assert "VELVET/velvet" not in near_section
 
 
@@ -23186,11 +23186,12 @@ def test_daily_brief_core_sections_hide_promoted_from_exploratory_and_near_miss(
         router_result=result,
         requested_profile="fixture",
     )
-    strong = brief.split("## Strong / High-Priority Core Opportunities", 1)[1].split("## Validated Digest Core Opportunities", 1)[0]
+    strong = brief.split("## High-Priority Core Opportunities", 1)[1].split("## Validated Digest Core Opportunities", 1)[0]
     digest = brief.split("## Validated Digest Core Opportunities", 1)[1].split("## Watchlist Core Opportunities", 1)[0]
-    watchlist = brief.split("## Watchlist Core Opportunities", 1)[1].split("## Quality-Capped / Local-Only Candidates", 1)[0]
-    near = brief.split("## Near-Miss Candidates", 1)[1].split("## Signal Quality Summary", 1)[0]
-    exploratory = brief.split("## Exploratory Digest", 1)[1].split("## Active Watchlist", 1)[0]
+    watchlist = brief.split("## Watchlist Core Opportunities", 1)[1].split("## Near-Miss Candidates", 1)[0]
+    near = brief.split("## Near-Miss Candidates", 1)[1].split("## Quality-Capped / Local-Only Candidates", 1)[0]
+    exploratory = brief.split("### Exploratory Digest", 1)[1].split("### Active Watchlist", 1)[0]
+    diagnostics = brief.split("## Diagnostics Appendix", 1)[1]
     assert strong.count("VELVET/velvet") == 1
     assert digest.count("AAVE/aave") == 1
     assert watchlist.count("RUNE/rune") == 1
@@ -23201,6 +23202,65 @@ def test_daily_brief_core_sections_hide_promoted_from_exploratory_and_near_miss(
     assert "AAVE/aave" not in exploratory
     assert "RUNE/rune" not in exploratory
     assert "M/m" in exploratory
+    assert "### Active Watchlist" in diagnostics
+    assert "### Validated Impact Hypothesis Routing" in diagnostics
+
+
+def test_daily_brief_near_miss_and_card_groups_are_operator_friendly():
+    from pathlib import Path
+    import tempfile
+    from crypto_rsi_scanner import event_alpha_daily_brief
+
+    memecore = {
+        "hypothesis_id": "hyp:memecore",
+        "incident_id": "incident:memecore",
+        "validated_symbol": "M",
+        "validated_coin_id": "memecore",
+        "candidate_role": "direct_subject",
+        "impact_category": "market_anomaly_unknown",
+        "impact_path_type": "market_dislocation_unknown",
+        "source_class": "broad_news",
+        "evidence_specificity": "direct_token_mechanism",
+        "market_confirmation_score": 35,
+        "market_confirmation_level": "weak",
+        "opportunity_score_final": 61,
+        "opportunity_level": "exploratory",
+        "why_not_watchlist": ["needs_strong_market_confirmation", "cause_unknown_market_dislocation"],
+        "upgrade_requirements": ["needs_direct_token_mechanism", "needs_market_confirmation"],
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core = root / "card_velvet.md"
+        near = root / "card_memecore.md"
+        local = root / "card_btc.md"
+        diagnostic = root / "card_kcs.md"
+        core.write_text("Final opportunity verdict: high_priority\nFinal route: HIGH_PRIORITY_RESEARCH\n", encoding="utf-8")
+        near.write_text("Final opportunity verdict: exploratory\nFinal route: STORE_ONLY\n", encoding="utf-8")
+        local.write_text("Final route: STORE_ONLY\nLocal-only after quality/state gate.\n", encoding="utf-8")
+        diagnostic.write_text("Playbook: source_noise_control\nImpact path type: generic_cooccurrence_only\n", encoding="utf-8")
+        brief = event_alpha_daily_brief.build_daily_brief(
+            hypothesis_rows=[memecore],
+            card_paths=[core, near, local, diagnostic],
+            requested_profile="fixture",
+            include_test_artifacts=True,
+            include_legacy_artifacts=True,
+        )
+    near_section = brief.split("## Near-Miss Candidates", 1)[1].split("## Quality-Capped / Local-Only Candidates", 1)[0]
+    assert "M/memecore" in near_section
+    assert "token moved, but the cause is still unknown" in near_section
+    assert "needs proof that this event directly affects the token" in near_section
+    assert "needs_strong_market_confirmation" not in near_section
+    cards = brief.split("### Research Cards", 1)[1].split("### Missed Opportunities", 1)[0]
+    core_cards = cards.split("#### Core Opportunity Cards", 1)[1].split("#### Near-Miss Cards", 1)[0]
+    near_cards = cards.split("#### Near-Miss Cards", 1)[1].split("#### Local-Only / Quality-Capped Cards", 1)[0]
+    local_cards = cards.split("#### Local-Only / Quality-Capped Cards", 1)[1].split("#### Diagnostic / Source-Noise / Control Cards", 1)[0]
+    diagnostic_cards = cards.split("#### Diagnostic / Source-Noise / Control Cards", 1)[1]
+    assert "card_velvet.md" in core_cards
+    assert "card_memecore.md" not in core_cards
+    assert "card_memecore.md" in near_cards
+    assert "card_btc.md" in local_cards
+    assert "card_kcs.md" not in diagnostic_cards
+    assert "Hidden from main card list" in diagnostic_cards
 
 
 def test_event_near_miss_dedupes_and_excludes_promoted_or_zero_quality_rows():
@@ -23253,6 +23313,17 @@ def test_quality_review_possible_false_positives_require_suspicion_reason():
         "evidence_specificity": "insufficient_data",
         "opportunity_score_final": 0,
     }
+    market_dislocation = {
+        "symbol": "M",
+        "coin_id": "memecore",
+        "opportunity_level": "exploratory",
+        "impact_path_type": "market_dislocation_unknown",
+        "candidate_role": "direct_subject",
+        "source_class": "broad_news",
+        "evidence_specificity": "direct_token_mechanism",
+        "why_not_watchlist": ["cause_unknown_market_dislocation", "needs_market_confirmation"],
+        "opportunity_score_final": 54,
+    }
     clean_text = event_alpha_quality_review.format_quality_review(
         event_alpha_quality_review.build_quality_review(hypothesis_rows=[strong])
     )
@@ -23260,23 +23331,27 @@ def test_quality_review_possible_false_positives_require_suspicion_reason():
     assert "- none" in clean_fp
     assert "VELVET" not in clean_fp
     mixed_text = event_alpha_quality_review.format_quality_review(
-        event_alpha_quality_review.build_quality_review(hypothesis_rows=[strong, noisy])
+        event_alpha_quality_review.build_quality_review(hypothesis_rows=[strong, noisy, market_dislocation])
     )
     mixed_fp = mixed_text.split("Possible false positives:", 1)[1].split("Quality Gate Conflicts:", 1)[0]
     assert "BTC" in mixed_fp
     assert "VELVET" not in mixed_fp
+    assert "M" not in mixed_fp
 
     explicit_text = event_alpha_quality_review.format_quality_review(
         event_alpha_quality_review.build_quality_review(hypothesis_rows=[
             {**strong, "symbol": "RUNE", "coin_id": "thorchain", "opportunity_level": "watchlist"},
             {"symbol": "HYPE", "coin_id": "hyperliquid", "warnings": ["invalid_subject"]},
             {"symbol": "KCS", "coin_id": "kucoin-shares", "why_local_only": "diagnostic_only"},
+            {"symbol": "HYPE", "coin_id": "hyperliquid", "impact_path_type": "generic_cooccurrence_only"},
+            {"symbol": "BTC", "coin_id": "bitcoin", "source_class": "publisher_suffix_false_positive"},
         ])
     )
     explicit_fp = explicit_text.split("Possible false positives:", 1)[1].split("Quality Gate Conflicts:", 1)[0]
     assert "RUNE" not in explicit_fp
     assert "HYPE" in explicit_fp
     assert "KCS" in explicit_fp
+    assert "BTC" in explicit_fp
 
 
 def test_research_card_index_groups_core_local_near_miss_and_diagnostics():
@@ -23383,6 +23458,9 @@ def test_opportunity_audit_accepts_core_opportunity_id_and_hides_diagnostics_by_
         profile="fixture",
     )
     assert "## Core Opportunity" in audit
+    assert "## Operator Presentation" in audit
+    assert "Daily brief section: Validated Digest Core Opportunities" in audit
+    assert "Research card group: Core Opportunity Cards" in audit
     assert core_id in audit
     assert "Kraken" in audit
     assert "hidden diagnostics: 1" in audit

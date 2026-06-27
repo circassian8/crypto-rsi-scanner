@@ -119,6 +119,32 @@ def build_daily_brief(
         for item in core_opportunities
         if item.alertable or item.is_high_priority or item.is_watchlist or item.is_validated_digest
     }
+    near_misses = event_near_miss.detect_near_miss_rows(
+        [decision.entry for decision in decisions] + hypotheses,
+        route_decisions=decisions,
+    )
+    near_misses = tuple(
+        item for item in near_misses
+        if event_core_opportunities.incident_asset_key_for_values(
+            item.incident_id,
+            item.coin_id,
+            item.symbol,
+        ) not in promoted_core_asset_keys
+        and event_core_opportunities.asset_key_for_values(item.coin_id, item.symbol) not in promoted_core_assets
+    )
+    near_miss_asset_keys = {
+        event_core_opportunities.asset_key_for_values(item.coin_id, item.symbol)
+        for item in near_misses
+    }
+    near_miss_incident_asset_keys = {
+        event_core_opportunities.incident_asset_key_for_values(item.incident_id, item.coin_id, item.symbol)
+        for item in near_misses
+    }
+    local_core_rows = [
+        item for item in core_sections["local"]
+        if event_core_opportunities.asset_key_for_opportunity(item) not in near_miss_asset_keys
+        and event_core_opportunities.incident_asset_key_for_opportunity(item) not in near_miss_incident_asset_keys
+    ]
     latest = event_alpha_run_ledger.latest_run(runs, requested_profile) or {}
     selected_profile = str(latest.get("profile") or "default") if latest else "none"
     selected_namespace = str(latest.get("artifact_namespace") or "legacy") if latest else "none"
@@ -149,11 +175,12 @@ def build_daily_brief(
         "## Executive Summary",
         f"- Core opportunities: {len(core_opportunities)} "
         f"(high_priority={len(core_sections['strong'])}, digest={len(core_sections['digest'])}, "
-        f"watchlist={len(core_sections['watchlist'])}, local_or_capped={len(core_sections['local'])})",
+        f"watchlist={len(core_sections['watchlist'])}, near_miss={len(near_misses)}, "
+        f"local_or_capped={len(local_core_rows)})",
         f"- Alertable routed decisions: {len(alertable)}",
-        f"- Near-miss candidates: pending calculation below",
+        f"- Near-miss candidates: {len(near_misses)}",
         "",
-        "## Strong / High-Priority Core Opportunities",
+        "## High-Priority Core Opportunities",
         *_core_opportunity_lines(core_sections["strong"], limit=8),
         "",
         "## Validated Digest Core Opportunities",
@@ -162,13 +189,20 @@ def build_daily_brief(
         "## Watchlist Core Opportunities",
         *_core_opportunity_lines(core_sections["watchlist"], limit=8),
         "",
+        "## Near-Miss Candidates",
+        *_near_miss_daily_lines(near_misses, limit=8),
+        "",
         "## Quality-Capped / Local-Only Candidates",
-        *_core_opportunity_lines(core_sections["local"], limit=8),
+        *_core_opportunity_lines(local_core_rows, limit=8),
         "",
         "## Canonical Incidents",
         *_canonical_incident_lines(incidents),
         "",
-        "## Diagnostics / Source-Noise / Controls",
+        "## System Health",
+        *_system_health_summary_lines(latest),
+        "",
+        "## Diagnostics Appendix",
+        "### Diagnostics / Source-Noise / Controls",
         (
             "- Hidden from main opportunity sections by default: "
             f"diagnostic_rows={diagnostic_core_rows}, "
@@ -181,7 +215,7 @@ def build_daily_brief(
             else "- None."
         ),
         "",
-        "## System Health / Providers / Budget",
+        "### System Health / Providers / Budget",
     ]
     if mismatch_warning:
         lines.append(f"- Profile warning: {mismatch_warning}")
@@ -231,11 +265,11 @@ def build_daily_brief(
                 f"- Notify delivery failures: {int(latest_notification.get('deliveries_failed') or 0)} "
                 "failed delivery row(s) — run --event-alpha-notification-deliveries-report"
             )
-    lines.extend(["", "### Provider Health"])
+    lines.extend(["", "#### Provider Health"])
     lines.extend(_provider_health_lines(provider_health_rows or {}))
-    lines.extend(["", "### LLM Budget"])
+    lines.extend(["", "#### LLM Budget"])
     lines.extend(_llm_budget_lines(latest))
-    lines.extend(["", "## Impact Hypotheses"])
+    lines.extend(["", "### Impact Hypotheses"])
     if latest:
         lines.append(
             f"- Generated/validated/promoted: {int(latest.get('impact_hypotheses') or 0)} / "
@@ -332,7 +366,7 @@ def build_daily_brief(
                 lines.append("- Rejected evidence examples: " + " | ".join(titles[:3]))
     elif latest and int(latest.get("impact_hypotheses") or 0) > 0:
         lines.append("- Stored rows: none loaded for this profile; inspect --event-impact-hypotheses-report.")
-    lines.extend(["", "## Catalyst Search Skip Reasons"])
+    lines.extend(["", "### Catalyst Search Skip Reasons"])
     if latest:
         skip_reasons = latest.get("catalyst_search_skip_reasons") or {}
         if isinstance(skip_reasons, Mapping) and skip_reasons:
@@ -344,11 +378,11 @@ def build_daily_brief(
             lines.append("- None.")
     else:
         lines.append("- No run row available.")
-    lines.extend(["", "## New Since Last Run"])
+    lines.extend(["", "### New Since Last Run"])
     lines.extend(_new_since_last_run_lines(runs))
-    lines.extend(["", "## Watchlist Got Hotter"])
+    lines.extend(["", "### Watchlist Got Hotter"])
     lines.extend(_watchlist_hotter_lines(entries))
-    lines.extend(["", "## Alertable Decisions"])
+    lines.extend(["", "### Alertable Decisions"])
     if alertable:
         if include_diagnostics:
             for decision in alertable[:10]:
@@ -358,7 +392,7 @@ def build_daily_brief(
             lines.append(f"- {len(alertable)} routed alertable decision(s); see core opportunity sections above.")
     else:
         lines.append("- None.")
-    lines.extend(["", "## Validated Impact Hypothesis Routing"])
+    lines.extend(["", "### Validated Impact Hypothesis Routing"])
     alertable_hypotheses = [
         decision for decision in decisions
         if decision.entry.relationship_type == "impact_hypothesis" and event_alpha_router.alertable_after_quality_gate(decision)
@@ -435,36 +469,9 @@ def build_daily_brief(
     lines.append("- Market confirmation by playbook: " + _market_confirmation_by_playbook(decisions))
     lines.append("- Top upgrade candidates: " + (_upgrade_candidate_line(decisions) or "none"))
     lines.append("- Top downgrade risks: " + (_downgrade_risk_line(decisions) or "none"))
-    near_misses = event_near_miss.detect_near_miss_rows(
-        [decision.entry for decision in decisions] + hypotheses,
-        route_decisions=decisions,
-    )
-    near_misses = tuple(
-        item for item in near_misses
-        if event_core_opportunities.incident_asset_key_for_values(
-            item.incident_id,
-            item.coin_id,
-            item.symbol,
-        ) not in promoted_core_asset_keys
-        and event_core_opportunities.asset_key_for_values(item.coin_id, item.symbol) not in promoted_core_assets
-    )
-    lines.extend(["", "## Near-Miss Candidates"])
-    if near_misses:
-        for item in near_misses[:8]:
-            missing = ", ".join(item.missing_evidence[:3]) if item.missing_evidence else "none"
-            actions = ", ".join(item.recommended_refresh_actions[:3]) if item.recommended_refresh_actions else "operator_review"
-            refresh = (
-                f"market_refresh={str(item.market_refresh_attempted).lower()}/"
-                f"{str(item.market_refresh_success).lower()}"
-            )
-            lines.append(
-                f"- {item.symbol}/{item.coin_id}: score={item.opportunity_score_before:.0f} "
-                f"level={item.opportunity_level_before} route={item.final_route_before or 'unknown'} "
-                f"missing={missing}; actions={actions}; {refresh}"
-            )
-    else:
-        lines.append("- None.")
-    lines.extend(["", "## Signal Quality Summary"])
+    lines.extend(["", "### Near-Miss Diagnostics"])
+    lines.extend(_near_miss_diagnostic_lines(near_misses, limit=8))
+    lines.extend(["", "### Signal Quality Summary"])
     lines.append("- Opportunity Verdict Distribution: " + _quality_decision_counts(decisions, "opportunity_level"))
     lines.append("- Impact Path Distribution: " + _quality_decision_counts(decisions, "impact_path_type"))
     lines.append("- Candidate Role Distribution: " + _quality_decision_counts(decisions, "candidate_role"))
@@ -478,12 +485,12 @@ def build_daily_brief(
     lines.append("- Top Downgrade Risks: " + (_downgrade_risk_line(decisions) or "none"))
     lines.append("- Candidate Discovery Funnel: " + _candidate_discovery_funnel_line(hypotheses))
     lines.append("- Feedback by Impact Path: " + _feedback_by_impact_path(alerts, feedback))
-    lines.extend(["", "## Quality Gate Downgrades"])
+    lines.extend(["", "### Quality Gate Downgrades"])
     downgraded = _quality_gate_downgrades(decisions)
     lines.append("- Downgraded items: " + (_brief_decisions(downgraded[:5]) or "none"))
     lines.append("- Top blocked route attempts: " + (_blocked_route_attempts_line(downgraded) or "none"))
     lines.append("- Reason counts: " + _quality_gate_reason_counts(downgraded))
-    lines.extend(["", "## Legacy Quality Conflicts"])
+    lines.extend(["", "### Legacy Quality Conflicts"])
     conflicts = _legacy_quality_conflicts(alerts)
     lines.extend(_legacy_quality_conflict_lines(conflicts[:8]))
     exploratory = event_alpha_notifications.select_exploratory_candidates(
@@ -504,7 +511,7 @@ def build_daily_brief(
         and event_core_opportunities.asset_key_for_values(item.decision.entry.coin_id, item.decision.entry.symbol)
         not in promoted_core_assets
     )
-    lines.extend(["", "## Exploratory Digest"])
+    lines.extend(["", "### Exploratory Digest"])
     exploratory_due = _lane_count(latest_notification, "lane_counts_due", event_alpha_notifications.LANE_EXPLORATORY_DIGEST)
     exploratory_sent = _lane_count(latest_notification, "lane_counts_sent", event_alpha_notifications.LANE_EXPLORATORY_DIGEST)
     lines.append(f"- Lane count sent/due: {exploratory_sent}/{exploratory_due}")
@@ -518,7 +525,7 @@ def build_daily_brief(
             )
     else:
         lines.append("- None.")
-    lines.extend(["", "## Active Watchlist"])
+    lines.extend(["", "### Active Watchlist"])
     active = [
         entry for entry in entries
         if not event_watchlist.state_is_quality_capped(entry)
@@ -535,7 +542,7 @@ def build_daily_brief(
             lines.append(f"- {event_watchlist.final_state_value(entry)}: {entry.symbol}/{entry.coin_id} score={entry.latest_score} playbook={entry.latest_playbook_type or 'unknown'}")
     else:
         lines.append("- No active watchlist entries.")
-    lines.extend(["", "## Quality-Capped Watchlist Rows"])
+    lines.extend(["", "### Quality-Capped Watchlist Rows"])
     capped = [entry for entry in entries if event_watchlist.state_is_quality_capped(entry)]
     if capped:
         for entry in sorted(capped, key=lambda item: item.latest_score, reverse=True)[:10]:
@@ -549,49 +556,53 @@ def build_daily_brief(
             )
     else:
         lines.append("- None.")
-    lines.extend(["", "## Research Cards"])
+    lines.extend(["", "### Research Cards"])
     cards = [Path(path) for path in card_paths]
     if cards:
-        lines.append("### Core Opportunity Cards")
-        for path in _card_paths_for_daily_brief(cards, include_diagnostics=include_diagnostics)[:20]:
-            lines.append(f"- [{path.name}]({path})")
-        lines.append("### Diagnostic / Source-Noise / Control Cards")
-        if diagnostic_core_rows or diagnostic_capped_rows:
-            lines.append(
-                f"- Hidden from main card list by default: diagnostics={diagnostic_core_rows}, "
-                f"quality_capped_support={diagnostic_capped_rows}"
-            )
-            if include_diagnostics:
-                for path in cards:
-                    if path not in _card_paths_for_daily_brief(cards, include_diagnostics=False):
-                        lines.append(f"- [{path.name}]({path})")
-        else:
-            lines.append("- None.")
+        grouped_cards = _card_groups_for_daily_brief(cards)
+        for group_name in event_research_cards.CARD_INDEX_GROUPS:
+            paths = grouped_cards.get(group_name, [])
+            if group_name == "Diagnostic / Source-Noise / Control Cards" and not include_diagnostics:
+                lines.append(f"#### {group_name}")
+                hidden_count = len(paths)
+                lines.append(
+                    f"- Hidden from main card list by default: cards={hidden_count}, "
+                    f"diagnostics={diagnostic_core_rows}, quality_capped_support={diagnostic_capped_rows}"
+                )
+                continue
+            lines.append(f"#### {group_name}")
+            if not paths:
+                lines.append("- None.")
+                continue
+            for path in paths[:20]:
+                lines.append(f"- [{path.name}]({path})")
+            if len(paths) > 20:
+                lines.append(f"- +{len(paths) - 20} more cards")
     else:
         lines.append("- No cards written for this brief.")
-    lines.extend(["", "## Missed Opportunities"])
+    lines.extend(["", "### Missed Opportunities"])
     if missed:
         for row in sorted(missed, key=lambda item: abs(_float(item.get("return_pct"))), reverse=True)[:5]:
             lines.append(f"- {row.get('symbol') or row.get('coin_id')}: {row.get('move_window')} {row.get('return_pct')} stage={row.get('failure_stage')}")
     else:
         lines.append("- No missed-opportunity rows found.")
-    lines.extend(["", "## Source Reliability"])
+    lines.extend(["", "### Source Reliability"])
     lines.append(_compact(event_source_reliability.format_source_reliability_report(
         alerts,
         feedback_rows=feedback,
         missed_rows=missed,
         run_rows=runs[:10],
     )))
-    lines.extend(["", "## Calibration Recommendations"])
+    lines.extend(["", "### Calibration Recommendations"])
     lines.append(_compact(event_alpha_calibration.format_calibration_report(
         alerts,
         feedback_rows=feedback,
         missed_rows=missed,
     )))
-    lines.extend(["", "## Top Suppression Reasons"])
+    lines.extend(["", "### Top Suppression Reasons"])
     lines.extend(_suppression_lines(decisions, entries))
     if not alertable:
-        lines.extend(["", "## Why No Alerts"])
+        lines.extend(["", "### Why No Alerts"])
         lines.append(_compact(event_alpha_explain.format_last_run_explanation(
             runs,
             alert_rows=alerts,
@@ -601,7 +612,7 @@ def build_daily_brief(
             include_legacy_artifacts=include_legacy_artifacts,
         )))
     else:
-        lines.extend(["", "## Why Alerts Were Sent"])
+        lines.extend(["", "### Why Alerts Were Sent"])
         for decision in alertable[:8]:
             lines.append(f"- {decision.entry.symbol}/{decision.entry.coin_id}: {decision.reason}")
     return _strip_sensitive("\n".join(lines).rstrip() + "\n")
@@ -634,6 +645,159 @@ def format_daily_brief_result(result: EventAlphaDailyBriefResult) -> str:
 def _compact(report: str) -> str:
     lines = [line for line in str(report or "").splitlines() if line and not line.startswith("=")]
     return "\n".join(f"> {line}" for line in lines[:20])
+
+
+def _system_health_summary_lines(latest: Mapping[str, Any]) -> list[str]:
+    if not latest:
+        return ["- No run ledger rows found; detailed diagnostics below."]
+    return [
+        f"- Latest run: {latest.get('run_id') or 'unknown'}",
+        f"- Success: {str(bool(latest.get('success'))).lower()}",
+        f"- Routed / alertable / sent: {int(latest.get('routed') or 0)} / "
+        f"{int(latest.get('alertable') or 0)} / {str(bool(latest.get('sent'))).lower()}",
+        f"- Catalyst frames analyzed / validated: "
+        f"{int(latest.get('catalyst_frames_analyzed') or latest.get('catalyst_frame_rows') or 0)} / "
+        f"{int(latest.get('catalyst_frame_validations') or latest.get('catalyst_frame_validations_applied') or 0)}",
+        "- Detailed provider, budget, routing, and quality diagnostics are in the appendix below.",
+    ]
+
+
+def _near_miss_daily_lines(
+    near_misses: Iterable[event_near_miss.EventNearMissCandidate],
+    *,
+    limit: int,
+) -> list[str]:
+    rows = list(near_misses)
+    if not rows:
+        return ["- None."]
+    lines: list[str] = []
+    for item in rows[:limit]:
+        interesting = _near_miss_interest(item)
+        missing = _friendly_reason_list(item.missing_evidence) or "none"
+        upgrade = _friendly_action_list(item.recommended_refresh_actions) or "operator review"
+        invalidate = _near_miss_invalidation(item)
+        lines.append(
+            f"- {item.symbol}/{item.coin_id}: {interesting} "
+            f"Score {item.opportunity_score_before:.0f}, level={_friendly_level(item.opportunity_level_before)}."
+        )
+        lines.append(f"  missing: {missing}")
+        lines.append(f"  would upgrade: {upgrade}")
+        lines.append(f"  would invalidate: {invalidate}")
+    if len(rows) > limit:
+        lines.append(f"- +{len(rows) - limit} more near-miss candidates")
+    return lines
+
+
+def _near_miss_diagnostic_lines(
+    near_misses: Iterable[event_near_miss.EventNearMissCandidate],
+    *,
+    limit: int,
+) -> list[str]:
+    rows = list(near_misses)
+    if not rows:
+        return ["- None."]
+    lines: list[str] = []
+    for item in rows[:limit]:
+        refresh = (
+            f"market_refresh={str(item.market_refresh_attempted).lower()}/"
+            f"{str(item.market_refresh_success).lower()}"
+        )
+        lines.append(
+            f"- {item.symbol}/{item.coin_id}: score={item.opportunity_score_before:.0f} "
+            f"level={item.opportunity_level_before} route={item.final_route_before or 'unknown'} "
+            f"raw_missing={', '.join(item.missing_evidence[:4]) or 'none'}; "
+            f"actions={', '.join(item.recommended_refresh_actions[:4]) or 'operator_review'}; {refresh}"
+        )
+    return lines
+
+
+_FRIENDLY_REASONS = {
+    "quality_context_missing": "missing enough validated context",
+    "needs_direct_token_mechanism": "needs proof that this event directly affects the token",
+    "needs_market_confirmation": "no convincing market reaction yet",
+    "market_confirmation": "no convincing market reaction yet",
+    "cause_unknown_market_dislocation": "token moved, but the cause is unknown",
+    "generic_cooccurrence_only": "token and event appeared together, but no impact mechanism was proven",
+    "impact_path_type_insufficient_data": "not enough evidence to establish the impact mechanism",
+    "impact_path_not_strong_enough": "impact path is not strong enough yet",
+    "score_below_promotion_threshold": "research score is below the promotion threshold",
+    "needs_strong_market_confirmation": "needs stronger price/volume confirmation",
+    "market_confirmation_level": "needs clearer market confirmation",
+    "source_low_quality": "needs a stronger independent source",
+    "needs_higher_quality_source": "needs a stronger independent source",
+    "blocked_by_low_score": "research score is still too low",
+    "blocked_by_source_noise": "source/noise risk is still too high",
+    "source_noise": "source text looks like publisher/noise rather than asset evidence",
+    "ticker_collision": "ticker collision risk",
+    "ticker_word_collision": "ticker word collision risk",
+    "source_origin_only_identity": "asset identity came only from source/publisher context",
+    "identity_low_confidence": "asset identity confidence is too low",
+    "rejected_candidate_asset": "candidate asset evidence was rejected",
+}
+
+
+def _friendly_reason(reason: object) -> str:
+    text = str(reason or "").strip()
+    if not text:
+        return ""
+    return _FRIENDLY_REASONS.get(text, text.replace("_", " "))
+
+
+def _friendly_reason_list(reasons: Iterable[object]) -> str:
+    translated = [_friendly_reason(reason) for reason in reasons]
+    translated = [reason for reason in translated if reason]
+    return "; ".join(dict.fromkeys(translated[:5]))
+
+
+def _friendly_action(action: object) -> str:
+    text = str(action or "").strip()
+    mapping = {
+        "targeted_market_refresh": "refresh market/volume context",
+        "targeted_derivatives_refresh": "check OI/funding/derivatives crowding",
+        "targeted_supply_refresh": "check unlock/supply pressure",
+        "targeted_evidence_refresh": "find independent catalyst evidence",
+        "operator_review": "manual analyst review",
+    }
+    return mapping.get(text, text.replace("_", " "))
+
+
+def _friendly_action_list(actions: Iterable[object]) -> str:
+    translated = [_friendly_action(action) for action in actions]
+    translated = [action for action in translated if action]
+    return "; ".join(dict.fromkeys(translated[:5]))
+
+
+def _friendly_level(level: object) -> str:
+    return str(level or "unknown").replace("_", " ")
+
+
+def _near_miss_interest(item: event_near_miss.EventNearMissCandidate) -> str:
+    missing_text = " ".join(item.missing_evidence).casefold()
+    if "cause_unknown_market_dislocation" in missing_text:
+        return "token moved, but the cause is still unknown."
+    if "generic_cooccurrence_only" in missing_text:
+        return "source evidence mentions the token and catalyst together, but the impact mechanism is not proven."
+    if item.opportunity_score_before >= 60:
+        return "close to digest threshold but still missing confirmation."
+    return "interesting enough for local research, but not ready for alert routing."
+
+
+def _near_miss_invalidation(item: event_near_miss.EventNearMissCandidate) -> str:
+    missing_text = " ".join(item.missing_evidence).casefold()
+    if "cause_unknown_market_dislocation" in missing_text:
+        return "an unrelated market move, no catalyst found, or fast mean reversion."
+    if "generic_cooccurrence_only" in missing_text:
+        return "no direct token impact path appears after source review."
+    if "market" in missing_text:
+        return "price/volume reaction remains weak or fades."
+    return "identity, catalyst link, or market reaction fails review."
+
+
+def _card_groups_for_daily_brief(paths: Iterable[Path]) -> dict[str, list[Path]]:
+    grouped: dict[str, list[Path]] = {name: [] for name in event_research_cards.CARD_INDEX_GROUPS}
+    for path in paths:
+        grouped.setdefault(event_research_cards.card_index_group(path), []).append(Path(path))
+    return grouped
 
 
 def _latest_notification_run(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any] | None:
@@ -812,6 +976,12 @@ def _core_opportunity_lines(
             f"score={item.opportunity_score_final:.0f} "
             f"path={item.primary_impact_path} role={item.candidate_role} "
             f"categories={categories} paths={paths}{diagnostics}"
+        )
+        lines.append(
+            f"  support: hypotheses={len(item.supporting_hypothesis_ids)} "
+            f"categories={categories} impact_paths={paths} "
+            f"hidden_diagnostics={item.diagnostic_row_count} "
+            f"quality_capped_support={item.quality_capped_supporting_rows}"
         )
         if item.supporting_evidence_quotes:
             lines.append(f"  evidence: {item.supporting_evidence_quotes[0]}")

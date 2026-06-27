@@ -361,6 +361,40 @@ def _false_positive_suspicion_reason(row: Mapping[str, Any]) -> str | None:
     role = str(row.get("candidate_role") or components.get("candidate_role") or "").casefold()
     impact = str(row.get("impact_path_type") or components.get("impact_path_type") or "").casefold()
     source_class = str(row.get("source_class") or components.get("source_class") or "").casefold()
+    explicit_noise_text = " ".join(str(value or "") for value in (
+        role,
+        impact,
+        source_class,
+        row.get("quality_gate_block_reason"),
+        row.get("quality_state_block_reason"),
+        row.get("route_block_reason"),
+        row.get("rejection_reasons"),
+        row.get("warnings"),
+        row.get("rejected_candidate_assets"),
+        components.get("rejected_candidate_assets"),
+    )).casefold()
+    explicit_noise_terms = {
+        "diagnostic_only",
+        "source_noise",
+        "invalid_subject",
+        "ticker_collision",
+        "ticker_word_collision",
+        "word_collision_false_positive",
+        "generic_cooccurrence_only",
+        "identity_low_confidence",
+        "source_origin_only_identity",
+        "identity_source_origin_rejected",
+        "common_word_collision",
+        "rejected_candidate_asset",
+        "publisher_suffix_false_positive",
+        "identity_url_only_rejected",
+    }
+    if (
+        impact == "market_dislocation_unknown"
+        and role in {"direct_subject", "macro_affected_asset", "ecosystem_affected_asset"}
+        and not any(term in explicit_noise_text for term in explicit_noise_terms)
+    ):
+        return None
     if (
         level in {"validated_digest", "watchlist", "high_priority"}
         and role not in {"source_noise", "ticker_word_collision", "ambiguous", "generic_mention"}
