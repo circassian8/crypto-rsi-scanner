@@ -71,8 +71,12 @@ def validate_llm_catalyst_frames(
         valid.append(_to_event_frame(frame, raws[0] if raws else None))
         if frame.frame_role in {event_catalyst_frames.ROLE_BACKGROUND, event_catalyst_frames.ROLE_HISTORICAL}:
             rejected.append(f"{frame.frame_type}:background_for:{frame.subject or 'unknown'}")
+            rejected.append("background_context_not_primary_catalyst")
+            if frame.frame_role == event_catalyst_frames.ROLE_HISTORICAL:
+                rejected.append("historical_context_only")
         if frame.frame_role in {event_catalyst_frames.ROLE_NEGATED, event_catalyst_frames.ROLE_CORRECTIVE}:
             rejected.append(f"{frame.frame_type}:negated_for:{frame.subject or 'unknown'}")
+            rejected.append("negated_claim_blocks_impact_path")
 
     selected, _supporting = event_catalyst_frames.select_main_catalyst_frame(valid, event)
     llm_main_type = selected.frame_type if selected is not None else None
@@ -86,6 +90,11 @@ def validate_llm_catalyst_frames(
         disagreements.append(disagreement_reason)
     if selected is not None and selected.frame_role == event_catalyst_frames.ROLE_MAIN:
         resolution = RESOLUTION_LLM_WINS if disagreement else RESOLUTION_RULES_WIN
+        if any(
+            frame.frame_role in {event_catalyst_frames.ROLE_BACKGROUND, event_catalyst_frames.ROLE_HISTORICAL}
+            for frame in valid
+        ):
+            rejected.append("main_catalyst_selected_over_background")
     if invalid and selected is None:
         resolution = RESOLUTION_RULES_WIN if rule_main is not None else RESOLUTION_UNRESOLVED
     if disagreement and _has_hard_gate(valid):

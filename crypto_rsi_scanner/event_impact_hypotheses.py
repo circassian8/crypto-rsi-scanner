@@ -187,11 +187,23 @@ class EventImpactHypothesis:
     claim_history: tuple[dict[str, Any], ...] = ()
     main_catalyst_frame_id: str | None = None
     main_frame_type: str | None = None
+    main_frame_role: str | None = None
+    main_frame_subject: str | None = None
+    main_frame_actor: str | None = None
+    main_frame_object: str | None = None
+    main_frame_evidence_quote: str | None = None
     background_frame_ids: tuple[str, ...] = ()
     negated_frame_ids: tuple[str, ...] = ()
+    corrective_frame_ids: tuple[str, ...] = ()
     frame_summary: tuple[dict[str, Any], ...] = ()
     background_context_summary: str | None = None
     rejected_impact_paths: tuple[str, ...] = ()
+    rejected_impact_paths_from_background: tuple[str, ...] = ()
+    selected_main_catalyst_reason: str | None = None
+    rule_predicted_impact_path: str | None = None
+    llm_predicted_main_frame_type: str | None = None
+    frame_rule_disagreement: bool | None = None
+    disagreement_resolution: str | None = None
     independent_source_domains: tuple[str, ...] = ()
     conflicting_claims: tuple[str, ...] = ()
     opportunity_score_final: float | None = None
@@ -1334,11 +1346,23 @@ def _hypothesis_from_rule(
         claim_history=tuple(_claim_to_row(claim) for claim in claim_rows[:12]),
         main_catalyst_frame_id=incident.main_catalyst_frame_id if incident else None,
         main_frame_type=incident.main_frame_type if incident else None,
+        main_frame_role=incident.main_frame_role if incident else None,
+        main_frame_subject=incident.main_frame_subject if incident else None,
+        main_frame_actor=incident.main_frame_actor if incident else None,
+        main_frame_object=incident.main_frame_object if incident else None,
+        main_frame_evidence_quote=incident.main_frame_evidence_quote if incident else None,
         background_frame_ids=incident.background_frame_ids if incident else (),
         negated_frame_ids=incident.negated_frame_ids if incident else (),
+        corrective_frame_ids=incident.corrective_frame_ids if incident else (),
         frame_summary=tuple(dict(item) for item in incident.frame_summary) if incident else (),
         background_context_summary=incident.background_context_summary if incident else None,
         rejected_impact_paths=_rejected_impact_paths_from_frames(incident) if incident else (),
+        rejected_impact_paths_from_background=_rejected_impact_paths_from_frames(incident) if incident else (),
+        selected_main_catalyst_reason=incident.selected_main_catalyst_reason if incident else None,
+        rule_predicted_impact_path=incident.rule_predicted_impact_path if incident else None,
+        llm_predicted_main_frame_type=incident.llm_predicted_main_frame_type if incident else None,
+        frame_rule_disagreement=incident.frame_rule_disagreement if incident else None,
+        disagreement_resolution=incident.disagreement_resolution if incident else None,
         independent_source_domains=incident.independent_source_domains if incident else (),
         conflicting_claims=incident.conflicting_claims if incident else (),
         created_at=now.isoformat(),
@@ -1575,14 +1599,27 @@ def _incident_frame_components(incident: event_incident_graph.CanonicalIncident)
     return {
         "main_catalyst_frame_id": incident.main_catalyst_frame_id,
         "main_frame_type": incident.main_frame_type,
+        "main_frame_role": incident.main_frame_role,
+        "main_frame_subject": incident.main_frame_subject,
+        "main_frame_actor": incident.main_frame_actor,
+        "main_frame_object": incident.main_frame_object,
+        "main_frame_evidence_quote": incident.main_frame_evidence_quote,
         "background_frame_ids": tuple(incident.background_frame_ids),
         "negated_frame_ids": tuple(incident.negated_frame_ids),
+        "corrective_frame_ids": tuple(incident.corrective_frame_ids),
         "background_context_summary": incident.background_context_summary,
         "frame_summary": tuple(incident.frame_summary),
         "selected_event_archetype": incident.event_archetype,
         "background_frame_count": float(len(incident.background_frame_ids)),
         "negated_frame_count": float(len(incident.negated_frame_ids)),
+        "corrective_frame_count": float(len(incident.corrective_frame_ids)),
         "rejected_impact_paths": _rejected_impact_paths_from_frames(incident),
+        "rejected_impact_paths_from_background": _rejected_impact_paths_from_frames(incident),
+        "selected_main_catalyst_reason": incident.selected_main_catalyst_reason,
+        "rule_predicted_impact_path": incident.rule_predicted_impact_path,
+        "llm_predicted_main_frame_type": incident.llm_predicted_main_frame_type,
+        "frame_rule_disagreement": incident.frame_rule_disagreement,
+        "disagreement_resolution": incident.disagreement_resolution,
     }
 
 
@@ -1598,8 +1635,25 @@ def _rejected_impact_paths_from_frames(incident: event_incident_graph.CanonicalI
         subject = str(frame.get("subject") or "unknown")
         if role in {"background_context", "historical_context"} and frame_type:
             out.append(f"{frame_type}:background_for:{subject}")
+            out.append("background_context_not_primary_catalyst")
+            if role == "historical_context":
+                out.append("historical_context_only")
         if role == "negated_claim" and frame_type:
             out.append(f"{frame_type}:negated_for:{subject}")
+            out.append("negated_claim_blocks_impact_path")
+        if role == "corrective_context" and frame_type:
+            out.append(f"{frame_type}:corrective_for:{subject}")
+            out.append("negated_claim_blocks_impact_path")
+    if any(
+        isinstance(frame, Mapping)
+        and str(frame.get("frame_role") or "") == "main_catalyst"
+        for frame in incident.frame_summary
+    ) and any(
+        isinstance(frame, Mapping)
+        and str(frame.get("frame_role") or "") in {"background_context", "historical_context"}
+        for frame in incident.frame_summary
+    ):
+        out.append("main_catalyst_selected_over_background")
     return tuple(dict.fromkeys(out))
 
 

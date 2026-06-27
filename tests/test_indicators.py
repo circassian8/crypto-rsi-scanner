@@ -22165,7 +22165,7 @@ def test_aave_kraken_hypothesis_uses_strategic_frame_in_cards_and_audit():
     )
     assert "main catalyst frame: acquisition_or_stake" in audit
     assert "background context: background: prior_exploit_context(KelpDAO)" in audit
-    assert "negated frame count: 1" in audit
+    assert "negated/corrective frame count: 1" in audit
 
 
 def test_llm_catalyst_frame_fixture_validation_and_downstream_use():
@@ -22259,8 +22259,17 @@ def test_llm_catalyst_frame_fixture_validation_and_downstream_use():
     incident = event_incident_graph.build_incidents((aave_event,), {enriched_raw.raw_id: enriched_raw})[0]
     assert incident.event_archetype == "strategic_investment"
     assert incident.main_frame_type == "acquisition_or_stake"
+    assert incident.main_frame_role == "main_catalyst"
+    assert incident.main_frame_subject == "Aave"
+    assert incident.main_frame_actor == "Kraken"
+    assert "15% stake" in (incident.main_frame_object or "")
+    assert "Kraken in talks" in (incident.main_frame_evidence_quote or "")
     assert incident.background_frame_ids
-    assert incident.negated_frame_ids
+    assert incident.corrective_frame_ids
+    assert incident.frame_rule_disagreement is True
+    assert incident.rule_predicted_impact_path == "exploit_security_event"
+    assert incident.llm_predicted_main_frame_type == "acquisition_or_stake"
+    assert incident.disagreement_resolution == "llm_wins"
     impact = event_impact_path_validator.validate_impact_path(
         enriched_raw,
         SimpleNamespace(impact_category="security_or_regulatory_shock", external_asset="Aave", score_components={}),
@@ -22357,6 +22366,8 @@ def test_event_alpha_operating_cycle_applies_llm_catalyst_frame_validation():
     enriched_raw = result.discovery_result.raw_events[0]
     validation = enriched_raw.raw_json["llm_catalyst_frame_validation"]
     assert validation["selected_main_frame"]["frame_type"] == "acquisition_or_stake"
+    assert validation["rule_predicted_impact_path"] == "acquisition_or_stake"
+    assert validation["llm_predicted_main_frame_type"] == "acquisition_or_stake"
     frames = event_catalyst_frames.build_catalyst_frames((enriched_raw,), event=event)
     selected_main, supporting_frames = event_catalyst_frames.select_main_catalyst_frame(frames)
     assert selected_main is not None
@@ -22365,6 +22376,8 @@ def test_event_alpha_operating_cycle_applies_llm_catalyst_frame_validation():
     incident = event_incident_graph.build_incidents((event,), {enriched_raw.raw_id: enriched_raw})[0]
     assert incident.event_archetype == "strategic_investment"
     assert incident.background_frame_ids
+    assert incident.main_frame_subject == "Aave"
+    assert incident.corrective_frame_ids
 
 
 def test_llm_catalyst_frame_validator_rejects_bad_quotes_and_identity_noise():
@@ -22469,6 +22482,13 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     assert event_alpha_profiles.get_profile("full_llm_live").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
     assert event_alpha_profiles.get_profile("catalyst_frame_validation").config_overrides["EVENT_LLM_CATALYST_FRAMES_PROVIDER"] == "fixture"
     assert event_alpha_profiles.get_profile("catalyst_frame_validation").with_llm is True
+    e2e = event_alpha_profiles.get_profile("catalyst_frame_e2e")
+    assert e2e.with_llm is True
+    assert e2e.send is False
+    assert e2e.config_overrides["EVENT_LLM_CATALYST_FRAMES_PROVIDER"] == "fixture"
+    assert str(e2e.config_overrides["EVENT_DISCOVERY_EVENTS_PATH"]).endswith("catalyst_frame_e2e_events.json")
+    assert e2e.config_overrides["EVENT_ANOMALY_SCANNER_ENABLED"] is False
+    assert e2e.config_overrides["EVENT_DISCOVERY_UNIVERSE_LIVE"] is False
     report = event_alpha_profiles.format_profile_report(event_alpha_profiles.get_profile("notify_llm_deep"))
     assert "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN=60" in report
     provider = OpenAILLMRelationshipProvider(api_key="")
@@ -22478,6 +22498,116 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     with open("Makefile", encoding="utf-8") as fh:
         text = fh.read()
     assert "event-alpha-catalyst-frame-validation-cycle" in text
+    assert "event-alpha-catalyst-frame-e2e-cycle" in text
+
+
+def test_event_alpha_catalyst_frame_e2e_cycle_writes_frame_artifacts():
+    import contextlib
+    import io
+    import json
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import config, scanner
+
+    attrs = (
+        "EVENT_DISCOVERY_EVENTS_PATH",
+        "EVENT_DISCOVERY_ALIASES_PATH",
+        "EVENT_DISCOVERY_UNIVERSE_PATH",
+        "EVENT_DISCOVERY_UNIVERSE_LIVE",
+        "EVENT_MARKET_ENRICHMENT_ENABLED",
+        "EVENT_ANOMALY_SCANNER_ENABLED",
+        "EVENT_CATALYST_SEARCH_ENABLED",
+        "EVENT_IMPACT_HYPOTHESIS_SEARCH_ENABLED",
+        "EVENT_IMPACT_HYPOTHESIS_CANDIDATE_DISCOVERY_ENABLED",
+        "EVENT_WATCHLIST_ENABLED",
+        "EVENT_WATCHLIST_STATE_PATH",
+        "EVENT_ALPHA_ROUTER_ENABLED",
+        "EVENT_ALPHA_ALERT_STORE_PATH",
+        "EVENT_ALPHA_RUN_LEDGER_PATH",
+        "EVENT_INCIDENT_STORE_PATH",
+        "EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
+        "EVENT_RESEARCH_CARDS_DIR",
+        "EVENT_ALPHA_DAILY_BRIEF_PATH",
+        "EVENT_ALPHA_RUN_MODE",
+        "EVENT_ALPHA_ARTIFACT_NAMESPACE",
+        "EVENT_ALPHA_ARTIFACT_BASE_DIR",
+        "EVENT_ALERTS_ENABLED",
+        "EVENT_RESEARCH_CARDS_AUTO_WRITE",
+        "EVENT_RESEARCH_CARDS_WRITE_TIERS",
+        "EVENT_LLM_ENABLED",
+        "EVENT_LLM_PROVIDER",
+        "EVENT_LLM_MODE",
+        "EVENT_LLM_EXTRACTOR_ENABLED",
+        "EVENT_LLM_CATALYST_FRAMES_ENABLED",
+        "EVENT_LLM_CATALYST_FRAMES_PROVIDER",
+        "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN",
+        "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE",
+        "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS",
+    )
+    original = {name: getattr(config, name) for name in attrs}
+
+    def read_jsonl(path):
+        return [
+            json.loads(line)
+            for line in Path(path).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        config.EVENT_ALPHA_ARTIFACT_BASE_DIR = Path(tmp)
+        config.EVENT_ALPHA_ARTIFACT_NAMESPACE = ""
+        config.EVENT_ALPHA_RUN_MODE = ""
+        config.EVENT_ALERTS_ENABLED = False
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                scanner.event_alpha_cycle(profile_name="catalyst_frame_e2e", event_now="2026-06-15T16:00:00Z")
+            text = out.getvalue()
+            assert "EVENT ALPHA PIPELINE REPORT" in text
+            assert "catalyst_frames=5/5" in text
+            assert "send_attempted=false" in text
+
+            incident_rows = read_jsonl(config.EVENT_INCIDENT_STORE_PATH)
+            hypothesis_rows = read_jsonl(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH)
+            watchlist_rows = read_jsonl(config.EVENT_WATCHLIST_STATE_PATH)
+            run_rows = read_jsonl(config.EVENT_ALPHA_RUN_LEDGER_PATH)
+            assert incident_rows
+            assert hypothesis_rows
+            assert watchlist_rows
+            assert run_rows[-1]["profile"] == "catalyst_frame_e2e"
+            assert run_rows[-1]["send_requested"] is False
+            assert run_rows[-1]["catalyst_frames_analyzed"] == 5
+            assert run_rows[-1]["catalyst_frame_validations"] == 5
+
+            aave_incident = next(row for row in incident_rows if row.get("main_frame_subject") == "Aave")
+            assert aave_incident["event_archetype"] == "strategic_investment"
+            assert aave_incident["main_frame_type"] == "acquisition_or_stake"
+            assert aave_incident["main_frame_actor"] == "Kraken"
+            assert aave_incident["corrective_frame_ids"]
+            assert aave_incident["main_frame_type"] != "exploit_security_event"
+
+            aave_hypothesis = next(row for row in hypothesis_rows if row.get("main_frame_subject") == "Aave")
+            assert aave_hypothesis["main_frame_type"] == "acquisition_or_stake"
+            assert aave_hypothesis["impact_path_reason"] == "strategic_investment"
+            assert aave_hypothesis["impact_path_type"] == "strategic_investment_or_valuation"
+            assert "prior_exploit_context:background_for:KelpDAO" in aave_hypothesis["rejected_impact_paths"]
+            assert "background_context_not_primary_catalyst" in aave_hypothesis["rejected_impact_paths"]
+            assert aave_hypothesis["selected_main_catalyst_reason"]
+
+            thor_incident = next(row for row in incident_rows if row.get("main_frame_subject") == "THORChain")
+            assert thor_incident["main_frame_type"] == "exploit_security_event"
+            memecore_incident = next(row for row in incident_rows if row.get("main_frame_subject") == "MemeCore")
+            assert memecore_incident["event_archetype"] == "market_dislocation_unknown"
+            assert all(row.get("latest_tier") != "TRIGGERED_FADE" for row in watchlist_rows)
+            card_files = list(Path(config.EVENT_RESEARCH_CARDS_DIR).glob("*.md"))
+            assert card_files
+            assert "Main catalyst: acquisition_or_stake" in card_files[0].read_text(encoding="utf-8") or any(
+                "Main catalyst: acquisition_or_stake" in path.read_text(encoding="utf-8")
+                for path in card_files
+            )
+        finally:
+            for name, value in original.items():
+                setattr(config, name, value)
 
 
 def test_event_alpha_claim_semantics_incidents_roles_and_market_context():

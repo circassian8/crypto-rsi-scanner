@@ -25,7 +25,11 @@ only after deterministic validation. Valid frames require quote support in the
 source text, acceptable crypto-asset identity evidence, no external-entity-as-
 crypto misuse, and no generic ticker-word collision. A validated LLM main frame
 may override a weaker deterministic rule frame only when those gates pass and
-the disagreement is recorded. Hard deterministic safety gates still win:
+the disagreement is recorded. Once accepted, the transformed raw rows are the
+authoritative source for downstream incident and impact-hypothesis artifacts,
+so incident, hypothesis, watchlist, card, audit, daily-brief, and run-ledger
+rows should preserve selected-main-frame, background/corrective, rejected-path,
+and rule-vs-LLM resolution metadata. Hard deterministic safety gates still win:
 validated LLM frames cannot create `TRIGGERED_FADE`, send notifications, open
 paper/live trades, write normal RSI signal rows, or bypass resolver, quality,
 proxy/direct, or event-fade eligibility checks.

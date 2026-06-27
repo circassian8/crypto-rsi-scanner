@@ -633,6 +633,43 @@ _PROFILES["catalyst_frame_validation"] = replace(
 )
 
 
+_PROFILES["catalyst_frame_e2e"] = replace(
+    _PROFILES["catalyst_frame_validation"],
+    name="catalyst_frame_e2e",
+    description=(
+        "Offline end-to-end Event Alpha fixture cycle proving quote-checked LLM "
+        "catalyst frames survive incidents, hypotheses, watchlist state, cards, "
+        "daily brief, and run ledger artifacts; no sends and no live providers."
+    ),
+    config_overrides={
+        **_PROFILES["catalyst_frame_validation"].config_overrides,
+        "EVENT_DISCOVERY_EVENTS_PATH": Path("fixtures/event_discovery/catalyst_frame_e2e_events.json"),
+        "EVENT_DISCOVERY_ALIASES_PATH": Path("fixtures/event_discovery/catalyst_frame_e2e_aliases.json"),
+        "EVENT_DISCOVERY_UNIVERSE_PATH": None,
+        "EVENT_DISCOVERY_UNIVERSE_LIVE": False,
+        "EVENT_MARKET_ENRICHMENT_ENABLED": False,
+        "EVENT_ANOMALY_SCANNER_ENABLED": False,
+        "EVENT_CATALYST_SEARCH_ENABLED": False,
+        "EVENT_IMPACT_HYPOTHESIS_SEARCH_ENABLED": False,
+        "EVENT_IMPACT_HYPOTHESIS_CANDIDATE_DISCOVERY_ENABLED": False,
+        "EVENT_ALPHA_SNAPSHOT_POLICY": "all",
+        "EVENT_RESEARCH_CARDS_AUTO_WRITE": True,
+        "EVENT_RESEARCH_CARDS_WRITE_TIERS": (
+            "STORE_ONLY",
+            "RADAR_DIGEST",
+            "WATCHLIST",
+            "HIGH_PRIORITY_WATCH",
+            "TRIGGERED_FADE",
+        ),
+    },
+    snapshot_policy="all",
+    card_auto_write=True,
+    card_write_tiers=("STORE_ONLY", "RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"),
+    with_llm=True,
+    send=False,
+)
+
+
 _PROFILES["notify_llm_quality"] = EventAlphaProfile(
     name="notify_llm_quality",
     description=(

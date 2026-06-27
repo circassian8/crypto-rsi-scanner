@@ -13,6 +13,7 @@ from . import (
     event_alpha_router,
     event_alpha_priors,
     event_anomaly_state,
+    event_catalyst_frames,
     event_catalyst_frame_validator,
     event_llm_catalyst_frames,
     event_catalyst_search,
@@ -612,9 +613,11 @@ def run_event_alpha_operating_cycle(
                         if analysis is None:
                             enriched.append(raw)
                             continue
+                        rule_frames = event_catalyst_frames.build_catalyst_frames((raw,))
                         validation = event_catalyst_frame_validator.validate_llm_catalyst_frames(
                             analysis,
-                            raw_events,
+                            (raw,),
+                            rule_frames=rule_frames,
                         )
                         enriched.append(event_catalyst_frame_validator.apply_validation_to_raw_event(
                             raw,
@@ -669,6 +672,7 @@ def run_event_alpha_operating_cycle(
             transformed = tuple(llm_transform(transformed))
         if catalyst_frame_transform is not None:
             transformed = tuple(catalyst_frame_transform(transformed))
+        source_raw_events = tuple(transformed)
         return transformed
 
     raw_event_transform: RawEventTransform | None = None

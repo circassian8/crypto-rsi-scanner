@@ -1,0 +1,64 @@
+{
+  "assets": [
+    {
+      "coin_id": "aave",
+      "symbol": "AAVE",
+      "name": "Aave",
+      "aliases": ["aave", "aave protocol"],
+      "categories": ["defi", "lending"],
+      "contract_addresses": {},
+      "market_cap": 1500000000,
+      "volume_24h": 120000000,
+      "price": 100.0,
+      "source": "catalyst_frame_e2e_fixture"
+    },
+    {
+      "coin_id": "thorchain",
+      "symbol": "RUNE",
+      "name": "THORChain",
+      "aliases": ["rune", "thorchain", "thor chain"],
+      "categories": ["defi", "cross-chain"],
+      "contract_addresses": {},
+      "market_cap": 600000000,
+      "volume_24h": 90000000,
+      "price": 2.4,
+      "source": "catalyst_frame_e2e_fixture"
+    },
+    {
+      "coin_id": "memecore",
+      "symbol": "M",
+      "name": "MemeCore",
+      "aliases": ["memecore", "m token", "$m"],
+      "categories": ["meme"],
+      "contract_addresses": {},
+      "market_cap": 120000000,
+      "volume_24h": 85000000,
+      "price": 0.12,
+      "source": "catalyst_frame_e2e_fixture"
+    },
+    {
+      "coin_id": "zcash",
+      "symbol": "ZEC",
+      "name": "Zcash",
+      "aliases": ["zec", "zcash"],
+      "categories": ["privacy"],
+      "contract_addresses": {},
+      "market_cap": 850000000,
+      "volume_24h": 110000000,
+      "price": 42.0,
+      "source": "catalyst_frame_e2e_fixture"
+    },
+    {
+      "coin_id": "velvet",
+      "symbol": "VELVET",
+      "name": "Velvet",
+      "aliases": ["velvet", "velvet capital", "velvet.trade"],
+      "categories": ["synthetic-exposure", "proxy"],
+      "contract_addresses": {},
+      "market_cap": 45000000,
+      "volume_24h": 120000000,
+      "price": 7.2,
+      "source": "catalyst_frame_e2e_fixture"
+    }
+  ]
+}

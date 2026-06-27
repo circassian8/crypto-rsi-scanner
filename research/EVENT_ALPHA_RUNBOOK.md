@@ -174,9 +174,17 @@ weaker deterministic frame. Use:
 
 ```
 make event-alpha-catalyst-frame-validation-cycle PYTHON=python3
-make event-opportunity-audit TARGET=AAVE PROFILE=catalyst_frame_validation PYTHON=python3
-make event-alpha-daily-brief PROFILE=catalyst_frame_validation PYTHON=python3
+make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3
+make event-opportunity-audit TARGET=AAVE PROFILE=catalyst_frame_e2e PYTHON=python3
+make event-alpha-daily-brief PROFILE=catalyst_frame_e2e PYTHON=python3
 ```
+
+
+`catalyst_frame_e2e` is the preferred local proof when reviewing artifact
+fidelity. It writes only under `event_fade_cache/catalyst_frame_e2e/`, uses
+fixture raw events and fixture LLM catalyst frames, disables live providers and
+sends, and proves that AAVE/Kraken remains a strategic investment while KelpDAO
+exploit language stays background/corrective context.
 
 The feature is research metadata only. It cannot send notifications, create
 paper/live rows, write normal RSI signals, execute trades, or create

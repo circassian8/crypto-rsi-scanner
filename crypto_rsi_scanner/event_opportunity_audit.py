@@ -323,9 +323,21 @@ def _incident_lines(
             else "weak or quality-blocked links do not make an incident active"
         ),
         f"- primary subject: {source.get('primary_subject') or components.get('primary_subject') or 'unknown'}",
-        f"- main catalyst frame: {source.get('main_frame_type') or components.get('main_frame_type') or 'unknown'}",
+        f"- main catalyst frame: {source.get('main_frame_type') or components.get('main_frame_type') or 'unknown'} "
+        f"({source.get('main_frame_role') or components.get('main_frame_role') or 'unknown'})",
+        f"- main catalyst subject/actor/object: "
+        f"{source.get('main_frame_subject') or components.get('main_frame_subject') or 'unknown'} / "
+        f"{source.get('main_frame_actor') or components.get('main_frame_actor') or 'unknown'} / "
+        f"{source.get('main_frame_object') or components.get('main_frame_object') or 'unknown'}",
+        f"- main catalyst evidence: {source.get('main_frame_evidence_quote') or components.get('main_frame_evidence_quote') or 'none'}",
+        f"- selected main catalyst reason: {source.get('selected_main_catalyst_reason') or components.get('selected_main_catalyst_reason') or 'unknown'}",
+        f"- rule vs LLM frame: rule={source.get('rule_predicted_impact_path') or components.get('rule_predicted_impact_path') or 'unknown'} "
+        f"llm={source.get('llm_predicted_main_frame_type') or components.get('llm_predicted_main_frame_type') or 'unknown'} "
+        f"disagreement={source.get('frame_rule_disagreement') if source.get('frame_rule_disagreement') is not None else components.get('frame_rule_disagreement', 'unknown')} "
+        f"resolution={source.get('disagreement_resolution') or components.get('disagreement_resolution') or 'unknown'}",
         f"- background context: {source.get('background_context_summary') or components.get('background_context_summary') or 'none'}",
-        f"- negated frame count: {len(source.get('negated_frame_ids') or components.get('negated_frame_ids') or [])}",
+        f"- negated/corrective frame count: "
+        f"{len(source.get('negated_frame_ids') or components.get('negated_frame_ids') or []) + len(source.get('corrective_frame_ids') or components.get('corrective_frame_ids') or [])}",
         f"- rejected/background impact paths: {_list_value(source.get('rejected_impact_paths') or components.get('rejected_impact_paths'))}",
         f"- affected ecosystem: {source.get('affected_ecosystem') or components.get('affected_ecosystem') or 'unknown'}",
         f"- current cause status: {source.get('current_cause_status') or source.get('cause_status') or components.get('cause_status') or 'unknown'}",

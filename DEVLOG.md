@@ -17,6 +17,17 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+
+## 2026-06-27 — Prove catalyst-frame semantics through Event Alpha artifacts · Codex
+**Why:** The LLM catalyst-frame eval proved AAVE/Kraken/KelpDAO in isolation, but the operational artifacts could still be generated from pre-LLM raw rows. The proof needed to run through the full Event Alpha pipeline so cards, audits, incidents, hypotheses, watchlist state, daily brief, and run ledger all agree.
+**Changes:**
+- Changed the Event Alpha raw-event transform path so downstream hypothesis/incident generation receives the transformed rows after source enrichment, extraction hints, and validated LLM catalyst frames.
+- Promoted catalyst-frame metadata through canonical incidents, incident-store rows, impact hypotheses, score components, cards, opportunity audits, daily briefs, and run-ledger counters. Rows now preserve main frame role/subject/actor/object/evidence, corrective frame ids, selected-main reason, rule/LLM predictions, disagreement resolution, and rejected background/corrective impact paths.
+- Added the isolated `catalyst_frame_e2e` fixture profile, AAVE/THORChain/MemeCore/ZEC/VELVET e2e fixtures, and `make event-alpha-catalyst-frame-e2e-cycle`, writing artifacts under `event_fade_cache/catalyst_frame_e2e/` without live providers or sends.
+- Added regression tests proving AAVE stays `strategic_investment_or_valuation`, KelpDAO exploit language is rejected background/corrective context, THORChain remains direct exploit, MemeCore remains unknown market dislocation, and no fixture creates `TRIGGERED_FADE`.
+**Verify:** `python3 tests/test_indicators.py` passed (470/470); `make event-alpha-signal-quality-eval PYTHON=python3` passed (32/32); `make event-alpha-quality-validation-cycle PYTHON=python3` passed; `make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; manual `make event-opportunity-audit PROFILE=catalyst_frame_e2e TARGET=AAVE PYTHON=python3` showed AAVE/Kraken as `acquisition_or_stake` with KelpDAO background/corrective rejected; `make verify PYTHON=python3` passed.
+**Notes/risks:** Research-only artifact hardening. Validated LLM frames still cannot send notifications, create paper/live rows, write normal RSI signals, bypass quality/resolver/event-fade gates, or create `TRIGGERED_FADE`.
+
 ## 2026-06-27 — Add quote-validated LLM catalyst-frame analyzer · Codex
 **Why:** Deterministic catalyst framing now separates main/background context,
 but AAVE/Kraken/KelpDAO-style articles need a constrained semantic support

@@ -450,10 +450,21 @@ def _row_from_incident(
         "primary_subject": primary_subject,
         "main_catalyst_frame_id": incident.main_catalyst_frame_id,
         "main_frame_type": incident.main_frame_type,
+        "main_frame_role": incident.main_frame_role,
+        "main_frame_subject": incident.main_frame_subject,
+        "main_frame_actor": incident.main_frame_actor,
+        "main_frame_object": incident.main_frame_object,
+        "main_frame_evidence_quote": incident.main_frame_evidence_quote,
         "background_frame_ids": tuple(incident.background_frame_ids),
         "negated_frame_ids": tuple(incident.negated_frame_ids),
+        "corrective_frame_ids": tuple(incident.corrective_frame_ids),
         "frame_summary": tuple(incident.frame_summary),
         "background_context_summary": incident.background_context_summary,
+        "rule_predicted_impact_path": incident.rule_predicted_impact_path,
+        "llm_predicted_main_frame_type": incident.llm_predicted_main_frame_type,
+        "frame_rule_disagreement": incident.frame_rule_disagreement,
+        "disagreement_resolution": incident.disagreement_resolution,
+        "selected_main_catalyst_reason": incident.selected_main_catalyst_reason,
         "incident_subject_quality": subject_quality,
         "incident_subject_quality_reason": subject_quality_reason,
         "diagnostic_only": diagnostic_only,
@@ -1370,8 +1381,17 @@ def _incident_lines(row: Mapping[str, Any]) -> list[str]:
         (
             "  catalyst_frames: "
             f"main={row.get('main_frame_type') or 'unknown'} "
+            f"role={row.get('main_frame_role') or 'unknown'} "
+            f"subject={row.get('main_frame_subject') or 'unknown'} "
+            f"actor={row.get('main_frame_actor') or 'unknown'} "
+            f"object={row.get('main_frame_object') or 'unknown'} "
             f"background={len(row.get('background_frame_ids') or [])} "
             f"negated={len(row.get('negated_frame_ids') or [])} "
+            f"corrective={len(row.get('corrective_frame_ids') or [])} "
+            f"rule={row.get('rule_predicted_impact_path') or 'unknown'} "
+            f"llm={row.get('llm_predicted_main_frame_type') or 'unknown'} "
+            f"disagreement={str(bool(row.get('frame_rule_disagreement'))).lower()} "
+            f"resolution={row.get('disagreement_resolution') or 'unknown'} "
             f"context={row.get('background_context_summary') or 'none'}"
         ),
         "  persistence: "

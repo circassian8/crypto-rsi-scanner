@@ -141,6 +141,11 @@ def build_daily_brief(
             f"- Raw/events/candidates/alerts: {int(latest.get('raw_events') or 0)} / {int(latest.get('candidates') or 0)} / {int(latest.get('alerts') or 0)}",
             f"- Routed/alertable/sent: {int(latest.get('routed') or 0)} / {int(latest.get('alertable') or 0)} / {str(bool(latest.get('sent'))).lower()}",
             f"- Sent/delivered/block: {int(latest.get('send_items_delivered') or 0)}/{int(latest.get('send_items_attempted') or 0)} / {latest.get('send_block_reason') or 'none'}",
+            "- Catalyst frames analyzed/validated/disagreements/unresolved: "
+            f"{int(latest.get('catalyst_frames_analyzed') or latest.get('catalyst_frame_rows') or 0)} / "
+            f"{int(latest.get('catalyst_frame_validations') or latest.get('catalyst_frame_validations_applied') or 0)} / "
+            f"{int(latest.get('catalyst_frame_disagreements') or 0)} / "
+            f"{int(latest.get('catalyst_frame_unresolved') or 0)}",
         ])
         warnings = [str(w) for w in latest.get("warnings") or [] if str(w)]
         if warnings:

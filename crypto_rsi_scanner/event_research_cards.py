@@ -645,8 +645,19 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     affected_ecosystem = components.get("affected_ecosystem") or "unknown"
     cause_status = components.get("cause_status") or "unknown"
     main_frame_type = components.get("main_frame_type") or "unknown"
+    main_frame_role = components.get("main_frame_role") or "unknown"
+    main_frame_subject = components.get("main_frame_subject") or "unknown"
+    main_frame_actor = components.get("main_frame_actor") or "unknown"
+    main_frame_object = components.get("main_frame_object") or "unknown"
+    main_frame_quote = components.get("main_frame_evidence_quote") or "none"
+    selected_main_reason = components.get("selected_main_catalyst_reason") or "unknown"
+    rule_predicted_path = components.get("rule_predicted_impact_path") or "unknown"
+    llm_predicted_path = components.get("llm_predicted_main_frame_type") or "unknown"
+    frame_disagreement = components.get("frame_rule_disagreement")
+    disagreement_resolution = components.get("disagreement_resolution") or "unknown"
     background_context_summary = components.get("background_context_summary") or "none"
     negated_frame_ids = components.get("negated_frame_ids") or []
+    corrective_frame_ids = components.get("corrective_frame_ids") or []
     rejected_impact_paths = components.get("rejected_impact_paths") or []
     frame_summary = components.get("frame_summary") or []
     claim_polarities = components.get("claim_polarities") or []
@@ -695,9 +706,15 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Canonical persistence reason: {components.get('canonical_persistence_reason') or 'unknown'}",
         f"- Incident relevance reasons: {'; '.join(str(item) for item in (components.get('incident_relevance_reasons') or [])[:4]) if components.get('incident_relevance_reasons') else 'none'}",
         f"- Event archetype: {event_archetype}",
-        f"- Main catalyst: {main_frame_type}",
+        f"- Main catalyst: {main_frame_type} ({main_frame_role})",
+        f"- Main catalyst subject/actor/object: {main_frame_subject} / {main_frame_actor} / {main_frame_object}",
+        f"- Main catalyst evidence: {main_frame_quote}",
+        f"- Main catalyst selected because: {selected_main_reason}",
+        f"- Rule vs LLM frame: rule={rule_predicted_path} llm={llm_predicted_path} "
+        f"disagreement={str(bool(frame_disagreement)).lower() if frame_disagreement is not None else 'unknown'} "
+        f"resolution={disagreement_resolution}",
         f"- Background context: {background_context_summary}",
-        f"- Negated/corrective frames: {len(negated_frame_ids)}",
+        f"- Negated/corrective frames: {len(negated_frame_ids) + len(corrective_frame_ids)}",
         f"- Rejected/background impact paths: {'; '.join(str(item) for item in rejected_impact_paths[:4]) if rejected_impact_paths else 'none'}",
         f"- Catalyst frame evidence: {_frame_summary_value(frame_summary)}",
         f"- Primary subject: {primary_subject}",

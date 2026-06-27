@@ -1,0 +1,167 @@
+[
+  {
+    "raw_id": "aave_kraken",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:00:00Z",
+    "published_at": "2026-06-15T10:30:00Z",
+    "source_url": "https://example.test/aave-kraken-stake",
+    "title": "Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation",
+    "body": "Kraken in talks to buy 15% stake in DeFi lender Aave at $385 million valuation after the fallout from April's KelpDAO exploit, despite Aave itself not being hacked.",
+    "source_confidence": 0.95,
+    "event": {
+      "event_id": "aave-kraken-stake",
+      "event_name": "Kraken in talks to buy 15% stake in Aave",
+      "event_type": "strategic_investment",
+      "event_time": "2026-06-15T10:30:00Z",
+      "event_time_confidence": 0.9,
+      "external_asset": "Aave",
+      "confidence": 0.92,
+      "description": "Aave is the direct subject of a strategic stake/acquisition report; KelpDAO exploit language is background context."
+    },
+    "market": {
+      "symbol": "AAVE",
+      "coin_id": "aave",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "price": 100.0,
+      "market_cap": 1500000000,
+      "volume_24h": 120000000,
+      "return_24h": 0.08,
+      "return_72h": 0.14,
+      "return_7d": 0.18,
+      "volume_zscore_24h": 1.7,
+      "volume_mcap": 0.08
+    }
+  },
+  {
+    "raw_id": "thor_exploit",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:05:00Z",
+    "published_at": "2026-06-15T11:00:00Z",
+    "source_url": "https://example.test/thorchain-exploit",
+    "title": "THORChain suffers exploit and RUNE resumes trading",
+    "body": "THORChain suffers exploit and RUNE resumes trading after validators coordinate a restart.",
+    "source_confidence": 0.9,
+    "event": {
+      "event_id": "thorchain-exploit",
+      "event_name": "THORChain exploit and RUNE trading resumption",
+      "event_type": "security_incident",
+      "event_time": "2026-06-15T11:00:00Z",
+      "event_time_confidence": 0.9,
+      "external_asset": "THORChain",
+      "confidence": 0.9,
+      "description": "Direct THORChain exploit/security catalyst affecting RUNE."
+    },
+    "market": {
+      "symbol": "RUNE",
+      "coin_id": "thorchain",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "price": 2.4,
+      "market_cap": 600000000,
+      "volume_24h": 90000000,
+      "return_24h": -0.18,
+      "return_72h": -0.26,
+      "return_7d": -0.31,
+      "volume_zscore_24h": 3.4,
+      "volume_mcap": 0.15
+    }
+  },
+  {
+    "raw_id": "memecore_no_exploit",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:10:00Z",
+    "published_at": "2026-06-15T12:00:00Z",
+    "source_url": "https://example.test/memecore-crash",
+    "title": "MemeCore's M token crashes 80% with no exploit or announcement to explain it",
+    "body": "MemeCore's M token crashes 80% with no exploit or announcement to explain it, leaving traders searching for a catalyst.",
+    "source_confidence": 0.82,
+    "event": {
+      "event_id": "memecore-crash-no-cause",
+      "event_name": "MemeCore M token unexplained crash",
+      "event_type": "market_dislocation_unknown",
+      "event_time": "2026-06-15T12:00:00Z",
+      "event_time_confidence": 0.8,
+      "external_asset": "MemeCore",
+      "confidence": 0.78,
+      "description": "Unexplained market dislocation; exploit and announcement causes are explicitly absent."
+    },
+    "market": {
+      "symbol": "M",
+      "coin_id": "memecore",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "price": 0.12,
+      "market_cap": 120000000,
+      "volume_24h": 85000000,
+      "return_24h": -0.8,
+      "return_72h": -0.72,
+      "return_7d": -0.64,
+      "volume_zscore_24h": 5.0,
+      "volume_mcap": 0.71
+    }
+  },
+  {
+    "raw_id": "zec_miner_listing",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:15:00Z",
+    "published_at": "2026-06-15T13:00:00Z",
+    "source_url": "https://example.test/zec-miner-nasdaq",
+    "title": "Zcash miner plans Nasdaq listing tied to ZEC treasury strategy",
+    "body": "Zcash miner plans Nasdaq listing tied to ZEC treasury strategy as the company accumulates ZEC reserves.",
+    "source_confidence": 0.88,
+    "event": {
+      "event_id": "zec-miner-nasdaq-listing",
+      "event_name": "Zcash miner Nasdaq listing tied to ZEC treasury",
+      "event_type": "listing_liquidity_event",
+      "event_time": "2026-06-15T13:00:00Z",
+      "event_time_confidence": 0.85,
+      "external_asset": "Zcash miner",
+      "confidence": 0.86,
+      "description": "External listing/treasury event with direct ZEC exposure."
+    },
+    "market": {
+      "symbol": "ZEC",
+      "coin_id": "zcash",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "price": 42.0,
+      "market_cap": 850000000,
+      "volume_24h": 110000000,
+      "return_24h": 0.16,
+      "return_72h": 0.24,
+      "return_7d": 0.37,
+      "volume_zscore_24h": 2.8,
+      "volume_mcap": 0.13
+    }
+  },
+  {
+    "raw_id": "velvet_spacex",
+    "provider": "manual_json",
+    "fetched_at": "2026-06-15T15:20:00Z",
+    "published_at": "2026-06-15T13:30:00Z",
+    "source_url": "https://example.test/velvet-spacex-exposure",
+    "title": "Velvet users can trade SpaceX pre-IPO exposure",
+    "body": "Velvet users can trade SpaceX pre-IPO exposure through a synthetic market for private-company access.",
+    "source_confidence": 0.9,
+    "event": {
+      "event_id": "velvet-spacex-preipo",
+      "event_name": "Velvet SpaceX pre-IPO exposure market",
+      "event_type": "proxy_attention",
+      "event_time": "2026-06-15T13:30:00Z",
+      "event_time_confidence": 0.85,
+      "external_asset": "SpaceX",
+      "confidence": 0.88,
+      "description": "VELVET/Velvet is framed as a venue/proxy for SpaceX pre-IPO exposure."
+    },
+    "market": {
+      "symbol": "VELVET",
+      "coin_id": "velvet",
+      "timestamp": "2026-06-15T16:00:00Z",
+      "price": 7.2,
+      "market_cap": 45000000,
+      "volume_24h": 120000000,
+      "return_24h": 1.2,
+      "return_72h": 3.5,
+      "return_7d": 8.5,
+      "volume_zscore_24h": 6.2,
+      "volume_mcap": 2.67
+    }
+  }
+]

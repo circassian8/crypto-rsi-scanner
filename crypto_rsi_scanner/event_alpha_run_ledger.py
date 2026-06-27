@@ -241,6 +241,7 @@ def _run_record(
     relationship_rows = list(getattr(result, "relationship_rows", ()) or ())
     card_paths = tuple(str(path) for path in getattr(result, "research_card_paths", ()) or ())
     llm_stats = _llm_stats((*extraction_rows, *catalyst_frame_rows, *relationship_rows))
+    catalyst_frame_counts = _catalyst_frame_counts(result, catalyst_frame_rows)
     warnings = list(getattr(result, "warnings", ()) or ())
     clock_status = dict(getattr(result, "clock_status", {}) or {})
     if failure:
@@ -285,6 +286,10 @@ def _run_record(
         "extraction_hints_applied": _int(getattr(result, "extraction_hint_events", 0)),
         "catalyst_frame_rows": len(catalyst_frame_rows),
         "catalyst_frame_validations_applied": _int(getattr(result, "catalyst_frame_validations_applied", 0)),
+        "catalyst_frames_analyzed": catalyst_frame_counts["analyzed"],
+        "catalyst_frame_validations": catalyst_frame_counts["validations"],
+        "catalyst_frame_disagreements": catalyst_frame_counts["disagreements"],
+        "catalyst_frame_unresolved": catalyst_frame_counts["unresolved"],
         "impact_hypotheses": len(tuple(getattr(result, "impact_hypotheses", ()) or ())),
         "hypotheses_validated": _int(getattr(result, "hypotheses_validated", 0)),
         "hypothesis_search_queries": _int(getattr(result, "hypothesis_search_queries", 0)),
@@ -510,6 +515,38 @@ def _hypothesis_search_skip_reasons(
     if "hypothesis search provider failed" in warning_text and not {"provider_unavailable", "provider_backoff"} & set(out):
         out["provider_unavailable"] = out.get("provider_unavailable", 0) + 1
     return out
+
+
+def _catalyst_frame_counts(
+    result: Any,
+    catalyst_frame_rows: Iterable[Any],
+) -> dict[str, int]:
+    analyzed = len([
+        row for row in catalyst_frame_rows
+        if getattr(row, "analysis", None) is not None
+    ])
+    validations = _int(getattr(result, "catalyst_frame_validations_applied", 0))
+    disagreements = 0
+    unresolved = 0
+    discovery = getattr(result, "discovery_result", None)
+    raw_events = getattr(discovery, "raw_events", ()) if discovery is not None else ()
+    for raw in raw_events or ():
+        payload = getattr(raw, "raw_json", None)
+        if not isinstance(payload, Mapping):
+            continue
+        validation = payload.get("llm_catalyst_frame_validation")
+        if not isinstance(validation, Mapping):
+            continue
+        if validation.get("frame_rule_disagreement"):
+            disagreements += 1
+        if str(validation.get("resolution") or "").strip() == "unresolved":
+            unresolved += 1
+    return {
+        "analyzed": analyzed,
+        "validations": validations,
+        "disagreements": disagreements,
+        "unresolved": unresolved,
+    }
 
 
 def _format_reason_counts(reasons: Mapping[str, Any]) -> str:

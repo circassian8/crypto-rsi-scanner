@@ -11,7 +11,7 @@ import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
 from . import event_catalyst_frames, event_claim_semantics
@@ -177,10 +177,21 @@ class CanonicalIncident:
     linked_assets: tuple[IncidentAssetRole, ...] = ()
     main_catalyst_frame_id: str | None = None
     main_frame_type: str | None = None
+    main_frame_role: str | None = None
+    main_frame_subject: str | None = None
+    main_frame_actor: str | None = None
+    main_frame_object: str | None = None
+    main_frame_evidence_quote: str | None = None
     background_frame_ids: tuple[str, ...] = ()
     negated_frame_ids: tuple[str, ...] = ()
+    corrective_frame_ids: tuple[str, ...] = ()
     frame_summary: tuple[dict[str, object], ...] = ()
     background_context_summary: str | None = None
+    rule_predicted_impact_path: str | None = None
+    llm_predicted_main_frame_type: str | None = None
+    frame_rule_disagreement: bool = False
+    disagreement_resolution: str | None = None
+    selected_main_catalyst_reason: str | None = None
     subject_quality: str = "valid"
     subject_quality_reason: str | None = None
     diagnostic_only: bool = False
@@ -485,16 +496,19 @@ def _incident_from_group(
         if frame.frame_role in {
             event_catalyst_frames.ROLE_BACKGROUND,
             event_catalyst_frames.ROLE_HISTORICAL,
-            event_catalyst_frames.ROLE_CORRECTIVE,
         }
     )
     negated_frames = tuple(frame for frame in frames if frame.frame_role == event_catalyst_frames.ROLE_NEGATED)
+    corrective_frames = tuple(frame for frame in frames if frame.frame_role == event_catalyst_frames.ROLE_CORRECTIVE)
+    frame_validation = _frame_validation_metadata(raws)
     if archetype == "market_dislocation_unknown" and negated_frames:
         status = event_claim_semantics.CauseStatus.RULED_OUT.value
     if background_frames:
         warnings = tuple(dict.fromkeys((*warnings, "incident_has_background_context_frames")))
     if negated_frames:
         warnings = tuple(dict.fromkeys((*warnings, "incident_has_negated_claim_frames")))
+    if corrective_frames:
+        warnings = tuple(dict.fromkeys((*warnings, "incident_has_corrective_claim_frames")))
     digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
     return CanonicalIncident(
         schema_version=INCIDENT_GRAPH_SCHEMA_VERSION,
@@ -515,15 +529,76 @@ def _incident_from_group(
         linked_assets=linked_assets,
         main_catalyst_frame_id=main_frame.frame_id if main_frame else None,
         main_frame_type=main_frame.frame_type if main_frame else None,
+        main_frame_role=main_frame.frame_role if main_frame else None,
+        main_frame_subject=main_frame.subject if main_frame else None,
+        main_frame_actor=main_frame.actor if main_frame else None,
+        main_frame_object=main_frame.object if main_frame else None,
+        main_frame_evidence_quote=main_frame.evidence_quote if main_frame else None,
         background_frame_ids=tuple(frame.frame_id for frame in background_frames),
         negated_frame_ids=tuple(frame.frame_id for frame in negated_frames),
+        corrective_frame_ids=tuple(frame.frame_id for frame in corrective_frames),
         frame_summary=event_catalyst_frames.frame_summary(frames),
-        background_context_summary=_background_context_summary(background_frames, negated_frames),
+        background_context_summary=_background_context_summary((*background_frames, *corrective_frames), negated_frames),
+        rule_predicted_impact_path=frame_validation.get("rule_predicted_impact_path"),
+        llm_predicted_main_frame_type=frame_validation.get("llm_predicted_main_frame_type"),
+        frame_rule_disagreement=bool(frame_validation.get("frame_rule_disagreement")),
+        disagreement_resolution=frame_validation.get("disagreement_resolution"),
+        selected_main_catalyst_reason=_selected_main_catalyst_reason(main_frame, frame_validation),
         subject_quality=subject_quality,
         subject_quality_reason=subject_quality_reason,
         diagnostic_only=diagnostic_only,
         warnings=warnings,
     )
+
+
+def _frame_validation_metadata(raws: tuple[RawDiscoveredEvent, ...]) -> dict[str, Any]:
+    rule_paths: list[str] = []
+    llm_paths: list[str] = []
+    resolutions: list[str] = []
+    disagreement = False
+    for raw in raws:
+        payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
+        validation = payload.get("llm_catalyst_frame_validation")
+        if not isinstance(validation, Mapping):
+            continue
+        rule_path = str(validation.get("rule_predicted_impact_path") or "").strip()
+        llm_path = str(validation.get("llm_predicted_main_frame_type") or "").strip()
+        resolution = str(validation.get("resolution") or "").strip()
+        if rule_path:
+            rule_paths.append(rule_path)
+        if llm_path:
+            llm_paths.append(llm_path)
+        if resolution:
+            resolutions.append(resolution)
+        disagreement = disagreement or bool(validation.get("frame_rule_disagreement"))
+    return {
+        "rule_predicted_impact_path": _first_unique(rule_paths),
+        "llm_predicted_main_frame_type": _first_unique(llm_paths),
+        "frame_rule_disagreement": disagreement,
+        "disagreement_resolution": _first_unique(resolutions),
+    }
+
+
+def _selected_main_catalyst_reason(
+    main_frame: event_catalyst_frames.EventCatalystFrame | None,
+    frame_validation: Mapping[str, Any],
+) -> str | None:
+    if main_frame is None:
+        return None
+    resolution = str(frame_validation.get("disagreement_resolution") or "").strip()
+    if resolution:
+        return f"llm_frame_validation_{resolution}"
+    if str(main_frame.frame_id or "").startswith("frame:llm:"):
+        return "quote_validated_llm_main_catalyst"
+    return "deterministic_main_catalyst_selection"
+
+
+def _first_unique(values: Iterable[str]) -> str | None:
+    for value in values:
+        value = str(value or "").strip()
+        if value:
+            return value
+    return None
 
 
 def _background_context_summary(
