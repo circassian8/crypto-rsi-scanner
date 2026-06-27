@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Standardize review zip filename · Codex
+**Why:** Repeated Pro-model handoffs had accumulated many timestamped/hash-
+suffixed zip files in the repo root, which made mobile download and handoff
+confusing.
+**Changes:**
+- Deleted the existing root-level `*.zip` handoff artifacts.
+- Added `scripts/export_source_with_artifacts.py` and `make
+  export-src-with-artifacts`, which overwrite one fixed review artifact:
+  `crypto_rsi_scanner_source_with_artifacts.zip`.
+- Updated `.gitignore` so the fixed review zip and older hyphenated
+  source-with-artifacts variants remain untracked.
+- Updated `AGENTS.md` so Claude and Codex should stop creating timestamped or
+  hash-suffixed review zips and use the fixed overwrite-in-place filename.
+**Verify:** `make export-src-with-artifacts PYTHON=python3` wrote
+`crypto_rsi_scanner_source_with_artifacts.zip` with 394 entries, 183 artifact
+entries, 20 research-card files, and 0 excluded entries; `python3 -m compileall
+-q crypto_rsi_scanner tests scripts` passed; `python3 tests/test_indicators.py`
+passed (484/484); `make verify PYTHON=python3` passed.
+**Notes/risks:** Export/operational-protocol only. The zip still excludes
+secrets, DBs, logs, virtualenvs, git data, caches, and other zip files while
+including source plus local research artifacts such as `event_fade_cache/`.
+
 ## 2026-06-27 — Polish Event Alpha operator-facing opportunity reports · Codex
 **Why:** The catalyst-frame e2e output was correct but still too noisy for an
 operator: default daily briefs mixed core opportunities, near-misses,

@@ -212,6 +212,8 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "python3 -m venv .venv" in makefile
     assert "export-src:" in makefile
     assert "git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD" in makefile
+    assert "export-src-with-artifacts:" in makefile
+    assert "python3 scripts/export_source_with_artifacts.py" in makefile
     assert "event-fade-check-review-template:" in makefile
     assert "--event-fade-check-review-template $(EVENT_FADE_SAMPLE_IN) $(EVENT_FADE_REVIEW_TEMPLATE)" in makefile
     assert "event-fade-check-review-bundle:" in makefile
@@ -232,6 +234,15 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
         capture_output=True,
     )
     assert "git archive --format=zip -o crypto-rsi-scanner-source.zip HEAD" in export_dry.stdout
+
+    export_artifacts_dry = subprocess.run(
+        ["make", "-n", "export-src-with-artifacts"],
+        cwd=root,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    assert "python3 scripts/export_source_with_artifacts.py" in export_artifacts_dry.stdout
 
     verify_dry = subprocess.run(
         ["make", "-n", "verify", "PYTHON=python3"],

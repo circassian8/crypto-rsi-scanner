@@ -35,8 +35,12 @@ a clear message:
 - After each successful commit + push, also provide a fresh project zip for
   Pro-model review. Include the current source plus local research artifacts
   such as `event_fade_cache/`, but never include secrets or machine-local noise
-  (`.env`, DBs, logs, `.venv`, `.git`, IDE files, caches). Prefer a clearly
-  named zip such as `crypto-rsi-scanner-source-with-artifacts.zip`.
+  (`.env`, DBs, logs, `.venv`, `.git`, IDE files, caches).
+- **Do not create one-off timestamped/hash-suffixed review zips.** The human
+  wants a single overwrite-in-place review artifact. Use
+  `make export-src-with-artifacts`, which writes
+  `crypto_rsi_scanner_source_with_artifacts.zip`, and overwrite that same file
+  every time.
 
 ## Collaboration files
 
@@ -76,6 +80,11 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 - **Clean source export:** `make export-src` writes
   `crypto-rsi-scanner-source.zip` via `git archive` so ignored local artifacts
   such as `.env`, DBs, logs, caches, and `.venv` are not shared.
+- **Source + research artifacts export:** `make export-src-with-artifacts`
+  overwrites `crypto_rsi_scanner_source_with_artifacts.zip` with current
+  committed source plus local research artifacts such as `event_fade_cache/`,
+  while excluding secrets, DBs, logs, virtualenvs, git data, caches, and other
+  zip files.
 - **Deterministic event research clock:** event fixture/review commands may set
   `RSI_EVENT_RESEARCH_NOW` or pass `--event-now`. Fixture-oriented Make targets
   use `EVENT_FIXTURE_NOW` (default `2026-06-15T16:00:00Z`) so checked-in June
