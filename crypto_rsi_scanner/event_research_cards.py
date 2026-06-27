@@ -15,6 +15,8 @@ from . import (
     event_graph,
     event_opportunity_verdict,
     event_alpha_reason_text,
+    event_source_packs,
+    event_source_registry,
     event_watchlist,
     event_watchlist_monitor,
 )
@@ -138,6 +140,8 @@ def render_research_card(
         "## Evidence Sources",
     ])
     lines.extend(_source_lines(entry, alert))
+    lines.extend(["", "## Source Coverage / Evidence Acquisition"])
+    lines.extend(_source_acquisition_lines(entry, alert))
     lines.extend([
         "",
         "## Accepted / Rejected Asset Links",
@@ -1239,6 +1243,61 @@ def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
         lines.append(f"- Latest source: {entry.latest_source or 'unknown'}")
         lines.append(f"- Source count: {entry.source_count}")
     return lines or ["- No source details found in local artifacts."]
+
+
+def _source_acquisition_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> list[str]:
+    components = dict(entry.latest_score_components if entry else {})
+    if alert:
+        alert_components = alert.get("score_components") if isinstance(alert.get("score_components"), Mapping) else {}
+        latest = alert.get("latest_score_components") if isinstance(alert.get("latest_score_components"), Mapping) else {}
+        components.update(dict(alert_components or {}))
+        components.update(dict(latest or {}))
+        components.update({key: value for key, value in alert.items() if value not in (None, "", [], {}, ())})
+    if not components and entry is None:
+        return ["- Source pack: unknown", "- Evidence acquisition: no local metadata."]
+    pack_name = str(components.get("source_pack") or "")
+    if not pack_name:
+        pack = event_source_packs.source_pack_for_playbook(
+            str(components.get("playbook_type") or components.get("latest_effective_playbook_type") or (entry.latest_playbook_type if entry else "") or ""),
+            impact_path_type=str(components.get("impact_path_type") or ""),
+            impact_category=str(components.get("impact_category") or ""),
+        )
+        pack_name = pack.name
+    assessment = event_source_registry.assess_source(
+        components,
+        symbol=str(components.get("validated_symbol") or (entry.symbol if entry else "") or ""),
+        coin_id=str(components.get("validated_coin_id") or (entry.coin_id if entry else "") or ""),
+        provider_coverage_status=components.get("provider_coverage_status"),
+    )
+    plan = components.get("evidence_acquisition_plan") if isinstance(components.get("evidence_acquisition_plan"), Mapping) else {}
+    needed = plan.get("evidence_needed") if isinstance(plan, Mapping) else components.get("evidence_needed")
+    queries = plan.get("evidence_query_plan") if isinstance(plan, Mapping) else components.get("evidence_query_plan")
+    failures = components.get("evidence_acquisition_failures") or assessment.warnings
+    if isinstance(failures, str):
+        failures = [failures]
+    if isinstance(needed, str):
+        needed = [needed]
+    if isinstance(queries, str):
+        queries = [queries]
+    upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
+    pack = event_source_packs.get_source_pack(pack_name)
+    lines = [
+        f"- Source pack: {pack_name}",
+        f"- Coverage status: {components.get('provider_coverage_status') or assessment.provider_coverage_status}",
+        f"- Evidence absence meaningful: {str(bool(components.get('evidence_absence_is_meaningful', assessment.evidence_absence_is_meaningful))).lower()}",
+        f"- Source quality prior/cap: {components.get('source_quality_prior') or assessment.source_quality_prior}/{components.get('source_confidence_cap') or assessment.confidence_cap}",
+        f"- Evidence acquisition attempted: {str(bool(components.get('evidence_acquisition_attempted'))).lower()}",
+        "- Evidence needed: " + ("; ".join(str(item) for item in list(needed or ())[:5]) if needed else "; ".join(pack.minimum_evidence[:4])),
+        f"- Planned queries: {len(queries or ()) if isinstance(queries, Iterable) and not isinstance(queries, (str, bytes, Mapping)) else 0}",
+        "- Provider/source gaps: " + ("; ".join(str(item) for item in list(failures or ())[:4]) if failures else "none"),
+        "- What source would upgrade this: "
+        + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=4) or "; ".join(pack.validation_requirements[:4])),
+        "- What source would downgrade this: denial/correction source, failed identity validation, or no market/impact confirmation.",
+    ]
+    return lines
 
 
 def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:

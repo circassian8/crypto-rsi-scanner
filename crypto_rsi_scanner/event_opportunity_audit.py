@@ -14,6 +14,8 @@ from . import (
     event_near_miss,
     event_opportunity_verdict,
     event_alpha_reason_text,
+    event_source_packs,
+    event_source_registry,
     event_watchlist,
 )
 
@@ -134,6 +136,9 @@ def format_opportunity_audit(
         f"- source/evidence: {components.get('source_class') or row.get('source_class') or 'unknown'} / {components.get('evidence_specificity') or row.get('evidence_specificity') or 'unknown'}",
         f"- evidence score: {components.get('evidence_quality_score') or row.get('evidence_quality_score') or 'n/a'}",
         "",
+        "## Source coverage and acquisition plan",
+        *_source_acquisition_audit_lines(row, components),
+        "",
         "## Market confirmation decision",
         f"- market level/score: {components.get('market_confirmation_level') or row.get('market_confirmation_level') or 'unknown'} / {components.get('market_confirmation_score') or row.get('market_confirmation_score') or 'n/a'}",
         f"- market freshness: {components.get('market_context_freshness_status') or row.get('market_context_freshness_status') or 'unknown'} "
@@ -233,6 +238,46 @@ def _near_miss_lines(
             f"status={status or 'pending'}"
         )
     return lines
+
+
+def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
+    merged = {**dict(components or {}), **dict(row or {})}
+    pack_name = str(merged.get("source_pack") or "")
+    if not pack_name:
+        pack = event_source_packs.source_pack_for_playbook(
+            str(merged.get("playbook_type") or merged.get("latest_effective_playbook_type") or ""),
+            impact_path_type=str(merged.get("impact_path_type") or ""),
+            impact_category=str(merged.get("impact_category") or ""),
+        )
+        pack_name = pack.name
+    else:
+        pack = event_source_packs.get_source_pack(pack_name)
+    assessment = event_source_registry.assess_source(
+        merged,
+        symbol=str(merged.get("validated_symbol") or merged.get("symbol") or ""),
+        coin_id=str(merged.get("validated_coin_id") or merged.get("coin_id") or ""),
+        provider_coverage_status=merged.get("provider_coverage_status"),
+    )
+    plan = merged.get("evidence_acquisition_plan") if isinstance(merged.get("evidence_acquisition_plan"), Mapping) else {}
+    needed = plan.get("evidence_needed") if isinstance(plan, Mapping) else merged.get("evidence_needed")
+    queries = plan.get("evidence_query_plan") if isinstance(plan, Mapping) else merged.get("evidence_query_plan")
+    failures = merged.get("evidence_acquisition_failures") or assessment.warnings
+    if isinstance(needed, str):
+        needed = [needed]
+    if isinstance(failures, str):
+        failures = [failures]
+    query_count = len(queries or ()) if isinstance(queries, Iterable) and not isinstance(queries, (str, bytes, Mapping)) else 0
+    return [
+        f"- source pack: {pack_name}",
+        f"- source mission: {assessment.source_mission}",
+        f"- provider coverage: {merged.get('provider_coverage_status') or assessment.provider_coverage_status}",
+        f"- evidence absence meaningful: {str(bool(merged.get('evidence_absence_is_meaningful', assessment.evidence_absence_is_meaningful))).lower()}",
+        f"- source quality prior/cap: {merged.get('source_quality_prior') or assessment.source_quality_prior}/{merged.get('source_confidence_cap') or assessment.confidence_cap}",
+        f"- evidence needed: {'; '.join(str(item) for item in list(needed or pack.minimum_evidence)[:5])}",
+        f"- planned query count: {query_count}",
+        f"- provider gaps/failures: {'; '.join(str(item) for item in list(failures or ())[:5]) if failures else 'none'}",
+        f"- validation criteria: {'; '.join(pack.validation_requirements[:5])}",
+    ]
 
 
 def _daily_brief_section(

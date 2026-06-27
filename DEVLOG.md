@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Add Event Alpha source registry and evidence planning · Codex
+**Why:** Event Alpha needed a stronger data/news evidence layer so broad sources
+like GDELT, Polymarket, and RSS can collect context without being treated as
+token-identity or impact-path proof. Near-miss and operator reports also needed
+to say which source pack would upgrade or downgrade a candidate.
+**Changes:**
+- Added `event_source_registry.py` with source classes, source missions,
+  provider coverage semantics, evidence-absence rules, CryptoPanic tag matching,
+  feed health/quarantine metadata, and conservative quality caps.
+- Added `event_source_packs.py` for listing, perp listing, unlock, proxy
+  pre-IPO/RWA, AI IPO proxy, security shock, fan/sports, political meme, and
+  market-anomaly evidence packs.
+- Added `event_llm_evidence_planner.py`, a deterministic/constrained evidence
+  planner that produces source-pack query/checklist metadata only.
+- Preserved richer provider metadata from CryptoPanic/news rows and official
+  exchange announcements without changing discovery eligibility or routing.
+- Threaded source-pack, provider coverage, evidence-acquisition plan, and
+  coverage-gap metadata through near-miss reports, daily briefs, research cards,
+  and opportunity audits.
+- Added offline tests for registry/provider semantics, source packs/feed
+  coverage, planner fixture cases, near-miss acquisition metadata, and operator
+  surfaces.
+**Verify:** `python3 tests/test_indicators.py` passed (493/493);
+`python3 -m compileall -q crypto_rsi_scanner tests` passed; `git diff --check`
+passed; `make event-alpha-signal-quality-eval PYTHON=python3` passed (36/36);
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed with no
+doctor blockers; `make event-alpha-quality-validation-cycle PYTHON=python3`
+passed with no doctor blockers; `make verify PYTHON=python3` passed.
+**Notes/risks:** Research-only metadata/reporting. No Telegram sends, paper/live
+rows, normal RSI writes, trading, or provider/LLM-created `TRIGGERED_FADE` paths
+were added.
+
 ## 2026-06-28 — Make CoreOpportunity the Event Alpha operator artifact spine · Codex
 **Why:** `market_refresh_smoke` could show a visible RUNE watchlist core
 opportunity without a research card, snapshots lacked core-opportunity linkage,

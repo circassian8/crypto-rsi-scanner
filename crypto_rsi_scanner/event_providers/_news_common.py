@@ -245,6 +245,18 @@ def _raw_event_from_row(row: Mapping[str, Any], provider: str) -> RawDiscoveredE
     source_url = row.get("source_url") or row.get("url") or row.get("link") or row.get("article_url")
     raw_id = str(row.get("raw_id") or row.get("id") or row.get("url") or f"{provider}:{content_hash(dict(row))[:16]}")
     payload = dict(row)
+    payload["source_provider"] = provider
+    if row.get("feed_url"):
+        payload["feed_url"] = row.get("feed_url")
+    currency_tags = _currency_tags(row)
+    if currency_tags:
+        payload["currency_tags"] = currency_tags
+    if provider == "cryptopanic":
+        payload["source_class"] = "cryptopanic_tagged" if currency_tags else "crypto_news"
+        if _cryptopanic_narrative_heat(row, title, body):
+            payload["narrative_heat"] = True
+    elif provider == "project_blog_rss" and row.get("feed_url"):
+        payload["source_class"] = "project_rss_feed"
     event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
     if not event_payload:
         event_payload = _infer_event_payload(title, body, row)
@@ -336,6 +348,38 @@ def infer_external_asset(text: str) -> str | None:
 
 def _infer_external_asset(text: str) -> str | None:
     return infer_external_asset(text)
+
+
+def _currency_tags(row: Mapping[str, Any]) -> tuple[str, ...]:
+    values: list[str] = []
+    for key in ("currencies", "currency_tags", "currencyTags", "tags"):
+        raw = row.get(key)
+        if isinstance(raw, Mapping):
+            raw = raw.values()
+        if isinstance(raw, str):
+            values.extend(part.strip() for part in raw.replace(";", ",").split(","))
+        elif isinstance(raw, Iterable):
+            for item in raw:
+                if isinstance(item, Mapping):
+                    for child_key in ("code", "symbol", "slug", "currency", "title"):
+                        if item.get(child_key):
+                            values.append(str(item.get(child_key)))
+                elif item not in (None, ""):
+                    values.append(str(item))
+    return tuple(dict.fromkeys(value.strip().upper() for value in values if value and value.strip()))
+
+
+def _cryptopanic_narrative_heat(row: Mapping[str, Any], title: str, body: str) -> bool:
+    text = clean_text(" ".join(str(value or "") for value in (
+        title,
+        body,
+        row.get("kind"),
+        row.get("filter"),
+        row.get("status"),
+        row.get("metadata"),
+        row.get("votes"),
+    )))
+    return any(token in text for token in ("hot", "rising", "important", "bullish"))
 
 
 def _normalized_external_entity(value: object) -> str | None:

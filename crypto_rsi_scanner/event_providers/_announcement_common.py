@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -158,6 +159,9 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         or item.get("link")
     )
     payload = dict(item)
+    payload["source_class"] = "official_exchange"
+    payload["announcement_kind"] = event_type
+    payload["announcement_symbols"] = _announcement_symbols(title, body)
     payload["event"] = {
         "event_name": title,
         "event_type": event_type,
@@ -195,6 +199,18 @@ def _event_type(title: str, body: str) -> str | None:
     )):
         return "exchange_listing"
     return None
+
+
+def _announcement_symbols(title: str, body: str) -> tuple[str, ...]:
+    text = f"{title} {body}"
+    out: list[str] = []
+    for match in re.finditer(r"\b([A-Z0-9]{2,12})(?:USDT|USDC|FDUSD|BTC|ETH)\b", text):
+        out.append(match.group(1))
+    for match in re.finditer(r"\(([A-Z0-9]{2,12})\)", text):
+        out.append(match.group(1))
+    for match in re.finditer(r"\b([A-Z0-9]{2,12})\s+(?:spot|perp|perpetual|futures|trading)\b", text, re.IGNORECASE):
+        out.append(match.group(1).upper())
+    return tuple(dict.fromkeys(value for value in out if value not in {"USD", "USDT", "USDC", "BTC", "ETH"}))
 
 
 def _parse_time(value: object) -> datetime | None:

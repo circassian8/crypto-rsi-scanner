@@ -21,6 +21,8 @@ from . import (
     event_opportunity_verdict,
     event_alpha_reason_text,
     event_research_cards,
+    event_source_packs,
+    event_source_registry,
     event_source_reliability,
     event_watchlist,
 )
@@ -225,6 +227,18 @@ def build_daily_brief(
         "",
         "## System Health",
         *_system_health_summary_lines(latest),
+        "",
+        "## Source Coverage / Evidence Acquisition",
+        *_source_coverage_summary_lines([*(decision.entry for decision in decisions), *hypotheses, *alerts], near_miss_candidates, upgrade_candidates),
+        "",
+        "### Provider Health by Source Pack",
+        *_provider_health_by_pack_lines(provider_health_rows or {}),
+        "",
+        "### Evidence Acquisition Results",
+        *_evidence_acquisition_result_lines((*near_miss_candidates, *upgrade_candidates), limit=8),
+        "",
+        "### Candidates Blocked by Source Coverage",
+        *_coverage_blocked_candidate_lines((*near_miss_candidates, *upgrade_candidates), limit=8),
         "",
         "## Market Freshness Readiness",
         *_market_freshness_readiness_lines([*(decision.entry for decision in decisions), *hypotheses, *alerts], requested_profile=requested_profile),
@@ -767,6 +781,87 @@ def _near_miss_diagnostic_lines(
             f" provider={item.market_refresh_provider or item.market_context_source or 'unknown'}"
             f" upgrade_status={item.refresh_upgrade_status or item.upgrade_reason or item.no_upgrade_reason or 'pending'}"
         )
+    return lines
+
+
+def _source_coverage_summary_lines(
+    rows: Iterable[Mapping[str, Any] | object],
+    near_misses: Iterable[event_near_miss.EventNearMissCandidate],
+    upgrade_candidates: Iterable[event_near_miss.EventNearMissCandidate],
+) -> list[str]:
+    row_maps = [_row_mapping(row) for row in rows]
+    row_maps = [row for row in row_maps if row]
+    summary = event_source_registry.format_source_coverage_summary(row_maps)
+    near = list(near_misses)
+    upgrades = list(upgrade_candidates)
+    gaps = [item for item in (*near, *upgrades) if item.source_coverage_gap]
+    plans = [item for item in (*near, *upgrades) if item.evidence_acquisition_attempted]
+    return [
+        f"- Source registry: {summary}",
+        f"- Evidence plans: {len(plans)} candidate(s) selected for source-pack acquisition planning.",
+        f"- Source coverage gaps: {len(gaps)} candidate(s) need healthier or more specific source coverage.",
+        "- Evidence absence rule: broad/degraded RSS/GDELT/Polymarket gaps are not treated as strong negative proof.",
+    ]
+
+
+def _provider_health_by_pack_lines(provider_health_rows: Mapping[str, Mapping[str, Any]]) -> list[str]:
+    if not provider_health_rows:
+        return ["- No provider health rows found."]
+    lines: list[str] = []
+    for pack_name in event_source_packs.source_pack_names():
+        pack = event_source_packs.get_source_pack(pack_name)
+        statuses: list[str] = []
+        for provider in pack.preferred_providers[:5]:
+            row = provider_health_rows.get(provider) or provider_health_rows.get(provider.replace("_announcements", ""))
+            status = "unknown"
+            if isinstance(row, Mapping):
+                status = str(row.get("coverage_status") or row.get("status") or row.get("ready") or "unknown")
+            statuses.append(f"{provider}={status}")
+        lines.append(f"- {pack.name}: " + ", ".join(statuses))
+    return lines
+
+
+def _evidence_acquisition_result_lines(
+    candidates: Iterable[event_near_miss.EventNearMissCandidate],
+    *,
+    limit: int,
+) -> list[str]:
+    rows = [item for item in candidates if item.evidence_acquisition_attempted or item.evidence_acquisition_results]
+    if not rows:
+        return ["- None."]
+    lines: list[str] = []
+    for item in rows[:limit]:
+        plan = item.evidence_acquisition_plan or {}
+        queries = plan.get("evidence_query_plan") if isinstance(plan, Mapping) else ()
+        needed = plan.get("evidence_needed") if isinstance(plan, Mapping) else ()
+        lines.append(
+            f"- {item.symbol}/{item.coin_id}: pack={item.source_pack or 'unknown'} "
+            f"queries={len(queries) if isinstance(queries, Iterable) and not isinstance(queries, (str, bytes, Mapping)) else 0} "
+            f"needed={'; '.join(str(value) for value in list(needed or ())[:3]) or 'none'} "
+            f"result={item.upgrade_reason or item.no_upgrade_reason or item.refresh_upgrade_status or 'planned'}"
+        )
+    if len(rows) > limit:
+        lines.append(f"- +{len(rows) - limit} more evidence acquisition candidates")
+    return lines
+
+
+def _coverage_blocked_candidate_lines(
+    candidates: Iterable[event_near_miss.EventNearMissCandidate],
+    *,
+    limit: int,
+) -> list[str]:
+    rows = [item for item in candidates if item.source_coverage_gap or item.provider_coverage_status in {"degraded", "unavailable", "not_configured", "partial"}]
+    if not rows:
+        return ["- None."]
+    lines: list[str] = []
+    for item in rows[:limit]:
+        lines.append(
+            f"- {item.symbol}/{item.coin_id}: pack={item.source_pack or 'unknown'} "
+            f"coverage={item.provider_coverage_status or 'unknown'} gap={item.source_coverage_gap or 'source_specificity_gap'} "
+            f"absence_meaningful={str(bool(item.evidence_absence_is_meaningful)).lower()}"
+        )
+    if len(rows) > limit:
+        lines.append(f"- +{len(rows) - limit} more coverage-blocked candidates")
     return lines
 
 

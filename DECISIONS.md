@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Event Alpha source evidence is mission-scoped
+**Status:** accepted
+**Decision:** Event Alpha source evidence must be interpreted through source
+class, source mission, provider coverage, and playbook source-pack context.
+Official exchange/project and structured event/unlock sources can validate
+token identity, catalyst timing, and direct impact when their evidence is
+specific. CryptoPanic currency-tag matches are stronger narrative/catalyst
+evidence than untagged news. Broad news, RSS recaps, SEO/affiliate posts, and
+prediction-market rows are context/diagnostic evidence by default; Polymarket
+or GDELT absence is not a strong negative when provider coverage is degraded,
+partial, unavailable, or not configured. A constrained evidence planner may
+produce source-pack query/checklist metadata for near-miss or upgrade
+candidates, but it must not create alerts, routes, watchlist state, paper/live
+rows, normal RSI writes, or `TRIGGERED_FADE`.
+**Why:** Event Alpha was collecting useful context from broad providers, but
+operators need to know whether a source actually proves asset identity and
+impact path or merely suggests where to look next. Source-pack semantics reduce
+false confidence while making near-miss evidence acquisition more actionable.
+**Revisit when:** Event Alpha stores source health, source pack fulfillment,
+and evidence acquisition attempts in a typed database with provider-level SLAs
+and reviewed precision/recall metrics.
+
 ## 2026-06-28 - CoreOpportunity is the operator-visible artifact contract
 **Status:** accepted
 **Decision:** Event Alpha operator-facing output should be keyed by

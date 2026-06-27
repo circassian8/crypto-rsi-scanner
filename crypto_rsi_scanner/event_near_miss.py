@@ -17,8 +17,11 @@ from . import (
     event_alpha_router,
     event_alpha_quality_fields,
     event_core_opportunities,
+    event_llm_evidence_planner,
     event_market_confirmation,
     event_opportunity_verdict,
+    event_source_packs,
+    event_source_registry,
 )
 
 
@@ -92,6 +95,16 @@ class EventNearMissCandidate:
     evidence_refresh_queries: tuple[str, ...] = ()
     evidence_quality_before: float | None = None
     evidence_quality_after: float | None = None
+    source_pack: str | None = None
+    provider_coverage_status: str | None = None
+    evidence_absence_is_meaningful: bool = False
+    source_coverage_gap: str | None = None
+    source_quality_prior: float | None = None
+    source_confidence_cap: float | None = None
+    evidence_acquisition_attempted: bool = False
+    evidence_acquisition_plan: Mapping[str, Any] | None = None
+    evidence_acquisition_results: Mapping[str, Any] | None = None
+    evidence_acquisition_failures: tuple[str, ...] = ()
     upgrade_reason: str | None = None
     no_upgrade_reason: str | None = None
     warnings: tuple[str, ...] = ()
@@ -384,6 +397,20 @@ def _append_candidate_report_lines(rows: list[str], item: EventNearMissCandidate
         )
     if item.evidence_refresh_queries:
         rows.append("  evidence_queries: " + "; ".join(item.evidence_refresh_queries))
+    rows.append(
+        "  source_pack: "
+        f"{item.source_pack or 'unknown'} coverage={item.provider_coverage_status or 'unknown'} "
+        f"absence_meaningful={str(bool(item.evidence_absence_is_meaningful)).lower()} "
+        f"gap={item.source_coverage_gap or 'none'}"
+    )
+    if item.evidence_acquisition_plan:
+        needed = item.evidence_acquisition_plan.get("evidence_needed") or ()
+        queries = item.evidence_acquisition_plan.get("evidence_query_plan") or ()
+        rows.append(
+            "  evidence_plan: "
+            f"needed={'; '.join(str(value) for value in list(needed)[:4]) or 'none'} "
+            f"queries={len(queries) if isinstance(queries, Iterable) and not isinstance(queries, (str, bytes, Mapping)) else 'n/a'}"
+        )
     rows.append(f"  outcome: {item.upgrade_reason or item.no_upgrade_reason or 'pending_refresh'}")
     if item.warnings:
         rows.append("  warnings: " + "; ".join(item.warnings))
@@ -573,6 +600,16 @@ def _refresh_one_hypothesis(
         "refresh_upgrade_reason": upgrade_reason,
         "upgrade_reason": upgrade_reason,
         "no_upgrade_reason": no_upgrade_reason,
+        "source_pack": near.source_pack,
+        "provider_coverage_status": near.provider_coverage_status,
+        "evidence_absence_is_meaningful": near.evidence_absence_is_meaningful,
+        "source_coverage_gap": near.source_coverage_gap,
+        "source_quality_prior": near.source_quality_prior,
+        "source_confidence_cap": near.source_confidence_cap,
+        "evidence_acquisition_attempted": near.evidence_acquisition_attempted,
+        "evidence_acquisition_plan": near.evidence_acquisition_plan,
+        "evidence_acquisition_results": near.evidence_acquisition_results,
+        "evidence_acquisition_failures": near.evidence_acquisition_failures,
     }
     current_components = dict(getattr(hypothesis, "score_components", {}) or {})
     current_components.update(metadata)
@@ -678,6 +715,16 @@ _OPTIONAL_HYPOTHESIS_FIELDS = {
     "refresh_upgrade_reason",
     "upgrade_reason",
     "no_upgrade_reason",
+    "source_pack",
+    "provider_coverage_status",
+    "evidence_absence_is_meaningful",
+    "source_coverage_gap",
+    "source_quality_prior",
+    "source_confidence_cap",
+    "evidence_acquisition_attempted",
+    "evidence_acquisition_plan",
+    "evidence_acquisition_results",
+    "evidence_acquisition_failures",
 }
 
 
@@ -755,8 +802,52 @@ def _candidate_from_row(
         return None
     if level == "local_only" and score < cfg.digest_threshold - cfg.near_threshold_points and not blocked_by_refreshable:
         return None
+    pack = event_source_packs.source_pack_for_playbook(
+        str(row.get("playbook_type") or row.get("latest_effective_playbook_type") or quality.get("playbook_type") or ""),
+        impact_path_type=str(quality.get("impact_path_type") or row.get("impact_path_type") or ""),
+        impact_category=str(row.get("impact_category") or quality.get("impact_category") or ""),
+    )
+    provider_status = str(row.get("provider_coverage_status") or quality.get("provider_coverage_status") or "")
+    source_assessment = event_source_registry.assess_source(
+        row,
+        symbol=symbol,
+        coin_id=coin_id,
+        playbook_type=str(row.get("playbook_type") or quality.get("playbook_type") or ""),
+        provider_coverage_status=provider_status or None,
+    )
+    source_gap = event_source_registry.coverage_gap_reason(
+        source_assessment.provider,
+        source_assessment.provider_coverage_status,
+    )
+    if source_gap:
+        missing = tuple(dict.fromkeys((*missing, "needs_source_coverage", source_gap)))
+    pack_eval = event_source_packs.evaluate_pack_evidence({**row, **source_assessment.to_metadata()}, pack=pack)
+    pack_missing = tuple(str(item) for item in pack_eval.get("source_pack_missing_evidence") or ())
+    if pack_missing:
+        missing = tuple(dict.fromkeys((*missing, *pack_missing)))
     priority = _priority_score(score, level, missing, route_inconsistent=route_inconsistent)
     queries = _evidence_refresh_queries(row, max_queries=cfg.max_source_queries)
+    planner_request = event_llm_evidence_planner.request_from_row(
+        {
+            **dict(row),
+            **source_assessment.to_metadata(),
+            "source_pack": pack.name,
+            "source_pack_missing_evidence": pack_missing,
+            "opportunity_level": level,
+            "opportunity_score_final": score,
+        },
+        missing_evidence=missing,
+        source_pack=pack.name,
+    )
+    planner_result = event_llm_evidence_planner.plan_evidence(planner_request)
+    plan_metadata = planner_result.to_metadata()
+    plan_selected = planner_result.selected and event_llm_evidence_planner.should_plan_evidence({
+        **dict(row),
+        "opportunity_level": level,
+        "opportunity_score_final": score,
+        "missing_requirements": missing,
+        "source_pack": pack.name,
+    })
     return EventNearMissCandidate(
         near_miss_id=_near_miss_id(row, symbol=symbol, coin_id=coin_id),
         refresh_id=_refresh_id(row, symbol=symbol, coin_id=coin_id),
@@ -769,7 +860,7 @@ def _candidate_from_row(
         opportunity_score_before=score,
         final_route_before=final_route or None,
         missing_evidence=missing,
-        recommended_refresh_actions=_recommended_refresh_actions(missing, row),
+        recommended_refresh_actions=_recommended_refresh_actions(missing, row, pack=pack),
         priority_score=priority,
         market_context_before=_market_context(row, source=str(row.get("market_context_source") or "existing"), now=datetime.now(timezone.utc), cfg=cfg),
         market_context_source=str(row.get("market_context_source") or quality.get("market_context_source") or "") or None,
@@ -778,6 +869,16 @@ def _candidate_from_row(
         market_confirmation_before=_float(quality.get("market_confirmation_score")),
         evidence_quality_before=_float(quality.get("evidence_quality_score")),
         evidence_refresh_queries=queries,
+        source_pack=pack.name,
+        provider_coverage_status=source_assessment.provider_coverage_status,
+        evidence_absence_is_meaningful=source_assessment.evidence_absence_is_meaningful,
+        source_coverage_gap=source_gap,
+        source_quality_prior=source_assessment.source_quality_prior,
+        source_confidence_cap=source_assessment.confidence_cap,
+        evidence_acquisition_attempted=plan_selected,
+        evidence_acquisition_plan=plan_metadata if plan_selected else None,
+        evidence_acquisition_failures=tuple(planner_result.provider_gaps),
+        warnings=tuple(dict.fromkeys((*source_assessment.warnings, *planner_result.warnings))),
     )
 
 
@@ -854,7 +955,12 @@ def _market_refresh_reasons(quality: Mapping[str, Any], row: Mapping[str, Any]) 
     return tuple(dict.fromkeys(out))
 
 
-def _recommended_refresh_actions(missing: Iterable[str], row: Mapping[str, Any]) -> tuple[str, ...]:
+def _recommended_refresh_actions(
+    missing: Iterable[str],
+    row: Mapping[str, Any],
+    *,
+    pack: event_source_packs.SourcePack | None = None,
+) -> tuple[str, ...]:
     actions: list[str] = []
     if any(_refreshable_market_reason(reason) for reason in missing):
         actions.append("targeted_market_refresh")
@@ -864,6 +970,16 @@ def _recommended_refresh_actions(missing: Iterable[str], row: Mapping[str, Any])
         actions.append("targeted_supply_refresh")
     if any("source" in reason or "evidence" in reason or "impact_path" in reason for reason in missing):
         actions.append("targeted_evidence_refresh")
+        actions.append("source_pack_search")
+    if any("official" in reason or "listing" in reason or "unlock" in reason for reason in missing):
+        actions.append("official_source_search")
+    if pack is not None:
+        if pack.market_refresh_required:
+            actions.append("targeted_market_refresh")
+        if pack.derivatives_refresh_required:
+            actions.append("targeted_derivatives_refresh")
+        if pack.supply_refresh_required:
+            actions.append("targeted_supply_refresh")
     return tuple(dict.fromkeys(actions or ("operator_review",)))
 
 

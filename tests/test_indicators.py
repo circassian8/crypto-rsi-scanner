@@ -27117,6 +27117,314 @@ def test_event_incident_primary_subject_validator_quarantines_garbage_before_per
         assert "diagnostic_rows_hidden: 0" in visible_report
 
 
+def test_event_source_registry_v2_provider_semantics():
+    from crypto_rsi_scanner import event_source_registry
+
+    polymarket_context = event_source_registry.assess_source(
+        {"provider": "polymarket", "title": "SpaceX IPO market opens"},
+        symbol="VELVET",
+        coin_id="velvet",
+    )
+    assert polymarket_context.source_class == "prediction_market"
+    assert polymarket_context.source_mission == "external_context"
+    assert polymarket_context.can_validate_token_identity is False
+    assert polymarket_context.evidence_absence_is_meaningful is False
+    assert "prediction_market_external_context_only" in polymarket_context.reason_codes
+
+    polymarket_named = event_source_registry.assess_source(
+        {"provider": "polymarket", "title": "VELVET market for SpaceX exposure"},
+        symbol="VELVET",
+        coin_id="velvet",
+    )
+    assert polymarket_named.can_validate_token_identity is True
+    assert "prediction_market_token_named_context" in polymarket_named.reason_codes
+
+    gdelt_degraded = event_source_registry.assess_source(
+        {"provider": "gdelt", "title": "Broad policy article mentions crypto"},
+        symbol="BTC",
+        coin_id="bitcoin",
+        provider_coverage_status="degraded",
+    )
+    assert gdelt_degraded.source_class == "broad_news"
+    assert gdelt_degraded.evidence_absence_is_meaningful is False
+    assert "provider_coverage_degraded" in gdelt_degraded.warnings
+
+    cryptopanic = event_source_registry.assess_source(
+        {
+            "provider": "cryptopanic",
+            "title": "RUNE exploit update is important",
+            "raw_json": {
+                "currency_tags": ("RUNE",),
+                "kind": "important",
+            },
+        },
+        symbol="RUNE",
+        coin_id="thorchain",
+    )
+    assert cryptopanic.source_class == "cryptopanic_tagged"
+    assert cryptopanic.cryptopanic_currency_tag_match is True
+    assert cryptopanic.narrative_heat is True
+    assert "cryptopanic_currency_tag_match" in cryptopanic.reason_codes
+
+    exchange = event_source_registry.assess_source(
+        {"provider": "binance_announcements", "title": "Binance Will List TEST"},
+        symbol="TEST",
+        coin_id="test-token",
+    )
+    assert exchange.source_class == "official_exchange"
+    assert exchange.can_validate_token_identity is True
+    assert exchange.can_validate_catalyst is True
+
+    seo = event_source_registry.assess_source(
+        {"provider": "rss", "title": "Best crypto to buy price prediction market recap"},
+        symbol="HYPE",
+        coin_id="hyperliquid",
+    )
+    assert seo.source_class in {"seo_or_affiliate", "market_recap"}
+    assert seo.can_validate_token_identity is False
+    assert "diagnostic_only_low_quality_source" in seo.warnings
+
+
+def test_event_source_packs_and_feed_coverage_semantics():
+    from crypto_rsi_scanner import event_source_packs, event_source_registry
+
+    names = set(event_source_packs.source_pack_names())
+    assert {
+        "listing_liquidity_pack",
+        "perp_listing_squeeze_pack",
+        "unlock_supply_pack",
+        "proxy_preipo_rwa_pack",
+        "ai_ipo_proxy_pack",
+        "security_shock_pack",
+        "fan_sports_pack",
+        "political_meme_pack",
+        "market_anomaly_pack",
+    }.issubset(names)
+
+    listing = event_source_packs.source_pack_for_playbook("listing_volatility")
+    assert listing.name == "listing_liquidity_pack"
+    assert "official_exchange" in listing.preferred_source_classes
+
+    proxy = event_source_packs.source_pack_for_playbook("proxy_attention", impact_path_type="venue_value_capture")
+    assert proxy.name == "proxy_preipo_rwa_pack"
+    assert "prediction_market" in proxy.context_only_sources
+
+    pack_eval = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "polymarket",
+            "title": "SpaceX IPO odds move",
+            "playbook_type": "proxy_attention",
+            "impact_path_type": "venue_value_capture",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+        },
+        pack=proxy,
+    )
+    assert pack_eval["source_pack"] == "proxy_preipo_rwa_pack"
+    assert pack_eval["source_pack_context_only"] is True
+    assert "source_is_context_only" in pack_eval["source_pack_missing_evidence"]
+
+    feed_403 = event_source_registry.feed_health_from_fetch(
+        feed_url="https://example.test/rss",
+        failure_type="http_403",
+        rows_fetched=0,
+        rows_kept=0,
+        rows_rejected=0,
+    )
+    assert feed_403.quarantined is True
+    assert feed_403.cooldown_reason == "feed_403_quarantined"
+
+    bad_recap = event_source_registry.feed_health_from_fetch(
+        feed_url="https://recap.example.test/price-prediction/rss",
+        failure_count=4,
+        rows_fetched=10,
+        rows_kept=1,
+        rows_rejected=9,
+    )
+    assert bad_recap.quarantined is True
+    assert bad_recap.quality in {"low", "medium"}
+    assert event_source_registry.evidence_absence_is_meaningful(
+        provider="gdelt",
+        source_class="broad_news",
+        coverage_status="degraded",
+    ) is False
+
+
+def test_event_llm_evidence_planner_fixture_cases():
+    from crypto_rsi_scanner import event_llm_evidence_planner
+
+    aave = event_llm_evidence_planner.plan_evidence({
+        "core_opportunity_id": "core:aave",
+        "symbol": "AAVE",
+        "coin_id": "aave",
+        "external_asset": "Kraken",
+        "playbook_type": "strategic_investment",
+        "impact_path_type": "strategic_investment_or_valuation",
+        "opportunity_score_final": 72,
+        "opportunity_level": "validated_digest",
+        "missing_requirements": ("official_source",),
+    })
+    assert aave.selected is True
+    assert any("AAVE" in query.query and "Kraken" in query.query for query in aave.query_plan)
+    assert "confirm token/project identity with non-URL evidence" in aave.checklist
+
+    velvet = event_llm_evidence_planner.plan_evidence({
+        "core_opportunity_id": "core:velvet",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "external_asset": "SpaceX",
+        "playbook_type": "proxy_attention",
+        "impact_path_type": "venue_value_capture",
+        "candidate_role": "proxy_venue",
+        "opportunity_score_final": 79,
+        "opportunity_level": "watchlist",
+    })
+    assert velvet.source_pack == "proxy_preipo_rwa_pack"
+    assert any(query.provider_hint == "polymarket" and query.must_validate_asset is False for query in velvet.query_plan)
+    assert velvet.market_refresh_requests == ("velvet",)
+
+    rune = event_llm_evidence_planner.plan_evidence({
+        "core_opportunity_id": "core:rune",
+        "symbol": "RUNE",
+        "coin_id": "thorchain",
+        "playbook_type": "security_or_regulatory_shock",
+        "impact_path_type": "exploit_security_event",
+        "opportunity_score_final": 80,
+        "opportunity_level": "watchlist",
+    })
+    assert rune.source_pack == "security_shock_pack"
+    assert any("exploit" in query.query.casefold() for query in rune.query_plan)
+
+    generic = event_llm_evidence_planner.plan_evidence({
+        "core_opportunity_id": "core:generic",
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "provider": "polymarket",
+        "playbook_type": "political_meme_proxy",
+        "opportunity_score_final": 45,
+        "opportunity_level": "local_only",
+    })
+    assert generic.selected is False
+    assert "planner_not_selected_below_prefilter" in generic.warnings
+
+
+def test_event_near_miss_source_pack_and_operator_surfaces():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_daily_brief,
+        event_near_miss,
+        event_opportunity_audit,
+        event_research_cards,
+        event_watchlist,
+    )
+
+    row = {
+        "hypothesis_id": "hyp:velvet-source-gap",
+        "event_cluster_id": "cluster:spacex",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "validated_symbol": "VELVET",
+        "validated_coin_id": "velvet",
+        "external_asset": "SpaceX",
+        "provider": "gdelt",
+        "provider_coverage_status": "degraded",
+        "title": "SpaceX IPO coverage mentions Velvet exposure",
+        "playbook_type": "proxy_attention",
+        "impact_category": "tokenized_stock_venue",
+        "impact_path_type": "venue_value_capture",
+        "candidate_role": "proxy_venue",
+        "source_class": "broad_news",
+        "evidence_specificity": "token_and_catalyst",
+        "evidence_quality_score": 58,
+        "market_confirmation_score": 35,
+        "opportunity_score_final": 64,
+        "opportunity_level": "exploratory",
+        "missing_requirements": ("impact_path_validation", "source evidence"),
+        "why_not_watchlist": "impact_path_not_validated",
+        "score_components": {
+            "validated_symbol": "VELVET",
+            "validated_coin_id": "velvet",
+            "external_asset": "SpaceX",
+            "playbook_type": "proxy_attention",
+            "impact_category": "tokenized_stock_venue",
+            "impact_path_type": "venue_value_capture",
+            "candidate_role": "proxy_venue",
+            "source_class": "broad_news",
+            "evidence_specificity": "token_and_catalyst",
+            "evidence_quality_score": 58,
+            "market_confirmation_score": 35,
+            "opportunity_score_final": 64,
+            "opportunity_level": "exploratory",
+            "missing_requirements": ("impact_path_validation", "source evidence"),
+            "why_not_watchlist": "impact_path_not_validated",
+        },
+    }
+    near = event_near_miss.detect_near_miss_rows((row,), cfg=event_near_miss.EventNearMissConfig())
+    assert len(near) == 1
+    assert near[0].source_pack == "proxy_preipo_rwa_pack"
+    assert near[0].provider_coverage_status == "degraded"
+    assert near[0].source_coverage_gap == "provider_coverage_degraded:gdelt"
+    assert near[0].evidence_absence_is_meaningful is False
+    assert "source_pack_search" in near[0].recommended_refresh_actions
+    assert near[0].evidence_acquisition_attempted is True
+    assert near[0].evidence_acquisition_plan["evidence_acquisition_source_pack"] == "proxy_preipo_rwa_pack"
+
+    report = event_near_miss.format_near_miss_report(near, profile="quality_validation")
+    assert "source_pack: proxy_preipo_rwa_pack" in report
+    assert "coverage=degraded" in report
+    assert "evidence_plan:" in report
+
+    brief = event_alpha_daily_brief.build_daily_brief(
+        hypothesis_rows=[{**row, "profile": "quality_validation", "artifact_namespace": "quality_validation", "run_mode": "notification_burn_in"}],
+        requested_profile="quality_validation",
+        artifact_namespace="quality_validation",
+    )
+    assert "## Source Coverage / Evidence Acquisition" in brief
+    assert "Candidates Blocked by Source Coverage" in brief
+    assert "VELVET/velvet" in brief
+
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="hypothesis|cluster:spacex|velvet",
+        cluster_id="cluster:spacex",
+        event_id="hyp:velvet-source-gap",
+        coin_id="velvet",
+        symbol="VELVET",
+        relationship_type="impact_hypothesis",
+        external_asset="SpaceX",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        previous_state=None,
+        first_seen_at=datetime(2026, 6, 15, tzinfo=timezone.utc).isoformat(),
+        last_seen_at=datetime(2026, 6, 15, tzinfo=timezone.utc).isoformat(),
+        latest_source="gdelt",
+        latest_playbook_type="proxy_attention",
+        latest_score_components={
+            **row["score_components"],
+            "source_pack": near[0].source_pack,
+            "provider_coverage_status": near[0].provider_coverage_status,
+            "evidence_absence_is_meaningful": near[0].evidence_absence_is_meaningful,
+            "source_coverage_gap": near[0].source_coverage_gap,
+            "source_quality_prior": near[0].source_quality_prior,
+            "source_confidence_cap": near[0].source_confidence_cap,
+            "evidence_acquisition_attempted": near[0].evidence_acquisition_attempted,
+            "evidence_acquisition_plan": near[0].evidence_acquisition_plan,
+            "evidence_acquisition_failures": near[0].evidence_acquisition_failures,
+        },
+    )
+    card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    assert "## Source Coverage / Evidence Acquisition" in card.markdown
+    assert "Source pack: proxy_preipo_rwa_pack" in card.markdown
+    assert "Coverage status: degraded" in card.markdown
+    assert "OPENAI_API_KEY" not in card.markdown
+
+    audit = event_opportunity_audit.format_opportunity_audit("VELVET", hypotheses=[row], watchlist_entries=[entry])
+    assert "## Source coverage and acquisition plan" in audit
+    assert "source pack: proxy_preipo_rwa_pack" in audit
+    assert "provider coverage: degraded" in audit
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

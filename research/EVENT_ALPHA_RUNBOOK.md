@@ -5,6 +5,31 @@ refresh watchlist rows, route research digests, write review artifacts, and
 export proposed eval cases. It must not trade, paper trade, write normal RSI
 signal rows, or let LLM/search/watchlist output create `TRIGGERED_FADE`.
 
+## Source Coverage And Evidence Plans
+
+Event Alpha now reports source registry and source-pack metadata in near-miss
+reports, daily briefs, research cards, and opportunity audits. Use these fields
+as an operator checklist:
+
+- `source_class` / `source_mission`: what the source is allowed to prove.
+- `provider_coverage_status`: whether absence from the provider is meaningful.
+  Degraded, partial, unavailable, or not-configured coverage is a gap, not a
+  strong negative signal.
+- `source_pack`: the playbook-specific evidence pack, such as listing,
+  unlock/supply, proxy pre-IPO/RWA, security shock, sports/fan, political meme,
+  or market anomaly.
+- `evidence_acquisition_plan`: bounded query/checklist metadata for what to
+  search next. It is advisory only and does not change routes or watchlist state
+  by itself.
+
+Broad news, RSS recap/SEO, and Polymarket rows are useful context, but they do
+not validate token impact by themselves. Official exchange/project,
+structured-unlock/calendar, and matching CryptoPanic currency-tag evidence are
+stronger source classes when the text also names the token and explains the
+impact path. The planner can suggest official searches, denial searches,
+market/derivatives/supply refreshes, and validation criteria; deterministic
+resolver, quality, router, and `event_fade.py` gates remain authoritative.
+
 ## Day-1 Notification Burn-In
 
 Use notification profiles when you want immediate Telegram research
