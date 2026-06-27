@@ -1911,11 +1911,36 @@ def _normalize_profile_paths() -> None:
             config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS = ()
 
 
-def _research_card_markdown_paths(cards_dir: str | Path) -> list[Path]:
+def _research_card_markdown_paths(cards_dir: str | Path, *, include_index: bool = False) -> list[Path]:
     directory = Path(cards_dir)
     if not directory.exists():
         return []
-    return sorted(path for path in directory.glob("*.md") if path.name != "index.md")
+    return sorted(
+        path for path in directory.glob("*.md")
+        if include_index or path.name != "index.md"
+    )
+
+
+def _event_alpha_card_lineage_context(
+    *,
+    run_id: str | None,
+    profile: str | None,
+    run_mode: str | None,
+    artifact_namespace: str | None,
+) -> dict[str, str]:
+    return {
+        "run_id": str(run_id or "manual_card_write"),
+        "profile": str(profile or "default"),
+        "run_mode": str(run_mode or "legacy"),
+        "artifact_namespace": str(artifact_namespace or "default"),
+    }
+
+
+def _latest_event_alpha_run_id(path: str | Path) -> str | None:
+    rows = event_alpha_run_ledger.load_run_records(path, limit=1).rows
+    if not rows:
+        return None
+    return str(rows[0].get("run_id") or "") or None
 
 
 def _latest_event_alpha_profile_from_runs() -> str | None:
@@ -2246,6 +2271,12 @@ def event_alpha_cycle(
             route_decisions=pipeline_result.router_result.decisions,
             selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
             now=now,
+            lineage_context=_event_alpha_card_lineage_context(
+                run_id=run_id,
+                profile=profile_for_run,
+                run_mode=run_mode,
+                artifact_namespace=artifact_namespace,
+            ),
         )
         pipeline_result = replace(pipeline_result, research_card_paths=card_write.card_paths)
         print(event_research_cards.format_card_write_result(card_write))
@@ -2731,6 +2762,12 @@ def _event_alpha_notify_cycle_body(
             route_decisions=pipeline_result.router_result.decisions,
             selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
             now=now,
+            lineage_context=_event_alpha_card_lineage_context(
+                run_id=run_id,
+                profile=profile_for_run,
+                run_mode=run_mode,
+                artifact_namespace=artifact_namespace,
+            ),
         )
         pipeline_result = replace(pipeline_result, research_card_paths=card_write.card_paths)
         print(event_research_cards.format_card_write_result(card_write))
@@ -3051,7 +3088,7 @@ def event_alpha_notify_go_no_go(
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
-        card_paths=[str(path) for path in _research_card_markdown_paths(context.research_cards_dir)],
+        card_paths=[str(path) for path in _research_card_markdown_paths(context.research_cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
         delivery_rows=delivery_rows,
@@ -3458,7 +3495,7 @@ def event_alpha_notification_checklist_report(
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
-        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
+        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
         profile=profile.name,
@@ -4400,6 +4437,7 @@ def event_opportunity_audit_report(
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=True)
     incidents = event_incident_store.load_incidents(context.incident_store_path, limit=500, include_legacy=True)
+    feedback = event_feedback.load_feedback(context.feedback_path)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
     print(_event_alpha_context_block(context))
     print(event_opportunity_audit.format_opportunity_audit(
@@ -4409,6 +4447,8 @@ def event_opportunity_audit_report(
         alert_rows=alerts.rows,
         route_decisions=routed.decisions,
         incident_rows=incidents.rows,
+        card_paths=_research_card_markdown_paths(context.research_cards_dir),
+        feedback_rows=feedback.records,
         profile=context.profile,
         include_diagnostics=include_diagnostics,
     ))
@@ -4881,6 +4921,12 @@ def event_alpha_notify_fixture_smoke(
         alert_rows=[],
         route_decisions=[decision],
         now=now,
+        lineage_context=_event_alpha_card_lineage_context(
+            run_id=run_id,
+            profile=context.profile,
+            run_mode=context.run_mode,
+            artifact_namespace=context.artifact_namespace,
+        ),
     )
     snapshot_path = _write_fixture_alert_snapshot(
         context,
@@ -5424,7 +5470,7 @@ def event_alpha_artifact_doctor_report(
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
-        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
+        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
         delivery_rows=delivery_rows,
@@ -5545,7 +5591,7 @@ def event_alpha_export_burn_in_pack(
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
-        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir)],
+        card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
         profile=config.EVENT_ALPHA_HEALTH_REQUIRE_PROFILE or None,
@@ -5755,6 +5801,12 @@ def event_research_cards_write(
         outcome_rows=outcome_rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
         now=datetime.now(timezone.utc),
+        lineage_context=_event_alpha_card_lineage_context(
+            run_id=_latest_event_alpha_run_id(context.run_ledger_path),
+            profile=context.profile,
+            run_mode=context.run_mode,
+            artifact_namespace=context.artifact_namespace,
+        ),
     )
     print(_event_alpha_context_block(context))
     print(event_research_cards.format_card_write_result(result))
@@ -5848,6 +5900,12 @@ def event_alpha_daily_brief_report(
         monitor_rows=monitor_result.rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
         now=datetime.now(timezone.utc),
+        lineage_context=_event_alpha_card_lineage_context(
+            run_id=_latest_event_alpha_run_id(context.run_ledger_path),
+            profile=context.profile,
+            run_mode=context.run_mode,
+            artifact_namespace=artifact_namespace,
+        ),
     )
     markdown = event_alpha_daily_brief.build_daily_brief(
         run_rows=runs.rows,

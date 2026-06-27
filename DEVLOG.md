@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Fix Event Alpha feedback readiness lineage · Codex
+**Why:** The `catalyst_frame_e2e` feedback-readiness check could fail even
+after the e2e artifacts were regenerated because research cards lacked current
+feedback-target metadata, `index.md` could be mistaken for a card, and
+opportunity audit did not read already-marked feedback rows.
+**Changes:**
+- Research cards now render current artifact lineage plus card path, stable
+  feedback target, feedback target type, and ready-to-copy useful/junk/watch
+  commands; legacy cards remain explicitly labeled as legacy lineage.
+- Card indexes and daily briefs expose each card's operator group and feedback
+  target, while artifact doctor and feedback readiness count real card files
+  separately from `index.md`.
+- Feedback readiness allows no-send/e2e namespaces to be ready from current
+  cards even when no alert snapshots exist, and it blocks cards missing lineage
+  or feedback targets.
+- Opportunity audit now resolves card-path targets and reads feedback artifacts
+  so marked useful/junk/watch status appears in the audit for the same target.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`python3 tests/test_indicators.py` passed (488/488); `make
+event-alpha-signal-quality-eval PYTHON=python3` passed (36/36); `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed; `make
+event-alpha-quality-validation-cycle PYTHON=python3` passed; `make verify
+PYTHON=python3` passed. Manual checks: `make event-alpha-feedback-readiness
+PROFILE=catalyst_frame_e2e PYTHON=python3` is ready with
+`cards_with_lineage=5/5` and `cards_with_feedback_target=5/5`; strict artifact
+doctor reports `research_card_files=5`, `research_card_index_present=true`,
+`cards_missing_lineage=0`, `cards_missing_feedback_target=0`, and no blockers;
+`make event-opportunity-audit PROFILE=catalyst_frame_e2e TARGET=VELVET
+PYTHON=python3` resolves the VELVET card path plus core feedback target.
+**Notes/risks:** Research-only artifact/reporting/readiness work. No live
+trading, paper trades, normal RSI signal writes, Telegram sends, or
+provider/LLM-created `TRIGGERED_FADE` logic changed.
+
 ## 2026-06-27 — Polish Event Alpha traceability and live readiness · Codex
 **Why:** Operator-facing Event Alpha artifacts needed a clearer join path from
 daily brief → card → audit → feedback, plus live-style readiness checks for

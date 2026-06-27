@@ -25,10 +25,17 @@ cards should show run id, profile, artifact namespace, incident id, hypothesis
 id, watchlist key, core opportunity id, alert/snapshot/card ids, and source raw
 or event ids when available. Legacy rows may remain readable, but missing
 lineage must be labeled as legacy/missing rather than rendered as a current
-unknown. Feedback and audit target lookup should accept the same family of ids
-where practical. Live-style frame profiles should also expose whether catalyst
-frame analysis ran or was intentionally skipped, and daily operator views should
-separate the canonical core-opportunity sections from diagnostics.
+unknown. Current cards must also show card path, stable feedback target,
+feedback target type, and ready-to-copy feedback commands. Card indexes are
+navigation artifacts, not research cards: readiness and artifact doctor counts
+must count real card files separately from `index.md` and should block current
+cards missing lineage or feedback targets. Feedback and audit target lookup
+should accept the same family of ids where practical, including card paths, and
+opportunity audit should read feedback artifacts so already-marked review status
+is visible for the same target. Live-style frame profiles should also expose
+whether catalyst frame analysis ran or was intentionally skipped, and daily
+operator views should separate the canonical core-opportunity sections from
+diagnostics.
 **Why:** Pro-model review and daily operations depend on being able to trace one
 visible opportunity back to its source evidence, support rows, card, and
 feedback target. Unlabeled lineage gaps and inconsistent target lookup make

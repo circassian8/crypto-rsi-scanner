@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import (
     event_core_opportunities,
     event_alpha_quality_fields,
     event_alpha_router,
+    event_research_cards,
     event_near_miss,
     event_opportunity_verdict,
     event_alpha_reason_text,
@@ -24,6 +26,8 @@ def format_opportunity_audit(
     alert_rows: Iterable[Mapping[str, Any]] = (),
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision | Mapping[str, Any]] = (),
     incident_rows: Iterable[Mapping[str, Any]] = (),
+    card_paths: Iterable[str | Path] = (),
+    feedback_rows: Iterable[Mapping[str, Any] | object] = (),
     profile: str | None = None,
     include_diagnostics: bool = False,
 ) -> str:
@@ -31,6 +35,7 @@ def format_opportunity_audit(
     clean = str(target or "").strip()
     if not clean:
         return "Event opportunity audit failed: target is required."
+    resolved_target = _target_from_card_path(clean, card_paths) or clean
     hypothesis_items = list(hypotheses)
     watchlist_items = list(watchlist_entries)
     alert_items = list(alert_rows)
@@ -42,7 +47,7 @@ def format_opportunity_audit(
         *alert_items,
         *hypothesis_items,
     ])
-    core_match = _find_core_match(clean, core_opportunities)
+    core_match = _find_core_match(resolved_target, core_opportunities)
     match = (
         {
             "source": "core_opportunity",
@@ -50,7 +55,7 @@ def format_opportunity_audit(
             "core_opportunity": core_match,
         }
         if core_match is not None
-        else _find_match(clean, hypothesis_items, watchlist_items, alert_items, decision_items, incidents)
+        else _find_match(resolved_target, hypothesis_items, watchlist_items, alert_items, decision_items, incidents)
     )
     if match is None:
         return "\n".join([
@@ -69,6 +74,13 @@ def format_opportunity_audit(
     near_miss = event_near_miss.near_miss_metadata_for_row(row)
     daily_section = _daily_brief_section(row, components, core_match, near_miss)
     card_group = _card_group_for_audit(row, components, core_match, near_miss)
+    matching_cards = _matching_card_paths(resolved_target, row, core_match, card_paths)
+    feedback_target = _audit_feedback_target(row, resolved_target, core_match, matching_cards)
+    feedback_matches = _matching_feedback_rows(feedback_target, row, feedback_rows)
+    feedback_status = "has_feedback" if feedback_matches else _value(row, "feedback_status", default="pending_or_unknown")
+    feedback_labels = tuple(
+        dict.fromkeys(str(item.get("label") or item.get("feedback") or "") for item in feedback_matches)
+    )
     lines = [
         "=" * 76,
         "EVENT OPPORTUNITY AUDIT (research-only)",
@@ -89,6 +101,8 @@ def format_opportunity_audit(
         "## Operator Presentation",
         f"- Daily brief section: {daily_section}",
         f"- Research card group: {card_group}",
+        f"- Card path: {_list_value(str(path) for path in matching_cards) if matching_cards else 'none'}",
+        f"- Feedback target: {feedback_target}",
         "- Reason: " + _operator_presentation_reason(row, components, core_match, near_miss),
         "",
         "## Evidence chain",
@@ -145,8 +159,9 @@ def format_opportunity_audit(
         "",
         "## Notification and feedback status",
         f"- delivery status: {_value(row, 'delivered_status', 'delivery_state', default='not_delivered_or_unknown')}",
-        f"- feedback status: {_value(row, 'feedback_status', default='pending_or_unknown')}",
-        f"- feedback label: {_value(row, 'label', 'feedback', default='none')}",
+        f"- feedback status: {feedback_status}",
+        f"- feedback label: {_list_value(feedback_labels) if feedback_labels else _value(row, 'label', 'feedback', default='none')}",
+        f"- outcome status: {_value(row, 'outcome_status', default='pending_or_unknown')}",
         "",
         "## Missing evidence",
         f"- missing requirements: {_list_value(components.get('missing_requirements') or row.get('missing_requirements'))}",
@@ -158,7 +173,7 @@ def format_opportunity_audit(
         "- " + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=8) or "source correction or failed confirmation"),
         "",
         "## Feedback command",
-        f"- make event-feedback-watch PROFILE={profile or 'notify_llm'} FEEDBACK_TARGET='{_audit_feedback_target(row, clean, core_match)}'",
+        f"- make event-feedback-watch PROFILE={profile or 'notify_llm'} FEEDBACK_TARGET='{feedback_target}'",
         "",
         "No secrets, Telegram sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
     ]
@@ -659,9 +674,116 @@ def _audit_feedback_target(
     row: Mapping[str, Any],
     fallback: str,
     core: event_core_opportunities.CoreOpportunity | None = None,
+    card_paths: Iterable[Path] = (),
 ) -> str:
+    for path in card_paths:
+        card_target = event_research_cards.card_feedback_target(path)
+        if card_target:
+            return card_target
     if core is not None:
         for candidate in (core.core_opportunity_id, row.get("card_id"), row.get("alert_id"), row.get("key"), row.get("hypothesis_id")):
             if candidate:
                 return str(candidate)
     return str(row.get("card_id") or row.get("alert_id") or row.get("key") or row.get("hypothesis_id") or fallback)
+
+
+def _matching_card_paths(
+    target: str,
+    row: Mapping[str, Any],
+    core: event_core_opportunities.CoreOpportunity | None,
+    card_paths: Iterable[str | Path],
+) -> tuple[Path, ...]:
+    identifiers = {
+        target,
+        str(row.get("alert_id") or ""),
+        str(row.get("card_id") or ""),
+        str(row.get("snapshot_id") or ""),
+        str(row.get("key") or ""),
+        str(row.get("event_id") or ""),
+        str(row.get("hypothesis_id") or ""),
+        str(row.get("incident_id") or ""),
+        str(row.get("symbol") or ""),
+        str(row.get("coin_id") or ""),
+        str(row.get("validated_symbol") or ""),
+        str(row.get("validated_coin_id") or ""),
+    }
+    if core is not None:
+        identifiers.add(core.core_opportunity_id)
+        identifiers.add(core.incident_id or "")
+        identifiers.update(str(value) for value in core.supporting_hypothesis_ids)
+        identifiers.update(str(support.get("key") or "") for support in core.supporting_rows)
+        identifiers.update(str(support.get("card_id") or "") for support in core.supporting_rows)
+        identifiers.update(str(support.get("alert_id") or "") for support in core.supporting_rows)
+    identifiers = {item for item in identifiers if item}
+    identifiers_l = {item.lower() for item in identifiers}
+    out: list[Path] = []
+    for raw_path in card_paths:
+        path = Path(raw_path)
+        if path.name == "index.md" or not path.exists():
+            continue
+        path_targets = {
+            str(path),
+            path.name,
+            path.stem,
+            event_research_cards.card_feedback_target(path) or "",
+        }
+        if identifiers_l.intersection(value.lower() for value in path_targets if value):
+            out.append(path)
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if any(identifier in text for identifier in identifiers):
+            out.append(path)
+    return tuple(dict.fromkeys(out))
+
+
+def _matching_feedback_rows(
+    feedback_target: str,
+    row: Mapping[str, Any],
+    feedback_rows: Iterable[Mapping[str, Any] | object],
+) -> tuple[dict[str, Any], ...]:
+    identifiers = {
+        str(feedback_target or ""),
+        str(row.get("alert_id") or ""),
+        str(row.get("alert_key") or ""),
+        str(row.get("card_id") or ""),
+        str(row.get("snapshot_id") or ""),
+        str(row.get("key") or ""),
+        str(row.get("event_id") or ""),
+        str(row.get("hypothesis_id") or ""),
+        str(row.get("incident_id") or ""),
+        str(row.get("symbol") or ""),
+        str(row.get("coin_id") or ""),
+        str(row.get("validated_symbol") or ""),
+        str(row.get("validated_coin_id") or ""),
+    }
+    components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+    identifiers.update({
+        str(components.get("validated_symbol") or ""),
+        str(components.get("validated_coin_id") or ""),
+    })
+    identifiers = {item for item in identifiers if item}
+    matches: list[dict[str, Any]] = []
+    for item in feedback_rows:
+        feedback = _row(item)
+        candidates = {
+            str(feedback.get("target") or ""),
+            str(feedback.get("key") or ""),
+            str(feedback.get("event_id") or ""),
+            str(feedback.get("incident_id") or ""),
+            str(feedback.get("coin_id") or ""),
+            str(feedback.get("symbol") or ""),
+        }
+        if identifiers.intersection(candidate for candidate in candidates if candidate):
+            matches.append(feedback)
+    return tuple(matches)
+
+
+def _target_from_card_path(target: str, card_paths: Iterable[str | Path]) -> str | None:
+    target_l = target.lower()
+    for raw_path in card_paths:
+        path = Path(raw_path)
+        if path.name == "index.md" or not path.exists():
+            continue
+        if target_l in {str(path).lower(), path.name.lower(), path.stem.lower()}:
+            return event_research_cards.card_feedback_target(path)
+    return None

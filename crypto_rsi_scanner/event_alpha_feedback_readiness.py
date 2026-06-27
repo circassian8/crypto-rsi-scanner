@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_notification_inbox, event_watchlist
+from . import event_alpha_notification_inbox, event_research_cards, event_watchlist
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,10 @@ class EventAlphaFeedbackReadinessResult:
     artifact_namespace: str
     cards_checked: int
     cards_with_lineage: int
+    cards_with_feedback_target: int
+    core_opportunity_cards_ready: int
+    near_miss_cards_ready: int
+    local_only_cards_ready: int
     alert_rows_checked: int
     alert_rows_with_feedback_targets: int
     inbox_review_items: int
@@ -43,29 +47,38 @@ def build_feedback_readiness(
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
     feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
     entries = list(watchlist_entries)
-    cards_with_lineage = sum(1 for path in cards if _card_has_current_lineage(path))
+    research_cards = [path for path in cards if path.name != "index.md"]
+    cards_with_lineage = sum(1 for path in research_cards if event_research_cards.card_has_current_lineage(path))
+    cards_with_target = sum(1 for path in research_cards if event_research_cards.card_feedback_target(path))
+    ready_by_group = _ready_card_groups(research_cards)
     alert_targets = sum(1 for row in alerts if _alert_has_feedback_target(row))
     calibration_ready = sum(1 for row in [*alerts, *(_entry_row(entry) for entry in entries)] if _row_has_calibration_fields(row))
     inbox_items = _inbox_review_count(inbox_result)
     blockers: list[str] = []
     warnings: list[str] = []
-    if cards and cards_with_lineage < len(cards):
+    if research_cards and cards_with_lineage < len(research_cards):
         blockers.append("research_cards_missing_lineage")
+    if research_cards and cards_with_target < len(research_cards):
+        blockers.append("research_cards_missing_feedback_target")
     if alerts and alert_targets < len(alerts):
         blockers.append("alert_snapshots_missing_feedback_targets")
     if inbox_result is not None and inbox_items <= 0 and (alerts or cards):
         warnings.append("inbox_has_no_review_items")
     if alerts and calibration_ready <= 0:
         blockers.append("calibration_fields_missing")
-    if not cards:
+    if not research_cards:
         warnings.append("no_research_cards_found")
     if not alerts:
         warnings.append("no_alert_snapshots_found")
     return EventAlphaFeedbackReadinessResult(
         profile=str(profile or "default"),
         artifact_namespace=str(artifact_namespace or "default"),
-        cards_checked=len(cards),
+        cards_checked=len(research_cards),
         cards_with_lineage=cards_with_lineage,
+        cards_with_feedback_target=cards_with_target,
+        core_opportunity_cards_ready=ready_by_group.get("Core Opportunity Cards", 0),
+        near_miss_cards_ready=ready_by_group.get("Near-Miss Cards", 0),
+        local_only_cards_ready=ready_by_group.get("Local-Only / Quality-Capped Cards", 0),
         alert_rows_checked=len(alerts),
         alert_rows_with_feedback_targets=alert_targets,
         inbox_review_items=inbox_items,
@@ -85,6 +98,13 @@ def format_feedback_readiness(result: EventAlphaFeedbackReadinessResult) -> str:
         f"artifact_namespace: {result.artifact_namespace}",
         f"ready: {str(result.ready).lower()}",
         f"cards_with_lineage: {result.cards_with_lineage}/{result.cards_checked}",
+        f"cards_with_feedback_target: {result.cards_with_feedback_target}/{result.cards_checked}",
+        (
+            "card_groups_ready: "
+            f"core={result.core_opportunity_cards_ready}, "
+            f"near_miss={result.near_miss_cards_ready}, "
+            f"local_only={result.local_only_cards_ready}"
+        ),
         f"alert_feedback_targets: {result.alert_rows_with_feedback_targets}/{result.alert_rows_checked}",
         f"inbox_review_items: {result.inbox_review_items}",
         f"feedback_rows: {result.feedback_rows}",
@@ -97,15 +117,21 @@ def format_feedback_readiness(result: EventAlphaFeedbackReadinessResult) -> str:
     ]
     return "\n".join(lines)
 
-
-def _card_has_current_lineage(path: Path) -> bool:
-    if not path.exists() or path.name == "index.md":
-        return False
-    text = path.read_text(encoding="utf-8", errors="replace")
-    required = ("- Run ID: ", "- Profile: ", "- Namespace: ", "- Generated at: ")
-    if not all(token in text for token in required):
-        return False
-    return "legacy_lineage_missing" not in text
+def _ready_card_groups(paths: Iterable[Path]) -> dict[str, int]:
+    counts: dict[str, int] = {
+        "Core Opportunity Cards": 0,
+        "Near-Miss Cards": 0,
+        "Local-Only / Quality-Capped Cards": 0,
+    }
+    for path in paths:
+        if not event_research_cards.card_has_current_lineage(path):
+            continue
+        if not event_research_cards.card_feedback_target(path):
+            continue
+        group = event_research_cards.card_index_group(path)
+        if group in counts:
+            counts[group] += 1
+    return counts
 
 
 def _alert_has_feedback_target(row: Mapping[str, Any]) -> bool:

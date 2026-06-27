@@ -23638,15 +23638,25 @@ def test_research_cards_have_current_lineage_and_legacy_marker():
         },
     )
     core_id = event_core_opportunities.core_opportunity_id_for_row(entry)
-    card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    card = event_research_cards.render_research_card(
+        entry.key,
+        watchlist_entries=[entry],
+        card_path="/tmp/card_velvet.md",
+    )
     assert "- Run ID: run-123" in card.markdown
     assert "- Profile: catalyst_frame_e2e" in card.markdown
     assert "- Namespace: catalyst_frame_e2e" in card.markdown
     assert "- Incident ID: incident:velvet:spacex" in card.markdown
     assert "- Hypothesis ID: hyp:velvet:spacex" in card.markdown
     assert f"- Core opportunity ID: {core_id}" in card.markdown
+    assert "- Card path: /tmp/card_velvet.md" in card.markdown
+    assert f"- Feedback target: {core_id}" in card.markdown
+    assert "- Feedback target type: core_opportunity_id" in card.markdown
+    assert "make event-feedback-useful PROFILE=catalyst_frame_e2e" in card.markdown
     assert "raw=velvet_spacex" in card.markdown
-    assert "legacy_lineage_missing" not in card.markdown
+    assert "legacy_lineage_missing: false" in card.markdown
+    assert "Lineage status: legacy_lineage_missing" not in card.markdown
+    assert "Run ID: legacy_lineage_missing" not in card.markdown
 
     legacy = _test_watchlist_entry(
         state=event_watchlist.EventWatchlistState.WATCHLIST.value,
@@ -23655,6 +23665,7 @@ def test_research_cards_have_current_lineage_and_legacy_marker():
     )
     legacy_card = event_research_cards.render_research_card(legacy.key, watchlist_entries=[legacy])
     assert "Lineage status: legacy_lineage_missing" in legacy_card.markdown
+    assert "legacy_lineage_missing: true" in legacy_card.markdown
     assert "- Run ID: legacy_lineage_missing" in legacy_card.markdown
 
 
@@ -23704,7 +23715,14 @@ def test_daily_brief_declares_canonical_view_and_market_freshness_readiness():
 def test_event_alpha_feedback_readiness_and_core_feedback_target():
     import tempfile
     from pathlib import Path
-    from crypto_rsi_scanner import event_alpha_feedback_readiness, event_feedback, event_research_cards, event_watchlist
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_feedback_readiness,
+        event_feedback,
+        event_opportunity_audit,
+        event_research_cards,
+        event_watchlist,
+    )
 
     entry = _test_watchlist_entry(
         state=event_watchlist.EventWatchlistState.WATCHLIST.value,
@@ -23724,7 +23742,11 @@ def test_event_alpha_feedback_readiness_and_core_feedback_target():
             "hypothesis_id": "hyp:aave",
         },
     )
-    card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    card = event_research_cards.render_research_card(
+        entry.key,
+        watchlist_entries=[entry],
+        card_path="/tmp/card_aave.md",
+    )
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         card_path = tmp_path / "card_aave.md"
@@ -23749,12 +23771,39 @@ def test_event_alpha_feedback_readiness_and_core_feedback_target():
         )
         assert ready.ready is True
         assert ready.cards_with_lineage == 1
+        assert ready.cards_with_feedback_target == 1
+        assert ready.core_opportunity_cards_ready == 1
         text = event_alpha_feedback_readiness.format_feedback_readiness(ready)
         assert "ready: true" in text
+        assert "cards_with_feedback_target: 1/1" in text
         core_id = __import__("crypto_rsi_scanner.event_core_opportunities", fromlist=["core_opportunity_id_for_row"]).core_opportunity_id_for_row(entry)
         cfg = event_feedback.EventFeedbackConfig(path=tmp_path / "feedback.jsonl")
         record = event_feedback.mark_feedback(core_id, "useful", watchlist_entries=[entry], cfg=cfg)
         assert record.key == entry.key
+        report = event_feedback.format_feedback_report(event_feedback.load_feedback(cfg.path))
+        assert "useful" in report
+        assert "AAVE/aave" in report
+        audit = event_opportunity_audit.format_opportunity_audit(
+            core_id,
+            watchlist_entries=[entry],
+            feedback_rows=event_feedback.load_feedback(cfg.path).records,
+            card_paths=[card_path],
+            profile="notify_llm_quality_frame",
+        )
+        assert "- feedback status: has_feedback" in audit
+        assert "- feedback label: useful" in audit
+        assert f"FEEDBACK_TARGET='{core_id}'" in audit
+
+        no_alert_ready = event_alpha_feedback_readiness.build_feedback_readiness(
+            profile="catalyst_frame_e2e",
+            artifact_namespace="catalyst_frame_e2e",
+            card_paths=[card_path],
+            alert_rows=[],
+            feedback_rows=[],
+            watchlist_entries=[entry],
+        )
+        assert no_alert_ready.ready is True
+        assert "no_alert_snapshots_found" in no_alert_ready.warnings
 
         legacy_path = tmp_path / "legacy.md"
         legacy_path.write_text("# Card\n\n- Run ID: legacy_lineage_missing\n", encoding="utf-8")
@@ -23767,6 +23816,54 @@ def test_event_alpha_feedback_readiness_and_core_feedback_target():
             watchlist_entries=[entry],
         )
         assert "research_cards_missing_lineage" in blocked.blockers
+
+        missing_target_path = tmp_path / "missing_target.md"
+        missing_target_path.write_text(
+            "# Card\n\n"
+            "## Artifact Lineage\n"
+            "- Generated at: 2026-06-15T16:00:00+00:00\n"
+            "- Lineage status: current\n"
+            "- legacy_lineage_missing: false\n"
+            "- Run ID: run-aave\n"
+            "- Profile: catalyst_frame_e2e\n"
+            "- Namespace: catalyst_frame_e2e\n",
+            encoding="utf-8",
+        )
+        missing_target = event_alpha_feedback_readiness.build_feedback_readiness(
+            profile="catalyst_frame_e2e",
+            artifact_namespace="catalyst_frame_e2e",
+            card_paths=[missing_target_path],
+            alert_rows=[],
+            feedback_rows=[],
+            watchlist_entries=[entry],
+        )
+        assert "research_cards_missing_feedback_target" in missing_target.blockers
+
+        index_path = tmp_path / "index.md"
+        index_path.write_text("# Event Research Cards\n\n", encoding="utf-8")
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-aave", "profile": "catalyst_frame_e2e", "artifact_namespace": "catalyst_frame_e2e", "run_mode": "test"}],
+            card_paths=[index_path, card_path],
+            profile="catalyst_frame_e2e",
+            artifact_namespace="catalyst_frame_e2e",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor.research_card_index_present is True
+        assert doctor.cards_missing_lineage == 0
+        assert doctor.cards_missing_feedback_target == 0
+        assert doctor.status in {"OK", "WARN"}
+
+        doctor_missing = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-aave", "profile": "catalyst_frame_e2e", "artifact_namespace": "catalyst_frame_e2e", "run_mode": "test"}],
+            card_paths=[card_path],
+            profile="catalyst_frame_e2e",
+            artifact_namespace="catalyst_frame_e2e",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor_missing.research_card_index_present is False
+        assert "index.md" in "; ".join(doctor_missing.blockers)
 
 
 def test_missing_unresolved_catalyst_frame_caps_validated_hypothesis():

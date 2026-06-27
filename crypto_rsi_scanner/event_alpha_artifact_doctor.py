@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_research_cards, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 
@@ -22,6 +22,8 @@ class EventAlphaArtifactDoctorResult:
     card_files: int
     research_card_files: int = 0
     research_card_index_present: bool = False
+    cards_missing_lineage: int = 0
+    cards_missing_feedback_target: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -257,6 +259,17 @@ def diagnose_artifacts(
     research_card_paths = [path for path in card_file_paths if path.name != "index.md"]
     card_count = len(research_card_paths)
     index_present = any(path.name == "index.md" for path in card_file_paths)
+    cards_missing_lineage = sum(1 for path in research_card_paths if not event_research_cards.card_has_current_lineage(path))
+    cards_missing_feedback_target = sum(1 for path in research_card_paths if not event_research_cards.card_feedback_target(path))
+    if card_count and not index_present:
+        message = "research cards exist but index.md was not found"
+        (blockers if strict else warnings).append(message)
+    if cards_missing_lineage:
+        message = f"research cards missing current lineage: {cards_missing_lineage}"
+        (blockers if strict else warnings).append(message)
+    if cards_missing_feedback_target:
+        message = f"research cards missing feedback target: {cards_missing_feedback_target}"
+        (blockers if strict else warnings).append(message)
     if alerts and not card_count and any(str(row.get("tier") or "") in {"HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"} for row in alerts):
         warnings.append("high-priority/triggered snapshots exist but no research cards were found")
     delivery_summary = _delivery.summarize_delivery_rows([row for row in delivery_rows if isinstance(row, Mapping)])
@@ -397,6 +410,8 @@ def diagnose_artifacts(
         card_files=card_count,
         research_card_files=card_count,
         research_card_index_present=index_present,
+        cards_missing_lineage=cards_missing_lineage,
+        cards_missing_feedback_target=cards_missing_feedback_target,
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -966,7 +981,9 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         (
             "research cards: "
             f"research_card_files={result.research_card_files} "
-            f"research_card_index_present={str(result.research_card_index_present).lower()}"
+            f"research_card_index_present={str(result.research_card_index_present).lower()} "
+            f"cards_missing_lineage={result.cards_missing_lineage} "
+            f"cards_missing_feedback_target={result.cards_missing_feedback_target}"
         ),
         (
             "snapshot lineage: "

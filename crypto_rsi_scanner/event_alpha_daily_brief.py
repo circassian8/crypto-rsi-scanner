@@ -581,7 +581,9 @@ def build_daily_brief(
                 lines.append("- None.")
                 continue
             for path in paths[:20]:
-                lines.append(f"- [{path.name}]({path})")
+                target = event_research_cards.card_feedback_target(path)
+                suffix = f" · feedback target: `{target}`" if target else ""
+                lines.append(f"- [{path.name}]({path}) · group: {group_name}{suffix}")
             if len(paths) > 20:
                 lines.append(f"- +{len(paths) - 20} more cards")
     else:

@@ -1000,7 +1000,10 @@ STRICT=1 make event-alpha-artifact-doctor PROFILE=no_key_live
 The doctor checks run-ledger to alert-snapshot lineage, missing matching
 snapshot rows for alertable runs, external snapshot paths, orphan alerts,
 mixed namespaces, provider health, budget rows, feedback/outcome IDs, and card
-coverage. Fresh alert snapshots must carry
+coverage. Research card coverage counts real card Markdown files separately
+from `index.md`; `index.md` is required as navigation but cannot satisfy the
+card count by itself. Strict mode blocks current cards missing Artifact Lineage
+or a stable feedback target. Fresh alert snapshots must carry
 `final_route_after_quality_gate`, `final_tier_after_quality_gate`,
 `alertable_after_quality_gate`, and a consistent quality verdict. Strict mode
 blocks fresh/current rows whose final route is alertable while the opportunity
@@ -1216,10 +1219,12 @@ verification steps, a playbook-specific trade-readiness checklist,
 invalidation, and outcome fields.
 Current cards also include Artifact Lineage with run/profile/namespace,
 incident/hypothesis/watchlist/core-opportunity ids, alert/snapshot/card ids, and
-source raw/event ids when available. Missing lineage is labeled as legacy
-lineage, not as a current unknown. If a Pro-model handoff shows a card without
-lineage, regenerate cards from the current profile namespace before relying on
-the card as current evidence.
+source raw/event ids when available. They also show the local card path, stable
+feedback target, feedback target type, and useful/junk/watch helper commands.
+Missing lineage is labeled as legacy lineage, not as a current unknown. If a
+Pro-model handoff shows a card without lineage or without a feedback target,
+regenerate cards from the current profile namespace before relying on the card
+as current evidence.
 
 Router reports now show stable `alert_id` and `card_id` values. Use the
 `ea:...` alert ID in feedback commands, and the matching `card_...` ID/filename
@@ -1232,12 +1237,17 @@ make event-feedback-useful FEEDBACK_TARGET=ea:cluster_id\|coin_id\|playbook
 
 Feedback and opportunity audit target lookup accept the same target family where
 possible: core opportunity id, hypothesis id, incident id, alert id, snapshot
-id, card id, watchlist key, symbol, or coin id. Notification inbox rows print a
-`feedback_target` line before the helper command. Run
+id, card id, card path, watchlist key, symbol, or coin id. Notification inbox
+rows print a `feedback_target` line before the helper command. Opportunity audit
+reads the feedback artifact, so after marking useful/junk/watch the audit for
+the same core id or card path should show `feedback status: has_feedback`. Run
 `make event-alpha-feedback-readiness PROFILE=notify_llm_quality` to check that
-cards have current lineage, alert snapshots expose feedback targets, inbox rows
-are reviewable, and calibration fields are present before treating a namespace
-as ready for feedback-loop tuning.
+cards have current lineage and feedback targets, alert snapshots expose feedback
+targets when present, inbox rows are reviewable, and calibration fields are
+present before treating a namespace as ready for feedback-loop tuning. No-send
+fixture/e2e namespaces may be feedback-ready from current cards even when they
+do not have alert snapshots; `no_alert_snapshots_found` is a warning, not a
+blocker.
 
 ## When No Alerts Arrive
 

@@ -60,6 +60,8 @@ def render_research_card(
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
     generated_at: datetime | None = None,
+    lineage_context: Mapping[str, Any] | None = None,
+    card_path: str | Path | None = None,
 ) -> EventResearchCardResult:
     """Render one Markdown card from local research artifacts."""
     clean_key = str(key or "").strip()
@@ -116,6 +118,8 @@ def render_research_card(
         decision=decision,
         core=core,
         generated_iso=generated_iso,
+        lineage_context=lineage_context,
+        card_path=card_path,
     ))
     lines.extend([
         "",
@@ -281,6 +285,7 @@ def write_research_cards(
     selected_tiers: Iterable[str] | None = None,
     limit: int = 25,
     now: datetime | None = None,
+    lineage_context: Mapping[str, Any] | None = None,
 ) -> EventResearchCardWriteResult:
     """Write selected Markdown cards and an index under a local artifact dir."""
     target = Path(out_dir).expanduser()
@@ -295,6 +300,7 @@ def write_research_cards(
     card_paths: list[Path] = []
     card_groups: dict[Path, str] = {}
     for entry in entries[: max(1, limit)]:
+        path = target / _card_filename(entry)
         card = render_research_card(
             entry.key,
             watchlist_entries=entries,
@@ -305,10 +311,11 @@ def write_research_cards(
             feedback_rows=feedback_rows,
             outcome_rows=outcome_rows,
             generated_at=observed,
+            lineage_context=lineage_context,
+            card_path=path,
         )
         if not card.found:
             continue
-        path = target / _card_filename(entry)
         path.write_text(_strip_sensitive(card.markdown), encoding="utf-8")
         card_paths.append(path)
         card_groups[path] = _card_index_group_for_entry(entry, route_decisions)
@@ -344,34 +351,111 @@ def _lineage_lines(
     decision: event_alpha_router.EventAlphaRouteDecision | None,
     core: event_core_opportunities.CoreOpportunity | None,
     generated_iso: str,
+    lineage_context: Mapping[str, Any] | None = None,
+    card_path: str | Path | None = None,
 ) -> list[str]:
-    run_id = _lineage_value("run_id", entry=entry, alert=alert, decision=decision, core=core)
-    profile = _lineage_value("profile", entry=entry, alert=alert, decision=decision, core=core)
-    namespace = _lineage_value("artifact_namespace", "namespace", entry=entry, alert=alert, decision=decision, core=core)
+    run_id = _lineage_value("run_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    profile = _lineage_value("profile", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    namespace = _lineage_value("artifact_namespace", "namespace", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
     missing = not (run_id and profile and namespace)
     legacy_label = "legacy_lineage_missing" if missing else None
-    watchlist_key = str(getattr(entry, "key", "") or _lineage_value("key", "alert_key", entry=entry, alert=alert, decision=decision, core=core) or key)
-    hypothesis_id = _lineage_value("hypothesis_id", entry=entry, alert=alert, decision=decision, core=core)
-    incident_id = _lineage_value("incident_id", entry=entry, alert=alert, decision=decision, core=core)
-    alert_id = _lineage_value("alert_id", entry=entry, alert=alert, decision=decision, core=core)
-    snapshot_id = _lineage_value("snapshot_id", entry=entry, alert=alert, decision=decision, core=core)
-    raw_ids = _lineage_values("source_raw_ids", "raw_ids", entry=entry, alert=alert, decision=decision, core=core)
-    event_ids = _lineage_values("source_event_ids", "event_ids", "event_id", entry=entry, alert=alert, decision=decision, core=core)
+    watchlist_key = str(getattr(entry, "key", "") or _lineage_value("key", "alert_key", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context) or key)
+    hypothesis_id = _lineage_value("hypothesis_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    incident_id = _lineage_value("incident_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    alert_id = _lineage_value("alert_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    snapshot_id = _lineage_value("snapshot_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    raw_ids = _lineage_values("source_raw_ids", "raw_ids", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    event_ids = _lineage_values("source_event_ids", "event_ids", "event_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context)
+    core_id = (core.core_opportunity_id if core is not None else _lineage_value("core_opportunity_id", entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context))
+    feedback_target, feedback_target_type = _feedback_target_for_card(
+        core_id=core_id,
+        alert_id=alert_id,
+        hypothesis_id=hypothesis_id,
+        incident_id=incident_id,
+        watchlist_key=watchlist_key,
+        card_path=card_path,
+    )
+    card_path_label = str(card_path) if card_path is not None else "none"
+    profile_for_command = profile or "default"
     return [
         f"- Generated at: {generated_iso}",
         f"- Lineage status: {legacy_label or 'current'}",
+        f"- legacy_lineage_missing: {str(bool(legacy_label)).lower()}",
         f"- Run ID: {run_id or legacy_label}",
         f"- Profile: {profile or legacy_label}",
         f"- Namespace: {namespace or legacy_label}",
         f"- Incident ID: {incident_id or 'none'}",
         f"- Hypothesis ID: {hypothesis_id or 'none'}",
         f"- Watchlist key: {watchlist_key}",
-        f"- Core opportunity ID: {(core.core_opportunity_id if core is not None else _lineage_value('core_opportunity_id', entry=entry, alert=alert, decision=decision, core=core)) or 'none'}",
+        f"- Core opportunity ID: {core_id or 'none'}",
         f"- Alert ID: {alert_id or 'none'}",
         f"- Snapshot ID: {snapshot_id or 'none'}",
         f"- Source raw/event IDs: raw={_list_label(raw_ids)} events={_list_label(event_ids)}",
-        f"- Cluster ID: {_value(entry, alert, 'cluster_id', 'cluster_id') or _lineage_value('cluster_id', entry=entry, alert=alert, decision=decision, core=core) or 'unknown'}",
+        f"- Card path: {card_path_label}",
+        f"- Feedback target: {feedback_target}",
+        f"- Feedback target type: {feedback_target_type}",
+        f"- Feedback command useful: make event-feedback-useful PROFILE={profile_for_command} FEEDBACK_TARGET='{feedback_target}'",
+        f"- Feedback command junk: make event-feedback-junk PROFILE={profile_for_command} FEEDBACK_TARGET='{feedback_target}'",
+        f"- Feedback command watch: make event-feedback-watch PROFILE={profile_for_command} FEEDBACK_TARGET='{feedback_target}'",
+        f"- Feedback command ignore: python3 main.py --event-feedback-ignore '{feedback_target}' --event-alpha-profile {profile_for_command}",
+        f"- Cluster ID: {_value(entry, alert, 'cluster_id', 'cluster_id') or _lineage_value('cluster_id', entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context) or 'unknown'}",
     ]
+
+
+def card_feedback_target(path: str | Path) -> str | None:
+    """Return the feedback target embedded in a research card, if any."""
+    p = Path(path)
+    if not p.exists() or p.name == "index.md":
+        return None
+    text = p.read_text(encoding="utf-8", errors="replace")
+    match = re.search(r"^- Feedback target:\s*(.+?)\s*$", text, flags=re.MULTILINE)
+    if not match:
+        return None
+    target = match.group(1).strip()
+    return target if target and target.lower() != "none" else None
+
+
+def card_has_current_lineage(path: str | Path) -> bool:
+    p = Path(path)
+    if not p.exists() or p.name == "index.md":
+        return False
+    text = p.read_text(encoding="utf-8", errors="replace")
+    required = ("- Run ID: ", "- Profile: ", "- Namespace: ", "- Generated at: ")
+    if not all(token in text for token in required):
+        return False
+    return not any(
+        marker in text
+        for marker in (
+            "Lineage status: legacy_lineage_missing",
+            "legacy_lineage_missing: true",
+            "Run ID: legacy_lineage_missing",
+            "Profile: legacy_lineage_missing",
+            "Namespace: legacy_lineage_missing",
+        )
+    )
+
+
+def _feedback_target_for_card(
+    *,
+    core_id: str | None,
+    alert_id: str | None,
+    hypothesis_id: str | None,
+    incident_id: str | None,
+    watchlist_key: str | None,
+    card_path: str | Path | None,
+) -> tuple[str, str]:
+    for target_type, value in (
+        ("core_opportunity_id", core_id),
+        ("alert_id", alert_id),
+        ("hypothesis_id", hypothesis_id),
+        ("incident_id", incident_id),
+        ("watchlist_key", watchlist_key),
+        ("card_path", str(card_path) if card_path is not None else None),
+    ):
+        text = str(value or "").strip()
+        if text and text.lower() != "none":
+            return text, target_type
+    return "none", "none"
 
 
 def _find_card_core_opportunity(
@@ -411,8 +495,9 @@ def _lineage_value(
     alert: Mapping[str, Any] | None,
     decision: event_alpha_router.EventAlphaRouteDecision | None,
     core: event_core_opportunities.CoreOpportunity | None,
+    lineage_context: Mapping[str, Any] | None = None,
 ) -> str | None:
-    for mapping in _lineage_mappings(entry=entry, alert=alert, decision=decision, core=core):
+    for mapping in _lineage_mappings(entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context):
         for key in keys:
             value = mapping.get(key)
             if value not in (None, "", [], {}, ()):
@@ -426,9 +511,10 @@ def _lineage_values(
     alert: Mapping[str, Any] | None,
     decision: event_alpha_router.EventAlphaRouteDecision | None,
     core: event_core_opportunities.CoreOpportunity | None,
+    lineage_context: Mapping[str, Any] | None = None,
 ) -> tuple[str, ...]:
     values: list[str] = []
-    for mapping in _lineage_mappings(entry=entry, alert=alert, decision=decision, core=core):
+    for mapping in _lineage_mappings(entry=entry, alert=alert, decision=decision, core=core, lineage_context=lineage_context):
         for key in keys:
             raw = mapping.get(key)
             if raw in (None, "", [], {}, ()):
@@ -450,6 +536,7 @@ def _lineage_mappings(
     alert: Mapping[str, Any] | None,
     decision: event_alpha_router.EventAlphaRouteDecision | None,
     core: event_core_opportunities.CoreOpportunity | None,
+    lineage_context: Mapping[str, Any] | None = None,
 ) -> tuple[Mapping[str, Any], ...]:
     rows: list[Mapping[str, Any]] = []
     if alert is not None:
@@ -477,6 +564,8 @@ def _lineage_mappings(
         components = core.primary_row.get("latest_score_components") or core.primary_row.get("score_components")
         if isinstance(components, Mapping):
             rows.append(components)
+    if lineage_context is not None:
+        rows.append(lineage_context)
     return tuple(rows)
 
 
@@ -578,7 +667,16 @@ def _render_index(
         lines.extend(["", f"## {group}", ""])
         if group_paths:
             for path in group_paths:
-                lines.append(f"- [{path.name}]({path.name})")
+                target = card_feedback_target(path)
+                group_label = _card_index_group(path, card_groups=card_groups)
+                suffix = f" · group: {group_label}"
+                if target:
+                    suffix += f" · feedback target: `{target}`"
+                lines.append(f"- [{path.name}]({path.name}){suffix}")
+                if target:
+                    lines.append(f"  - useful: `make event-feedback-useful FEEDBACK_TARGET='{target}'`")
+                    lines.append(f"  - junk: `make event-feedback-junk FEEDBACK_TARGET='{target}'`")
+                    lines.append(f"  - watch: `make event-feedback-watch FEEDBACK_TARGET='{target}'`")
         elif group == "Core Opportunity Cards":
             lines.append("No cards selected.")
         elif group == "Diagnostic / Source-Noise / Control Cards":
