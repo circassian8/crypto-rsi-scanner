@@ -90,6 +90,8 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
     lines.extend(_quality_gate_conflict_lines(rows, limit=8))
     lines.extend(["", "Quality-Capped Watchlist Rows:"])
     lines.extend(_quality_capped_state_lines(rows, limit=8))
+    lines.extend(["", "Market Freshness Readiness:"])
+    lines.extend(_market_freshness_readiness_lines(rows, limit=8))
     lines.extend(["", "Top upgrade candidates:"])
     lines.extend(_upgrade_lines(rows, limit=6))
     lines.extend(["", "Top downgrade risks:"])
@@ -482,6 +484,58 @@ def _quality_capped_state_lines(rows: list[dict[str, Any]], *, limit: int) -> li
     if len(capped) > limit:
         out.append(f"- +{len(capped) - limit} more quality-capped rows")
     return out
+
+
+def _market_freshness_readiness_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
+    statuses = _counts(rows, "market_context_freshness_status")
+    capped = [
+        row for row in rows
+        if _truthy(row.get("market_context_freshness_cap_applied"))
+        or str(row.get("market_context_freshness_status") or "") == "stale"
+    ]
+    missing = [
+        row for row in rows
+        if str(row.get("market_context_freshness_status") or "missing") in {"missing", "unknown"}
+    ]
+    refresh_needed = [
+        row for row in rows
+        if row in capped or row in missing
+    ]
+    out = [
+        "- statuses: " + _format_counts(statuses),
+        f"- fresh_market_context={statuses.get('fresh', 0)}",
+        f"- capped_by_stale_context={len(capped)}",
+        f"- missing_or_unknown_context={len(missing)}",
+        f"- targeted_market_refresh_needed={len(refresh_needed)}",
+    ]
+    for row in refresh_needed[:limit]:
+        out.append(
+            f"- {_label(row)}: status={row.get('market_context_freshness_status') or 'missing'} "
+            f"source={row.get('market_context_source') or 'unknown'} "
+            f"age={_market_age_label(row)} "
+            f"cap_applied={str(_truthy(row.get('market_context_freshness_cap_applied'))).lower()}"
+        )
+    if len(refresh_needed) > limit:
+        out.append(f"- +{len(refresh_needed) - limit} more rows need refresh")
+    return out
+
+
+def _market_age_label(row: Mapping[str, Any]) -> str:
+    try:
+        hours = float(row.get("market_context_age_hours"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return "unknown"
+    if hours < 1:
+        return f"{hours * 60:.0f}m"
+    return f"{hours:.1f}h"
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().casefold() in {"1", "true", "yes", "y"}
+    return bool(value)
 
 
 def _quality_gate_conflict(row: Mapping[str, Any]) -> bool:

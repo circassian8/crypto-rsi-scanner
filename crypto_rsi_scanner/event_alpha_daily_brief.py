@@ -172,6 +172,7 @@ def build_daily_brief(
         f"Profile match: {profile_match}",
         "",
         "Research-only. Not a trade signal, paper trade, live RSI signal, or execution.",
+        "Canonical operator view: Core Opportunities sections above. Diagnostics appendix contains raw/supporting/control rows and may repeat assets for debugging.",
         "",
         "## Executive Summary",
         f"- Core opportunities: {len(core_opportunities)} "
@@ -202,8 +203,11 @@ def build_daily_brief(
         "## System Health",
         *_system_health_summary_lines(latest),
         "",
+        "## Market Freshness Readiness",
+        *_market_freshness_readiness_lines([*(decision.entry for decision in decisions), *hypotheses, *alerts], requested_profile=requested_profile),
+        "",
         "## Diagnostics Appendix",
-        "### Diagnostics / Source-Noise / Controls",
+        "### Diagnostic Appendix: Diagnostics / Source-Noise / Controls",
         (
             "- Hidden from main opportunity sections by default: "
             f"diagnostic_rows={diagnostic_core_rows}, "
@@ -984,6 +988,103 @@ def _core_opportunity_sections(
     take("digest", lambda item: item.is_validated_digest or item.alertable)
     sections["local"] = remaining
     return sections
+
+
+def _market_freshness_readiness_lines(
+    rows: Iterable[Any],
+    *,
+    requested_profile: str | None,
+    limit: int = 8,
+) -> list[str]:
+    normalized = [_row_mapping(row) for row in rows]
+    statuses: dict[str, int] = {}
+    capped: list[Mapping[str, Any]] = []
+    missing: list[Mapping[str, Any]] = []
+    refresh_needed: list[Mapping[str, Any]] = []
+    for row in normalized:
+        components = _components_for_row(row)
+        status = str(
+            row.get("market_context_freshness_status")
+            or components.get("market_context_freshness_status")
+            or "missing"
+        )
+        statuses[status] = statuses.get(status, 0) + 1
+        cap = _truthy(row.get("market_context_freshness_cap_applied") if row.get("market_context_freshness_cap_applied") is not None else components.get("market_context_freshness_cap_applied"))
+        if cap or status in {"stale", "unknown", "missing"}:
+            refresh_needed.append(row)
+        if cap or status == "stale":
+            capped.append(row)
+        if status in {"missing", "unknown"}:
+            missing.append(row)
+    profile = str(requested_profile or "").casefold()
+    can_refresh = profile not in {"fixture", "quality_validation", "catalyst_frame_e2e", "notify_llm_quality_frame", "catalyst_frame_validation"}
+    lines = [
+        "- Freshness statuses: " + _format_counts(statuses),
+        f"- Fresh market context: {statuses.get('fresh', 0)}",
+        f"- Capped by stale/unknown context: {len(capped)}",
+        f"- Missing/unknown market context: {len(missing)}",
+        f"- Needs targeted market refresh: {len(refresh_needed)}",
+        f"- Live profile can perform refresh: {str(can_refresh).lower()}",
+    ]
+    for row in refresh_needed[:limit]:
+        components = _components_for_row(row)
+        label = _label_for_row(row, components)
+        status = row.get("market_context_freshness_status") or components.get("market_context_freshness_status") or "missing"
+        source = row.get("market_context_source") or components.get("market_context_source") or "unknown"
+        cap = row.get("market_context_freshness_cap_applied")
+        if cap is None:
+            cap = components.get("market_context_freshness_cap_applied")
+        lines.append(
+            f"  - {label}: status={status} source={source} age={_market_age_label(row, components)} cap_applied={str(_truthy(cap)).lower()}"
+        )
+    if len(refresh_needed) > limit:
+        lines.append(f"  - +{len(refresh_needed) - limit} more rows need refresh")
+    return lines
+
+
+def _row_mapping(row: Any) -> Mapping[str, Any]:
+    if isinstance(row, event_watchlist.EventWatchlistEntry):
+        data = dict(getattr(row, "__dict__", {}) or {})
+        data.setdefault("latest_score_components", dict(row.latest_score_components or {}))
+        return data
+    if isinstance(row, Mapping):
+        return row
+    return dict(getattr(row, "__dict__", {}) or {})
+
+
+def _components_for_row(row: Mapping[str, Any]) -> Mapping[str, Any]:
+    for key in ("latest_score_components", "score_components", "_components"):
+        value = row.get(key)
+        if isinstance(value, Mapping):
+            return value
+    return {}
+
+
+def _label_for_row(row: Mapping[str, Any], components: Mapping[str, Any]) -> str:
+    symbol = row.get("symbol") or row.get("validated_symbol") or components.get("validated_symbol") or "UNKNOWN"
+    coin = row.get("coin_id") or row.get("validated_coin_id") or components.get("validated_coin_id") or "unknown"
+    return f"{symbol}/{coin}"
+
+
+def _market_age_label(row: Mapping[str, Any], components: Mapping[str, Any]) -> str:
+    value = row.get("market_context_age_hours")
+    if value is None:
+        value = components.get("market_context_age_hours")
+    try:
+        hours = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return "unknown"
+    if hours < 1:
+        return f"{hours * 60:.0f}m"
+    return f"{hours:.1f}h"
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().casefold() in {"1", "true", "yes", "y"}
+    return bool(value)
 
 
 def _card_paths_for_daily_brief(paths: Iterable[Path], *, include_diagnostics: bool) -> list[Path]:

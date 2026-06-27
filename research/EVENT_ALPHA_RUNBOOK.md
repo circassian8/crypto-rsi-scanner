@@ -660,6 +660,26 @@ artifact include flag automatically, so the generated brief should select the
 latest fixture run and show catalyst-frame counters rather than treating the
 namespace as empty production history.
 
+Daily briefs include a canonical operator-view note near the top. Treat the
+Core Opportunities sections as the default working view. The Diagnostics
+Appendix intentionally contains raw/support/control rows and may repeat assets
+for debugging; those repeats are not additional operator opportunities.
+
+Daily briefs and quality reviews also include Market Freshness Readiness. Use
+that section before trusting watchlist/high-priority rows: fresh market context
+supports escalation, stale or unknown-timestamp context is capped according to
+profile policy, and missing context explains why an otherwise interesting
+candidate may remain local-only. Fixture/e2e profiles may label old fixture
+context as `fixture_allowed_stale`; live-style profiles should prefer fresh
+provider snapshots.
+
+`notify_llm_quality` is the live-style no-send quality profile for catalyst
+frame and signal-quality review. `notify_llm_quality_frame` is the fixture/no-send
+proof profile that exercises the same artifact shape with deterministic frame
+fixtures. Use `make event-alpha-quality-frame-live-smoke` when you need a fresh
+`notify_llm_quality`-style no-send run with frame/readiness reports; use
+`make event-alpha-notify-llm-quality-frame-smoke` for the offline fixture proof.
+
 The report defaults to the latest stored `run_id` while still printing
 total/latest/historical/legacy availability. Use `ALL_HISTORY=1` for the older
 full-history view, `RUN_ID=<id>` for a specific cycle, and `SINCE=<iso-time>` for
@@ -1194,6 +1214,12 @@ Cards are Markdown artifacts under `RSI_EVENT_RESEARCH_CARDS_DIR` and include
 playbook, source evidence, LLM interpretation, market confirmation, warnings,
 verification steps, a playbook-specific trade-readiness checklist,
 invalidation, and outcome fields.
+Current cards also include Artifact Lineage with run/profile/namespace,
+incident/hypothesis/watchlist/core-opportunity ids, alert/snapshot/card ids, and
+source raw/event ids when available. Missing lineage is labeled as legacy
+lineage, not as a current unknown. If a Pro-model handoff shows a card without
+lineage, regenerate cards from the current profile namespace before relying on
+the card as current evidence.
 
 Router reports now show stable `alert_id` and `card_id` values. Use the
 `ea:...` alert ID in feedback commands, and the matching `card_...` ID/filename
@@ -1203,6 +1229,15 @@ when opening generated cards:
 make event-alpha-router-report PROFILE=no_key_live
 make event-feedback-useful FEEDBACK_TARGET=ea:cluster_id\|coin_id\|playbook
 ```
+
+Feedback and opportunity audit target lookup accept the same target family where
+possible: core opportunity id, hypothesis id, incident id, alert id, snapshot
+id, card id, watchlist key, symbol, or coin id. Notification inbox rows print a
+`feedback_target` line before the helper command. Run
+`make event-alpha-feedback-readiness PROFILE=notify_llm_quality` to check that
+cards have current lineage, alert snapshots expose feedback targets, inbox rows
+are reviewable, and calibration fields are present before treating a namespace
+as ready for feedback-loop tuning.
 
 ## When No Alerts Arrive
 

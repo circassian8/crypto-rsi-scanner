@@ -66,6 +66,7 @@ def render_research_card(
     entry = _find_entry(clean_key, list(watchlist_entries))
     alert = _find_alert(clean_key, list(alert_rows))
     decision = _find_decision(clean_key, list(route_decisions))
+    core = _find_card_core_opportunity(clean_key, entry, alert, decision, route_decisions)
     cluster = _find_cluster(clean_key, list(clusters), entry, alert)
     monitor_row = _find_monitor_row(clean_key, list(monitor_rows), entry, alert)
     feedback = _matching_rows(clean_key, list(feedback_rows), entry, alert)
@@ -107,17 +108,15 @@ def render_research_card(
                     else " (allowed)"
                 )
             )
-    lines.extend([
-        "",
-        "## Artifact Lineage",
-        f"- Generated at: {generated_iso}",
-        f"- Run ID: {_value(None, alert, '', 'run_id') or 'unknown'}",
-        f"- Profile: {_value(None, alert, '', 'profile') or 'unknown'}",
-        f"- Namespace: {_value(None, alert, '', 'artifact_namespace') or 'unknown'}",
-        f"- Snapshot ID: {_value(None, alert, '', 'snapshot_id') or 'unknown'}",
-        f"- Watchlist key: {entry.key if entry is not None else (_value(None, alert, '', 'alert_key') or clean_key)}",
-        f"- Cluster ID: {_value(entry, alert, 'cluster_id', 'cluster_id') or 'unknown'}",
-    ])
+    lines.extend(["", "## Artifact Lineage"])
+    lines.extend(_lineage_lines(
+        clean_key,
+        entry=entry,
+        alert=alert,
+        decision=decision,
+        core=core,
+        generated_iso=generated_iso,
+    ))
     lines.extend([
         "",
         "## Cluster Context",
@@ -337,6 +336,157 @@ def format_card_write_result(result: EventResearchCardWriteResult) -> str:
     ])
 
 
+def _lineage_lines(
+    key: str,
+    *,
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+    decision: event_alpha_router.EventAlphaRouteDecision | None,
+    core: event_core_opportunities.CoreOpportunity | None,
+    generated_iso: str,
+) -> list[str]:
+    run_id = _lineage_value("run_id", entry=entry, alert=alert, decision=decision, core=core)
+    profile = _lineage_value("profile", entry=entry, alert=alert, decision=decision, core=core)
+    namespace = _lineage_value("artifact_namespace", "namespace", entry=entry, alert=alert, decision=decision, core=core)
+    missing = not (run_id and profile and namespace)
+    legacy_label = "legacy_lineage_missing" if missing else None
+    watchlist_key = str(getattr(entry, "key", "") or _lineage_value("key", "alert_key", entry=entry, alert=alert, decision=decision, core=core) or key)
+    hypothesis_id = _lineage_value("hypothesis_id", entry=entry, alert=alert, decision=decision, core=core)
+    incident_id = _lineage_value("incident_id", entry=entry, alert=alert, decision=decision, core=core)
+    alert_id = _lineage_value("alert_id", entry=entry, alert=alert, decision=decision, core=core)
+    snapshot_id = _lineage_value("snapshot_id", entry=entry, alert=alert, decision=decision, core=core)
+    raw_ids = _lineage_values("source_raw_ids", "raw_ids", entry=entry, alert=alert, decision=decision, core=core)
+    event_ids = _lineage_values("source_event_ids", "event_ids", "event_id", entry=entry, alert=alert, decision=decision, core=core)
+    return [
+        f"- Generated at: {generated_iso}",
+        f"- Lineage status: {legacy_label or 'current'}",
+        f"- Run ID: {run_id or legacy_label}",
+        f"- Profile: {profile or legacy_label}",
+        f"- Namespace: {namespace or legacy_label}",
+        f"- Incident ID: {incident_id or 'none'}",
+        f"- Hypothesis ID: {hypothesis_id or 'none'}",
+        f"- Watchlist key: {watchlist_key}",
+        f"- Core opportunity ID: {(core.core_opportunity_id if core is not None else _lineage_value('core_opportunity_id', entry=entry, alert=alert, decision=decision, core=core)) or 'none'}",
+        f"- Alert ID: {alert_id or 'none'}",
+        f"- Snapshot ID: {snapshot_id or 'none'}",
+        f"- Source raw/event IDs: raw={_list_label(raw_ids)} events={_list_label(event_ids)}",
+        f"- Cluster ID: {_value(entry, alert, 'cluster_id', 'cluster_id') or _lineage_value('cluster_id', entry=entry, alert=alert, decision=decision, core=core) or 'unknown'}",
+    ]
+
+
+def _find_card_core_opportunity(
+    key: str,
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+    decision: event_alpha_router.EventAlphaRouteDecision | None,
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+) -> event_core_opportunities.CoreOpportunity | None:
+    rows: list[Any] = []
+    if decision is not None:
+        rows.append(decision)
+    if entry is not None:
+        rows.append(entry)
+    if alert is not None:
+        rows.append(alert)
+    rows.extend(decisions)
+    for opportunity in event_core_opportunities.aggregate_core_opportunities(rows):
+        identifiers = {
+            opportunity.core_opportunity_id,
+            opportunity.symbol,
+            opportunity.coin_id,
+            opportunity.incident_id or "",
+            str(opportunity.primary_row.get("key") or ""),
+            str(opportunity.primary_row.get("alert_key") or ""),
+            str(opportunity.primary_row.get("hypothesis_id") or ""),
+        }
+        identifiers.update(str(value) for value in opportunity.supporting_hypothesis_ids)
+        if key in identifiers or key.lower() in {value.lower() for value in identifiers if value}:
+            return opportunity
+    return None
+
+
+def _lineage_value(
+    *keys: str,
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+    decision: event_alpha_router.EventAlphaRouteDecision | None,
+    core: event_core_opportunities.CoreOpportunity | None,
+) -> str | None:
+    for mapping in _lineage_mappings(entry=entry, alert=alert, decision=decision, core=core):
+        for key in keys:
+            value = mapping.get(key)
+            if value not in (None, "", [], {}, ()):
+                return str(value)
+    return None
+
+
+def _lineage_values(
+    *keys: str,
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+    decision: event_alpha_router.EventAlphaRouteDecision | None,
+    core: event_core_opportunities.CoreOpportunity | None,
+) -> tuple[str, ...]:
+    values: list[str] = []
+    for mapping in _lineage_mappings(entry=entry, alert=alert, decision=decision, core=core):
+        for key in keys:
+            raw = mapping.get(key)
+            if raw in (None, "", [], {}, ()):
+                continue
+            if isinstance(raw, str):
+                values.append(raw)
+            elif isinstance(raw, Mapping):
+                values.extend(str(item) for item in raw.values() if str(item or ""))
+            elif isinstance(raw, Iterable):
+                values.extend(str(item) for item in raw if str(item or ""))
+            else:
+                values.append(str(raw))
+    return tuple(dict.fromkeys(values))
+
+
+def _lineage_mappings(
+    *,
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+    decision: event_alpha_router.EventAlphaRouteDecision | None,
+    core: event_core_opportunities.CoreOpportunity | None,
+) -> tuple[Mapping[str, Any], ...]:
+    rows: list[Mapping[str, Any]] = []
+    if alert is not None:
+        rows.append(alert)
+        components = alert.get("score_components")
+        if isinstance(components, Mapping):
+            rows.append(components)
+    if decision is not None:
+        rows.append({
+            "alert_id": decision.alert_id,
+            "card_id": decision.card_id,
+            "route": decision.route.value,
+        })
+        rows.append(getattr(decision.entry, "__dict__", {}) or {})
+        rows.append(decision.entry.latest_score_components or {})
+    if entry is not None:
+        rows.append(getattr(entry, "__dict__", {}) or {})
+        rows.append(entry.latest_score_components or {})
+    if core is not None:
+        rows.append({
+            "core_opportunity_id": core.core_opportunity_id,
+            "incident_id": core.incident_id,
+        })
+        rows.append(core.primary_row)
+        components = core.primary_row.get("latest_score_components") or core.primary_row.get("score_components")
+        if isinstance(components, Mapping):
+            rows.append(components)
+    return tuple(rows)
+
+
+def _list_label(values: Iterable[str]) -> str:
+    rows = [str(value) for value in values if str(value or "")]
+    if not rows:
+        return "none"
+    return ", ".join(rows[:6]) + (f", +{len(rows) - 6} more" if len(rows) > 6 else "")
+
+
 def _find_entry(key: str, entries: list[event_watchlist.EventWatchlistEntry]) -> event_watchlist.EventWatchlistEntry | None:
     clean_key = key[3:] if key.startswith("ea:") else key
     if clean_key.startswith("card_"):
@@ -538,7 +688,12 @@ def _find_alert(key: str, rows: list[Mapping[str, Any]]) -> Mapping[str, Any] | 
     for row in rows:
         values = {
             str(row.get("alert_key") or ""),
+            str(row.get("alert_id") or ""),
+            str(row.get("card_id") or ""),
+            str(row.get("snapshot_id") or ""),
             str(row.get("event_id") or ""),
+            str(row.get("hypothesis_id") or ""),
+            str(row.get("incident_id") or ""),
             str(row.get("asset_symbol") or ""),
             str(row.get("asset_coin_id") or ""),
         }

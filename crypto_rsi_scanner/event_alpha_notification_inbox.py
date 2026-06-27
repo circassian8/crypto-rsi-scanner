@@ -274,6 +274,7 @@ def _append_item_section(
         if item.snapshot_quality_classification:
             lines.append(f"  snapshot_classification: {item.snapshot_quality_classification}")
         lines.append(f"  reason: {item.reason}")
+        lines.append(f"  feedback_target: {item.alert_id}")
         lines.append(f"  feedback_useful: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{item.alert_id}'")
         lines.append(f"  feedback_junk: make event-feedback-junk PROFILE={profile} FEEDBACK_TARGET='{item.alert_id}'")
     lines.append("")

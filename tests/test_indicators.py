@@ -22604,6 +22604,7 @@ def test_llm_catalyst_frame_validator_rejects_bad_quotes_and_identity_noise():
 
 
 def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
+    import subprocess
     from crypto_rsi_scanner import event_alpha_profiles
     from crypto_rsi_scanner.llm_providers.openai_provider import OpenAILLMRelationshipProvider
 
@@ -22627,6 +22628,12 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     assert quality_frame.config_overrides["EVENT_LLM_CATALYST_FRAMES_PROVIDER"] == "fixture"
     assert quality_frame.config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
     assert quality_frame.config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "all"
+    quality_frame_report = event_alpha_profiles.format_profile_report(quality_frame)
+    assert "catalyst-frame behavior:" in quality_frame_report
+    assert "- provider=fixture" in quality_frame_report
+    assert "official fixture/no-send proof profile" in quality_frame_report
+    quality_live_report = event_alpha_profiles.format_profile_report(event_alpha_profiles.get_profile("notify_llm_quality"))
+    assert "official live-style frame-enabled quality profile" in quality_live_report
     report = event_alpha_profiles.format_profile_report(event_alpha_profiles.get_profile("notify_llm_deep"))
     assert "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN=60" in report
     provider = OpenAILLMRelationshipProvider(api_key="")
@@ -22638,7 +22645,17 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     assert "event-alpha-catalyst-frame-validation-cycle" in text
     assert "event-alpha-catalyst-frame-e2e-cycle" in text
     assert "event-alpha-notify-llm-quality-frame-smoke" in text
+    assert "event-alpha-quality-frame-live-smoke" in text
+    assert "event-alpha-feedback-readiness" in text
     assert "event-alpha-frame-quality-loop" in text
+    dry = subprocess.run(
+        ["make", "-n", "event-alpha-quality-frame-live-smoke", "PYTHON=python3"],
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout
+    assert "--event-alert-send" not in dry
+    assert "--event-alpha-cycle --event-alpha-profile notify_llm_quality" in dry
 
 
 def test_event_alpha_catalyst_frame_e2e_cycle_writes_frame_artifacts():
@@ -23537,6 +23554,10 @@ def test_opportunity_audit_accepts_core_opportunity_id_and_hides_diagnostics_by_
         "final_route_after_quality_gate": "RESEARCH_DIGEST",
         "final_state_after_quality_gate": "RADAR",
         "hypothesis_id": "hyp:aave:kraken",
+        "key": "incident:aave|aave|direct_subject|strategic_investment",
+        "alert_id": "ea:aave-kraken",
+        "card_id": "card_aave_kraken",
+        "snapshot_id": "snap:aave",
         "evidence_quotes": ["Kraken in talks to buy 15% stake in DeFi lender Aave."],
         "main_frame_type": "acquisition_or_stake",
         "main_frame_actor": "Kraken",
@@ -23564,7 +23585,22 @@ def test_opportunity_audit_accepts_core_opportunity_id_and_hides_diagnostics_by_
     assert core_id in audit
     assert "Kraken" in audit
     assert "hidden diagnostics: 1" in audit
+    assert "watchlist keys:" in audit
+    assert "alert ids: ea:aave-kraken" in audit
+    assert "card ids/paths: card_aave_kraken" in audit
     assert "  - diagnostic:" not in audit
+    by_hypothesis = event_opportunity_audit.format_opportunity_audit(
+        "hyp:aave:kraken",
+        hypotheses=[primary, diagnostic],
+        profile="fixture",
+    )
+    assert core_id in by_hypothesis
+    by_incident = event_opportunity_audit.format_opportunity_audit(
+        "incident:aave",
+        hypotheses=[primary, diagnostic],
+        profile="fixture",
+    )
+    assert "Kraken stake in Aave" in by_incident
     audit_with_diagnostics = event_opportunity_audit.format_opportunity_audit(
         core_id,
         hypotheses=[primary, diagnostic],
@@ -23572,6 +23608,165 @@ def test_opportunity_audit_accepts_core_opportunity_id_and_hides_diagnostics_by_
         include_diagnostics=True,
     )
     assert "  - diagnostic:" in audit_with_diagnostics
+
+
+def test_research_cards_have_current_lineage_and_legacy_marker():
+    from dataclasses import replace
+    from crypto_rsi_scanner import event_core_opportunities, event_research_cards, event_watchlist
+
+    entry = replace(
+        _test_watchlist_entry(
+            state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+            symbol="VELVET",
+            coin_id="velvet",
+        ),
+        incident_id="incident:velvet:spacex",
+        hypothesis_id="hyp:velvet:spacex",
+        latest_score_components={
+            **_test_watchlist_entry(
+                state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+                symbol="VELVET",
+                coin_id="velvet",
+            ).latest_score_components,
+            "run_id": "run-123",
+            "profile": "catalyst_frame_e2e",
+            "artifact_namespace": "catalyst_frame_e2e",
+            "incident_id": "incident:velvet:spacex",
+            "hypothesis_id": "hyp:velvet:spacex",
+            "source_raw_ids": ["velvet_spacex"],
+            "source_event_ids": ["velvet-spacex-preipo"],
+        },
+    )
+    core_id = event_core_opportunities.core_opportunity_id_for_row(entry)
+    card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    assert "- Run ID: run-123" in card.markdown
+    assert "- Profile: catalyst_frame_e2e" in card.markdown
+    assert "- Namespace: catalyst_frame_e2e" in card.markdown
+    assert "- Incident ID: incident:velvet:spacex" in card.markdown
+    assert "- Hypothesis ID: hyp:velvet:spacex" in card.markdown
+    assert f"- Core opportunity ID: {core_id}" in card.markdown
+    assert "raw=velvet_spacex" in card.markdown
+    assert "legacy_lineage_missing" not in card.markdown
+
+    legacy = _test_watchlist_entry(
+        state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        symbol="AAVE",
+        coin_id="aave",
+    )
+    legacy_card = event_research_cards.render_research_card(legacy.key, watchlist_entries=[legacy])
+    assert "Lineage status: legacy_lineage_missing" in legacy_card.markdown
+    assert "- Run ID: legacy_lineage_missing" in legacy_card.markdown
+
+
+def test_daily_brief_declares_canonical_view_and_market_freshness_readiness():
+    from crypto_rsi_scanner import event_alpha_daily_brief
+
+    row = {
+        "run_id": "run-1",
+        "profile": "notify_llm_quality",
+        "artifact_namespace": "notify_llm_quality",
+        "run_mode": "notification_burn_in",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "incident_id": "incident:velvet",
+        "validated_symbol": "VELVET",
+        "validated_coin_id": "velvet",
+        "candidate_role": "proxy_venue",
+        "impact_path_type": "venue_value_capture",
+        "opportunity_level": "validated_digest",
+        "opportunity_score_final": 74,
+        "final_route_after_quality_gate": "RESEARCH_DIGEST",
+        "final_state_after_quality_gate": "RADAR",
+        "market_context_freshness_status": "stale",
+        "market_context_source": "candidate_event_market_snapshot",
+        "market_context_age_hours": 72,
+        "market_context_freshness_cap_applied": True,
+    }
+    markdown = event_alpha_daily_brief.build_daily_brief(
+        run_rows=[{
+            "run_id": "run-1",
+            "profile": "notify_llm_quality",
+            "artifact_namespace": "notify_llm_quality",
+            "run_mode": "notification_burn_in",
+            "success": True,
+        }],
+        hypothesis_rows=[row],
+        requested_profile="notify_llm_quality",
+        artifact_namespace="notify_llm_quality",
+    )
+    assert "Canonical operator view: Core Opportunities sections above." in markdown
+    assert "## Market Freshness Readiness" in markdown
+    assert "Capped by stale/unknown context: 1" in markdown
+    assert "Needs targeted market refresh: 1" in markdown
+    assert "### Diagnostic Appendix: Diagnostics / Source-Noise / Controls" in markdown
+
+
+def test_event_alpha_feedback_readiness_and_core_feedback_target():
+    import tempfile
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_feedback_readiness, event_feedback, event_research_cards, event_watchlist
+
+    entry = _test_watchlist_entry(
+        state=event_watchlist.EventWatchlistState.WATCHLIST.value,
+        symbol="AAVE",
+        coin_id="aave",
+    )
+    entry = __import__("dataclasses").replace(
+        entry,
+        incident_id="incident:aave",
+        hypothesis_id="hyp:aave",
+        latest_score_components={
+            **entry.latest_score_components,
+            "run_id": "run-aave",
+            "profile": "notify_llm_quality_frame",
+            "artifact_namespace": "notify_llm_quality_frame",
+            "incident_id": "incident:aave",
+            "hypothesis_id": "hyp:aave",
+        },
+    )
+    card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        card_path = tmp_path / "card_aave.md"
+        card_path.write_text(card.markdown, encoding="utf-8")
+        alert = {
+            "alert_id": "ea:aave",
+            "card_id": "card_aave",
+            "alert_key": entry.key,
+            "symbol": "AAVE",
+            "coin_id": "aave",
+            "impact_path_type": "strategic_investment_or_valuation",
+            "candidate_role": "direct_subject",
+            "opportunity_level": "validated_digest",
+        }
+        ready = event_alpha_feedback_readiness.build_feedback_readiness(
+            profile="notify_llm_quality_frame",
+            artifact_namespace="notify_llm_quality_frame",
+            card_paths=[card_path],
+            alert_rows=[alert],
+            feedback_rows=[],
+            watchlist_entries=[entry],
+        )
+        assert ready.ready is True
+        assert ready.cards_with_lineage == 1
+        text = event_alpha_feedback_readiness.format_feedback_readiness(ready)
+        assert "ready: true" in text
+        core_id = __import__("crypto_rsi_scanner.event_core_opportunities", fromlist=["core_opportunity_id_for_row"]).core_opportunity_id_for_row(entry)
+        cfg = event_feedback.EventFeedbackConfig(path=tmp_path / "feedback.jsonl")
+        record = event_feedback.mark_feedback(core_id, "useful", watchlist_entries=[entry], cfg=cfg)
+        assert record.key == entry.key
+
+        legacy_path = tmp_path / "legacy.md"
+        legacy_path.write_text("# Card\n\n- Run ID: legacy_lineage_missing\n", encoding="utf-8")
+        blocked = event_alpha_feedback_readiness.build_feedback_readiness(
+            profile="notify_llm_quality_frame",
+            artifact_namespace="notify_llm_quality_frame",
+            card_paths=[legacy_path],
+            alert_rows=[alert],
+            feedback_rows=[],
+            watchlist_entries=[entry],
+        )
+        assert "research_cards_missing_lineage" in blocked.blockers
 
 
 def test_missing_unresolved_catalyst_frame_caps_validated_hypothesis():

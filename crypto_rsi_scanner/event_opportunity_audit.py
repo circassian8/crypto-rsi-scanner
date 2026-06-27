@@ -158,7 +158,7 @@ def format_opportunity_audit(
         "- " + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=8) or "source correction or failed confirmation"),
         "",
         "## Feedback command",
-        f"- make event-feedback-watch PROFILE={profile or 'notify_llm'} FEEDBACK_TARGET='{_audit_feedback_target(row, clean)}'",
+        f"- make event-feedback-watch PROFILE={profile or 'notify_llm'} FEEDBACK_TARGET='{_audit_feedback_target(row, clean, core_match)}'",
         "",
         "No secrets, Telegram sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
     ]
@@ -289,10 +289,16 @@ def _find_core_match(
             item.coin_id,
             item.incident_id or "",
             item.canonical_incident_name or "",
+            str(item.primary_row.get("alert_id") or ""),
+            str(item.primary_row.get("card_id") or ""),
+            str(item.primary_row.get("snapshot_id") or ""),
         }
         identifiers.update(str(value) for value in item.supporting_hypothesis_ids)
         identifiers.update(str(row.get("key") or "") for row in item.supporting_rows)
         identifiers.update(str(row.get("alert_key") or "") for row in item.supporting_rows)
+        identifiers.update(str(row.get("alert_id") or "") for row in item.supporting_rows)
+        identifiers.update(str(row.get("card_id") or "") for row in item.supporting_rows)
+        identifiers.update(str(row.get("snapshot_id") or "") for row in item.supporting_rows)
         if clean in identifiers or clean_l in {value.lower() for value in identifiers if value}:
             return item
     return None
@@ -313,6 +319,10 @@ def _core_opportunity_lines(
         f"- aggregation reason: {item.why_opportunity_visible}",
         f"- supporting rows hidden from main view: {item.why_other_rows_hidden}",
         f"- supporting hypothesis ids: {_list_value(item.supporting_hypothesis_ids)}",
+        f"- watchlist keys: {_list_value(_collect_core_row_values(item.supporting_rows, 'key'))}",
+        f"- alert ids: {_list_value(_collect_core_row_values(item.supporting_rows, 'alert_id'))}",
+        f"- snapshot ids: {_list_value(_collect_core_row_values(item.supporting_rows, 'snapshot_id'))}",
+        f"- card ids/paths: {_list_value(_collect_core_row_values(item.supporting_rows, 'card_id', 'research_card_path'))}",
         f"- supporting categories: {_list_value(item.supporting_categories)}",
         f"- supporting impact paths: {_list_value(item.supporting_impact_paths)}",
     ]
@@ -393,6 +403,7 @@ def _row_matches(row: Mapping[str, Any], clean: str, original: str) -> bool:
         row.get("alert_id"),
         row.get("alert_key"),
         row.get("card_id"),
+        row.get("snapshot_id"),
         row.get("key"),
         row.get("event_id"),
         row.get("hypothesis_id"),
@@ -634,5 +645,23 @@ def _asset_list(value: Any) -> str:
     return "; ".join(rows)
 
 
-def _audit_feedback_target(row: Mapping[str, Any], fallback: str) -> str:
-    return str(row.get("alert_id") or row.get("key") or row.get("hypothesis_id") or fallback)
+def _collect_core_row_values(rows: Iterable[Mapping[str, Any]], *keys: str) -> tuple[str, ...]:
+    values: list[str] = []
+    for row in rows:
+        for key in keys:
+            value = row.get(key)
+            if value not in (None, "", [], {}, ()):
+                values.append(str(value))
+    return tuple(dict.fromkeys(values))
+
+
+def _audit_feedback_target(
+    row: Mapping[str, Any],
+    fallback: str,
+    core: event_core_opportunities.CoreOpportunity | None = None,
+) -> str:
+    if core is not None:
+        for candidate in (core.core_opportunity_id, row.get("card_id"), row.get("alert_id"), row.get("key"), row.get("hypothesis_id")):
+            if candidate:
+                return str(candidate)
+    return str(row.get("card_id") or row.get("alert_id") or row.get("key") or row.get("hypothesis_id") or fallback)

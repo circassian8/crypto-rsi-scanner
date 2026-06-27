@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_watchlist
+from . import event_alpha_router, event_core_opportunities, event_watchlist
 
 
 FEEDBACK_SCHEMA_VERSION = "event_alpha_feedback_v1"
@@ -194,7 +194,7 @@ def _find_watchlist_entry(
     exact = [
         entry
         for entry in entries
-        if clean_target == entry.key or clean_target == entry.event_id
+        if clean_target in _entry_feedback_identifiers(entry)
     ]
     if len(exact) == 1:
         return exact[0]
@@ -210,6 +210,27 @@ def _find_watchlist_entry(
     if len(loose) > 1:
         raise ValueError(f"feedback target {target!r} matched multiple watchlist rows; use the full key")
     return None
+
+
+def _entry_feedback_identifiers(entry: event_watchlist.EventWatchlistEntry) -> set[str]:
+    components = dict(entry.latest_score_components or {})
+    identifiers = {
+        entry.key,
+        entry.event_id,
+        entry.symbol,
+        entry.coin_id,
+        event_alpha_router.alert_id_for_entry(entry),
+        event_alpha_router.card_id_for_entry(entry),
+        str(entry.hypothesis_id or ""),
+        str(entry.incident_id or ""),
+        str(components.get("hypothesis_id") or ""),
+        str(components.get("incident_id") or ""),
+        str(components.get("core_opportunity_id") or ""),
+    }
+    core_id = event_core_opportunities.core_opportunity_id_for_row(entry)
+    if core_id:
+        identifiers.add(core_id)
+    return {item for item in identifiers if item}
 
 
 def _record_from_entry(

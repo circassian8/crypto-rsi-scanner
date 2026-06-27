@@ -73,6 +73,24 @@ def format_profile_report(profile: EventAlphaProfile) -> str:
         rows.extend(["", "LLM budget defaults:"])
         for key, value in budget.items():
             rows.append(f"- {key}={value}")
+    rows.extend(["", "catalyst-frame behavior:"])
+    frame_enabled = bool(profile.config_overrides.get("EVENT_LLM_CATALYST_FRAMES_ENABLED", False))
+    frame_provider = profile.config_overrides.get("EVENT_LLM_CATALYST_FRAMES_PROVIDER", "disabled")
+    rows.append(f"- enabled={str(frame_enabled).lower()}")
+    rows.append(f"- provider={frame_provider}")
+    rows.append(f"- sends={str(bool(profile.send)).lower()}")
+    rows.append(f"- requires_openai={str(frame_enabled and frame_provider == 'openai').lower()}")
+    if frame_enabled and frame_provider == "openai":
+        rows.append("- missing_api_key_behavior=fail-soft skip reason; no sends/trades")
+    elif frame_enabled and frame_provider == "fixture":
+        rows.append("- missing_api_key_behavior=not required; fixture frames are offline")
+    else:
+        rows.append("- missing_api_key_behavior=not applicable")
+    if profile.name == "notify_llm_quality":
+        rows.append("- intended_use=official live-style frame-enabled quality profile; scheduled target is no-send")
+    if profile.name == "notify_llm_quality_frame":
+        rows.append("- intended_use=official fixture/no-send proof profile for frame-enabled quality artifacts")
+        rows.append("- artifact_namespace=notify_llm_quality_frame")
     rows.extend(["", "artifact policy:"])
     for key, value in policy.items():
         rows.append(f"- {key}={value}")

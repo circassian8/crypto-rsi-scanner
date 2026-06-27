@@ -440,7 +440,12 @@ def _entry_from_alert(
     event = candidate.event
     requested_state = _state_from_alert(alert, observed, cfg)
     quality = event_alpha_quality_fields.ensure_quality_fields({}, components=alert.score_components)
-    score_components = {**dict(alert.score_components), **quality}
+    score_components = {
+        **dict(alert.score_components),
+        **quality,
+        "source_raw_ids": list(event.raw_ids),
+        "source_event_ids": [event.event_id],
+    }
     final_state, quality_state_block = quality_cap_watchlist_state(requested_state, score_components)
     state = EventWatchlistState(final_state)
     previous_state = prior.state if prior else None
@@ -818,6 +823,10 @@ def _entry_from_hypothesis(
         latest_playbook_action=_action_for_hypothesis_state(state, validated=validated),
         latest_market_snapshot=dict(getattr(hypothesis, "market_context_snapshot", {}) or {}),
         latest_score_components={
+            "run_id": _optional_str(getattr(hypothesis, "run_id", None)),
+            "profile": _optional_str(getattr(hypothesis, "profile", None)),
+            "run_mode": _optional_str(getattr(hypothesis, "run_mode", None)),
+            "artifact_namespace": _optional_str(getattr(hypothesis, "artifact_namespace", None)),
             "hypothesis_id": str(hypothesis_id or ""),
             "aggregated_candidate_id": _optional_str(getattr(hypothesis, "aggregated_candidate_id", None)),
             "supporting_hypothesis_count": getattr(hypothesis, "supporting_hypothesis_count", None),
@@ -825,6 +834,8 @@ def _entry_from_hypothesis(
             "supporting_categories": list(getattr(hypothesis, "supporting_categories", ()) or ())[:12],
             "supporting_impact_paths": list(getattr(hypothesis, "supporting_impact_paths", ()) or ())[:12],
             "supporting_evidence_quotes": list(getattr(hypothesis, "supporting_evidence_quotes", ()) or ())[:8],
+            "source_raw_ids": list(getattr(hypothesis, "source_raw_ids", ()) or ())[:24],
+            "source_event_ids": list(getattr(hypothesis, "source_event_ids", ()) or ())[:24],
             "impact_category": category,
             "validation_stage": validation_stage or "unknown",
             "impact_path_reason": _optional_str(getattr(hypothesis, "impact_path_reason", None)),

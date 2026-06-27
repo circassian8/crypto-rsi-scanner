@@ -76,6 +76,7 @@ from . import event_alpha_calibration
 from . import event_alpha_daily_brief
 from . import event_alpha_eval_export
 from . import event_alpha_explain
+from . import event_alpha_feedback_readiness
 from . import event_alpha_health_guard
 from . import event_impact_hypothesis_store
 from . import event_incident_store
@@ -3679,6 +3680,13 @@ def event_alpha_status(profile_name: str | None = None, verbose: bool = False) -
             f"enabled={str(bool(config.EVENT_LLM_EXTRACTOR_ENABLED)).lower()}"
         ),
         (
+            "LLM catalyst frames: "
+            f"provider={config.EVENT_LLM_CATALYST_FRAMES_PROVIDER} "
+            f"enabled={str(bool(config.EVENT_LLM_CATALYST_FRAMES_ENABLED)).lower()} "
+            f"max_rows={config.EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN} "
+            f"only_ambiguous={str(bool(config.EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS)).lower()}"
+        ),
+        (
             "LLM budget: "
             f"max_candidates={config.EVENT_LLM_MAX_CANDIDATES_PER_RUN} "
             f"max_extract_events={config.EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN} "
@@ -4760,6 +4768,56 @@ def event_alpha_notification_inbox_report(
         outcomes_path=context.outcomes_path,
     )
     print(event_alpha_notification_inbox.format_notification_inbox(result))
+
+
+def event_alpha_feedback_readiness_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print artifact-only feedback-loop readiness for Event Alpha."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "notify_llm_quality"
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(selected_profile, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    notification_runs = event_alpha_notification_runs.load_notification_runs(
+        context.notification_runs_path,
+        limit=250,
+    )
+    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path)
+    feedback = event_feedback.load_feedback(context.feedback_path)
+    delivery_rows = event_alpha_notification_delivery.load_delivery_records(
+        event_alpha_notification_delivery.deliveries_path_for_context(context)
+    )
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    inbox = event_alpha_notification_inbox.build_notification_inbox(
+        notification_runs=notification_runs.rows,
+        alert_rows=alerts.rows,
+        feedback_rows=[record.__dict__ for record in feedback.records],
+        notification_delivery_rows=delivery_rows,
+        watchlist_entries=watchlist.entries,
+        research_cards_dir=context.research_cards_dir,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        notification_runs_path=context.notification_runs_path,
+        alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        outcomes_path=context.outcomes_path,
+    )
+    result = event_alpha_feedback_readiness.build_feedback_readiness(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        card_paths=_research_card_markdown_paths(context.research_cards_dir),
+        alert_rows=alerts.rows,
+        feedback_rows=[record.__dict__ for record in feedback.records],
+        watchlist_entries=watchlist.entries,
+        inbox_result=inbox,
+    )
+    print(event_alpha_feedback_readiness.format_feedback_readiness(result))
 
 
 def event_alpha_notify_fixture_smoke(
@@ -8064,6 +8122,11 @@ def cli() -> None:
         help="Preflight profile-scoped Event Alpha artifact paths, providers, LLM budget, and send guards.",
     )
     parser.add_argument(
+        "--event-alpha-feedback-readiness",
+        action="store_true",
+        help="Check Event Alpha card lineage, inbox feedback targets, and calibration fields without sending or mutating tiers.",
+    )
+    parser.add_argument(
         "--event-watchlist-refresh",
         action="store_true",
         help="Refresh research-only event alpha watchlist state from current alert candidates.",
@@ -8910,6 +8973,13 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             send_requested=args.event_alert_send,
+            verbose=args.verbose,
+        )
+        return
+    if args.event_alpha_feedback_readiness:
+        event_alpha_feedback_readiness_report(
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
             verbose=args.verbose,
         )
         return

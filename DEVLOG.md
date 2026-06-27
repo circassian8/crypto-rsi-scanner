@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Polish Event Alpha traceability and live readiness · Codex
+**Why:** Operator-facing Event Alpha artifacts needed a clearer join path from
+daily brief → card → audit → feedback, plus live-style readiness checks for
+catalyst-frame profiles and market freshness before Pro-model handoffs.
+**Changes:**
+- Added current lineage metadata to watchlist-derived rows and research cards,
+  including run/profile/namespace, incident, hypothesis, watchlist, core
+  opportunity, alert/snapshot/card, and source raw/event ids, while marking
+  legacy cards with explicit lineage gaps.
+- Made opportunity audit and feedback lookup accept the same core opportunity,
+  hypothesis, incident, alert, snapshot, card, watchlist, symbol, and coin
+  targets; inbox rows now surface the feedback target directly.
+- Added a feedback-readiness report and Make target to check card lineage,
+  feedback targets, inbox reviewability, and calibration field coverage.
+- Added a canonical operator-view note plus market freshness readiness sections
+  to daily briefs and quality reviews, and standardized profile/status copy for
+  frame-enabled `notify_llm_quality` / `notify_llm_quality_frame` paths.
+- Added `make event-alpha-quality-frame-live-smoke` as a no-send live-style
+  frame/readiness proof target.
+**Verify:** `python3 tests/test_indicators.py` passed (488/488);
+`make event-llm-eval PYTHON=python3` passed (9/9); `make
+event-llm-extract-eval PYTHON=python3` passed (7/7); `make event-alpha-eval
+PYTHON=python3` passed (11/11); `make event-alpha-signal-quality-eval
+PYTHON=python3` passed (36/36); `make event-alpha-catalyst-frame-e2e-cycle
+PYTHON=python3` passed; `make event-alpha-quality-validation-cycle
+PYTHON=python3` passed; `make verify PYTHON=python3` passed; manual no-send
+smokes `make event-alpha-notify-llm-quality-frame-smoke PYTHON=python3`, `make
+event-alpha-daily-brief PROFILE=catalyst_frame_e2e PYTHON=python3`, `make
+event-opportunity-audit PROFILE=catalyst_frame_e2e TARGET=VELVET PYTHON=python3`,
+`make event-alpha-quality-frame-live-smoke PYTHON=python3`, and `make
+event-alpha-feedback-readiness PROFILE=notify_llm_quality PYTHON=python3`
+passed. The live-style smoke recorded expected fail-soft public-provider
+warnings (`GDELT` 429 and RSS 403/backoff) with strict doctor WARN-only and no
+blockers.
+**Notes/risks:** Research-only artifact/reporting/readiness work. No live
+trading, paper trades, normal RSI signal writes, send-guard loosening, or
+provider/LLM-created `TRIGGERED_FADE` logic changed.
+
 ## 2026-06-27 — Harden Event Alpha market-context freshness · Codex
 **Why:** Event Alpha quality verdicts could treat stale or timestamp-less market
 snapshots as if they were current market confirmation, and fixture/source

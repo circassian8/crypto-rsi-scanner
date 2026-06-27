@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Event Alpha operator artifacts need joinable lineage
+**Status:** accepted
+**Decision:** Operator-facing Event Alpha artifacts must preserve enough
+lineage to move between daily brief, research card, opportunity audit,
+notification inbox, and feedback commands without guessing. Current research
+cards should show run id, profile, artifact namespace, incident id, hypothesis
+id, watchlist key, core opportunity id, alert/snapshot/card ids, and source raw
+or event ids when available. Legacy rows may remain readable, but missing
+lineage must be labeled as legacy/missing rather than rendered as a current
+unknown. Feedback and audit target lookup should accept the same family of ids
+where practical. Live-style frame profiles should also expose whether catalyst
+frame analysis ran or was intentionally skipped, and daily operator views should
+separate the canonical core-opportunity sections from diagnostics.
+**Why:** Pro-model review and daily operations depend on being able to trace one
+visible opportunity back to its source evidence, support rows, card, and
+feedback target. Unlabeled lineage gaps and inconsistent target lookup make
+good artifacts hard to review and make legacy rows look current.
+**Revisit when:** Event Alpha artifacts move from JSONL/Markdown files into a
+typed review database with enforced foreign keys and a UI for card/audit/feedback
+navigation.
+
 ## 2026-06-27 - Stale market context cannot promote Event Alpha candidates
 **Status:** accepted
 **Decision:** Event Alpha market confirmation must carry source, observed-at
