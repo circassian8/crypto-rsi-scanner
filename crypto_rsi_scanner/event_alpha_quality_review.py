@@ -427,23 +427,38 @@ def _quality_gate_conflict_reason(row: Mapping[str, Any]) -> str:
 
 
 def _candidate_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
+    rows = _dedupe_core_opportunity_rows(rows)
     if not rows:
         return ["- none"]
     out = []
     for row in sorted(rows, key=lambda item: float(item.get("opportunity_score_final") or item.get("latest_score") or item.get("hypothesis_score") or 0), reverse=True)[:limit]:
         label = row.get("symbol") or row.get("validated_symbol") or row.get("coin_id") or row.get("hypothesis_id") or row.get("event_id") or "candidate"
+        components = row.get("_components") if isinstance(row.get("_components"), Mapping) else {}
+        supporting_count = int(row.get("supporting_hypothesis_count") or components.get("supporting_hypothesis_count") or 0)
+        supporting_categories = row.get("supporting_categories") or components.get("supporting_categories") or ()
+        supporting_impact_paths = row.get("supporting_impact_paths") or components.get("supporting_impact_paths") or ()
+        supporting_text = ""
+        if supporting_count > 1:
+            categories = ",".join(str(item) for item in list(supporting_categories)[:3])
+            paths = ",".join(str(item) for item in list(supporting_impact_paths)[:3])
+            supporting_text = f" supporting={supporting_count}"
+            if categories:
+                supporting_text += f" categories={categories}"
+            if paths:
+                supporting_text += f" paths={paths}"
         out.append(
             f"- {label}: level={row.get('opportunity_level') or 'unknown'} "
             f"market={row.get('market_confirmation_level') or 'unknown'} "
             f"path={row.get('impact_path_type') or 'unknown'} "
             f"source={row.get('source_class') or 'unknown'}/{row.get('evidence_specificity') or 'unknown'}"
+            f"{supporting_text}"
         )
     return out
 
 
 def _upgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
     candidates = []
-    for row in rows:
+    for row in _dedupe_core_opportunity_rows(rows):
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=row.get("_components") or row)
         if not upgrade.upgrade_requirements:
             continue
@@ -458,7 +473,7 @@ def _upgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
 
 def _downgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
     candidates = []
-    for row in rows:
+    for row in _dedupe_core_opportunity_rows(rows):
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=row.get("_components") or row)
         if not upgrade.downgrade_warnings:
             continue
@@ -469,6 +484,45 @@ def _downgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
     for _score, row, upgrade in sorted(candidates, key=lambda item: item[0], reverse=True)[:limit]:
         out.append(f"- {_label(row)}: {', '.join(upgrade.downgrade_warnings[:3])}")
     return out
+
+
+def _dedupe_core_opportunity_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    best: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        key = _core_opportunity_key(row)
+        current = best.get(key)
+        if current is None or _row_rank(row) > _row_rank(current):
+            best[key] = row
+    return list(best.values())
+
+
+def _core_opportunity_key(row: Mapping[str, Any]) -> str:
+    components = row.get("_components") if isinstance(row.get("_components"), Mapping) else {}
+    aggregate = row.get("aggregated_candidate_id") or components.get("aggregated_candidate_id")
+    if aggregate:
+        return f"aggregate:{aggregate}"
+    incident = row.get("incident_id") or components.get("incident_id") or row.get("event_cluster_id") or row.get("cluster_id") or row.get("event_id")
+    asset = (
+        row.get("validated_coin_id")
+        or components.get("validated_coin_id")
+        or row.get("coin_id")
+        or components.get("coin_id")
+        or row.get("validated_symbol")
+        or components.get("validated_symbol")
+        or row.get("symbol")
+        or components.get("symbol")
+        or "unknown_asset"
+    )
+    role = row.get("candidate_role") or components.get("candidate_role") or row.get("relationship_type") or "unknown_role"
+    path = row.get("primary_impact_path") or components.get("primary_impact_path") or row.get("impact_path_type") or components.get("impact_path_type") or row.get("impact_category") or "unknown_path"
+    return "|".join(str(part or "unknown") for part in (incident, asset, role, path))
+
+
+def _row_rank(row: Mapping[str, Any]) -> tuple[float, int, int]:
+    score = float(row.get("opportunity_score_final") or row.get("latest_score") or row.get("hypothesis_score") or 0.0)
+    source_rank = {"hypothesis": 3, "watchlist": 2, "alert_snapshot": 1}.get(str(row.get("_review_source") or ""), 0)
+    supporting = int(row.get("supporting_hypothesis_count") or 0)
+    return (score, source_rank, supporting)
 
 
 def _missing(rows: list[dict[str, Any]], key: str, missing_values: set[str]) -> list[dict[str, Any]]:

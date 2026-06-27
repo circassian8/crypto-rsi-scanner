@@ -17,6 +17,48 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-27 — Polish catalyst-frame live-style reports · Codex
+**Why:** The LLM catalyst-frame layer needed to be operationally consistent in
+live-style quality profiles, with clear skip reasons, no stale daily-brief
+selection ambiguity, and operator-facing reports that show one core opportunity
+without hiding supporting evidence.
+**Changes:**
+- Normalized required catalyst-frame skip reasons for missing OpenAI keys,
+disabled profiles, budget/deadline/no-row cases, and legacy run-ledger rows with
+null frame counters.
+- Added the no-send `notify_llm_quality_frame` fixture profile plus
+`make event-alpha-notify-llm-quality-frame-smoke` to prove
+`notify_llm_quality`-style frame artifacts, cards, incidents, hypotheses, daily
+brief, quality review, and strict doctor checks without live providers or sends.
+- Extended e2e/smoke Make targets so reports are generated after the cycle
+instead of reading stale artifacts, and daily briefs now show the selected run
+namespace.
+- Preserved aggregated hypothesis supporting impact paths in watchlist/report
+metadata and de-duplicated quality-review opportunity sections by core
+incident/asset/role/path while keeping support counts/categories/path families
+visible.
+- Polished doctor/card/audit wording so healthy quality-capped rows are warnings
+instead of conflicts, and cards/audits expose frame status.
+- Updated `ROADMAP.md`, `DECISIONS.md`, and
+`research/EVENT_ALPHA_RUNBOOK.md` with the new operating contract.
+**Verify:** `python3 tests/test_indicators.py` passed (475/475);
+`python3 -m compileall -q crypto_rsi_scanner tests` passed; `make
+event-llm-eval PYTHON=python3` passed (9/9); `make event-llm-extract-eval
+PYTHON=python3` passed (7/7); `make event-alpha-eval PYTHON=python3` passed
+(11/11); `make event-alpha-signal-quality-eval PYTHON=python3` passed (32/32);
+`make event-alpha-quality-validation-cycle PYTHON=python3` passed with strict
+doctor warnings only; `make event-alpha-notify-llm-quality-frame-smoke
+PYTHON=python3` passed with no blockers; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed with no blockers;
+`make event-opportunity-audit PROFILE=catalyst_frame_e2e TARGET=AAVE
+PYTHON=python3` confirmed AAVE/Kraken as the main strategic-stake frame with
+KelpDAO background/negated context; `make event-alpha-daily-brief
+PROFILE=catalyst_frame_e2e PYTHON=python3` wrote the brief; `make verify
+PYTHON=python3` passed.
+**Notes/risks:** Research-only artifact/report polish. Catalyst-frame metadata
+and skip reasons still cannot create `TRIGGERED_FADE`, send notifications,
+paper/live rows, normal RSI rows, or execution.
+
 ## 2026-06-27 — Operationalize catalyst-frame coverage and route caps · Codex
 **Why:** The catalyst-frame layer worked in fixtures, but live-style quality
 profiles needed explicit missing/unresolved frame state so ambiguous articles

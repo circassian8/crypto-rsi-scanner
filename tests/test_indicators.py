@@ -10895,10 +10895,13 @@ def test_event_alpha_quality_gate_dominates_router_and_artifacts():
     )
     assert doctor.alertable_route_conflicts_with_opportunity_level == 0
     assert doctor.active_watchlist_rows_quality_capped >= 1
-    assert doctor.universal_watchlist_state_conflicts >= 1
-    assert doctor.non_hypothesis_watchlist_quality_conflicts >= 1
+    assert doctor.universal_watchlist_state_conflicts == 0
+    assert doctor.non_hypothesis_watchlist_quality_conflicts == 0
     assert doctor.quality_capped_watchlist_rows >= 1
     assert doctor.fresh_watchlist_state_conflict_rows == 0
+    doctor_text = event_alpha_artifact_doctor.format_artifact_doctor_report(doctor)
+    assert "quality-capped rows present:" in doctor_text
+    assert "watchlist quality state:" in doctor_text
     uncapped_watchlist_conflict = asdict(btc)
     uncapped_watchlist_conflict["state"] = "WATCHLIST"
     uncapped_watchlist_conflict["final_state_after_quality_gate"] = "WATCHLIST"
@@ -22160,8 +22163,10 @@ def test_aave_kraken_hypothesis_uses_strategic_frame_in_cards_and_audit():
     assert "KelpDAO" in entry.latest_score_components["background_context_summary"]
     card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
     assert "Main catalyst: acquisition_or_stake" in card.markdown
+    assert "Frame status:" in card.markdown
     assert "prior_exploit_context(KelpDAO)" in card.markdown
     assert "denied_or_negated_exploit" in card.markdown
+    assert "Rejected/background impact paths:" in card.markdown
     audit = event_opportunity_audit.format_opportunity_audit(
         entry.key,
         hypotheses=[hypothesis],
@@ -22169,8 +22174,10 @@ def test_aave_kraken_hypothesis_uses_strategic_frame_in_cards_and_audit():
         profile="quality_validation",
     )
     assert "main catalyst frame: acquisition_or_stake" in audit
+    assert "frame status:" in audit
     assert "background context: background: prior_exploit_context(KelpDAO)" in audit
     assert "negated/corrective frame count: 1" in audit
+    assert "rejected/background impact paths:" in audit
 
 
 def test_llm_catalyst_frame_fixture_validation_and_downstream_use():
@@ -22482,6 +22489,7 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     from crypto_rsi_scanner.llm_providers.openai_provider import OpenAILLMRelationshipProvider
 
     assert event_alpha_profiles.get_profile("notify_no_key").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is False
+    assert event_alpha_profiles.get_profile("notify_llm_quality").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
     assert event_alpha_profiles.get_profile("notify_llm_deep").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
     assert event_alpha_profiles.get_profile("notify_llm_deep").config_overrides["EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN"] == 60
     assert event_alpha_profiles.get_profile("full_llm_live").config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
@@ -22494,6 +22502,12 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
     assert str(e2e.config_overrides["EVENT_DISCOVERY_EVENTS_PATH"]).endswith("catalyst_frame_e2e_events.json")
     assert e2e.config_overrides["EVENT_ANOMALY_SCANNER_ENABLED"] is False
     assert e2e.config_overrides["EVENT_DISCOVERY_UNIVERSE_LIVE"] is False
+    quality_frame = event_alpha_profiles.get_profile("notify_llm_quality_frame")
+    assert quality_frame.with_llm is True
+    assert quality_frame.send is False
+    assert quality_frame.config_overrides["EVENT_LLM_CATALYST_FRAMES_PROVIDER"] == "fixture"
+    assert quality_frame.config_overrides["EVENT_LLM_CATALYST_FRAMES_ENABLED"] is True
+    assert quality_frame.config_overrides["EVENT_ALPHA_SNAPSHOT_POLICY"] == "all"
     report = event_alpha_profiles.format_profile_report(event_alpha_profiles.get_profile("notify_llm_deep"))
     assert "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN=60" in report
     provider = OpenAILLMRelationshipProvider(api_key="")
@@ -22504,6 +22518,7 @@ def test_llm_catalyst_frame_profiles_make_target_and_missing_key_fail_soft():
         text = fh.read()
     assert "event-alpha-catalyst-frame-validation-cycle" in text
     assert "event-alpha-catalyst-frame-e2e-cycle" in text
+    assert "event-alpha-notify-llm-quality-frame-smoke" in text
 
 
 def test_event_alpha_catalyst_frame_e2e_cycle_writes_frame_artifacts():
@@ -22571,6 +22586,16 @@ def test_event_alpha_catalyst_frame_e2e_cycle_writes_frame_artifacts():
             assert "EVENT ALPHA PIPELINE REPORT" in text
             assert "catalyst_frames=5/5" in text
             assert "send_attempted=false" in text
+            with contextlib.redirect_stdout(io.StringIO()):
+                scanner.event_alpha_daily_brief_report(
+                    profile_name="catalyst_frame_e2e",
+                    artifact_namespace="catalyst_frame_e2e",
+                    include_test_artifacts=True,
+            )
+            daily_brief = Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH).read_text(encoding="utf-8")
+            assert "No run ledger rows found" not in daily_brief
+            assert "Selected run profile: catalyst_frame_e2e" in daily_brief
+            assert "Selected run namespace: catalyst_frame_e2e" in daily_brief
 
             incident_rows = read_jsonl(config.EVENT_INCIDENT_STORE_PATH)
             hypothesis_rows = read_jsonl(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH)
@@ -22672,7 +22697,7 @@ def test_catalyst_frame_missing_provider_records_skip_and_status():
     payload = result.discovery_result.raw_events[0].raw_json
     assert payload["catalyst_frame_required"] is True
     assert payload["catalyst_frame_status"] == "missing_required_frame_analysis"
-    assert payload["catalyst_frame_skip_reason"] == "provider_unavailable"
+    assert payload["catalyst_frame_skip_reason"] == "missing_api_key"
 
     with tempfile.TemporaryDirectory() as tmp:
         row = event_alpha_run_ledger.append_run_record(
@@ -22687,7 +22712,124 @@ def test_catalyst_frame_missing_provider_records_skip_and_status():
     assert row["catalyst_frames_analyzed"] == 0
     assert row["catalyst_frame_validations"] == 0
     assert row["catalyst_frame_rows_skipped"] == 1
-    assert row["catalyst_frame_skip_reasons"]["provider_unavailable"] == 1
+    assert row["catalyst_frame_skip_reasons"]["missing_api_key"] == 1
+
+
+def test_catalyst_frame_missing_key_and_disabled_modes_record_clear_skip_reasons():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from crypto_rsi_scanner import event_alpha_pipeline, event_alpha_run_ledger, event_llm_catalyst_frames
+    from crypto_rsi_scanner.event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.openai_provider import OpenAILLMRelationshipProvider
+
+    now = datetime(2026, 6, 27, 12, 30, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="aave_kraken_missing_key",
+        provider="fixture_news",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://alpha.example/aave-missing-key",
+        title="Kraken in talks to buy 15% stake in Aave at $385 million valuation",
+        body="The article references KelpDAO exploit fallout but says Aave itself was not hacked.",
+        raw_json={},
+        source_confidence=0.95,
+        content_hash="aave-missing-key",
+    )
+    event = NormalizedEvent(
+        "evt_aave_missing_key",
+        (raw.raw_id,),
+        raw.title,
+        "news",
+        None,
+        0.0,
+        now,
+        "fixture_news",
+        (raw.source_url or "",),
+        "Aave",
+        raw.body,
+        0.95,
+    )
+
+    def load_discovery_result(observed, raw_event_transform):
+        raws = (raw,)
+        if raw_event_transform is not None:
+            raws = tuple(raw_event_transform(raws))
+        return EventDiscoveryResult(raws, (event,), (), (), ())
+
+    missing_key_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=load_discovery_result,
+        now=now,
+        with_llm=True,
+        catalyst_frame_provider=OpenAILLMRelationshipProvider(api_key="", model="fixture"),
+        catalyst_frame_cfg=event_llm_catalyst_frames.EventLLMCatalystFrameConfig(
+            enabled=True,
+            provider="openai",
+            only_ambiguous=True,
+        ),
+        refresh_watchlist=False,
+        route=False,
+    )
+    missing_payload = missing_key_result.discovery_result.raw_events[0].raw_json
+    assert missing_payload["catalyst_frame_status"] == "missing_required_frame_analysis"
+    assert missing_payload["catalyst_frame_skip_reason"] == "missing_api_key"
+
+    disabled_result = event_alpha_pipeline.run_event_alpha_operating_cycle(
+        load_discovery_result=load_discovery_result,
+        now=now,
+        with_llm=True,
+        catalyst_frame_provider=None,
+        catalyst_frame_cfg=event_llm_catalyst_frames.EventLLMCatalystFrameConfig(
+            enabled=False,
+            provider="openai",
+            only_ambiguous=True,
+        ),
+        refresh_watchlist=False,
+        route=False,
+    )
+    disabled_payload = disabled_result.discovery_result.raw_events[0].raw_json
+    assert disabled_payload["catalyst_frame_status"] == "missing_required_frame_analysis"
+    assert disabled_payload["catalyst_frame_skip_reason"] == "disabled"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "runs.jsonl"
+        missing_row = event_alpha_run_ledger.append_run_record(
+            missing_key_result,
+            cfg=event_alpha_run_ledger.EventAlphaRunLedgerConfig(path),
+            profile="notify_llm_quality",
+            started_at=now,
+            finished_at=now,
+            with_llm=True,
+            send_requested=False,
+        )
+        disabled_row = event_alpha_run_ledger.append_run_record(
+            disabled_result,
+            cfg=event_alpha_run_ledger.EventAlphaRunLedgerConfig(path),
+            profile="notify_llm_quality",
+            started_at=now,
+            finished_at=now,
+            with_llm=True,
+            send_requested=False,
+        )
+        legacy_path = Path(tmp) / "legacy.jsonl"
+        legacy_path.write_text(
+            '{"row_type":"event_alpha_run","started_at":"2026-06-27T00:00:00+00:00",'
+            '"catalyst_frames_analyzed":null,"catalyst_frame_validations":null,'
+            '"catalyst_frame_disagreements":null,"catalyst_frame_unresolved":null,'
+            '"catalyst_frame_rows_skipped":null,"catalyst_frame_skip_reasons":null}\n',
+            encoding="utf-8",
+        )
+        legacy = event_alpha_run_ledger.load_run_records(legacy_path).rows[0]
+    assert missing_row["catalyst_frames_analyzed"] == 0
+    assert missing_row["catalyst_frame_skip_reasons"]["missing_api_key"] == 1
+    assert disabled_row["catalyst_frame_skip_reasons"]["disabled"] == 1
+    assert legacy["catalyst_frames_analyzed"] == 0
+    assert legacy["catalyst_frame_validations"] == 0
+    assert legacy["catalyst_frame_disagreements"] == 0
+    assert legacy["catalyst_frame_unresolved"] == 0
+    assert legacy["catalyst_frame_rows_skipped"] == 0
+    assert legacy["catalyst_frame_skip_reasons"] == {}
 
 
 def test_incident_asset_roles_demote_unvalidated_taxonomy_candidates():
@@ -22794,11 +22936,41 @@ def test_validated_hypothesis_aggregation_preserves_supporting_paths():
     assert item.aggregated_candidate_id
     assert item.supporting_hypothesis_count == 2
     assert set(item.supporting_categories) == {"rwa_preipo_proxy", "tokenized_stock_venue"}
+    assert item.supporting_impact_paths == ("venue_value_capture",)
     assert "VELVET users can trade SpaceX pre-IPO exposure." in item.supporting_evidence_quotes
 
 
 def test_missing_unresolved_catalyst_frame_caps_validated_hypothesis():
     from crypto_rsi_scanner import event_impact_hypotheses
+
+    missing_hypothesis = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:aave:missing",
+        event_cluster_id="incident:aave",
+        event_type="news",
+        external_asset="Aave",
+        impact_category="security_or_regulatory_shock",
+        candidate_sectors=("defi",),
+        candidate_symbols=("AAVE",),
+        candidate_coin_ids=("aave",),
+        validated_candidate_assets=({"symbol": "AAVE", "coin_id": "aave", "validated": True},),
+        confidence=0.90,
+        hypothesis_score=90.0,
+        validation_stage="impact_path_validated",
+        status="validated",
+        impact_path_type="exploit_security_event",
+        impact_path_reason="exploit_security_event",
+        candidate_role="direct_subject",
+        opportunity_score_final=88,
+        opportunity_level="high_priority",
+        frame_required=True,
+        frame_status="missing_required_frame_analysis",
+        frame_gate_reason="catalyst_frame_missing",
+        route_block_reason="catalyst_frame_missing",
+    )
+    missing_capped = event_impact_hypotheses._with_promotion_diagnostics(missing_hypothesis)
+    assert missing_capped.opportunity_level == "exploratory"
+    assert missing_capped.route_block_reason == "catalyst_frame_missing"
+    assert missing_capped.impact_path_type == "exploit_security_event"
 
     hypothesis = event_impact_hypotheses.EventImpactHypothesis(
         hypothesis_id="hyp:aave:bad",
@@ -25457,6 +25629,7 @@ def test_event_alpha_live_path_caps_non_hypothesis_watchlist_and_doctor_sees_pat
         )
         assert capped_doctor.fresh_watchlist_state_conflict_rows == 0
         assert capped_doctor.quality_capped_watchlist_rows == 1
+        assert capped_doctor.universal_watchlist_state_conflicts == 0
 
 
 def test_event_incident_primary_subject_validator_quarantines_garbage_before_persistence():

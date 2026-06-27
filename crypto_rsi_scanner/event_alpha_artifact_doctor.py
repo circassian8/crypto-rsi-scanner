@@ -307,9 +307,9 @@ def diagnose_artifacts(
     if fresh_missing_final_route and strict:
         blockers.append(f"fresh_alert_rows_missing_final_route={fresh_missing_final_route}")
     watchlist_conflicts = _watchlist_quality_state_conflicts(watchlist)
-    if watchlist_conflicts["active_watchlist_rows_quality_capped"]:
+    if watchlist_conflicts["quality_capped_watchlist_rows"]:
         warnings.append(
-            f"active_watchlist_rows_quality_capped={watchlist_conflicts['active_watchlist_rows_quality_capped']}"
+            f"quality-capped rows present: {watchlist_conflicts['quality_capped_watchlist_rows']}"
         )
     if watchlist_conflicts["non_hypothesis_watchlist_quality_conflicts"]:
         warnings.append(
@@ -631,6 +631,7 @@ def _watchlist_quality_state_conflicts(rows: Iterable[Mapping[str, Any]]) -> dic
         if capped and requested_active:
             out["quality_capped_watchlist_rows"] += 1
             out["active_watchlist_rows_quality_capped"] += 1
+            continue
         if has_conflict:
             out["watchlist_state_conflicts_with_quality"] += 1
             out["universal_watchlist_state_conflicts"] += 1
@@ -1001,7 +1002,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"fresh_alert_rows_missing_final_route={result.fresh_alert_rows_missing_final_route}"
         ),
         (
-            "watchlist quality conflicts: "
+            "watchlist quality state: "
             f"watchlist_state_conflicts_with_quality={result.watchlist_state_conflicts_with_quality} "
             f"universal={result.universal_watchlist_state_conflicts} "
             f"non_hypothesis={result.non_hypothesis_watchlist_quality_conflicts} "

@@ -175,6 +175,7 @@ weaker deterministic frame. Use:
 ```
 make event-alpha-catalyst-frame-validation-cycle PYTHON=python3
 make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3
+make event-alpha-notify-llm-quality-frame-smoke PYTHON=python3
 make event-opportunity-audit TARGET=AAVE PROFILE=catalyst_frame_e2e PYTHON=python3
 make event-alpha-daily-brief PROFILE=catalyst_frame_e2e PYTHON=python3
 ```
@@ -185,13 +186,23 @@ fidelity. It writes only under `event_fade_cache/catalyst_frame_e2e/`, uses
 fixture raw events and fixture LLM catalyst frames, disables live providers and
 sends, and proves that AAVE/Kraken remains a strategic investment while KelpDAO
 exploit language stays background/corrective context.
+Use `make event-alpha-notify-llm-quality-frame-smoke` when the review target is
+the live-style `notify_llm_quality` artifact shape rather than the isolated e2e
+namespace. It writes under `event_fade_cache/notify_llm_quality_frame/`, uses
+fixture catalyst-frame output, keeps sends disabled, and prints the cycle, daily
+brief, impact-hypothesis report, incident report, quality review, and strict
+artifact doctor. This is the preferred smoke before changing frame counters,
+skip reasons, or `notify_llm_quality` report wiring.
 
 Live-style profiles also record when catalyst-frame analysis was required but
 missing or unresolved. Run ledgers and daily briefs expose analyzed, validated,
 unresolved, skipped, and skip-reason counts so a provider outage, disabled
-profile, budget skip, or prefilter miss is visible. Rows with ambiguous
-multi-catalyst/proxy/security-background language may be capped to local or
-exploratory research when a required frame is missing or unresolved. A
+profile, missing OpenAI key, budget skip, no-row prefilter miss, or LLM deadline
+is visible as a normalized skip reason such as `disabled`, `missing_api_key`,
+`budget_exhausted`, `no_rows_selected`, `profile_disabled`, or
+`deadline_exceeded`. Rows with ambiguous multi-catalyst/proxy/security-
+background language may be capped to local or exploratory research when a
+required frame is missing or unresolved. A
 deterministic direct-event path can still be sufficient for clear listings,
 unlocks, strategic-stake/valuation reports, and confirmed direct exploits, but
 generic or ambiguous co-occurrence should not route as validated merely because
@@ -205,6 +216,11 @@ remain search candidates rather than affected assets. Compatible validated
 hypotheses may aggregate by incident, validated asset, role, and impact-path
 family, but supporting categories, hypothesis ids, and evidence quotes should
 remain visible for audit.
+Quality review and daily operator reports may show one core opportunity row for
+an aggregated incident/asset/role/path family, for example one VELVET/SpaceX
+row with supporting proxy categories. Treat this as presentation de-duplication
+only; raw hypotheses, supporting impact paths, and source evidence remain in the
+JSONL artifacts and cards for review.
 
 The feature is research metadata only. It cannot send notifications, create
 paper/live rows, write normal RSI signals, execute trades, or create

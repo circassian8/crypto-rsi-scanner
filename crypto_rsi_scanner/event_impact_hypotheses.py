@@ -213,6 +213,7 @@ class EventImpactHypothesis:
     aggregated_candidate_id: str | None = None
     primary_impact_path: str | None = None
     supporting_categories: tuple[str, ...] = ()
+    supporting_impact_paths: tuple[str, ...] = ()
     supporting_hypothesis_ids: tuple[str, ...] = ()
     supporting_evidence_quotes: tuple[str, ...] = ()
     supporting_hypothesis_count: int = 1
@@ -3479,6 +3480,13 @@ def _merge_aggregated_hypotheses(
         *(current.supporting_categories or (current.impact_category,)),
         *(item.supporting_categories or (item.impact_category,)),
     )))
+    supporting_impact_paths = tuple(dict.fromkeys(
+        path for path in (
+            *(current.supporting_impact_paths or (current.impact_path_type,)),
+            *(item.supporting_impact_paths or (item.impact_path_type,)),
+        )
+        if path
+    ))
     supporting_quotes = tuple(dict.fromkeys((
         *current.supporting_evidence_quotes,
         *current.evidence_quotes,
@@ -3491,12 +3499,14 @@ def _merge_aggregated_hypotheses(
         "aggregated_candidate_id": aggregate_id,
         "supporting_hypothesis_count": float(len(supporting_ids)),
         "supporting_categories": supporting_categories,
+        "supporting_impact_paths": supporting_impact_paths,
     })
     return replace(
         winner,
         aggregated_candidate_id=aggregate_id,
         primary_impact_path=winner.primary_impact_path or winner.impact_path_type or winner.impact_path_reason or winner.impact_category,
         supporting_categories=supporting_categories,
+        supporting_impact_paths=supporting_impact_paths,
         supporting_hypothesis_ids=supporting_ids,
         supporting_evidence_quotes=supporting_quotes,
         supporting_hypothesis_count=len(supporting_ids),

@@ -715,3 +715,50 @@ _PROFILES["notify_llm_quality_fresh"] = replace(
         "artifact namespace for stale-artifact validation."
     ),
 )
+
+_PROFILES["notify_llm_quality_frame"] = replace(
+    _PROFILES["notify_llm_quality"],
+    name="notify_llm_quality_frame",
+    description=(
+        "No-send notify_llm_quality-style fixture smoke for LLM catalyst-frame "
+        "coverage, run-ledger counters, incidents, hypotheses, daily brief, and doctor."
+    ),
+    config_overrides={
+        **_PROFILES["notify_llm_quality"].config_overrides,
+        "EVENT_DISCOVERY_EVENTS_PATH": Path("fixtures/event_discovery/catalyst_frame_e2e_events.json"),
+        "EVENT_DISCOVERY_ALIASES_PATH": Path("fixtures/event_discovery/catalyst_frame_e2e_aliases.json"),
+        "EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE": False,
+        "EVENT_DISCOVERY_GDELT_LIVE": False,
+        "EVENT_DISCOVERY_CRYPTOPANIC_LIVE": False,
+        "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE": False,
+        "EVENT_DISCOVERY_UNIVERSE_LIVE": False,
+        "EVENT_MARKET_ENRICHMENT_ENABLED": False,
+        "EVENT_ANOMALY_SCANNER_ENABLED": False,
+        "EVENT_CATALYST_SEARCH_ENABLED": False,
+        "EVENT_IMPACT_HYPOTHESIS_SEARCH_ENABLED": False,
+        "EVENT_IMPACT_HYPOTHESIS_CANDIDATE_DISCOVERY_ENABLED": False,
+        "EVENT_LLM_PROVIDER": "fixture",
+        "EVENT_LLM_EXTRACTOR_ENABLED": False,
+        "EVENT_LLM_EXTRACTOR_PROVIDER": "fixture",
+        "EVENT_LLM_EXTRACTOR_MODE": "shadow",
+        "EVENT_LLM_CATALYST_FRAMES_ENABLED": True,
+        "EVENT_LLM_CATALYST_FRAMES_PROVIDER": "fixture",
+        "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": 100,
+        "EVENT_LLM_CATALYST_FRAMES_MIN_SOURCE_SCORE": 0.0,
+        "EVENT_LLM_CATALYST_FRAMES_ONLY_AMBIGUOUS": False,
+        "EVENT_ALPHA_SNAPSHOT_POLICY": "all",
+        "EVENT_RESEARCH_CARDS_AUTO_WRITE": True,
+        "EVENT_RESEARCH_CARDS_WRITE_TIERS": (
+            "STORE_ONLY",
+            "RADAR_DIGEST",
+            "WATCHLIST",
+            "HIGH_PRIORITY_WATCH",
+            "TRIGGERED_FADE",
+        ),
+    },
+    snapshot_policy="all",
+    card_auto_write=True,
+    card_write_tiers=("STORE_ONLY", "RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"),
+    send=False,
+    send_lane_policy="quality_frame_fixture_no_send",
+)

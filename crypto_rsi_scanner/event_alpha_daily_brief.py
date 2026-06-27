@@ -104,6 +104,7 @@ def build_daily_brief(
     alertable = [decision for decision in list(router_result.alertable_decisions if router_result else ()) if event_alpha_router.alertable_after_quality_gate(decision)]
     latest = event_alpha_run_ledger.latest_run(runs, requested_profile) or {}
     selected_profile = str(latest.get("profile") or "default") if latest else "none"
+    selected_namespace = str(latest.get("artifact_namespace") or "legacy") if latest else "none"
     requested = str(requested_profile or "latest").strip() or "latest"
     profile_match = (
         "n/a"
@@ -123,6 +124,7 @@ def build_daily_brief(
         f"Run ledger path: {event_alpha_artifacts.safe_path_label(run_ledger_path) if run_ledger_path else 'unknown'}",
         f"Alert store path: {event_alpha_artifacts.safe_path_label(alert_store_path) if alert_store_path else 'unknown'}",
         f"Selected run profile: {selected_profile}",
+        f"Selected run namespace: {selected_namespace}",
         f"Profile match: {profile_match}",
         "",
         "Research-only. Not a trade signal, paper trade, live RSI signal, or execution.",

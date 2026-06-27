@@ -70,13 +70,28 @@ def load_run_records(path: str | Path, *, limit: int | None = None) -> EventAlph
     """Load recent run ledger rows, tolerating malformed legacy rows."""
     p = Path(path).expanduser()
     rows = [
-        row for row in _read_jsonl(p)
+        _normalize_run_row(row) for row in _read_jsonl(p)
         if row.get("row_type") == "event_alpha_run"
     ]
     rows.sort(key=lambda row: str(row.get("started_at") or ""), reverse=True)
     if limit is not None and limit > 0:
         rows = rows[:limit]
     return EventAlphaRunLedgerReadResult(path=p, rows_read=len(rows), rows=rows)
+
+
+def _normalize_run_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    out = dict(row)
+    for key in (
+        "catalyst_frames_analyzed",
+        "catalyst_frame_validations",
+        "catalyst_frame_disagreements",
+        "catalyst_frame_unresolved",
+        "catalyst_frame_rows_skipped",
+    ):
+        out[key] = _int(out.get(key))
+    reasons = out.get("catalyst_frame_skip_reasons")
+    out["catalyst_frame_skip_reasons"] = dict(reasons) if isinstance(reasons, Mapping) else {}
+    return out
 
 
 def latest_run(rows: Iterable[Mapping[str, Any]], profile: str | None = None) -> dict[str, Any] | None:
@@ -155,6 +170,14 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"hypothesis_queries={int(row.get('hypothesis_search_queries') or 0)} "
             f"hypothesis_results={int(row.get('hypothesis_search_results') or 0)} "
             f"promotions={int(row.get('hypothesis_promotions') or 0)}"
+        )
+        rows.append(
+            "  "
+            f"catalyst_frames analyzed={int(row.get('catalyst_frames_analyzed') or 0)} "
+            f"validated={int(row.get('catalyst_frame_validations') or 0)} "
+            f"disagreements={int(row.get('catalyst_frame_disagreements') or 0)} "
+            f"unresolved={int(row.get('catalyst_frame_unresolved') or 0)} "
+            f"skipped={int(row.get('catalyst_frame_rows_skipped') or 0)}"
         )
         query_types = row.get("hypothesis_search_queries_by_type") or {}
         result_types = row.get("hypothesis_search_results_by_type") or {}
@@ -252,6 +275,12 @@ def _run_record(
     clock_status = dict(getattr(result, "clock_status", {}) or {})
     if failure:
         warnings.append(failure)
+    if (
+        not with_llm
+        and _int(getattr(result, "raw_events", 0)) > 0
+        and not catalyst_frame_counts["skip_reasons"]
+    ):
+        catalyst_frame_counts["skip_reasons"] = {"profile_disabled": 1}
     run_id = getattr(result, "run_id", None) or run_id_for(started_at, profile)
     notify_burn = (
         bool(notification_burn_in)

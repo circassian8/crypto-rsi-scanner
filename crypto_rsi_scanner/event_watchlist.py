@@ -810,6 +810,7 @@ def _entry_from_hypothesis(
             "supporting_hypothesis_count": getattr(hypothesis, "supporting_hypothesis_count", None),
             "supporting_hypothesis_ids": list(getattr(hypothesis, "supporting_hypothesis_ids", ()) or ())[:12],
             "supporting_categories": list(getattr(hypothesis, "supporting_categories", ()) or ())[:12],
+            "supporting_impact_paths": list(getattr(hypothesis, "supporting_impact_paths", ()) or ())[:12],
             "supporting_evidence_quotes": list(getattr(hypothesis, "supporting_evidence_quotes", ()) or ())[:8],
             "impact_category": category,
             "validation_stage": validation_stage or "unknown",

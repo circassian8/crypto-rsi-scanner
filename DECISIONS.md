@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-27 - Catalyst-frame coverage must be operator-auditable
+**Status:** accepted
+**Decision:** Live-style Event Alpha profiles that depend on catalyst-frame
+quality control must expose frame coverage as first-class artifact metadata.
+Run ledgers, daily briefs, quality review, cards, opportunity audits, and
+artifact doctor reports should show analyzed/validated/unresolved/skipped frame
+counts, selected artifact namespace, and normalized skip reasons such as
+`disabled`, `missing_api_key`, `budget_exhausted`, `no_rows_selected`,
+`profile_disabled`, and `deadline_exceeded`. Operator-facing opportunity
+sections may aggregate duplicate supporting hypotheses into one core
+opportunity row, but they must preserve supporting categories, impact paths,
+hypothesis ids, and evidence in audit fields. The fixture-backed
+`notify_llm_quality_frame` profile is the no-send proof path for this live-style
+artifact shape.
+**Why:** A profile can appear healthy while silently missing catalyst-frame
+coverage because of provider configuration, missing credentials, budget/deadline
+limits, or prefilter behavior. Operators and Pro-model reviewers need clear
+coverage and skip-reason artifacts without reading raw JSONL internals or
+mistaking duplicate supporting rows for separate opportunities.
+**Revisit when:** Catalyst-frame artifacts move to a typed research database
+with enforced coverage columns and a dedicated UI for frame status, duplicate
+support, and skip reasons.
+
 ## 2026-06-27 - Required catalyst frames cap ambiguous research routes
 **Status:** accepted
 **Decision:** Event Alpha rows that contain ambiguous, multi-catalyst, proxy,

@@ -650,6 +650,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     main_frame_actor = components.get("main_frame_actor") or "unknown"
     main_frame_object = components.get("main_frame_object") or "unknown"
     main_frame_quote = components.get("main_frame_evidence_quote") or "none"
+    frame_status = components.get("frame_status") or "unknown"
     selected_main_reason = components.get("selected_main_catalyst_reason") or "unknown"
     rule_predicted_path = components.get("rule_predicted_impact_path") or "unknown"
     llm_predicted_path = components.get("llm_predicted_main_frame_type") or "unknown"
@@ -707,6 +708,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Incident relevance reasons: {'; '.join(str(item) for item in (components.get('incident_relevance_reasons') or [])[:4]) if components.get('incident_relevance_reasons') else 'none'}",
         f"- Event archetype: {event_archetype}",
         f"- Main catalyst: {main_frame_type} ({main_frame_role})",
+        f"- Frame status: {frame_status}",
         f"- Main catalyst subject/actor/object: {main_frame_subject} / {main_frame_actor} / {main_frame_object}",
         f"- Main catalyst evidence: {main_frame_quote}",
         f"- Main catalyst selected because: {selected_main_reason}",

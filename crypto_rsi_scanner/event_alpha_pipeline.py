@@ -592,6 +592,8 @@ def run_event_alpha_operating_cycle(
         if catalyst_frame_cfg is not None and catalyst_frame_cfg.enabled:
             if catalyst_frame_provider is None:
                 warnings.append("Event LLM catalyst-frame analysis skipped: no provider available")
+                provider_name = str(catalyst_frame_cfg.provider or "").strip().lower()
+                provider_skip_reason = "missing_api_key" if provider_name == "openai" else "profile_disabled"
                 def _mark_missing_llm_catalyst_frames(
                     raw_events: tuple[RawDiscoveredEvent, ...],
                 ) -> tuple[RawDiscoveredEvent, ...]:
@@ -599,7 +601,7 @@ def run_event_alpha_operating_cycle(
                         _raw_with_catalyst_frame_status(
                             raw,
                             status="missing_required_frame_analysis" if event_llm_catalyst_frames.frame_requirement_for_raw(raw)[0] else "not_required",
-                            skip_reason="provider_unavailable",
+                            skip_reason=provider_skip_reason,
                         )
                         for raw in raw_events
                     )
@@ -626,15 +628,21 @@ def run_event_alpha_operating_cycle(
                         for row in catalyst_frame_rows
                     }
                     selected_raw_ids = {row.raw_event.raw_id for row in catalyst_frame_rows}
+                    if not selected_raw_ids and any(
+                        event_llm_catalyst_frames.frame_requirement_for_raw(raw)[0]
+                        for raw in raw_events
+                    ):
+                        warnings.append("Event LLM catalyst-frame analysis skipped: no required rows selected")
                     for raw in raw_events:
                         required, required_reason = event_llm_catalyst_frames.frame_requirement_for_raw(raw)
                         analysis = analyses_by_raw_id.get(raw.raw_id)
                         if analysis is None:
+                            row_warnings = row_warnings_by_raw_id.get(raw.raw_id, ())
                             status = "missing_required_frame_analysis" if required else "not_required"
-                            skip_reason = (
-                                "provider_returned_no_analysis"
-                                if raw.raw_id in selected_raw_ids
-                                else "not_selected_by_catalyst_frame_prefilter_or_limit"
+                            skip_reason = _catalyst_frame_skip_reason(
+                                row_warnings,
+                                selected=raw.raw_id in selected_raw_ids,
+                                required=required,
                             )
                             enriched.append(_raw_with_catalyst_frame_status(
                                 raw,
@@ -642,7 +650,7 @@ def run_event_alpha_operating_cycle(
                                 required=required,
                                 required_reason=required_reason,
                                 skip_reason=skip_reason,
-                                warnings=row_warnings_by_raw_id.get(raw.raw_id, ()),
+                                warnings=row_warnings,
                             ))
                             continue
                         rule_frames = event_catalyst_frames.build_catalyst_frames((raw,))
@@ -1111,6 +1119,26 @@ def _llm_budget_warnings(rows: Iterable[object], *, label: str) -> list[str]:
     if not skipped:
         return []
     return [f"LLM {label} budget exhausted; skipped {len(skipped)} lower-priority row(s)"]
+
+
+def _catalyst_frame_skip_reason(
+    warnings: Iterable[str],
+    *,
+    selected: bool,
+    required: bool,
+) -> str:
+    text = " ".join(str(item or "") for item in warnings).casefold()
+    if "missing openai_api_key" in text or "missing api key" in text:
+        return "missing_api_key"
+    if "budget" in text and ("exhaust" in text or "skip" in text):
+        return "budget_exhausted"
+    if "deadline" in text or "timeout" in text or "timed out" in text:
+        return "deadline_exceeded"
+    if not selected:
+        return "no_rows_selected" if required else "not_required"
+    if not required:
+        return "not_required"
+    return "provider_returned_no_analysis"
 
 
 def _raw_with_catalyst_frame_status(

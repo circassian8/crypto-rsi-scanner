@@ -325,6 +325,7 @@ def _incident_lines(
         f"- primary subject: {source.get('primary_subject') or components.get('primary_subject') or 'unknown'}",
         f"- main catalyst frame: {source.get('main_frame_type') or components.get('main_frame_type') or 'unknown'} "
         f"({source.get('main_frame_role') or components.get('main_frame_role') or 'unknown'})",
+        f"- frame status: {source.get('frame_status') or components.get('frame_status') or 'unknown'}",
         f"- main catalyst subject/actor/object: "
         f"{source.get('main_frame_subject') or components.get('main_frame_subject') or 'unknown'} / "
         f"{source.get('main_frame_actor') or components.get('main_frame_actor') or 'unknown'} / "
