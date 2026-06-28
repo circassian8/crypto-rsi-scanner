@@ -298,6 +298,7 @@ and a separate `backtest.py` validates strategy ideas on years of history.
 | `event_watchlist.py` | research-only Event Alpha Radar state cache; tracks raw/radar/watchlist/high-priority/event-passed/armed/triggered/terminal transitions and duplicate suppression without routing alerts or writing live storage |
 | `event_incident_store.py` | profile-scoped canonical Event Alpha incident JSONL artifacts linking raw sources, claim history, hypotheses, watchlist rows, asset roles, and market/cause context |
 | `event_alpha_router.py` | artifact-only Event Alpha Radar route decisions from watchlist state; local research output only, no sends/trades/live writes |
+| `event_core_opportunity_store.py` | profile-scoped canonical CoreOpportunity JSONL artifacts; one post-refresh, quality-gated operator row per visible opportunity for daily briefs, near-miss reports, cards, audits, and doctor checks |
 | `event_alpha_alert_store.py` | research-only Event Alpha alert snapshot/outcome JSONL artifacts; reports cohorts and fills local OHLCV outcomes without live DB, paper, or execution writes |
 | `event_feedback.py` / `event_alpha_eval.py` | lightweight Event Alpha feedback JSONL artifacts and offline route/feedback golden evals; review metadata only |
 | `event_cache.py` | research-only JSONL observational cache for point-in-time event-discovery evidence; no live SQLite/signal/paper writes |

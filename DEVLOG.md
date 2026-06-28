@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Persist canonical Event Alpha core opportunities · Codex
+**Why:** Daily brief, near-miss, cards, audit, and doctor paths could still
+recompute operator-facing opportunities from mixed raw/support rows and disagree
+after market refresh or evidence acquisition. VELVET-style high-priority cores
+could therefore reappear as near-miss/diagnostic rows, and RUNE-style watchlist
+cores could look downgraded by stale support rows.
+**Changes:**
+- Added `event_core_opportunity_store.py`, a profile-scoped JSONL store for one
+  canonical post-refresh `CoreOpportunity` row per visible operator opportunity.
+- Wired Event Alpha cycles, run ledgers, daily briefs, near-miss reports,
+  research-card inputs, opportunity audits, artifact context, and artifact
+  doctor checks to prefer canonical core rows when present.
+- Added deterministic final-merge/store metadata for initial, post-refresh, and
+  final opportunity verdicts; market/evidence before/after fields; card path;
+  feedback target; support/diagnostic row ids; and hidden diagnostic counts.
+- Made stored core rows rank ahead of raw/support rows during aggregation, while
+  keeping test/legacy missing-store cases as warnings instead of strict blockers.
+- Added offline regressions proving VELVET/AAVE/RUNE/MEME canonical rows,
+  promoted-core near-miss exclusion, daily brief store preference, and doctor
+  store coverage reporting.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner/event_core_opportunity_store.py crypto_rsi_scanner/event_alpha_daily_brief.py crypto_rsi_scanner/event_alpha_artifact_doctor.py crypto_rsi_scanner/event_core_opportunities.py crypto_rsi_scanner/scanner.py tests/test_indicators.py` passed; `python3 tests/test_indicators.py` passed (502/502); `make event-alpha-signal-quality-eval PYTHON=python3`, `make event-alpha-evidence-acquisition-smoke PYTHON=python3`, `make event-alpha-market-refresh-smoke PYTHON=python3`, `make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, `make event-alpha-quality-validation-cycle PYTHON=python3`, and `make verify PYTHON=python3` passed. Manual smoke: `make event-alpha-near-miss-report PROFILE=market_refresh_smoke PYTHON=python3` showed `near_misses=0` / `upgrade_candidates=0` with 5 canonical core rows; `make event-alpha-daily-brief PROFILE=market_refresh_smoke PYTHON=python3` wrote the brief; `make event-opportunity-audit PROFILE=market_refresh_smoke TARGET=agg:3381ebd96566 PYTHON=python3` resolved VELVET as a high-priority core opportunity; `make event-alpha-artifact-doctor PROFILE=market_refresh_smoke STRICT=1 PYTHON=python3` completed with no blockers and `visible_core_opportunities_missing_store_rows=0`.
+**Notes/risks:** Research-only artifact/presentation change. No Telegram sends,
+paper/live rows, normal RSI writes, trading, or provider/LLM-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Make evidence acquisition final-verdict consistent · Codex
 **Why:** Source-pack evidence acquisition could improve evidence quality while
 operator reports still described the result through a single upgrade flag, which

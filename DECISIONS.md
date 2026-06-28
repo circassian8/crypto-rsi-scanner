@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Persisted CoreOpportunity rows are authoritative for operators
+**Status:** accepted
+**Decision:** After an Event Alpha cycle writes canonical
+`event_core_opportunities.jsonl` rows, operator-facing reports should prefer
+those rows over recomputing visible opportunities from mixed hypotheses,
+watchlist entries, alert snapshots, and support/control rows. The store records
+one final post-refresh, quality-gated core opportunity per visible
+incident/asset/role/path family, plus support and diagnostic row ids. Daily
+briefs, near-miss reports, cards, audits, run ledgers, and artifact doctor
+checks should treat the stored final route/state/opportunity verdict as the
+operator contract when present. Raw/support rows remain available for
+diagnostics, but they must not downgrade or duplicate the visible final
+opportunity.
+**Why:** Recomputing from heterogeneous artifacts made reports disagree after
+targeted market refresh and evidence acquisition. A promoted VELVET opportunity
+could also appear as a near-miss, and stale RUNE support rows could make a
+watchlist core look downgraded. Persisting the final core state gives operators
+and Pro-model reviews one stable object to inspect.
+**Revisit when:** Core opportunities move from JSONL artifacts into a typed
+database with schema-enforced relationships to hypotheses, cards, snapshots,
+feedback, and outcomes.
+
 ## 2026-06-28 - Evidence acquisition reports final verdicts, not evidence wins
 **Status:** accepted
 **Decision:** Event Alpha source-pack evidence acquisition must distinguish

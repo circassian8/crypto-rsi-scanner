@@ -113,6 +113,7 @@ from . import event_alpha_environment_doctor
 from . import event_source_reliability
 from . import event_catalyst_search
 from . import event_clock
+from . import event_core_opportunity_store
 from . import event_evidence_acquisition
 from . import event_feedback
 from . import event_llm_analyzer
@@ -1646,6 +1647,15 @@ def _event_alpha_alert_store_config_from_runtime(
     )
 
 
+def _event_core_opportunity_store_config_from_runtime(
+    path: str | None = None,
+) -> event_core_opportunity_store.EventCoreOpportunityStoreConfig:
+    core_path = Path(path).expanduser() if path else Path(getattr(config, "EVENT_CORE_OPPORTUNITY_STORE_PATH", config.EVENT_DISCOVERY_CACHE_DIR / "event_core_opportunities.jsonl"))
+    if not core_path.is_absolute():
+        core_path = config.DATA_DIR / core_path
+    return event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=core_path)
+
+
 def _event_alpha_run_ledger_config_from_runtime(path: str | None = None) -> event_alpha_run_ledger.EventAlphaRunLedgerConfig:
     ledger_path = Path(path).expanduser() if path else config.EVENT_ALPHA_RUN_LEDGER_PATH
     if not ledger_path.is_absolute():
@@ -1760,6 +1770,7 @@ def _apply_event_alpha_context_to_config(context: event_alpha_artifacts.EventAlp
     config.EVENT_PROVIDER_HEALTH_PATH = context.provider_health_path
     config.EVENT_ALPHA_DAILY_BRIEF_PATH = context.daily_brief_path
     config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH = context.impact_hypothesis_store_path
+    config.EVENT_CORE_OPPORTUNITY_STORE_PATH = context.core_opportunity_store_path
     config.EVENT_INCIDENT_STORE_PATH = context.incident_store_path
     config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH = context.evidence_acquisition_path
     config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR = context.proposed_eval_cases_dir
@@ -1806,6 +1817,7 @@ def resolve_event_alpha_artifact_context_for_report(
             provider_health_path=Path(config.EVENT_PROVIDER_HEALTH_PATH),
             daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
             impact_hypothesis_store_path=Path(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH),
+            core_opportunity_store_path=Path(getattr(config, "EVENT_CORE_OPPORTUNITY_STORE_PATH", base_dir / "event_core_opportunities.jsonl")),
             incident_store_path=Path(config.EVENT_INCIDENT_STORE_PATH),
             evidence_acquisition_path=Path(config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH),
             proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
@@ -1842,6 +1854,7 @@ def _event_alpha_context_block(context: event_alpha_artifacts.EventAlphaArtifact
         f"- feedback_path: {context.feedback_path}",
         f"- provider_health_path: {context.provider_health_path}",
         f"- impact_hypothesis_store_path: {context.impact_hypothesis_store_path}",
+        f"- core_opportunity_store_path: {context.core_opportunity_store_path}",
         f"- incident_store_path: {context.incident_store_path}",
         f"- evidence_acquisition_path: {context.evidence_acquisition_path}",
         f"- research_cards_dir: {context.research_cards_dir}",
@@ -1880,6 +1893,7 @@ def _event_alpha_report_context(
         provider_health_path=Path(config.EVENT_PROVIDER_HEALTH_PATH),
         daily_brief_path=Path(config.EVENT_ALPHA_DAILY_BRIEF_PATH),
         impact_hypothesis_store_path=Path(config.EVENT_IMPACT_HYPOTHESIS_STORE_PATH),
+        core_opportunity_store_path=Path(getattr(config, "EVENT_CORE_OPPORTUNITY_STORE_PATH", base_dir / "event_core_opportunities.jsonl")),
         incident_store_path=Path(config.EVENT_INCIDENT_STORE_PATH),
         evidence_acquisition_path=Path(config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH),
         proposed_eval_cases_dir=Path(config.EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR),
@@ -1905,6 +1919,7 @@ def _normalize_profile_paths() -> None:
         "EVENT_PROVIDER_HEALTH_PATH",
         "EVENT_ALPHA_DAILY_BRIEF_PATH",
         "EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
+        "EVENT_CORE_OPPORTUNITY_STORE_PATH",
         "EVENT_INCIDENT_STORE_PATH",
         "EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH",
         "EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR",
@@ -2168,6 +2183,41 @@ def _write_event_incidents_for_run(
     return updated, write_result
 
 
+def _write_event_core_opportunities_for_run(
+    pipeline_result: event_alpha_pipeline.EventAlphaPipelineResult,
+    *,
+    now: datetime,
+    run_id: str,
+    profile: str,
+    run_mode: str | None,
+    artifact_namespace: str | None,
+    card_paths: Iterable[str | Path] = (),
+) -> tuple[event_alpha_pipeline.EventAlphaPipelineResult, event_core_opportunity_store.EventCoreOpportunityStoreWriteResult]:
+    store_cfg = _event_core_opportunity_store_config_from_runtime()
+    watchlist_rows = tuple(pipeline_result.watchlist_result.entries) if pipeline_result.watchlist_result else ()
+    route_decisions = tuple(pipeline_result.router_result.decisions) if pipeline_result.router_result else ()
+    rows = [*route_decisions, *watchlist_rows, *pipeline_result.impact_hypotheses, *pipeline_result.alerts]
+    write_result = event_core_opportunity_store.write_core_opportunities(
+        rows,
+        cfg=store_cfg,
+        now=now,
+        run_id=run_id,
+        profile=profile,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        card_paths=card_paths,
+    )
+    updated = replace(
+        pipeline_result,
+        core_opportunity_store_path=str(store_cfg.path),
+        core_opportunity_write_attempted=write_result.attempted,
+        core_opportunity_write_success=write_result.success,
+        core_opportunity_rows_written=write_result.rows_written,
+        core_opportunity_write_block_reason=write_result.block_reason,
+    )
+    return updated, write_result
+
+
 def event_alpha_cycle(
     verbose: bool = False,
     with_llm: bool = False,
@@ -2311,6 +2361,15 @@ def event_alpha_cycle(
         pipeline_result = replace(pipeline_result, research_card_paths=card_write.card_paths)
         print(event_research_cards.format_card_write_result(card_write))
         print("")
+    pipeline_result, core_store_result = _write_event_core_opportunities_for_run(
+        pipeline_result,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        card_paths=pipeline_result.research_card_paths,
+    )
     print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
     store_cfg = _event_alpha_alert_store_config_from_runtime()
     if run_mode in event_alpha_artifacts.NON_OPERATIONAL_RUN_MODES:
@@ -2361,6 +2420,7 @@ def event_alpha_cycle(
         f"success={str(incident_store_result.success).lower()}"
         + (f" block={incident_store_result.block_reason}" if incident_store_result.block_reason else "")
     )
+    print(event_core_opportunity_store.format_core_opportunity_store_write_result(core_store_result))
     run_row = event_alpha_run_ledger.append_run_record(
         pipeline_result,
         cfg=_event_alpha_run_ledger_config_from_runtime(),
@@ -3131,6 +3191,7 @@ def event_alpha_notify_go_no_go(
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
+        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
         card_paths=[str(path) for path in _research_card_markdown_paths(context.research_cards_dir, include_index=True)],
@@ -3538,6 +3599,7 @@ def event_alpha_notification_checklist_report(
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
+        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
@@ -4412,32 +4474,44 @@ def event_alpha_near_miss_report(
         latest_run=True,
         include_legacy=True,
     )
+    core_store = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+    )
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
     cfg = _event_near_miss_config_from_runtime()
     rows: list[Mapping[str, Any]] = []
-    rows.extend(hypotheses.rows)
-    rows.extend(entry.__dict__ for entry in watchlist.entries)
+    if core_store.rows:
+        rows.extend(core_store.rows)
+    else:
+        rows.extend(hypotheses.rows)
+        rows.extend(entry.__dict__ for entry in watchlist.entries)
     near = event_near_miss.detect_near_miss_rows(rows, route_decisions=routed.decisions, cfg=cfg)
-    refresh_result = event_near_miss.refresh_near_miss_hypotheses(
-        _hypothesis_rows_as_objects(hypotheses.rows),
-        cfg=cfg,
-        market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
-        targeted_market_provider=_event_watchlist_market_provider_from_runtime()
-        if config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_ENABLED
-        else None,
-        derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
-        supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
-        now=_event_research_now(event_now),
-    )
-    route_context = {item.hypothesis_id: item for item in near if item.hypothesis_id}
-    report_items = tuple(
-        replace(item, final_route_before=route_context[item.hypothesis_id].final_route_before)
-        if item.hypothesis_id in route_context and not item.final_route_before
-        else item
-        for item in refresh_result.near_misses
-    ) or near
+    if core_store.rows:
+        report_items = near
+    else:
+        refresh_result = event_near_miss.refresh_near_miss_hypotheses(
+            _hypothesis_rows_as_objects(hypotheses.rows),
+            cfg=cfg,
+            market_rows=_event_watchlist_monitor_market_rows_from_runtime(),
+            targeted_market_provider=_event_watchlist_market_provider_from_runtime()
+            if config.EVENT_ALPHA_NEAR_MISS_MARKET_REFRESH_ENABLED
+            else None,
+            derivatives_rows=_event_watchlist_monitor_derivatives_rows_from_runtime(),
+            supply_rows=_event_watchlist_monitor_supply_rows_from_runtime(),
+            now=_event_research_now(event_now),
+        )
+        route_context = {item.hypothesis_id: item for item in near if item.hypothesis_id}
+        report_items = tuple(
+            replace(item, final_route_before=route_context[item.hypothesis_id].final_route_before)
+            if item.hypothesis_id in route_context and not item.final_route_before
+            else item
+            for item in refresh_result.near_misses
+        ) or near
     print(_event_alpha_context_block(context))
+    if core_store.rows:
+        print(f"canonical_core_store_rows: {len(core_store.rows)}")
     print(event_near_miss.format_near_miss_report(report_items, profile=context.profile))
 
 
@@ -4479,6 +4553,7 @@ def event_opportunity_audit_report(
         limit=500,
         include_legacy=True,
     )
+    core_store = event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True)
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=True)
     incidents = event_incident_store.load_incidents(context.incident_store_path, limit=500, include_legacy=True)
@@ -4488,6 +4563,7 @@ def event_opportunity_audit_report(
     print(event_opportunity_audit.format_opportunity_audit(
         target,
         hypotheses=hypotheses.rows,
+        core_opportunity_rows=core_store.rows,
         watchlist_entries=watchlist.entries,
         alert_rows=alerts.rows,
         route_decisions=routed.decisions,
@@ -4566,6 +4642,7 @@ def _event_alpha_reference_quality_rows(
         provider_health_path=namespace_dir / "event_provider_health.json",
         daily_brief_path=namespace_dir / "event_alpha_daily_brief.md",
         impact_hypothesis_store_path=namespace_dir / "event_impact_hypotheses.jsonl",
+        core_opportunity_store_path=namespace_dir / "event_core_opportunities.jsonl",
         incident_store_path=namespace_dir / "event_incidents.jsonl",
         evidence_acquisition_path=namespace_dir / "event_evidence_acquisition.jsonl",
         proposed_eval_cases_dir=namespace_dir / "proposed_eval_cases",
@@ -5264,6 +5341,10 @@ def _event_alpha_local_artifacts(*, run_limit: int = 500, latest_alerts: bool = 
         latest_run=True,
         include_legacy=True,
     )
+    core_opportunities = event_core_opportunity_store.load_core_opportunities(
+        _event_core_opportunity_store_config_from_runtime().path,
+        latest_run=True,
+    )
     incidents = event_incident_store.load_incidents(
         config.EVENT_INCIDENT_STORE_PATH,
         limit=500,
@@ -5294,6 +5375,7 @@ def _event_alpha_local_artifacts(*, run_limit: int = 500, latest_alerts: bool = 
         "budget_rows": budget_rows,
         "watchlist": watchlist,
         "hypotheses": hypotheses,
+        "core_opportunities": core_opportunities,
         "incidents": incidents,
         "outcome_rows": outcome_rows,
     }
@@ -5514,6 +5596,7 @@ def event_alpha_artifact_doctor_report(
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
+        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
@@ -5635,6 +5718,7 @@ def event_alpha_export_burn_in_pack(
         feedback_rows=artifacts["feedback_rows"],
         outcome_rows=artifacts["outcome_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
+        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
@@ -5785,6 +5869,10 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
     watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
     store_cfg = _event_alpha_alert_store_config_from_runtime()
     alerts = event_alpha_alert_store.load_alert_snapshots(store_cfg.path, latest_only=True)
+    core_store = event_core_opportunity_store.load_core_opportunities(
+        _event_core_opportunity_store_config_from_runtime().path,
+        latest_run=True,
+    )
     feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
     feedback_rows = [record.__dict__ for record in feedback.records]
     outcome_rows = _event_alpha_local_artifacts(run_limit=1, latest_alerts=False)["outcome_rows"]
@@ -5794,7 +5882,7 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
         result = event_research_cards.render_research_card(
             target,
             watchlist_entries=watchlist.entries,
-            alert_rows=alerts.rows,
+            alert_rows=[*core_store.rows, *alerts.rows],
             route_decisions=routed.decisions,
             monitor_rows=monitor_result.rows,
             feedback_rows=feedback_rows,
@@ -5805,7 +5893,7 @@ def event_research_card_report(target: str | None, verbose: bool = False) -> Non
     print(
         event_research_cards.render_selected_cards(
             watchlist_entries=watchlist.entries,
-            alert_rows=alerts.rows,
+            alert_rows=[*core_store.rows, *alerts.rows],
             route_decisions=routed.decisions,
             monitor_rows=monitor_result.rows,
             feedback_rows=feedback_rows,
@@ -5833,6 +5921,7 @@ def event_research_cards_write(
         _event_alpha_alert_store_config_from_runtime().path,
         latest_only=True,
     )
+    core_store = event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True)
     feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
     feedback_rows = [record.__dict__ for record in feedback.records]
     outcome_rows = _event_alpha_local_artifacts(run_limit=1, latest_alerts=False)["outcome_rows"]
@@ -5841,7 +5930,7 @@ def event_research_cards_write(
     result = event_research_cards.write_research_cards(
         config.EVENT_RESEARCH_CARDS_DIR,
         watchlist_entries=watchlist.entries,
-        alert_rows=alerts.rows,
+        alert_rows=[*core_store.rows, *alerts.rows],
         route_decisions=routed.decisions,
         monitor_rows=monitor_result.rows,
         feedback_rows=feedback_rows,
@@ -5934,6 +6023,10 @@ def event_alpha_daily_brief_report(
         _event_alpha_alert_store_config_from_runtime().path,
         latest_only=True,
     )
+    core_store = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+    )
     hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
         context.impact_hypothesis_store_path,
         limit=100,
@@ -5946,7 +6039,7 @@ def event_alpha_daily_brief_report(
     card_write = event_research_cards.write_research_cards(
         config.EVENT_RESEARCH_CARDS_DIR,
         watchlist_entries=watchlist.entries,
-        alert_rows=[*alerts.rows, *hypotheses.rows],
+        alert_rows=[*alerts.rows, *hypotheses.rows, *core_store.rows],
         route_decisions=router_result.decisions,
         monitor_rows=monitor_result.rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
@@ -5961,6 +6054,7 @@ def event_alpha_daily_brief_report(
     markdown = event_alpha_daily_brief.build_daily_brief(
         run_rows=runs.rows,
         alert_rows=alerts.rows,
+        core_opportunity_rows=core_store.rows,
         feedback_rows=[record.__dict__ for record in feedback.records],
         missed_rows=missed_rows,
         notification_runs=event_alpha_notification_runs.load_notification_runs(context.notification_runs_path).rows,

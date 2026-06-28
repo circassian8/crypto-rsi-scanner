@@ -542,10 +542,11 @@ def _should_attach_to_promoted_core(row: Mapping[str, Any]) -> bool:
     return role in {"unknown_with_reason", "generic_mention"} or path in {"insufficient_data", "generic_cooccurrence_only"}
 
 
-def _row_rank(row: Mapping[str, Any]) -> tuple[int, int, float, int]:
+def _row_rank(row: Mapping[str, Any]) -> tuple[int, int, int, float, int]:
     route = _final_route(row)
     state = _final_state(row)
     level = _clean(row.get("opportunity_level"))
+    canonical_rank = 2 if _clean(row.get("row_type")) == "event_core_opportunity" else 0
     route_rank = {
         event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value: 6,
         event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value: 5,
@@ -568,7 +569,7 @@ def _row_rank(row: Mapping[str, Any]) -> tuple[int, int, float, int]:
         event_watchlist.EventWatchlistState.HYPOTHESIS.value: 2,
         event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value: 1,
     }.get(state, 0)
-    return (route_rank, level_rank, _float(row.get("opportunity_score_final") or row.get("latest_score") or row.get("hypothesis_score")), state_rank)
+    return (canonical_rank, route_rank, level_rank, _float(row.get("opportunity_score_final") or row.get("latest_score") or row.get("hypothesis_score")), state_rank)
 
 
 def _opportunity_rank(item: CoreOpportunity) -> tuple[int, int, float, str]:

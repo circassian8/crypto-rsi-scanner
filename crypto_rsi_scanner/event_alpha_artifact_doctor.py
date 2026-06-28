@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_research_cards, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_research_cards, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 
@@ -25,6 +25,9 @@ class EventAlphaArtifactDoctorResult:
     cards_missing_lineage: int = 0
     cards_missing_feedback_target: int = 0
     visible_core_opportunities: int = 0
+    core_opportunity_store_rows: int = 0
+    visible_core_opportunities_missing_store_rows: int = 0
+    duplicate_core_opportunity_store_rows: int = 0
     visible_core_opportunities_missing_cards: int = 0
     visible_core_opportunities_missing_feedback_targets: int = 0
     alert_snapshots_missing_core_opportunity_id: int = 0
@@ -91,6 +94,7 @@ def diagnose_artifacts(
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     outcome_rows: Iterable[Mapping[str, Any]] = (),
     hypothesis_rows: Iterable[Mapping[str, Any] | object] = (),
+    core_opportunity_rows: Iterable[Mapping[str, Any] | object] = (),
     watchlist_rows: Iterable[Mapping[str, Any] | object] = (),
     incident_rows: Iterable[Mapping[str, Any] | object] = (),
     card_paths: Iterable[str | Path] = (),
@@ -111,6 +115,7 @@ def diagnose_artifacts(
     raw_feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
     raw_outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
     raw_hypotheses = [_row(row) for row in hypothesis_rows]
+    raw_core_rows = [_row(row) for row in core_opportunity_rows]
     raw_watchlist = [_row(row) for row in watchlist_rows]
     raw_incidents = [_row(row) for row in incident_rows]
     raw_legacy = sum(
@@ -147,6 +152,13 @@ def diagnose_artifacts(
     )
     hypotheses = event_alpha_artifacts.filter_artifact_rows(
         raw_hypotheses,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    core_rows = event_alpha_artifacts.filter_artifact_rows(
+        raw_core_rows,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -269,7 +281,19 @@ def diagnose_artifacts(
     cards_missing_feedback_target = sum(1 for path in research_card_paths if not event_research_cards.card_feedback_target(path))
     card_core_ids = {value for path in research_card_paths for value in (event_research_cards.card_core_opportunity_id(path),) if value}
     card_feedback_targets = {value for path in research_card_paths for value in (event_research_cards.card_feedback_target(path),) if value}
-    visible_core = event_core_opportunities.visible_core_opportunities([*watchlist, *alerts, *hypotheses])
+    visible_core = (
+        event_core_opportunity_store.core_opportunities_from_rows(core_rows)
+        if core_rows
+        else event_core_opportunities.visible_core_opportunities([*watchlist, *alerts, *hypotheses])
+    )
+    visible_core_ids = {item.core_opportunity_id for item in visible_core}
+    store_core_ids = {
+        str(row.get("core_opportunity_id") or "").strip()
+        for row in core_rows
+        if str(row.get("core_opportunity_id") or "").strip()
+    }
+    visible_missing_store_rows = len(visible_core_ids - store_core_ids) if core_rows else len(visible_core_ids)
+    duplicate_store_rows = max(0, len(core_rows) - len(store_core_ids))
     visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids)
     visible_missing_targets = sum(
         1
@@ -299,6 +323,12 @@ def diagnose_artifacts(
     if visible_missing_cards:
         message = f"visible_core_opportunities_missing_cards={visible_missing_cards}"
         (blockers if strict and fresh_visible_missing_cards else warnings).append(message)
+    if visible_missing_store_rows:
+        message = f"visible_core_opportunities_missing_store_rows={visible_missing_store_rows}"
+        strict_core_store = strict and not include_test_artifacts and not include_legacy_artifacts
+        (blockers if strict_core_store else warnings).append(message)
+    if duplicate_store_rows:
+        warnings.append(f"duplicate_core_opportunity_store_rows={duplicate_store_rows}")
     if visible_missing_targets:
         message = f"visible_core_opportunities_missing_feedback_targets={visible_missing_targets}"
         (blockers if strict and fresh_visible_missing_targets else warnings).append(message)
@@ -452,6 +482,9 @@ def diagnose_artifacts(
         cards_missing_lineage=cards_missing_lineage,
         cards_missing_feedback_target=cards_missing_feedback_target,
         visible_core_opportunities=len(visible_core),
+        core_opportunity_store_rows=len(core_rows),
+        visible_core_opportunities_missing_store_rows=visible_missing_store_rows,
+        duplicate_core_opportunity_store_rows=duplicate_store_rows,
         visible_core_opportunities_missing_cards=visible_missing_cards,
         visible_core_opportunities_missing_feedback_targets=visible_missing_targets,
         alert_snapshots_missing_core_opportunity_id=snapshots_missing_core,
@@ -1073,6 +1106,9 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         (
             "core opportunity coverage: "
             f"visible_core_opportunities={result.visible_core_opportunities} "
+            f"core_opportunity_store_rows={result.core_opportunity_store_rows} "
+            f"visible_core_opportunities_missing_store_rows={result.visible_core_opportunities_missing_store_rows} "
+            f"duplicate_core_opportunity_store_rows={result.duplicate_core_opportunity_store_rows} "
             f"visible_core_opportunities_missing_cards={result.visible_core_opportunities_missing_cards} "
             f"visible_core_opportunities_missing_feedback_targets={result.visible_core_opportunities_missing_feedback_targets} "
             f"alert_snapshots_missing_core_opportunity_id={result.alert_snapshots_missing_core_opportunity_id} "

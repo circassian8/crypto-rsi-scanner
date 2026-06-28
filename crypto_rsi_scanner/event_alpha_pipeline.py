@@ -130,6 +130,11 @@ class EventAlphaPipelineResult:
     incident_write_success: bool = False
     incident_rows_written: int = 0
     incident_write_block_reason: str | None = None
+    core_opportunity_store_path: str | None = None
+    core_opportunity_write_attempted: bool = False
+    core_opportunity_write_success: bool = False
+    core_opportunity_rows_written: int = 0
+    core_opportunity_write_block_reason: str | None = None
 
     @property
     def raw_events(self) -> int:

@@ -15,6 +15,7 @@ from . import (
     event_alpha_notification_runs,
     event_alpha_explain,
     event_core_opportunities,
+    event_core_opportunity_store,
     event_evidence_acquisition,
     event_near_miss,
     event_alpha_run_ledger,
@@ -42,6 +43,7 @@ def build_daily_brief(
     alert_rows: Iterable[Mapping[str, Any]] = (),
     feedback_rows: Iterable[Mapping[str, Any]] = (),
     missed_rows: Iterable[Mapping[str, Any]] = (),
+    core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
     notification_runs: Iterable[Mapping[str, Any]] = (),
     hypothesis_rows: Iterable[Mapping[str, Any]] = (),
     incident_rows: Iterable[Mapping[str, Any]] = (),
@@ -92,6 +94,13 @@ def build_daily_brief(
         include_test_artifacts=include_test_artifacts,
         include_legacy_artifacts=include_legacy_artifacts,
     )
+    stored_core_rows = event_alpha_artifacts.filter_artifact_rows(
+        [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)],
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
     hypotheses = event_alpha_artifacts.filter_artifact_rows(
         [dict(row) for row in hypothesis_rows if isinstance(row, Mapping)],
         profile=requested_profile,
@@ -116,7 +125,12 @@ def build_daily_brief(
     entries = list(watchlist_entries)
     decisions = list(router_result.decisions if router_result else ())
     alertable = [decision for decision in list(router_result.alertable_decisions if router_result else ()) if event_alpha_router.alertable_after_quality_gate(decision)]
-    core_opportunities = event_core_opportunities.aggregate_core_opportunities([*decisions, *hypotheses])
+    if stored_core_rows:
+        core_opportunities = event_core_opportunity_store.core_opportunities_from_rows(stored_core_rows)
+        core_source_rows: list[Any] = stored_core_rows
+    else:
+        core_opportunities = event_core_opportunities.aggregate_core_opportunities([*decisions, *hypotheses])
+        core_source_rows = [*(decision.entry for decision in decisions), *hypotheses]
     core_sections = _core_opportunity_sections(core_opportunities)
     diagnostic_core_rows = sum(item.diagnostic_row_count for item in core_opportunities)
     diagnostic_control_rows = sum(item.source_noise_control_count for item in core_opportunities)
@@ -136,7 +150,7 @@ def build_daily_brief(
         for item in core_sections["strong"]
     }
     near_misses = event_near_miss.detect_near_miss_rows(
-        [decision.entry for decision in decisions] + hypotheses,
+        core_source_rows,
         route_decisions=decisions,
     )
     _, raw_upgrade_candidates = event_near_miss.split_near_miss_candidates(near_misses)
@@ -205,7 +219,8 @@ def build_daily_brief(
         "",
         "## Executive Summary",
         f"- Core opportunities: {len(core_opportunities)} "
-        f"(high_priority={len(core_sections['strong'])}, digest={len(core_sections['digest'])}, "
+        f"(canonical_store_rows={len(stored_core_rows)}, "
+        f"high_priority={len(core_sections['strong'])}, digest={len(core_sections['digest'])}, "
         f"watchlist={len(core_sections['watchlist'])}, near_miss={len(near_miss_candidates)}, "
         f"upgrade={len(upgrade_candidates)}, "
         f"local_or_capped={len(local_core_rows)})",
@@ -238,7 +253,7 @@ def build_daily_brief(
         *_system_health_summary_lines(latest),
         "",
         "## Source Coverage / Evidence Acquisition",
-        *_source_coverage_summary_lines([*(decision.entry for decision in decisions), *hypotheses, *alerts], near_miss_candidates, upgrade_candidates),
+        *_source_coverage_summary_lines([*core_source_rows, *alerts], near_miss_candidates, upgrade_candidates),
         "",
         "### Provider Health by Source Pack",
         *_provider_health_by_pack_lines(provider_health_rows or {}),
@@ -250,7 +265,7 @@ def build_daily_brief(
         *_coverage_blocked_candidate_lines((*near_miss_candidates, *upgrade_candidates), limit=8),
         "",
         "## Market Freshness Readiness",
-        *_market_freshness_readiness_lines([*(decision.entry for decision in decisions), *hypotheses, *alerts], requested_profile=requested_profile),
+        *_market_freshness_readiness_lines([*core_source_rows, *alerts], requested_profile=requested_profile),
         "",
         "## Diagnostics Appendix",
         "### Diagnostic Appendix: Diagnostics / Source-Noise / Controls",

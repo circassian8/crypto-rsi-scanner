@@ -47,6 +47,7 @@ class EventAlphaArtifactContext:
     provider_health_path: Path
     daily_brief_path: Path
     impact_hypothesis_store_path: Path
+    core_opportunity_store_path: Path
     incident_store_path: Path
     evidence_acquisition_path: Path
     proposed_eval_cases_dir: Path
@@ -139,6 +140,11 @@ def context_from_profile(
         impact_hypothesis_store_path=_path_override(
             "RSI_EVENT_IMPACT_HYPOTHESIS_STORE_PATH",
             namespace_dir / "event_impact_hypotheses.jsonl",
+            data_dir=config.DATA_DIR,
+        ),
+        core_opportunity_store_path=_path_override(
+            "RSI_EVENT_CORE_OPPORTUNITY_STORE_PATH",
+            namespace_dir / "event_core_opportunities.jsonl",
             data_dir=config.DATA_DIR,
         ),
         incident_store_path=_path_override(

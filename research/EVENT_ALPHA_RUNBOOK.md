@@ -285,6 +285,16 @@ for visible rows should carry `core_opportunity_id`, `feedback_target`,
 briefs, inboxes, cards, audits, feedback labels, and Pro-model review bundles
 join on the same object.
 
+After a cycle completes, the canonical operator state is persisted in
+`event_core_opportunities.jsonl` under the active artifact namespace. This file
+contains one post-refresh, quality-gated core row per visible opportunity with
+the initial, post-refresh, and final verdict fields plus supporting and
+diagnostic row ids. Daily brief, near-miss report, card generation, opportunity
+audit, run-ledger, and artifact-doctor paths should prefer this store when it is
+present. Raw hypothesis/watchlist/support rows remain useful for diagnostics,
+but they should not create separate visible duplicates or downgrade the final
+core opportunity.
+
 Near-miss reporting has two operator buckets. `Near-Miss Candidates` are
 currently non-alertable/local candidates close to promotion but missing fixable
 evidence. `Upgrade Candidates` are already validated digest or watchlist rows
@@ -1122,6 +1132,11 @@ subjects. Diagnostic/raw/rejected rows warn by default and are hidden from
 operational incident counts; fresh canonical incident rows missing relevance
 fields block strict checks. Fresh active incidents without qualified links block
 strict checks. Fresh invalid canonical incident rows still block strict checks.
+The doctor also reports canonical core-store coverage:
+`core_opportunity_store_rows`, `visible_core_opportunities_missing_store_rows`,
+and duplicate store-row counts. Missing core-store rows block strict
+non-legacy/non-test operational checks, while legacy/test migration checks warn
+so old artifacts remain inspectable.
 
 For migration review only, include legacy/default rows explicitly:
 

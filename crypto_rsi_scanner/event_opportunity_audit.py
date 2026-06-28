@@ -24,6 +24,7 @@ def format_opportunity_audit(
     target: str,
     *,
     hypotheses: Iterable[Mapping[str, Any] | object] = (),
+    core_opportunity_rows: Iterable[Mapping[str, Any] | object] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry | Mapping[str, Any]] = (),
     alert_rows: Iterable[Mapping[str, Any]] = (),
     route_decisions: Iterable[event_alpha_router.EventAlphaRouteDecision | Mapping[str, Any]] = (),
@@ -39,11 +40,13 @@ def format_opportunity_audit(
         return "Event opportunity audit failed: target is required."
     resolved_target = _target_from_card_path(clean, card_paths) or clean
     hypothesis_items = list(hypotheses)
+    core_items = list(core_opportunity_rows)
     watchlist_items = list(watchlist_entries)
     alert_items = list(alert_rows)
     decision_items = list(route_decisions)
     incidents = [dict(row) for row in incident_rows if isinstance(row, Mapping)]
     core_opportunities = event_core_opportunities.aggregate_core_opportunities([
+        *core_items,
         *decision_items,
         *watchlist_items,
         *alert_items,

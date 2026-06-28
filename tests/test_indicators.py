@@ -27792,6 +27792,255 @@ def test_event_alpha_evidence_acquisition_smoke_target_exists():
     assert "EVENT_ALPHA_EVIDENCE_ACQUISITION_FIXTURE_ONLY" in profiles
 
 
+def test_event_core_opportunity_store_persists_canonical_rows():
+    from crypto_rsi_scanner import (
+        event_alpha_router,
+        event_core_opportunity_store,
+        event_watchlist,
+    )
+
+    rows = _canonical_core_fixture_rows()
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        result = event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-store",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        assert result.success
+        assert result.rows_written == 4
+        loaded = event_core_opportunity_store.load_core_opportunities(path, latest_run=True)
+        assert loaded.rows_read == 4
+        by_symbol = {row["symbol"]: row for row in loaded.rows}
+        assert by_symbol["VELVET"]["final_opportunity_level"] == "high_priority"
+        assert by_symbol["VELVET"]["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+        assert by_symbol["RUNE"]["final_state_after_quality_gate"] == event_watchlist.EventWatchlistState.WATCHLIST.value
+        assert set(by_symbol) == {"AAVE", "MEME", "RUNE", "VELVET"}
+
+
+def test_event_core_opportunity_store_prevents_stale_support_near_miss():
+    from crypto_rsi_scanner import event_core_opportunity_store, event_near_miss
+
+    rows = _canonical_core_fixture_rows()
+    merged = event_core_opportunity_store.merge_core_opportunity_verdict(
+        rows[0],
+        support_rows=[rows[1]],
+    )
+    assert merged["symbol"] == "VELVET"
+    assert merged["final_opportunity_level"] == "high_priority"
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-near-miss",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        loaded = event_core_opportunity_store.load_core_opportunities(path, latest_run=True)
+    near = event_near_miss.detect_near_miss_rows(loaded.rows)
+    symbols = {item.symbol for item in near}
+    assert "VELVET" not in symbols
+    assert "RUNE" not in symbols
+
+
+def test_event_alpha_daily_brief_uses_canonical_core_store_rows():
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_core_opportunity_store
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-brief",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        loaded = event_core_opportunity_store.load_core_opportunities(path, latest_run=True)
+    brief = event_alpha_daily_brief.build_daily_brief(
+        core_opportunity_rows=loaded.rows,
+        requested_profile="market_refresh_smoke",
+        artifact_namespace="market_refresh_smoke",
+        run_mode="burn_in",
+        generated_at=pd.Timestamp("2026-06-15T12:00:00Z").to_pydatetime(),
+    )
+    assert "canonical_store_rows=4" in brief
+    assert "## High-Priority Core Opportunities" in brief
+    high_section = brief.split("## High-Priority Core Opportunities", 1)[1].split("## Validated Digest Core Opportunities", 1)[0]
+    near_section = brief.split("## Near-Miss Candidates", 1)[1].split("## Upgrade Candidates", 1)[0]
+    assert "VELVET/velvet" in high_section
+    assert "VELVET/velvet" not in near_section
+
+
+def test_event_alpha_artifact_doctor_reports_core_store_coverage():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_core_opportunity_store
+
+    rows = _canonical_core_fixture_rows()
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-doctor",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        loaded = event_core_opportunity_store.load_core_opportunities(path, latest_run=True)
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{
+            "run_id": "run-core-doctor",
+            "profile": "market_refresh_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "market_refresh_smoke",
+            "success": True,
+            "alertable": 0,
+        }],
+        core_opportunity_rows=loaded.rows,
+        profile="market_refresh_smoke",
+        artifact_namespace="market_refresh_smoke",
+    )
+    assert doctor.core_opportunity_store_rows == 4
+    assert doctor.visible_core_opportunities_missing_store_rows == 0
+    assert "core_opportunity_store_rows=4" in event_alpha_artifact_doctor.format_artifact_doctor_report(doctor)
+
+    missing = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{
+            "run_id": "run-core-doctor",
+            "profile": "market_refresh_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "market_refresh_smoke",
+            "success": True,
+            "alertable": 0,
+        }],
+        hypothesis_rows=[rows[0]],
+        profile="market_refresh_smoke",
+        artifact_namespace="market_refresh_smoke",
+    )
+    assert missing.visible_core_opportunities_missing_store_rows == 1
+
+
+def _canonical_core_fixture_rows() -> list[dict[str, object]]:
+    from crypto_rsi_scanner import event_alpha_router, event_watchlist
+
+    base = {
+        "profile": "market_refresh_smoke",
+        "run_mode": "burn_in",
+        "artifact_namespace": "market_refresh_smoke",
+        "row_type": "event_impact_hypothesis",
+        "source_class": "validated_source",
+        "evidence_specificity": "specific",
+    }
+    return [
+        {
+            **base,
+            "hypothesis_id": "hyp-velvet-core",
+            "incident_id": "incident-spacex",
+            "canonical_incident_name": "SpaceX pre-IPO exposure",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "validated_symbol": "VELVET",
+            "validated_coin_id": "velvet",
+            "candidate_role": "proxy_venue",
+            "impact_category": "tokenized_stock_venue",
+            "impact_path_type": "venue_value_capture",
+            "opportunity_level": "high_priority",
+            "opportunity_score_final": 92,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+            "market_refresh_attempted": True,
+            "market_refresh_success": True,
+            "market_confirmation_after": 88,
+            "evidence_acquisition_attempted": True,
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "evidence_quality_after": 91,
+            "evidence_quotes": ["Velvet offers SpaceX exposure"],
+        },
+        {
+            **base,
+            "hypothesis_id": "hyp-velvet-stale-support",
+            "incident_id": "incident-spacex",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "validated_symbol": "VELVET",
+            "validated_coin_id": "velvet",
+            "candidate_role": "proxy_venue",
+            "impact_category": "rwa_preipo_proxy",
+            "impact_path_type": "rwa_preipo_proxy",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 70,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "market_context_freshness_status": "stale",
+            "market_context_freshness_cap_applied": True,
+            "why_not_watchlist": ["market_context_stale_capped"],
+            "evidence_quotes": ["SpaceX pre-IPO market mention"],
+        },
+        {
+            **base,
+            "hypothesis_id": "hyp-aave-core",
+            "incident_id": "incident-kraken-aave",
+            "canonical_incident_name": "Kraken strategic Aave stake",
+            "symbol": "AAVE",
+            "coin_id": "aave",
+            "validated_symbol": "AAVE",
+            "validated_coin_id": "aave",
+            "candidate_role": "direct_beneficiary",
+            "impact_category": "strategic_investment",
+            "impact_path_type": "strategic_investment",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 76,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "evidence_quotes": ["Kraken acquired a strategic stake in Aave"],
+        },
+        {
+            **base,
+            "hypothesis_id": "hyp-rune-core",
+            "incident_id": "incident-thorchain-exploit",
+            "canonical_incident_name": "THORChain exploit and trading restart",
+            "symbol": "RUNE",
+            "coin_id": "thorchain",
+            "validated_symbol": "RUNE",
+            "validated_coin_id": "thorchain",
+            "candidate_role": "direct_beneficiary",
+            "impact_category": "security_incident",
+            "impact_path_type": "exploit_security_event",
+            "opportunity_level": "watchlist",
+            "opportunity_score_final": 81,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.WATCHLIST.value,
+            "market_refresh_attempted": True,
+            "market_refresh_success": True,
+            "market_confirmation_after": 73,
+            "evidence_quotes": ["THORChain resumed trading after exploit response"],
+        },
+        {
+            **base,
+            "hypothesis_id": "hyp-meme-core",
+            "incident_id": "incident-memecore",
+            "symbol": "MEME",
+            "coin_id": "memecore",
+            "validated_symbol": "MEME",
+            "validated_coin_id": "memecore",
+            "candidate_role": "mentioned_asset",
+            "impact_category": "market_anomaly",
+            "impact_path_type": "insufficient_data",
+            "opportunity_level": "local_only",
+            "opportunity_score_final": 42,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.LOCAL_REPORT.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "why_local_only": ["missing_direct_impact_path"],
+        },
+    ]
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

@@ -240,6 +240,13 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"linked_hypotheses={int(row.get('incident_linked_hypotheses') or 0)} "
             f"linked_watchlist={int(row.get('incident_linked_watchlist_rows') or 0)}"
         )
+        rows.append(
+            "  "
+            f"core_opportunity_store={int(row.get('core_opportunity_rows_written') or 0)} "
+            f"attempted={str(bool(row.get('core_opportunity_write_attempted'))).lower()} "
+            f"success={str(bool(row.get('core_opportunity_write_success'))).lower()} "
+            f"block={row.get('core_opportunity_write_block_reason') or 'none'}"
+        )
         if row.get("send_block_reason"):
             rows.append(f"  send_block: {row.get('send_block_reason')}")
         rows.append(
@@ -392,6 +399,11 @@ def _run_record(
         "incident_linked_hypotheses": _incident_linked_hypotheses(result),
         "incident_linked_watchlist_rows": _incident_linked_watchlist_rows(result),
         "incident_write_block_reason": getattr(result, "incident_write_block_reason", None),
+        "core_opportunity_store_path": getattr(result, "core_opportunity_store_path", None),
+        "core_opportunity_write_attempted": bool(getattr(result, "core_opportunity_write_attempted", False)),
+        "core_opportunity_write_success": bool(getattr(result, "core_opportunity_write_success", False)),
+        "core_opportunity_rows_written": _int(getattr(result, "core_opportunity_rows_written", 0)),
+        "core_opportunity_write_block_reason": getattr(result, "core_opportunity_write_block_reason", None),
         "research_cards_written": len(card_paths),
         "research_card_paths": card_paths,
         "provider_fetch_count": _int(getattr(catalyst, "provider_fetch_count", 0)),
