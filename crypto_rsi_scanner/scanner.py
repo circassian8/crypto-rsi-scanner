@@ -5008,6 +5008,11 @@ def event_alpha_notification_inbox_report(
         limit=250,
     )
     alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path)
+    core_opportunities = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    )
     feedback = event_feedback.load_feedback(context.feedback_path)
     delivery_rows = event_alpha_notification_delivery.load_delivery_records(
         event_alpha_notification_delivery.deliveries_path_for_context(context)
@@ -5049,6 +5054,11 @@ def event_alpha_feedback_readiness_report(
         limit=250,
     )
     alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path)
+    core_opportunities = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    )
     feedback = event_feedback.load_feedback(context.feedback_path)
     delivery_rows = event_alpha_notification_delivery.load_delivery_records(
         event_alpha_notification_delivery.deliveries_path_for_context(context)
@@ -5075,6 +5085,7 @@ def event_alpha_feedback_readiness_report(
         alert_rows=alerts.rows,
         feedback_rows=[record.__dict__ for record in feedback.records],
         watchlist_entries=watchlist.entries,
+        core_opportunity_rows=core_opportunities.rows,
         inbox_result=inbox,
     )
     print(event_alpha_feedback_readiness.format_feedback_readiness(result))
@@ -5097,6 +5108,11 @@ def event_alpha_burn_in_readiness_report(
     provider_report = event_provider_status.build_event_discovery_provider_status(config)
     runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=500)
     alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=False)
+    core_opportunities = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    )
     feedback = event_feedback.load_feedback(context.feedback_path)
     feedback_rows = [record.__dict__ for record in feedback.records]
     delivery_rows = event_alpha_notification_delivery.load_delivery_records(
@@ -5128,6 +5144,7 @@ def event_alpha_burn_in_readiness_report(
         alert_rows=alerts.rows,
         feedback_rows=feedback_rows,
         watchlist_entries=watchlist.entries,
+        core_opportunity_rows=core_opportunities.rows,
         inbox_result=inbox,
     )
     outcome_rows = [
@@ -5159,11 +5176,7 @@ def event_alpha_burn_in_readiness_report(
             latest_run=True,
             include_legacy=True,
         ).rows,
-        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(
-            context.core_opportunity_store_path,
-            latest_run=True,
-            include_legacy=True,
-        ).rows,
+        core_opportunity_rows=core_opportunities.rows,
         watchlist_rows=watchlist.entries,
         incident_rows=event_incident_store.load_incidents(
             context.incident_store_path,

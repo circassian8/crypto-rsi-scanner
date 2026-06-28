@@ -30,6 +30,8 @@ SNAPSHOT_QUALITY_GATED_LOCAL = "quality_gated_local"
 SNAPSHOT_LEGACY_CONFLICT = "legacy_conflict"
 SNAPSHOT_MISSING_FINAL_ROUTE = "missing_final_route"
 SNAPSHOT_STALE_PRE_QUALITY_GATE = "stale_pre_quality_gate"
+SNAPSHOT_CORE_RECONCILED = "core_reconciled"
+SNAPSHOT_MISSING_CORE = "missing_core"
 
 LEGACY_CONFLICT_CLASSIFICATIONS = {
     SNAPSHOT_LEGACY_CONFLICT,
@@ -162,6 +164,7 @@ def load_alert_snapshots(path: str | Path, *, latest_only: bool = False) -> Even
         row for row in _read_jsonl(p)
         if row.get("row_type") == "event_alpha_alert_snapshot"
     ]
+    rows = reconcile_alert_snapshots_with_core_store(rows, _sibling_core_store_rows(p))
     if latest_only:
         latest: dict[str, tuple[str, int, dict[str, Any]]] = {}
         for idx, row in enumerate(rows):
@@ -172,6 +175,97 @@ def load_alert_snapshots(path: str | Path, *, latest_only: bool = False) -> Even
                 latest[key] = (observed, idx, row)
         rows = [item[2] for item in latest.values()]
     return EventAlphaAlertStoreReadResult(path=p, rows_read=len(rows), rows=rows)
+
+
+def reconcile_alert_snapshots_with_core_store(
+    snapshots: Iterable[Mapping[str, Any]],
+    core_store_rows: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Apply canonical core final state to alert snapshots when possible."""
+    core_rows = [dict(row) for row in core_store_rows if isinstance(row, Mapping)]
+    if not core_rows:
+        return [dict(row) for row in snapshots if isinstance(row, Mapping)]
+    return [_with_core_resolution(dict(row), core_rows) for row in snapshots if isinstance(row, Mapping)]
+
+
+def reconcile_alert_snapshot_with_core_store(
+    snapshot: Mapping[str, Any],
+    core_store_row: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Mirror final operator-facing fields from a canonical CoreOpportunity row."""
+    out = dict(snapshot)
+    core = dict(core_store_row)
+    requested_route = str(out.get("final_route_after_quality_gate") or out.get("route") or "")
+    requested_level = str(out.get("final_opportunity_level") or out.get("opportunity_level") or "")
+    requested_state = str(out.get("final_state_after_quality_gate") or out.get("state") or "")
+    out.setdefault("requested_route_before_core_reconciliation", requested_route)
+    out.setdefault("requested_opportunity_level_before_core_reconciliation", requested_level)
+    out.setdefault("requested_state_before_core_reconciliation", requested_state)
+
+    final_level = str(core.get("final_opportunity_level") or core.get("opportunity_level") or requested_level or "")
+    final_score = _first_present(core, ("final_opportunity_score", "opportunity_score_final"))
+    final_route = str(core.get("final_route_after_quality_gate") or core.get("route") or requested_route or "")
+    final_state = str(core.get("final_state_after_quality_gate") or core.get("state") or requested_state or "")
+    final_tier = _tier_for_final_route(final_route, out.get("requested_tier_before_quality_gate") or out.get("tier"), core)
+
+    mirror_fields = {
+        "symbol": core.get("symbol") or core.get("validated_symbol") or out.get("symbol"),
+        "coin_id": core.get("coin_id") or core.get("validated_coin_id") or out.get("coin_id"),
+        "asset_symbol": core.get("symbol") or core.get("validated_symbol") or out.get("asset_symbol"),
+        "asset_coin_id": core.get("coin_id") or core.get("validated_coin_id") or out.get("asset_coin_id"),
+        "validated_symbol": core.get("validated_symbol") or core.get("symbol") or out.get("validated_symbol"),
+        "validated_coin_id": core.get("validated_coin_id") or core.get("coin_id") or out.get("validated_coin_id"),
+        "final_opportunity_level": final_level,
+        "opportunity_level": final_level,
+        "final_opportunity_score": final_score,
+        "opportunity_score_final": final_score,
+        "opportunity_score": final_score if final_score is not None else out.get("opportunity_score"),
+        "final_route_after_quality_gate": final_route,
+        "route": final_route,
+        "lane": event_alpha_router.lane_value_for_route_value(final_route),
+        "final_state_after_quality_gate": final_state,
+        "state": final_state,
+        "final_tier_after_quality_gate": final_tier,
+        "tier": final_tier,
+        "final_verdict_source": core.get("final_verdict_source") or out.get("final_verdict_source"),
+        "final_verdict_reason": core.get("final_verdict_reason") or out.get("final_verdict_reason"),
+        "evidence_acquisition_status": core.get("evidence_acquisition_status") or out.get("evidence_acquisition_status"),
+        "acquisition_confirmation_status": core.get("acquisition_confirmation_status") or out.get("acquisition_confirmation_status"),
+        "acquisition_confirms_candidate": core.get("acquisition_confirms_candidate", out.get("acquisition_confirms_candidate")),
+        "acquisition_confirms_impact_path": core.get("acquisition_confirms_impact_path", out.get("acquisition_confirms_impact_path")),
+        "source_pack_confirmation_status": core.get("source_pack_confirmation_status") or out.get("source_pack_confirmation_status"),
+        "live_confirmation_required": core.get("live_confirmation_required", out.get("live_confirmation_required")),
+        "live_confirmation_passed": core.get("live_confirmation_passed", out.get("live_confirmation_passed")),
+        "live_confirmation_status": core.get("live_confirmation_status") or out.get("live_confirmation_status"),
+        "live_confirmation_reason": core.get("live_confirmation_reason") or out.get("live_confirmation_reason"),
+        "live_confirmation_capped": core.get("live_confirmation_capped", out.get("live_confirmation_capped")),
+        "live_confirmation_missing_requirements": core.get("live_confirmation_missing_requirements") or out.get("live_confirmation_missing_requirements"),
+        "quality_gate_block_reason": (
+            core.get("quality_gate_block_reason")
+            or core.get("canonical_route_adjustment_reason")
+            or out.get("quality_gate_block_reason")
+        ),
+        "feedback_target": core.get("feedback_target") or core.get("core_opportunity_id") or out.get("feedback_target"),
+        "feedback_target_type": core.get("feedback_target_type") or "core_opportunity_id",
+        "core_opportunity_id": core.get("core_opportunity_id") or out.get("core_opportunity_id"),
+    }
+    for key, value in mirror_fields.items():
+        if value is not None:
+            out[key] = value
+
+    out["alertable_after_quality_gate"] = event_alpha_router.route_value_is_alertable(final_route)
+    out["route_alertable"] = out["alertable_after_quality_gate"]
+    changed = any(
+        str(out.get(key) or "") != str(snapshot.get(key) or "")
+        for key in ("final_route_after_quality_gate", "route", "opportunity_level", "final_state_after_quality_gate")
+    )
+    out["snapshot_core_reconciled"] = True
+    out["snapshot_core_reconciliation_reason"] = (
+        "canonical_core_final_state_applied" if changed else "canonical_core_aligned"
+    )
+    out.setdefault("core_resolution_status", "canonical")
+    out["snapshot_core_resolution_status"] = SNAPSHOT_CORE_RECONCILED
+    return _with_snapshot_quality_classification(out)
 
 
 def fill_alert_outcomes(
@@ -970,9 +1064,16 @@ def _with_card_context(row: dict[str, Any], context: Mapping[str, Mapping[str, s
 
 
 def _with_core_resolution(row: dict[str, Any], core_rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
-    resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, core_rows)
+    core_rows_tuple = tuple(dict(item) for item in core_rows if isinstance(item, Mapping))
+    core_by_id = {
+        str(item.get("core_opportunity_id") or "").strip(): item
+        for item in core_rows_tuple
+        if str(item.get("core_opportunity_id") or "").strip()
+    }
+    resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, core_rows_tuple)
     out = dict(row)
     out["core_opportunity_id_status"] = resolution.resolution_status
+    out["core_resolution_status"] = resolution.resolution_status
     out["canonical_core_resolution_warnings"] = resolution.warnings
     if resolution.resolution_status == "canonical":
         out["core_opportunity_id"] = resolution.canonical_core_opportunity_id
@@ -980,11 +1081,17 @@ def _with_core_resolution(row: dict[str, Any], core_rows: Iterable[Mapping[str, 
         out.pop("diagnostic_support_for_core_opportunity_id", None)
         out.setdefault("feedback_target", resolution.canonical_core_opportunity_id)
         out.setdefault("feedback_target_type", "core_opportunity_id")
+        core_row = core_by_id.get(str(resolution.canonical_core_opportunity_id or ""))
+        if core_row:
+            out = reconcile_alert_snapshot_with_core_store(out, core_row)
     elif resolution.resolution_status == "diagnostic_support":
         out["core_opportunity_id"] = resolution.canonical_core_opportunity_id
         out["diagnostic_support_for_core_opportunity_id"] = resolution.diagnostic_support_for_core_opportunity_id
         out["diagnostic_row_id"] = _diagnostic_row_id(out)
         out["is_diagnostic_snapshot"] = True
+        core_row = core_by_id.get(str(resolution.canonical_core_opportunity_id or ""))
+        if core_row:
+            out = reconcile_alert_snapshot_with_core_store(out, core_row)
         out["feedback_target"] = resolution.diagnostic_support_for_core_opportunity_id or out.get("feedback_target") or out.get("alert_key")
         out["feedback_target_type"] = "diagnostic_support_for_core_opportunity_id"
     elif event_core_opportunities.row_is_diagnostic(out):
@@ -1001,7 +1108,37 @@ def _with_core_resolution(row: dict[str, Any], core_rows: Iterable[Mapping[str, 
             out["core_opportunity_id"] = resolution.canonical_core_opportunity_id
             out.setdefault("feedback_target", resolution.canonical_core_opportunity_id)
             out.setdefault("feedback_target_type", "core_opportunity_id")
+            out["core_resolution_status"] = SNAPSHOT_MISSING_CORE
+            out["snapshot_core_reconciled"] = False
+            out["snapshot_core_reconciliation_reason"] = "missing_canonical_core_store_row"
+            out["alertable_after_quality_gate"] = False
+            out["route_alertable"] = False
+            out["requested_route_before_core_reconciliation"] = out.get("final_route_after_quality_gate") or out.get("route")
+            out["requested_opportunity_level_before_core_reconciliation"] = out.get("final_opportunity_level") or out.get("opportunity_level")
+            out["final_route_after_quality_gate"] = event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+            out["route"] = event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+            out["lane"] = event_alpha_router.EventAlphaRouteLane.LOCAL_ONLY.value
+            out["final_tier_after_quality_gate"] = event_alerts.EventAlertTier.STORE_ONLY.value
+            out["tier"] = event_alerts.EventAlertTier.STORE_ONLY.value
+            out["quality_gate_block_reason"] = out.get("quality_gate_block_reason") or "missing_core_opportunity_store_row"
     return _with_snapshot_quality_classification(out)
+
+
+def _sibling_core_store_rows(alert_path: Path) -> list[dict[str, Any]]:
+    core_path = alert_path.expanduser().parent / "event_core_opportunities.jsonl"
+    if not core_path.exists():
+        return []
+    return [
+        row for row in _read_jsonl(core_path)
+        if row.get("row_type") == "event_core_opportunity"
+    ]
+
+
+def _first_present(row: Mapping[str, Any], keys: Iterable[str]) -> Any:
+    for key in keys:
+        if row.get(key) not in (None, ""):
+            return row.get(key)
+    return None
 
 
 def _diagnostic_row_id(row: Mapping[str, Any]) -> str:
@@ -1031,15 +1168,23 @@ def _filter_snapshot_rows(
         return [row for row in rows if str(row.get("alert_key") or "") in route_context]
     if mode == "alertable":
         if not route_context:
-            return []
+            return [
+                row for row in rows
+                if bool(row.get("alertable_after_quality_gate", row.get("route_alertable")))
+                and event_alpha_router.route_value_is_alertable(row.get("final_route_after_quality_gate") or row.get("route"))
+            ]
         return [
             row for row in rows
             if bool(
-                route_context.get(str(row.get("alert_key") or ""), {}).get(
+                row.get(
                     "alertable_after_quality_gate",
-                    route_context.get(str(row.get("alert_key") or ""), {}).get("route_alertable"),
+                    route_context.get(str(row.get("alert_key") or ""), {}).get(
+                        "alertable_after_quality_gate",
+                        route_context.get(str(row.get("alert_key") or ""), {}).get("route_alertable"),
+                    ),
                 )
             )
+            and event_alpha_router.route_value_is_alertable(row.get("final_route_after_quality_gate") or row.get("route"))
         ]
     if mode == "sampled_controls":
         limit = max(0, int(sampled_controls_limit))

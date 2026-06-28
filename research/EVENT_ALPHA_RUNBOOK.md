@@ -438,6 +438,15 @@ from the final core verdict fields (`final_route_after_quality_gate`,
 `final_state_after_quality_gate`, `opportunity_level`, and final verdict
 reason/source). Raw support-row gate reasons are useful diagnostics, but they
 must not make a final digest/high-priority core card say it is local-only.
+Alert snapshots follow the same rule. When a snapshot resolves to a canonical
+`core_opportunity_id`, the core row owns final route, tier, opportunity level,
+lifecycle state, alertability, live-confirmation fields, evidence-acquisition
+fields, and feedback target. Pre-reconciliation snapshot route/level/state may
+be kept only as `requested_*_before_core_reconciliation` audit metadata. Daily
+briefs, inboxes, feedback readiness, opportunity audits, and artifact doctor
+checks should use the reconciled final fields; if the canonical core row is
+missing, the snapshot should remain local/store-only until the core store is
+repaired.
 
 Card generation is a secondary artifact write. After cards are written, the
 cycle should backfill the generated card path, research-card path, and feedback

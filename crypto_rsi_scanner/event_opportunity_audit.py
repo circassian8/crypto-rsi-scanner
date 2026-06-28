@@ -187,6 +187,9 @@ def format_opportunity_audit(
         f"- router reason: {_value(row, 'route_reason', 'reason', default=match.get('reason') or 'not routed or stored locally')}",
         "- TRIGGERED_FADE was not created unless the row is already a deterministic proxy_fade/event_fade trigger.",
         "",
+        "## Alert snapshot / core reconciliation",
+        *_snapshot_core_reconciliation_lines(core_view, row),
+        "",
         "## Notification and feedback status",
         f"- delivery status: {_value(row, 'delivered_status', 'delivery_state', default='not_delivered_or_unknown')}",
         f"- feedback status: {feedback_status}",
@@ -216,6 +219,36 @@ def format_opportunity_audit(
         "No secrets, Telegram sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
     ]
     return "\n".join(lines)
+
+
+def _snapshot_core_reconciliation_lines(
+    core_view: event_core_opportunity_store.CanonicalCoreOpportunityView,
+    row: Mapping[str, Any],
+) -> list[str]:
+    snapshots = list(core_view.alert_snapshot_rows)
+    if not snapshots and str(row.get("row_type") or "") == "event_alpha_alert_snapshot":
+        snapshots = [dict(row)]
+    core_route = core_view.final_route_after_quality_gate or row.get("final_route_after_quality_gate") or row.get("route") or "unknown"
+    core_level = core_view.opportunity_level or row.get("final_opportunity_level") or row.get("opportunity_level") or "unknown"
+    if not snapshots:
+        return [
+            f"- snapshot found: false",
+            f"- canonical core final route/level: {core_route} / {core_level}",
+            "- alertable after reconciliation: false",
+        ]
+    snap = snapshots[0]
+    final_route = str(snap.get("final_route_after_quality_gate") or snap.get("route") or "")
+    requested = str(snap.get("requested_route_before_core_reconciliation") or snap.get("requested_route_before_quality_gate") or "")
+    status = str(snap.get("snapshot_core_resolution_status") or snap.get("core_resolution_status") or snap.get("core_opportunity_id_status") or "unknown")
+    return [
+        "- snapshot found: true",
+        f"- snapshot route before reconciliation: {requested or 'unknown'}",
+        f"- snapshot route after reconciliation: {final_route or 'unknown'}",
+        f"- canonical core final route/level: {core_route} / {core_level}",
+        f"- reconciliation status: {status}",
+        f"- reconciliation reason: {snap.get('snapshot_core_reconciliation_reason') or 'none'}",
+        f"- alertable after reconciliation: {str(event_alpha_router.route_value_is_alertable(final_route)).lower()}",
+    ]
 
 
 def _no_match_audit_report(

@@ -29668,6 +29668,360 @@ def test_artifact_doctor_detects_orphan_core_cards_and_snapshot_ids():
     assert any("alert_snapshots_core_id_missing_from_store=1" in item for item in doctor.blockers)
 
 
+def test_alert_snapshots_reconcile_with_canonical_core_store():
+    from crypto_rsi_scanner import event_alpha_alert_store, event_alpha_router, event_watchlist
+
+    core = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-snapshot-reconcile",
+        "profile": "live_burn_in_no_send",
+        "artifact_namespace": "live_burn_in_no_send",
+        "core_opportunity_id": "core_chz_world_cup",
+        "symbol": "CHZ",
+        "coin_id": "chiliz",
+        "validated_symbol": "CHZ",
+        "validated_coin_id": "chiliz",
+        "final_opportunity_level": "exploratory",
+        "opportunity_level": "exploratory",
+        "final_opportunity_score": 58,
+        "opportunity_score_final": 58,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+        "state": event_watchlist.EventWatchlistState.RADAR.value,
+        "evidence_acquisition_status": "no_results",
+        "acquisition_confirmation_status": "does_not_confirm",
+        "acquisition_confirms_candidate": False,
+        "acquisition_confirms_impact_path": False,
+        "live_confirmation_required": True,
+        "live_confirmation_passed": False,
+        "live_confirmation_status": "missing",
+        "live_confirmation_reason": "no_results_not_confirmation",
+        "live_confirmation_capped": True,
+        "live_confirmation_missing_requirements": ["accepted_evidence"],
+        "feedback_target": "core_chz_world_cup",
+        "feedback_target_type": "core_opportunity_id",
+    }
+    stale_snapshot = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "run-snapshot-reconcile",
+        "profile": "live_burn_in_no_send",
+        "artifact_namespace": "live_burn_in_no_send",
+        "alert_id": "ea:chz",
+        "alert_key": "event:chz",
+        "core_opportunity_id": "core_chz_world_cup",
+        "symbol": "CHZ",
+        "coin_id": "chiliz",
+        "opportunity_level": "validated_digest",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_score_final": 71,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "route": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "tier": "RADAR_DIGEST",
+        "final_tier_after_quality_gate": "RADAR_DIGEST",
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.WATCHLIST.value,
+        "state": event_watchlist.EventWatchlistState.WATCHLIST.value,
+        "alertable_after_quality_gate": True,
+        "route_alertable": True,
+        "evidence_acquisition_status": "not_executed",
+    }
+
+    reconciled = event_alpha_alert_store.reconcile_alert_snapshot_with_core_store(stale_snapshot, core)
+    assert reconciled["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    assert reconciled["route"] == event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    assert reconciled["final_opportunity_level"] == "exploratory"
+    assert reconciled["opportunity_level"] == "exploratory"
+    assert reconciled["final_state_after_quality_gate"] == event_watchlist.EventWatchlistState.RADAR.value
+    assert reconciled["alertable_after_quality_gate"] is False
+    assert reconciled["route_alertable"] is False
+    assert reconciled["evidence_acquisition_status"] == "no_results"
+    assert reconciled["acquisition_confirmation_status"] == "does_not_confirm"
+    assert reconciled["live_confirmation_capped"] is True
+    assert reconciled["live_confirmation_reason"] == "no_results_not_confirmation"
+    assert reconciled["requested_route_before_core_reconciliation"] == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
+    assert reconciled["requested_opportunity_level_before_core_reconciliation"] == "validated_digest"
+    assert reconciled["snapshot_core_reconciled"] is True
+    assert reconciled["snapshot_core_resolution_status"] == event_alpha_alert_store.SNAPSHOT_CORE_RECONCILED
+    assert reconciled["snapshot_core_reconciliation_reason"] == "canonical_core_final_state_applied"
+
+    aligned = event_alpha_alert_store.reconcile_alert_snapshot_with_core_store(reconciled, core)
+    assert aligned["snapshot_core_reconciliation_reason"] == "canonical_core_aligned"
+
+
+def test_alert_snapshot_load_reconciles_sibling_core_store_and_reports_counts():
+    import json
+    from crypto_rsi_scanner import (
+        event_alpha_alert_store,
+        event_alpha_daily_brief,
+        event_alpha_feedback_readiness,
+        event_alpha_notification_inbox,
+        event_alpha_router,
+        event_watchlist,
+    )
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core_path = root / "event_core_opportunities.jsonl"
+        alert_path = root / "event_alpha_alerts.jsonl"
+        core = {
+            "row_type": "event_core_opportunity",
+            "schema_version": "event_core_opportunity_store_v1",
+            "run_id": "run-load-reconcile",
+            "profile": "live_burn_in_no_send",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "live_burn_in_no_send",
+            "core_opportunity_id": "core_arg_world_cup",
+            "symbol": "ARG",
+            "coin_id": "argentine-football-association-fan-token",
+            "final_opportunity_level": "exploratory",
+            "opportunity_level": "exploratory",
+            "final_opportunity_score": 52,
+            "opportunity_score_final": 52,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "state": event_watchlist.EventWatchlistState.RADAR.value,
+            "evidence_acquisition_status": "no_results",
+            "live_confirmation_required": True,
+            "live_confirmation_passed": False,
+            "live_confirmation_capped": True,
+            "live_confirmation_reason": "no_results_not_confirmation",
+            "feedback_target": "core_arg_world_cup",
+            "feedback_target_type": "core_opportunity_id",
+        }
+        stale_snapshot = {
+            "row_type": "event_alpha_alert_snapshot",
+            "run_id": "run-load-reconcile",
+            "profile": "live_burn_in_no_send",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "live_burn_in_no_send",
+            "observed_at": "2026-06-15T12:00:00+00:00",
+            "alert_id": "ea:arg",
+            "alert_key": "event:arg",
+            "core_opportunity_id": "core_arg_world_cup",
+            "symbol": "ARG",
+            "coin_id": "argentine-football-association-fan-token",
+            "opportunity_level": "validated_digest",
+            "final_opportunity_level": "validated_digest",
+            "opportunity_score_final": 73,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "route": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "tier": "RADAR_DIGEST",
+            "alertable_after_quality_gate": True,
+            "route_alertable": True,
+        }
+        core_path.write_text(json.dumps(core) + "\n", encoding="utf-8")
+        alert_path.write_text(json.dumps(stale_snapshot) + "\n", encoding="utf-8")
+
+        loaded = event_alpha_alert_store.load_alert_snapshots(alert_path)
+        assert loaded.rows_read == 1
+        row = loaded.rows[0]
+        assert row["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+        assert row["alertable_after_quality_gate"] is False
+        assert row["snapshot_core_reconciled"] is True
+
+        brief = event_alpha_daily_brief.build_daily_brief(
+            run_rows=[{
+                "run_id": "run-load-reconcile",
+                "profile": "live_burn_in_no_send",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": "live_burn_in_no_send",
+                "success": True,
+                "routed": 1,
+                "alertable": 1,
+                "sent": False,
+            }],
+            core_opportunity_rows=[core],
+            alert_rows=loaded.rows,
+            requested_profile="live_burn_in_no_send",
+            artifact_namespace="live_burn_in_no_send",
+        )
+        assert "- Alertable routed decisions: 0" in brief
+        assert "- Routed/alertable/sent: 1 / 0 (run_ledger_pre_core=1) / false" in brief
+
+        inbox = event_alpha_notification_inbox.build_notification_inbox(
+            notification_runs=[{
+                "run_id": "run-load-reconcile",
+                "profile": "live_burn_in_no_send",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": "live_burn_in_no_send",
+                "would_send_count": 1,
+                "lane_counts_due": {"research_digest": 1},
+            }],
+            alert_rows=loaded.rows,
+            feedback_rows=[],
+            research_cards_dir=root,
+            profile="live_burn_in_no_send",
+            artifact_namespace="live_burn_in_no_send",
+            notification_runs_path=root / "runs.jsonl",
+            alert_store_path=alert_path,
+            feedback_path=root / "feedback.jsonl",
+        )
+        assert len(inbox.would_send_without_feedback) == 0
+        assert len(inbox.sent_without_feedback) == 0
+
+        readiness = event_alpha_feedback_readiness.build_feedback_readiness(
+            profile="live_burn_in_no_send",
+            artifact_namespace="live_burn_in_no_send",
+            card_paths=[],
+            alert_rows=loaded.rows,
+            feedback_rows=[],
+            watchlist_entries=[],
+            inbox_result=inbox,
+        )
+        assert readiness.alert_rows_core_reconciled == 1
+        assert readiness.stale_snapshot_routes_capped == 1
+        assert readiness.snapshots_missing_core_store == 0
+        assert "stale_routes_capped=1" in event_alpha_feedback_readiness.format_feedback_readiness(readiness)
+
+
+def test_artifact_doctor_detects_unreconciled_snapshot_core_mismatch():
+    from crypto_rsi_scanner import event_alpha_alert_store, event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+
+    core = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-snapshot-doctor",
+        "profile": "live_burn_in_no_send",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "live_burn_in_no_send",
+        "core_opportunity_id": "core_stale_live",
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "final_opportunity_level": "exploratory",
+        "opportunity_level": "exploratory",
+        "final_opportunity_score": 0,
+        "opportunity_score_final": 0,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+        "state": event_watchlist.EventWatchlistState.RADAR.value,
+        "live_confirmation_required": True,
+        "live_confirmation_passed": False,
+        "live_confirmation_status": "missing",
+        "live_confirmation_reason": "rejected_results_only_not_confirmation",
+        "live_confirmation_capped": True,
+    }
+    stale = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "run-snapshot-doctor",
+        "profile": "live_burn_in_no_send",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "live_burn_in_no_send",
+        "core_opportunity_id": "core_stale_live",
+        "alert_id": "ea:btc",
+        "alert_key": "event:btc",
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_level": "validated_digest",
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "route": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.WATCHLIST.value,
+        "state": event_watchlist.EventWatchlistState.WATCHLIST.value,
+        "alertable_after_quality_gate": True,
+        "route_alertable": True,
+    }
+    run = {
+        "run_id": "run-snapshot-doctor",
+        "profile": "live_burn_in_no_send",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "live_burn_in_no_send",
+        "success": True,
+    }
+    bad = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[run],
+        core_opportunity_rows=[core],
+        alert_rows=[stale],
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        strict=True,
+    )
+    assert bad.alert_snapshot_route_mismatch_core_store == 1
+    assert bad.alert_snapshot_level_mismatch_core_store == 1
+    assert bad.alert_snapshot_live_confirmation_stale == 1
+    assert bad.status == "BLOCKED"
+
+    reconciled = event_alpha_alert_store.reconcile_alert_snapshot_with_core_store(stale, core)
+    clean = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[run],
+        core_opportunity_rows=[core],
+        alert_rows=[reconciled],
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        strict=True,
+    )
+    assert clean.alert_snapshot_route_mismatch_core_store == 0
+    assert clean.alert_snapshot_level_mismatch_core_store == 0
+    assert clean.alert_snapshot_live_confirmation_stale == 0
+    assert clean.alert_snapshot_pre_reconciliation_alertable == 1
+    assert not any("alert_snapshot_pre_reconciliation_alertable" in item for item in clean.blockers)
+
+    missing = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[run],
+        core_opportunity_rows=[{**core, "core_opportunity_id": "core_other"}],
+        alert_rows=[{**stale, "core_opportunity_id": "core_missing"}],
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        strict=True,
+    )
+    assert missing.alert_snapshot_core_resolution_missing == 1
+    assert missing.status == "BLOCKED"
+
+
+def test_opportunity_audit_exposes_snapshot_core_reconciliation():
+    from crypto_rsi_scanner import event_alpha_alert_store, event_alpha_router, event_opportunity_audit, event_watchlist
+
+    core = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-snapshot-audit",
+        "profile": "live_burn_in_no_send",
+        "artifact_namespace": "live_burn_in_no_send",
+        "core_opportunity_id": "core_audit_chz",
+        "symbol": "CHZ",
+        "coin_id": "chiliz",
+        "candidate_role": "proxy_instrument",
+        "primary_impact_path": "fan_token_event",
+        "impact_path_type": "fan_token_event",
+        "final_opportunity_level": "exploratory",
+        "opportunity_level": "exploratory",
+        "final_opportunity_score": 55,
+        "opportunity_score_final": 55,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+        "state": event_watchlist.EventWatchlistState.RADAR.value,
+    }
+    stale = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "run-snapshot-audit",
+        "profile": "live_burn_in_no_send",
+        "artifact_namespace": "live_burn_in_no_send",
+        "core_opportunity_id": "core_audit_chz",
+        "symbol": "CHZ",
+        "coin_id": "chiliz",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_level": "validated_digest",
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "route": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+    }
+    reconciled = event_alpha_alert_store.reconcile_alert_snapshot_with_core_store(stale, core)
+    audit = event_opportunity_audit.format_opportunity_audit(
+        "core_audit_chz",
+        core_opportunity_rows=[core],
+        alert_rows=[reconciled],
+        profile="live_burn_in_no_send",
+    )
+    assert "## Alert snapshot / core reconciliation" in audit
+    assert "- snapshot route before reconciliation: RESEARCH_DIGEST" in audit
+    assert "- snapshot route after reconciliation: STORE_ONLY" in audit
+    assert "- canonical core final route/level: STORE_ONLY / exploratory" in audit
+    assert "- reconciliation status: core_reconciled" in audit
+    assert "- alertable after reconciliation: false" in audit
+
+
 def test_daily_brief_splits_core_market_freshness_from_support_gaps():
     from crypto_rsi_scanner import event_alpha_daily_brief
 

@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Alert snapshots defer to canonical core final state
+**Status:** accepted
+**Decision:** When an Event Alpha alert snapshot resolves to a canonical
+`core_opportunity_id`, the canonical CoreOpportunity row is authoritative for
+final operator-facing route, tier, opportunity level, lifecycle state,
+alertability, live-confirmation status, evidence-acquisition status, and
+feedback target. Snapshot fields that existed before reconciliation may be
+preserved as `requested_*_before_core_reconciliation` audit metadata, but daily
+briefs, inbox queues, feedback readiness, audits, and artifact doctor checks
+must use the reconciled final fields by default. Missing canonical core rows
+force snapshots to non-alertable local/store-only output until the core store is
+present or repaired.
+**Why:** Alert snapshots are downstream artifacts. If a live confirmation gate
+caps a core opportunity after snapshot-like support rows were created, stale
+snapshot fields can make local-only candidates look like digest/watchlist
+items. The canonical core store is the single operator contract for current
+Event Alpha opportunity state.
+**Revisit when:** Alert snapshots and core opportunities move into a typed
+relational store where the final route/state/level relationship can be enforced
+by schema and generated views.
+
 ## 2026-06-28 - Live-style digest promotion requires confirmation
 **Status:** accepted
 **Decision:** In live/no-send/research-send Event Alpha profiles,

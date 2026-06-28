@@ -132,6 +132,7 @@ def build_daily_brief(
         core_opportunities = event_core_opportunities.aggregate_core_opportunities([*decisions, *hypotheses])
         core_source_rows = [*(decision.entry for decision in decisions), *hypotheses]
     core_sections = _core_opportunity_sections(core_opportunities)
+    core_alertable_count = _core_alertable_count(core_opportunities)
     diagnostic_core_rows = sum(item.diagnostic_row_count for item in core_opportunities)
     diagnostic_control_rows = sum(item.source_noise_control_count for item in core_opportunities)
     diagnostic_capped_rows = sum(item.quality_capped_supporting_rows for item in core_opportunities)
@@ -224,7 +225,7 @@ def build_daily_brief(
         f"watchlist={len(core_sections['watchlist'])}, near_miss={len(near_miss_candidates)}, "
         f"upgrade={len(upgrade_candidates)}, "
         f"local_or_capped={len(local_core_rows)})",
-        f"- Alertable routed decisions: {len(alertable)}",
+        f"- Alertable routed decisions: {core_alertable_count}",
         f"- Near-miss candidates: {len(near_miss_candidates)}",
         f"- Upgrade candidates: {len(upgrade_candidates)}",
         "",
@@ -306,12 +307,16 @@ def build_daily_brief(
     if requested_profile and not runs and legacy_available and not include_legacy_artifacts:
         lines.append("- Profile warning: only legacy/default run rows were available; they were ignored for this profile brief")
     if latest:
+        run_alertable = int(latest.get("alertable") or 0)
+        alertable_text = str(core_alertable_count)
+        if run_alertable != core_alertable_count:
+            alertable_text = f"{core_alertable_count} (run_ledger_pre_core={run_alertable})"
         lines.extend([
             f"- Run: {latest.get('run_id') or 'unknown'}",
             f"- Profile: {latest.get('profile') or 'default'}",
             f"- Success: {str(bool(latest.get('success'))).lower()}",
             f"- Raw/events/candidates/alerts: {int(latest.get('raw_events') or 0)} / {int(latest.get('candidates') or 0)} / {int(latest.get('alerts') or 0)}",
-            f"- Routed/alertable/sent: {int(latest.get('routed') or 0)} / {int(latest.get('alertable') or 0)} / {str(bool(latest.get('sent'))).lower()}",
+            f"- Routed/alertable/sent: {int(latest.get('routed') or 0)} / {alertable_text} / {str(bool(latest.get('sent'))).lower()}",
             f"- Sent/delivered/block: {int(latest.get('send_items_delivered') or 0)}/{int(latest.get('send_items_attempted') or 0)} / {latest.get('send_block_reason') or 'none'}",
             "- Catalyst frames analyzed/validated/disagreements/unresolved: "
             f"{int(latest.get('catalyst_frames_analyzed') or latest.get('catalyst_frame_rows') or 0)} / "
@@ -690,7 +695,7 @@ def build_daily_brief(
     )))
     lines.extend(["", "### Top Suppression Reasons"])
     lines.extend(_suppression_lines(decisions, entries))
-    if not alertable:
+    if not alertable and core_alertable_count <= 0:
         lines.extend(["", "### Why No Alerts"])
         lines.append(_compact(event_alpha_explain.format_last_run_explanation(
             runs,
@@ -1156,6 +1161,13 @@ def _suppression_lines(
     if not counts:
         return ["- None."]
     return [f"- {reason}: {count}" for reason, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:5]]
+
+
+def _core_alertable_count(core_opportunities: Iterable[event_core_opportunities.CoreOpportunity]) -> int:
+    return sum(
+        1 for item in core_opportunities
+        if event_alpha_router.route_value_is_alertable(item.final_route_after_quality_gate)
+    )
 
 
 def _field_counts(rows: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_notification_inbox, event_core_opportunities, event_research_cards, event_watchlist
+from . import event_alpha_alert_store, event_alpha_notification_inbox, event_alpha_router, event_core_opportunities, event_research_cards, event_watchlist
 
 
 @dataclass(frozen=True)
@@ -21,9 +21,12 @@ class EventAlphaFeedbackReadinessResult:
     local_only_cards_ready: int
     alert_rows_checked: int
     alert_rows_with_feedback_targets: int
-    inbox_review_items: int
-    feedback_rows: int
-    calibration_ready_rows: int
+    alert_rows_core_reconciled: int = 0
+    stale_snapshot_routes_capped: int = 0
+    snapshots_missing_core_store: int = 0
+    inbox_review_items: int = 0
+    feedback_rows: int = 0
+    calibration_ready_rows: int = 0
     visible_core_opportunities: int = 0
     visible_core_opportunities_with_cards: int = 0
     visible_core_opportunities_with_feedback_targets: int = 0
@@ -45,6 +48,7 @@ def build_feedback_readiness(
     alert_rows: Iterable[Mapping[str, Any]],
     feedback_rows: Iterable[Mapping[str, Any]],
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry],
+    core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
     inbox_result: event_alpha_notification_inbox.EventAlphaNotificationInboxResult | None = None,
 ) -> EventAlphaFeedbackReadinessResult:
     """Check whether local artifacts are ready for manual useful/junk feedback."""
@@ -52,6 +56,7 @@ def build_feedback_readiness(
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
     feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
     entries = list(watchlist_entries)
+    core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
     research_cards = [path for path in cards if path.name != "index.md"]
     card_core_ids = {value for path in research_cards for value in (event_research_cards.card_core_opportunity_id(path),) if value}
     card_feedback_targets = {value for path in research_cards for value in (event_research_cards.card_feedback_target(path),) if value}
@@ -59,9 +64,15 @@ def build_feedback_readiness(
     cards_with_target = sum(1 for path in research_cards if event_research_cards.card_feedback_target(path))
     ready_by_group = _ready_card_groups(research_cards)
     alert_targets = sum(1 for row in alerts if _alert_has_feedback_target(row))
+    alert_core_reconciled = sum(1 for row in alerts if bool(row.get("snapshot_core_reconciled")))
+    stale_snapshot_routes_capped = sum(1 for row in alerts if _snapshot_route_was_capped_by_core(row))
+    snapshots_missing_core = sum(
+        1 for row in alerts
+        if str(row.get("core_resolution_status") or row.get("snapshot_core_resolution_status") or "") == event_alpha_alert_store.SNAPSHOT_MISSING_CORE
+    )
     calibration_ready = sum(1 for row in [*alerts, *(_entry_row(entry) for entry in entries)] if _row_has_calibration_fields(row))
     inbox_items = _inbox_review_count(inbox_result)
-    visible_core = event_core_opportunities.visible_core_opportunities([*entries, *alerts])
+    visible_core = event_core_opportunities.visible_core_opportunities(core_rows or [*entries, *alerts])
     alert_core_targets = {
         str(row.get("core_opportunity_id") or "")
         for row in alerts
@@ -113,6 +124,9 @@ def build_feedback_readiness(
         local_only_cards_ready=ready_by_group.get("Local-Only / Quality-Capped Cards", 0),
         alert_rows_checked=len(alerts),
         alert_rows_with_feedback_targets=alert_targets,
+        alert_rows_core_reconciled=alert_core_reconciled,
+        stale_snapshot_routes_capped=stale_snapshot_routes_capped,
+        snapshots_missing_core_store=snapshots_missing_core,
         inbox_review_items=inbox_items,
         feedback_rows=len(feedback),
         calibration_ready_rows=calibration_ready,
@@ -143,6 +157,12 @@ def format_feedback_readiness(result: EventAlphaFeedbackReadinessResult) -> str:
             f"local_only={result.local_only_cards_ready}"
         ),
         f"alert_feedback_targets: {result.alert_rows_with_feedback_targets}/{result.alert_rows_checked}",
+        (
+            "alert_snapshot_core_reconciliation: "
+            f"reconciled={result.alert_rows_core_reconciled}, "
+            f"stale_routes_capped={result.stale_snapshot_routes_capped}, "
+            f"missing_core={result.snapshots_missing_core_store}"
+        ),
         (
             "visible_core_opportunities: "
             f"{result.visible_core_opportunities} "
@@ -227,3 +247,13 @@ def _inbox_review_count(result: event_alpha_notification_inbox.EventAlphaNotific
         "high_priority_unreviewed",
         "triggered_fade_unreviewed",
     ))
+
+
+def _snapshot_route_was_capped_by_core(row: Mapping[str, Any]) -> bool:
+    requested = str(row.get("requested_route_before_core_reconciliation") or "").strip()
+    final = str(row.get("final_route_after_quality_gate") or row.get("route") or "").strip()
+    return (
+        bool(row.get("snapshot_core_reconciled"))
+        and event_alpha_router.route_value_is_alertable(requested)
+        and not event_alpha_router.route_value_is_alertable(final)
+    )

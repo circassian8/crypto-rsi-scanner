@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Reconcile alert snapshots with canonical core state · Codex
+**Why:** Live/no-send artifacts could have canonical CoreOpportunity rows capped
+to exploratory/local after live confirmation gates while linked
+`event_alpha_alerts.jsonl` snapshots still displayed stale pre-cap
+`validated_digest` / `RESEARCH_DIGEST` state. That made inbox, feedback, daily
+brief, and doctor output disagree about whether CHZ/ARG-style rows were
+alertable.
+**Changes:**
+- Added alert-snapshot reconciliation helpers that mirror final route, tier,
+  opportunity level, state, live-confirmation, evidence-acquisition,
+  feedback-target, and alertability fields from canonical core-store rows.
+- `load_alert_snapshots()` now reconciles against sibling
+  `event_core_opportunities.jsonl` automatically when present, and alertable
+  snapshot filtering uses the reconciled final route.
+- Daily brief alertable counts, notification inbox queues, feedback readiness,
+  opportunity audit, and artifact doctor now expose or enforce snapshot/core
+  reconciliation state.
+- Artifact doctor strict mode blocks fresh unreconciled snapshot/core route,
+  level, live-confirmation, or missing-core mismatches while treating
+  pre-reconciliation alertability as an audit warning once reconciled.
+- Added regression tests for stale digest snapshots, sibling core-store loading,
+  inbox/readiness/daily-brief counts, doctor blockers, and audit explanation.
+**Verify:** `python3 tests/test_indicators.py` passed (530/530);
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (36/36);
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`,
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, and
+`make event-alpha-live-burn-in-no-send PYTHON=python3` completed; live burn-in
+strict doctor reported zero snapshot/core mismatches and no blockers; `make
+verify PYTHON=python3` passed.
+**Notes/risks:** Research-artifact consistency only. No Telegram sends, paper
+trades, normal RSI rows, live DB writes, execution paths, or non-event-fade
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Require live confirmation for Event Alpha digest promotion · Codex
 **Why:** Fresh `live_burn_in_no_send` artifacts still promoted weak
 `validated_digest` candidates when source-pack evidence acquisition was skipped,

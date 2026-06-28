@@ -76,6 +76,11 @@ class EventAlphaArtifactDoctorResult:
     fresh_alert_rows_missing_top_level_quality: int = 0
     legacy_quality_missing_rows: int = 0
     alertable_route_conflicts_with_opportunity_level: int = 0
+    alert_snapshot_route_mismatch_core_store: int = 0
+    alert_snapshot_level_mismatch_core_store: int = 0
+    alert_snapshot_live_confirmation_stale: int = 0
+    alert_snapshot_core_resolution_missing: int = 0
+    alert_snapshot_pre_reconciliation_alertable: int = 0
     fresh_quality_route_conflict_rows: int = 0
     legacy_quality_conflict_rows: int = 0
     alert_rows_missing_final_route: int = 0
@@ -562,6 +567,7 @@ def diagnose_artifacts(
             warnings.append(message)
     route_conflict_alerts = _latest_run_rows(alerts, runs)
     route_conflicts = _alertable_quality_route_conflicts(route_conflict_alerts)
+    snapshot_core_conflicts = _alert_snapshot_core_conflicts(route_conflict_alerts, core_rows)
     fresh_route_conflicts = _quality_route_conflicts(route_conflict_alerts, legacy=False)
     legacy_route_conflicts = _quality_route_conflicts(route_conflict_alerts, legacy=True)
     missing_final_route = _missing_final_route_rows(route_conflict_alerts)
@@ -569,6 +575,23 @@ def diagnose_artifacts(
     if route_conflicts:
         message = f"alertable_route_conflicts_with_opportunity_level={route_conflicts}"
         warnings.append(message)
+    if snapshot_core_conflicts["route_mismatch"]:
+        message = f"alert_snapshot_route_mismatch_core_store={snapshot_core_conflicts['route_mismatch']}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if snapshot_core_conflicts["level_mismatch"]:
+        message = f"alert_snapshot_level_mismatch_core_store={snapshot_core_conflicts['level_mismatch']}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if snapshot_core_conflicts["live_confirmation_stale"]:
+        message = f"alert_snapshot_live_confirmation_stale={snapshot_core_conflicts['live_confirmation_stale']}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if snapshot_core_conflicts["core_resolution_missing"]:
+        message = f"alert_snapshot_core_resolution_missing={snapshot_core_conflicts['core_resolution_missing']}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if snapshot_core_conflicts["pre_reconciliation_alertable"]:
+        warnings.append(
+            "alert_snapshot_pre_reconciliation_alertable="
+            f"{snapshot_core_conflicts['pre_reconciliation_alertable']}"
+        )
     if fresh_route_conflicts and strict:
         blockers.append(f"fresh_quality_route_conflict_rows={fresh_route_conflicts}")
     if legacy_route_conflicts:
@@ -725,6 +748,11 @@ def diagnose_artifacts(
         fresh_alert_rows_missing_top_level_quality=quality["fresh_alert_rows_missing_top_level_quality"],
         legacy_quality_missing_rows=quality["legacy_quality_missing_rows"],
         alertable_route_conflicts_with_opportunity_level=route_conflicts,
+        alert_snapshot_route_mismatch_core_store=snapshot_core_conflicts["route_mismatch"],
+        alert_snapshot_level_mismatch_core_store=snapshot_core_conflicts["level_mismatch"],
+        alert_snapshot_live_confirmation_stale=snapshot_core_conflicts["live_confirmation_stale"],
+        alert_snapshot_core_resolution_missing=snapshot_core_conflicts["core_resolution_missing"],
+        alert_snapshot_pre_reconciliation_alertable=snapshot_core_conflicts["pre_reconciliation_alertable"],
         fresh_quality_route_conflict_rows=fresh_route_conflicts,
         legacy_quality_conflict_rows=legacy_route_conflicts,
         alert_rows_missing_final_route=missing_final_route,
@@ -1135,6 +1163,65 @@ def _latest_run_rows(rows: Iterable[Mapping[str, Any]], run_rows: Iterable[Mappi
 
 def _alertable_quality_route_conflicts(alerts: Iterable[Mapping[str, Any]]) -> int:
     return sum(1 for row in alerts if _row_has_alertable_quality_conflict(row))
+
+
+def _alert_snapshot_core_conflicts(
+    alerts: Iterable[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]],
+) -> dict[str, int]:
+    out = {
+        "route_mismatch": 0,
+        "level_mismatch": 0,
+        "live_confirmation_stale": 0,
+        "core_resolution_missing": 0,
+        "pre_reconciliation_alertable": 0,
+    }
+    core_by_id = {
+        str(row.get("core_opportunity_id") or "").strip(): row
+        for row in core_rows
+        if str(row.get("core_opportunity_id") or "").strip()
+    }
+    for row in alerts:
+        if event_alpha_artifacts.is_legacy_row(row):
+            continue
+        if bool(row.get("is_diagnostic_snapshot")):
+            continue
+        core_id = str(row.get("core_opportunity_id") or "").strip()
+        if not core_id:
+            continue
+        core = core_by_id.get(core_id)
+        if core is None:
+            out["core_resolution_missing"] += 1
+            continue
+        snapshot_reconciled = bool(row.get("snapshot_core_reconciled"))
+        snapshot_route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").strip()
+        core_route = str(core.get("final_route_after_quality_gate") or core.get("route") or "").strip()
+        snapshot_level = str(row.get("final_opportunity_level") or row.get("opportunity_level") or "").strip()
+        core_level = str(core.get("final_opportunity_level") or core.get("opportunity_level") or "").strip()
+        if snapshot_route != core_route and not snapshot_reconciled:
+            out["route_mismatch"] += 1
+        if snapshot_level != core_level and not snapshot_reconciled:
+            out["level_mismatch"] += 1
+        snapshot_promoted = (
+            snapshot_level in {"validated_digest", "watchlist", "high_priority"}
+            or event_alpha_router.route_value_is_alertable(snapshot_route)
+        )
+        core_promoted = (
+            core_level in {"validated_digest", "watchlist", "high_priority"}
+            or event_alpha_router.route_value_is_alertable(core_route)
+        )
+        if (
+            bool(core.get("live_confirmation_capped")) or str(core.get("live_confirmation_status") or "") in {"missing", "unresolved"}
+        ) and snapshot_promoted and not core_promoted and not snapshot_reconciled:
+            out["live_confirmation_stale"] += 1
+        requested_route = str(row.get("requested_route_before_core_reconciliation") or "").strip()
+        if (
+            snapshot_reconciled
+            and event_alpha_router.route_value_is_alertable(requested_route)
+            and not event_alpha_router.route_value_is_alertable(snapshot_route)
+        ):
+            out["pre_reconciliation_alertable"] += 1
+    return out
 
 
 def _quality_route_conflicts(alerts: Iterable[Mapping[str, Any]], *, legacy: bool) -> int:
@@ -1673,6 +1760,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"upgrade_candidates_include_high_priority={result.upgrade_candidates_include_high_priority} "
             f"daily_brief_card_group_mismatch_with_index={result.daily_brief_card_group_mismatch_with_index} "
             f"core_route_conflicts_with_opportunity_level={result.core_route_conflicts_with_opportunity_level} "
+            f"alert_snapshot_route_mismatch_core_store={result.alert_snapshot_route_mismatch_core_store} "
+            f"alert_snapshot_level_mismatch_core_store={result.alert_snapshot_level_mismatch_core_store} "
+            f"alert_snapshot_live_confirmation_stale={result.alert_snapshot_live_confirmation_stale} "
+            f"alert_snapshot_core_resolution_missing={result.alert_snapshot_core_resolution_missing} "
+            f"alert_snapshot_pre_reconciliation_alertable={result.alert_snapshot_pre_reconciliation_alertable} "
             f"live_validated_without_confirmation={result.live_validated_without_confirmation} "
             f"live_sector_digest_without_asset={result.live_sector_digest_without_asset} "
             f"live_rejected_results_promoted={result.live_rejected_results_promoted} "
