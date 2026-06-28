@@ -163,6 +163,21 @@ SOURCE_PACKS: dict[str, SourcePack] = {
         impact_path_families=("political_meme_proxy", "proxy_attention"),
         market_refresh_required=True,
     ),
+    "strategic_investment_pack": SourcePack(
+        name="strategic_investment_pack",
+        playbooks=("strategic_investment", "protocol_business_event", "direct_event"),
+        preferred_source_classes=(
+            event_source_registry.SourceClass.OFFICIAL_PROJECT.value,
+            event_source_registry.SourceClass.CRYPTO_NEWS.value,
+            event_source_registry.SourceClass.BROAD_NEWS.value,
+        ),
+        preferred_providers=("project_blog_rss", "cryptopanic", "gdelt"),
+        minimum_evidence=("investment or stake claim", "protocol/token subject", "valuation or business impact"),
+        validation_requirements=("impact_path_validation", "token_identity", "second_source_confirmation", "denial_or_correction_search"),
+        context_only_sources=(event_source_registry.SourceClass.MARKET_RECAP.value, event_source_registry.SourceClass.SEO_OR_AFFILIATE.value),
+        impact_path_families=("strategic_investment_or_valuation", "protocol_business_event", "acquisition_or_stake"),
+        market_refresh_required=True,
+    ),
     "market_anomaly_pack": SourcePack(
         name="market_anomaly_pack",
         playbooks=("market_anomaly", "market_anomaly_unknown"),
@@ -208,6 +223,8 @@ def source_pack_for_playbook(
         return SOURCE_PACKS["fan_sports_pack"]
     if "political" in text or "election" in text or "meme" in text:
         return SOURCE_PACKS["political_meme_pack"]
+    if any(term in text for term in ("strategic", "investment", "valuation", "stake", "acquisition", "business_event")):
+        return SOURCE_PACKS["strategic_investment_pack"]
     return SOURCE_PACKS["market_anomaly_pack"]
 
 

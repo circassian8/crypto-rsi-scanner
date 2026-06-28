@@ -148,7 +148,8 @@ def format_opportunity_audit(
         f"- market missing: {_list_value(components.get('market_confirmation_missing_fields') or row.get('market_confirmation_missing_fields'))}",
         "",
         "## Final opportunity verdict",
-        f"- level/score: {components.get('opportunity_level') or row.get('opportunity_level') or 'unknown'} / {components.get('opportunity_score_final') or row.get('opportunity_score_final') or 'n/a'}",
+        f"- level/score: {components.get('final_opportunity_level') or row.get('final_opportunity_level') or components.get('opportunity_level') or row.get('opportunity_level') or 'unknown'} / {components.get('final_opportunity_score') or row.get('final_opportunity_score') or components.get('opportunity_score_final') or row.get('opportunity_score_final') or 'n/a'}",
+        f"- source/reason: {components.get('final_verdict_source') or row.get('final_verdict_source') or 'initial'} / {components.get('final_verdict_reason') or row.get('final_verdict_reason') or 'none'}",
         f"- reasons: {_list_value(components.get('opportunity_verdict_reasons') or row.get('opportunity_verdict_reasons'))}",
         f"- why local-only: {_human_reason_value(components.get('why_local_only') or row.get('why_local_only')) or 'none'}",
         f"- why not watchlist: {_human_reason_value(components.get('why_not_watchlist') or row.get('why_not_watchlist')) or 'none'}",
@@ -280,9 +281,16 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
         f"- planned query count: {query_count}",
         (
             f"- execution result: status={acquisition.get('status') or merged.get('evidence_acquisition_status') or 'not_executed'} "
+            f"evidence={merged.get('acquisition_evidence_status') or acquisition.get('acquisition_evidence_status') or 'unknown'} "
             f"accepted={acquisition.get('accepted', merged.get('evidence_acquisition_accepted_count', 0))} "
             f"rejected={acquisition.get('rejected', merged.get('evidence_acquisition_rejected_count', 0))} "
-            f"upgrade={acquisition.get('upgrade_status') or merged.get('acquisition_upgrade_status') or 'unchanged'}"
+            f"final={acquisition.get('final_upgrade_status') or merged.get('final_upgrade_status') or merged.get('acquisition_upgrade_status') or 'unchanged'}"
+        ),
+        (
+            f"- final post-refresh verdict: {merged.get('final_opportunity_level') or merged.get('opportunity_level') or 'unknown'} "
+            f"/ {merged.get('final_opportunity_score') or merged.get('opportunity_score_final') or 'n/a'} "
+            f"source={merged.get('final_verdict_source') or 'initial'} "
+            f"reason={merged.get('final_verdict_reason') or 'none'}"
         ),
         f"- accepted reason codes: {'; '.join(str(item) for item in list(accepted_reasons or ())[:5]) if accepted_reasons else 'none'}",
         f"- accepted evidence samples: {'; '.join(str((item or {}).get('title') or (item or {}).get('source_url') or 'evidence')[:120] for item in list(accepted_evidence or ())[:2]) if accepted_evidence else 'none'}",

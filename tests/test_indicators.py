@@ -10692,6 +10692,11 @@ def test_event_alpha_near_miss_refreshes_market_context_without_triggering_fade(
     assert updated.opportunity_level_before_refresh == "exploratory"
     assert updated.opportunity_level_after_refresh == updated.opportunity_level
     assert updated.market_confirmation_after_refresh == updated.market_confirmation_score
+    assert updated.score_components["final_opportunity_level"] == updated.opportunity_level
+    assert updated.score_components["final_opportunity_score"] == updated.opportunity_score_final
+    assert updated.score_components["final_verdict_source"] == "market_refresh"
+    assert updated.score_components["market_data_freshness"] == "fresh"
+    assert updated.score_components["market_reaction_confirmation"] in {"moderate", "strong"}
     assert updated.score_components["opportunity_score_v2"] == 80
     assert "TRIGGERED_FADE" not in event_near_miss.format_near_miss_report(refreshed.near_misses)
 
@@ -27209,6 +27214,7 @@ def test_event_source_packs_and_feed_coverage_semantics():
         "security_shock_pack",
         "fan_sports_pack",
         "political_meme_pack",
+        "strategic_investment_pack",
         "market_anomaly_pack",
     }.issubset(names)
 
@@ -27219,6 +27225,13 @@ def test_event_source_packs_and_feed_coverage_semantics():
     proxy = event_source_packs.source_pack_for_playbook("proxy_attention", impact_path_type="venue_value_capture")
     assert proxy.name == "proxy_preipo_rwa_pack"
     assert "prediction_market" in proxy.context_only_sources
+
+    strategic = event_source_packs.source_pack_for_playbook(
+        "strategic_investment",
+        impact_path_type="strategic_investment_or_valuation",
+    )
+    assert strategic.name == "strategic_investment_pack"
+    assert "denial_or_correction_search" in strategic.validation_requirements
 
     pack_eval = event_source_packs.evaluate_pack_evidence(
         {
@@ -27276,7 +27289,9 @@ def test_event_llm_evidence_planner_fixture_cases():
         "missing_requirements": ("official_source",),
     })
     assert aave.selected is True
+    assert aave.source_pack == "strategic_investment_pack"
     assert any("AAVE" in query.query and "Kraken" in query.query for query in aave.query_plan)
+    assert any("denies" in query.query.casefold() for query in aave.denial_searches)
     assert "confirm token/project identity with non-URL evidence" in aave.checklist
 
     velvet = event_llm_evidence_planner.plan_evidence({
@@ -27317,6 +27332,115 @@ def test_event_llm_evidence_planner_fixture_cases():
     })
     assert generic.selected is False
     assert "planner_not_selected_below_prefilter" in generic.warnings
+
+
+def test_evidence_acquisition_final_upgrade_status_tracks_final_verdict_not_evidence_only():
+    from types import SimpleNamespace
+    from crypto_rsi_scanner import event_alpha_quality_fields, event_evidence_acquisition
+
+    result = event_evidence_acquisition.EvidenceAcquisitionResult(
+        acquisition_id="acq:test",
+        opportunity_id="core:velvet",
+        core_opportunity_id="core:velvet",
+        hypothesis_id="hyp:velvet",
+        incident_id="incident:spacex",
+        source_pack="proxy_preipo_rwa_pack",
+        status="accepted_evidence_found",
+        symbol="VELVET",
+        coin_id="velvet",
+        accepted_evidence=({"evidence_quality_score": 92, "reason_codes": ("cryptopanic_currency_tag_match",)},),
+        evidence_quality_before=70,
+        evidence_quality_after=92,
+        impact_path_validation_before="impact_path_validated",
+        impact_path_validation_after="impact_path_validated",
+        opportunity_score_before=88.5,
+        opportunity_level_before="high_priority",
+    )
+    before = SimpleNamespace(
+        opportunity_score_final=88.5,
+        opportunity_level="high_priority",
+        score_components={
+            "opportunity_score_final": 88.5,
+            "opportunity_level": "high_priority",
+            "market_refresh_success": True,
+            "market_confirmation_score": 100,
+            "market_confirmation_level": "strong",
+            "market_context_freshness_status": "fresh",
+        },
+    )
+    after = SimpleNamespace(
+        opportunity_score_final=72.5,
+        opportunity_level="validated_digest",
+        evidence_quality_score=92,
+        impact_path_type="venue_value_capture",
+        score_components={
+            "opportunity_score_final": 72.5,
+            "opportunity_level": "validated_digest",
+            "evidence_quality_score": 92,
+            "market_confirmation_score": 35,
+            "market_confirmation_level": "weak",
+        },
+    )
+    finalized = event_evidence_acquisition._finalize_result(result, before=before, after=after)
+
+    assert finalized.acquisition_evidence_status == "accepted_evidence_found"
+    assert finalized.evidence_quality_upgraded is True
+    assert finalized.final_upgrade_status == "unchanged"
+    assert finalized.acquisition_upgrade_status == "unchanged"
+    assert finalized.opportunity_score_delta == 0
+    assert finalized.post_refresh_opportunity_level == "validated_digest"
+    assert finalized.post_refresh_market_confirmation_score == 100
+    assert finalized.post_refresh_market_confirmation_level == "strong"
+    assert finalized.market_data_freshness == "fresh"
+    assert finalized.market_reaction_confirmation == "strong"
+    assert finalized.final_opportunity_level == "high_priority"
+    assert finalized.final_verdict_source == "market_refresh"
+
+    quality = event_alpha_quality_fields.ensure_quality_fields({
+        "opportunity_score_final": 72.5,
+        "opportunity_level": "validated_digest",
+        "final_opportunity_score": 88.5,
+        "final_opportunity_level": "high_priority",
+    })
+    assert quality["opportunity_score_final"] == 88.5
+    assert quality["opportunity_level"] == "high_priority"
+
+
+def test_evidence_acquisition_core_opportunity_dedupes_supporting_rows():
+    from crypto_rsi_scanner import event_evidence_acquisition
+
+    base = {
+        "event_cluster_id": "cluster:spacex",
+        "incident_id": "incident:spacex",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "validated_symbol": "VELVET",
+        "validated_coin_id": "velvet",
+        "external_asset": "SpaceX",
+        "playbook_type": "proxy_attention",
+        "impact_category": "tokenized_stock_venue",
+        "impact_path_type": "venue_value_capture",
+        "candidate_role": "proxy_venue",
+        "source_class": "crypto_news",
+        "evidence_specificity": "asset_and_catalyst",
+        "evidence_quality_score": 80,
+        "market_confirmation_score": 60,
+        "opportunity_score_final": 74,
+        "opportunity_level": "validated_digest",
+    }
+    rows = (
+        {**base, "hypothesis_id": "hyp:velvet:primary"},
+        {**base, "hypothesis_id": "hyp:velvet:supporting", "impact_category": "rwa_preipo_proxy"},
+    )
+    result = event_evidence_acquisition.run_evidence_acquisition(
+        rows,
+        provider=None,
+        providers_by_hint={},
+        cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(enabled=True, max_candidates=5, max_queries=1),
+    )
+    assert result.attempted == 1
+    assert result.results[0].core_opportunity_id
+    assert result.results[0].core_opportunity_id != "UNKNOWN"
 
 
 def test_event_near_miss_source_pack_and_operator_surfaces():

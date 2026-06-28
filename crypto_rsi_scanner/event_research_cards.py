@@ -819,6 +819,19 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
         "impact_path_type",
         "opportunity_level",
         "opportunity_score_final",
+        "initial_opportunity_score",
+        "initial_opportunity_level",
+        "post_refresh_opportunity_score",
+        "post_refresh_opportunity_level",
+        "post_refresh_market_confirmation_level",
+        "post_refresh_market_confirmation_score",
+        "post_refresh_evidence_quality_score",
+        "final_opportunity_score",
+        "final_opportunity_level",
+        "final_verdict_source",
+        "final_verdict_reason",
+        "market_data_freshness",
+        "market_reaction_confirmation",
         "final_route_after_quality_gate",
         "final_state_after_quality_gate",
         "quality_state_block_reason",
@@ -838,6 +851,10 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
     components.setdefault("impact_path_type", opportunity.primary_impact_path)
     components.setdefault("opportunity_level", opportunity.opportunity_level)
     components.setdefault("opportunity_score_final", opportunity.opportunity_score_final)
+    if components.get("final_opportunity_level") not in (None, ""):
+        components["opportunity_level"] = components.get("final_opportunity_level")
+    if components.get("final_opportunity_score") not in (None, ""):
+        components["opportunity_score_final"] = components.get("final_opportunity_score")
     components.setdefault("final_route_after_quality_gate", opportunity.final_route_after_quality_gate)
     components.setdefault("final_state_after_quality_gate", opportunity.final_state_after_quality_gate)
     return components
@@ -1295,9 +1312,15 @@ def _source_acquisition_lines(
         f"- Evidence acquisition attempted: {str(bool(components.get('evidence_acquisition_attempted'))).lower()}",
         (
             f"- Evidence acquisition result: status={acquisition.get('status') or components.get('evidence_acquisition_status') or 'not_executed'} "
+            f"evidence={components.get('acquisition_evidence_status') or acquisition.get('acquisition_evidence_status') or 'unknown'} "
             f"accepted={acquisition.get('accepted', components.get('evidence_acquisition_accepted_count', 0))} "
             f"rejected={acquisition.get('rejected', components.get('evidence_acquisition_rejected_count', 0))} "
-            f"upgrade={acquisition.get('upgrade_status') or components.get('acquisition_upgrade_status') or 'unchanged'}"
+            f"final={acquisition.get('final_upgrade_status') or components.get('final_upgrade_status') or components.get('acquisition_upgrade_status') or 'unchanged'}"
+        ),
+        (
+            f"- Final verdict after refresh: {components.get('final_opportunity_level') or components.get('opportunity_level') or 'unknown'} "
+            f"/ {components.get('final_opportunity_score') or components.get('opportunity_score_final') or 'n/a'} "
+            f"source={components.get('final_verdict_source') or 'initial'}"
         ),
         "- Accepted evidence reasons: " + ("; ".join(str(item) for item in list(accepted_reasons or ())[:5]) if accepted_reasons else "none"),
         "- Accepted evidence samples: "
@@ -1397,9 +1420,13 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     evidence_specificity_class = components.get("evidence_specificity") or "unknown"
     market_confirmation_score = components.get("market_confirmation_score")
     market_confirmation_level = components.get("market_confirmation_level") or "unknown"
+    market_data_freshness = components.get("market_data_freshness") or components.get("market_context_freshness_status") or "unknown"
+    market_reaction_confirmation = components.get("market_reaction_confirmation") or market_confirmation_level
     market_confirmation_summary = components.get("market_confirmation_summary") or "none"
     opportunity_score_final = components.get("opportunity_score_final")
     opportunity_level = components.get("opportunity_level") or "unknown"
+    final_opportunity_score = components.get("final_opportunity_score") or opportunity_score_final
+    final_opportunity_level = components.get("final_opportunity_level") or opportunity_level
     verdict_reasons = components.get("opportunity_verdict_reasons") or []
     missing_requirements = components.get("missing_requirements") or []
     manual_verification_items = components.get("manual_verification_items") or []
@@ -1453,10 +1480,13 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Impact path strength: {impact_path_strength}",
         f"- Impact path reason: {impact_path_reason}",
         f"- Opportunity score v2: {opportunity_score_v2 if opportunity_score_v2 is not None else 'n/a'}",
-        f"- Final opportunity verdict: {opportunity_level} / {opportunity_score_final if opportunity_score_final is not None else 'n/a'}",
+        f"- Final opportunity verdict: {final_opportunity_level} / {final_opportunity_score if final_opportunity_score is not None else 'n/a'}",
+        f"- Final verdict source: {components.get('final_verdict_source') or 'initial'} ({components.get('final_verdict_reason') or 'no refresh override'})",
         f"- Source/evidence specificity: {evidence_specificity if evidence_specificity is not None else 'n/a'}",
         f"- Evidence quality: {source_class}/{evidence_specificity_class} / {evidence_quality_score if evidence_quality_score is not None else 'n/a'}",
         f"- Market confirmation: {market_confirmation_level} / {market_confirmation_score if market_confirmation_score is not None else 'n/a'}",
+        f"- Market freshness: {market_data_freshness}",
+        f"- Market reaction confirmation: {market_reaction_confirmation}",
         f"- Market context source: {market_context_source} ({market_context_quality}; age={market_context_age}; cap_applied={str(bool(freshness_cap)).lower()})",
         "- Targeted market refresh: "
         + _targeted_market_refresh_line(components),

@@ -416,6 +416,15 @@ source-quality checks; context-only or generic results stay rejected/local. Use
 proof path: it runs VELVET, RUNE, ZEC, and context/no-result examples with no
 Telegram sends, trades, paper rows, normal RSI rows, or event-fade trigger
 creation.
+Read acquisition rows as a three-step trail, not a single upgrade flag:
+`initial_opportunity_*` is the verdict before the search,
+`post_refresh_*` is the recomputed evidence/market view after search, and
+`final_opportunity_*` is the canonical operator-facing verdict. Accepted
+evidence can improve `evidence_quality_score` while `final_upgrade_status`
+remains `unchanged` if the final opportunity did not improve. Reports/cards
+show `acquisition_evidence_status` separately from `final_upgrade_status`, and
+they keep `market_data_freshness` separate from
+`market_reaction_confirmation`.
 Candidate-only or identity-only evidence can improve review context but does
 not promote a token-level row. Candidate-discovery search hits can suggest new
 crypto candidates when the source payload or quote-validated extraction names an
@@ -587,7 +596,8 @@ VELVET/SpaceX validated-digest candidate upgrading to high priority from fresh
 fixture market confirmation, while weaker/no-reaction rows remain lower. The
 same reports and cards include `market_refresh_attempted`,
 `market_refresh_success`, provider/error details, before/after market
-confirmation, before/after opportunity score/level, and the refresh upgrade
+confirmation, market data freshness, market reaction confirmation, before/after
+opportunity score/level, canonical final opportunity verdict fields, and the refresh upgrade
 status.
 
 ### Reproducible quality-validation cycle

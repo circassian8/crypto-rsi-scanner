@@ -101,6 +101,7 @@ def ensure_quality_fields(row: Mapping[str, Any] | None, *, components: Mapping[
             out[key] = _copy_value(component_values.get(key))
         elif _is_missing_value(out.get(key)):
             out[key] = _contextual_default(key, out, defaults)
+    _apply_final_verdict_aliases(out, component_values)
     _attach_upgrade_path(out)
     return out
 
@@ -157,6 +158,40 @@ def quality_components(row: Mapping[str, Any] | None) -> dict[str, Any]:
         elif key not in out and value not in (None, "", [], {}):
             out[key] = value
     return ensure_quality_fields(out)
+
+
+def _apply_final_verdict_aliases(out: dict[str, Any], component_values: Mapping[str, Any]) -> None:
+    """Prefer canonical post-refresh verdict aliases when present.
+
+    Older artifacts may still carry pre-refresh ``opportunity_*`` fields while
+    newer refresh/acquisition paths write ``final_opportunity_*``. The final
+    fields are presentation/routing metadata only, but when they exist they are
+    the authoritative operator-facing verdict.
+    """
+    for final_key, canonical_key in (
+        ("final_opportunity_score", "opportunity_score_final"),
+        ("final_opportunity_level", "opportunity_level"),
+    ):
+        value = out.get(final_key)
+        if _is_missing_value(value):
+            value = component_values.get(final_key)
+        if not _is_missing_value(value):
+            out[canonical_key] = _copy_value(value)
+    for final_key, canonical_key in (
+        ("post_refresh_market_confirmation_level", "market_confirmation_level"),
+        ("post_refresh_market_confirmation_score", "market_confirmation_score"),
+        ("post_refresh_evidence_quality_score", "evidence_quality_score"),
+    ):
+        value = out.get(final_key)
+        if _is_missing_value(value):
+            value = component_values.get(final_key)
+        if not _is_missing_value(value):
+            out[canonical_key] = _copy_value(value)
+    freshness = out.get("market_data_freshness")
+    if _is_missing_value(freshness):
+        freshness = component_values.get("market_data_freshness")
+    if not _is_missing_value(freshness):
+        out["market_context_freshness_status"] = _copy_value(freshness)
 
 
 def quality_source(row: Mapping[str, Any] | None, *, components_key: str = "score_components") -> str:

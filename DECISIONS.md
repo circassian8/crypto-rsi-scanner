@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Evidence acquisition reports final verdicts, not evidence wins
+**Status:** accepted
+**Decision:** Event Alpha source-pack evidence acquisition must distinguish
+evidence-quality improvement from final opportunity upgrades. Accepted evidence
+may improve source quality, impact-path support, or review context, but
+`final_upgrade_status` and operator-facing route/state fields must be based on
+the canonical final opportunity verdict. Artifacts should preserve
+`initial_*`, `post_refresh_*`, and `final_opportunity_*` fields so operators can
+audit what changed. If a prior market-refresh verdict is stronger and the new
+evidence collection does not produce a better final opportunity, the stronger
+final verdict may be preserved with an explicit source/reason. Market data
+freshness and market reaction confirmation must remain separate fields.
+**Why:** A source row can prove better evidence without making the trade/research
+opportunity better, and a later evidence pass can otherwise make reports look
+upgraded or downgraded for the wrong reason. The final verdict is the only field
+that should drive operator-facing promotion.
+**Revisit when:** Evidence acquisition moves into a typed store and the
+initial/post-refresh/final verdict relationship can be enforced by schema.
+
 ## 2026-06-28 - Source-pack acquisition executes evidence, not alerts
 **Status:** accepted
 **Decision:** Event Alpha may execute bounded source-pack evidence plans for

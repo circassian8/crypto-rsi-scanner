@@ -209,6 +209,10 @@ def _query_plan(request: EvidencePlannerRequest, pack: event_source_packs.Source
     elif pack.name == "fan_sports_pack":
         queries.append(EvidencePlanQuery(f"{symbol} fan token {catalyst} match", "sports_fixtures", "event_time_confirmation"))
         queries.append(EvidencePlanQuery(f"{symbol} fan token demand {catalyst}", "cryptopanic", "impact_path_validation"))
+    elif pack.name == "strategic_investment_pack":
+        queries.append(EvidencePlanQuery(f"{symbol} {catalyst} stake investment", "cryptopanic", "impact_path_validation"))
+        queries.append(EvidencePlanQuery(f"{catalyst} {symbol} investment valuation", "gdelt", "second_source_confirmation"))
+        queries.append(EvidencePlanQuery(f"{symbol} {catalyst} strategic investment official", "project_blog_rss", "official_confirmation"))
     else:
         queries.append(EvidencePlanQuery(f"{symbol} {catalyst} crypto catalyst why moving", "cryptopanic", "source_pack_search"))
         queries.append(EvidencePlanQuery(f"{symbol} {catalyst} official announcement catalyst", "project_blog_rss", "official_confirmation"))
@@ -225,6 +229,11 @@ def _denial_queries(request: EvidencePlannerRequest, pack: event_source_packs.So
         )
     if pack.name == "security_shock_pack":
         return (EvidencePlanQuery(f"{symbol} no exploit false report", "gdelt", "denial_search"),)
+    if pack.name == "strategic_investment_pack":
+        return (
+            EvidencePlanQuery(f"{catalyst} denies {symbol} stake", "gdelt", "denial_search", must_validate_asset=False),
+            EvidencePlanQuery(f"{symbol} {catalyst} stake confirmed", "gdelt", "denial_search", must_validate_asset=False),
+        )
     return (EvidencePlanQuery(f"{symbol} catalyst denied corrected", "gdelt", "denial_search"),)
 
 

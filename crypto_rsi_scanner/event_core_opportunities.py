@@ -316,6 +316,14 @@ def _normalize_row(item: Any) -> dict[str, Any]:
     quality = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
     for key, value in quality.items():
         row.setdefault(key, value)
+    if row.get("final_opportunity_level") not in (None, ""):
+        row["opportunity_level"] = row.get("final_opportunity_level")
+    elif components.get("final_opportunity_level") not in (None, ""):
+        row["opportunity_level"] = components.get("final_opportunity_level")
+    if row.get("final_opportunity_score") not in (None, ""):
+        row["opportunity_score_final"] = row.get("final_opportunity_score")
+    elif components.get("final_opportunity_score") not in (None, ""):
+        row["opportunity_score_final"] = components.get("final_opportunity_score")
     row.setdefault("validated_symbol", components.get("validated_symbol"))
     row.setdefault("validated_coin_id", components.get("validated_coin_id"))
     row.setdefault("candidate_role", components.get("candidate_role"))

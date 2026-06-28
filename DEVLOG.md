@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Make evidence acquisition final-verdict consistent · Codex
+**Why:** Source-pack evidence acquisition could improve evidence quality while
+operator reports still described the result through a single upgrade flag, which
+blurred evidence wins with actual opportunity promotion. Market-refresh and
+acquisition rows also needed one canonical final verdict while keeping market
+freshness separate from market reaction.
+**Changes:**
+- Added canonical acquisition verdict metadata: `initial_*`,
+  `post_refresh_*`, `final_opportunity_*`, `final_verdict_source/reason`,
+  evidence-quality deltas, final upgrade status, market freshness, and market
+  reaction confirmation.
+- Made final upgrade status compare the canonical final opportunity verdict,
+  preserving a stronger prior market-refresh verdict when later evidence
+  acquisition does not improve the opportunity.
+- Updated daily briefs, research cards, opportunity audits, quality-field
+  aliases, and acquisition reports to show evidence status separately from final
+  verdict status.
+- Added core-opportunity/source-pack dedupe for acquisition requests and a
+  `strategic_investment_pack` for stake/acquisition/valuation-style events.
+- Added regressions for final-verdict preservation, supporting-row dedupe, and
+  AAVE strategic-investment evidence planning.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests` passed;
+`.venv/bin/python tests/test_indicators.py` passed (498/498);
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3` passed;
+`make event-alpha-market-refresh-smoke PYTHON=python3` passed;
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (36/36);
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3` passed with no
+doctor blockers; `make event-alpha-quality-validation-cycle PYTHON=python3`
+passed with no doctor blockers; `make verify PYTHON=python3` passed.
+**Notes/risks:** Research-only. No Telegram sends, paper/live rows, normal RSI
+writes, trading, or provider/LLM-created `TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Execute Event Alpha source-pack evidence plans · Codex
 **Why:** The source registry and evidence planner could tell operators what to
 search next, but daily briefs still showed mostly `planned` acquisition rows.

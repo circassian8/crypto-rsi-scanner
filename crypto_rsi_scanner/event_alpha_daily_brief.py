@@ -855,7 +855,10 @@ def _evidence_acquisition_result_lines(
                 f"pack={row.get('source_pack') or 'unknown'} status={row.get('status') or 'unknown'} "
                 f"accepted={len(accepted or ())} rejected={len(rejected or ())} "
                 f"score={row.get('opportunity_score_before')}->{row.get('opportunity_score_after')} "
-                f"upgrade={row.get('acquisition_upgrade_status') or 'unchanged'}"
+                f"evidence={row.get('acquisition_evidence_status') or 'unknown'} "
+                f"final={row.get('final_upgrade_status') or row.get('acquisition_upgrade_status') or 'unchanged'} "
+                f"verdict={row.get('final_opportunity_level') or row.get('opportunity_level_after') or 'unknown'} "
+                f"source={row.get('final_verdict_source') or 'initial'}"
             )
         if len(executed) > limit:
             lines.append(f"- +{len(executed) - limit} more acquisition rows in local artifacts")
