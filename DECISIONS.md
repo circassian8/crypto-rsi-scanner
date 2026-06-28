@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Diagnostic support snapshots cannot inherit core alertability
+**Status:** accepted
+**Decision:** Event Alpha diagnostic/support alert snapshots may carry
+`core_opportunity_id` and `diagnostic_support_for_core_opportunity_id` so they
+remain traceable to a canonical CoreOpportunity, but they must stay
+non-alertable `STORE_ONLY` / local-only artifacts. Only canonical-core
+snapshots may mirror a core row's alertable route, tier, lifecycle state, and
+opportunity level. Support rows may store the canonical route/level/state only
+inside `support_for_core_summary` for audit.
+**Why:** Source-noise, ticker-collision, and other support/control rows are
+evidence diagnostics, not operator-visible opportunities. Letting them inherit
+the core route makes the same opportunity appear both high-priority and
+insufficient-data/local-only, which breaks daily brief, inbox, quality-review,
+artifact-doctor, and Pro-model handoff semantics.
+**Revisit when:** Diagnostic/support rows are represented in a separate typed
+artifact/table that cannot be loaded through the alert snapshot path.
+
 ## 2026-06-28 - Alert snapshots defer to canonical core final state
 **Status:** accepted
 **Decision:** When an Event Alpha alert snapshot resolves to a canonical

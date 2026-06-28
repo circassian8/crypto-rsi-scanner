@@ -448,6 +448,15 @@ checks should use the reconciled final fields; if the canonical core row is
 missing, the snapshot should remain local/store-only until the core store is
 repaired.
 
+Diagnostic/support snapshots are the exception to canonical mirroring. They may
+link to the canonical core through `diagnostic_support_for_core_opportunity_id`
+and may include `support_for_core_summary` with the core route/level/state for
+audit, but their own final route, tier, lifecycle state, and alertability must
+remain store-only/local-only. If `load_alert_snapshots()` or artifact doctor
+shows a diagnostic/support row with an alertable route, treat that as an
+artifact bug, not an operator opportunity. The canonical core snapshot is the
+only alert snapshot allowed to represent the promoted opportunity.
+
 Card generation is a secondary artifact write. After cards are written, the
 cycle should backfill the generated card path, research-card path, and feedback
 target fields onto the already-stored core rows instead of appending duplicate

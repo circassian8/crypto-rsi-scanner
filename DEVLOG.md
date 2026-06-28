@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Keep diagnostic support snapshots non-alertable · Codex
+**Why:** Diagnostic/source-noise alert snapshots could link to a high-priority
+canonical CoreOpportunity for audit and then be re-promoted on load, inheriting
+the canonical `HIGH_PRIORITY_RESEARCH` route while still carrying
+`insufficient_data` diagnostic fields. That made alert snapshots look alertable
+when only the canonical core row should be.
+**Changes:**
+- Added an explicit diagnostic/support snapshot reconciliation path that links
+  support rows to their canonical core without inheriting route, tier,
+  opportunity level, state, or alertability.
+- Hardened alert-snapshot loading so persisted diagnostic/support markers
+  survive the sibling core-store reconciliation pass.
+- Artifact doctor now detects alertable diagnostic support rows, support rows
+  inheriting canonical routes, duplicate alertable canonical snapshots, and
+  missing canonical snapshots separately.
+- Research-card copy no longer lets stale support-row local-only blockers leak
+  into promoted core cards.
+- Added regression tests for diagnostic support snapshots, loader
+  reconciliation, daily brief/inbox behavior, strict doctor blockers, and
+  duplicate canonical snapshot detection.
+**Verify:** `python3 tests/test_indicators.py` passed (532/532);
+`make event-alpha-signal-quality-eval PYTHON=python3` passed (36/36);
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`,
+`make event-alpha-artifact-doctor PROFILE=evidence_acquisition_smoke STRICT=1
+PYTHON=python3`, `make event-alpha-market-refresh-smoke PYTHON=python3`,
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, and
+`make event-alpha-quality-validation-cycle PYTHON=python3` completed with no
+artifact-doctor blockers for the relevant strict doctors.
+**Notes/risks:** Research-artifact consistency only. No Telegram sends, paper
+trades, normal RSI rows, live DB writes, execution paths, or non-event-fade
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Reconcile alert snapshots with canonical core state · Codex
 **Why:** Live/no-send artifacts could have canonical CoreOpportunity rows capped
 to exploratory/local after live confirmation gates while linked

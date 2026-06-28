@@ -1856,6 +1856,14 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     else:
         upgrade_text = event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=6) or verdict_copy.upgrade_text
         downgrade_text = event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=6) or verdict_copy.downgrade_text
+    local_only_due_to_weak_cooccurrence = (
+        final_opportunity_level in {"local_only", "exploratory", "unknown", ""}
+        and (
+            "impact_path_not_validated" in gate_line
+            or "weak_validated_local_only" in gate_line
+            or str(why_digest_ineligible or "none").strip().casefold() not in {"", "none", "not available"}
+        )
+    )
     lines = [
         f"- Validated asset: {validated_symbol or 'unknown'}/{validated_coin_id or 'unknown'}",
         f"- Incident: {canonical_incident_name} ({incident_id})",
@@ -1914,7 +1922,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Opportunity verdict reasons: {'; '.join(str(item) for item in verdict_reasons[:4]) if verdict_reasons else 'none'}",
         f"- Missing requirements: {'; '.join(str(item) for item in missing_requirements[:4]) if missing_requirements else 'none'}",
         f"- Quality gate: {gate_line}",
-        f"- Local-only due to weak co-occurrence: {str('impact_path_not_validated' in gate_line or 'weak_validated_local_only' in gate_line or why_digest_ineligible != 'none').lower()}",
+        f"- Local-only due to weak co-occurrence: {str(local_only_due_to_weak_cooccurrence).lower()}",
         f"- Why promoted/local-only: {_impact_hypothesis_promotion_line(entry, components, gate_line)}",
         "- Safety label: catalyst link validated, but this is not a calibrated strategy or trade signal.",
         "- Why it may be wrong: " + _impact_hypothesis_wrong_line(components),

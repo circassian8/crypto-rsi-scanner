@@ -33,6 +33,12 @@ SNAPSHOT_STALE_PRE_QUALITY_GATE = "stale_pre_quality_gate"
 SNAPSHOT_CORE_RECONCILED = "core_reconciled"
 SNAPSHOT_MISSING_CORE = "missing_core"
 
+SNAPSHOT_CLASS_CANONICAL_CORE = "canonical_core_snapshot"
+SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT = "diagnostic_support_snapshot"
+SNAPSHOT_CLASS_LEGACY = "legacy_snapshot"
+SNAPSHOT_CLASS_EXTERNAL = "external_snapshot"
+SNAPSHOT_CLASS_ORPHAN = "orphan_snapshot"
+
 LEGACY_CONFLICT_CLASSIFICATIONS = {
     SNAPSHOT_LEGACY_CONFLICT,
     SNAPSHOT_MISSING_FINAL_ROUTE,
@@ -265,6 +271,60 @@ def reconcile_alert_snapshot_with_core_store(
     )
     out.setdefault("core_resolution_status", "canonical")
     out["snapshot_core_resolution_status"] = SNAPSHOT_CORE_RECONCILED
+    out["snapshot_class"] = SNAPSHOT_CLASS_CANONICAL_CORE
+    return _with_snapshot_quality_classification(out)
+
+
+def reconcile_diagnostic_support_snapshot_with_core_store(
+    snapshot: Mapping[str, Any],
+    core_store_row: Mapping[str, Any],
+    *,
+    diagnostic_support_for_core_opportunity_id: str | None = None,
+) -> dict[str, Any]:
+    """Link a diagnostic/support snapshot to a core without inheriting alertability."""
+    out = dict(snapshot)
+    core = dict(core_store_row)
+    requested_route = str(out.get("final_route_after_quality_gate") or out.get("route") or "")
+    requested_level = str(out.get("final_opportunity_level") or out.get("opportunity_level") or "")
+    requested_state = str(out.get("final_state_after_quality_gate") or out.get("state") or "")
+    out.setdefault("requested_route_before_core_reconciliation", requested_route)
+    out.setdefault("requested_opportunity_level_before_core_reconciliation", requested_level)
+    out.setdefault("requested_state_before_core_reconciliation", requested_state)
+
+    diagnostic_level = requested_level if requested_level in {"local_only", "exploratory", "diagnostic"} else "local_only"
+    out["core_opportunity_id"] = core.get("core_opportunity_id") or out.get("core_opportunity_id")
+    out["diagnostic_support_for_core_opportunity_id"] = (
+        diagnostic_support_for_core_opportunity_id
+        or core.get("core_opportunity_id")
+        or out.get("diagnostic_support_for_core_opportunity_id")
+    )
+    out["is_diagnostic_snapshot"] = True
+    out["snapshot_class"] = SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
+    out["snapshot_core_reconciled"] = False
+    out["snapshot_core_resolution_status"] = "diagnostic_support"
+    out["snapshot_core_reconciliation_reason"] = "diagnostic_support_not_alertable"
+    out["final_route_after_quality_gate"] = event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    out["route"] = event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    out["lane"] = event_alpha_router.EventAlphaRouteLane.LOCAL_ONLY.value
+    out["final_tier_after_quality_gate"] = event_alerts.EventAlertTier.STORE_ONLY.value
+    out["tier"] = event_alerts.EventAlertTier.STORE_ONLY.value
+    out["final_opportunity_level"] = diagnostic_level
+    out["opportunity_level"] = diagnostic_level
+    out["diagnostic_support_level"] = requested_level or diagnostic_level
+    out["alertable_after_quality_gate"] = False
+    out["route_alertable"] = False
+    out["support_for_core_summary"] = {
+        "core_opportunity_id": core.get("core_opportunity_id"),
+        "symbol": core.get("symbol") or core.get("validated_symbol"),
+        "coin_id": core.get("coin_id") or core.get("validated_coin_id"),
+        "final_opportunity_level": core.get("final_opportunity_level") or core.get("opportunity_level"),
+        "final_route_after_quality_gate": core.get("final_route_after_quality_gate") or core.get("route"),
+        "final_state_after_quality_gate": core.get("final_state_after_quality_gate") or core.get("state"),
+        "final_opportunity_score": _first_present(core, ("final_opportunity_score", "opportunity_score_final")),
+    }
+    out["quality_gate_block_reason"] = out.get("quality_gate_block_reason") or "diagnostic_support_not_alertable"
+    out.setdefault("feedback_target", out.get("diagnostic_row_id") or out.get("alert_id") or out.get("alert_key"))
+    out["feedback_target_type"] = "diagnostic_support_for_core_opportunity_id"
     return _with_snapshot_quality_classification(out)
 
 
@@ -1070,14 +1130,52 @@ def _with_core_resolution(row: dict[str, Any], core_rows: Iterable[Mapping[str, 
         for item in core_rows_tuple
         if str(item.get("core_opportunity_id") or "").strip()
     }
-    resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, core_rows_tuple)
     out = dict(row)
+    if _is_explicit_diagnostic_support_snapshot(out):
+        core_id = str(
+            out.get("diagnostic_support_for_core_opportunity_id")
+            or out.get("core_opportunity_id")
+            or ""
+        ).strip()
+        core_row = core_by_id.get(core_id)
+        if core_row:
+            out["core_opportunity_id_status"] = "diagnostic_support"
+            out["core_resolution_status"] = "diagnostic_support"
+            out["canonical_core_resolution_warnings"] = out.get("canonical_core_resolution_warnings") or ()
+            out["diagnostic_row_id"] = _diagnostic_row_id(out)
+            return reconcile_diagnostic_support_snapshot_with_core_store(
+                out,
+                core_row,
+                diagnostic_support_for_core_opportunity_id=core_id,
+            )
+        out["diagnostic_row_id"] = _diagnostic_row_id(out)
+        out["is_diagnostic_snapshot"] = True
+        out["snapshot_class"] = SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
+        out["snapshot_core_reconciled"] = False
+        out["snapshot_core_resolution_status"] = "diagnostic_support"
+        out["snapshot_core_reconciliation_reason"] = "diagnostic_support_missing_canonical_core"
+        out["alertable_after_quality_gate"] = False
+        out["route_alertable"] = False
+        out["requested_route_before_core_reconciliation"] = out.get("final_route_after_quality_gate") or out.get("route")
+        out["requested_opportunity_level_before_core_reconciliation"] = out.get("final_opportunity_level") or out.get("opportunity_level")
+        out["final_route_after_quality_gate"] = event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+        out["route"] = event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+        out["lane"] = event_alpha_router.EventAlphaRouteLane.LOCAL_ONLY.value
+        out["final_tier_after_quality_gate"] = event_alerts.EventAlertTier.STORE_ONLY.value
+        out["tier"] = event_alerts.EventAlertTier.STORE_ONLY.value
+        out["quality_gate_block_reason"] = out.get("quality_gate_block_reason") or "diagnostic_support_missing_canonical_core"
+        out["feedback_target"] = out.get("diagnostic_row_id") or out.get("feedback_target") or out.get("alert_key")
+        out["feedback_target_type"] = "diagnostic_support_for_core_opportunity_id"
+        return _with_snapshot_quality_classification(out)
+
+    resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, core_rows_tuple)
     out["core_opportunity_id_status"] = resolution.resolution_status
     out["core_resolution_status"] = resolution.resolution_status
     out["canonical_core_resolution_warnings"] = resolution.warnings
     if resolution.resolution_status == "canonical":
         out["core_opportunity_id"] = resolution.canonical_core_opportunity_id
         out["is_diagnostic_snapshot"] = False
+        out["snapshot_class"] = SNAPSHOT_CLASS_CANONICAL_CORE
         out.pop("diagnostic_support_for_core_opportunity_id", None)
         out.setdefault("feedback_target", resolution.canonical_core_opportunity_id)
         out.setdefault("feedback_target_type", "core_opportunity_id")
@@ -1089,14 +1187,20 @@ def _with_core_resolution(row: dict[str, Any], core_rows: Iterable[Mapping[str, 
         out["diagnostic_support_for_core_opportunity_id"] = resolution.diagnostic_support_for_core_opportunity_id
         out["diagnostic_row_id"] = _diagnostic_row_id(out)
         out["is_diagnostic_snapshot"] = True
+        out["snapshot_class"] = SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
         core_row = core_by_id.get(str(resolution.canonical_core_opportunity_id or ""))
         if core_row:
-            out = reconcile_alert_snapshot_with_core_store(out, core_row)
-        out["feedback_target"] = resolution.diagnostic_support_for_core_opportunity_id or out.get("feedback_target") or out.get("alert_key")
+            out = reconcile_diagnostic_support_snapshot_with_core_store(
+                out,
+                core_row,
+                diagnostic_support_for_core_opportunity_id=resolution.diagnostic_support_for_core_opportunity_id,
+            )
+        out["feedback_target"] = out.get("diagnostic_row_id") or out.get("feedback_target") or out.get("alert_key")
         out["feedback_target_type"] = "diagnostic_support_for_core_opportunity_id"
     elif event_core_opportunities.row_is_diagnostic(out):
         out["diagnostic_row_id"] = _diagnostic_row_id(out)
         out["is_diagnostic_snapshot"] = True
+        out["snapshot_class"] = SNAPSHOT_CLASS_ORPHAN
         out["diagnostic_support_for_core_opportunity_id"] = None
         out["core_opportunity_id"] = None
         if out.get("feedback_target_type") == "core_opportunity_id":
@@ -1104,6 +1208,7 @@ def _with_core_resolution(row: dict[str, Any], core_rows: Iterable[Mapping[str, 
             out["feedback_target_type"] = "diagnostic_row_id"
     else:
         out["is_diagnostic_snapshot"] = False
+        out.setdefault("snapshot_class", SNAPSHOT_CLASS_ORPHAN if resolution.resolution_status == "orphan" else SNAPSHOT_CLASS_EXTERNAL)
         if resolution.canonical_core_opportunity_id:
             out["core_opportunity_id"] = resolution.canonical_core_opportunity_id
             out.setdefault("feedback_target", resolution.canonical_core_opportunity_id)
@@ -1111,6 +1216,7 @@ def _with_core_resolution(row: dict[str, Any], core_rows: Iterable[Mapping[str, 
             out["core_resolution_status"] = SNAPSHOT_MISSING_CORE
             out["snapshot_core_reconciled"] = False
             out["snapshot_core_reconciliation_reason"] = "missing_canonical_core_store_row"
+            out["snapshot_class"] = SNAPSHOT_CLASS_ORPHAN
             out["alertable_after_quality_gate"] = False
             out["route_alertable"] = False
             out["requested_route_before_core_reconciliation"] = out.get("final_route_after_quality_gate") or out.get("route")
@@ -1150,6 +1256,24 @@ def _diagnostic_row_id(row: Mapping[str, Any]) -> str:
     return "diagnostic:" + hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
 
 
+def _is_diagnostic_support_snapshot(row: Mapping[str, Any]) -> bool:
+    return (
+        str(row.get("snapshot_class") or "") == SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
+        or str(row.get("core_resolution_status") or "") == "diagnostic_support"
+        or str(row.get("snapshot_core_resolution_status") or "") == "diagnostic_support"
+        or bool(row.get("is_diagnostic_snapshot"))
+    )
+
+
+def _is_explicit_diagnostic_support_snapshot(row: Mapping[str, Any]) -> bool:
+    return (
+        str(row.get("snapshot_class") or "") == SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
+        or str(row.get("core_resolution_status") or "") == "diagnostic_support"
+        or str(row.get("snapshot_core_resolution_status") or "") == "diagnostic_support"
+        or bool(str(row.get("diagnostic_support_for_core_opportunity_id") or "").strip())
+    )
+
+
 def _filter_snapshot_rows(
     rows: list[dict[str, Any]],
     *,
@@ -1161,7 +1285,7 @@ def _filter_snapshot_rows(
     if mode == "all":
         return rows
     if mode == "non_store":
-        return [row for row in rows if row.get("tier") != event_alerts.EventAlertTier.STORE_ONLY.value]
+        return [row for row in rows if row.get("tier") != event_alerts.EventAlertTier.STORE_ONLY.value and not _is_diagnostic_support_snapshot(row)]
     if mode == "routed":
         if not route_context:
             return rows
@@ -1172,6 +1296,7 @@ def _filter_snapshot_rows(
                 row for row in rows
                 if bool(row.get("alertable_after_quality_gate", row.get("route_alertable")))
                 and event_alpha_router.route_value_is_alertable(row.get("final_route_after_quality_gate") or row.get("route"))
+                and not _is_diagnostic_support_snapshot(row)
             ]
         return [
             row for row in rows
@@ -1185,6 +1310,7 @@ def _filter_snapshot_rows(
                 )
             )
             and event_alpha_router.route_value_is_alertable(row.get("final_route_after_quality_gate") or row.get("route"))
+            and not _is_diagnostic_support_snapshot(row)
         ]
     if mode == "sampled_controls":
         limit = max(0, int(sampled_controls_limit))

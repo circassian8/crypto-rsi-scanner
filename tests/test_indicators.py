@@ -29749,6 +29749,254 @@ def test_alert_snapshots_reconcile_with_canonical_core_store():
     assert aligned["snapshot_core_reconciliation_reason"] == "canonical_core_aligned"
 
 
+def test_diagnostic_support_snapshot_does_not_inherit_canonical_alertable_route():
+    import json
+    from crypto_rsi_scanner import (
+        event_alpha_alert_store,
+        event_alpha_artifact_doctor,
+        event_alpha_daily_brief,
+        event_alpha_notification_inbox,
+        event_alpha_router,
+        event_watchlist,
+    )
+
+    core = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-diagnostic-support",
+        "profile": "evidence_acquisition_smoke",
+        "run_mode": "burn_in",
+        "artifact_namespace": "evidence_acquisition_smoke",
+        "core_opportunity_id": "agg:3381ebd96566",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "validated_symbol": "VELVET",
+        "validated_coin_id": "velvet",
+        "candidate_role": "proxy_venue",
+        "impact_path_type": "venue_value_capture",
+        "final_opportunity_level": "high_priority",
+        "opportunity_level": "high_priority",
+        "final_opportunity_score": 92,
+        "opportunity_score_final": 92,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        "state": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        "feedback_target": "agg:3381ebd96566",
+        "feedback_target_type": "core_opportunity_id",
+    }
+    canonical_snapshot = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "run-diagnostic-support",
+        "profile": "evidence_acquisition_smoke",
+        "run_mode": "burn_in",
+        "artifact_namespace": "evidence_acquisition_smoke",
+        "alert_id": "ea:velvet-canonical",
+        "alert_key": "event:velvet-canonical",
+        "core_opportunity_id": "agg:3381ebd96566",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "candidate_role": "proxy_venue",
+        "impact_path_type": "venue_value_capture",
+        "final_opportunity_level": "high_priority",
+        "opportunity_level": "high_priority",
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "alertable_after_quality_gate": True,
+        "route_alertable": True,
+    }
+    support_snapshot = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "run-diagnostic-support",
+        "profile": "evidence_acquisition_smoke",
+        "run_mode": "burn_in",
+        "artifact_namespace": "evidence_acquisition_smoke",
+        "alert_id": "ea:velvet-support",
+        "alert_key": "event:velvet-support",
+        "core_opportunity_id": "agg:3381ebd96566",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "candidate_role": "source_noise",
+        "latest_effective_playbook_type": "source_noise_control",
+        "impact_path_type": "insufficient_data",
+        "evidence_specificity": "insufficient_data",
+        "source_class": "insufficient_data",
+        "quality_gate_block_reason": "impact_path_type_insufficient_data",
+        "final_opportunity_level": "local_only",
+        "opportunity_level": "local_only",
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "alertable_after_quality_gate": False,
+        "route_alertable": False,
+    }
+
+    rows = event_alpha_alert_store.reconcile_alert_snapshots_with_core_store(
+        [canonical_snapshot, support_snapshot],
+        [core],
+    )
+    canonical = next(row for row in rows if row["alert_id"] == "ea:velvet-canonical")
+    support = next(row for row in rows if row["alert_id"] == "ea:velvet-support")
+
+    assert canonical["snapshot_class"] == event_alpha_alert_store.SNAPSHOT_CLASS_CANONICAL_CORE
+    assert canonical["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+    assert canonical["alertable_after_quality_gate"] is True
+    assert support["snapshot_class"] == event_alpha_alert_store.SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
+    assert support["core_resolution_status"] == "diagnostic_support"
+    assert support["diagnostic_support_for_core_opportunity_id"] == "agg:3381ebd96566"
+    assert support["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    assert support["final_opportunity_level"] == "local_only"
+    assert support["alertable_after_quality_gate"] is False
+    assert support["support_for_core_summary"]["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        with (root / "event_core_opportunities.jsonl").open("w", encoding="utf-8") as fh:
+            fh.write(json.dumps(core) + "\n")
+        with (root / "event_alpha_alerts.jsonl").open("w", encoding="utf-8") as fh:
+            for row in rows:
+                fh.write(json.dumps(row) + "\n")
+        loaded = event_alpha_alert_store.load_alert_snapshots(root / "event_alpha_alerts.jsonl")
+        loaded_support = next(row for row in loaded.rows if row["alert_id"] == "ea:velvet-support")
+        assert loaded_support["snapshot_class"] == event_alpha_alert_store.SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
+        assert loaded_support["core_resolution_status"] == "diagnostic_support"
+        assert loaded_support["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+        assert loaded_support["alertable_after_quality_gate"] is False
+
+    alertable = [
+        row for row in rows
+        if row.get("alertable_after_quality_gate")
+        and event_alpha_router.route_value_is_alertable(row.get("final_route_after_quality_gate"))
+    ]
+    assert [row["alert_id"] for row in alertable] == ["ea:velvet-canonical"]
+
+    brief = event_alpha_daily_brief.build_daily_brief(
+        run_rows=[{
+            "run_id": "run-diagnostic-support",
+            "profile": "evidence_acquisition_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "evidence_acquisition_smoke",
+            "success": True,
+            "alertable": 2,
+        }],
+        core_opportunity_rows=[core],
+        alert_rows=rows,
+        requested_profile="evidence_acquisition_smoke",
+        artifact_namespace="evidence_acquisition_smoke",
+        include_test_artifacts=True,
+    )
+    assert "- Alertable routed decisions: 1" in brief
+
+    inbox = event_alpha_notification_inbox.build_notification_inbox(
+        notification_runs=[{
+            "run_id": "run-diagnostic-support",
+            "profile": "evidence_acquisition_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "evidence_acquisition_smoke",
+            "would_send_count": 2,
+            "lane_counts_due": {"research_digest": 2},
+        }],
+        alert_rows=rows,
+        feedback_rows=[],
+        research_cards_dir=Path("/tmp"),
+        profile="evidence_acquisition_smoke",
+        artifact_namespace="evidence_acquisition_smoke",
+        notification_runs_path=Path("/tmp/runs.jsonl"),
+        alert_store_path=Path("/tmp/alerts.jsonl"),
+        feedback_path=Path("/tmp/feedback.jsonl"),
+    )
+    assert all(item.get("alert_id") != "ea:velvet-support" for item in inbox.would_send_without_feedback)
+
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{
+            "run_id": "run-diagnostic-support",
+            "profile": "evidence_acquisition_smoke",
+            "artifact_namespace": "evidence_acquisition_smoke",
+            "success": True,
+        }],
+        core_opportunity_rows=[core],
+        alert_rows=rows,
+        profile="evidence_acquisition_smoke",
+        artifact_namespace="evidence_acquisition_smoke",
+        strict=True,
+    )
+    assert doctor.diagnostic_support_snapshot_alertable == 0
+    assert doctor.diagnostic_support_snapshot_inherits_core_route == 0
+    assert doctor.duplicate_alertable_snapshot_for_core == 0
+    assert not any("diagnostic_support_snapshot" in item for item in doctor.blockers)
+
+
+def test_artifact_doctor_blocks_bad_diagnostic_support_snapshot_and_duplicate_canonical_alerts():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+
+    core = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-bad-diagnostic-support",
+        "profile": "evidence_acquisition_smoke",
+        "run_mode": "burn_in",
+        "artifact_namespace": "evidence_acquisition_smoke",
+        "core_opportunity_id": "agg:3381ebd96566",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "final_opportunity_level": "high_priority",
+        "opportunity_level": "high_priority",
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+    }
+    bad_support = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "run-bad-diagnostic-support",
+        "profile": "evidence_acquisition_smoke",
+        "run_mode": "burn_in",
+        "artifact_namespace": "evidence_acquisition_smoke",
+        "alert_id": "ea:bad-support",
+        "core_opportunity_id": "agg:3381ebd96566",
+        "core_resolution_status": "diagnostic_support",
+        "snapshot_class": "diagnostic_support_snapshot",
+        "is_diagnostic_snapshot": True,
+        "candidate_role": "source_noise",
+        "impact_path_type": "insufficient_data",
+        "final_opportunity_level": "high_priority",
+        "opportunity_level": "high_priority",
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "alertable_after_quality_gate": True,
+        "route_alertable": True,
+    }
+    duplicate_a = {
+        **bad_support,
+        "alert_id": "ea:canonical-a",
+        "core_resolution_status": "canonical",
+        "snapshot_class": "canonical_core_snapshot",
+        "is_diagnostic_snapshot": False,
+        "candidate_role": "proxy_venue",
+        "impact_path_type": "venue_value_capture",
+    }
+    duplicate_b = {**duplicate_a, "alert_id": "ea:canonical-b"}
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{
+            "run_id": "run-bad-diagnostic-support",
+            "profile": "evidence_acquisition_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "evidence_acquisition_smoke",
+            "success": True,
+        }],
+        core_opportunity_rows=[core],
+        alert_rows=[bad_support, duplicate_a, duplicate_b],
+        profile="evidence_acquisition_smoke",
+        artifact_namespace="evidence_acquisition_smoke",
+        strict=True,
+    )
+    assert doctor.diagnostic_support_snapshot_alertable == 1
+    assert doctor.diagnostic_support_snapshot_inherits_core_route == 1
+    assert doctor.duplicate_alertable_snapshot_for_core == 1
+    assert doctor.status == "BLOCKED"
+    assert any("diagnostic_support_snapshot_alertable=1" in item for item in doctor.blockers)
+    assert any("diagnostic_support_snapshot_inherits_core_route=1" in item for item in doctor.blockers)
+    assert any("duplicate_alertable_snapshot_for_core=1" in item for item in doctor.blockers)
+
+
 def test_alert_snapshot_load_reconciles_sibling_core_store_and_reports_counts():
     import json
     from crypto_rsi_scanner import (

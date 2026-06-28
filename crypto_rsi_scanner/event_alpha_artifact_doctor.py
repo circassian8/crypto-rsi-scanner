@@ -81,6 +81,10 @@ class EventAlphaArtifactDoctorResult:
     alert_snapshot_live_confirmation_stale: int = 0
     alert_snapshot_core_resolution_missing: int = 0
     alert_snapshot_pre_reconciliation_alertable: int = 0
+    diagnostic_support_snapshot_alertable: int = 0
+    diagnostic_support_snapshot_inherits_core_route: int = 0
+    duplicate_alertable_snapshot_for_core: int = 0
+    canonical_snapshot_missing_for_visible_core: int = 0
     fresh_quality_route_conflict_rows: int = 0
     legacy_quality_conflict_rows: int = 0
     alert_rows_missing_final_route: int = 0
@@ -592,6 +596,26 @@ def diagnose_artifacts(
             "alert_snapshot_pre_reconciliation_alertable="
             f"{snapshot_core_conflicts['pre_reconciliation_alertable']}"
         )
+    if snapshot_core_conflicts["diagnostic_support_alertable"]:
+        message = f"diagnostic_support_snapshot_alertable={snapshot_core_conflicts['diagnostic_support_alertable']}"
+        (blockers if strict else warnings).append(message)
+    if snapshot_core_conflicts["diagnostic_support_inherits_core_route"]:
+        message = (
+            "diagnostic_support_snapshot_inherits_core_route="
+            f"{snapshot_core_conflicts['diagnostic_support_inherits_core_route']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if snapshot_core_conflicts["duplicate_alertable_snapshot_for_core"]:
+        message = (
+            "duplicate_alertable_snapshot_for_core="
+            f"{snapshot_core_conflicts['duplicate_alertable_snapshot_for_core']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if snapshot_core_conflicts["canonical_snapshot_missing_for_visible_core"]:
+        warnings.append(
+            "canonical_snapshot_missing_for_visible_core="
+            f"{snapshot_core_conflicts['canonical_snapshot_missing_for_visible_core']}"
+        )
     if fresh_route_conflicts and strict:
         blockers.append(f"fresh_quality_route_conflict_rows={fresh_route_conflicts}")
     if legacy_route_conflicts:
@@ -753,6 +777,10 @@ def diagnose_artifacts(
         alert_snapshot_live_confirmation_stale=snapshot_core_conflicts["live_confirmation_stale"],
         alert_snapshot_core_resolution_missing=snapshot_core_conflicts["core_resolution_missing"],
         alert_snapshot_pre_reconciliation_alertable=snapshot_core_conflicts["pre_reconciliation_alertable"],
+        diagnostic_support_snapshot_alertable=snapshot_core_conflicts["diagnostic_support_alertable"],
+        diagnostic_support_snapshot_inherits_core_route=snapshot_core_conflicts["diagnostic_support_inherits_core_route"],
+        duplicate_alertable_snapshot_for_core=snapshot_core_conflicts["duplicate_alertable_snapshot_for_core"],
+        canonical_snapshot_missing_for_visible_core=snapshot_core_conflicts["canonical_snapshot_missing_for_visible_core"],
         fresh_quality_route_conflict_rows=fresh_route_conflicts,
         legacy_quality_conflict_rows=legacy_route_conflicts,
         alert_rows_missing_final_route=missing_final_route,
@@ -1175,16 +1203,29 @@ def _alert_snapshot_core_conflicts(
         "live_confirmation_stale": 0,
         "core_resolution_missing": 0,
         "pre_reconciliation_alertable": 0,
+        "diagnostic_support_alertable": 0,
+        "diagnostic_support_inherits_core_route": 0,
+        "duplicate_alertable_snapshot_for_core": 0,
+        "canonical_snapshot_missing_for_visible_core": 0,
     }
+    core_rows_tuple = tuple(core_rows)
     core_by_id = {
         str(row.get("core_opportunity_id") or "").strip(): row
-        for row in core_rows
+        for row in core_rows_tuple
         if str(row.get("core_opportunity_id") or "").strip()
     }
+    alertable_canonical_by_core_route: dict[tuple[str, str], int] = {}
+    canonical_alertable_core_ids: set[str] = set()
     for row in alerts:
         if event_alpha_artifacts.is_legacy_row(row):
             continue
-        if bool(row.get("is_diagnostic_snapshot")):
+        if _is_diagnostic_support_snapshot(row):
+            route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").strip()
+            alertable = bool(row.get("alertable_after_quality_gate", row.get("route_alertable")))
+            if alertable or event_alpha_router.route_value_is_alertable(route):
+                out["diagnostic_support_alertable"] += 1
+            if event_alpha_router.route_value_is_alertable(route):
+                out["diagnostic_support_inherits_core_route"] += 1
             continue
         core_id = str(row.get("core_opportunity_id") or "").strip()
         if not core_id:
@@ -1221,7 +1262,35 @@ def _alert_snapshot_core_conflicts(
             and not event_alpha_router.route_value_is_alertable(snapshot_route)
         ):
             out["pre_reconciliation_alertable"] += 1
+        if event_alpha_router.route_value_is_alertable(snapshot_route):
+            canonical_alertable_core_ids.add(core_id)
+            key = (core_id, snapshot_route)
+            alertable_canonical_by_core_route[key] = alertable_canonical_by_core_route.get(key, 0) + 1
+    out["duplicate_alertable_snapshot_for_core"] = sum(
+        max(0, count - 1)
+        for count in alertable_canonical_by_core_route.values()
+        if count > 1
+    )
+    alertable_visible_core_ids = {
+        str(row.get("core_opportunity_id") or "").strip()
+        for row in core_rows_tuple
+        if str(row.get("core_opportunity_id") or "").strip()
+        and event_alpha_router.route_value_is_alertable(
+            row.get("final_route_after_quality_gate") or row.get("route")
+        )
+        and not event_core_opportunities.row_is_diagnostic(row)
+    }
+    out["canonical_snapshot_missing_for_visible_core"] = len(alertable_visible_core_ids - canonical_alertable_core_ids)
     return out
+
+
+def _is_diagnostic_support_snapshot(row: Mapping[str, Any]) -> bool:
+    return (
+        str(row.get("snapshot_class") or "") == event_alpha_alert_store.SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
+        or str(row.get("core_resolution_status") or "") == "diagnostic_support"
+        or str(row.get("snapshot_core_resolution_status") or "") == "diagnostic_support"
+        or bool(row.get("is_diagnostic_snapshot"))
+    )
 
 
 def _quality_route_conflicts(alerts: Iterable[Mapping[str, Any]], *, legacy: bool) -> int:
@@ -1765,6 +1834,10 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"alert_snapshot_live_confirmation_stale={result.alert_snapshot_live_confirmation_stale} "
             f"alert_snapshot_core_resolution_missing={result.alert_snapshot_core_resolution_missing} "
             f"alert_snapshot_pre_reconciliation_alertable={result.alert_snapshot_pre_reconciliation_alertable} "
+            f"diagnostic_support_snapshot_alertable={result.diagnostic_support_snapshot_alertable} "
+            f"diagnostic_support_snapshot_inherits_core_route={result.diagnostic_support_snapshot_inherits_core_route} "
+            f"duplicate_alertable_snapshot_for_core={result.duplicate_alertable_snapshot_for_core} "
+            f"canonical_snapshot_missing_for_visible_core={result.canonical_snapshot_missing_for_visible_core} "
             f"live_validated_without_confirmation={result.live_validated_without_confirmation} "
             f"live_sector_digest_without_asset={result.live_sector_digest_without_asset} "
             f"live_rejected_results_promoted={result.live_rejected_results_promoted} "
