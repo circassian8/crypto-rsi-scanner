@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Add live-style Event Alpha no-send burn-in gate · Codex
+**Why:** Event Alpha needed a real live-style, no-send proof path before any
+notification promotion: provider gaps, source-pack coverage, cards, feedback
+targets, market freshness, evidence acquisition, and artifact hygiene must be
+visible in one operator flow without sending Telegram or touching trading paths.
+**Changes:**
+- Added the `live_burn_in_no_send` profile and Make targets for
+  `event-alpha-live-burn-in-no-send` and `event-alpha-burn-in-readiness`.
+- Added `event_alpha_burn_in_readiness.py` plus scanner CLI wiring for a
+  profile-aware readiness gate that confirms a successful latest run,
+  no-send/no-delivery status, provider coverage, evidence acquisition, market
+  freshness visibility, feedback readiness, and strict artifact-doctor status.
+- Expanded provider status with configured/not-configured/healthy provider
+  summaries and source-pack coverage gaps with evidence-absence semantics.
+- Added a Burn-In Readiness section to the daily brief and a configurable
+  `RSI_EVENT_RESEARCH_CARDS_WRITE_LIMIT` so burn-in profiles can write cards for
+  every visible core opportunity.
+- Hardened artifact-doctor card-group validation so healthy
+  `QUALITY_BLOCKED`/local-only cards are not incorrectly treated as near-miss
+  mismatches.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, and
+  `research/EVENT_ALPHA_RUNBOOK.md`.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` passed (520/520); `make
+event-alpha-signal-quality-eval PYTHON=python3` passed (36/36); `make
+event-alpha-live-burn-in-no-send PYTHON=python3` completed with no sends and
+`READY_FOR_NO_SEND_BURN_IN_REVIEW: yes`; `make event-alpha-burn-in-readiness
+PROFILE=live_burn_in_no_send PYTHON=python3` confirmed 70 core opportunities,
+70 cards, 70 feedback targets, 10 evidence-acquisition rows, and no blockers;
+`make verify PYTHON=python3` passed.
+**Notes/risks:** The live-style burn-in still surfaces expected fail-soft
+provider warnings such as GDELT 429s, RSS 403s, and one OpenAI extraction
+timeout. These are recorded as provider/readiness signals, not crashes. No
+Telegram sends, paper trades, normal RSI rows, live DB writes, execution paths,
+or LLM/provider-created `TRIGGERED_FADE` were added.
+
 ## 2026-06-28 — Surface Event Alpha source contracts in artifacts · Codex
 **Why:** Source Registry v2 could already classify provider quality, but
 operator-facing cards/audits and evidence-acquisition rows did not consistently

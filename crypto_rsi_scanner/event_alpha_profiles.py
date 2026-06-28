@@ -122,6 +122,7 @@ def artifact_policy(profile: EventAlphaProfile) -> dict[str, Any]:
         "snapshot_policy": overrides.get("EVENT_ALPHA_SNAPSHOT_POLICY", profile.snapshot_policy),
         "card_auto_write": overrides.get("EVENT_RESEARCH_CARDS_AUTO_WRITE", profile.card_auto_write),
         "card_write_tiers": tiers,
+        "card_write_limit": overrides.get("EVENT_RESEARCH_CARDS_WRITE_LIMIT", "default"),
         "watchlist_monitor_enabled": overrides.get(
             "EVENT_WATCHLIST_MONITOR_ENABLED",
             profile.watchlist_monitor_enabled,
@@ -706,6 +707,7 @@ _PROFILES["catalyst_frame_e2e"] = replace(
             "HIGH_PRIORITY_WATCH",
             "TRIGGERED_FADE",
         ),
+        "EVENT_RESEARCH_CARDS_WRITE_LIMIT": 250,
     },
     snapshot_policy="all",
     card_auto_write=True,
@@ -766,6 +768,33 @@ _PROFILES["notify_llm_quality_fresh"] = replace(
         "notify_llm_quality inputs and quality gates, but writes to an isolated "
         "artifact namespace for stale-artifact validation."
     ),
+)
+
+_PROFILES["live_burn_in_no_send"] = replace(
+    _PROFILES["notify_llm_quality_fresh"],
+    name="live_burn_in_no_send",
+    description=(
+        "Fresh live-style frame-enabled Event Alpha burn-in profile for day-1 "
+        "readiness. It exercises configured providers, source packs, catalyst "
+        "frames, market refresh, cards, and artifact doctors without requesting sends."
+    ),
+    config_overrides={
+        **_PROFILES["notify_llm_quality_fresh"].config_overrides,
+        "EVENT_ALPHA_SNAPSHOT_POLICY": "all",
+        "EVENT_RESEARCH_CARDS_WRITE_TIERS": (
+            "STORE_ONLY",
+            "RADAR_DIGEST",
+            "WATCHLIST",
+            "HIGH_PRIORITY_WATCH",
+            "TRIGGERED_FADE",
+        ),
+        "EVENT_RESEARCH_CARDS_WRITE_LIMIT": 250,
+    },
+    snapshot_policy="all",
+    card_write_tiers=("STORE_ONLY", "RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"),
+    send=False,
+    send_lane_policy="live_burn_in_no_send",
+    send_guard="no-send burn-in profile; do not pass --event-alert-send",
 )
 
 _PROFILES["notify_llm_quality_frame"] = replace(

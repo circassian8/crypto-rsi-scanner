@@ -18,6 +18,7 @@ NOTIFICATION_BURN_IN_PROFILES = {
     "notify_llm_deep",
     "notify_llm_quality",
     "notify_llm_quality_fresh",
+    "live_burn_in_no_send",
 }
 OPERATIONAL_PROFILES = {"research_send"}
 LEGACY_NAMESPACE = "legacy"

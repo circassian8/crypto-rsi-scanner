@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Live-style burn-in requires an explicit no-send readiness gate
+**Status:** accepted
+**Decision:** Event Alpha live-style burn-in should have a dedicated no-send
+profile and readiness report before operators treat artifacts as meaningful or
+consider notification promotion. The readiness gate must verify a successful
+fresh run, no send request/delivery, provider/source-pack coverage, strict
+artifact-doctor status, feedback/card readiness, evidence acquisition, and
+market-freshness visibility. Provider gaps should be visible as coverage gaps;
+missing or degraded broad sources are not automatically strong negative
+evidence.
+**Why:** The radar can be safe and still misleading if a no-op run is mistaken
+for a clean absence of opportunities. A profile-scoped no-send burn-in gate
+separates safe execution, provider readiness, artifact completeness, and
+manual review readiness without adding Telegram sends, paper/live rows, or
+trading paths.
+**Revisit when:** A reviewed burn-in dataset and operator feedback justify a
+separate human-approved notification promotion workflow.
+
 ## 2026-06-28 - Source contracts must be explicit in operator artifacts
 **Status:** accepted
 **Decision:** Event Alpha source-quality artifacts should expose a compact

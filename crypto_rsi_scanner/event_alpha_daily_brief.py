@@ -228,6 +228,16 @@ def build_daily_brief(
         f"- Near-miss candidates: {len(near_miss_candidates)}",
         f"- Upgrade candidates: {len(upgrade_candidates)}",
         "",
+        "## Burn-In Readiness",
+        *_burn_in_readiness_lines(
+            latest=latest,
+            core_opportunities=core_opportunities,
+            card_paths=card_paths,
+            evidence_acquisition_rows=acquisition_rows,
+            provider_health_rows=provider_health_rows or {},
+            requested_profile=requested_profile,
+        ),
+        "",
         "## High-Priority Core Opportunities",
         *_core_opportunity_lines(core_sections["strong"], limit=8),
         "",
@@ -721,6 +731,54 @@ def format_daily_brief_result(result: EventAlphaDailyBriefResult) -> str:
 def _compact(report: str) -> str:
     lines = [line for line in str(report or "").splitlines() if line and not line.startswith("=")]
     return "\n".join(f"> {line}" for line in lines[:20])
+
+
+def _burn_in_readiness_lines(
+    *,
+    latest: Mapping[str, Any],
+    core_opportunities: Iterable[Any],
+    card_paths: Iterable[Path],
+    evidence_acquisition_rows: Iterable[Mapping[str, Any]],
+    provider_health_rows: Mapping[str, Mapping[str, Any]],
+    requested_profile: str | None,
+) -> list[str]:
+    cores = list(core_opportunities)
+    cards = [Path(path) for path in card_paths if Path(path).name != "index.md"]
+    feedback_targets = sum(1 for path in cards if event_research_cards.card_feedback_target(path))
+    acquisition = [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)]
+    accepted = sum(
+        1 for row in acquisition
+        if int(row.get("accepted_evidence_count") or 0) > 0
+        or str(row.get("acquisition_status") or row.get("status") or "") in {
+            "accepted_evidence_found",
+            "accepted",
+        }
+    )
+    send_requested = bool(latest.get("send_requested")) if latest else False
+    sent = bool(latest.get("sent")) if latest else False
+    delivered = int(latest.get("send_items_delivered") or latest.get("deliveries_delivered") or 0) if latest else 0
+    no_send = bool(latest) and not send_requested and not sent and delivered <= 0
+    health_rows = list((provider_health_rows or {}).values())
+    backoff = sum(1 for row in health_rows if row.get("disabled_until"))
+    degraded = sum(1 for row in health_rows if int(row.get("consecutive_failures") or 0) > 0 or row.get("last_error_safe"))
+    provider_fetches = int(latest.get("provider_fetch_count") or 0) if latest else 0
+    provider_hits = int(latest.get("provider_cache_hits") or 0) if latest else 0
+    provider_misses = int(latest.get("provider_cache_misses") or 0) if latest else 0
+    warnings = [str(item) for item in (latest.get("warnings") or []) if str(item)] if latest else []
+    keys_missing = [item for item in warnings if "missing" in item.lower() or "disabled" in item.lower()]
+    return [
+        f"- Burn-in mode: {'no-send' if no_send else 'send-capable or unknown'} "
+        f"(profile={requested_profile or latest.get('profile') or 'latest'})",
+        f"- Provider coverage: health_rows={len(health_rows)} degraded={degraded} backoff={backoff} "
+        f"fetches={provider_fetches} cache_hits={provider_hits} cache_misses={provider_misses}",
+        f"- Opportunities found: core={len(cores)} high_priority={sum(1 for item in cores if getattr(item, 'is_high_priority', False))} "
+        f"watchlist={sum(1 for item in cores if getattr(item, 'is_watchlist', False))}",
+        f"- Evidence acquisition: rows={len(acquisition)} accepted={accepted}",
+        f"- Feedback targets: cards_with_targets={feedback_targets}/{len(cards)}",
+        "- What to review manually: provider gaps, source-pack evidence absence, core opportunity cards, near-miss rows, and feedback targets.",
+        "- Missing keys/providers: "
+        + ("; ".join(keys_missing[:5]) if keys_missing else "see provider readiness/status report for configured vs missing sources."),
+    ]
 
 
 def _system_health_summary_lines(latest: Mapping[str, Any]) -> list[str]:

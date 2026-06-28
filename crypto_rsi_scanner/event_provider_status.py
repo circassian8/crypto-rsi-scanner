@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import event_source_packs
+
 
 @dataclass(frozen=True)
 class ProviderStatus:
@@ -342,6 +344,9 @@ def provider_status_to_dict(report: EventDiscoveryProviderStatus) -> dict[str, A
 
 
 def format_event_discovery_provider_status(report: EventDiscoveryProviderStatus) -> str:
+    configured = tuple(item for item in (*report.sources, *report.enrichment) if item.ready)
+    not_configured = tuple(item for item in (*report.sources, *report.enrichment) if not item.ready)
+    healthy = tuple(item.name for item in configured)
     lines = [
         "EVENT DISCOVERY PROVIDER STATUS",
         f"Mode: {report.mode}",
@@ -375,6 +380,18 @@ def format_event_discovery_provider_status(report: EventDiscoveryProviderStatus)
             f"- configured review cycle ready: {'yes' if report.ready_for_configured_review_cycle else 'no'}",
         ]
     )
+    lines.extend([
+        "",
+        "Provider readiness summary:",
+        "- providers_configured: " + (_join_names(item.name for item in configured) or "none"),
+        "- providers_not_configured: " + (_join_names(item.name for item in not_configured) or "none"),
+        "- providers_healthy: " + (_join_names(healthy) or "none"),
+        "- providers_degraded_or_backoff: see provider-health report; none in static readiness snapshot",
+    ])
+    pack_lines = _source_pack_gap_lines(report)
+    if pack_lines:
+        lines.extend(["", "Source pack coverage gaps:"])
+        lines.extend(pack_lines)
     if report.warnings:
         lines.append("")
         lines.append("Warnings:")
@@ -384,3 +401,46 @@ def format_event_discovery_provider_status(report: EventDiscoveryProviderStatus)
         lines.append("Next:")
         lines.extend(f"- {step}" for step in report.next_steps)
     return "\n".join(lines)
+
+
+def _source_pack_gap_lines(report: EventDiscoveryProviderStatus) -> list[str]:
+    ready_by_name = {item.name: item.ready for item in (*report.sources, *report.enrichment)}
+    # Map provider status names onto the provider names used by source packs.
+    provider_aliases = {
+        "project_blog_rss": "project_blog_rss",
+        "gdelt_news": "gdelt",
+        "cryptopanic_news": "cryptopanic",
+        "prediction_market_events": "polymarket",
+        "binance_announcements": "binance_announcements",
+        "bybit_announcements": "bybit_announcements",
+        "tokenomist_unlocks": "tokenomist",
+        "tokenomist_supply": "tokenomist",
+        "coinalyze_derivatives": "coinalyze",
+        "coingecko_universe": "coingecko",
+    }
+    ready_providers = {
+        alias
+        for status_name, alias in provider_aliases.items()
+        if ready_by_name.get(status_name)
+    }
+    lines: list[str] = []
+    for pack in event_source_packs.SOURCE_PACKS.values():
+        preferred = set(pack.preferred_providers)
+        missing = tuple(sorted(provider for provider in preferred if provider not in ready_providers))
+        if not missing:
+            continue
+        absence_meaningful = any(
+            provider in ready_providers
+            for provider in preferred
+            if provider in {"binance_announcements", "bybit_announcements", "tokenomist", "coinalyze"}
+        )
+        lines.append(
+            f"- {pack.name}: missing={_join_names(missing)} "
+            f"evidence_absence_meaningful={str(absence_meaningful).lower()} "
+            f"preferred={_join_names(preferred)}"
+        )
+    return lines[:12]
+
+
+def _join_names(values: Any) -> str:
+    return ", ".join(str(item) for item in sorted(set(values)) if str(item))

@@ -71,6 +71,7 @@ from . import event_alpha_artifact_doctor
 from . import event_alpha_artifacts
 from . import event_alpha_alert_store
 from . import event_alpha_burn_in
+from . import event_alpha_burn_in_readiness
 from . import event_alpha_burn_in_pack
 from . import event_alpha_calibration
 from . import event_alpha_daily_brief
@@ -2371,6 +2372,7 @@ def event_alpha_cycle(
             alert_rows=latest_core_rows,
             route_decisions=pipeline_result.router_result.decisions,
             selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
+            limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
             now=now,
             lineage_context=_event_alpha_card_lineage_context(
                 run_id=run_id,
@@ -2910,6 +2912,7 @@ def _event_alpha_notify_cycle_body(
             alert_rows=latest_core_rows,
             route_decisions=pipeline_result.router_result.decisions,
             selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
+            limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
             now=now,
             lineage_context=_event_alpha_card_lineage_context(
                 run_id=run_id,
@@ -5077,6 +5080,134 @@ def event_alpha_feedback_readiness_report(
     print(event_alpha_feedback_readiness.format_feedback_readiness(result))
 
 
+def event_alpha_burn_in_readiness_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print live-style no-send burn-in readiness from profile-scoped artifacts."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "live_burn_in_no_send"
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(selected_profile, artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    provider_report = event_provider_status.build_event_discovery_provider_status(config)
+    runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=500)
+    alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=False)
+    feedback = event_feedback.load_feedback(context.feedback_path)
+    feedback_rows = [record.__dict__ for record in feedback.records]
+    delivery_rows = event_alpha_notification_delivery.load_delivery_records(
+        event_alpha_notification_delivery.deliveries_path_for_context(context)
+    )
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
+    notification_runs = event_alpha_notification_runs.load_notification_runs(
+        context.notification_runs_path,
+        limit=250,
+    )
+    inbox = event_alpha_notification_inbox.build_notification_inbox(
+        notification_runs=notification_runs.rows,
+        alert_rows=alerts.rows,
+        feedback_rows=feedback_rows,
+        notification_delivery_rows=delivery_rows,
+        watchlist_entries=watchlist.entries,
+        research_cards_dir=context.research_cards_dir,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        notification_runs_path=context.notification_runs_path,
+        alert_store_path=context.alert_store_path,
+        feedback_path=context.feedback_path,
+        outcomes_path=context.outcomes_path,
+    )
+    feedback_readiness = event_alpha_feedback_readiness.build_feedback_readiness(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        card_paths=_research_card_markdown_paths(context.research_cards_dir),
+        alert_rows=alerts.rows,
+        feedback_rows=feedback_rows,
+        watchlist_entries=watchlist.entries,
+        inbox_result=inbox,
+    )
+    outcome_rows = [
+        row for row in alerts.rows if any(
+            row.get(field) not in (None, "")
+            for field in (
+                "primary_horizon_return",
+                "return_1h",
+                "return_4h",
+                "return_24h",
+                "return_72h",
+                "return_7d",
+                "max_favorable_excursion",
+                "max_adverse_excursion",
+                "mfe_mae_ratio",
+                "direction_hit",
+                "volatility_hit",
+            )
+        )
+    ]
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=runs.rows,
+        alert_rows=alerts.rows,
+        feedback_rows=feedback_rows,
+        outcome_rows=outcome_rows,
+        hypothesis_rows=event_impact_hypothesis_store.load_impact_hypotheses(
+            context.impact_hypothesis_store_path,
+            limit=500,
+            latest_run=True,
+            include_legacy=True,
+        ).rows,
+        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(
+            context.core_opportunity_store_path,
+            latest_run=True,
+            include_legacy=True,
+        ).rows,
+        watchlist_rows=watchlist.entries,
+        incident_rows=event_incident_store.load_incidents(
+            context.incident_store_path,
+            limit=500,
+            latest_run=True,
+            include_legacy=True,
+        ).rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(
+            context.evidence_acquisition_path
+        ),
+        card_paths=[str(path) for path in _research_card_markdown_paths(context.research_cards_dir, include_index=True)],
+        provider_health_rows=event_provider_health.load_provider_health(context.provider_health_path),
+        llm_budget_rows=event_alpha_burn_in.load_llm_budget_rows(context.llm_budget_ledger_path),
+        delivery_rows=delivery_rows,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        include_test_artifacts=False,
+        include_legacy_artifacts=False,
+        inspected_alert_store_path=context.alert_store_path,
+        strict=True,
+    )
+    core_store = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    )
+    acquisition_rows = event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path)
+    readiness = event_alpha_burn_in_readiness.build_burn_in_readiness(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_rows=runs.rows,
+        provider_status=provider_report,
+        artifact_doctor=doctor,
+        feedback_readiness=feedback_readiness,
+        core_opportunity_rows=core_store.rows,
+        evidence_acquisition_rows=acquisition_rows,
+        daily_brief_path=context.daily_brief_path,
+    )
+    print(_event_alpha_context_block(context))
+    print(event_provider_status.format_event_discovery_provider_status(provider_report))
+    print("")
+    print(event_alpha_burn_in_readiness.format_burn_in_readiness(readiness))
+
+
 def event_alpha_notify_fixture_smoke(
     verbose: bool = False,
     *,
@@ -6032,6 +6163,7 @@ def event_research_cards_write(
         feedback_rows=feedback_rows,
         outcome_rows=outcome_rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
+        limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
         now=datetime.now(timezone.utc),
         lineage_context=_event_alpha_card_lineage_context(
             run_id=_latest_event_alpha_run_id(context.run_ledger_path),
@@ -6139,6 +6271,7 @@ def event_alpha_daily_brief_report(
         route_decisions=router_result.decisions,
         monitor_rows=monitor_result.rows,
         selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
+        limit=config.EVENT_RESEARCH_CARDS_WRITE_LIMIT,
         now=datetime.now(timezone.utc),
         lineage_context=_event_alpha_card_lineage_context(
             run_id=_latest_event_alpha_run_id(context.run_ledger_path),
@@ -8612,6 +8745,11 @@ def cli() -> None:
         help="Print Event Alpha burn-in acceptance checklist for research-send readiness.",
     )
     parser.add_argument(
+        "--event-alpha-burn-in-readiness",
+        action="store_true",
+        help="Print live-style no-send Event Alpha burn-in readiness from local artifacts.",
+    )
+    parser.add_argument(
         "--event-alpha-v1-readiness",
         action="store_true",
         help="Print v1 promotion readiness flags for Event Alpha burn-in artifacts.",
@@ -9490,6 +9628,13 @@ def cli() -> None:
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
             include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+        )
+        return
+    if args.event_alpha_burn_in_readiness:
+        event_alpha_burn_in_readiness_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
         )
         return
     if args.event_alpha_v1_readiness:

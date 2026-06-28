@@ -675,6 +675,7 @@ EVENT_RESEARCH_CARDS_WRITE_TIERS = tuple(
     _env_csv("RSI_EVENT_RESEARCH_CARDS_WRITE_TIERS")
     or ["HIGH_PRIORITY_WATCH", "TRIGGERED_FADE", "WATCHLIST"]
 )
+EVENT_RESEARCH_CARDS_WRITE_LIMIT = int(os.getenv("RSI_EVENT_RESEARCH_CARDS_WRITE_LIMIT", "25"))
 
 # Macro context header in the digest (Fear & Greed + BTC trend + breadth).
 MACRO_ENABLED = (os.getenv("RSI_MACRO", "1").lower() not in ("0", "false", "no"))

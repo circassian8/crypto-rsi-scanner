@@ -524,6 +524,27 @@ def test_event_provider_status_ready_with_live_prediction_market_source():
     assert "limit=12" in text
 
 
+def test_event_provider_status_formats_burn_in_readiness_summary_and_pack_gaps():
+    cfg = _event_provider_status_cfg(
+        EVENT_DISCOVERY_CRYPTOPANIC_LIVE=True,
+        EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN="",
+        EVENT_DISCOVERY_GDELT_LIVE=True,
+        EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIVE=False,
+    )
+    report = event_provider_status.build_event_discovery_provider_status(cfg)
+    text = event_provider_status.format_event_discovery_provider_status(report)
+
+    assert "Provider readiness summary:" in text
+    assert "providers_configured:" in text
+    assert "gdelt_news" in text
+    assert "providers_not_configured:" in text
+    assert "cryptopanic_news" in text
+    assert "Source pack coverage gaps:" in text
+    assert "evidence_absence_meaningful=false" in text
+    assert "CryptoPanic live mode is enabled but the API token is missing" in text
+    assert "api_token=missing" in text
+
+
 def test_config_load_url_list_dedupes_comments_and_inline_notes():
     import tempfile
     from pathlib import Path
@@ -21482,6 +21503,175 @@ def test_event_alpha_v1_readiness_health_tuning_and_pack_reports():
         assert "OPENAI_API_KEY" not in zf.read("cards/card.md").decode()
 
 
+def test_event_alpha_burn_in_readiness_requires_no_send_and_reviewable_artifacts():
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_burn_in_readiness,
+        event_alpha_feedback_readiness,
+        event_provider_status,
+    )
+
+    with TemporaryDirectory() as tmp:
+        brief = Path(tmp) / "event_alpha_daily_brief.md"
+        brief.write_text("## Market Freshness Readiness\n- fresh\n", encoding="utf-8")
+        provider_report = event_provider_status.EventDiscoveryProviderStatus(
+            mode="research_only",
+            cache_dir="event_fade_cache/live_burn_in_no_send",
+            lookback_hours=72,
+            horizon_days=14,
+            sources=(event_provider_status.ProviderStatus("gdelt_news", "event_source", True),),
+            enrichment=(event_provider_status.ProviderStatus("coingecko_universe", "enrichment", True),),
+            warnings=(),
+            next_steps=(),
+        )
+        doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
+            status="OK",
+            profile="live_burn_in_no_send",
+            artifact_namespace="live_burn_in_no_send",
+            run_rows=1,
+            alert_rows=1,
+            feedback_rows=0,
+            outcome_rows=0,
+            card_files=1,
+        )
+        feedback = event_alpha_feedback_readiness.EventAlphaFeedbackReadinessResult(
+            profile="live_burn_in_no_send",
+            artifact_namespace="live_burn_in_no_send",
+            cards_checked=1,
+            cards_with_lineage=1,
+            cards_with_feedback_target=1,
+            core_opportunity_cards_ready=1,
+            near_miss_cards_ready=0,
+            local_only_cards_ready=0,
+            alert_rows_checked=1,
+            alert_rows_with_feedback_targets=1,
+            inbox_review_items=1,
+            feedback_rows=0,
+            calibration_ready_rows=1,
+            visible_core_opportunities=1,
+            visible_core_opportunities_with_cards=1,
+            visible_core_opportunities_with_feedback_targets=1,
+        )
+        run = {
+            "run_id": "run-live-burn",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "live_burn_in_no_send",
+            "success": True,
+            "send_requested": False,
+            "sent": False,
+            "send_items_delivered": 0,
+            "raw_events": 4,
+            "candidates": 2,
+            "evidence_acquisition_attempted": 1,
+        }
+        result = event_alpha_burn_in_readiness.build_burn_in_readiness(
+            profile="live_burn_in_no_send",
+            artifact_namespace="live_burn_in_no_send",
+            run_rows=[run],
+            provider_status=provider_report,
+            artifact_doctor=doctor,
+            feedback_readiness=feedback,
+            core_opportunity_rows=[{"core_opportunity_id": "core:velvet"}],
+            evidence_acquisition_rows=[{"accepted_evidence_count": 1}],
+            daily_brief_path=brief,
+        )
+        text = event_alpha_burn_in_readiness.format_burn_in_readiness(result)
+
+        assert result.ready is True
+        assert result.no_send_confirmed is True
+        assert result.market_freshness_visible is True
+        assert "READY_FOR_NO_SEND_BURN_IN_REVIEW: yes" in text
+        assert "provider_coverage:" in text
+        assert "manual review checklist:" in text
+
+
+def test_event_alpha_burn_in_readiness_blocks_send_and_delivery_rows():
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_burn_in_readiness,
+        event_alpha_feedback_readiness,
+        event_provider_status,
+    )
+
+    provider_report = event_provider_status.EventDiscoveryProviderStatus(
+        mode="research_only",
+        cache_dir="cache",
+        lookback_hours=72,
+        horizon_days=14,
+        sources=(event_provider_status.ProviderStatus("manual_json", "event_source", True),),
+        enrichment=(event_provider_status.ProviderStatus("asset_aliases", "enrichment", True),),
+        warnings=(),
+        next_steps=(),
+    )
+    doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
+        status="WARN",
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        run_rows=1,
+        alert_rows=1,
+        feedback_rows=0,
+        outcome_rows=0,
+        card_files=1,
+        delivery_rows=1,
+    )
+    feedback = event_alpha_feedback_readiness.EventAlphaFeedbackReadinessResult(
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        cards_checked=0,
+        cards_with_lineage=0,
+        cards_with_feedback_target=0,
+        core_opportunity_cards_ready=0,
+        near_miss_cards_ready=0,
+        local_only_cards_ready=0,
+        alert_rows_checked=0,
+        alert_rows_with_feedback_targets=0,
+        inbox_review_items=0,
+        feedback_rows=0,
+        calibration_ready_rows=0,
+    )
+    result = event_alpha_burn_in_readiness.build_burn_in_readiness(
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        run_rows=[{
+            "run_id": "sent-run",
+            "profile": "live_burn_in_no_send",
+            "success": True,
+            "send_requested": True,
+            "sent": True,
+            "send_items_delivered": 1,
+        }],
+        provider_status=provider_report,
+        artifact_doctor=doctor,
+        feedback_readiness=feedback,
+        core_opportunity_rows=[{"core_opportunity_id": "core:aave"}],
+        evidence_acquisition_rows=[],
+        daily_brief_path=None,
+    )
+
+    assert result.ready is False
+    assert "latest run is not confirmed no-send" in result.blockers
+    assert "market freshness readiness section was not found in the daily brief" in result.warnings
+    delivery_leak = event_alpha_burn_in_readiness.build_burn_in_readiness(
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        run_rows=[{
+            "run_id": "no-send-run",
+            "profile": "live_burn_in_no_send",
+            "success": True,
+            "send_requested": False,
+            "sent": False,
+            "send_items_delivered": 0,
+        }],
+        provider_status=provider_report,
+        artifact_doctor=doctor,
+        feedback_readiness=feedback,
+        core_opportunity_rows=[{"core_opportunity_id": "core:aave"}],
+        evidence_acquisition_rows=[],
+        daily_brief_path=None,
+    )
+    assert "delivery ledger rows exist in no-send burn-in namespace" in delivery_leak.blockers
+
+
 def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     text = __import__("pathlib").Path("Makefile").read_text(encoding="utf-8")
     assert "event-alpha-priors-shadow-report:" in text
@@ -21489,6 +21679,8 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     assert "event-alpha-burn-in-llm:" in text
     assert "event-alpha-burn-in-scorecard:" in text
     assert "event-alpha-burn-in-checklist:" in text
+    assert "event-alpha-live-burn-in-no-send:" in text
+    assert "event-alpha-burn-in-readiness:" in text
     assert "event-alpha-v1-readiness:" in text
     assert "event-alpha-health-guard:" in text
     assert "event-alpha-artifact-doctor:" in text
@@ -21524,6 +21716,10 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     burn_in = text.split("event-alpha-burn-in-no-key:", 1)[1].split("event-alpha-burn-in-llm:", 1)[0]
     assert "--event-alert-send" not in burn_in
     assert "--event-alpha-profile no_key_live" in burn_in
+    live_burn_in = text.split("event-alpha-live-burn-in-no-send:", 1)[1].split("event-alpha-burn-in-readiness:", 1)[0]
+    assert "--event-alpha-cycle" in live_burn_in
+    assert "--event-alpha-burn-in-readiness" in live_burn_in
+    assert "--event-alert-send" not in live_burn_in
     assert "EVENT_ALPHA_PROFILE_DIR" in text
     llm_burn_in = text.split("event-alpha-burn-in-llm:", 1)[1].split("event-alpha-weekly-review:", 1)[0]
     assert "--event-alpha-profile full_llm_live" in llm_burn_in
@@ -24130,6 +24326,10 @@ def test_daily_brief_declares_canonical_view_and_market_freshness_readiness():
         artifact_namespace="notify_llm_quality",
     )
     assert "Canonical operator view: Core Opportunities sections above." in markdown
+    assert "## Burn-In Readiness" in markdown
+    assert "Burn-in mode: no-send" in markdown
+    assert "What to review manually" in markdown
+    assert "Missing keys/providers" in markdown
     assert "## Market Freshness Readiness" in markdown
     assert "Capped by stale/unknown context: 1" in markdown
     assert "Needs targeted market refresh: 1" in markdown
@@ -26267,6 +26467,18 @@ def test_notify_llm_quality_profile_and_make_target_are_no_send():
     assert fresh_ctx.run_mode == "notification_burn_in"
     assert fresh_ctx.artifact_namespace == "notify_llm_quality_fresh"
     assert str(fresh_ctx.namespace_dir).endswith("notify_llm_quality_fresh")
+    burn_in_profile = event_alpha_profiles.get_profile("live_burn_in_no_send")
+    assert burn_in_profile.send is False
+    assert burn_in_profile.notification_burn_in is True
+    assert burn_in_profile.snapshot_policy == "all"
+    assert "STORE_ONLY" in burn_in_profile.card_write_tiers
+    assert burn_in_profile.config_overrides["EVENT_RESEARCH_CARDS_WRITE_LIMIT"] == 250
+    burn_in_ctx = event_alpha_artifacts.context_from_profile(
+        "live_burn_in_no_send",
+        base_dir=Path("/tmp/event-alpha-test"),
+    )
+    assert burn_in_ctx.run_mode == "notification_burn_in"
+    assert burn_in_ctx.artifact_namespace == "live_burn_in_no_send"
 
     text = Path("Makefile").read_text(encoding="utf-8")
     assert "event-alpha-notify-llm-quality-scheduled:" in text
@@ -26303,6 +26515,16 @@ def test_notify_llm_quality_profile_and_make_target_are_no_send():
     assert "--event-alert-send" not in dry.stdout
     assert "EVENT_FIXTURE_NOW_ENV" not in dry.stdout
     assert "RSI_EVENT_RESEARCH_NOW" not in dry.stdout
+    burn_dry = subprocess.run(
+        ["make", "-n", "event-alpha-live-burn-in-no-send", "PROFILE=live_burn_in_no_send", "PYTHON=python3"],
+        cwd=Path.cwd(),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "--event-alpha-cycle" in burn_dry.stdout
+    assert "--event-alpha-burn-in-readiness" in burn_dry.stdout
+    assert "--event-alert-send" not in burn_dry.stdout
     validation_target = text.split("\nevent-alpha-notify-llm-quality-validation-cycle:", 1)[1].split(
         "\nevent-alpha-policy-simulate:", 1
     )[0]
@@ -28313,6 +28535,69 @@ def test_event_alpha_artifact_doctor_reports_core_store_coverage():
         artifact_namespace="market_refresh_smoke",
     )
     assert missing.visible_core_opportunities_missing_store_rows == 1
+
+
+def test_event_alpha_artifact_doctor_accepts_quality_blocked_local_card_group():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        card = root / "card_core_quality_blocked.md"
+        card.write_text(
+            "\n".join([
+                "# ADA quality blocked",
+                "",
+                "## Lineage",
+                "- Core opportunity ID: core_quality_blocked",
+                "- Feedback target: core_quality_blocked",
+            ]),
+            encoding="utf-8",
+        )
+        (root / "index.md").write_text(
+            "\n".join([
+                "# Event Research Cards",
+                "",
+                "## Local-Only / Quality-Capped Cards",
+                "",
+                "- [card_core_quality_blocked.md](card_core_quality_blocked.md) · group: Local-Only / Quality-Capped Cards · feedback target: `core_quality_blocked`",
+            ]),
+            encoding="utf-8",
+        )
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-quality-blocked-card",
+                "profile": "fixture",
+                "run_mode": "burn_in",
+                "artifact_namespace": "fixture",
+                "success": True,
+            }],
+            core_opportunity_rows=[{
+                "row_type": "event_core_opportunity",
+                "run_id": "run-quality-blocked-card",
+                "profile": "fixture",
+                "run_mode": "burn_in",
+                "artifact_namespace": "fixture",
+                "core_opportunity_id": "core_quality_blocked",
+                "symbol": "ADA",
+                "coin_id": "cardano",
+                "candidate_role": "direct_subject",
+                "impact_path_type": "strategic_investment_or_valuation",
+                "opportunity_level": "exploratory",
+                "opportunity_score_final": 64,
+                "final_route_after_quality_gate": "STORE_ONLY",
+                "final_state_after_quality_gate": "QUALITY_BLOCKED",
+                "state_quality_capped": True,
+                "card_path": str(card),
+                "research_card_path": str(card),
+                "feedback_target": "core_quality_blocked",
+            }],
+            card_paths=[card, root / "index.md"],
+            profile="fixture",
+            artifact_namespace="fixture",
+            strict=True,
+        )
+    assert doctor.daily_brief_card_group_mismatch_with_index == 0
+    assert "daily_brief_card_group_mismatch_with_index" not in "\n".join(doctor.blockers)
 
 
 def test_canonical_core_resolution_links_diagnostics_and_orphans():

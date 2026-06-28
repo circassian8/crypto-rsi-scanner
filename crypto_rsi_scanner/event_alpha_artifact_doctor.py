@@ -780,6 +780,14 @@ def _expected_card_group_for_store_core(
         return "Diagnostic / Source-Noise / Control Cards"
     if opportunity.is_high_priority or opportunity.is_watchlist or opportunity.is_validated_digest or opportunity.alertable:
         return "Core Opportunity Cards"
+    if (
+        str(opportunity.final_state_after_quality_gate or "").strip()
+        == event_watchlist.EventWatchlistState.QUALITY_BLOCKED.value
+        or str(opportunity.primary_row.get("state_quality_capped") or "").strip().casefold()
+        in {"1", "true", "yes", "y"}
+        or opportunity.quality_capped_supporting_rows > 0
+    ):
+        return "Local-Only / Quality-Capped Cards"
     if str(opportunity.opportunity_level or "").casefold() == "exploratory" or opportunity.opportunity_score_final >= 50:
         return "Near-Miss Cards"
     return "Local-Only / Quality-Capped Cards"

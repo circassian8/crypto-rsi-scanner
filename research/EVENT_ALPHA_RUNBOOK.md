@@ -189,6 +189,31 @@ report, and strict artifact doctor. Treat this as the clean live-style proof
 path for Pro-model review; `quality_validation` remains the isolated offline
 fixture proof path.
 
+Use `make event-alpha-live-burn-in-no-send
+PROFILE=live_burn_in_no_send` to prove a real live-style burn-in run without
+requesting Telegram delivery. This target clears only
+`event_fade_cache/live_burn_in_no_send/`, runs profile-aware status and
+preflight, runs the unified Event Alpha cycle without `--event-alert-send`,
+writes the daily brief, quality review, feedback-readiness report, strict
+artifact doctor, and the final burn-in readiness report:
+
+```bash
+make event-alpha-live-burn-in-no-send PROFILE=live_burn_in_no_send
+make event-alpha-burn-in-readiness PROFILE=live_burn_in_no_send
+make event-alpha-daily-brief PROFILE=live_burn_in_no_send
+make event-alpha-artifact-doctor PROFILE=live_burn_in_no_send STRICT=1
+```
+
+The readiness report should confirm `no_send_confirmed=true`, a successful
+latest run, no delivery rows in the namespace, provider/source-pack coverage,
+strict doctor status, card/feedback target readiness, evidence acquisition
+attempts, and a visible Market Freshness Readiness section in the daily brief.
+Missing provider keys or degraded public sources should be reviewed as coverage
+gaps. They do not make evidence absence meaningful by themselves. Do not move
+from no-send burn-in to guarded sends unless the operator has reviewed the core
+cards, near-miss/local-only sections, provider gaps, source-pack evidence
+absence semantics, and feedback targets.
+
 Notification lanes are independent: a daily digest cooldown does not block an
 instant escalation, and instant escalation cooldown does not block a
 deterministic proxy-fade `TRIGGERED_FADE`. Triggered-fade notifications dedupe
