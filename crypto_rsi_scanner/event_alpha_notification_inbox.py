@@ -364,12 +364,17 @@ def _append_item_section(
         lines.append("")
         return
     for item in rows[:20]:
+        item_id_label = "core_id" if item.core_opportunity_id and item.alert_id == item.core_opportunity_id else "alert_id"
         lines.append(
-            f"- {item.symbol or 'UNKNOWN'}/{item.coin_id or 'unknown'} alert_id={item.alert_id} "
+            f"- {item.symbol or 'UNKNOWN'}/{item.coin_id or 'unknown'} {item_id_label}={item.alert_id} "
             f"tier={item.tier} playbook={item.playbook} "
             f"sent={_yes_no(item.sent)} would_send={_yes_no(item.would_send)} "
             f"delivery_state={item.delivery_state or 'none'}"
         )
+        if item.alert_key and item.alert_key != item.alert_id:
+            lines.append(f"  source_alert_id: {item.alert_key}")
+        if item.core_opportunity_id and item.alert_id != item.core_opportunity_id:
+            lines.append(f"  core_opportunity_id: {item.core_opportunity_id}")
         lines.append(f"  card: {item.card_path or 'not_written'}")
         lines.append(f"  run_id: {item.run_id or 'unknown'}")
         if item.quality_gate_block_reason:
@@ -497,8 +502,8 @@ def _inbox_item_from_core(
     ids = _core_review_ids(core, row, feedback_target, card_path)
     reviewed = bool(ids & reviewed_ids)
     return EventAlphaNotificationInboxItem(
-        alert_id=str(row.get("alert_id") or core_id),
-        alert_key=str(row.get("alert_key") or core_id),
+        alert_id=core_id,
+        alert_key=str(row.get("alert_id") or row.get("alert_key") or core_id),
         symbol=str(core.symbol or core_row.get("symbol") or core_row.get("validated_symbol") or "UNKNOWN"),
         coin_id=str(core.coin_id or core_row.get("coin_id") or core_row.get("validated_coin_id") or "unknown"),
         run_id=run_id,

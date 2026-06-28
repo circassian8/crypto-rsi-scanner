@@ -11489,7 +11489,8 @@ def test_event_alpha_cycle_send_uses_router_approved_decisions_only():
         assert len(sent) == 1
         assert sent[0][1] == "HTML"
         assert sent[0][2] == ("chat",)
-        assert "HIGH_PRIORITY_RESEARCH" in sent[0][0]
+        assert "Event Alpha High-Priority Research" in sent[0][0]
+        assert "high-priority research" in sent[0][0]
         assert "HIGH" in sent[0][0]
         assert "DUP" not in sent[0][0]
         assert any(
@@ -11924,6 +11925,291 @@ def test_event_alpha_routed_notification_message_is_research_only_and_reviewable
     assert "research_card=/tmp/card.md" in message
     assert "make event-feedback-useful FEEDBACK_TARGET=ea:spacex|solana|proxy_attention" in message
     assert "<IPO> proxy" not in message
+
+
+def test_event_alpha_notification_uses_canonical_core_identity_and_compact_message():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notification_sender,
+        event_alpha_notifications,
+        event_alpha_router,
+        event_watchlist,
+    )
+
+    class FakeStorage:
+        def __init__(self):
+            self.meta = {}
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+    now = datetime(2026, 6, 28, 12, 0, tzinfo=timezone.utc)
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="hypothesis|incident:8ba9e42c8d86|bittensor|direct_subject|strategic_investment",
+        cluster_id="incident:8ba9e42c8d86",
+        event_id="incident:8ba9e42c8d86",
+        coin_id="bittensor",
+        symbol="TAO",
+        relationship_type="impact_hypothesis",
+        external_asset="Bittensor",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        previous_state=None,
+        first_seen_at=now.isoformat(),
+        last_seen_at=now.isoformat(),
+        hypothesis_id="hypothesis:tao-lower-layer",
+        source_count=1,
+        highest_score=72,
+        latest_score=72,
+        latest_tier="WATCHLIST",
+        latest_event_name="Lower-layer Bittensor source row",
+        latest_source="fixture",
+        latest_score_components={"hypothesis_id": "hypothesis:tao-lower-layer"},
+        should_alert=True,
+    )
+    decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+        alertable=True,
+        reason="lower-layer route before canonical reconciliation",
+        lane=event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+    )
+    core = {
+        "core_opportunity_id": "agg:ffdcb488dbed",
+        "primary_hypothesis_id": "hypothesis:tao-lower-layer",
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "canonical_incident_name": "Bitcoin ETF catalyst with tagged evidence",
+        "candidate_role": "direct_subject",
+        "impact_path_type": "direct_token_event",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_score_final": 76,
+        "final_route_after_quality_gate": "RESEARCH_DIGEST",
+        "evidence_acquisition_status": "accepted_evidence_found",
+        "acquisition_confirmation_status": "confirms",
+        "accepted_evidence_count": 1,
+        "source_class": "cryptopanic_tagged",
+        "source_pack": "crypto_news_pack",
+        "market_confirmation_level": "fresh_reaction",
+        "market_context_freshness_status": "fresh",
+        "why_opportunity_visible": "accepted tagged evidence validates the token/catalyst link",
+        "upgrade_requirements": ["review accepted source evidence", "verify market reaction is organic"],
+        "card_path": "/tmp/local/cards/agg-ffdcb488dbed.md",
+    }
+    sent_messages = []
+
+    def fake_sender(message):
+        sent_messages.append(message)
+        chunks = event_alpha_notification_sender.telegram_chunk_count(message)
+        return event_alpha_notification_sender.NotificationSendAttemptResult(
+            attempted=True,
+            success=True,
+            recipient_count=1,
+            delivered_count=1,
+            failed_count=0,
+            chunk_count=chunks,
+            delivered_chunks=chunks,
+            failed_chunks=0,
+            channel_summary={"channel": "fixture", "delivered_count": 1},
+        )
+
+    with TemporaryDirectory() as tmp:
+        delivery_cfg = delivery.NotificationDeliveryConfig(path=Path(tmp) / "deliveries.jsonl")
+        result = event_alpha_notifications.send_notifications(
+            [decision],
+            storage=FakeStorage(),
+            cfg=event_alpha_notifications.EventAlphaNotificationConfig(
+                enabled=True,
+                mode="research_only",
+                notification_scope="namespace",
+                artifact_namespace="notify_llm_deep",
+                daily_digest_cooldown_hours=0,
+                health_heartbeat_enabled=False,
+            ),
+            send_fn=fake_sender,
+            now=now,
+            profile="notify_llm_deep",
+            card_path_by_alert_id={decision.alert_id: "/tmp/local/cards/lower.md", "agg:ffdcb488dbed": core["card_path"]},
+            core_opportunity_rows=[core],
+            delivery_cfg=delivery_cfg,
+            run_id="run-1",
+            namespace="notify_llm_deep",
+        )
+        rows = delivery.latest_rows_by_delivery(delivery.load_delivery_records(delivery_cfg.path))
+        preview = (Path(tmp) / "event_alpha_notification_preview.md").read_text(encoding="utf-8")
+
+    assert result.success is True
+    assert rows[0]["alert_id"] == "agg:ffdcb488dbed"
+    assert rows[0]["core_opportunity_id"] == "agg:ffdcb488dbed"
+    assert rows[0]["canonical_symbol"] == "BTC"
+    assert rows[0]["canonical_coin_id"] == "bitcoin"
+    assert rows[0]["feedback_target"] == "agg:ffdcb488dbed"
+    assert rows[0]["identity_reconciled"] is True
+    assert rows[0]["source_alert_ids"] == [decision.alert_id]
+    assert rows[0]["notification_item_ids"] == ["agg:ffdcb488dbed"]
+    message = sent_messages[0]
+    assert "BTC / bitcoin" in message
+    assert "Feedback target: agg:ffdcb488dbed" in message
+    assert "Research-only / unvalidated" in message
+    assert "alert_id=" not in message
+    assert "card_id=" not in message
+    assert "research_card=" not in message
+    assert "/tmp/local/cards" not in message
+    assert "source_alert_ids:" in preview
+    assert "agg:ffdcb488dbed" in preview
+
+
+def test_event_alpha_notification_blocks_rejected_only_core_digest():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router, event_watchlist
+
+    class FakeStorage:
+        def __init__(self):
+            self.meta = {}
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+    now = datetime(2026, 6, 28, 12, 0, tzinfo=timezone.utc)
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="hypothesis|incident:btc|bitcoin|weak_macro",
+        cluster_id="incident:btc",
+        event_id="incident:btc",
+        coin_id="bitcoin",
+        symbol="BTC",
+        relationship_type="impact_hypothesis",
+        external_asset="Bitcoin",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        previous_state=None,
+        first_seen_at=now.isoformat(),
+        last_seen_at=now.isoformat(),
+        hypothesis_id="hypothesis:btc-weak",
+        source_count=1,
+        highest_score=71,
+        latest_score=71,
+        latest_tier="WATCHLIST",
+        latest_event_name="Broad bitcoin policy article",
+        latest_source="fixture",
+        latest_score_components={"hypothesis_id": "hypothesis:btc-weak"},
+        should_alert=True,
+    )
+    decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+        alertable=True,
+        reason="pre-core weak digest",
+        lane=event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+    )
+    rejected_core = {
+        "core_opportunity_id": "agg:btc-weak",
+        "primary_hypothesis_id": "hypothesis:btc-weak",
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_score_final": 72,
+        "final_route_after_quality_gate": "RESEARCH_DIGEST",
+        "impact_path_type": "insufficient_data",
+        "source_class": "broad_news",
+        "evidence_acquisition_status": "rejected_results_only",
+        "acquisition_confirmation_status": "does_not_confirm",
+        "accepted_evidence_count": 0,
+        "market_confirmation_level": "none",
+        "market_context_freshness_status": "missing",
+    }
+    plan = event_alpha_notifications.build_notification_plan(
+        [decision],
+        storage=FakeStorage(),
+        cfg=event_alpha_notifications.EventAlphaNotificationConfig(enabled=True, daily_digest_cooldown_hours=0),
+        now=now,
+        core_opportunity_rows=[rejected_core],
+    )
+    assert event_alpha_notifications.LANE_DAILY_DIGEST not in plan.decisions_by_lane
+    assert plan.would_send_count == 0
+    assert any("rejected_results_only_not_confirmation" in warning for warning in plan.canonicalization_warnings)
+
+
+def test_event_alpha_artifact_doctor_flags_notification_identity_and_preview_conflicts():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        preview = Path(tmp) / "event_alpha_notification_preview.md"
+        preview.write_text(
+            "# Event Alpha Notification Preview\n\n"
+            "## Telegram Body\n\n"
+            "```html\n"
+            "alert_id=ea:hypothesis|incident:btc route=RESEARCH_DIGEST research_card=/tmp/card.md\n"
+            "```",
+            encoding="utf-8",
+        )
+        core = {
+            "row_type": "event_core_opportunity",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep",
+            "core_opportunity_id": "agg:btc-weak",
+            "symbol": "BTC",
+            "coin_id": "bitcoin",
+            "final_opportunity_level": "validated_digest",
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "impact_path_type": "insufficient_data",
+            "source_class": "broad_news",
+            "evidence_acquisition_status": "rejected_results_only",
+            "acquisition_confirmation_status": "does_not_confirm",
+            "accepted_evidence_count": 0,
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+        }
+        delivery_row = {
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "delivery-1",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep",
+            "alert_id": "ea:hypothesis|incident:btc",
+            "core_opportunity_id": "agg:btc-weak",
+            "lane": "daily_digest",
+            "route": "RESEARCH_DIGEST",
+            "state": "delivered",
+            "attempted_at": "2026-06-28T12:00:00+00:00",
+            "delivered_at": "2026-06-28T12:00:01+00:00",
+            "notification_preview_path": str(preview),
+        }
+        result = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-1",
+                "row_type": "event_alpha_run",
+                "profile": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": "notify_llm_deep",
+                "alertable": 1,
+                "snapshot_write_success": True,
+                "snapshot_rows_written": 1,
+            }],
+            alert_rows=[],
+            core_opportunity_rows=[core],
+            delivery_rows=[delivery_row],
+            strict=True,
+        )
+    assert result.delivery_alert_id_not_canonical == 1
+    assert result.digest_item_without_live_confirmation == 1
+    assert result.digest_item_rejected_results_only == 1
+    assert result.telegram_message_contains_absolute_path == 1
+    assert result.telegram_message_contains_raw_debug_dump == 1
+    assert result.status == "BLOCKED"
 
 
 def test_event_alpha_notification_disabled_records_would_send_and_heartbeat():
@@ -12736,14 +13022,13 @@ def test_event_alpha_degraded_heartbeat_copy_and_delivery():
     assert send_result.heartbeat_sent is True
     assert send_result.lane_items_delivered[event_alpha_notifications.LANE_HEALTH_HEARTBEAT] == 1
     message = sent[0]
-    assert "Research-only / DAY-1 UNVALIDATED" in message
-    assert "Trading action: NONE" in message
-    assert "namespace=notify_no_key" in message
-    assert "cycle_completed=no" in message
-    assert "degraded=yes" in message
-    assert "partial_results=yes" in message
-    assert "alertable_count=0" in message
-    assert "warnings_summary=notification_cycle_failed_soft: RuntimeError" in message
+    assert "Research-only / unvalidated" in message
+    assert "Not a trade signal" in message
+    assert "Profile: notify_no_key" in message
+    assert "Completed: no" in message
+    assert "Status: degraded" in message
+    assert "Alertable decisions: 0" in message
+    assert "Top issues: notification_cycle_failed_soft: RuntimeError" in message
 
 
 def test_event_alpha_notification_provider_fail_fast_defaults():
@@ -22395,7 +22680,7 @@ def test_event_alpha_notification_send_skips_recent_in_flight_but_retries_stale(
         cfg = notif.EventAlphaNotificationConfig(enabled=True, daily_digest_cooldown_hours=0)
         now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
         decisions = [_notify_route_decision("SOL", event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST, event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST)]
-        message = event_alpha_router.format_routed_telegram_digest(decisions, profile="notify_no_key", card_path_by_alert_id={})
+        message = notif.format_core_opportunity_telegram_digest(decisions, profile="notify_no_key", card_path_by_alert_id={})
         content_hash = delivery.compute_content_hash(
             message,
             alert_id=",".join(sorted(decision.alert_id for decision in decisions)),
@@ -30016,12 +30301,16 @@ def test_notification_inbox_prefers_canonical_core_items_and_hides_diagnostics()
 
     velvet_item = next(item for item in inbox.canonical_review_items if item.symbol == "VELVET")
     assert Path(velvet_item.card_path).name == Path(velvet["card_path"]).name
+    assert velvet_item.alert_id == velvet["core_opportunity_id"]
+    assert velvet_item.alert_key == "ea:velvet-canonical"
     assert velvet_item.feedback_target == velvet["core_opportunity_id"]
     assert velvet_item.core_opportunity_id == velvet["core_opportunity_id"]
     assert any(item.alert_id == "ea:velvet-support" for item in inbox.diagnostic_review_items_hidden)
     assert all(item.alert_id != "ea:velvet-support" for item in inbox.quality_gated_local_only)
     assert all(item.alert_id != "ea:velvet-support" for item in inbox.exploratory_without_feedback)
     text = event_alpha_notification_inbox.format_notification_inbox(inbox)
+    assert f"core_id={velvet['core_opportunity_id']}" in text
+    assert "source_alert_id: ea:velvet-canonical" in text
     assert "card: not_written" not in text.split("VELVET/velvet", 1)[1].split("run_id:", 1)[0]
     assert "feedback_target: ea:velvet-support" not in text
 

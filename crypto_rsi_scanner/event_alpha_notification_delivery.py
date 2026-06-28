@@ -92,6 +92,17 @@ class NotificationDeliveryRecord:
     state: str
     dedupe_key: str | None = None
     dedupe_bucket: str | None = None
+    requested_alert_id: str | None = None
+    core_opportunity_id: str | None = None
+    canonical_symbol: str | None = None
+    canonical_coin_id: str | None = None
+    canonical_card_path: str | None = None
+    feedback_target: str | None = None
+    source_alert_ids: tuple[str, ...] = ()
+    notification_item_ids: tuple[str, ...] = ()
+    identity_reconciled: bool = False
+    identity_reconciliation_reason: str | None = None
+    notification_preview_path: str | None = None
     attempted_at: str | None = None
     delivered_at: str | None = None
     error_class: str | None = None
@@ -119,6 +130,17 @@ class NotificationDeliveryRecord:
             "content_hash": self.content_hash,
             "dedupe_key": self.dedupe_key,
             "dedupe_bucket": self.dedupe_bucket,
+            "requested_alert_id": self.requested_alert_id,
+            "core_opportunity_id": self.core_opportunity_id,
+            "canonical_symbol": self.canonical_symbol,
+            "canonical_coin_id": self.canonical_coin_id,
+            "canonical_card_path": self.canonical_card_path,
+            "feedback_target": self.feedback_target,
+            "source_alert_ids": list(self.source_alert_ids),
+            "notification_item_ids": list(self.notification_item_ids),
+            "identity_reconciled": bool(self.identity_reconciled),
+            "identity_reconciliation_reason": self.identity_reconciliation_reason,
+            "notification_preview_path": self.notification_preview_path,
             "state": self.state,
             "attempted_at": self.attempted_at,
             "delivered_at": self.delivered_at,
@@ -224,6 +246,17 @@ def build_record(
     content_hash: str,
     dedupe_key: str | None = None,
     dedupe_bucket: str | None = None,
+    requested_alert_id: str | None = None,
+    core_opportunity_id: str | None = None,
+    canonical_symbol: str | None = None,
+    canonical_coin_id: str | None = None,
+    canonical_card_path: str | None = None,
+    feedback_target: str | None = None,
+    source_alert_ids: Iterable[str] = (),
+    notification_item_ids: Iterable[str] = (),
+    identity_reconciled: bool = False,
+    identity_reconciliation_reason: str | None = None,
+    notification_preview_path: str | None = None,
     state: str,
     now: datetime,
     delivered_at: datetime | None = None,
@@ -248,6 +281,17 @@ def build_record(
         content_hash=str(content_hash),
         dedupe_key=str(dedupe_key) if dedupe_key else None,
         dedupe_bucket=str(dedupe_bucket)[:200] if dedupe_bucket else None,
+        requested_alert_id=str(requested_alert_id) if requested_alert_id else None,
+        core_opportunity_id=str(core_opportunity_id) if core_opportunity_id else None,
+        canonical_symbol=str(canonical_symbol) if canonical_symbol else None,
+        canonical_coin_id=str(canonical_coin_id) if canonical_coin_id else None,
+        canonical_card_path=str(canonical_card_path) if canonical_card_path else None,
+        feedback_target=str(feedback_target) if feedback_target else None,
+        source_alert_ids=tuple(str(item) for item in source_alert_ids if str(item)),
+        notification_item_ids=tuple(str(item) for item in notification_item_ids if str(item)),
+        identity_reconciled=bool(identity_reconciled),
+        identity_reconciliation_reason=str(identity_reconciliation_reason)[:200] if identity_reconciliation_reason else None,
+        notification_preview_path=str(notification_preview_path) if notification_preview_path else None,
         state=str(state),
         attempted_at=_iso(now),
         delivered_at=_iso(delivered_at) if delivered_at else None,
@@ -489,10 +533,16 @@ def _section(title: str, rows: list[dict[str, Any]], limit: int) -> list[str]:
     rows = sorted(rows, key=lambda row: str(row.get("attempted_at") or ""), reverse=True)[: max(0, limit)]
     for row in rows:
         stamp = row.get("delivered_at") or row.get("attempted_at") or "unknown"
+        identity = str(row.get("core_opportunity_id") or row.get("alert_id") or "n/a")
+        symbol = str(row.get("canonical_symbol") or row.get("canonical_coin_id") or "").strip()
+        if symbol:
+            identity = f"{identity} ({symbol})"
         detail = (
-            f"- {stamp} lane={row.get('lane') or 'unknown'} alert_id={row.get('alert_id') or 'n/a'} "
+            f"- {stamp} lane={row.get('lane') or 'unknown'} item={identity} "
             f"route={row.get('route') or 'n/a'} key={str(row.get('dedupe_key') or row.get('content_hash') or '')[:12]}"
         )
+        if row.get("source_alert_ids") and row.get("identity_reconciled"):
+            detail += " source_alerts=" + ",".join(str(item) for item in row.get("source_alert_ids") or [])
         if row.get("error_class"):
             detail += f" error_class={row.get('error_class')}"
         if row.get("error_message_safe"):

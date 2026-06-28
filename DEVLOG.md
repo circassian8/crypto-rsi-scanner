@@ -17,6 +17,50 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Canonicalize Event Alpha notification delivery identity · Codex
+**Why:** A notify run could deliver a Telegram digest whose delivery ledger was
+keyed to a lower-level hypothesis row while cards, snapshots, daily brief, and
+the canonical core store showed a different opportunity. Weak live-style rows
+with rejected-only evidence could also remain digest-eligible in the send path.
+**Changes:**
+- Event Alpha notification plans now reconcile router decisions against
+  canonical CoreOpportunity rows before sending or writing delivery ledger rows.
+  New delivery rows persist canonical core id, symbol/coin, card path, feedback
+  target, source alert ids, notification item ids, identity reconciliation
+  status, and preview path.
+- Telegram digest rendering for routed Event Alpha notifications now uses a
+  compact operator format with one top-level research disclaimer, top 3
+  candidates, evidence/market/check-next lines, and no raw alert id/card id/full
+  local path/debug dump in the Telegram body.
+- Live/send digest notification gating now blocks canonical core rows whose
+  evidence acquisition is `rejected_results_only`, `no_results`, `skipped_budget`,
+  or otherwise non-confirming unless accepted evidence, strong official/tagged
+  source evidence, or fresh non-generic market confirmation is present.
+- Notification delivery previews are written to
+  `event_alpha_notification_preview.md`, and artifact doctor now checks delivery
+  identity/core-store mismatches, noncanonical alert ids, rejected-only digest
+  sends, missing previews, absolute paths, and raw debug fields in Telegram
+  previews.
+- Notification inbox core-review items now display the canonical
+  `core_opportunity_id` first and keep linked lower-level alert ids as
+  `source_alert_id` audit metadata, so old delivered artifacts no longer read as
+  if the source/support row were the primary review target.
+- Added `make event-alpha-notification-format-smoke` for fake-sender
+  formatting/preview/doctor smoke coverage.
+**Verify:** `python3 tests/test_indicators.py` passed (539/539). Further
+verification commands were run after this entry as part of the same prompt:
+`make event-alpha-signal-quality-eval PYTHON=python3`, `make
+event-alpha-notification-format-smoke PYTHON=python3`, `make
+event-alpha-live-burn-in-no-send PYTHON=python3`, strict `make
+event-alpha-artifact-doctor PROFILE=live_burn_in_no_send STRICT=1
+PYTHON=python3`, `make event-alpha-evidence-acquisition-smoke PYTHON=python3`,
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, and `make verify
+PYTHON=python3`.
+**Notes/risks:** Formatting and research-notification delivery only. No live
+trading, paper trades, normal RSI rows, or provider/LLM-created
+`TRIGGERED_FADE` paths were added. Actual Telegram delivery still requires the
+existing send guard.
+
 ## 2026-06-28 — Make review surfaces core-opportunity-first · Codex
 **Why:** Notification inbox, feedback readiness, and opportunity audit still
 had paths that could surface diagnostic/support alert snapshots as if they were

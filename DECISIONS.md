@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Telegram notifications use canonical core identity
+**Status:** accepted
+**Decision:** Event Alpha routed Telegram notifications must reconcile candidate
+items through canonical CoreOpportunity rows before delivery when the core store
+is available. Delivery ledger `alert_id` / dedupe item identity should use the
+canonical `core_opportunity_id`; lower-level router/watchlist/hypothesis ids
+must be preserved only as `source_alert_ids` / requested identity metadata.
+Telegram digest bodies should be compact operator summaries, not raw router
+debug dumps, and should omit full local paths and pipe-delimited internal ids.
+Live/send digest rows with non-confirming acquisition statuses such as
+`rejected_results_only`, `no_results`, or `skipped_budget` must remain
+local-only unless accepted evidence, a strong official/tagged source, or fresh
+non-generic market confirmation independently supports the opportunity.
+**Why:** Operators and Pro-model reviewers need delivery artifacts, daily
+briefs, cards, inbox items, and feedback targets to point at the same durable
+opportunity. Sending a lower-level row while the canonical core says a different
+asset or local-only verdict makes the Telegram output misleading and can promote
+weak evidence despite quality gates.
+**Revisit when:** Notifications are backed by a typed core-opportunity delivery
+table with schema-enforced source/support/core relationships.
+
 ## 2026-06-28 - Operator review surfaces are canonical core-first
 **Status:** accepted
 **Decision:** Event Alpha notification inbox, feedback readiness, opportunity

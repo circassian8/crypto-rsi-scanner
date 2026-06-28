@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import html
-from dataclasses import dataclass, field
+import json
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
@@ -92,6 +93,8 @@ class EventAlphaNotificationPlan:
     notification_scope: str = NOTIFICATION_SCOPE_GLOBAL
     scope_value: str = NOTIFICATION_SCOPE_GLOBAL
     migration_warnings: tuple[str, ...] = ()
+    core_row_by_alert_id: dict[str, dict[str, Any]] = field(default_factory=dict)
+    canonicalization_warnings: tuple[str, ...] = ()
 
     @property
     def decision_count(self) -> int:
@@ -109,6 +112,22 @@ class EventAlphaNotificationPlan:
         return counts
 
 
+@dataclass(frozen=True)
+class DeliveryIdentity:
+    notification_item_ids: tuple[str, ...]
+    source_alert_ids: tuple[str, ...]
+    requested_alert_id: str | None = None
+    alert_id: str | None = None
+    core_opportunity_id: str | None = None
+    canonical_symbol: str | None = None
+    canonical_coin_id: str | None = None
+    canonical_card_path: str | None = None
+    feedback_target: str | None = None
+    identity_reconciled: bool = False
+    identity_reconciliation_reason: str | None = None
+    notification_preview_path: str | None = None
+
+
 SendFn = Callable[[str], bool | sender.NotificationSendAttemptResult | Mapping[str, Any]]
 
 
@@ -119,10 +138,13 @@ def build_notification_plan(
     cfg: EventAlphaNotificationConfig,
     now: datetime | None = None,
     include_health_heartbeat: bool = False,
+    core_opportunity_rows: Iterable[Mapping[str, Any] | object] = (),
 ) -> EventAlphaNotificationPlan:
     """Return lane-specific due decisions without mutating storage."""
     observed = _as_utc(now or datetime.now(timezone.utc))
-    all_decisions = list(decisions)
+    raw_decisions = list(decisions)
+    core_index = _core_index_for_decisions(raw_decisions, core_opportunity_rows)
+    all_decisions, canonical_warnings = _canonicalize_decisions_for_notification(raw_decisions, core_index)
     quality_mode = _quality_mode(cfg.quality_mode)
     alertable = _filter_alertable_by_quality_mode(
         [decision for decision in all_decisions if event_alpha_router.alertable_after_quality_gate(decision)],
@@ -202,6 +224,8 @@ def build_notification_plan(
         notification_scope=_clean_scope(cfg.notification_scope),
         scope_value=_scope_value(cfg),
         migration_warnings=legacy_meta_warnings(storage, cfg),
+        core_row_by_alert_id=core_index,
+        canonicalization_warnings=canonical_warnings,
     )
 
 
@@ -470,6 +494,7 @@ def send_notifications(
     profile: str | None = None,
     pipeline_result: Any | None = None,
     card_path_by_alert_id: Mapping[str, str | Path] | None = None,
+    core_opportunity_rows: Iterable[Mapping[str, Any] | object] = (),
     include_health_heartbeat: bool = False,
     delivery_cfg: delivery.NotificationDeliveryConfig | None = None,
     run_id: str | None = None,
@@ -490,6 +515,7 @@ def send_notifications(
         cfg=cfg,
         now=observed,
         include_health_heartbeat=include_health_heartbeat,
+        core_opportunity_rows=core_opportunity_rows,
     )
     lane_attempts = plan.lane_counts
     would_send = plan.would_send_count
@@ -580,22 +606,54 @@ def send_notifications(
                 card_path_by_alert_id=card_map,
                 cfg=cfg,
             )
-            alert_ids = [item.decision.alert_id for item in items]
+            identity = _delivery_identity_for_decisions(
+                [item.decision for item in items],
+                core_row_by_alert_id=plan.core_row_by_alert_id,
+                card_path_by_alert_id=card_map,
+                lane=lane,
+                preview_path=writer.preview_path if writer else None,
+            )
+            alert_ids = list(identity.notification_item_ids)
             route_label = "EXPLORATORY_DIGEST"
         else:
-            message = event_alpha_router.format_routed_telegram_digest(
+            message = format_core_opportunity_telegram_digest(
                 items,
                 profile=profile,
                 card_path_by_alert_id=card_map,
+                core_row_by_alert_id=plan.core_row_by_alert_id,
+                pipeline_result=pipeline_result,
+                max_items=3,
             )
-            alert_ids = [decision.alert_id for decision in items]
+            identity = _delivery_identity_for_decisions(
+                items,
+                core_row_by_alert_id=plan.core_row_by_alert_id,
+                card_path_by_alert_id=card_map,
+                lane=lane,
+                preview_path=writer.preview_path if writer else None,
+            )
+            alert_ids = list(identity.notification_item_ids)
             route_label = _route_label(items)
-        if writer and writer.skip_as_duplicate(message=message, lane=lane, alert_ids=alert_ids, route=route_label):
+        if writer:
+            writer.write_preview(
+                message=message,
+                lane=lane,
+                route=route_label,
+                identity=identity,
+                would_send=True,
+                sent=False,
+            )
+        if writer and writer.skip_as_duplicate(
+            message=message,
+            lane=lane,
+            alert_ids=alert_ids,
+            route=route_label,
+            identity=identity,
+        ):
             continue
         attempted = True
         if writer:
-            writer.record_planned(message=message, lane=lane, alert_ids=alert_ids, route=route_label)
-            writer.record_sending(message=message, lane=lane, alert_ids=alert_ids, route=route_label)
+            writer.record_planned(message=message, lane=lane, alert_ids=alert_ids, route=route_label, identity=identity)
+            writer.record_sending(message=message, lane=lane, alert_ids=alert_ids, route=route_label, identity=identity)
         attempt = _call_send_fn(send_fn, message)
         terminal_state = delivery.state_for_send_counts(
             delivered_count=attempt.delivered_count,
@@ -619,6 +677,7 @@ def send_notifications(
                     alert_ids=alert_ids,
                     route=route_label,
                     attempt=attempt,
+                    identity=identity,
                 )
         elif terminal_state == delivery.STATE_PARTIAL_DELIVERED:
             block_reasons.append(f"{lane}: partial delivery ({attempt.delivered_count}/{attempt.recipient_count} recipient(s))")
@@ -638,6 +697,7 @@ def send_notifications(
                     alert_ids=alert_ids,
                     route=route_label,
                     attempt=attempt,
+                    identity=identity,
                 )
         else:
             block_reasons.append(f"{lane}: {attempt.error_message_safe or 'no channel delivered'}")
@@ -648,23 +708,58 @@ def send_notifications(
                     alert_ids=alert_ids,
                     route=route_label,
                     attempt=attempt,
+                    identity=identity,
                 )
     if plan.heartbeat_due:
         heartbeat_message = format_health_heartbeat(profile=profile, result=pipeline_result, now=observed)
+        heartbeat_identity = DeliveryIdentity(
+            notification_item_ids=("heartbeat",),
+            source_alert_ids=("heartbeat",),
+            requested_alert_id="heartbeat",
+            alert_id="heartbeat",
+            identity_reconciled=False,
+            identity_reconciliation_reason="heartbeat",
+            notification_preview_path=str(writer.preview_path) if writer else None,
+        )
+        if writer:
+            writer.write_preview(
+                message=heartbeat_message,
+                lane=LANE_HEALTH_HEARTBEAT,
+                route="HEALTH_HEARTBEAT",
+                identity=heartbeat_identity,
+                would_send=True,
+                sent=False,
+            )
         # Same delivery-ledger dedupe as the digest lanes for idempotency. In
         # practice the heartbeat carries a timestamp so its content hash differs
         # each run, but this keeps every lane consistently deduped.
         heartbeat_dup = bool(
             writer
             and writer.skip_as_duplicate(
-                message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT"
+                message=heartbeat_message,
+                lane=LANE_HEALTH_HEARTBEAT,
+                alert_ids=["heartbeat"],
+                route="HEALTH_HEARTBEAT",
+                identity=heartbeat_identity,
             )
         )
         if not heartbeat_dup:
             attempted = True
             if writer:
-                writer.record_planned(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT")
-                writer.record_sending(message=heartbeat_message, lane=LANE_HEALTH_HEARTBEAT, alert_ids=["heartbeat"], route="HEALTH_HEARTBEAT")
+                writer.record_planned(
+                    message=heartbeat_message,
+                    lane=LANE_HEALTH_HEARTBEAT,
+                    alert_ids=["heartbeat"],
+                    route="HEALTH_HEARTBEAT",
+                    identity=heartbeat_identity,
+                )
+                writer.record_sending(
+                    message=heartbeat_message,
+                    lane=LANE_HEALTH_HEARTBEAT,
+                    alert_ids=["heartbeat"],
+                    route="HEALTH_HEARTBEAT",
+                    identity=heartbeat_identity,
+                )
             attempt = _call_send_fn(send_fn, heartbeat_message)
             terminal_state = delivery.state_for_send_counts(
                 delivered_count=attempt.delivered_count,
@@ -681,6 +776,7 @@ def send_notifications(
                         alert_ids=["heartbeat"],
                         route="HEALTH_HEARTBEAT",
                         attempt=attempt,
+                        identity=heartbeat_identity,
                     )
             elif terminal_state == delivery.STATE_PARTIAL_DELIVERED:
                 block_reasons.append(
@@ -695,6 +791,7 @@ def send_notifications(
                         alert_ids=["heartbeat"],
                         route="HEALTH_HEARTBEAT",
                         attempt=attempt,
+                        identity=heartbeat_identity,
                     )
             else:
                 block_reasons.append(f"health_heartbeat: {attempt.error_message_safe or 'no channel delivered'}")
@@ -705,6 +802,7 @@ def send_notifications(
                         alert_ids=["heartbeat"],
                         route="HEALTH_HEARTBEAT",
                         attempt=attempt,
+                        identity=heartbeat_identity,
                     )
 
     delivered = sum(delivered_by_lane.values())
@@ -742,6 +840,482 @@ def _call_send_fn(send_fn: SendFn, message: str) -> sender.NotificationSendAttem
     return sender.normalize_send_result(raw, message=message, recipient_count=0)
 
 
+def _delivery_identity_for_decisions(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]],
+    card_path_by_alert_id: Mapping[str, str | Path],
+    lane: str,
+    preview_path: str | Path | None = None,
+) -> DeliveryIdentity:
+    source_ids = tuple(dict.fromkeys(decision.alert_id for decision in decisions if decision.alert_id))
+    cores = [_core_row_for_decision(decision, core_row_by_alert_id) for decision in decisions]
+    core_rows = [row for row in cores if row]
+    core_ids = tuple(dict.fromkeys(str(row.get("core_opportunity_id") or "").strip() for row in core_rows if str(row.get("core_opportunity_id") or "").strip()))
+    notification_ids = core_ids or source_ids or (lane,)
+    first_core = core_rows[0] if core_rows else {}
+    card_path = (
+        first_core.get("card_path")
+        or first_core.get("research_card_path")
+        or first_core.get("canonical_card_path")
+        or _first_card_path(card_path_by_alert_id, (*core_ids, *source_ids))
+    )
+    alert_id = ",".join(notification_ids)
+    requested = ",".join(source_ids)
+    reconciled = bool(core_ids)
+    return DeliveryIdentity(
+        notification_item_ids=notification_ids,
+        source_alert_ids=source_ids,
+        requested_alert_id=requested or alert_id,
+        alert_id=alert_id,
+        core_opportunity_id=",".join(core_ids) if core_ids else None,
+        canonical_symbol=_joined_unique(
+            row.get("symbol") or row.get("validated_symbol") for row in core_rows
+        ),
+        canonical_coin_id=_joined_unique(
+            row.get("coin_id") or row.get("validated_coin_id") for row in core_rows
+        ),
+        canonical_card_path=str(card_path) if card_path else None,
+        feedback_target=",".join(core_ids) if core_ids else (requested or alert_id),
+        identity_reconciled=reconciled,
+        identity_reconciliation_reason="canonical_core_opportunity" if reconciled else "source_alert_identity",
+        notification_preview_path=str(preview_path) if preview_path else None,
+    )
+
+
+def _identity_record_fields(identity: DeliveryIdentity | None) -> dict[str, Any]:
+    if identity is None:
+        return {}
+    return {
+        "requested_alert_id": identity.requested_alert_id,
+        "core_opportunity_id": identity.core_opportunity_id,
+        "canonical_symbol": identity.canonical_symbol,
+        "canonical_coin_id": identity.canonical_coin_id,
+        "canonical_card_path": identity.canonical_card_path,
+        "feedback_target": identity.feedback_target,
+        "source_alert_ids": identity.source_alert_ids,
+        "notification_item_ids": identity.notification_item_ids,
+        "identity_reconciled": identity.identity_reconciled,
+        "identity_reconciliation_reason": identity.identity_reconciliation_reason,
+        "notification_preview_path": identity.notification_preview_path,
+    }
+
+
+def format_core_opportunity_telegram_digest(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    profile: str | None = None,
+    card_path_by_alert_id: Mapping[str, object] | None = None,
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]] | None = None,
+    pipeline_result: Any | None = None,
+    max_items: int = 3,
+) -> str:
+    """Render a compact human-facing digest keyed by canonical core opportunities."""
+    keep = [decision for decision in decisions if event_alpha_router.alertable_after_quality_gate(decision)]
+    card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
+    core_map = core_row_by_alert_id or {}
+    title = "Event Alpha Research Digest"
+    if any(event_alpha_router.final_route_value(item) == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value for item in keep):
+        title = "Event Alpha High-Priority Research"
+    if any(event_alpha_router.final_route_value(item) == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value for item in keep):
+        title = "Event Alpha Triggered Fade Research"
+    lines = [
+        f"<b>{_esc(title)}</b>",
+        "<i>Research-only / unvalidated. Not a trade signal.</i>",
+        f"Profile: {_esc(profile or 'default')}",
+        f"Items: {len(keep)}",
+    ]
+    provider_summary = _provider_degradation_summary(pipeline_result)
+    if provider_summary:
+        lines.append(f"Provider status: {_esc(provider_summary)}")
+    if not keep:
+        lines.append("No router-approved escalations.")
+        return "\n".join(lines)
+    displayed = 0
+    seen_core: set[str] = set()
+    for decision in keep:
+        core = _core_row_for_decision(decision, core_map) or {}
+        core_id = str(core.get("core_opportunity_id") or "").strip()
+        if core_id and core_id in seen_core:
+            continue
+        if core_id:
+            seen_core.add(core_id)
+        if displayed >= max(1, int(max_items or 1)):
+            break
+        entry = decision.entry
+        symbol = str(core.get("symbol") or core.get("validated_symbol") or entry.symbol or "UNKNOWN")
+        coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or entry.coin_id or "unknown")
+        catalyst = str(
+            core.get("canonical_incident_name")
+            or core.get("incident_canonical_name")
+            or core.get("event_name")
+            or entry.latest_event_name
+            or "unknown catalyst"
+        )
+        route = _human_route(event_alpha_router.final_route_value(decision))
+        level = _human_reason(core.get("final_opportunity_level") or decision.opportunity_level or entry.opportunity_level or route)
+        impact = _human_reason(core.get("impact_path_type") or entry.impact_path_type or entry.latest_effective_playbook_type)
+        role = _human_reason(core.get("candidate_role") or entry.candidate_role or entry.relationship_type)
+        evidence = _evidence_line(core)
+        market = _market_line_for_core(core, entry)
+        why = _truncate_text(
+            core.get("why_opportunity_visible")
+            or core.get("final_verdict_reason")
+            or decision.reason
+            or "quality-gated research lead",
+            140,
+        )
+        verify = _truncate_text(_verification_line(core, entry), 130)
+        displayed += 1
+        lines.extend(
+            [
+                "",
+                f"<b>{displayed}. {_esc(symbol)} / {_esc(coin_id)}</b>",
+                f"Catalyst: {_esc(catalyst)}",
+                f"Level: {_esc(level)} · Route: {_esc(route)}",
+                f"Impact: {_esc(impact)} · Role: {_esc(role)}",
+                f"Why surfaced: {_esc(why)}",
+                f"Evidence: {_esc(evidence)}",
+                f"Market: {_esc(market)}",
+                f"Check next: {_esc(verify)}",
+            ]
+        )
+        card = core.get("card_path") or core.get("research_card_path") or _first_card_path(card_paths, (core_id, decision.alert_id))
+        if card:
+            lines.append(f"Card: {_esc(Path(str(card)).name)}")
+        if core_id:
+            lines.append(f"Feedback target: {_esc(core_id)}")
+    hidden = max(0, len(keep) - displayed)
+    if hidden:
+        lines.append("")
+        lines.append(f"+{hidden} more in the local notification inbox.")
+    lines.append("")
+    lines.append("Research cards and feedback commands are available in local artifacts/inbox.")
+    return "\n".join(lines)
+
+
+def _evidence_line(core: Mapping[str, Any]) -> str:
+    accepted = int(_float_or_none(core.get("accepted_evidence_count")) or 0)
+    status = str(core.get("evidence_acquisition_status") or "unknown").strip()
+    confirm = str(core.get("acquisition_confirmation_status") or "").strip()
+    pack = str(core.get("source_pack") or "source pack unknown").strip()
+    if accepted > 0:
+        return f"{accepted} accepted evidence item(s) from {pack}"
+    if status == "rejected_results_only" or confirm == "does_not_confirm":
+        return f"not confirmed; acquisition found rejected-only evidence via {pack}"
+    if status in {"no_results", "skipped_budget", "provider_unavailable", "skipped_config"}:
+        return f"not confirmed; acquisition status {status} via {pack}"
+    return f"{status or 'unknown'} via {pack}"
+
+
+def _market_line_for_core(core: Mapping[str, Any], entry: Any) -> str:
+    level = str(core.get("market_confirmation_level") or getattr(entry, "market_confirmation_level", None) or "unknown")
+    freshness = str(core.get("market_context_freshness_status") or getattr(entry, "market_context_freshness_status", None) or "unknown")
+    score = core.get("market_confirmation_score")
+    if score is None:
+        score = getattr(entry, "market_confirmation_score", None)
+    if score is not None:
+        return f"{_human_reason(level)}; freshness {_human_reason(freshness)}; score {_fmt_num(score)}"
+    return f"{_human_reason(level)}; freshness {_human_reason(freshness)}"
+
+
+def _verification_line(core: Mapping[str, Any], entry: Any) -> str:
+    items = _as_list(core.get("upgrade_requirements")) or _as_list(core.get("manual_verification_items"))
+    if not items:
+        items = list(getattr(entry, "upgrade_requirements", ()) or getattr(entry, "manual_verification_items", ()) or ())
+    if not items:
+        return "review the local card and source evidence before acting"
+    return "; ".join(str(item).replace("_", " ") for item in items[:2])
+
+
+def _provider_degradation_summary(result: Any | None) -> str:
+    warnings = [str(item) for item in getattr(result, "warnings", ()) or () if str(item)]
+    if not warnings:
+        return ""
+    provider_warnings = [item for item in warnings if any(token in item.lower() for token in ("provider", "gdelt", "rss", "cryptopanic", "timeout", "429", "403"))]
+    selected = provider_warnings[:3] or warnings[:2]
+    return "; ".join(_truncate_text(item, 80) for item in selected)
+
+
+def _first_card_path(card_paths: Mapping[str, object], keys: Iterable[str]) -> str | None:
+    for key in keys:
+        if not key:
+            continue
+        path = card_paths.get(str(key))
+        if path:
+            return str(path)
+    return None
+
+
+def _joined_unique(values: Iterable[Any]) -> str | None:
+    clean = tuple(dict.fromkeys(str(item).strip() for item in values if str(item or "").strip()))
+    return ",".join(clean) if clean else None
+
+
+def _human_route(value: object) -> str:
+    raw = str(getattr(value, "value", value) or "").strip()
+    mapping = {
+        "RESEARCH_DIGEST": "research digest",
+        "HIGH_PRIORITY_RESEARCH": "high-priority research",
+        "TRIGGERED_FADE_RESEARCH": "triggered fade research",
+        "STORE_ONLY": "stored locally",
+        "LOCAL_REPORT": "local report",
+    }
+    return mapping.get(raw, _human_reason(raw))
+
+
+def _fmt_num(value: Any) -> str:
+    number = _float_or_none(value)
+    if number is None:
+        return "n/a"
+    return f"{number:.1f}".rstrip("0").rstrip(".")
+
+
+def _truncate_text(value: Any, limit: int) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "..."
+
+
+def _canonicalize_decisions_for_notification(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]],
+) -> tuple[list[event_alpha_router.EventAlphaRouteDecision], tuple[str, ...]]:
+    canonical: list[event_alpha_router.EventAlphaRouteDecision] = []
+    warnings: list[str] = []
+    for decision in decisions:
+        core = _core_row_for_decision(decision, core_row_by_alert_id)
+        if not core:
+            canonical.append(decision)
+            continue
+        final_route = _core_final_route(core)
+        block_reason = _core_notification_block_reason(core)
+        if block_reason:
+            final_route = event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+            warnings.append(f"{decision.alert_id}:notification_core_gate:{block_reason}")
+        alertable = event_alpha_router.route_value_is_alertable(final_route)
+        route = _route_enum_for_value(final_route)
+        lane = _lane_enum_for_route(final_route)
+        reason = str(
+            block_reason
+            or core.get("why_opportunity_visible")
+            or core.get("final_verdict_reason")
+            or core.get("quality_gate_block_reason")
+            or decision.reason
+        )
+        canonical.append(
+            replace(
+                decision,
+                route=route,
+                lane=lane,
+                alertable=alertable,
+                reason=reason,
+                final_route_after_quality_gate=final_route,
+                quality_gate_block_reason=block_reason or decision.quality_gate_block_reason,
+                opportunity_level=str(core.get("final_opportunity_level") or core.get("opportunity_level") or decision.opportunity_level or ""),
+                opportunity_score_final=_float_or_none(
+                    core.get("opportunity_score_final")
+                    or core.get("final_opportunity_score")
+                    or decision.opportunity_score_final
+                ),
+            )
+        )
+    return canonical, tuple(dict.fromkeys(warnings))
+
+
+def _core_index_for_decisions(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    core_rows: Iterable[Mapping[str, Any] | object],
+) -> dict[str, dict[str, Any]]:
+    _ = decisions
+    index: dict[str, dict[str, Any]] = {}
+    for raw in core_rows or ():
+        row = _as_mapping(raw)
+        if not row:
+            continue
+        for key in _core_identity_keys(row):
+            index.setdefault(key, row)
+            index.setdefault(f"ea:{key}", row)
+    return index
+
+
+def _core_row_for_decision(
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    if not core_row_by_alert_id:
+        return None
+    for key in _decision_identity_keys(decision):
+        row = core_row_by_alert_id.get(key)
+        if row:
+            return dict(row)
+    return None
+
+
+def _decision_identity_keys(decision: event_alpha_router.EventAlphaRouteDecision) -> tuple[str, ...]:
+    entry = decision.entry
+    components = getattr(entry, "latest_score_components", None) or {}
+    values: list[Any] = [
+        decision.alert_id,
+        decision.card_id,
+        getattr(entry, "key", None),
+        getattr(entry, "hypothesis_id", None),
+        getattr(entry, "incident_id", None),
+        components.get("core_opportunity_id") if isinstance(components, Mapping) else None,
+        components.get("canonical_core_opportunity_id") if isinstance(components, Mapping) else None,
+        components.get("primary_hypothesis_id") if isinstance(components, Mapping) else None,
+        components.get("hypothesis_id") if isinstance(components, Mapping) else None,
+        components.get("watchlist_key") if isinstance(components, Mapping) else None,
+        components.get("alert_id") if isinstance(components, Mapping) else None,
+    ]
+    if isinstance(components, Mapping):
+        for name in ("supporting_hypothesis_ids", "diagnostic_row_ids", "supporting_row_ids"):
+            values.extend(_as_list(components.get(name)))
+    return tuple(dict.fromkeys(str(item).strip() for item in values if str(item or "").strip()))
+
+
+def _core_identity_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
+    values: list[Any] = [
+        row.get("core_opportunity_id"),
+        row.get("aggregated_candidate_id"),
+        row.get("primary_hypothesis_id"),
+        row.get("hypothesis_id"),
+        row.get("watchlist_key"),
+        row.get("alert_id"),
+        row.get("key"),
+    ]
+    for name in ("supporting_hypothesis_ids", "diagnostic_row_ids", "supporting_row_ids", "source_alert_ids"):
+        values.extend(_as_list(row.get(name)))
+    clean = [str(item).strip() for item in values if str(item or "").strip()]
+    return tuple(dict.fromkeys(clean))
+
+
+def _core_final_route(core: Mapping[str, Any]) -> str:
+    value = str(
+        core.get("final_route_after_quality_gate")
+        or core.get("route")
+        or core.get("final_route")
+        or event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    )
+    if value in {"WATCHLIST", "RADAR", "VALIDATED_DIGEST"}:
+        return event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
+    if value == "HIGH_PRIORITY":
+        return event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+    if value in {"LOCAL_ONLY", "QUALITY_BLOCKED", "RAW_EVIDENCE", "HYPOTHESIS"}:
+        return event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    return value
+
+
+def _core_notification_block_reason(core: Mapping[str, Any]) -> str | None:
+    route = _core_final_route(core)
+    if route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value:
+        return None
+    if not event_alpha_router.route_value_is_alertable(route):
+        return "canonical_core_not_alertable"
+    symbol = str(core.get("symbol") or core.get("validated_symbol") or "").strip()
+    coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or "").strip()
+    if symbol.upper() == "SECTOR" or coin_id.startswith("sector") or not coin_id:
+        return "sector_or_missing_validated_asset_not_digest_eligible"
+    status = str(core.get("evidence_acquisition_status") or "").strip()
+    confirmation = str(core.get("acquisition_confirmation_status") or "").strip()
+    accepted = int(_float_or_none(core.get("accepted_evidence_count")) or 0)
+    market = str(core.get("market_confirmation_level") or "").strip().casefold()
+    freshness = str(core.get("market_context_freshness_status") or "").strip().casefold()
+    source_class = str(core.get("source_class") or "").strip().casefold()
+    impact_path = str(core.get("impact_path_type") or "").strip().casefold()
+    has_market_confirmation = market not in {"", "none", "missing", "unknown", "insufficient_data"} and freshness not in {"missing", "stale"}
+    has_strong_source = source_class in {
+        "official_project",
+        "official_exchange",
+        "structured_event_calendar",
+        "cryptopanic_tagged",
+        "project_blog",
+        "exchange_announcement",
+    }
+    has_accepted_confirmation = accepted > 0 or confirmation == "confirms" or bool(core.get("acquisition_confirms_candidate"))
+    direct_event = impact_path in {
+        "direct_token_event",
+        "listing_liquidity_event",
+        "unlock_supply_event",
+        "exploit_security_event",
+        "venue_value_capture",
+        "fan_token_event",
+    }
+    if has_accepted_confirmation or has_strong_source or (has_market_confirmation and direct_event):
+        return None
+    if status == "rejected_results_only" or confirmation == "does_not_confirm":
+        return "rejected_results_only_not_confirmation"
+    if status == "skipped_budget":
+        return "skipped_budget_not_confirmation"
+    if status == "no_results":
+        return "no_results_not_confirmation"
+    if status in {"provider_unavailable", "backoff", "skipped_config", "not_configured"}:
+        return f"{status}_not_confirmation"
+    return "live_confirmation_missing"
+
+
+def _route_enum_for_value(value: object) -> event_alpha_router.EventAlphaRoute:
+    raw = str(getattr(value, "value", value) or "")
+    try:
+        return event_alpha_router.EventAlphaRoute(raw)
+    except ValueError:
+        if raw == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value:
+            return event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH
+        if raw == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value:
+            return event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH
+        if raw == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value:
+            return event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST
+        return event_alpha_router.EventAlphaRoute.STORE_ONLY
+
+
+def _lane_enum_for_route(value: object) -> event_alpha_router.EventAlphaRouteLane:
+    lane = event_alpha_router.lane_value_for_route_value(value)
+    try:
+        return event_alpha_router.EventAlphaRouteLane(lane)
+    except ValueError:
+        return event_alpha_router.EventAlphaRouteLane.LOCAL_ONLY
+
+
+def _as_mapping(value: Mapping[str, Any] | object) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if hasattr(value, "to_row"):
+        try:
+            row = value.to_row()
+            if isinstance(row, Mapping):
+                return dict(row)
+        except Exception:
+            return {}
+    if hasattr(value, "__dict__"):
+        return dict(getattr(value, "__dict__", {}) or {})
+    return {}
+
+
+def _as_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    if isinstance(value, str) and value.startswith("["):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, list):
+            return parsed
+    return [value]
+
+
+def _float_or_none(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class _DeliveryWriter:
     """Append-only delivery recorder used by ``send_notifications``.
 
@@ -764,6 +1338,7 @@ class _DeliveryWriter:
         self.namespace = namespace
         self.now = now
         self.existing = delivery.load_delivery_records(cfg.path)
+        self.preview_path = Path(cfg.path).expanduser().parent / "event_alpha_notification_preview.md"
         self.counts: dict[str, int] = {
             delivery.STATE_DELIVERED: 0,
             delivery.STATE_PARTIAL_DELIVERED: 0,
@@ -808,6 +1383,8 @@ class _DeliveryWriter:
         dedupe_bucket: str | None = None,
         **kwargs: Any,
     ) -> None:
+        identity = kwargs.pop("identity", None)
+        identity_fields = _identity_record_fields(identity)
         record = delivery.build_record(
             run_id=self.run_id,
             alert_id=self._joined(alert_ids),
@@ -819,6 +1396,7 @@ class _DeliveryWriter:
             dedupe_key=dedupe_key,
             dedupe_bucket=dedupe_bucket,
             state=state,
+            **identity_fields,
             now=self.now,
             **kwargs,
         )
@@ -829,7 +1407,15 @@ class _DeliveryWriter:
         if state in delivery.TERMINAL_STATES:
             self.counts["records"] += 1
 
-    def skip_as_duplicate(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> bool:
+    def skip_as_duplicate(
+        self,
+        *,
+        message: str,
+        lane: str,
+        alert_ids: list[str],
+        route: str,
+        identity: DeliveryIdentity | None = None,
+    ) -> bool:
         if not self.cfg.dedupe_by_content:
             return False
         content_hash = self._hash(message, lane, alert_ids)
@@ -862,6 +1448,7 @@ class _DeliveryWriter:
                 dedupe_key=dedupe_key,
                 dedupe_bucket=dedupe_bucket,
                 state=delivery.STATE_SKIPPED_IN_FLIGHT,
+                identity=identity,
                 error_class="in_flight_content",
                 error_message=(
                     f"in-flight duplicate within {self.cfg.in_flight_grace_minutes:g}m "
@@ -877,12 +1464,21 @@ class _DeliveryWriter:
             dedupe_key=dedupe_key,
             dedupe_bucket=dedupe_bucket,
             state=delivery.STATE_SKIPPED_DUPLICATE,
+            identity=identity,
             error_class="duplicate_content",
             error_message=f"duplicate within {self.cfg.dedupe_window_hours:g}h (prior delivered_at={dup.get('delivered_at')})",
         )
         return True
 
-    def record_planned(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> None:
+    def record_planned(
+        self,
+        *,
+        message: str,
+        lane: str,
+        alert_ids: list[str],
+        route: str,
+        identity: DeliveryIdentity | None = None,
+    ) -> None:
         dedupe_key, dedupe_bucket = self._dedupe_key(message, lane, alert_ids)
         self._append(
             alert_ids=alert_ids,
@@ -892,9 +1488,18 @@ class _DeliveryWriter:
             dedupe_key=dedupe_key,
             dedupe_bucket=dedupe_bucket,
             state=delivery.STATE_PLANNED,
+            identity=identity,
         )
 
-    def record_sending(self, *, message: str, lane: str, alert_ids: list[str], route: str) -> None:
+    def record_sending(
+        self,
+        *,
+        message: str,
+        lane: str,
+        alert_ids: list[str],
+        route: str,
+        identity: DeliveryIdentity | None = None,
+    ) -> None:
         dedupe_key, dedupe_bucket = self._dedupe_key(message, lane, alert_ids)
         self._append(
             alert_ids=alert_ids,
@@ -904,6 +1509,7 @@ class _DeliveryWriter:
             dedupe_key=dedupe_key,
             dedupe_bucket=dedupe_bucket,
             state=delivery.STATE_SENDING,
+            identity=identity,
         )
 
     def record_attempt_result(
@@ -914,6 +1520,7 @@ class _DeliveryWriter:
         alert_ids: list[str],
         route: str,
         attempt: sender.NotificationSendAttemptResult,
+        identity: DeliveryIdentity | None = None,
     ) -> None:
         state = delivery.state_for_send_counts(
             delivered_count=attempt.delivered_count,
@@ -938,6 +1545,7 @@ class _DeliveryWriter:
             delivered_chunks=attempt.delivered_chunks,
             failed_chunks=attempt.failed_chunks,
             channel_summary=attempt.channel_summary,
+            identity=identity,
         )
 
     def record_blocked(
@@ -956,12 +1564,33 @@ class _DeliveryWriter:
                 continue
             if exploratory:
                 message = format_exploratory_telegram_digest(items, profile=profile, card_path_by_alert_id=card_map)
-                alert_ids = [item.decision.alert_id for item in items]
+                identity = _delivery_identity_for_decisions(
+                    [item.decision for item in items],
+                    core_row_by_alert_id=plan.core_row_by_alert_id,
+                    card_path_by_alert_id=card_map,
+                    lane=lane,
+                    preview_path=self.preview_path,
+                )
+                alert_ids = list(identity.notification_item_ids)
                 route_label = "EXPLORATORY_DIGEST"
             else:
-                message = event_alpha_router.format_routed_telegram_digest(items, profile=profile, card_path_by_alert_id=card_map)
-                alert_ids = [decision.alert_id for decision in items]
+                message = format_core_opportunity_telegram_digest(
+                    items,
+                    profile=profile,
+                    card_path_by_alert_id=card_map,
+                    core_row_by_alert_id=plan.core_row_by_alert_id,
+                    max_items=3,
+                )
+                identity = _delivery_identity_for_decisions(
+                    items,
+                    core_row_by_alert_id=plan.core_row_by_alert_id,
+                    card_path_by_alert_id=card_map,
+                    lane=lane,
+                    preview_path=self.preview_path,
+                )
+                alert_ids = list(identity.notification_item_ids)
                 route_label = _route_label(items)
+            self.write_preview(message=message, lane=lane, route=route_label, identity=identity, would_send=True, sent=False)
             self._append(
                 alert_ids=alert_ids,
                 lane=lane,
@@ -970,11 +1599,22 @@ class _DeliveryWriter:
                 dedupe_key=self._dedupe_key(message, lane, alert_ids)[0],
                 dedupe_bucket=self._dedupe_key(message, lane, alert_ids)[1],
                 state=delivery.STATE_BLOCKED,
+                identity=identity,
                 error_class=error_class,
                 error_message=reason,
             )
         if plan.heartbeat_due:
             message = format_health_heartbeat(profile=profile)
+            identity = DeliveryIdentity(
+                notification_item_ids=("heartbeat",),
+                source_alert_ids=("heartbeat",),
+                requested_alert_id="heartbeat",
+                alert_id="heartbeat",
+                identity_reconciled=False,
+                identity_reconciliation_reason="heartbeat",
+                notification_preview_path=str(self.preview_path),
+            )
+            self.write_preview(message=message, lane=LANE_HEALTH_HEARTBEAT, route="HEALTH_HEARTBEAT", identity=identity, would_send=True, sent=False)
             self._append(
                 alert_ids=["heartbeat"],
                 lane=LANE_HEALTH_HEARTBEAT,
@@ -983,9 +1623,53 @@ class _DeliveryWriter:
                 dedupe_key=self._dedupe_key(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"])[0],
                 dedupe_bucket=self._dedupe_key(message, LANE_HEALTH_HEARTBEAT, ["heartbeat"])[1],
                 state=delivery.STATE_BLOCKED,
+                identity=identity,
                 error_class=error_class,
                 error_message=reason,
             )
+
+    def write_preview(
+        self,
+        *,
+        message: str,
+        lane: str,
+        route: str,
+        identity: DeliveryIdentity,
+        would_send: bool,
+        sent: bool,
+    ) -> None:
+        """Write the latest operator-visible Telegram body for local review."""
+        body = [
+            "# Event Alpha Notification Preview",
+            "",
+            f"generated_at: {self.now.isoformat()}",
+            f"profile: {self.profile or 'default'}",
+            f"namespace: {self.namespace or 'default'}",
+            f"lane: {lane}",
+            f"route: {route}",
+            f"would_send: {str(bool(would_send)).lower()}",
+            f"sent: {str(bool(sent)).lower()}",
+            f"alert_id: {identity.alert_id or self._joined(identity.notification_item_ids)}",
+            f"core_opportunity_id: {identity.core_opportunity_id or 'none'}",
+            f"canonical_symbol: {identity.canonical_symbol or 'unknown'}",
+            f"canonical_coin_id: {identity.canonical_coin_id or 'unknown'}",
+            f"feedback_target: {identity.feedback_target or identity.core_opportunity_id or identity.alert_id or 'none'}",
+            "source_alert_ids: " + ", ".join(identity.source_alert_ids or ("none",)),
+            "notification_item_ids: " + ", ".join(identity.notification_item_ids or ("none",)),
+            f"identity_reconciled: {str(identity.identity_reconciled).lower()}",
+            f"identity_reconciliation_reason: {identity.identity_reconciliation_reason or 'none'}",
+            "",
+            "## Telegram Body",
+            "",
+            "```html",
+            message,
+            "```",
+        ]
+        try:
+            self.preview_path.parent.mkdir(parents=True, exist_ok=True)
+            self.preview_path.write_text("\n".join(body) + "\n", encoding="utf-8")
+        except OSError:
+            return
 
 
 def _route_label(items: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
@@ -1350,40 +2034,23 @@ def format_health_heartbeat(
     warnings = tuple(str(item) for item in getattr(result, "warnings", ()) or () if str(item))
     partial = bool(getattr(result, "partial_results", False) or _provider_failure_count(warnings) > 0)
     lines = [
-        "<b>Event Alpha notification heartbeat</b>",
-        "<i>Research-only / DAY-1 UNVALIDATED. Not a trade signal.</i>",
-        "Validation status: DAY-1 UNVALIDATED",
-        "Trading action: NONE",
-        "Review before acting.",
-        f"profile={_esc(profile or getattr(result, 'profile', None) or 'default')}",
-        f"namespace={_esc(getattr(result, 'artifact_namespace', None) or 'default')}",
-        f"generated_at={_esc(observed.isoformat())}",
-        f"cycle_completed={_yes_no(bool(getattr(result, 'cycle_completed', result is not None)))}",
-        f"degraded={_yes_no(partial)}",
-        f"partial_results={_yes_no(partial)}",
-        f"provider_failure_count={_provider_failure_count(warnings)}",
-        f"runtime_budget_status={'exhausted' if _runtime_budget_exhausted(warnings) else 'ok'}",
-        f"alertable_count={_num(result, 'alertable')}",
-        f"artifact_doctor_status={_esc(getattr(result, 'artifact_doctor_status', 'not_run') if result is not None else 'not_run')}",
-        (
-            "run_stats: "
-            f"raw_events={_num(result, 'raw_events')} "
-            f"anomalies={_num(result, 'anomaly_lifecycle_entries')} "
-            f"candidates={_num(result, 'candidates')} "
-            f"watchlist={_num(result, 'watchlist_entries')} "
-            f"alertable={_num(result, 'alertable')}"
-        ),
-        (
-            "llm_budget: "
-            f"extractions={_num(result, 'extractions')}/{len(getattr(result, 'extraction_rows', ()) or ())} "
-            f"relationship_rows={len(getattr(result, 'relationship_rows', ()) or ())}"
-        ),
+        "<b>Event Alpha Heartbeat</b>",
+        "<i>Research-only / unvalidated. Not a trade signal.</i>",
+        f"Profile: {_esc(profile or getattr(result, 'profile', None) or 'default')}",
+        f"Generated: {_esc(observed.isoformat())}",
+        f"Status: {_esc('degraded' if partial else 'ok')}",
+        f"Completed: {_yes_no(bool(getattr(result, 'cycle_completed', result is not None)))}",
+        f"Raw events: {_num(result, 'raw_events')} · Core opportunities: {_num(result, 'core_opportunities')}",
+        f"Alertable decisions: {_num(result, 'alertable')} · Sent by this lane: heartbeat",
+        f"Provider issues: {_provider_failure_count(warnings)}",
+        f"LLM budget: {'exhausted' if _runtime_budget_exhausted(warnings) else 'ok'}",
+        f"Artifact doctor: {_esc(getattr(result, 'artifact_doctor_status', 'not_run') if result is not None else 'not_run')}",
     ]
     if warnings:
-        lines.append("warnings_summary=" + _esc("; ".join(warnings[:5])))
+        lines.append("Top issues: " + _esc("; ".join(_truncate_text(item, 90) for item in warnings[:3])))
     else:
-        lines.append("warnings_summary=none")
-    lines.append("next=make event-alpha-notify-preview PROFILE=" + _esc(profile or "notify_no_key"))
+        lines.append("Top issues: none")
+    lines.append("Next: make event-alpha-notify-preview PROFILE=" + _esc(profile or "notify_no_key"))
     return "\n".join(lines)
 
 

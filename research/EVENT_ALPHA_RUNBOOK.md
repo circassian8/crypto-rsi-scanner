@@ -162,6 +162,33 @@ the notification checklist, and the notification preview for `notify_no_key`,
 then prints the two guarded send commands. Use `make event-alpha-day1-start-llm`
 for the same no-send flow against `notify_llm`.
 
+Routed Telegram notifications are core-opportunity-first. When
+`event_core_opportunities.jsonl` exists, the notification plan reconciles router
+decisions to the canonical `core_opportunity_id` before formatting, dedupe, and
+delivery-ledger writes. Lower-level watchlist/hypothesis ids are retained as
+`source_alert_ids` for audit, but the delivered item, feedback target, and card
+reference should point at the `agg:...` core opportunity. The rendered Telegram
+body is intentionally compact: it shows candidate, catalyst, route/level,
+impact role, evidence status, market status, and check-next text, while hiding
+raw alert ids, card ids, full local paths, and repeated boilerplate. Each
+delivery attempt writes the last operator-visible body to
+`event_alpha_notification_preview.md`; use:
+
+```bash
+make event-alpha-notification-format-smoke PYTHON=python3
+make event-alpha-notification-deliveries-report PROFILE=fixture PYTHON=python3
+```
+
+Live-style notification profiles also re-check confirmation before digest
+delivery. A core row whose evidence acquisition is `rejected_results_only`,
+`no_results`, `skipped_budget`, or otherwise non-confirming stays local-only
+unless another strong confirmation exists: accepted source-pack evidence,
+official/structured/tagged source evidence, or fresh non-generic market
+confirmation on a real impact path. Artifact doctor strict mode checks delivery
+identity/core-store mismatches, noncanonical alert ids, rejected-only digest
+items, missing previews, raw debug dumps, and absolute local paths in previewed
+Telegram bodies.
+
 `notify_no_key` uses public RSS, GDELT, Polymarket, live CoinGecko universe,
 market enrichment, anomaly scanning, catalyst search, watchlist monitoring,
 router lanes, and auto-written research cards. `notify_llm` uses the same source

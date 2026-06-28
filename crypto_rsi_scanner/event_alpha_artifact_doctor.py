@@ -67,6 +67,13 @@ class EventAlphaArtifactDoctorResult:
     delivery_rows: int = 0
     deliveries_partial_delivered: int = 0
     deliveries_failed: int = 0
+    delivery_identity_mismatch_core_store: int = 0
+    delivery_alert_id_not_canonical: int = 0
+    telegram_message_contains_absolute_path: int = 0
+    telegram_message_contains_raw_debug_dump: int = 0
+    digest_item_without_live_confirmation: int = 0
+    digest_item_rejected_results_only: int = 0
+    notification_preview_missing: int = 0
     quality_fields_missing_count: int = 0
     hypothesis_rows_missing_opportunity_verdict: int = 0
     watchlist_rows_missing_quality_fields: int = 0
@@ -614,6 +621,48 @@ def diagnose_artifacts(
         warnings.append(
             f"notification deliveries failed: {delivery_summary.failed} failed delivery row(s) for this profile/namespace"
         )
+    delivery_conflicts = _notification_delivery_conflicts(
+        delivery_rows=[row for row in delivery_rows if isinstance(row, Mapping)],
+        core_rows_by_id=core_rows_by_id,
+    )
+    if delivery_conflicts["delivery_identity_mismatch_core_store"]:
+        message = (
+            "delivery_identity_mismatch_core_store="
+            f"{delivery_conflicts['delivery_identity_mismatch_core_store']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["delivery_alert_id_not_canonical"]:
+        message = (
+            "delivery_alert_id_not_canonical="
+            f"{delivery_conflicts['delivery_alert_id_not_canonical']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["digest_item_without_live_confirmation"]:
+        message = (
+            "digest_item_without_live_confirmation="
+            f"{delivery_conflicts['digest_item_without_live_confirmation']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["digest_item_rejected_results_only"]:
+        message = (
+            "digest_item_rejected_results_only="
+            f"{delivery_conflicts['digest_item_rejected_results_only']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["telegram_message_contains_absolute_path"]:
+        message = (
+            "telegram_message_contains_absolute_path="
+            f"{delivery_conflicts['telegram_message_contains_absolute_path']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["telegram_message_contains_raw_debug_dump"]:
+        message = (
+            "telegram_message_contains_raw_debug_dump="
+            f"{delivery_conflicts['telegram_message_contains_raw_debug_dump']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["notification_preview_missing"]:
+        warnings.append(f"notification_preview_missing={delivery_conflicts['notification_preview_missing']}")
     quality = _quality_missing_summary(
         hypotheses=hypotheses,
         watchlist=watchlist,
@@ -834,6 +883,13 @@ def diagnose_artifacts(
         delivery_rows=delivery_summary.rows,
         deliveries_partial_delivered=delivery_summary.partial_delivered,
         deliveries_failed=delivery_summary.failed,
+        delivery_identity_mismatch_core_store=delivery_conflicts["delivery_identity_mismatch_core_store"],
+        delivery_alert_id_not_canonical=delivery_conflicts["delivery_alert_id_not_canonical"],
+        telegram_message_contains_absolute_path=delivery_conflicts["telegram_message_contains_absolute_path"],
+        telegram_message_contains_raw_debug_dump=delivery_conflicts["telegram_message_contains_raw_debug_dump"],
+        digest_item_without_live_confirmation=delivery_conflicts["digest_item_without_live_confirmation"],
+        digest_item_rejected_results_only=delivery_conflicts["digest_item_rejected_results_only"],
+        notification_preview_missing=delivery_conflicts["notification_preview_missing"],
         quality_fields_missing_count=quality["quality_fields_missing_count"],
         hypothesis_rows_missing_opportunity_verdict=quality["hypothesis_rows_missing_opportunity_verdict"],
         watchlist_rows_missing_quality_fields=quality["watchlist_rows_missing_quality_fields"],
@@ -1517,6 +1573,104 @@ def _live_confirmation_conflicts(
     return out
 
 
+def _notification_delivery_conflicts(
+    *,
+    delivery_rows: Iterable[Mapping[str, Any]],
+    core_rows_by_id: Mapping[str, Mapping[str, Any]],
+) -> dict[str, int]:
+    out = {
+        "delivery_identity_mismatch_core_store": 0,
+        "delivery_alert_id_not_canonical": 0,
+        "telegram_message_contains_absolute_path": 0,
+        "telegram_message_contains_raw_debug_dump": 0,
+        "digest_item_without_live_confirmation": 0,
+        "digest_item_rejected_results_only": 0,
+        "notification_preview_missing": 0,
+    }
+    latest = _delivery.latest_rows_by_delivery(delivery_rows)
+    for row in latest:
+        lane = str(row.get("lane") or "")
+        if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
+            continue
+        core_id = str(row.get("core_opportunity_id") or "").strip()
+        alert_id = str(row.get("alert_id") or "").strip()
+        core = core_rows_by_id.get(core_id) if core_id else None
+        if core_id and not core:
+            out["delivery_identity_mismatch_core_store"] += 1
+        if core_id and alert_id and alert_id != core_id and lane != "triggered_fade":
+            out["delivery_alert_id_not_canonical"] += 1
+        if core and lane in {"daily_digest", "instant_escalation"}:
+            if _delivery_core_lacks_live_confirmation(core):
+                out["digest_item_without_live_confirmation"] += 1
+            if str(core.get("evidence_acquisition_status") or "") == "rejected_results_only":
+                out["digest_item_rejected_results_only"] += 1
+        preview_path = str(row.get("notification_preview_path") or "").strip()
+        if not preview_path:
+            out["notification_preview_missing"] += 1
+            continue
+        path = Path(preview_path)
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            out["notification_preview_missing"] += 1
+            continue
+        telegram_body = text.split("## Telegram Body", 1)[-1]
+        if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
+            out["telegram_message_contains_absolute_path"] += 1
+        if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
+            out["telegram_message_contains_raw_debug_dump"] += 1
+    return out
+
+
+def _delivery_core_lacks_live_confirmation(core: Mapping[str, Any]) -> bool:
+    if not event_alpha_router.route_value_is_alertable(core.get("final_route_after_quality_gate") or core.get("route")):
+        return False
+    status = str(core.get("evidence_acquisition_status") or "").strip()
+    confirmation = str(core.get("acquisition_confirmation_status") or "").strip()
+    accepted = _as_int(core.get("accepted_evidence_count"))
+    source_class = str(core.get("source_class") or "").strip()
+    market = str(core.get("market_confirmation_level") or "").casefold()
+    freshness = str(core.get("market_context_freshness_status") or "").casefold()
+    impact = str(core.get("impact_path_type") or "").casefold()
+    strong_source = source_class in {
+        "official_project",
+        "official_exchange",
+        "structured_event_calendar",
+        "cryptopanic_tagged",
+        "project_blog",
+        "exchange_announcement",
+    }
+    direct_impact = impact in {
+        "direct_token_event",
+        "listing_liquidity_event",
+        "unlock_supply_event",
+        "exploit_security_event",
+        "venue_value_capture",
+        "fan_token_event",
+    }
+    fresh_market = market not in {"", "none", "missing", "unknown", "insufficient_data"} and freshness not in {"missing", "stale"}
+    if accepted > 0 or confirmation == "confirms" or bool(core.get("acquisition_confirms_candidate")):
+        return False
+    if strong_source or (fresh_market and direct_impact):
+        return False
+    return status in {
+        "",
+        "rejected_results_only",
+        "no_results",
+        "skipped_budget",
+        "provider_unavailable",
+        "skipped_config",
+        "not_configured",
+    } or confirmation in {"", "does_not_confirm", "unresolved", "coverage_gap"}
+
+
+def _as_int(value: Any) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _row_has_alertable_quality_conflict(row: Mapping[str, Any]) -> bool:
     components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
     data = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
@@ -1988,7 +2142,14 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         ),
         (
             "notification deliveries: "
-            f"rows={result.delivery_rows} partial={result.deliveries_partial_delivered} failed={result.deliveries_failed}"
+            f"rows={result.delivery_rows} partial={result.deliveries_partial_delivered} failed={result.deliveries_failed} "
+            f"identity_mismatch={result.delivery_identity_mismatch_core_store} "
+            f"alert_id_not_canonical={result.delivery_alert_id_not_canonical} "
+            f"digest_without_confirmation={result.digest_item_without_live_confirmation} "
+            f"digest_rejected_only={result.digest_item_rejected_results_only} "
+            f"preview_missing={result.notification_preview_missing} "
+            f"raw_debug_dump={result.telegram_message_contains_raw_debug_dump} "
+            f"absolute_path={result.telegram_message_contains_absolute_path}"
         ),
         (
             "quality fields: "

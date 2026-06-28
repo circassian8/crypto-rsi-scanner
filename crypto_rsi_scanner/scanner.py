@@ -2942,6 +2942,7 @@ def _event_alpha_notify_cycle_body(
             cfg=_event_alpha_notification_config_from_runtime(profile_for_run),
             now=now,
             include_health_heartbeat=True,
+            core_opportunity_rows=latest_core_rows,
         )
     finally:
         storage.close()
@@ -2996,6 +2997,7 @@ def _event_alpha_notify_cycle_body(
             run_id=run_id,
             namespace=artifact_namespace or lock_context.artifact_namespace,
             pause_state=pause_state,
+            core_opportunity_rows=latest_core_rows,
         )
     else:
         print("Event Alpha notify cycle send not requested; pass --event-alert-send for guarded delivery or would-send accounting.")
@@ -6885,6 +6887,7 @@ def _send_event_alpha_routed_digest(
     run_id: str | None = None,
     namespace: str | None = None,
     pause_state: event_alpha_notification_pause.EventAlphaNotificationPauseState | None = None,
+    core_opportunity_rows: Iterable[Mapping[str, object]] = (),
 ) -> event_alpha_pipeline.EventAlphaSendResult:
     all_decisions = list(decisions)
     alertable = [decision for decision in all_decisions if decision.alertable]
@@ -6908,6 +6911,7 @@ def _send_event_alpha_routed_digest(
                 cfg=notif_cfg,
                 now=now,
                 include_health_heartbeat=include_health_heartbeat,
+                core_opportunity_rows=core_opportunity_rows,
             )
             result = event_alpha_pipeline.EventAlphaSendResult(
                 requested=True,
@@ -6934,6 +6938,7 @@ def _send_event_alpha_routed_digest(
             profile=profile,
             pipeline_result=pipeline_result,
             card_path_by_alert_id=card_path_by_alert_id,
+            core_opportunity_rows=core_opportunity_rows,
             include_health_heartbeat=include_health_heartbeat,
             delivery_cfg=delivery_cfg,
             run_id=run_id,
