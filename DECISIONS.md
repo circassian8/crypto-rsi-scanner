@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Canonical core view owns incident context
+**Status:** accepted
+**Decision:** `CanonicalCoreOpportunityView` should include linked canonical
+incident rows and select the best incident row for operator-facing rendering.
+Cards, opportunity audits, daily briefs, and doctor checks should consume
+incident/catalyst-frame context through this joined core view when a canonical
+core opportunity exists. Legacy per-row incident reconstruction is fallback
+only for old artifacts without core rows.
+**Why:** Incident rows carry the main catalyst frame, subject/actor/object,
+claim context, and relevance status. Reconstructing that context separately
+from the canonical opportunity can make cards or audits disagree with the
+core row even when route/state/evidence are already canonical.
+**Revisit when:** Event Alpha incidents and core opportunities move into a
+typed store with explicit relational joins.
+
 ## 2026-06-28 - Canonical core verdict fields own secondary operator copy
 **Status:** accepted
 **Decision:** When a canonical CoreOpportunity row exists, research cards,

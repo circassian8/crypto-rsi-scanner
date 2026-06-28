@@ -28523,10 +28523,30 @@ def test_opportunity_audit_primary_sections_use_canonical_core_view():
         "upgrade_requirements": ["blocked_by_generic_cooccurrence", "needs_direct_token_mechanism"],
         "downgrade_warnings": ["no_value_capture"],
     }
+    incident_row = {
+        "row_type": "event_incident",
+        "run_id": "run-core-audit-primary",
+        "profile": "market_refresh_smoke",
+        "artifact_namespace": "market_refresh_smoke",
+        "incident_id": velvet["incident_id"],
+        "canonical_name": "SpaceX pre-IPO exposure via Velvet",
+        "canonical_incident_name": "SpaceX pre-IPO exposure via Velvet",
+        "incident_relevance_status": "active_incident",
+        "incident_relevance_score": 100.0,
+        "primary_subject": "SpaceX pre-IPO exposure",
+        "main_frame_type": "proxy_attention",
+        "main_frame_role": "main_catalyst",
+        "main_frame_subject": "SpaceX pre-IPO exposure",
+        "main_frame_actor": "Velvet",
+        "main_frame_object": "pre-IPO trading venue",
+        "main_frame_evidence_quote": "Velvet users can trade SpaceX pre-IPO exposure",
+        "linked_assets": [{"symbol": "VELVET", "coin_id": "velvet", "role": "proxy_venue"}],
+    }
     audit = event_opportunity_audit.format_opportunity_audit(
         velvet["core_opportunity_id"],
         core_opportunity_rows=[velvet],
         alert_rows=[stale_support],
+        incident_rows=[incident_row],
         profile="market_refresh_smoke",
     )
     assert "- impact path: venue_value_capture" in audit
@@ -28540,6 +28560,9 @@ def test_opportunity_audit_primary_sections_use_canonical_core_view():
     assert "blocked by generic cooccurrence" not in audit
     assert "needs proof that this event directly affects the token" not in audit
     assert "no token value-capture mechanism is visible" not in audit
+    assert "- main catalyst frame: proxy_attention (main_catalyst)" in audit
+    assert "- main catalyst subject/actor/object: SpaceX pre-IPO exposure / Velvet / pre-IPO trading venue" in audit
+    assert "- main catalyst evidence: Velvet users can trade SpaceX pre-IPO exposure" in audit
 
 
 def test_quality_review_uses_core_opportunities_as_primary_sections():
@@ -28589,6 +28612,7 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
         core_path = root / "event_core_opportunities.jsonl"
         alert_path = root / "event_alpha_alerts.jsonl"
         acquisition_path = root / "event_evidence_acquisition.jsonl"
+        incident_path = root / "event_incidents.jsonl"
         feedback_path = root / "event_alpha_feedback.jsonl"
         card_dir = root / "cards"
         event_core_opportunity_store.write_core_opportunities(
@@ -28663,6 +28687,29 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
             }) + "\n",
             encoding="utf-8",
         )
+        incident_path.write_text(
+            json.dumps({
+                "row_type": "event_incident",
+                "run_id": "run-core-view",
+                "profile": "market_refresh_smoke",
+                "artifact_namespace": "market_refresh_smoke",
+                "incident_id": velvet["incident_id"],
+                "canonical_name": "SpaceX pre-IPO exposure via Velvet",
+                "canonical_incident_name": "SpaceX pre-IPO exposure via Velvet",
+                "incident_relevance_status": "active_incident",
+                "incident_relevance_score": 100.0,
+                "primary_subject": "SpaceX pre-IPO exposure",
+                "main_frame_type": "proxy_attention",
+                "main_frame_role": "main_catalyst",
+                "main_frame_subject": "SpaceX pre-IPO exposure",
+                "main_frame_actor": "Velvet",
+                "main_frame_object": "pre-IPO trading venue",
+                "main_frame_evidence_quote": "Velvet users can trade SpaceX pre-IPO exposure",
+                "linked_assets": [{"symbol": "VELVET", "coin_id": "velvet", "role": "proxy_venue"}],
+                "last_updated_at": "2026-06-15T13:00:00+00:00",
+            }) + "\n",
+            encoding="utf-8",
+        )
         view = event_core_opportunity_store.load_canonical_core_opportunity_view(
             "market_refresh_smoke",
             "market_refresh_smoke",
@@ -28670,6 +28717,7 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
             core_store_path=core_path,
             alert_store_path=alert_path,
             evidence_acquisition_path=acquisition_path,
+            incident_store_path=incident_path,
             feedback_path=feedback_path,
             research_cards_dir=card_dir,
         )
@@ -28690,6 +28738,10 @@ def test_canonical_core_opportunity_view_loads_linked_artifacts():
     assert len(view.evidence_acquisition_rows) == 1
     assert view.evidence_acquisition_rows[0]["status"] == "accepted_evidence_found"
     assert len(view.alert_snapshot_rows) == 1
+    assert len(view.incident_rows) == 1
+    assert view.incident_row
+    assert view.incident_row["main_frame_type"] == "proxy_attention"
+    assert view.incident_row["incident_relevance_status"] == "active_incident"
     assert view.feedback_status == "has_feedback"
     assert view.market_refresh_rows
     assert legacy.found

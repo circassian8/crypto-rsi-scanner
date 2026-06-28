@@ -51,9 +51,12 @@ The operator-facing opportunity spine is the canonical CoreOpportunity view.
 When `event_core_opportunities.jsonl` exists, cards and audits should read the
 stored core row plus its linked support rows, diagnostic/control rows,
 evidence-acquisition rows, market-refresh rows, alert snapshots, card path, and
-feedback status through the canonical read model. Support/control artifacts are
-audit evidence attached to the core opportunity; they should not create a
-second visible truth for route, state, tier, or final opportunity verdict.
+feedback status through the canonical read model. Incident rows and selected
+catalyst-frame context are part of that same read model, so audits/cards should
+use the joined incident row before falling back to legacy per-row incident
+reconstruction. Support/control artifacts are audit evidence attached to the
+core opportunity; they should not create a second visible truth for route,
+state, tier, incident context, or final opportunity verdict.
 Source-pack acquisition display follows the same rule: use the canonical
 core acquisition view for accepted/rejected counts, reason codes, samples,
 source pack, provider failures, and before/after verdicts. If a support row

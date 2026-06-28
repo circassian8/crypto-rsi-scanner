@@ -51,6 +51,7 @@ def format_opportunity_audit(
         core_rows=core_items,
         supporting_rows=[*hypothesis_items, *watchlist_items, *alert_items, *decision_items],
         alert_rows=alert_items,
+        incident_rows=incidents,
         feedback_rows=feedback_rows,
         card_paths=card_paths,
         profile=profile,
@@ -87,7 +88,7 @@ def format_opportunity_audit(
     resolution_rows = core_items or ([core_match.primary_row] if core_match is not None else [])
     core_resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, resolution_rows)
     components = _components(row)
-    incident = _incident_context(row, components, incidents)
+    incident = core_view.incident_row or _incident_context(row, components, incidents)
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
     verdict_copy = event_opportunity_verdict.build_verdict_aware_upgrade_downgrade_text(components)
     near_miss = event_near_miss.near_miss_metadata_for_row(row)

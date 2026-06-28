@@ -17,6 +17,34 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Join incidents into the canonical CoreOpportunity view · Codex
+**Why:** Cards and audits were converging on the canonical CoreOpportunity read
+model, but incident/catalyst-frame context could still be reconstructed
+separately. That left room for operator-facing views to disagree about the
+main incident even when the core opportunity id was stable.
+**Changes:**
+- `CanonicalCoreOpportunityView` now loads and exposes linked incident rows,
+  including the best incident row for a core opportunity.
+- Opportunity audit passes incident rows through the canonical core view and
+  renders the joined incident/frame context before falling back to legacy row
+  reconstruction.
+- Added regressions proving VELVET/SpaceX core views and audits carry the
+  joined incident frame (`proxy_attention`, main catalyst, evidence quote).
+**Verify:** `python3 -m py_compile crypto_rsi_scanner/event_core_opportunity_store.py
+crypto_rsi_scanner/event_opportunity_audit.py`; `python3 -m compileall -q
+crypto_rsi_scanner tests`; `python3 tests/test_indicators.py` passed
+(516/516, also exercised twice during focused checks); `make
+event-alpha-signal-quality-eval PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-market-refresh-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-quality-validation-cycle PYTHON=python3`; `make verify
+PYTHON=python3`; and the requested manual evidence-acquisition audit, daily
+brief, and strict artifact doctor smoke checks exited 0.
+**Notes/risks:** Research-only read-model/audit change. No Telegram sends,
+paper/live rows, normal RSI writes, trading, or LLM/provider-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Make Event Alpha core rendering verdict-aware · Codex
 **Why:** Canonical CoreOpportunity rows were authoritative for route/state, but
 secondary card and audit sections could still render fallback/support-row text
