@@ -60,6 +60,16 @@ source pack, provider failures, and before/after verdicts. If a support row
 disagrees with the core row, keep it under diagnostics instead of letting it
 change the primary card, audit, quality-review section, market-freshness line,
 or upgrade-candidate list.
+The same canonical-core rule applies to secondary operator copy. Cards and
+audits should derive latest source, source count, impact-path
+reason/strength, digest eligibility, market confirmation/freshness, upgrade
+requirements, downgrade warnings, and missing-evidence text from the final core
+verdict and joined acquisition/market evidence. Filler values such as
+`unknown`, `missing`, or `insufficient_data` are placeholders, not stronger
+truth than accepted evidence. A promoted `validated_digest`, `watchlist`, or
+`high_priority` core should not show generic-cooccurrence, missing direct
+mechanism, or missing value-capture blockers in its primary text; those belong
+only in diagnostics for stale support/control rows.
 
 ## Feedback And Calibration Loop
 

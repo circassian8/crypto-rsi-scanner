@@ -64,6 +64,19 @@ ACTION_TEXT = {
 }
 
 
+PASSED_GATE_REASON_CODES = {
+    "blocked_by_generic_cooccurrence",
+    "generic_cooccurrence_only",
+    "needs_direct_token_mechanism",
+    "explained_token_impact_path",
+    "missing_direct_impact_path",
+    "needs_impact_path_validation",
+    "impact_path_not_validated",
+    "no_value_capture",
+    "no_value_capture_explained",
+}
+
+
 def humanize_event_alpha_reason(reason: object) -> str:
     """Translate a stable Event Alpha reason code into concise operator text."""
     text = str(reason or "").strip()
@@ -90,3 +103,7 @@ def humanize_event_alpha_actions(actions: Iterable[object], *, limit: int = 5) -
     translated = [humanize_event_alpha_action(action) for action in actions]
     translated = [action for action in translated if action]
     return "; ".join(dict.fromkeys(translated[: max(1, limit)]))
+
+
+def reason_code_is_passed_gate_blocker(reason: object) -> bool:
+    return str(reason or "").strip() in PASSED_GATE_REASON_CODES

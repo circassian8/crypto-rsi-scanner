@@ -1455,25 +1455,10 @@ def _origin(url: str) -> str:
     return parsed.netloc or parsed.path or "unknown"
 
 
-def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
-    lines: list[str] = []
-    if alert is not None:
-        if alert.get("source"):
-            lines.append(f"- Source: {alert.get('source')}")
-        if alert.get("source_url"):
-            lines.append(f"- URL: {alert.get('source_url')}")
-        if alert.get("source_provider"):
-            lines.append(f"- Provider: {alert.get('source_provider')}")
-    if entry is not None:
-        lines.append(f"- Latest source: {entry.latest_source or 'unknown'}")
-        lines.append(f"- Source count: {entry.source_count}")
-    return lines or ["- No source details found in local artifacts."]
-
-
-def _source_acquisition_lines(
+def _card_components(
     entry: event_watchlist.EventWatchlistEntry | None,
     alert: Mapping[str, Any] | None,
-) -> list[str]:
+) -> dict[str, Any]:
     components = dict(entry.latest_score_components if entry else {})
     if alert:
         alert_components = alert.get("score_components") if isinstance(alert.get("score_components"), Mapping) else {}
@@ -1481,6 +1466,145 @@ def _source_acquisition_lines(
         components.update(dict(alert_components or {}))
         components.update(dict(latest or {}))
         components.update({key: value for key, value in alert.items() if value not in (None, "", [], {}, ())})
+    if entry is not None:
+        for key, value in {
+            "latest_source": entry.latest_source,
+            "source_count": entry.source_count,
+            "symbol": entry.symbol,
+            "coin_id": entry.coin_id,
+            "impact_path_type": entry.impact_path_type,
+            "impact_path_strength": entry.impact_path_strength,
+            "candidate_role": entry.candidate_role,
+            "market_confirmation_level": entry.market_confirmation_level,
+            "market_confirmation_score": entry.market_confirmation_score,
+            "market_context_freshness_status": entry.market_context_freshness_status,
+            "market_context_age_hours": entry.market_context_age_hours,
+            "opportunity_level": entry.opportunity_level,
+            "opportunity_score_final": entry.opportunity_score_final,
+        }.items():
+            if value not in (None, "", [], {}, ()) and key not in components:
+                components[key] = value
+    return components
+
+
+def _accepted_evidence_samples(components: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    raw = components.get("evidence_acquisition_accepted_evidence") or components.get("accepted_evidence")
+    if isinstance(raw, Mapping):
+        return [raw]
+    if isinstance(raw, Iterable) and not isinstance(raw, (str, bytes)):
+        return [item for item in raw if isinstance(item, Mapping)]
+    return []
+
+
+def _first_accepted_evidence_sample(components: Mapping[str, Any]) -> Mapping[str, Any]:
+    samples = _accepted_evidence_samples(components)
+    return samples[0] if samples else {}
+
+
+def _int_value(value: object) -> int | None:
+    try:
+        return int(float(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_promoted_components(components: Mapping[str, Any]) -> bool:
+    level = str(components.get("final_opportunity_level") or components.get("opportunity_level") or "").casefold()
+    route = str(components.get("final_route_after_quality_gate") or components.get("route") or "").upper()
+    return level in {"validated_digest", "watchlist", "high_priority"} or event_alpha_router.route_value_is_alertable(route)
+
+
+def _canonical_reason_from_components(components: Mapping[str, Any]) -> str | None:
+    path = str(components.get("impact_path_type") or components.get("primary_impact_path") or "").strip()
+    pack = str(components.get("source_pack") or components.get("evidence_acquisition_source_pack") or "").strip()
+    if path in {"proxy_attention", "proxy_exposure", "venue_value_capture"} or pack == "proxy_preipo_rwa_pack":
+        return "venue_value_capture"
+    if path == "strategic_investment_or_valuation" or pack == "strategic_investment_pack":
+        return "strategic_investment"
+    if path == "market_dislocation_unknown":
+        return "cause_unknown_market_dislocation"
+    return path or None
+
+
+def _canonical_strength_from_components(components: Mapping[str, Any]) -> str | None:
+    level = str(components.get("final_opportunity_level") or components.get("opportunity_level") or "").casefold()
+    path = str(components.get("impact_path_type") or components.get("primary_impact_path") or "").casefold()
+    if path in {"", "insufficient_data", "generic_cooccurrence_only"}:
+        return None
+    if level in {"high_priority", "watchlist"}:
+        return "strong"
+    if level == "validated_digest":
+        return "medium"
+    return None
+
+
+def _canonical_market_summary_from_components(components: Mapping[str, Any]) -> str | None:
+    level = components.get("market_confirmation_level") or components.get("market_reaction_confirmation")
+    score = components.get("market_confirmation_score")
+    freshness = components.get("market_data_freshness") or components.get("market_context_freshness_status")
+    source = components.get("market_context_source")
+    if not any(value not in (None, "", [], {}, ()) for value in (level, score, freshness, source)):
+        return None
+    parts = []
+    if level or score is not None:
+        parts.append(f"{level or 'not available'} / {score if score is not None else 'n/a'}")
+    if freshness or source:
+        parts.append(f"freshness={freshness or 'not available'} source={source or 'not available'}")
+    return "; ".join(parts)
+
+
+def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
+    components = _card_components(entry, alert)
+    sample = _first_accepted_evidence_sample(components)
+    latest_source = _display_text(
+        components.get("latest_source")
+        or components.get("source")
+        or components.get("source_provider")
+    ) or _display_text(sample.get("provider") if sample else None) or _display_text(sample.get("provider_hint") if sample else None)
+    source_url = components.get("source_url") or components.get("latest_source_url") or (sample.get("source_url") if sample else None)
+    source_title = components.get("latest_source_title") or (sample.get("title") if sample else None)
+    accepted_count = _int_value(components.get("evidence_acquisition_accepted_count")) or len(_accepted_evidence_samples(components))
+    source_count = _int_value(components.get("source_count")) or (entry.source_count if entry is not None else 0) or accepted_count
+    lines: list[str] = [
+        f"- Latest source: {latest_source or 'not available'}",
+        f"- Source count: {source_count if source_count else 'not available'}",
+    ]
+    if accepted_count:
+        lines.append(f"- Accepted evidence count: {accepted_count}")
+    if source_title:
+        lines.append(f"- Latest evidence title: {source_title}")
+    if source_url:
+        lines.append(f"- URL: {source_url}")
+    provider = _display_text(components.get("source_provider")) or _display_text(sample.get("provider") if sample else None)
+    if provider:
+        lines.append(f"- Provider: {provider}")
+    return lines
+
+
+def _display_text(value: Any) -> str | None:
+    text = str(value or "").strip()
+    if text.casefold() in {
+        "",
+        "unknown",
+        "missing",
+        "none",
+        "not available",
+        "n/a",
+        "insufficient_data",
+        "impact_hypothesis",
+        "watchlist",
+        "alert_snapshot",
+        "core_opportunity",
+    }:
+        return None
+    return text
+
+
+def _source_acquisition_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> list[str]:
+    components = _card_components(entry, alert)
     if not components and entry is None:
         return ["- Source pack: unknown", "- Evidence acquisition: no local metadata."]
     pack_name = str(components.get("source_pack") or "")
@@ -1514,6 +1638,7 @@ def _source_acquisition_lines(
     if isinstance(queries, str):
         queries = [queries]
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
+    verdict_copy = event_opportunity_verdict.build_verdict_aware_upgrade_downgrade_text(components)
     pack = event_source_packs.get_source_pack(pack_name)
     lines = [
         f"- Source pack: {pack_name}",
@@ -1523,15 +1648,15 @@ def _source_acquisition_lines(
         f"- Evidence acquisition attempted: {str(bool(components.get('evidence_acquisition_attempted'))).lower()}",
         (
             f"- Evidence acquisition result: status={acquisition.get('status') or components.get('evidence_acquisition_status') or 'not_executed'} "
-            f"evidence={components.get('acquisition_evidence_status') or acquisition.get('acquisition_evidence_status') or 'unknown'} "
+            f"evidence={components.get('acquisition_evidence_status') or acquisition.get('acquisition_evidence_status') or 'not available'} "
             f"accepted={acquisition.get('accepted', components.get('evidence_acquisition_accepted_count', 0))} "
             f"rejected={acquisition.get('rejected', components.get('evidence_acquisition_rejected_count', 0))} "
             f"final={acquisition.get('final_upgrade_status') or components.get('final_upgrade_status') or components.get('acquisition_upgrade_status') or 'unchanged'}"
         ),
         (
-            f"- Final verdict after refresh: {components.get('final_opportunity_level') or components.get('opportunity_level') or 'unknown'} "
+            f"- Final verdict after refresh: {components.get('final_opportunity_level') or components.get('opportunity_level') or 'not available'} "
             f"/ {components.get('final_opportunity_score') or components.get('opportunity_score_final') or 'n/a'} "
-            f"source={components.get('final_verdict_source') or 'initial'}"
+            f"source={components.get('final_verdict_source') or 'not available'}"
         ),
         "- Accepted evidence reasons: " + ("; ".join(str(item) for item in list(accepted_reasons or ())[:5]) if accepted_reasons else "none"),
         "- Accepted evidence samples: "
@@ -1544,8 +1669,12 @@ def _source_acquisition_lines(
         f"- Planned queries: {len(queries or ()) if isinstance(queries, Iterable) and not isinstance(queries, (str, bytes, Mapping)) else 0}",
         "- Provider/source gaps: " + ("; ".join(str(item) for item in list(failures or ())[:4]) if failures else "none"),
         "- What source would upgrade this: "
-        + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=4) or "; ".join(pack.validation_requirements[:4])),
-        "- What source would downgrade this: denial/correction source, failed identity validation, or no market/impact confirmation.",
+        + (
+            verdict_copy.upgrade_text
+            if _is_promoted_components(components)
+            else (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=4) or "; ".join(pack.validation_requirements[:4]))
+        ),
+        "- What source would downgrade this: " + verdict_copy.downgrade_text,
     ]
     return lines
 
@@ -1553,16 +1682,40 @@ def _source_acquisition_lines(
 def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
     snapshot = dict(entry.latest_market_snapshot if entry else {})
     if alert is not None:
+        components = _card_components(entry, alert)
+        for key in ("latest_market_snapshot", "market_snapshot"):
+            if isinstance(components.get(key), Mapping):
+                snapshot.update(dict(components[key]))
         for key in ("market_price", "return_24h", "return_72h", "return_7d", "volume_24h", "market_cap"):
             if alert.get(key) is not None:
                 snapshot[key] = alert.get(key)
+    else:
+        components = _card_components(entry, alert)
+    market_level = components.get("market_confirmation_level") or components.get("market_reaction_confirmation")
+    market_score = components.get("market_confirmation_score")
+    freshness = components.get("market_data_freshness") or components.get("market_context_freshness_status")
+    context_source = components.get("market_context_source")
+    context_age = _format_market_context_age(components)
+    if not snapshot and (market_level or market_score is not None or freshness or context_source):
+        return [
+            f"- Market confirmation: {market_level or 'not available'} / {market_score if market_score is not None else 'n/a'}",
+            f"- Market freshness: {freshness or 'not available'}",
+            f"- Market context source: {context_source or 'not available'} (age={context_age})",
+            "- Market snapshot: computed from refresh summary; raw snapshot not stored.",
+        ]
     if not snapshot:
-        return ["- No market snapshot stored."]
+        return ["- Market data: not available."]
     lines = []
+    if market_level or market_score is not None:
+        lines.append(f"- Market confirmation: {market_level or 'not available'} / {market_score if market_score is not None else 'n/a'}")
+    if freshness or context_source:
+        lines.append(f"- Market freshness/source: {freshness or 'not available'} / {context_source or 'not available'} (age={context_age})")
+    if snapshot.get("summary_only"):
+        lines.append("- Market snapshot: computed from refresh summary; raw snapshot not stored.")
     for key in ("price", "market_price", "return_24h", "return_72h", "return_7d", "volume_24h", "market_cap"):
         if snapshot.get(key) is not None:
             lines.append(f"- {key}: {snapshot.get(key)}")
-    return lines or ["- No market snapshot stored."]
+    return lines or ["- Market data: not available."]
 
 
 def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) -> list[str]:
@@ -1590,9 +1743,9 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     if isinstance(validation_reasons, str):
         validation_reasons = [validation_reasons]
     gate_line = _impact_hypothesis_quality_gate_line(entry, components)
-    impact_path_reason = components.get("impact_path_reason") or "unknown"
-    impact_path_type = components.get("impact_path_type") or "unknown"
-    candidate_role = components.get("candidate_role") or "unknown"
+    impact_path_reason = components.get("impact_path_reason") or _canonical_reason_from_components(components) or "not available"
+    impact_path_type = components.get("impact_path_type") or components.get("primary_impact_path") or "not available"
+    candidate_role = components.get("candidate_role") or "not available"
     incident_id = components.get("incident_id") or "unknown"
     canonical_incident_name = components.get("canonical_incident_name") or "unknown"
     event_archetype = components.get("event_archetype") or "unknown"
@@ -1622,7 +1775,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     conflicting_claims = components.get("conflicting_claims") or []
     role_confidence = components.get("role_confidence")
     role_evidence = components.get("role_evidence") or []
-    market_context_source = components.get("market_context_source") or "unknown"
+    market_context_source = components.get("market_context_source") or "not available"
     market_context_age = _format_market_context_age(components)
     market_context_quality = (
         components.get("market_context_freshness_status")
@@ -1633,19 +1786,22 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     market_reaction_confirmed = components.get("market_reaction_confirmed")
     causal_mechanism_confirmed = components.get("causal_mechanism_confirmed")
     incident_confidence = components.get("incident_confidence")
-    impact_path_strength = components.get("impact_path_strength") or "unknown"
+    impact_path_strength = components.get("impact_path_strength") or _canonical_strength_from_components(components) or "not available"
     opportunity_score_v2 = components.get("opportunity_score_v2")
     evidence_specificity = components.get("evidence_specificity_score")
-    why_digest_ineligible = components.get("why_digest_ineligible") or "none"
+    verdict_copy = event_opportunity_verdict.build_verdict_aware_upgrade_downgrade_text(components)
+    why_digest_ineligible = components.get("why_digest_ineligible") or verdict_copy.missing_evidence_text
     digest_eligible = components.get("digest_eligible_by_impact_path")
+    if digest_eligible is None and _is_promoted_components(components):
+        digest_eligible = True
     evidence_quality_score = components.get("evidence_quality_score")
     source_class = components.get("source_class") or "unknown"
     evidence_specificity_class = components.get("evidence_specificity") or "unknown"
     market_confirmation_score = components.get("market_confirmation_score")
-    market_confirmation_level = components.get("market_confirmation_level") or "unknown"
-    market_data_freshness = components.get("market_data_freshness") or components.get("market_context_freshness_status") or "unknown"
+    market_confirmation_level = components.get("market_confirmation_level") or "not available"
+    market_data_freshness = components.get("market_data_freshness") or components.get("market_context_freshness_status") or "not available"
     market_reaction_confirmation = components.get("market_reaction_confirmation") or market_confirmation_level
-    market_confirmation_summary = components.get("market_confirmation_summary") or "none"
+    market_confirmation_summary = components.get("market_confirmation_summary") or _canonical_market_summary_from_components(components) or "not available"
     opportunity_score_final = components.get("opportunity_score_final")
     opportunity_level = components.get("opportunity_level") or "unknown"
     final_opportunity_score = components.get("final_opportunity_score") or opportunity_score_final
@@ -1663,6 +1819,12 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     if isinstance(why_not_promoted, str):
         why_not_promoted = [why_not_promoted]
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
+    if _is_promoted_components(components):
+        upgrade_text = verdict_copy.upgrade_text
+        downgrade_text = verdict_copy.downgrade_text
+    else:
+        upgrade_text = event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=6) or verdict_copy.upgrade_text
+        downgrade_text = event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=6) or verdict_copy.downgrade_text
     lines = [
         f"- Validated asset: {validated_symbol or 'unknown'}/{validated_coin_id or 'unknown'}",
         f"- Incident: {canonical_incident_name} ({incident_id})",
@@ -1732,9 +1894,9 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
             else "independent catalyst source, asset identity, liquidity/organic volume, and whether the catalyst actually affects this token."
         ),
         "- What would upgrade this candidate: "
-        + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=6) or "manual analyst review"),
+        + upgrade_text,
         "- What would invalidate this candidate: "
-        + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=6) or "source correction or failed confirmation"),
+        + downgrade_text,
     ]
     if validation_reasons:
         lines.append("- Validation evidence: " + "; ".join(str(item) for item in validation_reasons[:4]))

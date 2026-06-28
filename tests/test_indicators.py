@@ -28429,9 +28429,13 @@ def test_research_card_primary_fields_use_canonical_core_row():
         "main_frame_actor": "Velvet",
         "main_frame_object": "pre-IPO exposure",
         "frame_status": "validated",
+        "latest_source": "impact_hypothesis",
+        "source_provider": "impact_hypothesis",
         "evidence_acquisition_accepted_count": 1,
         "evidence_acquisition_accepted_evidence": [{
             "title": "VELVET offers SpaceX pre-IPO tokenized stock exposure",
+            "provider": "cryptopanic",
+            "source_url": "https://cryptopanic.com/news/velvet-spacex-pre-ipo",
             "reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
         }],
         "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
@@ -28456,10 +28460,24 @@ def test_research_card_primary_fields_use_canonical_core_row():
     )
     assert "- State / alert tier: HIGH_PRIORITY / HIGH_PRIORITY_RESEARCH" in card.markdown
     assert "- Source pack: proxy_preipo_rwa_pack" in card.markdown
+    assert "- Latest source: cryptopanic" in card.markdown
+    assert "- Latest source: unknown" not in card.markdown
+    assert "- Latest source: not available" not in card.markdown
     assert "- Evidence acquisition attempted: true" in card.markdown
     assert "accepted=1" in card.markdown
     assert "cryptopanic_currency_tag_match" in card.markdown
     assert "VELVET offers SpaceX pre-IPO tokenized stock exposure" in card.markdown
+    assert "- Impact path strength: strong" in card.markdown
+    assert "- Impact path strength: unknown" not in card.markdown
+    assert "- Impact path reason: venue_value_capture" in card.markdown
+    assert "- Impact path digest eligible: true" in card.markdown
+    assert "- Market confirmation: strong / 88" in card.markdown
+    assert "No market snapshot stored" not in card.markdown
+    assert "Market data: not available" not in card.markdown
+    assert "Already high priority" in card.markdown
+    assert "blocked by generic cooccurrence" not in card.markdown
+    assert "needs proof that this event directly affects the token" not in card.markdown
+    assert "no token value-capture mechanism is visible" not in card.markdown
     assert "- Opportunity verdict: high_priority / 92.0" in card.markdown
     assert "- Relationship: venue_value_capture" in card.markdown
     assert "- Quality gate: passed final quality gate (HIGH_PRIORITY_RESEARCH)" in card.markdown
@@ -28467,6 +28485,61 @@ def test_research_card_primary_fields_use_canonical_core_row():
     assert "Quality gate: local-only" not in card.markdown
     assert "validated impact hypothesis promoted to RADAR" not in card.markdown
     assert "STORE_ONLY" not in card.markdown.split("## Artifact Lineage", 1)[0]
+
+
+def test_opportunity_audit_primary_sections_use_canonical_core_view():
+    from crypto_rsi_scanner import event_core_opportunity_store, event_opportunity_audit
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        store_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=store_path),
+            run_id="run-core-audit-primary",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        store_rows = event_core_opportunity_store.load_core_opportunities(store_path, latest_run=True).rows
+    velvet = {
+        **next(row for row in store_rows if row["symbol"] == "VELVET"),
+        "evidence_acquisition_accepted_count": 1,
+        "evidence_acquisition_accepted_evidence": [{
+            "title": "VELVET offers SpaceX pre-IPO tokenized stock exposure",
+            "provider": "cryptopanic",
+            "source_url": "https://cryptopanic.com/news/velvet-spacex-pre-ipo",
+            "reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+        }],
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+        "evidence_acquisition_results": {"status": "accepted_evidence_found", "accepted": 1, "rejected": 0},
+    }
+    stale_support = {
+        **velvet,
+        "row_type": "event_alpha_alert_snapshot",
+        "opportunity_level": "local_only",
+        "opportunity_score_final": 0,
+        "impact_path_type": "insufficient_data",
+        "upgrade_requirements": ["blocked_by_generic_cooccurrence", "needs_direct_token_mechanism"],
+        "downgrade_warnings": ["no_value_capture"],
+    }
+    audit = event_opportunity_audit.format_opportunity_audit(
+        velvet["core_opportunity_id"],
+        core_opportunity_rows=[velvet],
+        alert_rows=[stale_support],
+        profile="market_refresh_smoke",
+    )
+    assert "- impact path: venue_value_capture" in audit
+    assert "- strength: strong" in audit
+    assert "- reason: venue_value_capture" in audit
+    assert "- source pack: proxy_preipo_rwa_pack" in audit
+    assert "accepted reason codes: cryptopanic_currency_tag_match; direct_token_mechanism" in audit
+    assert "VELVET offers SpaceX pre-IPO tokenized stock exposure" in audit
+    assert "- market level/score: strong / 88" in audit
+    assert "Already high priority" in audit
+    assert "blocked by generic cooccurrence" not in audit
+    assert "needs proof that this event directly affects the token" not in audit
+    assert "no token value-capture mechanism is visible" not in audit
 
 
 def test_quality_review_uses_core_opportunities_as_primary_sections():
@@ -28493,11 +28566,15 @@ def test_quality_review_uses_core_opportunities_as_primary_sections():
     strong = text.split("Strong opportunities:", 1)[1].split("Validated but market-unconfirmed:", 1)[0]
     weak = text.split("Weak co-occurrence / local-only:", 1)[1].split("Sector hypotheses awaiting validation:", 1)[0]
     upgrades = text.split("Top upgrade candidates:", 1)[1].split("Top downgrade risks:", 1)[0]
+    downgrades = text.split("Top downgrade risks:", 1)[1].split("Quality Tuning Suggestions:", 1)[0]
     freshness = text.split("Market Freshness Readiness:", 1)[1].split("Top upgrade candidates:", 1)[0]
     assert "operator_view: canonical_core_rows=4" in text
     assert "VELVET" in strong
     assert "VELVET" not in weak
     assert "VELVET" not in upgrades
+    assert "VELVET" in downgrades
+    assert "invalid exposure/value-capture claim" in downgrades
+    assert "no token value-capture mechanism is visible" not in downgrades
     assert "AAVE" in upgrades
     assert "status=fresh source=missing" not in freshness
     assert "support_or_diagnostic_rows=" in text
@@ -28697,6 +28774,9 @@ def test_artifact_doctor_detects_canonical_core_rendering_mismatch_and_acquisiti
                 "- Opportunity verdict: local_only / 0.0",
                 "- Source pack: market_anomaly_pack",
                 "- Evidence acquisition result: status=accepted_evidence_found evidence=accepted accepted=0 rejected=0 final=unchanged",
+                "- Latest source: unknown",
+                "- Market data: not available.",
+                "- What would upgrade this candidate: blocked by generic cooccurrence; needs proof that this event directly affects the token",
             ]),
             encoding="utf-8",
         )
@@ -28745,6 +28825,10 @@ def test_artifact_doctor_detects_canonical_core_rendering_mismatch_and_acquisiti
     assert doctor.card_primary_fields_mismatch_core_store == 1
     assert doctor.card_evidence_acquisition_count_mismatch == 1
     assert doctor.card_source_pack_mismatch_core_acquisition == 1
+    assert doctor.card_primary_section_contains_support_row_blockers == 1
+    assert doctor.card_upgrade_text_inconsistent_with_final_level == 1
+    assert doctor.card_market_confirmation_missing_but_core_has_market_confirmation == 1
+    assert doctor.card_latest_source_unknown_but_accepted_evidence_exists == 1
     assert doctor.evidence_acquisition_core_id_missing_from_store == 1
     assert any("card_primary_fields_mismatch_core_store=1" in item for item in doctor.blockers)
     assert any("card_evidence_acquisition_count_mismatch=1" in item for item in doctor.blockers)

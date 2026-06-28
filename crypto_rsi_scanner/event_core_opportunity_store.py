@@ -581,6 +581,14 @@ def _row_from_core_opportunity(
     evidence_specificity = _first_text(all_rows, ("evidence_specificity",))
     evidence_score = evidence_after if evidence_after is not None else _first_float(all_rows, ("evidence_quality_score",))
     market_level = _first_text(all_rows, ("market_confirmation_level", "market_reaction_confirmation", "post_refresh_market_confirmation_level"))
+    impact_path_reason = (
+        _first_text(all_rows, ("impact_path_reason",))
+        or _canonical_impact_path_reason(item.primary_impact_path, source_pack)
+    )
+    impact_path_strength = (
+        _first_text(all_rows, ("impact_path_strength",))
+        or _canonical_impact_path_strength(item.opportunity_level, item.primary_impact_path, evidence_score, market_after)
+    )
     initial_level = _first_text(all_rows, ("initial_opportunity_level", "opportunity_level_before", "opportunity_level_pre_refresh")) or item.opportunity_level
     initial_score = _first_float(all_rows, ("initial_opportunity_score", "opportunity_score_before", "opportunity_score_pre_refresh"))
     post_level = _first_text(all_rows, ("post_refresh_opportunity_level", "refreshed_opportunity_level", "opportunity_level_after_market_refresh")) or item.opportunity_level
@@ -591,10 +599,33 @@ def _row_from_core_opportunity(
     evidence_before = acquisition.evidence_quality_before if acquisition.evidence_quality_before is not None else evidence_before
     evidence_after = acquisition.evidence_quality_after if acquisition.evidence_quality_after is not None else evidence_after
     evidence_score = evidence_after if evidence_after is not None else evidence_score
+    if str(market_level or "").casefold() in {"", "unknown", "missing", "none", "insufficient_data"} and market_after is not None:
+        market_level = _market_level_from_score(market_after)
+    impact_path_reason = impact_path_reason or _canonical_impact_path_reason(item.primary_impact_path, source_pack)
+    if str(impact_path_strength or "").casefold() in {"", "unknown", "missing", "none", "insufficient_data"} and str(item.primary_impact_path or "").casefold() not in {"", "unknown", "missing", "none", "insufficient_data", "generic_cooccurrence_only"}:
+        impact_path_strength = _canonical_impact_path_strength(item.opportunity_level, item.primary_impact_path, evidence_score, market_after)
     initial_level = acquisition.opportunity_level_before or initial_level
     initial_score = acquisition.opportunity_score_before if acquisition.opportunity_score_before is not None else initial_score
     post_level = acquisition.opportunity_level_after or post_level
     post_score = acquisition.opportunity_score_after if acquisition.opportunity_score_after is not None else post_score
+    accepted_source = _accepted_evidence_source_summary(acquisition.accepted_evidence_samples)
+    latest_source = _first_real_text(all_rows, ("latest_source", "source", "source_provider", "provider")) or accepted_source.get("provider")
+    source_count = _canonical_source_count(all_rows, acquisition)
+    market_summary = _canonical_market_summary(
+        market_level=market_level,
+        market_score=market_after,
+        market_context=market_context,
+    )
+    market_snapshot = _best_market_snapshot(all_rows)
+    if not market_snapshot and market_after is not None:
+        market_snapshot = {
+            "market_confirmation_level": market_level,
+            "market_confirmation_score": market_after,
+            "market_context_source": market_context.get("market_context_source"),
+            "market_context_freshness_status": market_context.get("market_context_freshness_status"),
+            "market_context_age_hours": market_context.get("market_context_age_hours"),
+            "summary_only": True,
+        }
     support_ids = _row_ids(support)
     diagnostic_ids = _row_ids(diagnostics)
     return {
@@ -626,6 +657,12 @@ def _row_from_core_opportunity(
         "supporting_impact_paths": list(item.supporting_impact_paths),
         "supporting_evidence_quotes": list(item.supporting_evidence_quotes),
         "evidence_quotes": list(item.supporting_evidence_quotes),
+        "source_count": source_count,
+        "latest_source": latest_source,
+        "latest_source_url": accepted_source.get("source_url"),
+        "latest_source_title": accepted_source.get("title"),
+        "source_provider": accepted_source.get("provider") or latest_source,
+        "source_url": accepted_source.get("source_url"),
         "supporting_row_ids": support_ids,
         "diagnostic_row_ids": diagnostic_ids,
         "diagnostic_row_count": item.diagnostic_row_count,
@@ -636,6 +673,8 @@ def _row_from_core_opportunity(
         "initial_opportunity_score": initial_score if initial_score is not None else item.opportunity_score_final,
         "market_refresh_attempted": _any_truthy(all_rows, ("market_refresh_attempted", "targeted_market_refresh_attempted")),
         "market_refresh_success": _any_truthy(all_rows, ("market_refresh_success", "targeted_market_refresh_success")),
+        "market_snapshot": market_snapshot,
+        "latest_market_snapshot": market_snapshot,
         "market_context_freshness_status": market_context.get("market_context_freshness_status"),
         "market_context_source": market_context.get("market_context_source"),
         "market_context_observed_at": market_context.get("market_context_observed_at"),
@@ -644,6 +683,9 @@ def _row_from_core_opportunity(
         "market_context_data_quality": market_context.get("market_context_data_quality"),
         "market_confirmation_score": market_after,
         "market_confirmation_level": market_level,
+        "market_confirmation_summary": market_summary,
+        "market_data_freshness": market_context.get("market_context_freshness_status"),
+        "market_reaction_confirmation": market_level,
         "market_confirmation_before": market_before,
         "market_confirmation_after": market_after,
         "main_frame_type": _first_text(all_rows, ("main_frame_type",)),
@@ -682,6 +724,12 @@ def _row_from_core_opportunity(
         "evidence_quality_score": evidence_score,
         "evidence_quality_before": evidence_before,
         "evidence_quality_after": evidence_after,
+        "impact_path_strength": impact_path_strength,
+        "impact_path_reason": impact_path_reason,
+        "digest_eligible_by_impact_path": item.opportunity_level in {"validated_digest", "watchlist", "high_priority"},
+        "manual_verification_items": _canonical_manual_verification_items(item, source_pack),
+        "upgrade_requirements": _canonical_upgrade_requirements(item.opportunity_level),
+        "downgrade_warnings": _canonical_downgrade_warnings(item.primary_impact_path, item.opportunity_level),
         "post_refresh_opportunity_level": post_level,
         "post_refresh_opportunity_score": post_score if post_score is not None else item.opportunity_score_final,
         "final_opportunity_level": item.opportunity_level,
@@ -701,6 +749,181 @@ def _row_from_core_opportunity(
         "feedback_target_type": "core_opportunity_id",
         "generated_at": generated_at,
     }
+
+
+def _accepted_evidence_source_summary(samples: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    for sample in samples:
+        if not isinstance(sample, Mapping):
+            continue
+        provider = _text_or_none(sample.get("provider")) or _text_or_none(sample.get("provider_hint"))
+        title = _text_or_none(sample.get("title"))
+        source_url = _text_or_none(sample.get("source_url"))
+        if provider or title or source_url:
+            return {"provider": provider, "title": title, "source_url": source_url}
+    return {}
+
+
+def _canonical_source_count(
+    rows: Iterable[Mapping[str, Any]],
+    acquisition: CoreEvidenceAcquisitionView,
+) -> int:
+    counts = [
+        _float_or_none(_first_value(rows, ("source_count", "independent_source_count", "source_update_count"))),
+        float(acquisition.accepted_evidence_count) if acquisition.accepted_evidence_count else None,
+    ]
+    count = max((int(value) for value in counts if value is not None), default=0)
+    return count
+
+
+def _first_real_text(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> str | None:
+    text = _first_text(rows, keys)
+    return None if _is_filler_text(text) else text
+
+
+def _is_filler_text(value: Any) -> bool:
+    return str(value or "").strip().casefold() in {
+        "",
+        "unknown",
+        "missing",
+        "none",
+        "not available",
+        "n/a",
+        "insufficient_data",
+        "impact_hypothesis",
+        "watchlist",
+        "alert_snapshot",
+        "core_opportunity",
+    }
+
+
+def _canonical_impact_path_reason(primary_path: str | None, source_pack: str | None) -> str | None:
+    path = str(primary_path or "").strip()
+    pack = str(source_pack or "").strip()
+    if path in {"proxy_attention", "proxy_exposure", "venue_value_capture"} or pack == "proxy_preipo_rwa_pack":
+        return "venue_value_capture"
+    if path in {"strategic_investment_or_valuation", "acquisition_or_stake"} or pack == "strategic_investment_pack":
+        return "strategic_investment"
+    if path == "exploit_security_event":
+        return "exploit_security_event"
+    if path == "listing_liquidity_event":
+        return "listing_liquidity_event"
+    if path == "market_dislocation_unknown":
+        return "cause_unknown_market_dislocation"
+    return path or None
+
+
+def _canonical_impact_path_strength(
+    level: str | None,
+    primary_path: str | None,
+    evidence_score: float | None,
+    market_score: float | None,
+) -> str | None:
+    path = str(primary_path or "").strip()
+    lvl = str(level or "").strip()
+    if path in {"insufficient_data", "generic_cooccurrence_only", ""}:
+        return "none" if path else None
+    if lvl in {"high_priority", "watchlist"}:
+        return "strong"
+    if lvl == "validated_digest":
+        return "medium"
+    if (evidence_score or 0.0) >= 75 and (market_score or 0.0) >= 50:
+        return "medium"
+    return "weak"
+
+
+def _canonical_market_summary(
+    *,
+    market_level: str | None,
+    market_score: float | None,
+    market_context: Mapping[str, Any],
+) -> str | None:
+    if not market_level and market_score is None and not market_context:
+        return None
+    parts = []
+    if market_level:
+        score_text = f" / {market_score:.0f}" if market_score is not None else ""
+        parts.append(f"{market_level}{score_text}")
+    freshness = market_context.get("market_context_freshness_status")
+    source = market_context.get("market_context_source")
+    age = market_context.get("market_context_age_hours")
+    if freshness or source:
+        age_text = ""
+        if isinstance(age, (int, float)):
+            age_text = f"; age={age:.1f}h" if age >= 1 else f"; age={age * 60:.0f}m"
+        parts.append(f"freshness={freshness or 'not available'} source={source or 'not available'}{age_text}")
+    return "; ".join(parts) if parts else None
+
+
+def _market_level_from_score(score: float | None) -> str | None:
+    if score is None:
+        return None
+    if score >= 75:
+        return "strong"
+    if score >= 50:
+        return "moderate"
+    if score > 0:
+        return "weak"
+    return "none"
+
+
+def _best_market_snapshot(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    for row in rows:
+        for source in (
+            row.get("latest_market_snapshot"),
+            row.get("market_snapshot"),
+            row.get("market_context"),
+        ):
+            if isinstance(source, Mapping) and source:
+                return dict(source)
+        components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else row.get("score_components")
+        if isinstance(components, Mapping):
+            for source in (
+                components.get("latest_market_snapshot"),
+                components.get("market_snapshot"),
+                components.get("market_context"),
+            ):
+                if isinstance(source, Mapping) and source:
+                    return dict(source)
+    return {}
+
+
+def _canonical_manual_verification_items(
+    item: event_core_opportunities.CoreOpportunity,
+    source_pack: str | None,
+) -> list[str]:
+    if item.opportunity_level == "high_priority":
+        return [
+            "verify independent source corroboration",
+            "verify exposure/value-capture claim remains valid",
+            "verify liquidity and market confirmation are still fresh",
+        ]
+    if item.opportunity_level == "watchlist":
+        return ["verify second source, market confirmation, derivatives/liquidity, and catalyst timing"]
+    if item.opportunity_level == "validated_digest":
+        return ["verify market reaction, official/second-source confirmation, and source-pack coverage"]
+    if str(source_pack or "") == "market_anomaly_pack":
+        return ["find causal catalyst evidence and confirm the move is not purely mechanical"]
+    return ["validate catalyst, token identity, impact path, and market confirmation"]
+
+
+def _canonical_upgrade_requirements(level: str | None) -> list[str]:
+    if level == "high_priority":
+        return ["sustained_fresh_market_confirmation", "stronger_source_corroboration", "derivatives_or_liquidity_support"]
+    if level == "watchlist":
+        return ["fresh_stronger_market_confirmation", "second_independent_source", "derivatives_or_liquidity_support"]
+    if level == "validated_digest":
+        return ["fresh_price_volume_reaction", "official_or_second_source_confirmation", "derivatives_or_supply_confirmation"]
+    return ["validated_catalyst", "direct_token_mechanism", "identity_validation", "market_confirmation"]
+
+
+def _canonical_downgrade_warnings(primary_path: str | None, level: str | None) -> list[str]:
+    if level in {"high_priority", "watchlist", "validated_digest"}:
+        if str(primary_path or "") in {"proxy_attention", "proxy_exposure", "venue_value_capture"}:
+            return ["source_correction_or_denial", "exposure_value_capture_invalid", "market_confirmation_fades", "liquidity_drifts_lower", "catalyst_stale"]
+        if str(primary_path or "") == "strategic_investment_or_valuation":
+            return ["deal_denied_or_corrected", "token_value_capture_invalid", "market_reaction_absent", "market_context_stale"]
+        return ["source_correction_or_denial", "impact_path_invalid", "market_confirmation_fades", "liquidity_drifts_lower"]
+    return ["source_noise", "weak_cooccurrence_only", "market_move_without_catalyst"]
 
 
 def _acquisition_candidate_rows(rows: Iterable[Mapping[str, Any] | object]) -> list[dict[str, Any]]:

@@ -698,9 +698,14 @@ def _upgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
         return ["- none"]
     out = []
     for _score, row, upgrade in sorted(candidates, key=lambda item: item[0], reverse=True)[:limit]:
+        verdict_copy = event_opportunity_verdict.build_verdict_aware_upgrade_downgrade_text(row.get("_components") or row)
         out.append(
             f"- {_label(row)}: "
-            + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=3) or "manual analyst review")
+            + (
+                verdict_copy.upgrade_text
+                if _row_is_already_promoted(row)
+                else (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=3) or "manual analyst review")
+            )
         )
     return out
 
@@ -716,9 +721,14 @@ def _downgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
         return ["- none"]
     out = []
     for _score, row, upgrade in sorted(candidates, key=lambda item: item[0], reverse=True)[:limit]:
+        verdict_copy = event_opportunity_verdict.build_verdict_aware_upgrade_downgrade_text(row.get("_components") or row)
         out.append(
             f"- {_label(row)}: "
-            + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=3) or "source correction or failed confirmation")
+            + (
+                verdict_copy.downgrade_text
+                if _row_is_already_promoted(row)
+                else (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=3) or "source correction or failed confirmation")
+            )
         )
     return out
 

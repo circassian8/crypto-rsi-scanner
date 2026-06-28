@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Make Event Alpha core rendering verdict-aware · Codex
+**Why:** Canonical CoreOpportunity rows were authoritative for route/state, but
+secondary card and audit sections could still render fallback/support-row text
+such as `Latest source: unknown`, `Impact path strength: unknown`, missing
+market snapshots, or generic-cooccurrence blockers on a high-priority VELVET
+core.
+**Changes:**
+- Canonical core store rows now persist derived display fields for latest
+  source, source count, accepted evidence, impact-path reason/strength,
+  digest eligibility, market confirmation summary/snapshot, manual verification
+  items, upgrade requirements, and downgrade warnings.
+- Research cards, opportunity audits, and quality-review upgrade/downgrade
+  sections now use verdict-aware copy so promoted cores do not show stale
+  support-row hard-gate blockers in primary sections.
+- Accepted evidence samples now outrank filler/internal artifact source labels
+  such as `unknown`, `impact_hypothesis`, `watchlist`, and `alert_snapshot`
+  when rendering canonical latest-source fields.
+- Artifact doctor now checks for canonical rendering drift, including support
+  blockers in primary cards, inconsistent high-priority upgrade copy, missing
+  market confirmation display, and unknown latest source despite accepted
+  evidence.
+- Added regressions covering VELVET canonical card fields, VELVET opportunity
+  audit primary sections, quality-review verdict-aware risks, and
+  artifact-doctor rendering mismatch detection.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` passed (516/516); `make
+event-alpha-signal-quality-eval PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-market-refresh-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-quality-validation-cycle PYTHON=python3`; `make verify
+PYTHON=python3`; and the requested manual smoke wrappers for VELVET audit,
+strict evidence-acquisition artifact doctor, and daily brief all exited 0.
+**Notes/risks:** Research-only artifact/presentation repair. No Telegram sends,
+paper/live rows, normal RSI writes, trading, or LLM/provider-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Make Event Alpha core opportunity views acquisition-aware · Codex
 **Why:** Evidence acquisition, cards, audits, and quality review could still
 disagree after canonical core rows existed. VELVET showed accepted

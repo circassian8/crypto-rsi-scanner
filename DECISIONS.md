@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Canonical core verdict fields own secondary operator copy
+**Status:** accepted
+**Decision:** When a canonical CoreOpportunity row exists, research cards,
+opportunity audits, quality review, and artifact-doctor checks must render both
+primary and secondary source/impact/market/upgrade/downgrade copy from the
+canonical final core fields and joined canonical acquisition/market evidence.
+Fallback/support-row blockers such as generic co-occurrence, missing direct
+mechanism, or missing value capture may appear only in diagnostic/support
+sections when the final core has already passed those gates. Filler values such
+as `unknown`, `missing`, `none`, or `insufficient_data` should not override
+accepted evidence samples or derived canonical market/impact fields.
+**Why:** Operators and Pro-model reviews inspect cards and audits first. A
+high-priority core opportunity that shows stale support-row blockers or
+`Latest source: unknown` in secondary sections looks contradictory even when
+the stored final route/state are correct.
+**Revisit when:** Core opportunities, source acquisition, market refresh,
+cards, audits, and support diagnostics move into a typed store that can enforce
+final-vs-support presentation contracts by schema.
+
 ## 2026-06-28 - Canonical core acquisition view owns source-evidence display
 **Status:** accepted
 **Decision:** Operator-facing cards, audits, quality review, and artifact

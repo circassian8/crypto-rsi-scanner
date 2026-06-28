@@ -43,6 +43,12 @@ class EventAlphaArtifactDoctorResult:
     card_primary_fields_mismatch_core_store: int = 0
     card_evidence_acquisition_count_mismatch: int = 0
     card_source_pack_mismatch_core_acquisition: int = 0
+    card_primary_section_contains_support_row_blockers: int = 0
+    card_upgrade_text_inconsistent_with_final_level: int = 0
+    audit_primary_impact_path_mismatch_core: int = 0
+    audit_source_pack_mismatch_core: int = 0
+    card_market_confirmation_missing_but_core_has_market_confirmation: int = 0
+    card_latest_source_unknown_but_accepted_evidence_exists: int = 0
     quality_review_promoted_core_in_weak_section: int = 0
     market_freshness_contradictory_summary: int = 0
     quality_review_market_freshness_contradiction: int = 0
@@ -389,6 +395,16 @@ def diagnose_artifacts(
         core_rows_by_id,
         acquisition_rows,
     )
+    card_support_blockers = _card_primary_section_contains_support_row_blockers(research_card_paths, core_rows_by_id)
+    card_upgrade_inconsistent = _card_upgrade_text_inconsistent_with_final_level(research_card_paths, core_rows_by_id)
+    card_market_missing = _card_market_confirmation_missing_but_core_has_market_confirmation(research_card_paths, core_rows_by_id)
+    card_source_unknown = _card_latest_source_unknown_but_accepted_evidence_exists(
+        research_card_paths,
+        core_rows_by_id,
+        acquisition_rows,
+    )
+    audit_impact_mismatch = 0
+    audit_source_pack_mismatch = 0
     market_freshness_contradictions = sum(1 for row in core_rows if _core_row_has_market_freshness_contradiction(row))
     promoted_core_in_weak = _promoted_core_rows_that_are_weak(core_rows)
     upgrade_high_priority = 0
@@ -444,6 +460,18 @@ def diagnose_artifacts(
         (blockers if strict and core_store_available else warnings).append(message)
     if card_source_pack_mismatches:
         message = f"card_source_pack_mismatch_core_acquisition={card_source_pack_mismatches}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if card_support_blockers:
+        message = f"card_primary_section_contains_support_row_blockers={card_support_blockers}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if card_upgrade_inconsistent:
+        message = f"card_upgrade_text_inconsistent_with_final_level={card_upgrade_inconsistent}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if card_market_missing:
+        message = f"card_market_confirmation_missing_but_core_has_market_confirmation={card_market_missing}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if card_source_unknown:
+        message = f"card_latest_source_unknown_but_accepted_evidence_exists={card_source_unknown}"
         (blockers if strict and core_store_available else warnings).append(message)
     if promoted_core_in_weak:
         message = f"quality_review_promoted_core_in_weak_section={promoted_core_in_weak}"
@@ -627,6 +655,12 @@ def diagnose_artifacts(
         card_primary_fields_mismatch_core_store=card_primary_mismatches,
         card_evidence_acquisition_count_mismatch=card_acquisition_mismatches,
         card_source_pack_mismatch_core_acquisition=card_source_pack_mismatches,
+        card_primary_section_contains_support_row_blockers=card_support_blockers,
+        card_upgrade_text_inconsistent_with_final_level=card_upgrade_inconsistent,
+        audit_primary_impact_path_mismatch_core=audit_impact_mismatch,
+        audit_source_pack_mismatch_core=audit_source_pack_mismatch,
+        card_market_confirmation_missing_but_core_has_market_confirmation=card_market_missing,
+        card_latest_source_unknown_but_accepted_evidence_exists=card_source_unknown,
         quality_review_promoted_core_in_weak_section=promoted_core_in_weak,
         market_freshness_contradictory_summary=market_freshness_contradictions,
         quality_review_market_freshness_contradiction=market_freshness_contradictions,
@@ -853,6 +887,100 @@ def _card_source_pack_mismatches(
         if rendered and rendered != view.source_pack:
             mismatches += 1
     return mismatches
+
+
+def _card_primary_section_contains_support_row_blockers(
+    card_paths: Iterable[Path],
+    core_rows_by_id: Mapping[str, Mapping[str, Any]],
+) -> int:
+    blockers = (
+        "blocked by generic cooccurrence",
+        "needs proof that this event directly affects the token",
+        "no token value-capture mechanism is visible",
+    )
+    count = 0
+    for path in card_paths:
+        core = _card_core_row(path, core_rows_by_id)
+        if not core or not _core_row_is_promoted(core):
+            continue
+        text = _read_card_text(path).casefold()
+        count += int(any(blocker in text for blocker in blockers))
+    return count
+
+
+def _card_upgrade_text_inconsistent_with_final_level(
+    card_paths: Iterable[Path],
+    core_rows_by_id: Mapping[str, Mapping[str, Any]],
+) -> int:
+    count = 0
+    for path in card_paths:
+        core = _card_core_row(path, core_rows_by_id)
+        if not core or not _core_row_is_promoted(core):
+            continue
+        text = _read_card_text(path).casefold()
+        if str(core.get("opportunity_level") or core.get("final_opportunity_level") or "").casefold() == "high_priority":
+            count += int("already high priority" not in text)
+    return count
+
+
+def _card_market_confirmation_missing_but_core_has_market_confirmation(
+    card_paths: Iterable[Path],
+    core_rows_by_id: Mapping[str, Mapping[str, Any]],
+) -> int:
+    count = 0
+    for path in card_paths:
+        core = _card_core_row(path, core_rows_by_id)
+        if not core:
+            continue
+        has_market = core.get("market_confirmation_level") not in (None, "", "none") or core.get("market_confirmation_score") not in (None, "")
+        if not has_market:
+            continue
+        text = _read_card_text(path).casefold()
+        count += int("no market snapshot stored" in text or "market data: not available" in text)
+    return count
+
+
+def _card_latest_source_unknown_but_accepted_evidence_exists(
+    card_paths: Iterable[Path],
+    core_rows_by_id: Mapping[str, Mapping[str, Any]],
+    acquisition_rows: Iterable[Mapping[str, Any]],
+) -> int:
+    count = 0
+    acquisition_list = [dict(row) for row in acquisition_rows if isinstance(row, Mapping)]
+    for path in card_paths:
+        core = _card_core_row(path, core_rows_by_id)
+        if not core:
+            continue
+        core_id = event_research_cards.card_core_opportunity_id(path) or ""
+        view = event_core_opportunity_store.core_evidence_acquisition_view_from_rows(
+            core_id,
+            core_rows=[core],
+            evidence_acquisition_rows=acquisition_list,
+        )
+        accepted = max(int(core.get("evidence_acquisition_accepted_count") or 0), view.accepted_evidence_count)
+        if accepted <= 0:
+            continue
+        text = _read_card_text(path).casefold()
+        count += int("- latest source: unknown" in text or "- latest source: not available" in text)
+    return count
+
+
+def _card_core_row(path: Path, core_rows_by_id: Mapping[str, Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    core_id = event_research_cards.card_core_opportunity_id(path)
+    return core_rows_by_id.get(core_id or "")
+
+
+def _read_card_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _core_row_is_promoted(row: Mapping[str, Any]) -> bool:
+    level = str(row.get("final_opportunity_level") or row.get("opportunity_level") or "").casefold()
+    route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").upper()
+    return level in {"validated_digest", "watchlist", "high_priority"} or event_alpha_router.route_value_is_alertable(route)
 
 
 def _card_evidence_count(text: str, label: str) -> int | None:
@@ -1416,6 +1544,12 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"card_primary_fields_mismatch_core_store={result.card_primary_fields_mismatch_core_store} "
             f"card_evidence_acquisition_count_mismatch={result.card_evidence_acquisition_count_mismatch} "
             f"card_source_pack_mismatch_core_acquisition={result.card_source_pack_mismatch_core_acquisition} "
+            f"card_primary_section_contains_support_row_blockers={result.card_primary_section_contains_support_row_blockers} "
+            f"card_upgrade_text_inconsistent_with_final_level={result.card_upgrade_text_inconsistent_with_final_level} "
+            f"audit_primary_impact_path_mismatch_core={result.audit_primary_impact_path_mismatch_core} "
+            f"audit_source_pack_mismatch_core={result.audit_source_pack_mismatch_core} "
+            f"card_market_confirmation_missing_but_core_has_market_confirmation={result.card_market_confirmation_missing_but_core_has_market_confirmation} "
+            f"card_latest_source_unknown_but_accepted_evidence_exists={result.card_latest_source_unknown_but_accepted_evidence_exists} "
             f"quality_review_promoted_core_in_weak_section={result.quality_review_promoted_core_in_weak_section} "
             f"market_freshness_contradictory_summary={result.market_freshness_contradictory_summary} "
             f"quality_review_market_freshness_contradiction={result.quality_review_market_freshness_contradiction} "

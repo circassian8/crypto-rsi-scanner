@@ -89,6 +89,7 @@ def format_opportunity_audit(
     components = _components(row)
     incident = _incident_context(row, components, incidents)
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
+    verdict_copy = event_opportunity_verdict.build_verdict_aware_upgrade_downgrade_text(components)
     near_miss = event_near_miss.near_miss_metadata_for_row(row)
     daily_section = _daily_brief_section(row, components, core_match, near_miss)
     card_group = _card_group_for_audit(row, components, core_match, near_miss)
@@ -192,13 +193,21 @@ def format_opportunity_audit(
         f"- outcome status: {_value(row, 'outcome_status', default='pending_or_unknown')}",
         "",
         "## Missing evidence",
-        f"- missing requirements: {_list_value(components.get('missing_requirements') or row.get('missing_requirements'))}",
+        f"- missing requirements: {_audit_missing_evidence_text(components, row, verdict_copy)}",
         "",
         "## What would upgrade this candidate",
-        "- " + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=8) or "manual analyst review"),
+        "- " + (
+            verdict_copy.upgrade_text
+            if _is_promoted_audit_row(components, row)
+            else (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=8) or verdict_copy.upgrade_text)
+        ),
         "",
         "## What would downgrade / invalidate this candidate",
-        "- " + (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=8) or "source correction or failed confirmation"),
+        "- " + (
+            verdict_copy.downgrade_text
+            if _is_promoted_audit_row(components, row)
+            else (event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=8) or verdict_copy.downgrade_text)
+        ),
         "",
         "## Feedback command",
         f"- make event-feedback-watch PROFILE={profile or 'notify_llm'} FEEDBACK_TARGET='{feedback_target}'",
@@ -349,6 +358,43 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
         f"- provider gaps/failures: {'; '.join(str(item) for item in list(failures or ())[:5]) if failures else 'none'}",
         f"- validation criteria: {'; '.join(pack.validation_requirements[:5])}",
     ]
+
+
+def _is_promoted_audit_row(components: Mapping[str, Any], row: Mapping[str, Any]) -> bool:
+    level = str(
+        components.get("final_opportunity_level")
+        or row.get("final_opportunity_level")
+        or components.get("opportunity_level")
+        or row.get("opportunity_level")
+        or ""
+    ).casefold()
+    route = str(
+        components.get("final_route_after_quality_gate")
+        or row.get("final_route_after_quality_gate")
+        or row.get("route")
+        or ""
+    ).upper()
+    return level in {"validated_digest", "watchlist", "high_priority"} or event_alpha_router.route_value_is_alertable(route)
+
+
+def _audit_missing_evidence_text(
+    components: Mapping[str, Any],
+    row: Mapping[str, Any],
+    verdict_copy: event_opportunity_verdict.VerdictAwareUpgradeDowngradeText,
+) -> str:
+    raw = components.get("missing_requirements") or row.get("missing_requirements") or ()
+    values = []
+    if isinstance(raw, str):
+        values = [raw]
+    elif isinstance(raw, Iterable) and not isinstance(raw, Mapping):
+        values = [str(item) for item in raw if str(item or "")]
+    if _is_promoted_audit_row(components, row):
+        values = [
+            value for value in values
+            if not event_alpha_reason_text.reason_code_is_passed_gate_blocker(value)
+        ]
+    text = _list_value(values)
+    return text if text and text != "none" else verdict_copy.missing_evidence_text
 
 
 def _daily_brief_section(

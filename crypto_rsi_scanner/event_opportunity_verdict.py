@@ -39,6 +39,13 @@ class OpportunityUpgradePath:
     summary: str
 
 
+@dataclass(frozen=True)
+class VerdictAwareUpgradeDowngradeText:
+    upgrade_text: str
+    downgrade_text: str
+    missing_evidence_text: str
+
+
 def evaluate_opportunity(
     *,
     impact_path: event_impact_path_validator.ImpactPathValidation | None,
@@ -459,6 +466,80 @@ def explain_upgrade_path(
         upgrade_requirements=tuple(upgrades),
         downgrade_warnings=tuple(downgrades),
         summary=summary,
+    )
+
+
+def build_verdict_aware_upgrade_downgrade_text(
+    components: Mapping[str, Any] | None = None,
+) -> VerdictAwareUpgradeDowngradeText:
+    """Return operator copy that respects the final opportunity verdict.
+
+    This is presentation-only. It prevents canonical promoted opportunities
+    from rendering stale support-row gate blockers in primary card/audit text.
+    """
+    data = dict(components or {})
+    level = str(
+        data.get("final_opportunity_level")
+        or data.get("opportunity_level")
+        or data.get("verdict_opportunity_level")
+        or ""
+    ).strip().casefold()
+    route = str(data.get("final_route_after_quality_gate") or data.get("route") or "").upper()
+    if level == OpportunityLevel.HIGH_PRIORITY.value or "HIGH_PRIORITY" in route:
+        return VerdictAwareUpgradeDowngradeText(
+            upgrade_text=(
+                "Already high priority; further upgrade would require sustained fresh market "
+                "confirmation, stronger source corroboration, or derivatives/liquidity support."
+            ),
+            downgrade_text=(
+                "Source correction or denial, invalid exposure/value-capture claim, fading market "
+                "confirmation, drying liquidity, or stale catalyst timing."
+            ),
+            missing_evidence_text="No primary hard-gate blocker remains for this high-priority research opportunity.",
+        )
+    if level == OpportunityLevel.WATCHLIST.value or "WATCHLIST" in route:
+        return VerdictAwareUpgradeDowngradeText(
+            upgrade_text=(
+                "Could upgrade to high priority with fresh stronger market confirmation, "
+                "derivatives/liquidity confirmation, or a second independent high-quality source."
+            ),
+            downgrade_text=(
+                "Source correction or denial, failed catalyst-to-token mechanism, weak market "
+                "follow-through, or deteriorating liquidity."
+            ),
+            missing_evidence_text="Watchlist candidate; remaining gaps are confirmation depth, not basic eligibility.",
+        )
+    if level == OpportunityLevel.VALIDATED_DIGEST.value or "RESEARCH_DIGEST" in route:
+        return VerdictAwareUpgradeDowngradeText(
+            upgrade_text=(
+                "Could upgrade to watchlist with fresh price/volume reaction, official or second-source "
+                "confirmation, or derivatives/supply confirmation."
+            ),
+            downgrade_text=(
+                "Source correction, catalyst-link rejection, absent market reaction, or stale market context."
+            ),
+            missing_evidence_text="Validated digest candidate; needs stronger market or corroborating evidence for watchlist.",
+        )
+    if level == OpportunityLevel.EXPLORATORY.value:
+        return VerdictAwareUpgradeDowngradeText(
+            upgrade_text=(
+                "Needs validated catalyst link, deterministic asset identity, direct token mechanism, "
+                "or stronger market confirmation depending on the missing fields."
+            ),
+            downgrade_text=(
+                "Treat as local research if catalyst evidence remains source-thin, ambiguous, or unsupported by market reaction."
+            ),
+            missing_evidence_text="Exploratory candidate; primary gaps must be resolved before promotion.",
+        )
+    return VerdictAwareUpgradeDowngradeText(
+        upgrade_text=(
+            "Needs validated catalyst evidence, deterministic asset identity, a direct token mechanism, "
+            "and market confirmation before promotion."
+        ),
+        downgrade_text=(
+            "Keep local-only if the item remains generic co-occurrence, source noise, or market move without a catalyst."
+        ),
+        missing_evidence_text="Local-only candidate; primary eligibility evidence is still missing.",
     )
 
 
