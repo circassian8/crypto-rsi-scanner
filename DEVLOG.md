@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Harden live notification identity and broad-asset digest guards · Codex
+**Why:** A live-style notification artifact could still be misleading if a
+delivery used a lower-level source row identity, or if a BTC/ETH/SOL
+Strategy/MSTR treasury-valuation article satisfied "strong direct source"
+confirmation without accepted evidence or fresh market confirmation.
+**Changes:**
+- The notification-format smoke now writes canonical CoreOpportunity rows,
+  research cards, alert snapshots, delivery ledger rows, and a Telegram preview
+  from a core-backed VELVET/SpaceX opportunity plus a weak BTC strategic-context
+  control that remains local-only.
+- Fixture snapshots now preserve canonical evidence counts after core-store
+  normalization (`accepted_evidence_count` falls back to
+  `evidence_acquisition_accepted_count`).
+- Live confirmation now rejects broad BTC/ETH/SOL strategic/valuation/treasury
+  context such as Strategy/MSTR valuation, ETF/company-equity valuation, or
+  market-structure commentary unless accepted evidence, official/tagged source
+  evidence, direct token impact, or fresh non-generic market confirmation exists.
+- Artifact doctor now reports `strategic_broad_asset_digest_without_confirmation`
+  for delivered/promoted daily digests that violate that guard.
+**Verify:** `python3 tests/test_indicators.py` passed (541/541). Also ran
+`make event-alpha-signal-quality-eval PYTHON=python3`, `make
+event-alpha-notification-format-smoke PYTHON=python3`, `make
+event-alpha-live-burn-in-no-send PYTHON=python3`, `make
+event-alpha-burn-in-readiness PROFILE=live_burn_in_no_send PYTHON=python3`,
+strict `make event-alpha-artifact-doctor PROFILE=live_burn_in_no_send STRICT=1
+PYTHON=python3`, `make event-alpha-evidence-acquisition-smoke PYTHON=python3`,
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, notification-format
+inbox/daily-brief/opportunity-audit manual checks, and `make verify
+PYTHON=python3`.
+**Notes/risks:** Live burn-in remains no-send and research-only. The run
+completed with expected provider noise (GDELT 429, RSS 403, OpenAI extraction
+timeouts) and no doctor blockers; live namespace warnings remain review
+diagnostics rather than notification identity/digest blockers.
+
 ## 2026-06-28 — Harden live burn-in acquisition and readiness · Codex
 **Why:** `event-alpha-live-burn-in-no-send` could still crash when evidence
 acquisition exited early or provider calls failed, and older/carded artifacts

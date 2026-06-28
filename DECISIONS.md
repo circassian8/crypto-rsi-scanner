@@ -52,6 +52,23 @@ weak evidence despite quality gates.
 **Revisit when:** Notifications are backed by a typed core-opportunity delivery
 table with schema-enforced source/support/core relationships.
 
+## 2026-06-28 - Broad-asset treasury context is not direct confirmation
+**Status:** accepted
+**Decision:** BTC/ETH/SOL live-style strategic investment or valuation rows
+about public-company treasury holdings, Strategy/MSTR valuation, ETF/company
+equity valuation, CME/SEC/CFTC market-structure commentary, or similar broad
+context do not satisfy `strong_direct_original_source_evidence` by themselves.
+They must stay local/exploratory unless the source directly affects the asset
+or token itself, accepted source-pack evidence exists, official/tagged source
+evidence validates the token/catalyst/impact path, or fresh non-generic market
+confirmation supports the opportunity.
+**Why:** A company-valuation or treasury article may mention Bitcoin or other
+major assets without creating a token-level catalyst. Treating that as a direct
+BTC/ETH/SOL digest confirmation made live-style Telegram output over-permissive
+and could promote broad context rows despite rejected-only or missing evidence.
+**Revisit when:** Reviewed burn-in feedback shows a specific, bounded treasury
+context playbook has useful recall and a separate confirmation rule is approved.
+
 ## 2026-06-28 - Operator review surfaces are canonical core-first
 **Status:** accepted
 **Decision:** Event Alpha notification inbox, feedback readiness, opportunity

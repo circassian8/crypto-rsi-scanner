@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import sys
 from collections.abc import Callable, Iterable
 from dataclasses import replace
@@ -3805,9 +3806,15 @@ def _write_fixture_alert_snapshot(
     decision: event_alpha_router.EventAlphaRouteDecision,
     run_id: str,
     observed_at: datetime,
+    core_row: Mapping[str, Any] | None = None,
 ) -> Path:
     path = context.alert_store_path.expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
+    core = dict(core_row or {})
+    score_components = dict(entry.latest_score_components)
+    core_id = str(core.get("core_opportunity_id") or score_components.get("core_opportunity_id") or "").strip()
+    if core_id:
+        score_components.setdefault("core_opportunity_id", core_id)
     row = {
         "schema_version": event_alpha_alert_store.ALERT_STORE_SCHEMA_VERSION,
         "row_type": "event_alpha_alert_snapshot",
@@ -3835,7 +3842,7 @@ def _write_fixture_alert_snapshot(
         "source_count": entry.source_count,
         "tier": entry.latest_tier,
         "opportunity_score": entry.latest_score,
-        "score_components": dict(entry.latest_score_components),
+        "score_components": score_components,
         "playbook_type": entry.latest_playbook_type,
         "rule_playbook_type": entry.latest_rule_playbook_type,
         "effective_playbook_type": entry.latest_effective_playbook_type,
@@ -3851,6 +3858,42 @@ def _write_fixture_alert_snapshot(
         "route_alertable": decision.alertable,
         "route_reason": decision.reason,
         "reason": decision.reason,
+        "core_opportunity_id": core_id or None,
+        "feedback_target": core_id or decision.alert_id,
+        "feedback_target_type": "core_opportunity_id" if core_id else "alert_id",
+        "final_opportunity_level": core.get("final_opportunity_level") or core.get("opportunity_level") or "high_priority",
+        "opportunity_level": core.get("final_opportunity_level") or core.get("opportunity_level") or "high_priority",
+        "opportunity_score_final": core.get("opportunity_score_final") or entry.latest_score,
+        "final_route_after_quality_gate": core.get("final_route_after_quality_gate") or decision.route.value,
+        "final_tier_after_quality_gate": core.get("final_tier_after_quality_gate") or decision.route.value,
+        "alertable_after_quality_gate": bool(core.get("alertable_after_quality_gate", decision.alertable)),
+        "final_state_after_quality_gate": core.get("final_state_after_quality_gate") or entry.state,
+        "impact_path_type": core.get("impact_path_type") or entry.impact_path_type or entry.relationship_type,
+        "candidate_role": core.get("candidate_role") or entry.candidate_role or "proxy_venue",
+        "impact_path_strength": core.get("impact_path_strength") or entry.impact_path_strength or "strong",
+        "source_class": core.get("source_class") or entry.source_class,
+        "evidence_specificity": core.get("evidence_specificity") or entry.evidence_specificity,
+        "evidence_quality_score": core.get("evidence_quality_score") or entry.evidence_quality_score,
+        "market_confirmation_score": core.get("market_confirmation_score") if core.get("market_confirmation_score") is not None else entry.market_confirmation_score,
+        "market_confirmation_level": core.get("market_confirmation_level") or entry.market_confirmation_level,
+        "market_context_freshness_status": core.get("market_context_freshness_status") or entry.market_context_freshness_status,
+        "market_context_age_hours": core.get("market_context_age_hours") if core.get("market_context_age_hours") is not None else 0,
+        "market_context_stale": bool(core.get("market_context_stale", False)),
+        "market_context_freshness_cap_applied": bool(core.get("market_context_freshness_cap_applied", False)),
+        "evidence_acquisition_status": core.get("evidence_acquisition_status"),
+        "acquisition_confirmation_status": core.get("acquisition_confirmation_status"),
+        "accepted_evidence_count": (
+            core.get("accepted_evidence_count")
+            if core.get("accepted_evidence_count") is not None
+            else core.get("evidence_acquisition_accepted_count")
+        ),
+        "source_pack": core.get("source_pack"),
+        "opportunity_verdict_reasons": core.get("opportunity_verdict_reasons") or core.get("verdict_reason_codes") or ["fixture_notification_smoke"],
+        "why_local_only": core.get("why_local_only") or ("not_local_only" if decision.alertable else "rejected_results_only_not_confirmation"),
+        "why_not_watchlist": core.get("why_not_watchlist") or ("already_high_priority" if decision.alertable else "accepted_confirmation_missing"),
+        "manual_verification_items": core.get("manual_verification_items") or ["review the local fixture card before acting"],
+        "upgrade_requirements": core.get("upgrade_requirements") or [],
+        "downgrade_warnings": core.get("downgrade_warnings") or ["conflicting_evidence"],
         "verify": ["fixture smoke confirms fake-sender notification plumbing only"],
     }
     with path.open("a", encoding="utf-8") as fh:
@@ -5242,37 +5285,57 @@ def event_alpha_notify_fixture_smoke(
         base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
         artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "fixture_notify_smoke",
     )
+    if str(context.artifact_namespace or "").endswith("smoke"):
+        shutil.rmtree(context.namespace_dir, ignore_errors=True)
     _apply_event_alpha_context_to_config(context)
     _normalize_profile_paths()
     run_id = event_alpha_run_ledger.run_id_for(now, "fixture")
     entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
-        key="fixture-catalyst|fixture-coin|proxy_attention",
-        cluster_id="fixture-catalyst|proxy_attention|2026-06-15",
-        event_id="fixture-notify-smoke",
-        coin_id="fixture-coin",
-        symbol="FIX",
-        relationship_type="proxy_attention",
-        external_asset="Fixture Catalyst",
+        key="fixture-spacex|velvet|proxy_attention",
+        cluster_id="fixture-spacex|proxy_attention|2026-06-15",
+        event_id="fixture-notify-velvet",
+        coin_id="velvet",
+        symbol="VELVET",
+        relationship_type="venue_value_capture",
+        external_asset="SpaceX",
         event_time=now.isoformat(),
         state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
         previous_state=event_watchlist.EventWatchlistState.WATCHLIST.value,
         first_seen_at=now.isoformat(),
         last_seen_at=now.isoformat(),
         source_count=2,
-        highest_score=88,
-        latest_score=88,
+        highest_score=92,
+        latest_score=92,
         latest_tier="HIGH_PRIORITY_WATCH",
-        latest_event_name="Fixture Event Alpha notification smoke",
-        latest_source="fixture",
+        latest_event_name="VELVET offers SpaceX pre-IPO tokenized stock exposure",
+        latest_source="CryptoPanic fixture",
         latest_playbook_type="proxy_attention",
         latest_rule_playbook_type="proxy_attention",
         latest_effective_playbook_type="proxy_attention",
-        latest_playbook_score=88,
+        latest_playbook_score=92,
         latest_playbook_action="high_priority_watch",
-        latest_market_snapshot={"price": 1.0, "return_24h": 0.12, "volume_zscore_24h": 3.5},
-        latest_score_components={"external_catalyst": 90, "market_move_volume": 75},
+        latest_market_snapshot={"price": 1.0, "return_24h": 0.42, "volume_zscore_24h": 5.2},
+        latest_score_components={
+            "core_opportunity_id": "agg:fixture-velvet-spacex",
+            "hypothesis_id": "hypothesis:fixture-velvet-spacex",
+            "external_catalyst": 92,
+            "market_move_volume": 88,
+            "impact_path_type": "venue_value_capture",
+            "impact_path_strength": "strong",
+            "candidate_role": "proxy_venue",
+            "source_class": "cryptopanic_tagged",
+            "evidence_specificity": "direct_token_mechanism",
+            "evidence_quality_score": 91,
+            "market_confirmation_score": 88,
+            "market_confirmation_level": "strong",
+            "market_context_freshness_status": "fresh",
+            "opportunity_score_final": 92,
+            "opportunity_level": "high_priority",
+        },
+        incident_id="incident:fixture-spacex",
+        hypothesis_id="hypothesis:fixture-velvet-spacex",
         should_alert=True,
         material_change_reasons=("fixture_notification_smoke",),
     )
@@ -5283,10 +5346,107 @@ def event_alpha_notify_fixture_smoke(
         reason="Fixture high-priority state escalation for notification smoke.",
         lane=event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION,
     )
+    core_source_row = {
+        "row_type": "event_impact_hypothesis",
+        "core_opportunity_id": "agg:fixture-velvet-spacex",
+        "key": entry.key,
+        "hypothesis_id": entry.hypothesis_id,
+        "incident_id": entry.incident_id,
+        "event_id": entry.event_id,
+        "symbol": entry.symbol,
+        "coin_id": entry.coin_id,
+        "validated_symbol": entry.symbol,
+        "validated_coin_id": entry.coin_id,
+        "canonical_incident_name": entry.latest_event_name,
+        "candidate_role": "proxy_venue",
+        "impact_category": "proxy_attention",
+        "impact_path_type": "venue_value_capture",
+        "impact_path_strength": "strong",
+        "impact_path_reason": "venue_value_capture",
+        "relationship_type": "venue_value_capture",
+        "opportunity_level": "high_priority",
+        "final_opportunity_level": "high_priority",
+        "opportunity_score_final": 92,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        "source_class": "cryptopanic_tagged",
+        "evidence_specificity": "direct_token_mechanism",
+        "evidence_quality_score": 91,
+        "market_confirmation_score": 88,
+        "market_confirmation_level": "strong",
+        "market_context_freshness_status": "fresh",
+        "market_context_source": "fixture_market_context",
+        "evidence_acquisition_status": "accepted_evidence_found",
+        "evidence_acquisition_accepted_count": 1,
+        "accepted_evidence_count": 1,
+        "acquisition_confirmation_status": "confirms",
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+        "accepted_evidence_samples": [
+            {
+                "title": "VELVET offers SpaceX pre-IPO tokenized stock exposure",
+                "provider": "cryptopanic_fixture",
+                "source_url": "https://example.invalid/velvet-spacex",
+            }
+        ],
+        "source_pack": "proxy_preipo_rwa_pack",
+        "latest_source": "CryptoPanic fixture",
+        "latest_source_title": "VELVET offers SpaceX pre-IPO tokenized stock exposure",
+        "why_opportunity_visible": "Accepted tagged evidence validates the token/catalyst link.",
+        "upgrade_requirements": ["verify accepted source evidence", "confirm market reaction remains organic"],
+        "latest_market_snapshot": entry.latest_market_snapshot,
+    }
+    weak_btc_control = {
+        "row_type": "event_impact_hypothesis",
+        "core_opportunity_id": "agg:fixture-btc-rejected",
+        "key": "fixture-strategy|bitcoin|strategic_context",
+        "hypothesis_id": "hypothesis:fixture-btc-rejected",
+        "incident_id": "incident:fixture-strategy-valuation",
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "validated_symbol": "BTC",
+        "validated_coin_id": "bitcoin",
+        "canonical_incident_name": "Strategy valuation article mentions Bitcoin treasury holdings",
+        "candidate_role": "treasury_context",
+        "impact_category": "strategic_investment_or_valuation",
+        "impact_path_type": "strategic_investment_or_valuation",
+        "impact_path_strength": "medium",
+        "impact_path_reason": "treasury_context",
+        "opportunity_level": "local_only",
+        "final_opportunity_level": "local_only",
+        "opportunity_score_final": 44,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+        "source_class": "crypto_news",
+        "evidence_specificity": "direct_token_mechanism",
+        "evidence_quality_score": 88,
+        "market_confirmation_score": 0,
+        "market_confirmation_level": "none",
+        "market_context_freshness_status": "missing",
+        "evidence_acquisition_status": "rejected_results_only",
+        "evidence_acquisition_rejected_count": 2,
+        "accepted_evidence_count": 0,
+        "acquisition_confirmation_status": "does_not_confirm",
+        "source_pack": "strategic_investment_pack",
+        "latest_source": "Strategy valuation fixture",
+        "why_opportunity_visible": "Fixture control: broad treasury valuation context is not direct BTC confirmation.",
+    }
+    core_write = event_core_opportunity_store.write_core_opportunities(
+        [core_source_row, weak_btc_control],
+        cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(context.core_opportunity_store_path),
+        now=now,
+        run_id=run_id,
+        profile=context.profile,
+        run_mode=context.run_mode,
+        artifact_namespace=context.artifact_namespace,
+    )
+    core_rows = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+    ).rows
     card_write = event_research_cards.write_research_cards(
         context.research_cards_dir,
         watchlist_entries=[entry],
-        alert_rows=[],
+        alert_rows=core_rows,
         route_decisions=[decision],
         now=now,
         lineage_context=_event_alpha_card_lineage_context(
@@ -5296,12 +5456,86 @@ def event_alpha_notify_fixture_smoke(
             artifact_namespace=context.artifact_namespace,
         ),
     )
+    event_core_opportunity_store.update_core_opportunity_card_links(
+        context.core_opportunity_store_path,
+        card_write.card_paths,
+        run_id=run_id,
+    )
+    core_rows = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+    ).rows
+    core_by_id = {str(row.get("core_opportunity_id") or ""): row for row in core_rows}
+    canonical_core = core_by_id.get("agg:fixture-velvet-spacex") or (core_rows[0] if core_rows else {})
+    btc_core = core_by_id.get("agg:fixture-btc-rejected") or {}
     snapshot_path = _write_fixture_alert_snapshot(
         context,
         entry=entry,
         decision=decision,
         run_id=run_id,
         observed_at=now,
+        core_row=canonical_core,
+    )
+    btc_entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="fixture-strategy|bitcoin|strategic_context",
+        cluster_id="fixture-strategy|strategic_context|2026-06-15",
+        event_id="fixture-btc-rejected",
+        coin_id="bitcoin",
+        symbol="BTC",
+        relationship_type="strategic_investment_or_valuation",
+        external_asset="Strategy",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+        previous_state=None,
+        first_seen_at=now.isoformat(),
+        last_seen_at=now.isoformat(),
+        source_count=1,
+        highest_score=44,
+        latest_score=44,
+        latest_tier="STORE_ONLY",
+        latest_event_name="Strategy valuation article mentions Bitcoin treasury holdings",
+        latest_source="Strategy valuation fixture",
+        latest_playbook_type="strategic_investment_or_valuation",
+        latest_rule_playbook_type="strategic_investment_or_valuation",
+        latest_effective_playbook_type="strategic_investment_or_valuation",
+        latest_playbook_score=44,
+        latest_playbook_action="store_only",
+        latest_market_snapshot={},
+        latest_score_components={
+            "core_opportunity_id": "agg:fixture-btc-rejected",
+            "hypothesis_id": "hypothesis:fixture-btc-rejected",
+            "impact_path_type": "strategic_investment_or_valuation",
+            "impact_path_reason": "treasury_context",
+            "candidate_role": "treasury_context",
+            "source_class": "crypto_news",
+            "evidence_acquisition_status": "rejected_results_only",
+            "accepted_evidence_count": 0,
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+            "opportunity_level": "local_only",
+            "opportunity_score_final": 44,
+        },
+        incident_id="incident:fixture-strategy-valuation",
+        hypothesis_id="hypothesis:fixture-btc-rejected",
+        should_alert=False,
+        suppressed_reason="rejected_results_only_not_confirmation",
+    )
+    btc_decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=btc_entry,
+        route=event_alpha_router.EventAlphaRoute.STORE_ONLY,
+        alertable=False,
+        reason="Fixture control: rejected-only strategic broad-asset context is local-only.",
+        lane=event_alpha_router.EventAlphaRouteLane.LOCAL_ONLY,
+    )
+    _write_fixture_alert_snapshot(
+        context,
+        entry=btc_entry,
+        decision=btc_decision,
+        run_id=run_id,
+        observed_at=now,
+        core_row=btc_core,
     )
     fake_storage = _FixtureNotificationStorage()
     delivered_messages: list[str] = []
@@ -5341,6 +5575,7 @@ def event_alpha_notify_fixture_smoke(
         now=now,
         profile=context.profile,
         card_path_by_alert_id=_card_paths_by_alert_id([decision], card_write.card_paths),
+        core_opportunity_rows=core_rows,
         include_health_heartbeat=False,
         delivery_cfg=delivery_cfg,
         run_id=run_id,
@@ -5378,13 +5613,18 @@ def event_alpha_notify_fixture_smoke(
         notification_scope_value=send_result.notification_scope_value,
         notification_burn_in=True,
         research_card_paths=card_write.card_paths,
+        core_opportunity_store_path=str(context.core_opportunity_store_path),
+        core_opportunity_write_attempted=core_write.attempted,
+        core_opportunity_write_success=core_write.success,
+        core_opportunity_rows_written=core_write.rows_written,
+        core_opportunity_write_block_reason=core_write.block_reason,
         run_ledger_path=str(context.run_ledger_path),
         alert_store_path=str(context.alert_store_path),
         watchlist_state_path=str(context.watchlist_state_path),
         research_cards_dir=str(context.research_cards_dir),
         snapshot_write_attempted=True,
         snapshot_write_success=True,
-        snapshot_rows_written=1,
+        snapshot_rows_written=2,
         snapshot_write_block_reason=None,
         notification_delivery_records_written=send_result.delivery_records_written,
         notification_deliveries_delivered=send_result.deliveries_delivered,
@@ -5427,9 +5667,12 @@ def event_alpha_notify_fixture_smoke(
         f"notification_run_path: {context.notification_runs_path}",
         f"notification_would_send: {notification_row.get('would_send_count')}",
         f"alert_snapshot_path: {snapshot_path}",
+        f"core_opportunity_store_path: {context.core_opportunity_store_path}",
+        f"core_opportunities_written: {core_write.rows_written}",
         f"research_card_count: {card_write.cards_written}",
         f"research_card_index: {card_write.index_path}",
-        f"feedback: make event-feedback-useful FEEDBACK_TARGET='{decision.alert_id}'",
+        "feedback: make event-feedback-useful "
+        f"FEEDBACK_TARGET='{canonical_core.get('core_opportunity_id') or decision.alert_id}'",
         "No live providers, Telegram sends, normal RSI alerts, paper trades, live DB rows, or execution were used.",
     ]))
 

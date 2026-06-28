@@ -73,6 +73,7 @@ class EventAlphaArtifactDoctorResult:
     telegram_message_contains_raw_debug_dump: int = 0
     digest_item_without_live_confirmation: int = 0
     digest_item_rejected_results_only: int = 0
+    strategic_broad_asset_digest_without_confirmation: int = 0
     notification_preview_missing: int = 0
     quality_fields_missing_count: int = 0
     hypothesis_rows_missing_opportunity_verdict: int = 0
@@ -660,6 +661,12 @@ def diagnose_artifacts(
             f"{delivery_conflicts['digest_item_rejected_results_only']}"
         )
         (blockers if strict else warnings).append(message)
+    if delivery_conflicts["strategic_broad_asset_digest_without_confirmation"]:
+        message = (
+            "strategic_broad_asset_digest_without_confirmation="
+            f"{delivery_conflicts['strategic_broad_asset_digest_without_confirmation']}"
+        )
+        (blockers if strict else warnings).append(message)
     if delivery_conflicts["telegram_message_contains_absolute_path"]:
         message = (
             "telegram_message_contains_absolute_path="
@@ -900,6 +907,7 @@ def diagnose_artifacts(
         telegram_message_contains_raw_debug_dump=delivery_conflicts["telegram_message_contains_raw_debug_dump"],
         digest_item_without_live_confirmation=delivery_conflicts["digest_item_without_live_confirmation"],
         digest_item_rejected_results_only=delivery_conflicts["digest_item_rejected_results_only"],
+        strategic_broad_asset_digest_without_confirmation=delivery_conflicts["strategic_broad_asset_digest_without_confirmation"],
         notification_preview_missing=delivery_conflicts["notification_preview_missing"],
         quality_fields_missing_count=quality["quality_fields_missing_count"],
         hypothesis_rows_missing_opportunity_verdict=quality["hypothesis_rows_missing_opportunity_verdict"],
@@ -1596,6 +1604,7 @@ def _notification_delivery_conflicts(
         "telegram_message_contains_raw_debug_dump": 0,
         "digest_item_without_live_confirmation": 0,
         "digest_item_rejected_results_only": 0,
+        "strategic_broad_asset_digest_without_confirmation": 0,
         "notification_preview_missing": 0,
     }
     latest = _delivery.latest_rows_by_delivery(delivery_rows)
@@ -1615,6 +1624,8 @@ def _notification_delivery_conflicts(
                 out["digest_item_without_live_confirmation"] += 1
             if str(core.get("evidence_acquisition_status") or "") == "rejected_results_only":
                 out["digest_item_rejected_results_only"] += 1
+            if _delivery_core_is_strategic_broad_asset_context(core):
+                out["strategic_broad_asset_digest_without_confirmation"] += 1
         preview_path = str(row.get("notification_preview_path") or "").strip()
         if not preview_path:
             out["notification_preview_missing"] += 1
@@ -1673,6 +1684,53 @@ def _delivery_core_lacks_live_confirmation(core: Mapping[str, Any]) -> bool:
         "skipped_config",
         "not_configured",
     } or confirmation in {"", "does_not_confirm", "unresolved", "coverage_gap"}
+
+
+def _delivery_core_is_strategic_broad_asset_context(core: Mapping[str, Any]) -> bool:
+    if not _delivery_core_lacks_live_confirmation(core):
+        return False
+    symbol = str(core.get("symbol") or core.get("validated_symbol") or "").strip().upper()
+    coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or "").strip().casefold()
+    if symbol not in {"BTC", "ETH", "SOL"} and coin_id not in {"bitcoin", "ethereum", "solana"}:
+        return False
+    impact = str(core.get("impact_path_type") or core.get("primary_impact_path") or "").strip().casefold()
+    reason = str(core.get("impact_path_reason") or core.get("primary_impact_path_reason") or "").strip().casefold()
+    if impact not in {"strategic_investment", "strategic_investment_or_valuation", "valuation_event"} and reason not in {
+        "strategic_investment",
+        "treasury_context",
+        "external_equity_proxy_context",
+    }:
+        return False
+    text = " ".join(
+        str(core.get(key) or "")
+        for key in (
+            "canonical_incident_name",
+            "incident_canonical_name",
+            "latest_event_name",
+            "event_name",
+            "latest_source_title",
+            "source_title",
+            "latest_source",
+            "source",
+            "why_opportunity_visible",
+            "final_verdict_reason",
+        )
+    ).casefold()
+    return any(
+        term in text
+        for term in (
+            "strategy",
+            "microstrategy",
+            "mstr",
+            "treasury",
+            "holdings",
+            "valuation",
+            "discount",
+            "premium",
+            "public company",
+            "market structure",
+        )
+    )
 
 
 def _as_int(value: Any) -> int:
@@ -2158,6 +2216,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"alert_id_not_canonical={result.delivery_alert_id_not_canonical} "
             f"digest_without_confirmation={result.digest_item_without_live_confirmation} "
             f"digest_rejected_only={result.digest_item_rejected_results_only} "
+            f"strategic_broad_digest={result.strategic_broad_asset_digest_without_confirmation} "
             f"preview_missing={result.notification_preview_missing} "
             f"raw_debug_dump={result.telegram_message_contains_raw_debug_dump} "
             f"absolute_path={result.telegram_message_contains_absolute_path}"

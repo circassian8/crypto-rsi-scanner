@@ -189,6 +189,16 @@ identity/core-store mismatches, noncanonical alert ids, rejected-only digest
 items, missing previews, raw debug dumps, and absolute local paths in previewed
 Telegram bodies.
 
+For broad assets such as BTC, ETH, and SOL, Strategy/MSTR treasury valuation,
+public-company discount/premium, ETF/company-equity valuation, and generic
+CME/SEC/CFTC market-structure articles are context, not direct token
+confirmation. They should render as local/exploratory or near-miss rows unless
+accepted source-pack evidence, official/tagged token evidence, a direct
+token/project event, or fresh non-generic market confirmation upgrades the
+candidate. Artifact doctor reports
+`strategic_broad_asset_digest_without_confirmation` if a delivered/promoted
+digest violates this rule.
+
 `notify_no_key` uses public RSS, GDELT, Polymarket, live CoinGecko universe,
 market enrichment, anomaly scanning, catalyst search, watchlist monitoring,
 router lanes, and auto-written research cards. `notify_llm` uses the same source

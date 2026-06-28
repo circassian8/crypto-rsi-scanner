@@ -12164,8 +12164,11 @@ def test_event_alpha_artifact_doctor_flags_notification_identity_and_preview_con
             "coin_id": "bitcoin",
             "final_opportunity_level": "validated_digest",
             "final_route_after_quality_gate": "RESEARCH_DIGEST",
-            "impact_path_type": "insufficient_data",
-            "source_class": "broad_news",
+            "impact_path_type": "strategic_investment_or_valuation",
+            "impact_path_reason": "treasury_context",
+            "canonical_incident_name": "Strategy valuation discount versus Bitcoin treasury holdings",
+            "latest_source_title": "MSTR valuation discount widens despite BTC holdings",
+            "source_class": "crypto_news",
             "evidence_acquisition_status": "rejected_results_only",
             "acquisition_confirmation_status": "does_not_confirm",
             "accepted_evidence_count": 0,
@@ -12207,6 +12210,7 @@ def test_event_alpha_artifact_doctor_flags_notification_identity_and_preview_con
     assert result.delivery_alert_id_not_canonical == 1
     assert result.digest_item_without_live_confirmation == 1
     assert result.digest_item_rejected_results_only == 1
+    assert result.strategic_broad_asset_digest_without_confirmation == 1
     assert result.telegram_message_contains_absolute_path == 1
     assert result.telegram_message_contains_raw_debug_dump == 1
     assert result.status == "BLOCKED"
@@ -28868,6 +28872,82 @@ def test_live_core_confirmation_allows_accepted_and_official_evidence():
     assert by_symbol["LIST"]["final_opportunity_level"] == "validated_digest"
     assert by_symbol["LIST"]["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
     assert by_symbol["LIST"]["live_confirmation_reason"] == "official_or_structured_source_confirmation"
+
+
+def test_live_confirmation_caps_broad_treasury_valuation_but_allows_direct_project_stake():
+    from crypto_rsi_scanner import event_alpha_router, event_core_opportunity_store, event_watchlist
+
+    rows = [
+        {
+            "row_type": "event_impact_hypothesis",
+            "hypothesis_id": "hyp-btc-strategy-valuation",
+            "incident_id": "incident-strategy-valuation",
+            "symbol": "BTC",
+            "coin_id": "bitcoin",
+            "candidate_role": "direct_subject",
+            "impact_category": "strategic_investment_or_valuation",
+            "impact_path_type": "strategic_investment_or_valuation",
+            "impact_path_reason": "strategic_investment",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 78,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "canonical_incident_name": "Strategy trades below Bitcoin treasury valuation",
+            "latest_source_title": "MSTR valuation discount widens versus Bitcoin holdings",
+            "source_class": "crypto_news",
+            "evidence_specificity": "direct_token_mechanism",
+            "evidence_quality_score": 90,
+            "market_confirmation_score": 0,
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+            "evidence_acquisition_status": "planned",
+            "source_pack": "strategic_investment_pack",
+        },
+        {
+            "row_type": "event_impact_hypothesis",
+            "hypothesis_id": "hyp-aave-kraken-stake",
+            "incident_id": "incident-aave-kraken",
+            "symbol": "AAVE",
+            "coin_id": "aave",
+            "candidate_role": "direct_subject",
+            "impact_category": "strategic_investment_or_valuation",
+            "impact_path_type": "strategic_investment_or_valuation",
+            "impact_path_reason": "strategic_investment",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 78,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "canonical_incident_name": "Kraken takes strategic stake in Aave ecosystem",
+            "latest_source_title": "Kraken strategic investment directly names AAVE",
+            "source_class": "crypto_news",
+            "evidence_specificity": "direct_token_mechanism",
+            "evidence_quality_score": 90,
+            "market_confirmation_score": 0,
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+            "evidence_acquisition_status": "planned",
+            "source_pack": "strategic_investment_pack",
+        },
+    ]
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-live-broad-strategy",
+            profile="live_burn_in_no_send",
+            run_mode="notification_burn_in",
+            artifact_namespace="live_burn_in_no_send",
+        )
+        stored = event_core_opportunity_store.load_core_opportunities(path, latest_run=True).rows
+    by_symbol = {row["symbol"]: row for row in stored}
+    assert by_symbol["BTC"]["final_opportunity_level"] == "exploratory"
+    assert by_symbol["BTC"]["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    assert by_symbol["BTC"]["live_confirmation_passed"] is False
+    assert by_symbol["BTC"]["live_confirmation_reason"] == "evidence_acquisition_not_executed"
+    assert by_symbol["AAVE"]["final_opportunity_level"] == "validated_digest"
+    assert by_symbol["AAVE"]["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
+    assert by_symbol["AAVE"]["live_confirmation_reason"] == "strong_direct_original_source_evidence"
 
 
 def test_live_confirmation_gated_rows_surface_in_reports():

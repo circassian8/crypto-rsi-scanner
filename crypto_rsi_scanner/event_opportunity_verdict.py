@@ -831,6 +831,8 @@ def _strong_live_confirmation_reason(data: Mapping[str, Any]) -> str | None:
         and source_class not in {"", "broad_news", "prediction_market", "seo_or_affiliate", "social_or_unknown", "insufficient_data"}
         and _non_generic_impact_path(impact_path, impact_strength)
     ):
+        if _strategic_broad_asset_context_only(data):
+            return None
         return "strong_direct_original_source_evidence"
     if (
         impact_path in {"direct_token_event", "listing_liquidity_event", "unlock_supply_event", "exploit_security_event"}
@@ -853,6 +855,86 @@ def _non_generic_impact_path(path: str, strength: str) -> bool:
         "technology_risk",
         "market_structure_policy",
     }
+
+
+def _strategic_broad_asset_context_only(data: Mapping[str, Any]) -> bool:
+    """Return true for broad-asset treasury/valuation context, not token impact.
+
+    A crypto-news article about Strategy/MSTR, ETF/company equity valuation,
+    market structure, or treasury discounts can mention BTC/ETH/SOL directly
+    without proving that the asset itself is the affected subject. Accepted
+    source-pack evidence or fresh market confirmation can still validate those
+    rows through the normal live-confirmation paths.
+    """
+    symbol = str(data.get("symbol") or data.get("validated_symbol") or "").strip().upper()
+    coin_id = str(data.get("coin_id") or data.get("validated_coin_id") or "").strip().casefold()
+    broad_asset = symbol in {"BTC", "ETH", "SOL"} or coin_id in {"bitcoin", "ethereum", "solana"}
+    if not broad_asset:
+        return False
+    impact_path = str(data.get("impact_path_type") or data.get("primary_impact_path") or "").strip().casefold()
+    impact_reason = str(data.get("impact_path_reason") or data.get("primary_impact_path_reason") or "").strip().casefold()
+    event_archetype = str(data.get("event_archetype") or data.get("main_frame_type") or "").strip().casefold()
+    strategic = any(
+        token in {impact_path, impact_reason, event_archetype}
+        for token in {
+            "strategic_investment",
+            "strategic_investment_or_valuation",
+            "valuation_event",
+            "treasury_context",
+            "external_equity_proxy_context",
+        }
+    )
+    if not strategic:
+        return False
+    text = " ".join(
+        str(value or "")
+        for value in (
+            data.get("canonical_incident_name"),
+            data.get("incident_canonical_name"),
+            data.get("latest_event_name"),
+            data.get("event_name"),
+            data.get("latest_source_title"),
+            data.get("source_title"),
+            data.get("latest_source"),
+            data.get("source"),
+            data.get("why_opportunity_visible"),
+            data.get("final_verdict_reason"),
+        )
+    ).casefold()
+    context_terms = (
+        "strategy",
+        "microstrategy",
+        "mstr",
+        "treasury",
+        "holdings",
+        "valuation",
+        "discount",
+        "premium",
+        "public company",
+        "equity valuation",
+        "shares",
+        "stock",
+        "cme",
+        "sec",
+        "cftc",
+        "market structure",
+    )
+    if not any(term in text for term in context_terms):
+        return False
+    direct_terms = (
+        "protocol upgrade",
+        "network upgrade",
+        "bitcoin etf approved",
+        "ethereum etf approved",
+        "solana etf approved",
+        "spot bitcoin etf",
+        "spot ethereum etf",
+        "spot solana etf",
+        "listing",
+        "unlock",
+        "exploit",
+    )
+    return not any(term in text for term in direct_terms)
 
 
 def _is_sector_only_row(data: Mapping[str, Any]) -> bool:
