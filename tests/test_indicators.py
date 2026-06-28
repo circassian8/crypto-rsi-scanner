@@ -28137,6 +28137,123 @@ def test_research_card_primary_fields_use_canonical_core_row():
     assert "STORE_ONLY" not in card.markdown.split("## Artifact Lineage", 1)[0]
 
 
+def test_canonical_core_opportunity_view_loads_linked_artifacts():
+    import json
+    from crypto_rsi_scanner import event_alpha_router, event_core_opportunity_store, event_research_cards
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core_path = root / "event_core_opportunities.jsonl"
+        alert_path = root / "event_alpha_alerts.jsonl"
+        acquisition_path = root / "event_evidence_acquisition.jsonl"
+        feedback_path = root / "event_alpha_feedback.jsonl"
+        card_dir = root / "cards"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=core_path),
+            run_id="run-core-view",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        cards = event_research_cards.write_research_cards(card_dir, watchlist_entries=[], alert_rows=core_rows)
+        event_core_opportunity_store.update_core_opportunity_card_links(
+            core_path,
+            cards.card_paths,
+            run_id="run-core-view",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        velvet = next(row for row in core_rows if row["symbol"] == "VELVET")
+        meme = next(row for row in core_rows if row["symbol"] == "MEME")
+        alert_path.write_text(
+            json.dumps({
+                "row_type": "event_alpha_alert_snapshot",
+                "run_id": "run-core-view",
+                "profile": "market_refresh_smoke",
+                "artifact_namespace": "market_refresh_smoke",
+                "alert_id": "alert-velvet-core",
+                "core_opportunity_id": velvet["core_opportunity_id"],
+                "symbol": "VELVET",
+                "coin_id": "velvet",
+                "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            }) + "\n",
+            encoding="utf-8",
+        )
+        acquisition_path.write_text(
+            "\n".join([
+                json.dumps({
+                    "row_type": "event_evidence_acquisition",
+                    "run_id": "run-core-view",
+                    "profile": "market_refresh_smoke",
+                    "artifact_namespace": "market_refresh_smoke",
+                    "core_opportunity_id": velvet["core_opportunity_id"],
+                    "hypothesis_id": "hyp-velvet-core",
+                    "symbol": "VELVET",
+                    "coin_id": "velvet",
+                    "status": "accepted_evidence_found",
+                    "queries_executed": 3,
+                }),
+                json.dumps({
+                    "row_type": "event_evidence_acquisition",
+                    "run_id": "run-core-view",
+                    "profile": "market_refresh_smoke",
+                    "artifact_namespace": "market_refresh_smoke",
+                    "core_opportunity_id": meme["core_opportunity_id"],
+                    "original_core_opportunity_id": "core_legacy_memecore",
+                    "hypothesis_id": "hyp-meme-core",
+                    "symbol": "MEME",
+                    "coin_id": "memecore",
+                }),
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        feedback_path.write_text(
+            json.dumps({
+                "row_type": "event_alpha_feedback",
+                "target": velvet["core_opportunity_id"],
+                "label": "useful",
+                "marked_at": "2026-06-15T13:00:00+00:00",
+                "marked_by": "human",
+                "symbol": "VELVET",
+                "coin_id": "velvet",
+            }) + "\n",
+            encoding="utf-8",
+        )
+        view = event_core_opportunity_store.load_canonical_core_opportunity_view(
+            "market_refresh_smoke",
+            "market_refresh_smoke",
+            velvet["core_opportunity_id"],
+            core_store_path=core_path,
+            alert_store_path=alert_path,
+            evidence_acquisition_path=acquisition_path,
+            feedback_path=feedback_path,
+            research_cards_dir=card_dir,
+        )
+        legacy = event_core_opportunity_store.load_canonical_core_opportunity_view(
+            "market_refresh_smoke",
+            "market_refresh_smoke",
+            "core_legacy_memecore",
+            core_store_path=core_path,
+            evidence_acquisition_path=acquisition_path,
+        )
+
+    assert view.found
+    assert view.symbol == "VELVET"
+    assert view.coin_id == "velvet"
+    assert view.opportunity_level == "high_priority"
+    assert view.final_route_after_quality_gate == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+    assert view.research_card_path and view.research_card_path.endswith(".md")
+    assert len(view.evidence_acquisition_rows) == 1
+    assert view.evidence_acquisition_rows[0]["status"] == "accepted_evidence_found"
+    assert len(view.alert_snapshot_rows) == 1
+    assert view.feedback_status == "has_feedback"
+    assert view.market_refresh_rows
+    assert legacy.found
+    assert legacy.symbol == "MEME"
+    assert "input_target_resolved_to_canonical:core_legacy_memecore->" in ";".join(legacy.warnings)
+
+
 def test_evidence_acquisition_rows_reconcile_to_canonical_core_store_ids():
     import json
     from crypto_rsi_scanner import event_core_opportunity_store, event_evidence_acquisition

@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from . import (
     event_alpha_router,
     event_core_opportunities,
+    event_core_opportunity_store,
     event_graph,
     event_opportunity_verdict,
     event_alpha_reason_text,
@@ -80,18 +81,37 @@ def render_research_card(
 ) -> EventResearchCardResult:
     """Render one Markdown card from local research artifacts."""
     clean_key = str(key or "").strip()
-    entry = _find_entry(clean_key, list(watchlist_entries))
-    alert = _find_alert(clean_key, list(alert_rows))
-    decision = _find_decision(clean_key, list(route_decisions))
-    core = _find_card_core_opportunity(clean_key, entry, alert, decision, route_decisions)
+    entry_rows = list(watchlist_entries)
+    alert_row_list = list(alert_rows)
+    decision_rows = list(route_decisions)
+    monitor_row_list = list(monitor_rows)
+    feedback_row_list = list(feedback_rows)
+    outcome_row_list = list(outcome_rows)
+    entry = _find_entry(clean_key, entry_rows)
+    alert = _find_alert(clean_key, alert_row_list)
+    decision = _find_decision(clean_key, decision_rows)
+    core_rows = [row for row in alert_row_list if isinstance(row, Mapping) and row.get("row_type") == "event_core_opportunity"]
+    core_view = event_core_opportunity_store.canonical_core_opportunity_view_from_rows(
+        clean_key,
+        core_rows=core_rows,
+        supporting_rows=[*alert_row_list, *decision_rows, *entry_rows],
+        alert_rows=alert_row_list,
+        feedback_rows=feedback_row_list,
+        card_paths=[card_path] if card_path is not None else (),
+    ) if core_rows else None
+    core = (
+        core_view.core_opportunity
+        if core_view is not None and core_view.found
+        else _find_card_core_opportunity(clean_key, entry, alert, decision, decision_rows)
+    )
     if core is not None:
         if entry is None or (alert is not None and alert.get("row_type") == "event_core_opportunity"):
             entry = _entry_from_core_opportunity(core)
-        alert = _canonical_card_alert(core, alert)
+        alert = _canonical_card_alert(core, core_view.canonical_core_row if core_view is not None and core_view.canonical_core_row else alert)
     cluster = _find_cluster(clean_key, list(clusters), entry, alert)
-    monitor_row = _find_monitor_row(clean_key, list(monitor_rows), entry, alert)
-    feedback = _matching_rows(clean_key, list(feedback_rows), entry, alert)
-    outcome = _find_outcome(clean_key, list(outcome_rows), entry, alert) or alert
+    monitor_row = _find_monitor_row(clean_key, monitor_row_list, entry, alert)
+    feedback = _matching_rows(clean_key, feedback_row_list, entry, alert)
+    outcome = _find_outcome(clean_key, outcome_row_list, entry, alert) or alert
     if entry is None and alert is None:
         return EventResearchCardResult(
             key=clean_key,

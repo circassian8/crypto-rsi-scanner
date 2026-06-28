@@ -30,6 +30,14 @@ impact path. The planner can suggest official searches, denial searches,
 market/derivatives/supply refreshes, and validation criteria; deterministic
 resolver, quality, router, and `event_fade.py` gates remain authoritative.
 
+The operator-facing opportunity spine is the canonical CoreOpportunity view.
+When `event_core_opportunities.jsonl` exists, cards and audits should read the
+stored core row plus its linked support rows, diagnostic/control rows,
+evidence-acquisition rows, market-refresh rows, alert snapshots, card path, and
+feedback status through the canonical read model. Support/control artifacts are
+audit evidence attached to the core opportunity; they should not create a
+second visible truth for route, state, tier, or final opportunity verdict.
+
 ## Day-1 Notification Burn-In
 
 Use notification profiles when you want immediate Telegram research

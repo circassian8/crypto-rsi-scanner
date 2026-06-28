@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Canonical CoreOpportunity view is the operator read model
+**Status:** accepted
+**Decision:** Operator-facing Event Alpha artifacts should read one joined
+canonical view for a core opportunity: the stored core row, supporting rows,
+diagnostic/control rows, evidence acquisition, market refresh evidence, card
+path, alert snapshots, and feedback status. New card and audit code should use
+`load_canonical_core_opportunity_view(...)` or its row-based equivalent when a
+canonical core store is available, falling back to legacy aggregation only for
+older artifacts without core rows.
+**Why:** Canonical core ids solved most duplicate/opportunity drift, but callers
+could still reassemble different partial views from the same artifacts. A
+single read model makes the stored final route/state/verdict the operator
+contract while preserving all supporting evidence for audit.
+**Revisit when:** Event Alpha artifacts move into a typed store with schema
+enforced joins and the JSONL read model can be replaced by database queries.
+
 ## 2026-06-28 - CoreOpportunity store rows win after secondary artifact writes
 **Status:** accepted
 **Decision:** Event Alpha cycles may create secondary artifacts after the

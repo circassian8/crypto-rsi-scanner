@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Add canonical core opportunity read model · Codex
+**Why:** Core rows were authoritative in practice, but cards and audits still
+assembled their own partial artifact views. That left room for future drift
+between the canonical `event_core_opportunities.jsonl` row and linked support,
+acquisition, alert, card, and feedback artifacts.
+**Changes:**
+- Added `CanonicalCoreOpportunityView` plus
+  `load_canonical_core_opportunity_view(...)` /
+  `canonical_core_opportunity_view_from_rows(...)` in
+  `event_core_opportunity_store.py`.
+- The canonical view now joins the stored core row, supporting rows,
+  diagnostic/control rows, evidence-acquisition rows, market-refresh evidence,
+  research-card path, alert snapshots, and feedback status without mutating
+  artifacts.
+- Updated research-card rendering and opportunity audits to consult the
+  canonical read model before falling back to legacy row aggregation.
+- Added a regression that proves the view loads linked cards, alerts,
+  evidence-acquisition rows, market-refresh rows, feedback, and resolves a
+  legacy acquisition core id back to its canonical core.
+**Verify:** `python3 tests/test_indicators.py` passed (513/513);
+`make event-alpha-signal-quality-eval PYTHON=python3`, `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`, `make
+event-alpha-market-refresh-smoke PYTHON=python3`, `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, `make
+event-alpha-quality-validation-cycle PYTHON=python3`, and `make verify
+PYTHON=python3` passed. Manual smoke: `make event-opportunity-audit
+PROFILE=evidence_acquisition_smoke TARGET=agg:3381ebd96566 PYTHON=python3`,
+`make event-alpha-daily-brief PROFILE=evidence_acquisition_smoke
+PYTHON=python3`, and `make event-alpha-artifact-doctor
+PROFILE=evidence_acquisition_smoke STRICT=1 PYTHON=python3` passed.
+**Notes/risks:** Read-model and presentation consistency only. No Telegram
+sends, paper/live rows, normal RSI writes, trading, or provider/LLM-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Reconcile canonical core rendering artifacts · Codex
 **Why:** Event Alpha core-store rows were authoritative, but secondary artifacts
 could still disagree after card and evidence-acquisition writes. VELVET could

@@ -8,7 +8,7 @@ checks do not independently recompute conflicting opportunity state.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -51,6 +51,49 @@ class EventCoreOpportunityCardLinkUpdateResult:
     success: bool
     rows_updated: int = 0
     block_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class CanonicalCoreOpportunityView:
+    """Single read model for one operator-facing Event Alpha opportunity."""
+
+    profile: str | None
+    artifact_namespace: str | None
+    requested_core_opportunity_id: str
+    core_opportunity_id: str | None
+    found: bool
+    canonical_core_row: dict[str, Any] | None = None
+    core_opportunity: event_core_opportunities.CoreOpportunity | None = None
+    supporting_rows: tuple[dict[str, Any], ...] = ()
+    diagnostic_rows: tuple[dict[str, Any], ...] = ()
+    evidence_acquisition_rows: tuple[dict[str, Any], ...] = ()
+    market_refresh_rows: tuple[dict[str, Any], ...] = ()
+    research_card_path: str | None = None
+    alert_snapshot_rows: tuple[dict[str, Any], ...] = ()
+    feedback_target: str | None = None
+    feedback_status: str = "pending_or_unknown"
+    feedback_rows: tuple[dict[str, Any], ...] = ()
+    warnings: tuple[str, ...] = ()
+
+    @property
+    def symbol(self) -> str | None:
+        return _first_text([self.canonical_core_row or {}], ("symbol", "validated_symbol"))
+
+    @property
+    def coin_id(self) -> str | None:
+        return _first_text([self.canonical_core_row or {}], ("coin_id", "validated_coin_id"))
+
+    @property
+    def opportunity_level(self) -> str | None:
+        return _first_text([self.canonical_core_row or {}], ("final_opportunity_level", "opportunity_level"))
+
+    @property
+    def final_route_after_quality_gate(self) -> str | None:
+        return _first_text([self.canonical_core_row or {}], ("final_route_after_quality_gate", "route"))
+
+    @property
+    def final_state_after_quality_gate(self) -> str | None:
+        return _first_text([self.canonical_core_row or {}], ("final_state_after_quality_gate", "state"))
 
 
 def write_core_opportunities(
@@ -189,6 +232,191 @@ def update_core_opportunity_card_links(
             rows_updated=0,
             block_reason=f"{type(exc).__name__}: {exc}",
         )
+
+
+def load_canonical_core_opportunity_view(
+    profile: str | None,
+    artifact_namespace: str | None,
+    core_opportunity_id: str,
+    *,
+    core_store_path: str | Path | None = None,
+    alert_store_path: str | Path | None = None,
+    evidence_acquisition_path: str | Path | None = None,
+    feedback_path: str | Path | None = None,
+    research_cards_dir: str | Path | None = None,
+    latest_run: bool = True,
+    include_legacy: bool = True,
+) -> CanonicalCoreOpportunityView:
+    """Load the canonical operator-facing view for one core opportunity.
+
+    The returned object intentionally joins related research artifacts without
+    changing any underlying state. It is the read-side source of truth for
+    cards, audits, and diagnostics.
+    """
+    clean = str(core_opportunity_id or "").strip()
+    try:
+        from . import event_alpha_artifacts
+
+        context = event_alpha_artifacts.context_from_profile(
+            profile,
+            artifact_namespace=artifact_namespace,
+        )
+    except Exception:  # noqa: BLE001 - reports must stay usable with partial config.
+        context = None
+    resolved_profile = str(profile or getattr(context, "profile", "") or "").strip() or None
+    resolved_namespace = str(artifact_namespace or getattr(context, "artifact_namespace", "") or "").strip() or None
+    core_path = core_store_path or getattr(context, "core_opportunity_store_path", None)
+    alert_path = alert_store_path or getattr(context, "alert_store_path", None)
+    acquisition_path = evidence_acquisition_path or getattr(context, "evidence_acquisition_path", None)
+    feedback_artifact_path = feedback_path or getattr(context, "feedback_path", None)
+    cards_dir = research_cards_dir or getattr(context, "research_cards_dir", None)
+
+    core_rows = load_core_opportunities(
+        core_path,
+        latest_run=latest_run,
+        include_legacy=include_legacy,
+    ).rows if core_path else []
+    alert_rows = _load_alert_rows(alert_path)
+    acquisition_rows = _load_acquisition_rows(acquisition_path)
+    feedback_rows = _load_feedback_rows(feedback_artifact_path)
+    if context is not None:
+        try:
+            core_rows = event_alpha_artifacts.filter_artifact_rows(
+                core_rows,
+                profile=resolved_profile,
+                artifact_namespace=resolved_namespace,
+                include_test_artifacts=True,
+                include_legacy_artifacts=True,
+            )
+            alert_rows = event_alpha_artifacts.filter_artifact_rows(
+                alert_rows,
+                profile=resolved_profile,
+                artifact_namespace=resolved_namespace,
+                include_test_artifacts=True,
+                include_legacy_artifacts=True,
+            )
+            acquisition_rows = event_alpha_artifacts.filter_artifact_rows(
+                acquisition_rows,
+                profile=resolved_profile,
+                artifact_namespace=resolved_namespace,
+                include_test_artifacts=True,
+                include_legacy_artifacts=True,
+            )
+        except Exception:  # noqa: BLE001 - artifact joins should remain best-effort.
+            pass
+    card_paths = _markdown_card_paths(cards_dir)
+    return canonical_core_opportunity_view_from_rows(
+        clean,
+        core_rows=core_rows,
+        supporting_rows=alert_rows,
+        evidence_acquisition_rows=acquisition_rows,
+        alert_rows=alert_rows,
+        feedback_rows=feedback_rows,
+        card_paths=card_paths,
+        profile=resolved_profile,
+        artifact_namespace=resolved_namespace,
+    )
+
+
+def canonical_core_opportunity_view_from_rows(
+    core_opportunity_id: str,
+    *,
+    core_rows: Iterable[Mapping[str, Any] | object] = (),
+    supporting_rows: Iterable[Mapping[str, Any] | object] = (),
+    evidence_acquisition_rows: Iterable[Mapping[str, Any] | object] = (),
+    alert_rows: Iterable[Mapping[str, Any] | object] = (),
+    feedback_rows: Iterable[Mapping[str, Any] | object] = (),
+    card_paths: Iterable[str | Path] = (),
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
+) -> CanonicalCoreOpportunityView:
+    """Build a canonical core-opportunity view from already-loaded artifacts."""
+    requested = str(core_opportunity_id or "").strip()
+    warnings: list[str] = []
+    core_row_list = [_row_dict(row) for row in core_rows]
+    support_row_list = [_row_dict(row) for row in supporting_rows]
+    acquisition_row_list = [_row_dict(row) for row in evidence_acquisition_rows]
+    alert_row_list = [_row_dict(row) for row in alert_rows]
+    feedback_row_list = [_row_dict(row) for row in feedback_rows]
+    normalized_card_paths = tuple(Path(path) for path in card_paths)
+    if not requested:
+        return CanonicalCoreOpportunityView(
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            requested_core_opportunity_id=requested,
+            core_opportunity_id=None,
+            found=False,
+            warnings=("missing_core_opportunity_id",),
+        )
+    resolved_target = _target_from_acquisition_rows(requested, acquisition_row_list) or requested
+    core_items = core_opportunities_from_rows(core_row_list)
+    opportunity = _find_core_opportunity(resolved_target, core_items)
+    if opportunity is None and resolved_target != requested:
+        opportunity = _find_core_opportunity(requested, core_items)
+    if opportunity is None:
+        resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(
+            {"core_opportunity_id": resolved_target},
+            core_row_list,
+        )
+        warnings.extend(resolution.warnings)
+        if resolution.canonical_core_opportunity_id and resolution.canonical_core_opportunity_id != resolved_target:
+            opportunity = _find_core_opportunity(resolution.canonical_core_opportunity_id, core_items)
+    if opportunity is None:
+        return CanonicalCoreOpportunityView(
+            profile=profile,
+            artifact_namespace=artifact_namespace,
+            requested_core_opportunity_id=requested,
+            core_opportunity_id=resolved_target or None,
+            found=False,
+            warnings=tuple(dict.fromkeys([*warnings, "core_opportunity_not_found"])),
+        )
+
+    canonical_id = opportunity.core_opportunity_id
+    canonical_row = _canonical_store_row(canonical_id, core_row_list, opportunity)
+    identifiers = _core_view_identifiers(canonical_row, opportunity)
+    linked_support = tuple(_unique_rows(
+        [row for row in [*support_row_list, *opportunity.supporting_rows] if _row_matches_identifiers(row, identifiers)]
+    ))
+    linked_diagnostics = tuple(_unique_rows(
+        [row for row in [*opportunity.diagnostic_rows, *support_row_list] if _row_is_diagnostic_support(row, canonical_id, identifiers)]
+    ))
+    linked_acquisition = tuple(_unique_rows(
+        [row for row in acquisition_row_list if _row_matches_identifiers(row, identifiers)]
+    ))
+    linked_alerts = tuple(_unique_rows(
+        [row for row in alert_row_list if _row_matches_identifiers(row, identifiers)]
+    ))
+    market_refresh_rows = tuple(_unique_rows(
+        row for row in [canonical_row, *linked_support, *linked_acquisition, *linked_alerts]
+        if _is_market_refresh_row(row)
+    ))
+    card_path = _research_card_path(canonical_row, canonical_id, normalized_card_paths)
+    feedback_target = _first_text([canonical_row], ("feedback_target",)) or canonical_id
+    linked_feedback = tuple(_unique_rows(
+        [row for row in feedback_row_list if _feedback_matches(row, identifiers, feedback_target)]
+    ))
+    feedback_status = "has_feedback" if linked_feedback else "pending_or_unknown"
+    if requested != canonical_id:
+        warnings.append(f"input_target_resolved_to_canonical:{requested}->{canonical_id}")
+    return CanonicalCoreOpportunityView(
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        requested_core_opportunity_id=requested,
+        core_opportunity_id=canonical_id,
+        found=True,
+        canonical_core_row=canonical_row,
+        core_opportunity=opportunity,
+        supporting_rows=linked_support,
+        diagnostic_rows=linked_diagnostics,
+        evidence_acquisition_rows=linked_acquisition,
+        market_refresh_rows=market_refresh_rows,
+        research_card_path=card_path,
+        alert_snapshot_rows=linked_alerts,
+        feedback_target=feedback_target,
+        feedback_status=feedback_status,
+        feedback_rows=linked_feedback,
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
 
 
 def core_opportunities_from_rows(rows: Iterable[Mapping[str, Any]]) -> tuple[event_core_opportunities.CoreOpportunity, ...]:
@@ -354,6 +582,53 @@ def _row_from_core_opportunity(
     }
 
 
+def _load_alert_rows(path: str | Path | None) -> list[dict[str, Any]]:
+    if path is None:
+        return []
+    try:
+        from . import event_alpha_alert_store
+
+        return [dict(row) for row in event_alpha_alert_store.load_alert_snapshots(path).rows]
+    except Exception:  # noqa: BLE001 - partial artifact views should fail soft.
+        return []
+
+
+def _load_acquisition_rows(path: str | Path | None) -> list[dict[str, Any]]:
+    if path is None:
+        return []
+    try:
+        from . import event_evidence_acquisition
+
+        return [dict(row) for row in event_evidence_acquisition.load_acquisition_results(path)]
+    except Exception:  # noqa: BLE001 - partial artifact views should fail soft.
+        return []
+
+
+def _load_feedback_rows(path: str | Path | None) -> list[dict[str, Any]]:
+    if path is None:
+        return []
+    try:
+        from . import event_feedback
+
+        return [asdict(record) for record in event_feedback.load_feedback(path).records]
+    except Exception:  # noqa: BLE001 - partial artifact views should fail soft.
+        return []
+
+
+def _markdown_card_paths(path: str | Path | None) -> tuple[Path, ...]:
+    if path is None:
+        return ()
+    root = Path(path).expanduser()
+    if not root.exists():
+        return ()
+    if root.is_file():
+        return (root,) if root.suffix.lower() == ".md" else ()
+    try:
+        return tuple(path for path in root.glob("*.md") if path.name != "index.md")
+    except OSError:
+        return ()
+
+
 def _card_path_by_core_id(paths: Iterable[str | Path]) -> dict[str, str]:
     out: dict[str, str] = {}
     try:
@@ -366,6 +641,256 @@ def _card_path_by_core_id(paths: Iterable[str | Path]) -> dict[str, str]:
         if core_id:
             out.setdefault(core_id, str(path))
     return out
+
+
+def _find_core_opportunity(
+    target: str,
+    opportunities: Iterable[event_core_opportunities.CoreOpportunity],
+) -> event_core_opportunities.CoreOpportunity | None:
+    clean = target[3:] if target.startswith("ea:") else target
+    clean_l = clean.casefold()
+    for item in opportunities:
+        identifiers = {
+            item.core_opportunity_id,
+            item.symbol,
+            item.coin_id,
+            item.incident_id or "",
+            item.canonical_incident_name or "",
+            str(item.primary_row.get("alert_id") or ""),
+            str(item.primary_row.get("card_id") or ""),
+            str(item.primary_row.get("snapshot_id") or ""),
+            str(item.primary_row.get("key") or ""),
+            str(item.primary_row.get("alert_key") or ""),
+            str(item.primary_row.get("hypothesis_id") or ""),
+        }
+        identifiers.update(str(value) for value in item.supporting_hypothesis_ids)
+        identifiers.update(_as_list_values(item.primary_row.get("supporting_row_ids")))
+        identifiers.update(_as_list_values(item.primary_row.get("diagnostic_row_ids")))
+        for row in (*item.supporting_rows, *item.diagnostic_rows):
+            identifiers.update(_row_identifier_values(row))
+        if clean in identifiers or clean_l in {value.casefold() for value in identifiers if value}:
+            return item
+    return None
+
+
+def _target_from_acquisition_rows(target: str, rows: Iterable[Mapping[str, Any]]) -> str | None:
+    clean = str(target or "").strip()
+    clean_l = clean.casefold()
+    for row in rows:
+        candidates = {
+            str(row.get("original_core_opportunity_id") or ""),
+            str(row.get("requested_core_opportunity_id") or ""),
+            str(row.get("support_row_id") or ""),
+            str(row.get("hypothesis_id") or ""),
+        }
+        if clean in candidates or clean_l in {item.casefold() for item in candidates if item}:
+            resolved = str(row.get("core_opportunity_id") or "").strip()
+            if resolved:
+                return resolved
+    return None
+
+
+def _canonical_store_row(
+    core_id: str,
+    core_rows: Iterable[Mapping[str, Any]],
+    opportunity: event_core_opportunities.CoreOpportunity,
+) -> dict[str, Any]:
+    for row in core_rows:
+        if str(row.get("core_opportunity_id") or "") == core_id:
+            return dict(row)
+    row = _row_from_core_opportunity(
+        opportunity,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+    )
+    return dict(row)
+
+
+def _core_view_identifiers(
+    canonical_row: Mapping[str, Any],
+    opportunity: event_core_opportunities.CoreOpportunity,
+) -> set[str]:
+    identifiers = set(_row_identifier_values(canonical_row))
+    identifiers.add(opportunity.core_opportunity_id)
+    identifiers.add(opportunity.symbol)
+    identifiers.add(opportunity.coin_id)
+    identifiers.add(opportunity.incident_id or "")
+    identifiers.add(opportunity.canonical_incident_name or "")
+    identifiers.update(str(value) for value in opportunity.supporting_hypothesis_ids)
+    identifiers.update(_as_list_values(canonical_row.get("supporting_row_ids")))
+    identifiers.update(_as_list_values(canonical_row.get("diagnostic_row_ids")))
+    for row in (*opportunity.supporting_rows, *opportunity.diagnostic_rows):
+        identifiers.update(_row_identifier_values(row))
+    return {str(value) for value in identifiers if str(value or "").strip()}
+
+
+def _row_identifier_values(row: Mapping[str, Any]) -> set[str]:
+    values = {
+        row.get("core_opportunity_id"),
+        row.get("diagnostic_support_for_core_opportunity_id"),
+        row.get("original_core_opportunity_id"),
+        row.get("feedback_target"),
+        row.get("target"),
+        row.get("alert_id"),
+        row.get("alert_key"),
+        row.get("card_id"),
+        row.get("snapshot_id"),
+        row.get("watchlist_key"),
+        row.get("key"),
+        row.get("event_id"),
+        row.get("hypothesis_id"),
+        row.get("incident_id"),
+        row.get("symbol"),
+        row.get("validated_symbol"),
+        row.get("coin_id"),
+        row.get("validated_coin_id"),
+        row.get("asset_symbol"),
+        row.get("asset_coin_id"),
+    }
+    for key in ("supporting_hypothesis_ids", "supporting_row_ids", "diagnostic_row_ids", "source_event_ids", "event_ids"):
+        values.update(_as_list_values(row.get(key)))
+    return {str(value) for value in values if str(value or "").strip()}
+
+
+def _row_matches_identifiers(row: Mapping[str, Any], identifiers: set[str]) -> bool:
+    direct_values = {
+        row.get("core_opportunity_id"),
+        row.get("diagnostic_support_for_core_opportunity_id"),
+        row.get("original_core_opportunity_id"),
+        row.get("feedback_target"),
+        row.get("target"),
+        row.get("alert_id"),
+        row.get("alert_key"),
+        row.get("card_id"),
+        row.get("snapshot_id"),
+        row.get("watchlist_key"),
+        row.get("key"),
+        row.get("event_id"),
+        row.get("hypothesis_id"),
+    }
+    for key in ("supporting_hypothesis_ids", "supporting_row_ids", "diagnostic_row_ids", "source_event_ids", "event_ids"):
+        direct_values.update(_as_list_values(row.get(key)))
+    if {str(value) for value in direct_values if str(value or "").strip()}.intersection(identifiers):
+        return True
+    incident = str(row.get("incident_id") or "").strip()
+    asset_values = {
+        str(value)
+        for value in (
+            row.get("symbol"),
+            row.get("validated_symbol"),
+            row.get("coin_id"),
+            row.get("validated_coin_id"),
+            row.get("asset_symbol"),
+            row.get("asset_coin_id"),
+        )
+        if str(value or "").strip()
+    }
+    return bool(incident and incident in identifiers and asset_values.intersection(identifiers))
+
+
+def _row_is_diagnostic_support(row: Mapping[str, Any], core_id: str, identifiers: set[str]) -> bool:
+    if str(row.get("diagnostic_support_for_core_opportunity_id") or "") == core_id:
+        return True
+    if not _row_matches_identifiers(row, identifiers):
+        return False
+    return event_core_opportunities.row_is_diagnostic(row)
+
+
+def _is_market_refresh_row(row: Mapping[str, Any]) -> bool:
+    return _any_truthy(
+        [row],
+        (
+            "market_refresh_attempted",
+            "targeted_market_refresh_attempted",
+            "market_refresh_success",
+            "targeted_market_refresh_success",
+        ),
+    ) or any(
+        key in row
+        for key in (
+            "market_context_after",
+            "market_confirmation_after",
+            "market_context_observed_at",
+            "market_context_freshness_status",
+        )
+    )
+
+
+def _research_card_path(
+    canonical_row: Mapping[str, Any],
+    core_id: str,
+    paths: Iterable[Path],
+) -> str | None:
+    existing = _first_text([canonical_row], ("research_card_path", "card_path"))
+    if existing:
+        return existing
+    try:
+        from . import event_research_cards
+    except Exception:  # noqa: BLE001 - optional presentation helper.
+        return None
+    for path in paths:
+        if event_research_cards.card_core_opportunity_id(path) == core_id:
+            return str(path)
+    return None
+
+
+def _feedback_matches(row: Mapping[str, Any], identifiers: set[str], feedback_target: str | None) -> bool:
+    explicit_target = str(row.get("target") or "").strip()
+    if explicit_target and (explicit_target == feedback_target or explicit_target in identifiers):
+        return True
+    return _row_matches_identifiers(row, identifiers)
+
+
+def _unique_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        normalized = dict(row)
+        id_value = _first_text(
+            [normalized],
+            (
+                "core_opportunity_id",
+                "diagnostic_support_for_core_opportunity_id",
+                "original_core_opportunity_id",
+                "alert_id",
+                "snapshot_id",
+                "hypothesis_id",
+                "key",
+                "event_id",
+            ),
+        )
+        row_type = str(normalized.get("row_type") or "row").strip()
+        dedupe_key = (
+            f"{row_type}:{id_value}"
+            if id_value
+            else json.dumps(_json_ready(normalized), sort_keys=True, separators=(",", ":"))
+        )
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        out.append(normalized)
+    return out
+
+
+def _row_dict(value: Mapping[str, Any] | object) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if is_dataclass(value):
+        return asdict(value)
+    return dict(getattr(value, "__dict__", {}) or {})
+
+
+def _as_list_values(value: Any) -> set[str]:
+    if value in (None, "", [], {}, ()):
+        return set()
+    if isinstance(value, str):
+        return {item.strip() for item in value.replace("|", ";").split(";") if item.strip()}
+    if isinstance(value, Mapping):
+        return {str(item) for item in value.values() if str(item or "").strip()}
+    if isinstance(value, Iterable):
+        return {str(item) for item in value if str(item or "").strip()}
+    return {str(value)}
 
 
 def _row_ids(rows: Iterable[Mapping[str, Any]]) -> list[str]:

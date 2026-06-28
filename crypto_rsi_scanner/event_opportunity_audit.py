@@ -8,6 +8,7 @@ from typing import Any, Iterable, Mapping
 
 from . import (
     event_core_opportunities,
+    event_core_opportunity_store,
     event_alpha_quality_fields,
     event_alpha_router,
     event_research_cards,
@@ -45,18 +46,31 @@ def format_opportunity_audit(
     alert_items = list(alert_rows)
     decision_items = list(route_decisions)
     incidents = [dict(row) for row in incident_rows if isinstance(row, Mapping)]
-    stored_core_opportunities = event_core_opportunities.aggregate_core_opportunities(core_items)
+    core_view = event_core_opportunity_store.canonical_core_opportunity_view_from_rows(
+        resolved_target,
+        core_rows=core_items,
+        supporting_rows=[*hypothesis_items, *watchlist_items, *alert_items, *decision_items],
+        alert_rows=alert_items,
+        feedback_rows=feedback_rows,
+        card_paths=card_paths,
+        profile=profile,
+    )
+    stored_core_opportunities = (
+        (core_view.core_opportunity,)
+        if core_view.found and core_view.core_opportunity is not None
+        else event_core_opportunities.aggregate_core_opportunities(core_items)
+    )
     core_opportunities = stored_core_opportunities or event_core_opportunities.aggregate_core_opportunities([
         *decision_items,
         *watchlist_items,
         *alert_items,
         *hypothesis_items,
     ])
-    core_match = _find_core_match(resolved_target, core_opportunities)
+    core_match = core_view.core_opportunity if core_view.found else _find_core_match(resolved_target, core_opportunities)
     match = (
         {
             "source": "core_opportunity",
-            "row": core_match.primary_row,
+            "row": core_view.canonical_core_row or core_match.primary_row,
             "core_opportunity": core_match,
         }
         if core_match is not None
@@ -79,8 +93,10 @@ def format_opportunity_audit(
     daily_section = _daily_brief_section(row, components, core_match, near_miss)
     card_group = _card_group_for_audit(row, components, core_match, near_miss)
     matching_cards = _matching_card_paths(resolved_target, row, core_match, card_paths)
+    if core_view.research_card_path:
+        matching_cards = tuple(dict.fromkeys([Path(core_view.research_card_path), *matching_cards]))
     feedback_target = _audit_feedback_target(row, resolved_target, core_match, matching_cards)
-    feedback_matches = _matching_feedback_rows(feedback_target, row, feedback_rows)
+    feedback_matches = core_view.feedback_rows or _matching_feedback_rows(feedback_target, row, feedback_rows)
     feedback_status = "has_feedback" if feedback_matches else _value(row, "feedback_status", default="pending_or_unknown")
     feedback_labels = tuple(
         dict.fromkeys(str(item.get("label") or item.get("feedback") or "") for item in feedback_matches)
