@@ -1038,6 +1038,20 @@ def _artifact_row(
         for failure in query.provider_failures
         if failure
     ))
+    source_contract = event_source_registry.source_contract_metadata(
+        {
+            "symbol": result.symbol,
+            "coin_id": result.coin_id,
+            "provider_coverage_status": (
+                provider_coverage_statuses[0]
+                if len(provider_coverage_statuses) == 1
+                else event_source_registry.ProviderCoverageStatus.COMPLETE.value
+            ),
+        },
+        evidence_rows=(*result.accepted_evidence, *result.rejected_evidence),
+        symbol=result.symbol,
+        coin_id=result.coin_id,
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "row_type": "event_evidence_acquisition",
@@ -1069,6 +1083,11 @@ def _artifact_row(
         "query_execution_statuses": query_execution_statuses,
         "provider_coverage_statuses": provider_coverage_statuses,
         "provider_coverage_gaps": coverage_gaps,
+        "source_can_prove": source_contract["source_can_prove"],
+        "source_cannot_prove": source_contract["source_cannot_prove"],
+        "source_useful_playbooks": source_contract["source_useful_playbooks"],
+        "evidence_absence_is_meaningful": source_contract["evidence_absence_is_meaningful"],
+        "source_coverage_gap_reasons": source_contract["source_coverage_gap_reasons"],
         "queries": query_metadata,
         "queries_executed": result.queries_executed,
         "providers_used": result.providers_used,

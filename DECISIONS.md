@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Source contracts must be explicit in operator artifacts
+**Status:** accepted
+**Decision:** Event Alpha source-quality artifacts should expose a compact
+source contract: what the source can prove, what it cannot prove, which
+playbooks it is useful for, and whether absence of evidence is meaningful.
+Non-official sources must explicitly mark `official_confirmation` as not
+provable, even when they can validate token identity, catalyst context, or
+impact path through other evidence.
+**Why:** Source packs combine official, structured, news, prediction-market,
+market, derivatives, and supply evidence. Operators need to see why a
+CryptoPanic-tagged item can strengthen token/catalyst evidence but still does
+not replace an official project/exchange confirmation.
+**Revisit when:** Source registry and evidence acquisition move into a typed
+store with enforced source-contract columns and richer provider-specific
+schemas.
+
 ## 2026-06-28 - Canonical core view owns incident context
 **Status:** accepted
 **Decision:** `CanonicalCoreOpportunityView` should include linked canonical

@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Surface Event Alpha source contracts in artifacts · Codex
+**Why:** Source Registry v2 could already classify provider quality, but
+operator-facing cards/audits and evidence-acquisition rows did not consistently
+show the concrete source contract: what this source can prove, cannot prove,
+and which playbooks it is useful for.
+**Changes:**
+- Added a reusable source-contract metadata helper that merges registry
+  assessment with accepted/rejected evidence rows.
+- Non-official sources now explicitly list `official_confirmation` as something
+  they cannot prove, so CryptoPanic/GDELT/Polymarket evidence does not look
+  stronger than it is.
+- Evidence acquisition artifacts now persist `source_can_prove`,
+  `source_cannot_prove`, `source_useful_playbooks`,
+  `evidence_absence_is_meaningful`, and source coverage gap reasons.
+- Research cards and opportunity audits render compact human-readable source
+  contract lines without leaking control enum names into card grouping.
+- Added regressions for registry aggregation, card/audit source-contract copy,
+  and acquisition artifact persistence.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`; `python3
+tests/test_indicators.py` passed (516/516).
+**Notes/risks:** Research-only metadata and rendering change. No sends, trades,
+paper rows, normal RSI rows, or provider/LLM-created `TRIGGERED_FADE` paths
+were added.
+
 ## 2026-06-28 — Join incidents into the canonical CoreOpportunity view · Codex
 **Why:** Cards and audits were converging on the canonical CoreOpportunity read
 model, but incident/catalyst-frame context could still be reconstructed

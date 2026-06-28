@@ -63,6 +63,12 @@ source pack, provider failures, and before/after verdicts. If a support row
 disagrees with the core row, keep it under diagnostics instead of letting it
 change the primary card, audit, quality-review section, market-freshness line,
 or upgrade-candidate list.
+Cards, audits, and acquisition rows should also show the source contract:
+what the source can prove, what it cannot prove, the playbooks it is relevant
+for, and whether absence is meaningful under current provider coverage.
+CryptoPanic-tagged evidence can strengthen token/catalyst/impact evidence, but
+it still cannot prove official confirmation; official project/exchange or
+structured sources remain the right evidence for official confirmation.
 The same canonical-core rule applies to secondary operator copy. Cards and
 audits should derive latest source, source count, impact-path
 reason/strength, digest eligibility, market confirmation/freshness, upgrade

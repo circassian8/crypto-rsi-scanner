@@ -598,6 +598,63 @@ def evidence_absence_is_meaningful(
     return False
 
 
+def source_contract_metadata(
+    row: Mapping[str, Any] | None = None,
+    *,
+    evidence_rows: Iterable[Mapping[str, Any]] = (),
+    assessment: SourceRegistryAssessment | None = None,
+    provider: str | None = None,
+    source_url: str | None = None,
+    raw_json: Mapping[str, Any] | None = None,
+    text: str | None = None,
+    symbol: str | None = None,
+    coin_id: str | None = None,
+    playbook_type: str | None = None,
+    mission: str | SourceMission | None = None,
+    provider_coverage_status: str | ProviderCoverageStatus | None = None,
+) -> dict[str, Any]:
+    """Return compact source-contract metadata for artifacts and reports.
+
+    The registry assessment answers the source contract for the current row.
+    Accepted/rejected evidence rows may already carry a more specific contract;
+    merge those first so operator surfaces can show what the actual evidence
+    proves instead of only the fallback provider default.
+    """
+    mapping = dict(row or {})
+    if assessment is None:
+        assessment = assess_source(
+            mapping,
+            provider=provider,
+            source_url=source_url,
+            raw_json=raw_json,
+            text=text,
+            symbol=symbol,
+            coin_id=coin_id,
+            playbook_type=playbook_type,
+            mission=mission,
+            provider_coverage_status=provider_coverage_status,
+        )
+    rows = [mapping, *(dict(item) for item in evidence_rows if isinstance(item, Mapping))]
+    can_prove = _contract_values(rows, "source_can_prove") or assessment.can_prove
+    cannot_prove = _contract_values(rows, "source_cannot_prove") or assessment.cannot_prove
+    useful_playbooks = _contract_values(rows, "source_useful_playbooks") or assessment.useful_playbooks
+    absence_values = [
+        bool(row.get("evidence_absence_is_meaningful"))
+        for row in rows
+        if "evidence_absence_is_meaningful" in row
+    ]
+    coverage_values = _contract_values(rows, "provider_coverage_status")
+    gap_values = _contract_values(rows, "source_coverage_gap_reason")
+    return {
+        "source_can_prove": tuple(dict.fromkeys(str(item) for item in can_prove if str(item))),
+        "source_cannot_prove": tuple(dict.fromkeys(str(item) for item in cannot_prove if str(item))),
+        "source_useful_playbooks": tuple(dict.fromkeys(str(item) for item in useful_playbooks if str(item))),
+        "evidence_absence_is_meaningful": any(absence_values) if absence_values else assessment.evidence_absence_is_meaningful,
+        "provider_coverage_statuses": tuple(dict.fromkeys(str(item) for item in coverage_values if str(item))),
+        "source_coverage_gap_reasons": tuple(dict.fromkeys(str(item) for item in gap_values if str(item))),
+    }
+
+
 def coverage_gap_reason(provider: str | None, status: str | ProviderCoverageStatus | None) -> str | None:
     value = _coverage_status(status)
     if value == ProviderCoverageStatus.COMPLETE.value:
@@ -619,6 +676,8 @@ def _source_contract(
         can.append(str(descriptor.default_mission))
     if descriptor.source_class in {SourceClass.OFFICIAL_PROJECT.value, SourceClass.OFFICIAL_EXCHANGE.value}:
         can.append(SourceMission.OFFICIAL_CONFIRMATION.value)
+    else:
+        cannot.append(SourceMission.OFFICIAL_CONFIRMATION.value)
     if can_identity:
         can.append(SourceMission.TOKEN_IDENTITY_VALIDATION.value)
     else:
@@ -722,6 +781,23 @@ def _coverage_status(value: str | ProviderCoverageStatus | None) -> str:
     if text in {"missing", "disabled", "not_ready"}:
         return ProviderCoverageStatus.NOT_CONFIGURED.value
     return ProviderCoverageStatus.COMPLETE.value
+
+
+def _contract_values(rows: Iterable[Mapping[str, Any]], key: str) -> tuple[str, ...]:
+    values: list[str] = []
+    for row in rows:
+        raw = row.get(key)
+        if raw in (None, "", [], {}, ()):
+            continue
+        if isinstance(raw, str):
+            values.extend(part.strip() for part in raw.replace(";", ",").split(",") if part.strip())
+        elif isinstance(raw, Mapping):
+            values.extend(str(value) for value in raw.values() if str(value))
+        elif isinstance(raw, Iterable):
+            values.extend(str(value) for value in raw if str(value))
+        else:
+            values.append(str(raw))
+    return tuple(dict.fromkeys(values))
 
 
 def _currency_tags(payload: Mapping[str, Any]) -> tuple[str, ...]:

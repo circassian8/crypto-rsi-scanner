@@ -328,6 +328,11 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
     acquisition = merged.get("evidence_acquisition_results") if isinstance(merged.get("evidence_acquisition_results"), Mapping) else {}
     accepted_reasons = merged.get("accepted_evidence_reason_codes") or ()
     accepted_evidence = merged.get("evidence_acquisition_accepted_evidence") or ()
+    contract = event_source_registry.source_contract_metadata(
+        merged,
+        evidence_rows=tuple(item for item in accepted_evidence if isinstance(item, Mapping)),
+        assessment=assessment,
+    )
     if isinstance(needed, str):
         needed = [needed]
     if isinstance(failures, str):
@@ -339,6 +344,9 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
         f"- provider coverage: {merged.get('provider_coverage_status') or assessment.provider_coverage_status}",
         f"- evidence absence meaningful: {str(bool(merged.get('evidence_absence_is_meaningful', assessment.evidence_absence_is_meaningful))).lower()}",
         f"- source quality prior/cap: {merged.get('source_quality_prior') or assessment.source_quality_prior}/{merged.get('source_confidence_cap') or assessment.confidence_cap}",
+        f"- source can prove: {_source_contract_text(contract.get('source_can_prove'))}",
+        f"- source cannot prove: {_source_contract_text(contract.get('source_cannot_prove'))}",
+        f"- relevant playbooks: {_source_contract_text(contract.get('source_useful_playbooks'))}",
         f"- evidence needed: {'; '.join(str(item) for item in list(needed or pack.minimum_evidence)[:5])}",
         f"- planned query count: {query_count}",
         (
@@ -359,6 +367,29 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
         f"- provider gaps/failures: {'; '.join(str(item) for item in list(failures or ())[:5]) if failures else 'none'}",
         f"- validation criteria: {'; '.join(pack.validation_requirements[:5])}",
     ]
+
+
+def _source_contract_text(values: object, *, limit: int = 5) -> str:
+    if values in (None, "", [], {}, ()):
+        return "none"
+    if isinstance(values, str):
+        items = [part.strip() for part in values.replace(";", ",").split(",") if part.strip()]
+    elif isinstance(values, Mapping):
+        items = [str(value) for value in values.values() if str(value)]
+    elif isinstance(values, Iterable):
+        items = [str(value) for value in values if str(value)]
+    else:
+        items = [str(values)]
+    items = list(dict.fromkeys(items))
+    if not items:
+        return "none"
+    shown = [_human_contract_value(item) for item in items[:limit]]
+    suffix = f"; +{len(items) - limit} more" if len(items) > limit else ""
+    return "; ".join(shown) + suffix
+
+
+def _human_contract_value(value: object) -> str:
+    return str(value).replace("_", " ")
 
 
 def _is_promoted_audit_row(components: Mapping[str, Any], row: Mapping[str, Any]) -> bool:

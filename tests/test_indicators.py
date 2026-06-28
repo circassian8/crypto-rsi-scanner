@@ -27348,6 +27348,21 @@ def test_event_source_registry_v2_provider_semantics():
     assert cryptopanic.cryptopanic_currency_tag_match is True
     assert cryptopanic.narrative_heat is True
     assert "cryptopanic_currency_tag_match" in cryptopanic.reason_codes
+    cryptopanic_contract = event_source_registry.source_contract_metadata(
+        {"provider": "cryptopanic", "raw_json": {"currency_tags": ("RUNE",)}},
+        evidence_rows=(
+            {
+                "source_can_prove": ("token_identity_validation", "impact_path_validation"),
+                "source_cannot_prove": ("official_confirmation",),
+                "source_useful_playbooks": ("security_or_regulatory_shock",),
+            },
+        ),
+        symbol="RUNE",
+        coin_id="thorchain",
+    )
+    assert "impact_path_validation" in cryptopanic_contract["source_can_prove"]
+    assert "official_confirmation" in cryptopanic_contract["source_cannot_prove"]
+    assert cryptopanic_contract["source_useful_playbooks"] == ("security_or_regulatory_shock",)
 
     exchange = event_source_registry.assess_source(
         {"provider": "binance_announcements", "title": "Binance Will List TEST"},
@@ -27760,12 +27775,18 @@ def test_event_near_miss_source_pack_and_operator_surfaces():
     assert "## Source Coverage / Evidence Acquisition" in card.markdown
     assert "Source pack: proxy_preipo_rwa_pack" in card.markdown
     assert "Coverage status: degraded" in card.markdown
+    assert "Source can prove:" in card.markdown
+    assert "Source cannot prove:" in card.markdown
+    assert "Relevant playbooks:" in card.markdown
     assert "OPENAI_API_KEY" not in card.markdown
 
     audit = event_opportunity_audit.format_opportunity_audit("VELVET", hypotheses=[row], watchlist_entries=[entry])
     assert "## Source coverage and acquisition plan" in audit
     assert "source pack: proxy_preipo_rwa_pack" in audit
     assert "provider coverage: degraded" in audit
+    assert "source can prove:" in audit
+    assert "source cannot prove:" in audit
+    assert "relevant playbooks:" in audit
 
 
 def test_event_evidence_acquisition_executes_fixture_searches():
@@ -27867,6 +27888,10 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         assert rows[0]["evidence_acquisition_plan"]["source_pack"] == "security_shock_pack"
         assert rows[0]["evidence_acquisition_results"]["status"] == "accepted_evidence_found"
         assert "accepted_evidence_found" in rows[0]["query_execution_statuses"]
+        assert "impact_path_validation" in rows[0]["source_can_prove"]
+        assert "token_identity_validation" in rows[0]["source_can_prove"]
+        assert "security_or_regulatory_shock" in rows[0]["source_useful_playbooks"]
+        assert "official_confirmation" in rows[0]["source_cannot_prove"]
 
 
 def test_event_evidence_acquisition_provider_unavailable_and_operator_surfaces():

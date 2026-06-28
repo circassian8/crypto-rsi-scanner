@@ -1640,11 +1640,19 @@ def _source_acquisition_lines(
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
     verdict_copy = event_opportunity_verdict.build_verdict_aware_upgrade_downgrade_text(components)
     pack = event_source_packs.get_source_pack(pack_name)
+    contract = event_source_registry.source_contract_metadata(
+        components,
+        evidence_rows=tuple(item for item in accepted_evidence if isinstance(item, Mapping)),
+        assessment=assessment,
+    )
     lines = [
         f"- Source pack: {pack_name}",
         f"- Coverage status: {components.get('provider_coverage_status') or assessment.provider_coverage_status}",
         f"- Evidence absence meaningful: {str(bool(components.get('evidence_absence_is_meaningful', assessment.evidence_absence_is_meaningful))).lower()}",
         f"- Source quality prior/cap: {components.get('source_quality_prior') or assessment.source_quality_prior}/{components.get('source_confidence_cap') or assessment.confidence_cap}",
+        "- Source can prove: " + _source_contract_text(contract.get("source_can_prove")),
+        "- Source cannot prove: " + _source_contract_text(contract.get("source_cannot_prove")),
+        "- Relevant playbooks: " + _source_contract_text(contract.get("source_useful_playbooks")),
         f"- Evidence acquisition attempted: {str(bool(components.get('evidence_acquisition_attempted'))).lower()}",
         (
             f"- Evidence acquisition result: status={acquisition.get('status') or components.get('evidence_acquisition_status') or 'not_executed'} "
@@ -1677,6 +1685,29 @@ def _source_acquisition_lines(
         "- What source would downgrade this: " + verdict_copy.downgrade_text,
     ]
     return lines
+
+
+def _source_contract_text(values: object, *, limit: int = 5) -> str:
+    if values in (None, "", [], {}, ()):
+        return "none"
+    if isinstance(values, str):
+        items = [part.strip() for part in values.replace(";", ",").split(",") if part.strip()]
+    elif isinstance(values, Mapping):
+        items = [str(value) for value in values.values() if str(value)]
+    elif isinstance(values, Iterable):
+        items = [str(value) for value in values if str(value)]
+    else:
+        items = [str(values)]
+    items = list(dict.fromkeys(items))
+    if not items:
+        return "none"
+    shown = [_human_contract_value(item) for item in items[:limit]]
+    suffix = f"; +{len(items) - limit} more" if len(items) > limit else ""
+    return "; ".join(shown) + suffix
+
+
+def _human_contract_value(value: object) -> str:
+    return str(value).replace("_", " ")
 
 
 def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
