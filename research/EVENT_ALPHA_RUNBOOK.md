@@ -12,15 +12,27 @@ reports, daily briefs, research cards, and opportunity audits. Use these fields
 as an operator checklist:
 
 - `source_class` / `source_mission`: what the source is allowed to prove.
+- `source_can_prove` / `source_cannot_prove` / `source_useful_playbooks`: the
+  explicit source contract. Broad context, market data, derivatives, and supply
+  evidence each prove different things; they should not be treated as generic
+  confirmation.
 - `provider_coverage_status`: whether absence from the provider is meaningful.
   Degraded, partial, unavailable, or not-configured coverage is a gap, not a
   strong negative signal.
 - `source_pack`: the playbook-specific evidence pack, such as listing,
   unlock/supply, proxy pre-IPO/RWA, security shock, sports/fan, political meme,
   or market anomaly.
+- `source_pack_sufficient_for_validated_digest`,
+  `source_pack_required_for_watchlist`, and
+  `source_pack_required_for_high_priority`: pack-specific criteria used to
+  explain why evidence is enough for local review, digest, watchlist, or still
+  missing required confirmation.
 - `evidence_acquisition_plan`: bounded query/checklist metadata for what to
   search next. It is advisory only and does not change routes or watchlist state
   by itself.
+- `feed_quality_score`, `feed_source_class`, and feed-level quarantine/cooldown
+  fields on live RSS sources: a 403 or parse failure quarantines that feed while
+  healthy feeds in the same bundle can continue.
 
 Broad news, RSS recap/SEO, and Polymarket rows are useful context, but they do
 not validate token impact by themselves. Official exchange/project,
@@ -29,6 +41,11 @@ stronger source classes when the text also names the token and explains the
 impact path. The planner can suggest official searches, denial searches,
 market/derivatives/supply refreshes, and validation criteria; deterministic
 resolver, quality, router, and `event_fade.py` gates remain authoritative.
+Source-pack acquisition rows now persist the attempted plan, execution results,
+query execution statuses, provider coverage statuses, accepted/rejected samples,
+and source-pack sufficiency booleans. Treat these rows as audit evidence; they
+can improve a local research verdict only after deterministic identity,
+catalyst-link, impact-path, source-quality, and quality-gate checks pass.
 
 The operator-facing opportunity spine is the canonical CoreOpportunity view.
 When `event_core_opportunities.jsonl` exists, cards and audits should read the

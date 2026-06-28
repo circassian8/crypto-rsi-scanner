@@ -2692,6 +2692,10 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     )
     events = provider.fetch_events(start, end)
     assert len(events) == 2
+    assert len(provider.last_feed_health) == 2
+    assert all(item.rows_fetched == 1 for item in provider.last_feed_health)
+    assert all(item.rows_kept == 1 for item in provider.last_feed_health)
+    assert all(item.feed_quality_score > 0 for item in provider.last_feed_health)
     assert [url for url, _timeout, _accept in seen] == ["https://example.test/rss", "https://example.test/atom"]
     assert all(timeout == 4.0 for _url, timeout, _accept in seen)
     assert all("application/rss+xml" in accept for _url, _timeout, accept in seen)
@@ -2746,6 +2750,10 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     assert mixed_seen == ["https://example.test/missing", "https://example.test/rss"]
     assert any("feed_failure" in warning for warning in mixed.last_warnings)
     assert not any("skipped remaining feeds" in warning for warning in mixed.last_warnings)
+    assert len(mixed.last_feed_health) == 2
+    assert mixed.last_feed_health[0].quarantined is True
+    assert mixed.last_feed_health[0].cooldown_reason == "feed_403_quarantined"
+    assert mixed.last_feed_health[1].rows_kept == 1
 
     import tempfile
     from pathlib import Path
@@ -2790,6 +2798,8 @@ def test_event_discovery_project_blog_live_rss_provider_parses_feeds_offline():
     assert dns_seen == ["https://example.test/rss"]
     assert any("provider_failure" in warning for warning in dns_failed.last_warnings)
     assert any("skipped remaining feeds" in warning for warning in dns_failed.last_warnings)
+    assert len(dns_failed.last_feed_health) == 1
+    assert dns_failed.last_feed_health[0].failure_type == "provider_failure"
 
 
 def test_event_discovery_news_external_asset_inference_handles_generic_ipo_entities():
@@ -27153,6 +27163,8 @@ def test_event_source_registry_v2_provider_semantics():
     assert polymarket_context.source_class == "prediction_market"
     assert polymarket_context.source_mission == "external_context"
     assert polymarket_context.can_validate_token_identity is False
+    assert "external_context" in polymarket_context.can_prove
+    assert "impact_path_validation" in polymarket_context.cannot_prove
     assert polymarket_context.evidence_absence_is_meaningful is False
     assert "prediction_market_external_context_only" in polymarket_context.reason_codes
 
@@ -27172,6 +27184,7 @@ def test_event_source_registry_v2_provider_semantics():
     )
     assert gdelt_degraded.source_class == "broad_news"
     assert gdelt_degraded.evidence_absence_is_meaningful is False
+    assert gdelt_degraded.source_coverage_gap_reason == "provider_coverage_degraded:gdelt"
     assert "provider_coverage_degraded" in gdelt_degraded.warnings
 
     cryptopanic = event_source_registry.assess_source(
@@ -27199,6 +27212,18 @@ def test_event_source_registry_v2_provider_semantics():
     assert exchange.source_class == "official_exchange"
     assert exchange.can_validate_token_identity is True
     assert exchange.can_validate_catalyst is True
+    assert "official_confirmation" in exchange.can_prove
+    assert "listing_volatility" in exchange.useful_playbooks
+
+    market_data = event_source_registry.assess_source(
+        {"provider": "coingecko_market_data", "title": "RUNE price snapshot"},
+        symbol="RUNE",
+        coin_id="thorchain",
+    )
+    assert market_data.source_class == "market_data"
+    assert market_data.source_mission == "market_confirmation"
+    assert "market_confirmation" in market_data.can_prove
+    assert "impact_path_validation" in market_data.cannot_prove
 
     seo = event_source_registry.assess_source(
         {"provider": "rss", "title": "Best crypto to buy price prediction market recap"},
@@ -27224,16 +27249,20 @@ def test_event_source_packs_and_feed_coverage_semantics():
         "fan_sports_pack",
         "political_meme_pack",
         "strategic_investment_pack",
+        "protocol_business_event_pack",
         "market_anomaly_pack",
     }.issubset(names)
 
     listing = event_source_packs.source_pack_for_playbook("listing_volatility")
     assert listing.name == "listing_liquidity_pack"
     assert "official_exchange" in listing.preferred_source_classes
+    assert "cryptopanic_tagged" in listing.preferred_source_classes
+    assert "official_exchange_source" in listing.sufficient_for_validated_digest
 
     proxy = event_source_packs.source_pack_for_playbook("proxy_attention", impact_path_type="venue_value_capture")
     assert proxy.name == "proxy_preipo_rwa_pack"
     assert "prediction_market" in proxy.context_only_sources
+    assert "official_project" in proxy.impact_path_validating_sources
 
     strategic = event_source_packs.source_pack_for_playbook(
         "strategic_investment",
@@ -27241,6 +27270,12 @@ def test_event_source_packs_and_feed_coverage_semantics():
     )
     assert strategic.name == "strategic_investment_pack"
     assert "denial_or_correction_search" in strategic.validation_requirements
+    assert "second_source_confirmation" in strategic.sufficient_for_validated_digest
+    protocol_business = event_source_packs.source_pack_for_playbook(
+        "protocol_business_event",
+        impact_path_type="protocol_business_event",
+    )
+    assert protocol_business.name == "protocol_business_event_pack"
 
     pack_eval = event_source_packs.evaluate_pack_evidence(
         {
@@ -27255,7 +27290,23 @@ def test_event_source_packs_and_feed_coverage_semantics():
     )
     assert pack_eval["source_pack"] == "proxy_preipo_rwa_pack"
     assert pack_eval["source_pack_context_only"] is True
+    assert pack_eval["source_pack_validated_digest_sufficient"] is False
     assert "source_is_context_only" in pack_eval["source_pack_missing_evidence"]
+
+    listing_eval = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "bybit_announcements",
+            "title": "Bybit Will List TESTUSDT",
+            "playbook_type": "listing_volatility",
+            "symbol": "TEST",
+            "coin_id": "test-token",
+            "market_confirmation_score": 75,
+        },
+        pack=listing,
+    )
+    assert listing_eval["source_pack_validated_digest_sufficient"] is True
+    assert listing_eval["source_pack_watchlist_requirements_met"] is True
+    assert listing_eval["source_pack_impact_path_validating_source"] is True
 
     feed_403 = event_source_registry.feed_health_from_fetch(
         feed_url="https://example.test/rss",
@@ -27266,6 +27317,8 @@ def test_event_source_packs_and_feed_coverage_semantics():
     )
     assert feed_403.quarantined is True
     assert feed_403.cooldown_reason == "feed_403_quarantined"
+    assert feed_403.feed_source_class == feed_403.source_class
+    assert feed_403.feed_quality_score <= 30
 
     bad_recap = event_source_registry.feed_health_from_fetch(
         feed_url="https://recap.example.test/price-prediction/rss",
@@ -27276,6 +27329,7 @@ def test_event_source_packs_and_feed_coverage_semantics():
     )
     assert bad_recap.quarantined is True
     assert bad_recap.quality in {"low", "medium"}
+    assert bad_recap.to_metadata()["feed_quality_score"] <= 50
     assert event_source_registry.evidence_absence_is_meaningful(
         provider="gdelt",
         source_class="broad_news",
@@ -27654,11 +27708,20 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         assert result.rows_written == 1
         assert result.results[0].status == "accepted_evidence_found"
         assert any("cryptopanic_currency_tag_match" in item["reason_codes"] for item in result.results[0].accepted_evidence)
+        accepted_sample = result.results[0].accepted_evidence[0]
+        assert accepted_sample["source_class"] == "cryptopanic_tagged"
+        assert accepted_sample["source_pack_impact_path_validating_source"] is True
+        assert accepted_sample["source_pack_validated_digest_sufficient"] is True
+        assert "impact_path_validation" in accepted_sample["source_can_prove"]
         assert result.path == artifact_path
         rows = event_evidence_acquisition.load_acquisition_results(artifact_path)
         assert rows[0]["symbol"] == "RUNE"
         assert rows[0]["coin_id"] == "thorchain"
         assert rows[0]["accepted_evidence"]
+        assert rows[0]["evidence_acquisition_attempted"] is True
+        assert rows[0]["evidence_acquisition_plan"]["source_pack"] == "security_shock_pack"
+        assert rows[0]["evidence_acquisition_results"]["status"] == "accepted_evidence_found"
+        assert "accepted_evidence_found" in rows[0]["query_execution_statuses"]
 
 
 def test_event_evidence_acquisition_provider_unavailable_and_operator_surfaces():
@@ -27761,6 +27824,9 @@ def test_event_evidence_acquisition_provider_unavailable_and_operator_surfaces()
     assert "Executed source-pack searches" in brief
     assert "VELVET" in brief
     assert "accepted=1" in brief
+    assert rows[0]["evidence_acquisition_plan"]["query_count"] == 3
+    assert rows[0]["evidence_acquisition_results"]["accepted"] == 1
+    assert rows[0]["provider_coverage_statuses"] == ["complete"]
 
     updated = result.hypotheses[0]
     components = dict(updated.score_components)

@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Evidence absence is source-pack and coverage scoped
+**Status:** accepted
+**Decision:** Event Alpha source evidence must carry an explicit source
+contract (`source_can_prove`, `source_cannot_prove`, useful playbooks, mission,
+confidence cap, and coverage status) plus playbook-specific source-pack
+sufficiency fields. Official exchange/project, structured calendar/unlock,
+matching CryptoPanic tags, market data, derivatives, and supply sources each
+prove different things. Broad GDELT/RSS/Polymarket context, SEO/recap feeds, or
+degraded/unavailable providers must not make “no source found” look like strong
+negative evidence. Source-pack acquisition may execute bounded provider queries
+and persist plans/results/coverage gaps, but accepted evidence is still only
+research metadata until deterministic identity, catalyst-link, impact-path,
+quality, router, and `event_fade.py` gates validate it.
+**Why:** Event Alpha’s semantic layer is only as good as the source layer. A
+clean source contract prevents broad/noisy feeds from over-validating token
+impact while making true official/CryptoPanic/structured evidence auditable.
+**Revisit when:** Source/provider coverage moves from JSONL artifacts into a
+typed store with provider-level SLAs, reviewed precision/recall, and automated
+source-quality calibration.
+
 ## 2026-06-28 - Canonical CoreOpportunity view is the operator read model
 **Status:** accepted
 **Decision:** Operator-facing Event Alpha artifacts should read one joined

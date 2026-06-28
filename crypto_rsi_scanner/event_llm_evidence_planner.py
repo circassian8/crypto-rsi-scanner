@@ -125,6 +125,7 @@ def request_from_row(
         score=_float(merged.get("opportunity_score_final")) or _float(merged.get("score")) or 0.0,
         opportunity_level=str(merged.get("opportunity_level") or "local_only"),
         frame_disagreement=bool(merged.get("frame_rule_disagreement")),
+        provider_health=_provider_health_from_row(merged),
         source_pack=source_pack or str(merged.get("source_pack") or ""),
     )
 
@@ -269,6 +270,18 @@ def _provider_gaps(provider_health: Mapping[str, Any]) -> tuple[str, ...]:
         if text in {"degraded", "unavailable", "not_configured", "disabled", "missing_api_key"}:
             gaps.append(f"{provider}:{text}")
     return tuple(gaps)
+
+
+def _provider_health_from_row(row: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    for key in ("provider_health", "provider_health_by_source_pack", "source_provider_health"):
+        value = row.get(key)
+        if isinstance(value, Mapping):
+            return value
+    provider = str(row.get("provider") or row.get("source_provider") or "").strip()
+    status = str(row.get("provider_coverage_status") or "").strip()
+    if provider and status:
+        return {provider: {"status": status}}
+    return None
 
 
 def _plan_id(request: EvidencePlannerRequest, source_pack: str) -> str:

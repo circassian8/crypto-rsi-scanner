@@ -14,6 +14,7 @@ from typing import Any, Callable, Iterable, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from .. import event_source_registry
 from ..event_models import RawDiscoveredEvent
 from ._news_common import fetch_news_events, news_events_from_items
 
@@ -50,9 +51,11 @@ class ProjectBlogRssProvider:
         self.opener = opener or _urlopen_with_timeout
         self.fetched_at = fetched_at
         self.last_warnings: tuple[str, ...] = ()
+        self.last_feed_health: tuple[event_source_registry.FeedHealth, ...] = ()
 
     def fetch_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
         self.last_warnings = ()
+        self.last_feed_health = ()
         if self.path is None and self.live_enabled:
             return self._fetch_live_events(start, end)
         return fetch_news_events(
@@ -67,6 +70,7 @@ class ProjectBlogRssProvider:
         fetched_at = self.fetched_at or datetime.now(timezone.utc)
         events: list[RawDiscoveredEvent] = []
         warnings: list[str] = []
+        feed_health: list[event_source_registry.FeedHealth] = []
         for feed_url in self.feed_urls:
             try:
                 request = Request(
@@ -83,6 +87,15 @@ class ProjectBlogRssProvider:
                 failure_kind = _feed_failure_kind(exc)
                 warning = f"{failure_kind} project_blog_rss feed_url={feed_url}: {exc}"
                 warnings.append(warning)
+                feed_health.append(event_source_registry.feed_health_from_fetch(
+                    feed_url=feed_url,
+                    last_failure_at=fetched_at.isoformat(),
+                    failure_type=_feed_health_failure_type(exc, failure_kind),
+                    rows_fetched=0,
+                    rows_kept=0,
+                    rows_rejected=0,
+                    failure_count=1,
+                ))
                 if self.required:
                     raise
                 log.warning(warning)
@@ -92,14 +105,23 @@ class ProjectBlogRssProvider:
                     log.warning(warning)
                     break
                 continue
-            events.extend(news_events_from_items(
+            parsed_events = news_events_from_items(
                 rows,
                 provider=self.name,
                 start=start,
                 end=end,
                 fetched_at=fetched_at,
+            )
+            events.extend(parsed_events)
+            feed_health.append(event_source_registry.feed_health_from_fetch(
+                feed_url=feed_url,
+                last_success_at=fetched_at.isoformat(),
+                rows_fetched=len(rows),
+                rows_kept=len(parsed_events),
+                rows_rejected=max(0, len(rows) - len(parsed_events)),
             ))
         self.last_warnings = tuple(warnings)
+        self.last_feed_health = tuple(feed_health)
         return events
 
 
@@ -193,5 +215,16 @@ def _feed_failure_kind(exc: Exception) -> str:
     if "http " in text or text.startswith("http"):
         return "feed_failure"
     if isinstance(exc, ET.ParseError):
+        return "feed_failure"
+    return "provider_failure"
+
+
+def _feed_health_failure_type(exc: Exception, failure_kind: str) -> str:
+    if isinstance(exc, HTTPError):
+        return f"http_{exc.code}"
+    text = str(exc).casefold()
+    if "http 403" in text or "403" == text.strip():
+        return "http_403"
+    if failure_kind == "feed_failure":
         return "feed_failure"
     return "provider_failure"

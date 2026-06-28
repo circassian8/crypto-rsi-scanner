@@ -776,6 +776,23 @@ def _validate_raw_result(
         coin_id=request.coin_id,
         playbook_type=str((request.row or {}).get("playbook_type") or ""),
         mission=event_source_registry.SourceMission.IMPACT_PATH_VALIDATION.value,
+        provider_coverage_status=request.provider_coverage_status,
+    )
+    pack_eval = event_source_packs.evaluate_pack_evidence(
+        {
+            **raw_map,
+            "symbol": request.symbol,
+            "coin_id": request.coin_id,
+            "validated_symbol": request.symbol,
+            "validated_coin_id": request.coin_id,
+            "playbook_type": (request.row or {}).get("playbook_type"),
+            "impact_path_type": (request.row or {}).get("impact_path_type"),
+            "impact_category": (request.row or {}).get("impact_category"),
+            "provider_coverage_status": request.provider_coverage_status,
+            "market_confirmation_score": (request.row or {}).get("market_confirmation_score"),
+            "score_components": (request.row or {}).get("score_components"),
+        },
+        pack=pack,
     )
     quality = event_evidence_quality.evaluate_evidence_quality(
         raw,
@@ -791,6 +808,8 @@ def _validate_raw_result(
         reject_reasons.append("catalyst_missing")
     if assessment.source_class in pack.context_only_sources:
         reject_reasons.append("source_context_only")
+    if plan_query.must_validate_asset and not bool(pack_eval.get("source_pack_impact_path_validating_source")):
+        reject_reasons.append("source_pack_missing_impact_path_validator")
     if quality.evidence_specificity in {
         event_evidence_quality.EvidenceSpecificity.GENERIC_CONTEXT.value,
         event_evidence_quality.EvidenceSpecificity.CATALYST_ONLY.value,
@@ -831,10 +850,21 @@ def _validate_raw_result(
         "source_class": assessment.source_class,
         "source_mission": assessment.source_mission,
         "provider_coverage_status": assessment.provider_coverage_status,
+        "source_coverage_gap_reason": assessment.source_coverage_gap_reason,
+        "evidence_absence_is_meaningful": assessment.evidence_absence_is_meaningful,
+        "source_can_prove": assessment.can_prove,
+        "source_cannot_prove": assessment.cannot_prove,
+        "source_useful_playbooks": assessment.useful_playbooks,
         "evidence_quality_score": quality.evidence_quality_score,
         "evidence_specificity": quality.evidence_specificity,
         "reason_codes": tuple(dict.fromkeys(reason_codes if accepted else reject_reasons)),
         "source_registry_reasons": assessment.reason_codes[:6],
+        "source_pack_context_only": bool(pack_eval.get("source_pack_context_only")),
+        "source_pack_impact_path_validating_source": bool(pack_eval.get("source_pack_impact_path_validating_source")),
+        "source_pack_validated_digest_sufficient": bool(pack_eval.get("source_pack_validated_digest_sufficient")),
+        "source_pack_watchlist_requirements_met": bool(pack_eval.get("source_pack_watchlist_requirements_met")),
+        "source_pack_high_priority_requirements_met": bool(pack_eval.get("source_pack_high_priority_requirements_met")),
+        "source_pack_missing_evidence": tuple(pack_eval.get("source_pack_missing_evidence") or ()),
         "query": plan_query.query,
         "provider_hint": plan_query.provider_hint,
         "purpose": plan_query.purpose,
@@ -991,6 +1021,23 @@ def _artifact_row(
     context: Mapping[str, Any],
     observed_at: str,
 ) -> dict[str, Any]:
+    query_metadata = tuple(query.to_metadata() for query in result.query_results)
+    query_execution_statuses = tuple(dict.fromkeys(
+        str(query.get("status") or "")
+        for query in query_metadata
+        if str(query.get("status") or "")
+    ))
+    provider_coverage_statuses = tuple(dict.fromkeys(
+        str(item.get("provider_coverage_status") or "")
+        for item in (*result.accepted_evidence, *result.rejected_evidence)
+        if str(item.get("provider_coverage_status") or "")
+    ))
+    coverage_gaps = tuple(dict.fromkeys(
+        failure
+        for query in result.query_results
+        for failure in query.provider_failures
+        if failure
+    ))
     return {
         "schema_version": SCHEMA_VERSION,
         "row_type": "event_evidence_acquisition",
@@ -1011,7 +1058,18 @@ def _artifact_row(
         "external_asset": result.external_asset,
         "source_pack": result.source_pack,
         "status": result.status,
-        "queries": tuple(query.to_metadata() for query in result.query_results),
+        "evidence_acquisition_attempted": True,
+        "evidence_acquisition_plan": {
+            "source_pack": result.source_pack,
+            "query_count": len(result.query_results),
+            "queries": query_metadata,
+            "research_only": True,
+        },
+        "evidence_acquisition_results": result.to_metadata()["evidence_acquisition_results"],
+        "query_execution_statuses": query_execution_statuses,
+        "provider_coverage_statuses": provider_coverage_statuses,
+        "provider_coverage_gaps": coverage_gaps,
+        "queries": query_metadata,
         "queries_executed": result.queries_executed,
         "providers_used": result.providers_used,
         "provider_failures": result.provider_failures,

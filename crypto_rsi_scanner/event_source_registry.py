@@ -25,6 +25,7 @@ class SourceClass(str, Enum):
     CRYPTO_NEWS = "crypto_news"
     BROAD_NEWS = "broad_news"
     PREDICTION_MARKET = "prediction_market"
+    MARKET_DATA = "market_data"
     MARKET_RECAP = "market_recap"
     DERIVATIVES_DATA = "derivatives_data"
     SUPPLY_DATA = "supply_data"
@@ -33,14 +34,20 @@ class SourceClass(str, Enum):
 
 
 class SourceMission(str, Enum):
+    EXTERNAL_CONTEXT = "external_context"
+    TOKEN_IDENTITY_VALIDATION = "token_identity_validation"
+    CATALYST_VALIDATION = "catalyst_validation"
+    IMPACT_PATH_VALIDATION = "impact_path_validation"
+    MARKET_CONFIRMATION = "market_confirmation"
+    DERIVATIVE_CONFIRMATION = "derivative_confirmation"
+    SUPPLY_CONFIRMATION = "supply_confirmation"
+    OFFICIAL_CONFIRMATION = "official_confirmation"
+    CONTRADICTION_OR_DENIAL_CHECK = "contradiction_or_denial_check"
+    # Compatibility values retained for older artifacts and tests.
     TOKEN_IDENTITY = "token_identity"
     CATALYST_CONFIRMATION = "catalyst_confirmation"
     EVENT_TIME_CONFIRMATION = "event_time_confirmation"
-    IMPACT_PATH_VALIDATION = "impact_path_validation"
-    MARKET_CONFIRMATION = "market_confirmation"
     DERIVATIVES_CONFIRMATION = "derivatives_confirmation"
-    SUPPLY_CONFIRMATION = "supply_confirmation"
-    EXTERNAL_CONTEXT = "external_context"
     SOURCE_NOISE_CONTROL = "source_noise_control"
 
 
@@ -65,6 +72,9 @@ class SourceDescriptor:
     can_validate_catalyst: bool = False
     can_validate_impact_path: bool = False
     can_validate_event_time: bool = False
+    can_prove: tuple[str, ...] = ()
+    cannot_prove: tuple[str, ...] = ()
+    useful_playbooks: tuple[str, ...] = ()
     reason_codes: tuple[str, ...] = ()
 
 
@@ -81,7 +91,11 @@ class SourceRegistryAssessment:
     can_validate_catalyst: bool = False
     can_validate_impact_path: bool = False
     can_validate_event_time: bool = False
+    can_prove: tuple[str, ...] = ()
+    cannot_prove: tuple[str, ...] = ()
+    useful_playbooks: tuple[str, ...] = ()
     evidence_absence_is_meaningful: bool = False
+    source_coverage_gap_reason: str | None = None
     quality_capped: bool = False
     cryptopanic_currency_tag_match: bool = False
     narrative_heat: bool = False
@@ -101,7 +115,11 @@ class SourceRegistryAssessment:
             "can_validate_catalyst": self.can_validate_catalyst,
             "can_validate_impact_path": self.can_validate_impact_path,
             "can_validate_event_time": self.can_validate_event_time,
+            "source_can_prove": self.can_prove,
+            "source_cannot_prove": self.cannot_prove,
+            "source_useful_playbooks": self.useful_playbooks,
             "evidence_absence_is_meaningful": self.evidence_absence_is_meaningful,
+            "source_coverage_gap_reason": self.source_coverage_gap_reason,
             "source_quality_capped": self.quality_capped,
             "cryptopanic_currency_tag_match": self.cryptopanic_currency_tag_match,
             "narrative_heat": self.narrative_heat,
@@ -116,6 +134,8 @@ class FeedHealth:
     source_domain: str
     source_class: str
     quality: str
+    feed_source_class: str = ""
+    feed_quality_score: float = 50.0
     last_success_at: str | None = None
     last_failure_at: str | None = None
     failure_type: str | None = None
@@ -127,6 +147,26 @@ class FeedHealth:
     cooldown_reason: str | None = None
     reason_codes: tuple[str, ...] = ()
 
+    def to_metadata(self) -> dict[str, Any]:
+        return {
+            "feed_url": self.feed_url,
+            "source_domain": self.source_domain,
+            "source_class": self.source_class,
+            "feed_source_class": self.feed_source_class or self.source_class,
+            "feed_quality": self.quality,
+            "feed_quality_score": self.feed_quality_score,
+            "last_success_at": self.last_success_at,
+            "last_failure_at": self.last_failure_at,
+            "failure_type": self.failure_type,
+            "rows_fetched": self.rows_fetched,
+            "rows_kept": self.rows_kept,
+            "rows_rejected": self.rows_rejected,
+            "failure_count": self.failure_count,
+            "quarantined": self.quarantined,
+            "cooldown_reason": self.cooldown_reason,
+            "reason_codes": self.reason_codes,
+        }
+
 
 _OFFICIAL_EXCHANGE_HINTS = ("binance", "bybit", "coinbase", "okx", "kucoin", "bitget", "kraken")
 _STRUCTURED_CALENDAR_HINTS = ("coinmarketcal", "coindar", "messari")
@@ -136,6 +176,39 @@ _SUPPLY_HINTS = ("etherscan", "arkham", "dune", "tokenomist")
 _CRYPTO_NEWS_HINTS = ("coindesk", "cointelegraph", "decrypt", "theblock", "blockworks", "cryptoslate")
 _SEO_HINTS = ("price prediction", "coupon", "invite code", "best crypto to buy", "sponsored")
 _MARKET_RECAP_HINTS = ("market recap", "daily recap", "weekly recap", "top gainers", "crypto prices today")
+_MARKET_DATA_HINTS = ("coingecko", "coinmarketcap", "ohlcv", "klines", "price snapshot", "market data")
+
+_PLAYBOOKS_BY_SOURCE_CLASS: dict[str, tuple[str, ...]] = {
+    SourceClass.OFFICIAL_PROJECT.value: (
+        "proxy_attention",
+        "direct_event",
+        "strategic_investment",
+        "security_or_regulatory_shock",
+    ),
+    SourceClass.OFFICIAL_EXCHANGE.value: ("listing_volatility", "perp_listing_squeeze", "direct_event"),
+    SourceClass.STRUCTURED_CALENDAR.value: ("fan_sports_proxy", "direct_event", "proxy_attention"),
+    SourceClass.STRUCTURED_UNLOCK.value: ("unlock_supply_pressure", "direct_event"),
+    SourceClass.CRYPTOPANIC_TAGGED.value: (
+        "proxy_attention",
+        "security_or_regulatory_shock",
+        "strategic_investment",
+        "market_anomaly",
+    ),
+    SourceClass.CRYPTO_NEWS.value: (
+        "proxy_attention",
+        "security_or_regulatory_shock",
+        "strategic_investment",
+        "market_anomaly",
+    ),
+    SourceClass.BROAD_NEWS.value: ("proxy_attention", "political_meme_proxy", "market_anomaly"),
+    SourceClass.PREDICTION_MARKET.value: ("proxy_attention", "political_meme_proxy", "fan_sports_proxy"),
+    SourceClass.MARKET_DATA.value: ("market_anomaly", "listing_volatility", "proxy_attention"),
+    SourceClass.DERIVATIVES_DATA.value: ("perp_listing_squeeze", "proxy_fade", "market_anomaly"),
+    SourceClass.SUPPLY_DATA.value: ("unlock_supply_pressure", "direct_event"),
+    SourceClass.MARKET_RECAP.value: ("source_noise_control", "market_anomaly"),
+    SourceClass.SEO_OR_AFFILIATE.value: ("source_noise_control",),
+    SourceClass.SOCIAL_OR_UNKNOWN.value: ("source_noise_control",),
+}
 
 
 def source_descriptor_for(
@@ -162,7 +235,7 @@ def source_descriptor_for(
             source_domain=domain,
             source_url=url,
             source_class=SourceClass.OFFICIAL_EXCHANGE.value,
-            default_mission=SourceMission.CATALYST_CONFIRMATION.value,
+            default_mission=SourceMission.OFFICIAL_CONFIRMATION.value,
             source_quality_prior=92.0,
             confidence_cap=95.0,
             can_validate_token_identity=True,
@@ -178,7 +251,7 @@ def source_descriptor_for(
             source_domain=domain,
             source_url=url,
             source_class=SourceClass.OFFICIAL_PROJECT.value,
-            default_mission=SourceMission.IMPACT_PATH_VALIDATION.value,
+            default_mission=SourceMission.OFFICIAL_CONFIRMATION.value,
             source_quality_prior=88.0,
             confidence_cap=95.0,
             can_validate_token_identity=True,
@@ -210,7 +283,7 @@ def source_descriptor_for(
             source_domain=domain,
             source_url=url,
             source_class=SourceClass.STRUCTURED_CALENDAR.value,
-            default_mission=SourceMission.CATALYST_CONFIRMATION.value,
+            default_mission=SourceMission.CATALYST_VALIDATION.value,
             source_quality_prior=84.0,
             confidence_cap=90.0,
             can_validate_token_identity=True,
@@ -226,7 +299,7 @@ def source_descriptor_for(
             source_domain=domain,
             source_url=url,
             source_class=SourceClass.DERIVATIVES_DATA.value,
-            default_mission=SourceMission.DERIVATIVES_CONFIRMATION.value,
+            default_mission=SourceMission.DERIVATIVE_CONFIRMATION.value,
             source_quality_prior=80.0,
             confidence_cap=90.0,
             can_validate_catalyst=False,
@@ -247,6 +320,29 @@ def source_descriptor_for(
             can_validate_impact_path=True,
             reason_codes=tuple(reasons),
         )
+    if any(hint in joined for hint in _MARKET_DATA_HINTS):
+        reasons.append("market_data_source")
+        return SourceDescriptor(
+            provider=provider_text or "unknown",
+            source_domain=domain,
+            source_url=url,
+            source_class=SourceClass.MARKET_DATA.value,
+            default_mission=SourceMission.MARKET_CONFIRMATION.value,
+            source_quality_prior=80.0,
+            confidence_cap=90.0,
+            can_validate_token_identity=True,
+            can_validate_catalyst=False,
+            can_validate_impact_path=False,
+            can_validate_event_time=False,
+            can_prove=(SourceMission.MARKET_CONFIRMATION.value, SourceMission.TOKEN_IDENTITY_VALIDATION.value),
+            cannot_prove=(
+                SourceMission.CATALYST_VALIDATION.value,
+                SourceMission.IMPACT_PATH_VALIDATION.value,
+                SourceMission.OFFICIAL_CONFIRMATION.value,
+            ),
+            useful_playbooks=_PLAYBOOKS_BY_SOURCE_CLASS[SourceClass.MARKET_DATA.value],
+            reason_codes=tuple(reasons),
+        )
     if "cryptopanic" in joined:
         tags = _currency_tags(payload)
         reasons.append("cryptopanic_tagged" if tags else "cryptopanic_untagged")
@@ -255,7 +351,7 @@ def source_descriptor_for(
             source_domain=domain,
             source_url=url,
             source_class=SourceClass.CRYPTOPANIC_TAGGED.value if tags else SourceClass.CRYPTO_NEWS.value,
-            default_mission=SourceMission.CATALYST_CONFIRMATION.value,
+            default_mission=SourceMission.CATALYST_VALIDATION.value,
             source_quality_prior=74.0 if tags else 62.0,
             confidence_cap=88.0 if tags else 78.0,
             can_validate_token_identity=bool(tags),
@@ -309,7 +405,7 @@ def source_descriptor_for(
             source_domain=domain,
             source_url=url,
             source_class=SourceClass.CRYPTO_NEWS.value,
-            default_mission=SourceMission.CATALYST_CONFIRMATION.value,
+            default_mission=SourceMission.CATALYST_VALIDATION.value,
             source_quality_prior=65.0,
             confidence_cap=80.0,
             can_validate_catalyst=True,
@@ -438,6 +534,13 @@ def assess_source(
     }
     if quality_capped:
         reasons.append("source_quality_capped")
+    can_prove, cannot_prove = _source_contract(
+        descriptor,
+        can_identity=can_identity,
+        can_catalyst=can_catalyst,
+        can_impact=can_impact,
+        can_time=can_time,
+    )
     return SourceRegistryAssessment(
         provider=descriptor.provider,
         source_domain=descriptor.source_domain,
@@ -450,7 +553,11 @@ def assess_source(
         can_validate_catalyst=can_catalyst,
         can_validate_impact_path=can_impact,
         can_validate_event_time=can_time,
+        can_prove=can_prove,
+        cannot_prove=cannot_prove,
+        useful_playbooks=descriptor.useful_playbooks or _PLAYBOOKS_BY_SOURCE_CLASS.get(descriptor.source_class, ()),
         evidence_absence_is_meaningful=absence,
+        source_coverage_gap_reason=coverage_gap_reason(descriptor.provider, status),
         quality_capped=quality_capped,
         cryptopanic_currency_tag_match=tag_match,
         narrative_heat="narrative_heat" in reasons,
@@ -477,6 +584,7 @@ def evidence_absence_is_meaningful(
         SourceClass.OFFICIAL_EXCHANGE.value,
         SourceClass.STRUCTURED_CALENDAR.value,
         SourceClass.STRUCTURED_UNLOCK.value,
+        SourceClass.MARKET_DATA.value,
         SourceClass.DERIVATIVES_DATA.value,
         SourceClass.SUPPLY_DATA.value,
     }
@@ -495,6 +603,39 @@ def coverage_gap_reason(provider: str | None, status: str | ProviderCoverageStat
     if value == ProviderCoverageStatus.COMPLETE.value:
         return None
     return f"provider_coverage_{value}:{provider or 'unknown'}"
+
+
+def _source_contract(
+    descriptor: SourceDescriptor,
+    *,
+    can_identity: bool,
+    can_catalyst: bool,
+    can_impact: bool,
+    can_time: bool,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    can = list(descriptor.can_prove)
+    cannot = list(descriptor.cannot_prove)
+    if descriptor.default_mission:
+        can.append(str(descriptor.default_mission))
+    if descriptor.source_class in {SourceClass.OFFICIAL_PROJECT.value, SourceClass.OFFICIAL_EXCHANGE.value}:
+        can.append(SourceMission.OFFICIAL_CONFIRMATION.value)
+    if can_identity:
+        can.append(SourceMission.TOKEN_IDENTITY_VALIDATION.value)
+    else:
+        cannot.append(SourceMission.TOKEN_IDENTITY_VALIDATION.value)
+    if can_catalyst:
+        can.append(SourceMission.CATALYST_VALIDATION.value)
+    else:
+        cannot.append(SourceMission.CATALYST_VALIDATION.value)
+    if can_impact:
+        can.append(SourceMission.IMPACT_PATH_VALIDATION.value)
+    else:
+        cannot.append(SourceMission.IMPACT_PATH_VALIDATION.value)
+    if can_time:
+        can.append(SourceMission.EVENT_TIME_CONFIRMATION.value)
+    else:
+        cannot.append(SourceMission.EVENT_TIME_CONFIRMATION.value)
+    return tuple(dict.fromkeys(can)), tuple(dict.fromkeys(cannot))
 
 
 def feed_health_from_fetch(
@@ -524,14 +665,20 @@ def feed_health_from_fetch(
         cooldown_reason = "repeated_feed_failure_cooldown"
         reasons.append("repeated_feed_failure_cooldown")
     quality = "high" if descriptor.source_class in {SourceClass.OFFICIAL_PROJECT.value, SourceClass.OFFICIAL_EXCHANGE.value} else "medium"
+    quality_score = descriptor.source_quality_prior
     if descriptor.source_class in {SourceClass.MARKET_RECAP.value, SourceClass.SEO_OR_AFFILIATE.value}:
         quality = "low"
+        quality_score = min(quality_score, 35.0)
         reasons.append("diagnostic_only_feed")
+    if quarantined:
+        quality_score = min(quality_score, 30.0)
     return FeedHealth(
         feed_url=feed_url,
         source_domain=domain,
         source_class=descriptor.source_class,
         quality=quality,
+        feed_source_class=descriptor.source_class,
+        feed_quality_score=round(max(0.0, min(100.0, quality_score)), 2),
         last_success_at=last_success_at,
         last_failure_at=last_failure_at,
         failure_type=failure_type,

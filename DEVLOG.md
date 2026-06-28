@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Harden Event Alpha source contracts and acquisition artifacts · Codex
+**Why:** The source registry and source-pack layer existed, but operator
+artifacts needed a sharper answer to “what does this source prove, what does it
+not prove, and is absence of evidence meaningful right now?”
+**Changes:**
+- Extended Source Registry v2 with `market_data`, v2 mission names,
+  `source_can_prove`, `source_cannot_prove`, useful playbooks, coverage-gap
+  reasons, and feed-level RSS quality/quarantine metadata.
+- Added explicit source-pack sufficiency criteria for validated digest,
+  watchlist, and high-priority review, plus a first-class
+  `protocol_business_event_pack`.
+- Evidence acquisition validation now carries source-pack context, pack
+  sufficiency booleans, source contract fields, coverage semantics, and
+  plan/results metadata into accepted/rejected samples and JSONL rows.
+- Live RSS provider records per-feed health, so a 403/quarantined feed no
+  longer makes the whole RSS provider look uniformly unusable.
+**Verify:** `python3 tests/test_indicators.py`; `make
+event-alpha-signal-quality-eval PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-market-refresh-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-quality-validation-cycle PYTHON=python3`; `make verify
+PYTHON=python3`.
+**Notes/risks:** Research-only evidence semantics and artifact completeness.
+No Telegram sends, paper/live rows, normal RSI writes, trading, or
+LLM/provider-created `TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Add canonical core opportunity read model · Codex
 **Why:** Core rows were authoritative in practice, but cards and audits still
 assembled their own partial artifact views. That left room for future drift
