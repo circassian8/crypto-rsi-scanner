@@ -28318,9 +28318,9 @@ def test_event_core_opportunity_store_derives_route_from_final_verdict():
             rows,
             cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
             run_id="run-core-route-normalized",
-            profile="live_burn_in_no_send",
-            run_mode="notification_burn_in",
-            artifact_namespace="live_burn_in_no_send",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
         )
         assert result.success
         loaded = event_core_opportunity_store.load_core_opportunities(path, latest_run=True)
@@ -28332,6 +28332,217 @@ def test_event_core_opportunity_store_derives_route_from_final_verdict():
     assert stored["canonical_route_adjustment_reason"] == "core_route_derived_from_opportunity_level:validated_digest"
     assert "final route derived from canonical opportunity level" in stored["final_verdict_reason"]
     assert "local-only" not in stored["final_verdict_reason"]
+
+
+def test_live_core_confirmation_caps_unconfirmed_digest_candidates():
+    from crypto_rsi_scanner import event_alpha_router, event_core_opportunity_store, event_watchlist
+
+    rows = [
+        {
+            "row_type": "event_impact_hypothesis",
+            "hypothesis_id": "hyp-eth-skipped-budget",
+            "incident_id": "incident-eth-strategic",
+            "symbol": "ETH",
+            "coin_id": "ethereum",
+            "validated_symbol": "ETH",
+            "validated_coin_id": "ethereum",
+            "candidate_role": "direct_beneficiary",
+            "impact_path_type": "strategic_investment",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 74,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "source_class": "crypto_news",
+            "evidence_specificity": "direct_token_mechanism",
+            "evidence_quality_score": 80,
+            "market_confirmation_score": 20,
+            "market_context_freshness_status": "missing",
+            "evidence_acquisition_status": "skipped_budget",
+            "source_pack": "strategic_investment_pack",
+        },
+        {
+            "row_type": "event_impact_hypothesis",
+            "hypothesis_id": "hyp-tao-rejected-only",
+            "incident_id": "incident-tao-strategic",
+            "symbol": "TAO",
+            "coin_id": "bittensor",
+            "candidate_role": "direct_beneficiary",
+            "impact_path_type": "strategic_investment",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 72,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "source_class": "crypto_news",
+            "evidence_specificity": "direct_token_mechanism",
+            "evidence_quality_score": 78,
+            "evidence_acquisition_status": "rejected_results_only",
+            "evidence_acquisition_rejected_count": 2,
+            "source_pack": "strategic_investment_pack",
+        },
+        {
+            "row_type": "event_impact_hypothesis",
+            "hypothesis_id": "hyp-sector-sports",
+            "incident_id": "incident-sector-sports",
+            "symbol": "SECTOR",
+            "coin_id": "sports_fan_proxy",
+            "candidate_role": "sector_hypothesis",
+            "impact_path_type": "sports_fan_proxy",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 70,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "source_class": "structured_calendar",
+            "evidence_specificity": "event_time_only",
+            "evidence_quality_score": 78,
+            "evidence_acquisition_status": "no_results",
+            "source_pack": "fan_sports_pack",
+        },
+    ]
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-live-confirmation-caps",
+            profile="live_burn_in_no_send",
+            run_mode="notification_burn_in",
+            artifact_namespace="live_burn_in_no_send",
+        )
+        stored = event_core_opportunity_store.load_core_opportunities(path, latest_run=True).rows
+    by_symbol = {row["symbol"]: row for row in stored}
+    assert by_symbol["ETH"]["final_opportunity_level"] == "exploratory"
+    assert by_symbol["ETH"]["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.STORE_ONLY.value
+    assert by_symbol["ETH"]["acquisition_confirmation_status"] == "unresolved"
+    assert by_symbol["ETH"]["live_confirmation_reason"] == "skipped_budget_not_confirmation"
+    assert by_symbol["TAO"]["final_opportunity_level"] == "exploratory"
+    assert by_symbol["TAO"]["acquisition_confirmation_status"] == "does_not_confirm"
+    assert by_symbol["TAO"]["live_confirmation_reason"] == "rejected_results_only_not_confirmation"
+    assert by_symbol["SECTOR"]["final_opportunity_level"] == "local_only"
+    assert by_symbol["SECTOR"]["live_confirmation_reason"] == "sector_only_digest_not_allowed"
+    assert all(row["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.STORE_ONLY.value for row in stored)
+
+
+def test_live_core_confirmation_allows_accepted_and_official_evidence():
+    from crypto_rsi_scanner import event_alpha_router, event_core_opportunity_store, event_watchlist
+
+    rows = [
+        {
+            "row_type": "event_impact_hypothesis",
+            "hypothesis_id": "hyp-velvet-accepted",
+            "incident_id": "incident-spacex",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "candidate_role": "proxy_venue",
+            "impact_path_type": "venue_value_capture",
+            "opportunity_level": "high_priority",
+            "opportunity_score_final": 91,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+            "source_class": "cryptopanic_tagged",
+            "evidence_specificity": "direct_token_mechanism",
+            "evidence_quality_score": 91,
+            "market_confirmation_score": 88,
+            "market_context_freshness_status": "fresh",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "evidence_acquisition_accepted_count": 1,
+            "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+            "source_pack": "proxy_preipo_rwa_pack",
+        },
+        {
+            "row_type": "event_impact_hypothesis",
+            "hypothesis_id": "hyp-listing-official",
+            "incident_id": "incident-listing",
+            "symbol": "LIST",
+            "coin_id": "listing-token",
+            "candidate_role": "direct_beneficiary",
+            "impact_path_type": "listing_liquidity_event",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 72,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+            "source_class": "official_exchange",
+            "evidence_specificity": "official_direct_event",
+            "evidence_quality_score": 82,
+            "evidence_acquisition_status": "no_results",
+            "source_pack": "listing_liquidity_pack",
+        },
+    ]
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-live-confirmation-accepted",
+            profile="live_burn_in_no_send",
+            run_mode="notification_burn_in",
+            artifact_namespace="live_burn_in_no_send",
+        )
+        stored = event_core_opportunity_store.load_core_opportunities(path, latest_run=True).rows
+    by_symbol = {row["symbol"]: row for row in stored}
+    assert by_symbol["VELVET"]["final_opportunity_level"] == "high_priority"
+    assert by_symbol["VELVET"]["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+    assert by_symbol["VELVET"]["live_confirmation_passed"] is True
+    assert by_symbol["VELVET"]["acquisition_confirmation_status"] == "confirms"
+    assert by_symbol["LIST"]["final_opportunity_level"] == "validated_digest"
+    assert by_symbol["LIST"]["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
+    assert by_symbol["LIST"]["live_confirmation_reason"] == "official_or_structured_source_confirmation"
+
+
+def test_live_confirmation_gated_rows_surface_in_reports():
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_alpha_quality_review, event_alpha_router, event_core_opportunity_store, event_watchlist
+
+    row = {
+        "row_type": "event_impact_hypothesis",
+        "hypothesis_id": "hyp-doge-skipped-budget",
+        "incident_id": "incident-doge-strategic",
+        "symbol": "DOGE",
+        "coin_id": "dogecoin",
+        "candidate_role": "direct_beneficiary",
+        "impact_path_type": "strategic_investment",
+        "opportunity_level": "validated_digest",
+        "opportunity_score_final": 73,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+        "source_class": "crypto_news",
+        "evidence_specificity": "direct_token_mechanism",
+        "evidence_quality_score": 78,
+        "market_confirmation_score": 10,
+        "market_context_freshness_status": "missing",
+        "evidence_acquisition_status": "skipped_budget",
+        "source_pack": "strategic_investment_pack",
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            [row],
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-live-confirmation-report",
+            profile="live_burn_in_no_send",
+            run_mode="notification_burn_in",
+            artifact_namespace="live_burn_in_no_send",
+        )
+        stored = event_core_opportunity_store.load_core_opportunities(path, latest_run=True).rows
+    brief = event_alpha_daily_brief.build_daily_brief(
+        core_opportunity_rows=stored,
+        requested_profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        include_test_artifacts=True,
+    )
+    assert "## Live Confirmation Gated Candidates" in brief
+    assert "DOGE/dogecoin" in brief
+    assert "skipped_budget_not_confirmation" in brief
+    digest_section = brief.split("## Validated Digest Core Opportunities", 1)[1].split("## Watchlist Core Opportunities", 1)[0]
+    assert "DOGE/dogecoin" not in digest_section
+
+    review = event_alpha_quality_review.format_quality_review(
+        event_alpha_quality_review.build_quality_review(
+            profile="live_burn_in_no_send",
+            core_opportunity_rows=stored,
+        )
+    )
+    assert "live_confirmation_gates:" in review
+    assert "skipped_budget_capped=1" in review
+    assert "Live Confirmation Gated Candidates:" in review
 
 
 def test_core_evidence_acquisition_view_aggregates_canonical_rows():
@@ -28627,6 +28838,55 @@ def test_event_alpha_artifact_doctor_blocks_core_route_verdict_conflict():
     assert doctor.core_route_conflicts_with_opportunity_level == 1
     assert doctor.status == "BLOCKED"
     assert any("core_route_conflicts_with_opportunity_level=1" in item for item in doctor.blockers)
+
+
+def test_event_alpha_artifact_doctor_blocks_live_promoted_without_confirmation():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+
+    conflict = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-live-unconfirmed",
+        "profile": "live_burn_in_no_send",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "live_burn_in_no_send",
+        "core_opportunity_id": "core_live_unconfirmed",
+        "symbol": "TAO",
+        "coin_id": "bittensor",
+        "candidate_role": "direct_beneficiary",
+        "primary_impact_path": "strategic_investment",
+        "impact_path_type": "strategic_investment",
+        "evidence_specificity": "direct_token_mechanism",
+        "source_class": "crypto_news",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_level": "validated_digest",
+        "final_opportunity_score": 72,
+        "opportunity_score_final": 72,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "route": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+        "evidence_acquisition_status": "rejected_results_only",
+        "evidence_acquisition_rejected_count": 2,
+        "live_confirmation_required": True,
+        "live_confirmation_passed": False,
+    }
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{
+            "run_id": "run-live-unconfirmed",
+            "profile": "live_burn_in_no_send",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "live_burn_in_no_send",
+            "success": True,
+        }],
+        core_opportunity_rows=[conflict],
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        strict=True,
+    )
+    assert doctor.live_validated_without_confirmation == 1
+    assert doctor.live_rejected_results_promoted == 1
+    assert doctor.status == "BLOCKED"
+    assert any("live_validated_without_confirmation=1" in item for item in doctor.blockers)
 
 
 def test_event_alpha_artifact_doctor_accepts_quality_blocked_local_card_group():

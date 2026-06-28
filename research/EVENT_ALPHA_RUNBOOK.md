@@ -65,6 +65,19 @@ duplicate suppression, or `TRIGGERED_FADE` route applies. Strict artifact doctor
 reports `core_route_conflicts_with_opportunity_level`; treat a nonzero value as
 a fresh artifact blocker before reviewing daily briefs, cards, or feedback
 queues.
+Live-style profiles add one more promotion gate. A canonical core opportunity
+may stay `validated_digest`, `watchlist`, or `high_priority` only when at least
+one live confirmation source exists: accepted source-pack acquisition evidence,
+official/structured evidence, matching CryptoPanic token/catalyst evidence,
+strong direct source evidence, or fresh non-generic market confirmation.
+`skipped_budget`, `no_results`, `rejected_results_only`,
+provider-unavailable/backoff, broad-news context, and prediction-market-only
+context do not confirm the candidate by themselves. Sector-only rows such as
+`SECTOR/sports_fan_proxy` remain exploratory/local by default unless
+`RSI_EVENT_ALPHA_ALLOW_SECTOR_DIGEST=1` is explicitly enabled for a debug or
+future reviewed workflow. Daily briefs show these rows under `Live Confirmation
+Gated Candidates`, quality review reports `live_confirmation_gates`, and strict
+artifact doctor blocks fresh live promoted rows without confirmation.
 Source-pack acquisition display follows the same rule: use the canonical
 core acquisition view for accepted/rejected counts, reason codes, samples,
 source pack, provider failures, and before/after verdicts. If a support row

@@ -74,6 +74,7 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
         "snapshot_quality_classifications: " + _format_counts(_counts(rows, "_snapshot_quality_classification")),
         "watchlist_state_quality: " + _format_counts(_counts(rows, "state_quality_classification")),
         "candidate_discovery_funnel: " + _format_counts(result.candidate_discovery_funnel),
+        "live_confirmation_gates: " + _format_counts(_live_confirmation_counts(section_rows)),
         f"operator_view: canonical_core_rows={len([row for row in rows if _is_core_review_row(row)])} support_or_diagnostic_rows={len(diagnostic_rows)}",
         "quality_note: unknown/insufficient_data rows are conservative local-only verdicts or legacy rows, not hidden promotions.",
         "",
@@ -100,6 +101,8 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
     lines.extend(_quality_gate_conflict_lines(rows, limit=8))
     lines.extend(["", "Quality-Capped Watchlist Rows:"])
     lines.extend(_quality_capped_state_lines(rows, limit=8))
+    lines.extend(["", "Live Confirmation Gated Candidates:"])
+    lines.extend(_live_confirmation_gated_lines(section_rows, limit=8))
     lines.extend(["", "Market Freshness Readiness:"])
     lines.extend(_market_freshness_readiness_lines(section_rows, limit=8))
     lines.extend(["", "Top upgrade candidates:"])
@@ -547,6 +550,54 @@ def _quality_capped_state_lines(rows: list[dict[str, Any]], *, limit: int) -> li
         )
     if len(capped) > limit:
         out.append(f"- +{len(capped) - limit} more quality-capped rows")
+    return out
+
+
+def _live_confirmation_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    out = {
+        "live_confirmation_missing": 0,
+        "rejected_only_capped": 0,
+        "skipped_budget_capped": 0,
+        "no_results_capped": 0,
+        "sector_only_capped": 0,
+    }
+    for row in rows:
+        if not _truthy(row.get("live_confirmation_capped")):
+            continue
+        out["live_confirmation_missing"] += 1
+        status = str(row.get("evidence_acquisition_status") or "").strip()
+        reason = str(row.get("live_confirmation_reason") or "").strip()
+        if status == "rejected_results_only" or reason == "rejected_results_only_not_confirmation":
+            out["rejected_only_capped"] += 1
+        if status == "skipped_budget" or reason == "skipped_budget_not_confirmation":
+            out["skipped_budget_capped"] += 1
+        if status == "no_results" or reason == "no_results_not_confirmation":
+            out["no_results_capped"] += 1
+        if reason == "sector_only_digest_not_allowed" or str(row.get("symbol") or "").upper() == "SECTOR":
+            out["sector_only_capped"] += 1
+    return out
+
+
+def _live_confirmation_gated_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
+    gated = [row for row in rows if _truthy(row.get("live_confirmation_capped"))]
+    if not gated:
+        return ["- none"]
+    out: list[str] = []
+    for row in gated[:limit]:
+        missing = row.get("live_confirmation_missing_requirements")
+        if not isinstance(missing, list):
+            missing = []
+        out.append(
+            f"- {_label(row)}: requested={row.get('requested_opportunity_level_before_live_confirmation') or 'unknown'} "
+            f"final={row.get('final_opportunity_level') or row.get('opportunity_level') or 'unknown'} "
+            f"acquisition={row.get('evidence_acquisition_status') or 'unknown'} "
+            f"confirmation={row.get('acquisition_confirmation_status') or 'unknown'} "
+            f"reason={row.get('live_confirmation_reason') or 'live_confirmation_missing'}"
+        )
+        if missing:
+            out.append("  missing: " + "; ".join(str(value) for value in missing[:3]))
+    if len(gated) > limit:
+        out.append(f"- +{len(gated) - limit} more live-confirmation gated rows")
     return out
 
 

@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Live-style digest promotion requires confirmation
+**Status:** accepted
+**Decision:** In live/no-send/research-send Event Alpha profiles,
+`validated_digest`, `watchlist`, and `high_priority` core opportunities require
+real confirmation beyond the score: accepted source-pack evidence,
+official/structured source evidence, matching CryptoPanic token/catalyst
+evidence, strong direct source evidence, or fresh non-generic market
+confirmation. `skipped_budget`, `no_results`, `rejected_results_only`, provider
+backoff/unavailable, and broad/prediction-market context do not confirm a
+candidate by themselves. Sector-only rows stay exploratory/local by default
+unless `RSI_EVENT_ALPHA_ALLOW_SECTOR_DIGEST=1` is explicitly set.
+**Why:** Live burn-in artifacts should not promote weak article/co-occurrence
+rows simply because the score model reached digest threshold while acquisition
+coverage was missing or negative. Digest promotion should mean the candidate
+has some source, acquisition, or market evidence that actually confirms the
+token/catalyst/impact path.
+**Revisit when:** A reviewed burn-in sample shows that specific source packs or
+sector-only briefs are useful enough to promote under a documented, separate
+policy.
+
 ## 2026-06-28 - Canonical core route follows final opportunity verdict
 **Status:** accepted
 **Decision:** Canonical CoreOpportunity rows must persist final route/tier fields

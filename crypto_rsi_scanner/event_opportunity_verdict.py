@@ -40,6 +40,26 @@ class OpportunityUpgradePath:
 
 
 @dataclass(frozen=True)
+class AcquisitionConfirmation:
+    confirms_candidate: bool
+    confirms_impact_path: bool
+    status: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class LiveConfirmationVerdict:
+    required: bool
+    confirmed: bool
+    status: str
+    reason: str | None
+    capped_level: str | None = None
+    capped_score: float | None = None
+    missing_requirements: tuple[str, ...] = ()
+    manual_verification_items: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class VerdictAwareUpgradeDowngradeText:
     upgrade_text: str
     downgrade_text: str
@@ -291,6 +311,132 @@ def evaluate_opportunity(
         why_not_watchlist=why_not_watchlist,
         components=final_components,
     )
+
+
+def live_confirmation_required(
+    *,
+    profile: str | None = None,
+    run_mode: str | None = None,
+    artifact_namespace: str | None = None,
+) -> bool:
+    """Return true when promoted research opportunities need live confirmation.
+
+    Fixture/test/replay profiles are intentionally exempt so offline evals can
+    prove deterministic behavior. Live-style burn-in/no-send/research-send
+    profiles require independent source, acquisition, or fresh-market support
+    before a scored row may remain validated digest or above.
+    """
+    profile_text = str(profile or "").strip().casefold()
+    mode_text = str(run_mode or "").strip().casefold()
+    namespace_text = str(artifact_namespace or "").strip().casefold()
+    fixture_profiles = {
+        "fixture",
+        "quality_validation",
+        "catalyst_frame_validation",
+        "catalyst_frame_e2e",
+        "notify_llm_quality_frame",
+        "market_refresh_smoke",
+        "evidence_acquisition_smoke",
+    }
+    if profile_text in fixture_profiles or mode_text in {"test", "fixture", "replay"}:
+        return False
+    live_markers = (
+        "live",
+        "notify",
+        "research_send",
+        "burn_in",
+        "no_send",
+        "operational",
+    )
+    return (
+        mode_text in {"notification_burn_in", "burn_in", "operational"}
+        or any(marker in profile_text for marker in live_markers)
+        or any(marker in namespace_text for marker in live_markers)
+    )
+
+
+def classify_acquisition_confirmation(row: Mapping[str, Any] | None) -> AcquisitionConfirmation:
+    """Classify whether acquisition evidence confirms a live candidate."""
+    data = dict(row or {})
+    nested = data.get("evidence_acquisition_results")
+    if not isinstance(nested, Mapping):
+        nested = {}
+    status = str(
+        data.get("evidence_acquisition_status")
+        or data.get("acquisition_status")
+        or data.get("source_acquisition_status")
+        or nested.get("status")
+        or data.get("acquisition_evidence_status")
+        or ""
+    ).strip()
+    accepted_count = _count_value(
+        data.get("evidence_acquisition_accepted_count"),
+        data.get("accepted_evidence_count"),
+        nested.get("accepted"),
+        data.get("accepted_evidence"),
+        data.get("evidence_acquisition_accepted_evidence"),
+    )
+    rejected_count = _count_value(
+        data.get("evidence_acquisition_rejected_count"),
+        data.get("rejected_evidence_count"),
+        nested.get("rejected"),
+        data.get("rejected_evidence"),
+        data.get("rejected_evidence_samples"),
+        data.get("evidence_acquisition_rejected_samples"),
+    )
+    if accepted_count > 0 or status == "accepted_evidence_found":
+        return AcquisitionConfirmation(True, True, "confirms", "accepted_evidence_found")
+    if status == "rejected_results_only" or rejected_count > 0:
+        return AcquisitionConfirmation(False, False, "does_not_confirm", "rejected_results_only_not_confirmation")
+    if status == "no_results":
+        return AcquisitionConfirmation(False, False, "does_not_confirm", "no_results_not_confirmation")
+    if status == "skipped_budget":
+        return AcquisitionConfirmation(False, False, "unresolved", "skipped_budget_not_confirmation")
+    if status in {"provider_unavailable", "provider_backoff", "skipped_config", "not_configured", "failed_soft"}:
+        return AcquisitionConfirmation(False, False, "coverage_gap", f"{status}_not_confirmation")
+    if status in {"planned", "not_executed", ""}:
+        return AcquisitionConfirmation(False, False, "coverage_gap", "evidence_acquisition_not_executed")
+    return AcquisitionConfirmation(False, False, "unresolved", "evidence_acquisition_not_confirming")
+
+
+def apply_live_confirmation_policy(
+    row: Mapping[str, Any],
+    *,
+    profile: str | None = None,
+    run_mode: str | None = None,
+    artifact_namespace: str | None = None,
+    allow_sector_digest: bool = False,
+) -> LiveConfirmationVerdict:
+    """Return a live/no-send promotion cap for one canonical opportunity row.
+
+    The LLM/provider layer never creates trades or event-fade triggers; this
+    policy only decides whether a research artifact may stay validated digest or
+    above in live-style profiles.
+    """
+    data = dict(row)
+    required = live_confirmation_required(
+        profile=profile or data.get("profile"),
+        run_mode=run_mode or data.get("run_mode"),
+        artifact_namespace=artifact_namespace or data.get("artifact_namespace"),
+    )
+    level = str(data.get("final_opportunity_level") or data.get("opportunity_level") or "").strip()
+    if not required or level not in {
+        OpportunityLevel.VALIDATED_DIGEST.value,
+        OpportunityLevel.WATCHLIST.value,
+        OpportunityLevel.HIGH_PRIORITY.value,
+    }:
+        return LiveConfirmationVerdict(required=required, confirmed=True, status="not_required", reason=None)
+    acquisition = classify_acquisition_confirmation(data)
+    if _is_sector_only_row(data) and not allow_sector_digest:
+        return _live_cap(data, "sector_only_digest_not_allowed", acquisition)
+    if acquisition.confirms_candidate and acquisition.confirms_impact_path:
+        return LiveConfirmationVerdict(required=True, confirmed=True, status="confirmed", reason="accepted_evidence_found")
+    confirmation_reason = _strong_live_confirmation_reason(data)
+    if confirmation_reason:
+        return LiveConfirmationVerdict(required=True, confirmed=True, status="confirmed", reason=confirmation_reason)
+    if _broad_context_only(data):
+        return _live_cap(data, "broad_or_prediction_market_context_not_confirmation", acquisition)
+    return _live_cap(data, acquisition.reason or "live_confirmation_missing", acquisition)
 
 
 def _verdict(
@@ -591,3 +737,180 @@ def _score(*values: object) -> float:
             number *= 100.0
         return max(0.0, min(100.0, number))
     return 0.0
+
+
+def _live_cap(
+    data: Mapping[str, Any],
+    reason: str,
+    acquisition: AcquisitionConfirmation,
+) -> LiveConfirmationVerdict:
+    current_score = _score(data.get("final_opportunity_score"), data.get("opportunity_score_final"))
+    sector = _is_sector_only_row(data)
+    generic = str(data.get("impact_path_type") or data.get("primary_impact_path") or "").strip() in {
+        "",
+        "unknown",
+        "insufficient_data",
+        "generic_cooccurrence_only",
+        "macro_attention_only",
+        "technology_risk",
+        "market_structure_policy",
+    }
+    if sector or generic or current_score < 45:
+        level = OpportunityLevel.LOCAL_ONLY.value
+        score_cap = 44.0
+    else:
+        level = OpportunityLevel.EXPLORATORY.value
+        score_cap = 64.0
+    missing = (
+        reason,
+        "accepted_source_pack_evidence_or_fresh_market_confirmation",
+    )
+    verify = (
+        "find accepted source-pack evidence, official/structured evidence, or fresh market confirmation before digest promotion",
+    )
+    if acquisition.status == "coverage_gap":
+        verify = (
+            "resolve source-pack coverage before treating this live candidate as validated",
+        )
+    return LiveConfirmationVerdict(
+        required=True,
+        confirmed=False,
+        status="missing",
+        reason=reason,
+        capped_level=level,
+        capped_score=min(current_score or score_cap, score_cap),
+        missing_requirements=missing,
+        manual_verification_items=verify,
+    )
+
+
+def _strong_live_confirmation_reason(data: Mapping[str, Any]) -> str | None:
+    source_class = str(data.get("source_class") or "").strip()
+    source_classes = {
+        source_class,
+        *(
+            str(value)
+            for value in _as_values(data.get("source_classes"))
+            if str(value or "").strip()
+        ),
+    }
+    evidence_score = _score(data.get("evidence_quality_score"), data.get("post_refresh_evidence_quality_score"))
+    market_score = _score(data.get("market_confirmation_score"), data.get("market_confirmation_after"))
+    market_level = str(data.get("market_confirmation_level") or "").strip()
+    freshness = str(data.get("market_context_freshness_status") or data.get("market_data_freshness") or "").strip()
+    impact_path = str(data.get("impact_path_type") or data.get("primary_impact_path") or "").strip()
+    impact_strength = str(data.get("impact_path_strength") or "").strip()
+    reason_codes = {
+        str(value)
+        for value in (
+            *_as_values(data.get("accepted_evidence_reason_codes")),
+            *_as_values(data.get("source_registry_reasons")),
+            *_as_values(data.get("reason_codes")),
+        )
+        if str(value or "").strip()
+    }
+    official_or_structured = {
+        "official_project",
+        "official_exchange",
+        "structured_calendar",
+        "structured_unlock",
+    }
+    if source_classes.intersection(official_or_structured) and evidence_score >= 65:
+        return "official_or_structured_source_confirmation"
+    if "cryptopanic_tagged" in source_classes or "cryptopanic_currency_tag_match" in reason_codes:
+        return "cryptopanic_tagged_token_catalyst_confirmation"
+    if (
+        market_score >= 75
+        and (market_level in {"strong", "confirmed"} or market_score >= 85)
+        and freshness in {"fresh", "fixture_allowed_stale"}
+        and _non_generic_impact_path(impact_path, impact_strength)
+    ):
+        return "fresh_market_confirmation"
+    if (
+        evidence_score >= 85
+        and source_class not in {"", "broad_news", "prediction_market", "seo_or_affiliate", "social_or_unknown", "insufficient_data"}
+        and _non_generic_impact_path(impact_path, impact_strength)
+    ):
+        return "strong_direct_original_source_evidence"
+    if (
+        impact_path in {"direct_token_event", "listing_liquidity_event", "unlock_supply_event", "exploit_security_event"}
+        and source_class not in {"", "broad_news", "prediction_market", "seo_or_affiliate", "social_or_unknown", "insufficient_data"}
+        and evidence_score >= 70
+    ):
+        return "explicit_deterministic_direct_event_source"
+    return None
+
+
+def _non_generic_impact_path(path: str, strength: str) -> bool:
+    if strength in {"strong", "medium"} and path not in {"", "unknown", "insufficient_data"}:
+        return True
+    return path not in {
+        "",
+        "unknown",
+        "insufficient_data",
+        "generic_cooccurrence_only",
+        "macro_attention_only",
+        "technology_risk",
+        "market_structure_policy",
+    }
+
+
+def _is_sector_only_row(data: Mapping[str, Any]) -> bool:
+    symbol = str(data.get("symbol") or data.get("validated_symbol") or "").strip().upper()
+    coin_id = str(data.get("coin_id") or data.get("validated_coin_id") or "").strip().casefold()
+    if symbol == "SECTOR":
+        return True
+    return coin_id in {
+        "sports_fan_proxy",
+        "political_meme_proxy",
+        "ai_ipo_proxy",
+        "rwa_preipo_proxy",
+        "market_anomaly",
+        "sector",
+    }
+
+
+def _broad_context_only(data: Mapping[str, Any]) -> bool:
+    source_class = str(data.get("source_class") or "").strip()
+    if source_class not in {"prediction_market", "broad_news"}:
+        return False
+    acquisition = classify_acquisition_confirmation(data)
+    if acquisition.confirms_candidate:
+        return False
+    impact_path = str(data.get("impact_path_type") or data.get("primary_impact_path") or "").strip()
+    specificity = str(data.get("evidence_specificity") or "").strip()
+    direct_mechanism = specificity in {"direct_token_mechanism", "official_direct_event", "specific"}
+    return not (direct_mechanism and _non_generic_impact_path(impact_path, str(data.get("impact_path_strength") or "")))
+
+
+def _count_value(*values: object) -> int:
+    for value in values:
+        if value in (None, "", (), [], {}):
+            continue
+        if isinstance(value, Mapping):
+            return len(value)
+        if isinstance(value, str):
+            try:
+                return int(value)
+            except ValueError:
+                return 1
+        try:
+            if isinstance(value, (list, tuple, set)):
+                return len(value)
+            return int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def _as_values(value: object) -> tuple[object, ...]:
+    if value in (None, "", [], {}, ()):
+        return ()
+    if isinstance(value, Mapping):
+        return tuple(value.values())
+    if isinstance(value, str):
+        return (value,)
+    try:
+        return tuple(value)  # type: ignore[arg-type]
+    except TypeError:
+        return (value,)

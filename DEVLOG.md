@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Require live confirmation for Event Alpha digest promotion · Codex
+**Why:** Fresh `live_burn_in_no_send` artifacts still promoted weak
+`validated_digest` candidates when source-pack evidence acquisition was skipped,
+found no results, or found only rejected evidence. Live-style burn-in needs real
+confirmation before digest/watchlist/high-priority rows are operator-visible as
+promoted opportunities.
+**Changes:**
+- Added profile-aware live confirmation policy for canonical core writes:
+  live/no-send/research-send style profiles cap digest-or-higher rows unless
+  they have accepted source-pack evidence, official/structured source evidence,
+  matching CryptoPanic token/catalyst evidence, strong direct source evidence,
+  or fresh non-generic market confirmation.
+- Evidence acquisition statuses now persist confirmation semantics:
+  `confirms`, `does_not_confirm`, `unresolved`, or `coverage_gap`, with
+  `acquisition_confirms_candidate` and `acquisition_confirms_impact_path`.
+- Sector-only rows are capped below digest by default via
+  `RSI_EVENT_ALPHA_ALLOW_SECTOR_DIGEST=0`.
+- Daily brief and quality review now show live-confirmation-gated candidates and
+  counts for rejected-only, skipped-budget, no-results, and sector caps.
+- Artifact doctor strict mode now blocks live promoted core rows without
+  confirmation via live confirmation counters.
+- Added regression tests for skipped-budget, rejected-only, sector-only,
+  accepted CryptoPanic evidence, official exchange evidence, report visibility,
+  and doctor blockers.
+**Verify:** `python3 tests/test_indicators.py` passed (526/526).
+**Notes/risks:** Research-artifact gating only. No Telegram sends, paper
+trades, normal RSI rows, live DB writes, execution paths, or non-event-fade
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Repair canonical core route truth · Codex
 **Why:** A fresh live-style no-send audit found five canonical
 CoreOpportunity rows whose final opportunity verdict was `validated_digest`

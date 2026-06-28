@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_research_cards, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_opportunity_verdict, event_research_cards, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 
@@ -55,6 +55,10 @@ class EventAlphaArtifactDoctorResult:
     upgrade_candidates_include_high_priority: int = 0
     daily_brief_card_group_mismatch_with_index: int = 0
     core_route_conflicts_with_opportunity_level: int = 0
+    live_validated_without_confirmation: int = 0
+    live_sector_digest_without_asset: int = 0
+    live_rejected_results_promoted: int = 0
+    live_skipped_budget_promoted: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -409,6 +413,7 @@ def diagnose_artifacts(
     market_freshness_contradictions = sum(1 for row in core_rows if _core_row_has_market_freshness_contradiction(row))
     promoted_core_in_weak = _promoted_core_rows_that_are_weak(core_rows)
     core_route_conflicts = _core_route_conflicts_with_opportunity_level(core_rows)
+    live_confirmation_conflicts = _live_confirmation_conflicts(core_rows, profile=profile, artifact_namespace=artifact_namespace)
     upgrade_high_priority = 0
     fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
     fresh_visible_missing_targets = sum(
@@ -489,6 +494,30 @@ def diagnose_artifacts(
         (blockers if strict and core_store_available else warnings).append(message)
     if core_route_conflicts:
         message = f"core_route_conflicts_with_opportunity_level={core_route_conflicts}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if live_confirmation_conflicts["live_validated_without_confirmation"]:
+        message = (
+            "live_validated_without_confirmation="
+            f"{live_confirmation_conflicts['live_validated_without_confirmation']}"
+        )
+        (blockers if strict and core_store_available else warnings).append(message)
+    if live_confirmation_conflicts["live_sector_digest_without_asset"]:
+        message = (
+            "live_sector_digest_without_asset="
+            f"{live_confirmation_conflicts['live_sector_digest_without_asset']}"
+        )
+        (blockers if strict and core_store_available else warnings).append(message)
+    if live_confirmation_conflicts["live_rejected_results_promoted"]:
+        message = (
+            "live_rejected_results_promoted="
+            f"{live_confirmation_conflicts['live_rejected_results_promoted']}"
+        )
+        (blockers if strict and core_store_available else warnings).append(message)
+    if live_confirmation_conflicts["live_skipped_budget_promoted"]:
+        message = (
+            "live_skipped_budget_promoted="
+            f"{live_confirmation_conflicts['live_skipped_budget_promoted']}"
+        )
         (blockers if strict and core_store_available else warnings).append(message)
     if visible_missing_targets:
         message = f"visible_core_opportunities_missing_feedback_targets={visible_missing_targets}"
@@ -672,6 +701,10 @@ def diagnose_artifacts(
         upgrade_candidates_include_high_priority=upgrade_high_priority,
         daily_brief_card_group_mismatch_with_index=card_group_mismatches,
         core_route_conflicts_with_opportunity_level=core_route_conflicts,
+        live_validated_without_confirmation=live_confirmation_conflicts["live_validated_without_confirmation"],
+        live_sector_digest_without_asset=live_confirmation_conflicts["live_sector_digest_without_asset"],
+        live_rejected_results_promoted=live_confirmation_conflicts["live_rejected_results_promoted"],
+        live_skipped_budget_promoted=live_confirmation_conflicts["live_skipped_budget_promoted"],
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -1154,6 +1187,52 @@ def _core_route_conflicts_with_opportunity_level(rows: Iterable[Mapping[str, Any
     return count
 
 
+def _live_confirmation_conflicts(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    profile: str | None,
+    artifact_namespace: str | None,
+) -> dict[str, int]:
+    out = {
+        "live_validated_without_confirmation": 0,
+        "live_sector_digest_without_asset": 0,
+        "live_rejected_results_promoted": 0,
+        "live_skipped_budget_promoted": 0,
+    }
+    for row in rows:
+        level = str(row.get("final_opportunity_level") or row.get("opportunity_level") or "").strip()
+        route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").strip()
+        if level not in {"validated_digest", "watchlist", "high_priority"}:
+            continue
+        if route not in {
+            event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value,
+        }:
+            continue
+        if not event_opportunity_verdict.live_confirmation_required(
+            profile=str(row.get("profile") or profile or ""),
+            run_mode=str(row.get("run_mode") or ""),
+            artifact_namespace=str(row.get("artifact_namespace") or artifact_namespace or ""),
+        ):
+            continue
+        if bool(row.get("live_confirmation_passed")):
+            continue
+        if str(row.get("live_confirmation_status") or "") == "confirmed":
+            continue
+        out["live_validated_without_confirmation"] += 1
+        symbol = str(row.get("symbol") or "").strip().upper()
+        coin_id = str(row.get("coin_id") or "").strip().casefold()
+        if symbol == "SECTOR" or coin_id in {"sports_fan_proxy", "political_meme_proxy", "ai_ipo_proxy", "rwa_preipo_proxy", "sector"}:
+            out["live_sector_digest_without_asset"] += 1
+        status = str(row.get("evidence_acquisition_status") or "").strip()
+        if status == "rejected_results_only":
+            out["live_rejected_results_promoted"] += 1
+        if status == "skipped_budget":
+            out["live_skipped_budget_promoted"] += 1
+    return out
+
+
 def _row_has_alertable_quality_conflict(row: Mapping[str, Any]) -> bool:
     components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
     data = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
@@ -1593,7 +1672,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"quality_review_market_freshness_contradiction={result.quality_review_market_freshness_contradiction} "
             f"upgrade_candidates_include_high_priority={result.upgrade_candidates_include_high_priority} "
             f"daily_brief_card_group_mismatch_with_index={result.daily_brief_card_group_mismatch_with_index} "
-            f"core_route_conflicts_with_opportunity_level={result.core_route_conflicts_with_opportunity_level}"
+            f"core_route_conflicts_with_opportunity_level={result.core_route_conflicts_with_opportunity_level} "
+            f"live_validated_without_confirmation={result.live_validated_without_confirmation} "
+            f"live_sector_digest_without_asset={result.live_sector_digest_without_asset} "
+            f"live_rejected_results_promoted={result.live_rejected_results_promoted} "
+            f"live_skipped_budget_promoted={result.live_skipped_budget_promoted}"
         ),
         (
             "snapshot lineage: "

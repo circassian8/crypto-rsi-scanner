@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_router, event_core_opportunities, event_opportunity_verdict
+from . import config, event_alpha_router, event_core_opportunities, event_opportunity_verdict, event_watchlist
 
 
 EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION = "event_core_opportunity_store_v1"
@@ -649,13 +649,55 @@ def _row_from_core_opportunity(
         }
     support_ids = _row_ids(support)
     diagnostic_ids = _row_ids(diagnostics)
-    final_route, route_adjustment_reason = _canonical_core_route(item, primary)
+    live_policy_input = {
+        **primary,
+        "profile": profile or primary.get("profile"),
+        "run_mode": run_mode or primary.get("run_mode"),
+        "artifact_namespace": artifact_namespace or primary.get("artifact_namespace"),
+        "symbol": item.symbol,
+        "coin_id": item.coin_id,
+        "candidate_role": item.candidate_role,
+        "impact_path_type": item.primary_impact_path,
+        "primary_impact_path": item.primary_impact_path,
+        "opportunity_level": item.opportunity_level,
+        "final_opportunity_level": item.opportunity_level,
+        "opportunity_score_final": item.opportunity_score_final,
+        "final_opportunity_score": item.opportunity_score_final,
+        "source_class": source_class,
+        "evidence_specificity": evidence_specificity,
+        "evidence_quality_score": evidence_score,
+        "market_confirmation_score": market_after,
+        "market_confirmation_level": market_level,
+        "market_context_freshness_status": market_context.get("market_context_freshness_status"),
+        "evidence_acquisition_status": acquisition.acquisition_status,
+        "evidence_acquisition_accepted_count": acquisition.accepted_evidence_count,
+        "evidence_acquisition_rejected_count": acquisition.rejected_evidence_count,
+        "accepted_evidence_reason_codes": list(acquisition.accepted_reason_codes),
+        "source_pack": source_pack,
+    }
+    live_policy = event_opportunity_verdict.apply_live_confirmation_policy(
+        live_policy_input,
+        profile=profile,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        allow_sector_digest=bool(config.EVENT_ALPHA_ALLOW_SECTOR_DIGEST),
+    )
+    final_level = live_policy.capped_level or item.opportunity_level
+    final_score = live_policy.capped_score if live_policy.capped_score is not None else item.opportunity_score_final
+    final_state = _canonical_core_state(item, final_level, live_policy)
+    final_route, route_adjustment_reason = _canonical_core_route(item, primary, final_level=final_level)
     final_verdict_reason = (
         _first_text(all_rows, ("final_verdict_reason", "quality_gate_block_reason", "route_reason", "opportunity_verdict_reason"))
         or _default_core_verdict_reason(item.opportunity_level)
     )
-    if route_adjustment_reason:
-        final_verdict_reason = _canonical_route_adjusted_verdict_reason(item.opportunity_level)
+    if live_policy.required and not live_policy.confirmed and live_policy.reason:
+        final_verdict_reason = (
+            f"Live confirmation gate capped {item.opportunity_level} to {final_level}: "
+            f"{live_policy.reason}."
+        )
+    if route_adjustment_reason and not (live_policy.required and not live_policy.confirmed):
+        final_verdict_reason = _canonical_route_adjusted_verdict_reason(final_level)
+    acquisition_confirmation = event_opportunity_verdict.classify_acquisition_confirmation(live_policy_input)
     return {
         "schema_version": EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION,
         "row_type": "event_core_opportunity",
@@ -675,7 +717,7 @@ def _row_from_core_opportunity(
         "playbook_type": item.primary_impact_path,
         "effective_playbook_type": item.primary_impact_path,
         "latest_playbook_type": item.primary_impact_path,
-        "state": item.final_state_after_quality_gate,
+        "state": final_state,
         "tier": final_route,
         "latest_tier": final_route,
         "route": final_route,
@@ -754,20 +796,37 @@ def _row_from_core_opportunity(
         "evidence_quality_after": evidence_after,
         "impact_path_strength": impact_path_strength,
         "impact_path_reason": impact_path_reason,
-        "digest_eligible_by_impact_path": item.opportunity_level in {"validated_digest", "watchlist", "high_priority"},
-        "manual_verification_items": _canonical_manual_verification_items(item, source_pack),
-        "upgrade_requirements": _canonical_upgrade_requirements(item.opportunity_level),
-        "downgrade_warnings": _canonical_downgrade_warnings(item.primary_impact_path, item.opportunity_level),
+        "digest_eligible_by_impact_path": final_level in {"validated_digest", "watchlist", "high_priority"},
+        "manual_verification_items": _canonical_manual_verification_items(item, source_pack, final_level=final_level, live_policy=live_policy),
+        "upgrade_requirements": _canonical_upgrade_requirements(final_level, live_policy=live_policy),
+        "downgrade_warnings": _canonical_downgrade_warnings(item.primary_impact_path, final_level),
         "post_refresh_opportunity_level": post_level,
         "post_refresh_opportunity_score": post_score if post_score is not None else item.opportunity_score_final,
-        "final_opportunity_level": item.opportunity_level,
-        "final_opportunity_score": item.opportunity_score_final,
-        "opportunity_level": item.opportunity_level,
-        "opportunity_score_final": item.opportunity_score_final,
-        "final_state_after_quality_gate": item.final_state_after_quality_gate,
+        "requested_opportunity_level_before_live_confirmation": item.opportunity_level,
+        "requested_opportunity_score_before_live_confirmation": item.opportunity_score_final,
+        "requested_route_before_live_confirmation": item.final_route_after_quality_gate,
+        "requested_state_before_live_confirmation": item.final_state_after_quality_gate,
+        "final_opportunity_level": final_level,
+        "final_opportunity_score": final_score,
+        "opportunity_level": final_level,
+        "opportunity_score_final": final_score,
+        "final_state_after_quality_gate": final_state,
         "final_route_after_quality_gate": final_route,
         "final_tier_after_quality_gate": final_route,
         "canonical_route_adjustment_reason": route_adjustment_reason,
+        "live_confirmation_required": live_policy.required,
+        "live_confirmation_passed": live_policy.confirmed,
+        "live_confirmation_status": live_policy.status,
+        "live_confirmation_reason": live_policy.reason,
+        "live_confirmation_capped": bool(live_policy.capped_level),
+        "live_confirmation_original_level": item.opportunity_level,
+        "live_confirmation_capped_level": live_policy.capped_level,
+        "live_confirmation_missing_requirements": list(live_policy.missing_requirements),
+        "acquisition_confirms_candidate": acquisition_confirmation.confirms_candidate,
+        "acquisition_confirms_impact_path": acquisition_confirmation.confirms_impact_path,
+        "acquisition_confirmation_status": acquisition_confirmation.status,
+        "acquisition_confirmation_reason": acquisition_confirmation.reason,
+        "source_pack_confirmation_status": acquisition_confirmation.status,
         "final_verdict_source": _first_text(all_rows, ("final_verdict_source", "opportunity_verdict_source", "verdict_source")) or "core_opportunity_merge",
         "final_verdict_reason": final_verdict_reason,
         "why_opportunity_visible": item.why_opportunity_visible,
@@ -783,10 +842,26 @@ def _row_from_core_opportunity(
 def _canonical_core_route(
     item: event_core_opportunities.CoreOpportunity,
     primary: Mapping[str, Any],
+    *,
+    final_level: str | None = None,
 ) -> tuple[str, str | None]:
     current = str(item.final_route_after_quality_gate or "").strip()
+    level = str(final_level or item.opportunity_level or "").strip()
+    if current == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value:
+        return current, None
+    if level not in {
+        event_opportunity_verdict.OpportunityLevel.VALIDATED_DIGEST.value,
+        event_opportunity_verdict.OpportunityLevel.WATCHLIST.value,
+        event_opportunity_verdict.OpportunityLevel.HIGH_PRIORITY.value,
+    } and current in {
+        event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+    }:
+        return (
+            event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            f"core_route_capped_by_live_confirmation:{level}",
+        )
     if current in {
-        event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value,
         event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
         event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
         event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value,
@@ -794,7 +869,6 @@ def _canonical_core_route(
         return current, None
     if _core_route_quality_blocked(primary):
         return current or event_alpha_router.EventAlphaRoute.STORE_ONLY.value, None
-    level = str(item.opportunity_level or "").strip()
     if level == event_opportunity_verdict.OpportunityLevel.HIGH_PRIORITY.value:
         return (
             event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
@@ -809,6 +883,21 @@ def _canonical_core_route(
             f"core_route_derived_from_opportunity_level:{level}",
         )
     return current or event_alpha_router.EventAlphaRoute.STORE_ONLY.value, None
+
+
+def _canonical_core_state(
+    item: event_core_opportunities.CoreOpportunity,
+    final_level: str,
+    live_policy: event_opportunity_verdict.LiveConfirmationVerdict,
+) -> str:
+    current = str(item.final_state_after_quality_gate or item.primary_row.get("state") or "").strip()
+    if current == event_watchlist.EventWatchlistState.TRIGGERED_FADE.value:
+        return current
+    if not live_policy.capped_level:
+        return current
+    if final_level == event_opportunity_verdict.OpportunityLevel.LOCAL_ONLY.value:
+        return event_watchlist.EventWatchlistState.RAW_EVIDENCE.value
+    return event_watchlist.EventWatchlistState.RADAR.value
 
 
 def _core_route_quality_blocked(primary: Mapping[str, Any]) -> bool:
@@ -974,23 +1063,35 @@ def _best_market_snapshot(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
 def _canonical_manual_verification_items(
     item: event_core_opportunities.CoreOpportunity,
     source_pack: str | None,
+    *,
+    final_level: str | None = None,
+    live_policy: event_opportunity_verdict.LiveConfirmationVerdict | None = None,
 ) -> list[str]:
-    if item.opportunity_level == "high_priority":
+    if live_policy and live_policy.required and not live_policy.confirmed:
+        return list(live_policy.manual_verification_items)
+    level = final_level or item.opportunity_level
+    if level == "high_priority":
         return [
             "verify independent source corroboration",
             "verify exposure/value-capture claim remains valid",
             "verify liquidity and market confirmation are still fresh",
         ]
-    if item.opportunity_level == "watchlist":
+    if level == "watchlist":
         return ["verify second source, market confirmation, derivatives/liquidity, and catalyst timing"]
-    if item.opportunity_level == "validated_digest":
+    if level == "validated_digest":
         return ["verify market reaction, official/second-source confirmation, and source-pack coverage"]
     if str(source_pack or "") == "market_anomaly_pack":
         return ["find causal catalyst evidence and confirm the move is not purely mechanical"]
     return ["validate catalyst, token identity, impact path, and market confirmation"]
 
 
-def _canonical_upgrade_requirements(level: str | None) -> list[str]:
+def _canonical_upgrade_requirements(
+    level: str | None,
+    *,
+    live_policy: event_opportunity_verdict.LiveConfirmationVerdict | None = None,
+) -> list[str]:
+    if live_policy and live_policy.required and not live_policy.confirmed:
+        return list(live_policy.missing_requirements)
     if level == "high_priority":
         return ["sustained_fresh_market_confirmation", "stronger_source_corroboration", "derivatives_or_liquidity_support"]
     if level == "watchlist":

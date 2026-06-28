@@ -256,6 +256,9 @@ def build_daily_brief(
         "## Quality-Capped / Local-Only Candidates",
         *_core_opportunity_lines(local_core_rows, limit=8),
         "",
+        "## Live Confirmation Gated Candidates",
+        *_live_confirmation_gated_core_lines(core_opportunities, limit=8),
+        "",
         "## Canonical Incidents",
         *_canonical_incident_lines(incidents),
         "",
@@ -1257,6 +1260,48 @@ def _core_opportunity_lines(
             lines.append(f"  collapsed: {item.why_other_rows_hidden}")
     if len(rows) > limit:
         lines.append(f"- +{len(rows) - limit} more core opportunities")
+    return lines
+
+
+def _live_confirmation_gated_core_lines(
+    opportunities: Iterable[event_core_opportunities.CoreOpportunity],
+    *,
+    limit: int,
+) -> list[str]:
+    rows = [
+        item
+        for item in opportunities
+        if bool(item.primary_row.get("live_confirmation_capped"))
+        or (
+            bool(item.primary_row.get("live_confirmation_required"))
+            and not bool(item.primary_row.get("live_confirmation_passed"))
+        )
+    ]
+    if not rows:
+        return ["- None."]
+    lines: list[str] = []
+    for item in rows[:limit]:
+        row = item.primary_row
+        missing = row.get("live_confirmation_missing_requirements")
+        if not isinstance(missing, list):
+            missing = []
+        upgrades = row.get("upgrade_requirements")
+        if not isinstance(upgrades, list):
+            upgrades = []
+        lines.append(
+            f"- {item.core_opportunity_id} {item.symbol}/{item.coin_id}: "
+            f"requested={row.get('requested_opportunity_level_before_live_confirmation') or item.opportunity_level} "
+            f"capped={row.get('final_opportunity_level') or item.opportunity_level} "
+            f"status={row.get('evidence_acquisition_status') or 'unknown'} "
+            f"confirmation={row.get('acquisition_confirmation_status') or 'unknown'} "
+            f"reason={row.get('live_confirmation_reason') or row.get('quality_gate_block_reason') or 'live_confirmation_missing'}"
+        )
+        lines.append(
+            "  upgrade: "
+            + "; ".join(str(value) for value in (missing or upgrades)[:3])
+        )
+    if len(rows) > limit:
+        lines.append(f"- +{len(rows) - limit} more live-confirmation gated candidates")
     return lines
 
 
