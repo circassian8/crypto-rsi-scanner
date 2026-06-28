@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Canonical core ids govern visible Event Alpha artifacts
+**Status:** accepted
+**Decision:** Visible Event Alpha research cards, daily-brief card groups, alert
+snapshots, opportunity audits, and artifact-doctor coverage must resolve through
+canonical `event_core_opportunities.jsonl` rows when those rows exist. A visible
+core opportunity id is valid only when it is present in the canonical store or
+resolves to a compatible stored incident/asset/role/path family. Source-noise,
+ticker-collision, control, and other diagnostic rows may link to a canonical
+core through `diagnostic_support_for_core_opportunity_id`, but they must not
+invent separate visible core ids or appear in Core Opportunity Cards.
+**Why:** Operator-facing artifacts need one stable review object per real
+opportunity. Fake card/snapshot core ids made Pro-model review and feedback
+grouping ambiguous, and daily briefs could disagree with card indexes or market
+freshness summaries.
+**Revisit when:** The JSONL artifact store is replaced by a typed relational or
+document store that enforces core/card/snapshot/support relationships by schema.
+
 ## 2026-06-28 - Persisted CoreOpportunity rows are authoritative for operators
 **Status:** accepted
 **Decision:** After an Event Alpha cycle writes canonical

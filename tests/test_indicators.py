@@ -23961,6 +23961,15 @@ def test_opportunity_audit_accepts_core_opportunity_id_and_hides_diagnostics_by_
         include_diagnostics=True,
     )
     assert "  - diagnostic:" in audit_with_diagnostics
+    orphan_audit = event_opportunity_audit.format_opportunity_audit(
+        "core_missing",
+        core_opportunity_rows=[primary],
+        profile="fixture",
+    )
+    assert "matched_source: none" in orphan_audit
+    assert "input target resolution status: orphan" in orphan_audit
+    assert "visible_core_missing_store_row:core_missing" in orphan_audit
+    assert "No matching hypothesis, watchlist row, alert snapshot, or route decision found." in orphan_audit
 
 
 def test_research_cards_have_current_lineage_and_legacy_marker():
@@ -27926,6 +27935,280 @@ def test_event_alpha_artifact_doctor_reports_core_store_coverage():
     assert missing.visible_core_opportunities_missing_store_rows == 1
 
 
+def test_canonical_core_resolution_links_diagnostics_and_orphans():
+    from crypto_rsi_scanner import event_core_opportunities, event_core_opportunity_store
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-resolution",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        store_rows = event_core_opportunity_store.load_core_opportunities(path, latest_run=True).rows
+    velvet_core = next(row["core_opportunity_id"] for row in store_rows if row["symbol"] == "VELVET")
+    rune_core = next(row["core_opportunity_id"] for row in store_rows if row["symbol"] == "RUNE")
+
+    rune_resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(
+        {
+            "incident_id": "incident-thorchain-exploit",
+            "validated_symbol": "RUNE",
+            "validated_coin_id": "thorchain",
+            "candidate_role": "direct_beneficiary",
+            "impact_path_type": "exploit_security_event",
+        },
+        store_rows,
+    )
+    assert rune_resolution.resolution_status == "canonical"
+    assert rune_resolution.canonical_core_opportunity_id == rune_core
+
+    diagnostic = event_core_opportunities.resolve_canonical_core_opportunity_id(
+        {
+            "core_opportunity_id": "core_601f14c59028",
+            "incident_id": "incident-spacex",
+            "validated_symbol": "VELVET",
+            "validated_coin_id": "velvet",
+            "candidate_role": "source_noise",
+            "latest_effective_playbook_type": "source_noise_control",
+            "impact_path_type": "generic_cooccurrence_only",
+        },
+        store_rows,
+    )
+    assert diagnostic.resolution_status == "diagnostic_support"
+    assert diagnostic.diagnostic_support_for_core_opportunity_id == velvet_core
+    assert "noncanonical_core_id_replaced:core_601f14c59028" in diagnostic.warnings
+
+    orphan = event_core_opportunities.resolve_canonical_core_opportunity_id(
+        {
+            "core_opportunity_id": "core_missing_visible",
+            "incident_id": "incident-orphan",
+            "validated_symbol": "ORPHAN",
+            "validated_coin_id": "orphan",
+            "candidate_role": "direct_beneficiary",
+            "impact_path_type": "listing_liquidity_event",
+            "opportunity_level": "watchlist",
+        },
+        store_rows,
+    )
+    assert orphan.resolution_status == "orphan"
+    assert "visible_core_missing_store_row:core_missing_visible" in orphan.warnings
+
+    explicit_orphan = event_core_opportunities.resolve_canonical_core_opportunity_id(
+        {"core_opportunity_id": "core_missing_from_store"},
+        store_rows,
+    )
+    assert explicit_orphan.resolution_status == "orphan"
+    assert explicit_orphan.canonical_core_opportunity_id == "core_missing_from_store"
+    assert "visible_core_missing_store_row:core_missing_from_store" in explicit_orphan.warnings
+
+
+def test_research_cards_use_canonical_core_store_groups():
+    from crypto_rsi_scanner import event_core_opportunity_store, event_research_cards
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        store_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=store_path),
+            run_id="run-core-cards",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        store_rows = event_core_opportunity_store.load_core_opportunities(store_path, latest_run=True).rows
+        result = event_research_cards.write_research_cards(
+            root / "cards",
+            watchlist_entries=[],
+            alert_rows=store_rows,
+        )
+        store_ids = {row["core_opportunity_id"] for row in store_rows}
+        groups = event_research_cards.card_index_group_map(result.card_paths)
+        core_paths = [path for path in result.card_paths if groups[path] == "Core Opportunity Cards"]
+        assert core_paths
+        assert all(event_research_cards.card_core_opportunity_id(path) in store_ids for path in core_paths)
+        index_text = result.index_path.read_text(encoding="utf-8")
+        core_section = index_text.split("## Core Opportunity Cards", 1)[1].split("## Near-Miss Cards", 1)[0]
+        local_section = index_text.split("## Local-Only / Quality-Capped Cards", 1)[1].split("## Diagnostic", 1)[0]
+        assert "RUNE" in "".join(path.read_text(encoding="utf-8") for path in core_paths)
+        assert "memecore" in local_section.casefold() or any(
+            "memecore" in path.read_text(encoding="utf-8").casefold()
+            for path, group in groups.items()
+            if group == "Local-Only / Quality-Capped Cards"
+        )
+
+
+def test_alert_snapshots_mark_source_noise_as_diagnostic_support():
+    from dataclasses import replace
+    from crypto_rsi_scanner import (
+        event_alpha_alert_store,
+        event_alpha_router,
+        event_core_opportunity_store,
+        event_watchlist,
+    )
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=core_path),
+            run_id="run-core-snapshots",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        velvet_core = next(row["core_opportunity_id"] for row in core_rows if row["symbol"] == "VELVET")
+        entry = replace(
+            _test_watchlist_entry(state=event_watchlist.EventWatchlistState.RADAR.value, symbol="VELVET", coin_id="velvet"),
+            key="incident-spacex|velvet|source_noise_control",
+            incident_id="incident-spacex",
+            relationship_type="impact_hypothesis",
+            latest_effective_playbook_type="source_noise_control",
+            latest_playbook_type="source_noise_control",
+            latest_score_components={
+                "incident_id": "incident-spacex",
+                "validated_symbol": "VELVET",
+                "validated_coin_id": "velvet",
+                "candidate_role": "source_noise",
+                "impact_path_type": "generic_cooccurrence_only",
+                "opportunity_level": "local_only",
+                "opportunity_score_final": 0,
+                "core_opportunity_id": "core_601f14c59028",
+            },
+        )
+        decision = event_alpha_router.EventAlphaRouteDecision(
+            entry=entry,
+            route=event_alpha_router.EventAlphaRoute.STORE_ONLY,
+            alertable=False,
+            reason="source-noise control",
+            requested_route_before_quality_gate=event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            final_route_after_quality_gate=event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            quality_gate_block_reason="source_noise_control",
+        )
+        store_path = root / "alerts.jsonl"
+        event_alpha_alert_store.write_alert_snapshots(
+            [],
+            cfg=event_alpha_alert_store.EventAlphaAlertStoreConfig(path=store_path),
+            router_result=event_alpha_router.EventAlphaRouterResult(Path("state.jsonl"), 1, [decision], True),
+            core_opportunity_rows=core_rows,
+        )
+        rows = event_alpha_alert_store.load_alert_snapshots(store_path).rows
+    assert rows[0]["is_diagnostic_snapshot"] is True
+    assert rows[0]["core_opportunity_id_status"] == "diagnostic_support"
+    assert rows[0]["diagnostic_support_for_core_opportunity_id"] == velvet_core
+    assert rows[0]["core_opportunity_id"] == velvet_core
+
+
+def test_artifact_doctor_detects_orphan_core_cards_and_snapshot_ids():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_core_opportunity_store
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=core_path),
+            run_id="run-core-doctor-orphan",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        card_dir = root / "cards"
+        card_dir.mkdir()
+        orphan = card_dir / "card_core_missing.md"
+        orphan.write_text(
+            "# Orphan\n\n- Core opportunity ID: core_missing_visible\n- Feedback target: core_missing_visible\nFinal route: HIGH_PRIORITY_RESEARCH\n",
+            encoding="utf-8",
+        )
+        index = card_dir / "index.md"
+        index.write_text("# Cards\n\n## Core Opportunity Cards\n\n- [card_core_missing.md](card_core_missing.md)\n", encoding="utf-8")
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-core-doctor-orphan",
+                "profile": "market_refresh_smoke",
+                "run_mode": "burn_in",
+                "artifact_namespace": "market_refresh_smoke",
+                "success": True,
+                "alertable": 0,
+            }],
+            core_opportunity_rows=core_rows,
+            alert_rows=[{
+                "row_type": "event_alpha_alert_snapshot",
+                "run_id": "run-core-doctor-orphan",
+                "profile": "market_refresh_smoke",
+                "run_mode": "burn_in",
+                "artifact_namespace": "market_refresh_smoke",
+                "core_opportunity_id": "core_missing_visible",
+                "final_route_after_quality_gate": "RESEARCH_DIGEST",
+                "opportunity_level": "validated_digest",
+            }],
+            card_paths=[orphan, index],
+            profile="market_refresh_smoke",
+            artifact_namespace="market_refresh_smoke",
+            strict=True,
+        )
+    assert doctor.core_cards_missing_store_row == 1
+    assert doctor.alert_snapshots_core_id_missing_from_store == 1
+    assert any("core_cards_missing_store_row=1" in item for item in doctor.blockers)
+    assert any("alert_snapshots_core_id_missing_from_store=1" in item for item in doctor.blockers)
+
+
+def test_daily_brief_splits_core_market_freshness_from_support_gaps():
+    from crypto_rsi_scanner import event_alpha_daily_brief
+
+    rows = _canonical_core_fixture_rows()
+    brief = event_alpha_daily_brief.build_daily_brief(
+        hypothesis_rows=rows,
+        requested_profile="market_refresh_smoke",
+        artifact_namespace="market_refresh_smoke",
+        include_test_artifacts=True,
+        include_legacy_artifacts=True,
+    )
+    freshness = brief.split("## Market Freshness Readiness", 1)[1].split("## Diagnostics Appendix", 1)[0]
+    velvet_line = next(line for line in freshness.splitlines() if "VELVET/velvet" in line)
+    assert "core_market_freshness_status=fresh" in velvet_line
+    assert "core_market_context_source=market_refresh" in velvet_line
+    assert "core_market_refresh_needed=false" in velvet_line
+    assert "support_rows_stale_or_missing_count=1" in velvet_line
+    assert "status=fresh source=missing" not in freshness
+
+
+def test_daily_brief_evidence_plans_and_executions_are_counted_separately():
+    from crypto_rsi_scanner import event_alpha_daily_brief
+
+    acquisition = {
+        "row_type": "event_evidence_acquisition",
+        "profile": "market_refresh_smoke",
+        "run_mode": "burn_in",
+        "artifact_namespace": "market_refresh_smoke",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "status": "accepted_evidence_found",
+        "queries_executed": 3,
+        "accepted_evidence": [{"title": "Velvet confirms SpaceX exposure"}],
+    }
+    brief = event_alpha_daily_brief.build_daily_brief(
+        hypothesis_rows=[],
+        evidence_acquisition_rows=[acquisition],
+        requested_profile="market_refresh_smoke",
+        artifact_namespace="market_refresh_smoke",
+        include_test_artifacts=True,
+        include_legacy_artifacts=True,
+    )
+    coverage = brief.split("## Source Coverage / Evidence Acquisition", 1)[1].split("### Provider Health by Source Pack", 1)[0]
+    assert "evidence_plans_created=0" in coverage
+    assert "acquisition_requests_executed=1" in coverage
+    assert "provider_queries_executed=3" in coverage
+    assert "accepted_evidence_found=1" in coverage
+    assert "Evidence plans: 0 candidate" not in coverage
+
+
 def _canonical_core_fixture_rows() -> list[dict[str, object]]:
     from crypto_rsi_scanner import event_alpha_router, event_watchlist
 
@@ -27956,6 +28239,10 @@ def _canonical_core_fixture_rows() -> list[dict[str, object]]:
             "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
             "market_refresh_attempted": True,
             "market_refresh_success": True,
+            "market_context_freshness_status": "fresh",
+            "market_context_source": "market_refresh",
+            "market_context_age_hours": 0.5,
+            "market_context_freshness_cap_applied": False,
             "market_confirmation_after": 88,
             "evidence_acquisition_attempted": True,
             "evidence_acquisition_status": "accepted_evidence_found",

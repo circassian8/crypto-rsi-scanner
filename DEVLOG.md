@@ -17,6 +17,45 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Make canonical core rows authoritative for cards and snapshots · Codex
+**Why:** Event Alpha was writing `event_core_opportunities.jsonl`, but research
+cards, daily-brief card groups, and alert snapshots could still create
+opportunity-like IDs outside the canonical core store. Source-noise/control
+snapshots also looked like separate core opportunities instead of diagnostic
+support.
+**Changes:**
+- Added canonical core-id resolution for rows, cards, alerts, and audits:
+  exact store match, compatible incident/asset/path match, diagnostic support,
+  orphan, legacy, and no-core statuses.
+- Made store-backed research card generation use canonical core rows directly,
+  preserve catalyst-frame metadata, and share card-index grouping with daily
+  briefs.
+- Linked source-noise/control alert snapshots as diagnostic support rows with
+  `diagnostic_row_id`, `diagnostic_support_for_core_opportunity_id`,
+  `is_diagnostic_snapshot`, and core-id status metadata instead of fake visible
+  core ids.
+- Extended artifact doctor checks for missing core-store rows, orphan core
+  cards, fake diagnostic core ids, snapshot/store mismatches, and daily
+  brief/index group mismatches.
+- Split daily-brief market freshness into core freshness versus support-row
+  gaps, and separated evidence plans created from acquisition requests executed.
+**Verify:** `python3 tests/test_indicators.py` passed (508/508);
+`make event-alpha-signal-quality-eval PYTHON=python3`, `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`, `make
+event-alpha-market-refresh-smoke PYTHON=python3`, `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, `make
+event-alpha-quality-validation-cycle PYTHON=python3`, and `make verify
+PYTHON=python3` passed. Manual smoke: `make event-alpha-daily-brief
+PROFILE=evidence_acquisition_smoke PYTHON=python3`, `make
+event-alpha-artifact-doctor PROFILE=evidence_acquisition_smoke STRICT=1
+PYTHON=python3`, `make event-opportunity-audit
+PROFILE=evidence_acquisition_smoke TARGET=core_5f5ac4e47f96 PYTHON=python3`,
+and `make event-opportunity-audit PROFILE=evidence_acquisition_smoke
+TARGET=agg:3381ebd96566 PYTHON=python3` passed.
+**Notes/risks:** Research-only artifact consistency change. No Telegram sends,
+paper/live rows, normal RSI writes, trading, or provider/LLM-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Persist canonical Event Alpha core opportunities · Codex
 **Why:** Daily brief, near-miss, cards, audit, and doctor paths could still
 recompute operator-facing opportunities from mixed raw/support rows and disagree

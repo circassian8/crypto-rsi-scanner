@@ -32,6 +32,12 @@ class EventAlphaArtifactDoctorResult:
     visible_core_opportunities_missing_feedback_targets: int = 0
     alert_snapshots_missing_core_opportunity_id: int = 0
     alert_snapshots_missing_feedback_target: int = 0
+    core_cards_missing_store_row: int = 0
+    visible_core_cards_missing_store_row: int = 0
+    orphan_core_opportunity_cards: int = 0
+    diagnostic_snapshots_with_fake_core_id: int = 0
+    alert_snapshots_core_id_missing_from_store: int = 0
+    daily_brief_card_group_mismatch_with_index: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -279,6 +285,7 @@ def diagnose_artifacts(
     index_present = any(path.name == "index.md" for path in card_file_paths)
     cards_missing_lineage = sum(1 for path in research_card_paths if not event_research_cards.card_has_current_lineage(path))
     cards_missing_feedback_target = sum(1 for path in research_card_paths if not event_research_cards.card_feedback_target(path))
+    card_group_map = event_research_cards.card_index_group_map(research_card_paths)
     card_core_ids = {value for path in research_card_paths for value in (event_research_cards.card_core_opportunity_id(path),) if value}
     card_feedback_targets = {value for path in research_card_paths for value in (event_research_cards.card_feedback_target(path),) if value}
     visible_core = (
@@ -287,12 +294,14 @@ def diagnose_artifacts(
         else event_core_opportunities.visible_core_opportunities([*watchlist, *alerts, *hypotheses])
     )
     visible_core_ids = {item.core_opportunity_id for item in visible_core}
+    visible_core_by_id = {item.core_opportunity_id: item for item in visible_core}
     store_core_ids = {
         str(row.get("core_opportunity_id") or "").strip()
         for row in core_rows
         if str(row.get("core_opportunity_id") or "").strip()
     }
-    visible_missing_store_rows = len(visible_core_ids - store_core_ids) if core_rows else len(visible_core_ids)
+    core_store_available = bool(store_core_ids)
+    visible_missing_store_rows = len(visible_core_ids - store_core_ids) if core_store_available else len(visible_core_ids)
     duplicate_store_rows = max(0, len(core_rows) - len(store_core_ids))
     visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids)
     visible_missing_targets = sum(
@@ -300,6 +309,42 @@ def diagnose_artifacts(
         for item in visible_core
         if item.core_opportunity_id not in card_feedback_targets
         and not any(str(row.get("core_opportunity_id") or "") == item.core_opportunity_id and _alert_has_feedback_target(row) for row in alerts)
+    )
+    core_card_paths = [
+        path for path in research_card_paths
+        if (card_group_map.get(path) or event_research_cards.card_index_group(path)) == "Core Opportunity Cards"
+    ]
+    core_cards_missing_store = sum(
+        1
+        for path in core_card_paths
+        if event_research_cards.card_core_opportunity_id(path) not in store_core_ids
+    )
+    visible_core_cards_missing_store = core_cards_missing_store
+    orphan_core_cards = core_cards_missing_store
+    card_group_mismatches = sum(
+        1
+        for path in research_card_paths
+        if path in card_group_map
+        and _expected_card_group_for_store_core(
+            visible_core_by_id.get(str(event_research_cards.card_core_opportunity_id(path) or ""))
+        ) not in {None, card_group_map[path]}
+    )
+    diagnostic_fake_core = sum(
+        1
+        for row in alerts
+        if (
+            bool(row.get("is_diagnostic_snapshot"))
+            or event_core_opportunities.row_is_diagnostic(row)
+        )
+        and str(row.get("core_opportunity_id") or "").strip()
+        and str(row.get("core_opportunity_id_status") or "") not in {"diagnostic_support", "canonical"}
+    )
+    snapshot_core_missing_store = sum(
+        1
+        for row in alerts
+        if str(row.get("core_opportunity_id") or "").strip()
+        and str(row.get("core_opportunity_id") or "").strip() not in store_core_ids
+        and not bool(row.get("is_diagnostic_snapshot"))
     )
     fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
     fresh_visible_missing_targets = sum(
@@ -329,6 +374,19 @@ def diagnose_artifacts(
         (blockers if strict_core_store else warnings).append(message)
     if duplicate_store_rows:
         warnings.append(f"duplicate_core_opportunity_store_rows={duplicate_store_rows}")
+    if core_cards_missing_store:
+        message = f"core_cards_missing_store_row={core_cards_missing_store}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if orphan_core_cards:
+        warnings.append(f"orphan_core_opportunity_cards={orphan_core_cards}")
+    if diagnostic_fake_core:
+        warnings.append(f"diagnostic_snapshots_with_fake_core_id={diagnostic_fake_core}")
+    if snapshot_core_missing_store:
+        message = f"alert_snapshots_core_id_missing_from_store={snapshot_core_missing_store}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if card_group_mismatches:
+        message = f"daily_brief_card_group_mismatch_with_index={card_group_mismatches}"
+        (blockers if strict and core_store_available else warnings).append(message)
     if visible_missing_targets:
         message = f"visible_core_opportunities_missing_feedback_targets={visible_missing_targets}"
         (blockers if strict and fresh_visible_missing_targets else warnings).append(message)
@@ -489,6 +547,12 @@ def diagnose_artifacts(
         visible_core_opportunities_missing_feedback_targets=visible_missing_targets,
         alert_snapshots_missing_core_opportunity_id=snapshots_missing_core,
         alert_snapshots_missing_feedback_target=snapshots_missing_feedback,
+        core_cards_missing_store_row=core_cards_missing_store,
+        visible_core_cards_missing_store_row=visible_core_cards_missing_store,
+        orphan_core_opportunity_cards=orphan_core_cards,
+        diagnostic_snapshots_with_fake_core_id=diagnostic_fake_core,
+        alert_snapshots_core_id_missing_from_store=snapshot_core_missing_store,
+        daily_brief_card_group_mismatch_with_index=card_group_mismatches,
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -592,6 +656,20 @@ def _alert_snapshot_should_have_core_id(row: Mapping[str, Any]) -> bool:
         event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
         event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
     }
+
+
+def _expected_card_group_for_store_core(
+    opportunity: event_core_opportunities.CoreOpportunity | None,
+) -> str | None:
+    if opportunity is None:
+        return None
+    if event_core_opportunities.core_opportunity_visibility_group(opportunity) is None:
+        return "Diagnostic / Source-Noise / Control Cards"
+    if opportunity.is_high_priority or opportunity.is_watchlist or opportunity.is_validated_digest or opportunity.alertable:
+        return "Core Opportunity Cards"
+    if str(opportunity.opportunity_level or "").casefold() == "exploratory" or opportunity.opportunity_score_final >= 50:
+        return "Near-Miss Cards"
+    return "Local-Only / Quality-Capped Cards"
 
 
 def _core_has_fresh_rows(opportunity: event_core_opportunities.CoreOpportunity) -> bool:
@@ -1112,7 +1190,13 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"visible_core_opportunities_missing_cards={result.visible_core_opportunities_missing_cards} "
             f"visible_core_opportunities_missing_feedback_targets={result.visible_core_opportunities_missing_feedback_targets} "
             f"alert_snapshots_missing_core_opportunity_id={result.alert_snapshots_missing_core_opportunity_id} "
-            f"alert_snapshots_missing_feedback_target={result.alert_snapshots_missing_feedback_target}"
+            f"alert_snapshots_missing_feedback_target={result.alert_snapshots_missing_feedback_target} "
+            f"core_cards_missing_store_row={result.core_cards_missing_store_row} "
+            f"visible_core_cards_missing_store_row={result.visible_core_cards_missing_store_row} "
+            f"orphan_core_opportunity_cards={result.orphan_core_opportunity_cards} "
+            f"diagnostic_snapshots_with_fake_core_id={result.diagnostic_snapshots_with_fake_core_id} "
+            f"alert_snapshots_core_id_missing_from_store={result.alert_snapshots_core_id_missing_from_store} "
+            f"daily_brief_card_group_mismatch_with_index={result.daily_brief_card_group_mismatch_with_index}"
         ),
         (
             "snapshot lineage: "

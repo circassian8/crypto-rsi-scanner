@@ -68,6 +68,14 @@ class CoreOpportunity:
         )
 
 
+@dataclass(frozen=True)
+class CanonicalCoreResolution:
+    canonical_core_opportunity_id: str | None
+    resolution_status: str
+    diagnostic_support_for_core_opportunity_id: str | None = None
+    warnings: tuple[str, ...] = ()
+
+
 VISIBLE_CORE_GROUPS = {
     "High-Priority Core Opportunities",
     "Validated Digest Core Opportunities",
@@ -202,6 +210,83 @@ def core_opportunity_id_for_row(row: Any) -> str | None:
     return _core_id(key)
 
 
+def resolve_canonical_core_opportunity_id(
+    row: Any,
+    core_store_rows: Iterable[Any],
+) -> CanonicalCoreResolution:
+    """Resolve a row against the canonical CoreOpportunity store.
+
+    Visible/operator rows may only use a core id from the store. Diagnostic
+    rows can support a canonical core, but they are not themselves canonical.
+    """
+    normalized = _normalize_row(row)
+    if not normalized:
+        return CanonicalCoreResolution(None, "no_core", warnings=("empty_row",))
+    store = tuple(_core_opportunities_from_rows(core_store_rows))
+    if not store:
+        fallback = core_opportunity_id_for_row(normalized)
+        status = "diagnostic_orphan" if _is_diagnostic_row(normalized) else "orphan"
+        warning = "core_store_empty"
+        return CanonicalCoreResolution(
+            None if _is_diagnostic_row(normalized) else fallback,
+            status,
+            warnings=(warning,),
+        )
+    by_id = {item.core_opportunity_id: item for item in store}
+    explicit = _clean(normalized.get("core_opportunity_id") or normalized.get("aggregated_candidate_id"))
+    diagnostic = _is_diagnostic_row(normalized)
+    if explicit and explicit in by_id:
+        if diagnostic:
+            return CanonicalCoreResolution(
+                explicit,
+                "diagnostic_support",
+                diagnostic_support_for_core_opportunity_id=explicit,
+            )
+        return CanonicalCoreResolution(explicit, "canonical")
+    identifier_support = _matching_core_by_row_identifier(normalized, store)
+    if identifier_support is not None:
+        warnings = () if not explicit else (f"noncanonical_core_id_replaced:{explicit}",)
+        return CanonicalCoreResolution(
+            identifier_support.core_opportunity_id,
+            "diagnostic_support",
+            diagnostic_support_for_core_opportunity_id=identifier_support.core_opportunity_id,
+            warnings=warnings,
+        )
+    support = _matching_core_for_row(normalized, store, diagnostic_only=True)
+    if support is not None and diagnostic:
+        warnings = () if not explicit else (f"noncanonical_core_id_replaced:{explicit}",)
+        return CanonicalCoreResolution(
+            support.core_opportunity_id,
+            "diagnostic_support",
+            diagnostic_support_for_core_opportunity_id=support.core_opportunity_id,
+            warnings=warnings,
+        )
+    match = _matching_core_for_row(normalized, store, diagnostic_only=False)
+    if match is not None:
+        warnings = () if not explicit or explicit == match.core_opportunity_id else (f"noncanonical_core_id_replaced:{explicit}",)
+        return CanonicalCoreResolution(match.core_opportunity_id, "canonical", warnings=warnings)
+    if diagnostic:
+        return CanonicalCoreResolution(
+            None,
+            "orphan",
+            warnings=(f"diagnostic_core_orphan:{explicit}",) if explicit else ("diagnostic_core_orphan",),
+        )
+    if explicit and not _asset_key(normalized):
+        return CanonicalCoreResolution(
+            explicit,
+            "orphan",
+            warnings=(f"visible_core_missing_store_row:{explicit}", "missing_asset_identity"),
+        )
+    if not _asset_key(normalized):
+        return CanonicalCoreResolution(None, "no_core", warnings=("missing_asset_identity",))
+    fallback = explicit or core_opportunity_id_for_row(normalized)
+    return CanonicalCoreResolution(
+        fallback,
+        "orphan",
+        warnings=(f"visible_core_missing_store_row:{fallback}",) if fallback else ("visible_core_missing_store_row",),
+    )
+
+
 def row_key_candidates_for_opportunity(opportunity: CoreOpportunity) -> tuple[str, ...]:
     values: list[str] = []
     for row in (opportunity.primary_row, *opportunity.supporting_rows):
@@ -232,6 +317,118 @@ def asset_key_for_opportunity(opportunity: CoreOpportunity) -> str:
 
 def row_is_diagnostic(row: Any) -> bool:
     return _is_diagnostic_row(_normalize_row(row))
+
+
+def _core_opportunities_from_rows(rows: Iterable[Any]) -> tuple[CoreOpportunity, ...]:
+    direct: list[CoreOpportunity] = []
+    raw: list[Any] = []
+    for item in rows:
+        if isinstance(item, CoreOpportunity):
+            direct.append(item)
+        else:
+            raw.append(item)
+    return tuple([*direct, *aggregate_core_opportunities(raw)])
+
+
+def _matching_core_for_row(
+    row: Mapping[str, Any],
+    store: Iterable[CoreOpportunity],
+    *,
+    diagnostic_only: bool,
+) -> CoreOpportunity | None:
+    incident_asset = _incident_asset_key(row)
+    asset = _asset_key(row)
+    row_role = _normalized_role(_value(row, _components(row), "candidate_role", "relationship_type", "latest_effective_playbook_type", "playbook_type"))
+    row_family = _impact_path_family(_primary_impact_path(row) or _value(row, _components(row), "impact_category"))
+    candidates: list[tuple[int, CoreOpportunity]] = []
+    for item in store:
+        if incident_asset == incident_asset_key_for_opportunity(item):
+            if diagnostic_only:
+                candidates.append((100, item))
+                continue
+            role_match = row_role in {"", "unknown", item.candidate_role, _normalized_role(item.candidate_role)}
+            family_match = row_family in {"", "unknown", _impact_path_family(item.primary_impact_path)} or _impact_path_family(item.primary_impact_path) == row_family
+            if role_match and family_match:
+                candidates.append((100, item))
+            elif family_match:
+                candidates.append((80, item))
+        elif asset and asset == asset_key_for_opportunity(item):
+            if diagnostic_only:
+                candidates.append((60, item))
+                continue
+            family_match = row_family in {"", "unknown", _impact_path_family(item.primary_impact_path)} or _impact_path_family(item.primary_impact_path) == row_family
+            if family_match:
+                candidates.append((60, item))
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda pair: (pair[0], _opportunity_rank(pair[1])), reverse=True)[0][1]
+
+
+def _matching_core_by_row_identifier(
+    row: Mapping[str, Any],
+    store: Iterable[CoreOpportunity],
+) -> CoreOpportunity | None:
+    candidates = _row_identifier_candidates(row)
+    if not candidates:
+        return None
+    matches: list[tuple[int, CoreOpportunity]] = []
+    for item in store:
+        support_ids = _core_support_identifier_candidates(item)
+        if not support_ids.intersection(candidates):
+            continue
+        rank = 100 if _asset_key(row) == asset_key_for_opportunity(item) else 80
+        matches.append((rank, item))
+    if not matches:
+        return None
+    return sorted(matches, key=lambda pair: (pair[0], _opportunity_rank(pair[1])), reverse=True)[0][1]
+
+
+def _row_identifier_candidates(row: Mapping[str, Any]) -> set[str]:
+    out: set[str] = set()
+    for key in ("row_id", "alert_id", "key", "watchlist_key", "event_id", "hypothesis_id"):
+        value = str(row.get(key) or "").strip()
+        if not value:
+            continue
+        out.add(value)
+        if value.startswith("ea:"):
+            out.add(value[3:])
+    return out
+
+
+def _core_support_identifier_candidates(item: CoreOpportunity) -> set[str]:
+    out: set[str] = set()
+    rows = (item.primary_row, *item.supporting_rows, *item.diagnostic_rows)
+    for row in rows:
+        for key in (
+            "supporting_row_ids",
+            "diagnostic_row_ids",
+            "supporting_hypothesis_ids",
+            "row_id",
+            "alert_id",
+            "key",
+            "watchlist_key",
+            "event_id",
+            "hypothesis_id",
+        ):
+            raw = row.get(key)
+            if raw in (None, "", [], {}, ()):
+                continue
+            if isinstance(raw, str):
+                values = [raw]
+            elif isinstance(raw, Mapping):
+                values = [str(value) for value in raw.values()]
+            elif isinstance(raw, Iterable):
+                values = [str(value) for value in raw]
+            else:
+                values = [str(raw)]
+            for value in values:
+                text = str(value or "").strip()
+                if not text:
+                    continue
+                out.add(text)
+                if text.startswith("ea:"):
+                    out.add(text[3:])
+    return out
 
 
 def _build_core_opportunity(

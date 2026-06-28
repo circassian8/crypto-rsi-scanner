@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -86,6 +87,7 @@ def write_alert_snapshots(
     artifact_namespace: str | None = None,
     delivery_rows: Iterable[Mapping[str, Any]] = (),
     research_card_paths: Iterable[str | Path] = (),
+    core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
 ) -> EventAlphaAlertStoreWriteResult:
     """Append research-only alert snapshots to JSONL."""
     observed = _as_utc(now or datetime.now(timezone.utc))
@@ -107,12 +109,15 @@ def write_alert_snapshots(
         )
         for row in rows
     ]
+    core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
     route_context = _route_context_by_key(router_result)
     rows = [_with_route_context(row, route_context) for row in rows]
     delivery_context = _delivery_context_by_alert_id(delivery_rows)
     card_context = _card_context_by_card_id(research_card_paths)
     rows = [_with_delivery_context(row, delivery_context) for row in rows]
     rows = [_with_card_context(row, card_context) for row in rows]
+    if core_rows:
+        rows = [_with_core_resolution(row, core_rows) for row in rows]
     rows = _filter_snapshot_rows(
         rows,
         policy=cfg.snapshot_policy,
@@ -954,6 +959,50 @@ def _with_card_context(row: dict[str, Any], context: Mapping[str, Mapping[str, s
                 out["feedback_target_type"] = card.get("feedback_target_type")
             return out
     return row
+
+
+def _with_core_resolution(row: dict[str, Any], core_rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, core_rows)
+    out = dict(row)
+    out["core_opportunity_id_status"] = resolution.resolution_status
+    out["canonical_core_resolution_warnings"] = resolution.warnings
+    if resolution.resolution_status == "canonical":
+        out["core_opportunity_id"] = resolution.canonical_core_opportunity_id
+        out["is_diagnostic_snapshot"] = False
+        out.pop("diagnostic_support_for_core_opportunity_id", None)
+        out.setdefault("feedback_target", resolution.canonical_core_opportunity_id)
+        out.setdefault("feedback_target_type", "core_opportunity_id")
+    elif resolution.resolution_status == "diagnostic_support":
+        out["core_opportunity_id"] = resolution.canonical_core_opportunity_id
+        out["diagnostic_support_for_core_opportunity_id"] = resolution.diagnostic_support_for_core_opportunity_id
+        out["diagnostic_row_id"] = _diagnostic_row_id(out)
+        out["is_diagnostic_snapshot"] = True
+        out["feedback_target"] = resolution.diagnostic_support_for_core_opportunity_id or out.get("feedback_target") or out.get("alert_key")
+        out["feedback_target_type"] = "diagnostic_support_for_core_opportunity_id"
+    elif event_core_opportunities.row_is_diagnostic(out):
+        out["diagnostic_row_id"] = _diagnostic_row_id(out)
+        out["is_diagnostic_snapshot"] = True
+        out["diagnostic_support_for_core_opportunity_id"] = None
+        out["core_opportunity_id"] = None
+        if out.get("feedback_target_type") == "core_opportunity_id":
+            out["feedback_target"] = out.get("alert_id") or out.get("alert_key") or out["diagnostic_row_id"]
+            out["feedback_target_type"] = "diagnostic_row_id"
+    else:
+        out["is_diagnostic_snapshot"] = False
+        if resolution.canonical_core_opportunity_id:
+            out["core_opportunity_id"] = resolution.canonical_core_opportunity_id
+            out.setdefault("feedback_target", resolution.canonical_core_opportunity_id)
+            out.setdefault("feedback_target_type", "core_opportunity_id")
+    return _with_snapshot_quality_classification(out)
+
+
+def _diagnostic_row_id(row: Mapping[str, Any]) -> str:
+    for key in ("diagnostic_row_id", "snapshot_id", "alert_id", "alert_key", "event_id", "hypothesis_id"):
+        value = str(row.get(key) or "").strip()
+        if value:
+            return value
+    payload = json.dumps(_json_ready(dict(row)), sort_keys=True, separators=(",", ":"))
+    return "diagnostic:" + hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
 
 
 def _filter_snapshot_rows(

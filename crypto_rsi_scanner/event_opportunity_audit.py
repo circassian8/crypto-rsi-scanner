@@ -45,8 +45,8 @@ def format_opportunity_audit(
     alert_items = list(alert_rows)
     decision_items = list(route_decisions)
     incidents = [dict(row) for row in incident_rows if isinstance(row, Mapping)]
-    core_opportunities = event_core_opportunities.aggregate_core_opportunities([
-        *core_items,
+    stored_core_opportunities = event_core_opportunities.aggregate_core_opportunities(core_items)
+    core_opportunities = stored_core_opportunities or event_core_opportunities.aggregate_core_opportunities([
         *decision_items,
         *watchlist_items,
         *alert_items,
@@ -63,16 +63,15 @@ def format_opportunity_audit(
         else _find_match(resolved_target, hypothesis_items, watchlist_items, alert_items, decision_items, incidents)
     )
     if match is None:
-        return "\n".join([
-            "=" * 76,
-            "EVENT OPPORTUNITY AUDIT (research-only)",
-            "=" * 76,
-            f"target: {clean}",
-            f"profile: {profile or 'default'}",
-            "No matching hypothesis, watchlist row, alert snapshot, or route decision found.",
-            "No secrets, sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
-        ])
+        return _no_match_audit_report(
+            clean,
+            resolved_target,
+            core_items,
+            profile=profile,
+        )
     row = match["row"]
+    resolution_rows = core_items or ([core_match.primary_row] if core_match is not None else [])
+    core_resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, resolution_rows)
     components = _components(row)
     incident = _incident_context(row, components, incidents)
     upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
@@ -93,6 +92,10 @@ def format_opportunity_audit(
         f"target: {clean}",
         f"profile: {profile or 'default'}",
         f"matched_source: {match['source']}",
+        f"canonical_core_opportunity_id: {core_resolution.canonical_core_opportunity_id or 'none'}",
+        f"input target resolution status: {core_resolution.resolution_status}",
+        f"diagnostic_support_for_core_opportunity_id: {core_resolution.diagnostic_support_for_core_opportunity_id or 'none'}",
+        f"canonical resolution warnings: {_list_value(core_resolution.warnings) if core_resolution.warnings else 'none'}",
         f"quality_field_source: {_quality_source(row)}",
         "",
         "## Candidate summary",
@@ -187,6 +190,33 @@ def format_opportunity_audit(
         "No secrets, Telegram sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
     ]
     return "\n".join(lines)
+
+
+def _no_match_audit_report(
+    clean: str,
+    resolved_target: str,
+    core_store_rows: Iterable[Mapping[str, Any] | object],
+    *,
+    profile: str | None,
+) -> str:
+    core_resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(
+        {"core_opportunity_id": resolved_target},
+        core_store_rows,
+    )
+    return "\n".join([
+        "=" * 76,
+        "EVENT OPPORTUNITY AUDIT (research-only)",
+        "=" * 76,
+        f"target: {clean}",
+        f"profile: {profile or 'default'}",
+        "matched_source: none",
+        f"canonical_core_opportunity_id: {core_resolution.canonical_core_opportunity_id or 'none'}",
+        f"input target resolution status: {core_resolution.resolution_status}",
+        f"diagnostic_support_for_core_opportunity_id: {core_resolution.diagnostic_support_for_core_opportunity_id or 'none'}",
+        f"canonical resolution warnings: {_list_value(core_resolution.warnings) if core_resolution.warnings else 'none'}",
+        "No matching hypothesis, watchlist row, alert snapshot, or route decision found.",
+        "No secrets, sends, trades, paper rows, normal RSI rows, or event-fade state were touched.",
+    ])
 
 
 def _near_miss_lines(
@@ -410,6 +440,9 @@ def _find_core_match(
         identifiers.update(str(row.get("alert_id") or "") for row in item.supporting_rows)
         identifiers.update(str(row.get("card_id") or "") for row in item.supporting_rows)
         identifiers.update(str(row.get("snapshot_id") or "") for row in item.supporting_rows)
+        identifiers.update(str(row.get("core_opportunity_id") or "") for row in item.supporting_rows)
+        identifiers.update(_as_list_values(item.primary_row.get("supporting_row_ids")))
+        identifiers.update(_as_list_values(item.primary_row.get("diagnostic_row_ids")))
         if clean in identifiers or clean_l in {value.lower() for value in identifiers if value}:
             return item
     return None
@@ -532,6 +565,16 @@ def _row_matches(row: Mapping[str, Any], clean: str, original: str) -> bool:
     })
     text_keys = {str(value) for value in keys if value not in (None, "")}
     return clean in text_keys or original in text_keys or ("ea:" + clean) in text_keys
+
+
+def _as_list_values(value: Any) -> set[str]:
+    if value in (None, "", [], {}, ()):
+        return set()
+    if isinstance(value, str):
+        return {value}
+    if isinstance(value, Iterable) and not isinstance(value, Mapping):
+        return {str(item) for item in value if str(item or "")}
+    return {str(value)}
 
 
 def _entry_row(entry: event_watchlist.EventWatchlistEntry | Mapping[str, Any]) -> dict[str, Any]:

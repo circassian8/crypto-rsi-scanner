@@ -253,7 +253,12 @@ def build_daily_brief(
         *_system_health_summary_lines(latest),
         "",
         "## Source Coverage / Evidence Acquisition",
-        *_source_coverage_summary_lines([*core_source_rows, *alerts], near_miss_candidates, upgrade_candidates),
+        *_source_coverage_summary_lines(
+            [*core_source_rows, *alerts],
+            near_miss_candidates,
+            upgrade_candidates,
+            acquisition_rows=acquisition_rows,
+        ),
         "",
         "### Provider Health by Source Pack",
         *_provider_health_by_pack_lines(provider_health_rows or {}),
@@ -812,6 +817,8 @@ def _source_coverage_summary_lines(
     rows: Iterable[Mapping[str, Any] | object],
     near_misses: Iterable[event_near_miss.EventNearMissCandidate],
     upgrade_candidates: Iterable[event_near_miss.EventNearMissCandidate],
+    *,
+    acquisition_rows: Iterable[Mapping[str, Any]] = (),
 ) -> list[str]:
     row_maps = [_row_mapping(row) for row in rows]
     row_maps = [row for row in row_maps if row]
@@ -819,10 +826,37 @@ def _source_coverage_summary_lines(
     near = list(near_misses)
     upgrades = list(upgrade_candidates)
     gaps = [item for item in (*near, *upgrades) if item.source_coverage_gap]
-    plans = [item for item in (*near, *upgrades) if item.evidence_acquisition_attempted]
+    planned = [item for item in (*near, *upgrades) if item.evidence_acquisition_plan]
+    planned_attempted = [item for item in (*near, *upgrades) if item.evidence_acquisition_attempted]
+    executed_rows = [dict(row) for row in acquisition_rows if isinstance(row, Mapping)]
+    provider_queries = sum(
+        int(row.get("queries_executed") or row.get("evidence_acquisition_queries_executed") or 0)
+        for row in executed_rows
+    )
+    accepted = sum(
+        1 for row in executed_rows
+        if str(row.get("status") or "") == event_evidence_acquisition.EvidenceAcquisitionStatus.ACCEPTED_EVIDENCE_FOUND.value
+        or bool(row.get("accepted_evidence"))
+    )
+    no_results = sum(
+        1 for row in executed_rows
+        if str(row.get("status") or "") == event_evidence_acquisition.EvidenceAcquisitionStatus.NO_RESULTS.value
+    )
+    rejected_only = sum(
+        1 for row in executed_rows
+        if str(row.get("status") or "") == event_evidence_acquisition.EvidenceAcquisitionStatus.REJECTED_RESULTS_ONLY.value
+    )
     return [
         f"- Source registry: {summary}",
-        f"- Evidence plans: {len(plans)} candidate(s) selected for source-pack acquisition planning.",
+        (
+            "- Evidence acquisition funnel: "
+            f"evidence_plans_created={len(planned) or len(planned_attempted)}, "
+            f"acquisition_requests_executed={len(executed_rows)}, "
+            f"provider_queries_executed={provider_queries}, "
+            f"accepted_evidence_found={accepted}, "
+            f"no_results={no_results}, "
+            f"rejected_only={rejected_only}"
+        ),
         f"- Source coverage gaps: {len(gaps)} candidate(s) need healthier or more specific source coverage.",
         "- Evidence absence rule: broad/degraded RSS/GDELT/Polymarket gaps are not treated as strong negative proof.",
     ]
@@ -965,8 +999,12 @@ def _near_miss_invalidation(item: event_near_miss.EventNearMissCandidate) -> str
 
 def _card_groups_for_daily_brief(paths: Iterable[Path]) -> dict[str, list[Path]]:
     grouped: dict[str, list[Path]] = {name: [] for name in event_research_cards.CARD_INDEX_GROUPS}
+    group_map = event_research_cards.card_index_group_map(paths)
     for path in paths:
-        grouped.setdefault(event_research_cards.card_index_group(path), []).append(Path(path))
+        p = Path(path)
+        if p.name == "index.md":
+            continue
+        grouped.setdefault(group_map.get(p) or event_research_cards.card_index_group(p), []).append(p)
     return grouped
 
 
@@ -1268,16 +1306,27 @@ def _core_market_freshness_line(item: event_core_opportunities.CoreOpportunity) 
     if not row_infos:
         row_infos.append(("missing", "unknown", "unknown", False, False))
     status_rank = {"fresh": 0, "fixture_allowed_stale": 1, "stale": 2, "unknown": 3, "missing": 4}
-    best = sorted(row_infos, key=lambda item_info: status_rank.get(item_info[0], 5))[0]
-    stale_or_missing = sum(1 for status, _, _, cap, _ in row_infos if cap or status in {"stale", "unknown", "missing"})
+    core_components = _components_for_row(item.primary_row)
+    core_status = str(item.primary_row.get("market_context_freshness_status") or core_components.get("market_context_freshness_status") or "")
+    core_source = str(item.primary_row.get("market_context_source") or core_components.get("market_context_source") or "")
+    core_age = _market_age_label(item.primary_row, core_components)
+    if not core_status:
+        best = sorted(row_infos, key=lambda item_info: status_rank.get(item_info[0], 5))[0]
+        core_status, core_source, core_age = best[0], best[1], best[2]
+    support_infos = row_infos[1:] if len(row_infos) > 1 else ()
+    support_gaps = sum(1 for status, _, _, cap, _ in support_infos if cap or status in {"stale", "unknown", "missing"})
+    core_refresh_needed = core_status in {"", "stale", "unknown", "missing"}
+    support_refresh_needed = 0 if core_status in {"fresh", "fixture_allowed_stale"} else support_gaps
     refresh_attempted = any(info[4] for info in row_infos)
-    refresh_needed = stale_or_missing > 0
     return (
         f"  - {item.core_opportunity_id} {item.symbol}/{item.coin_id}: "
-        f"status={best[0]} source={best[1]} age={best[2]} "
+        f"core_market_freshness_status={core_status or 'missing'} "
+        f"core_market_context_source={core_source or 'unknown'} "
+        f"core_market_context_age={core_age} "
         f"refresh_attempted={str(refresh_attempted).lower()} "
-        f"refresh_needed={str(refresh_needed).lower()} "
-        f"support_rows_stale_or_missing={stale_or_missing}"
+        f"core_market_refresh_needed={str(core_refresh_needed).lower()} "
+        f"support_rows_stale_or_missing_count={support_gaps} "
+        f"support_rows_needing_refresh_count={support_refresh_needed}"
     )
 
 

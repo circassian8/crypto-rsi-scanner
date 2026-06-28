@@ -2341,13 +2341,27 @@ def event_alpha_cycle(
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
     )
+    pipeline_result, core_store_result = _write_event_core_opportunities_for_run(
+        pipeline_result,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        card_paths=(),
+    )
+    latest_core_rows = event_core_opportunity_store.load_core_opportunities(
+        _event_core_opportunity_store_config_from_runtime().path,
+        latest_run=True,
+        run_id=run_id,
+    ).rows
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
         watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
         card_write = event_research_cards.write_research_cards(
             config.EVENT_RESEARCH_CARDS_DIR,
             watchlist_entries=watchlist.entries,
-            alert_rows=[],
+            alert_rows=latest_core_rows,
             route_decisions=pipeline_result.router_result.decisions,
             selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
             now=now,
@@ -2361,15 +2375,6 @@ def event_alpha_cycle(
         pipeline_result = replace(pipeline_result, research_card_paths=card_write.card_paths)
         print(event_research_cards.format_card_write_result(card_write))
         print("")
-    pipeline_result, core_store_result = _write_event_core_opportunities_for_run(
-        pipeline_result,
-        now=now,
-        run_id=run_id,
-        profile=profile_for_run,
-        run_mode=run_mode,
-        artifact_namespace=artifact_namespace,
-        card_paths=pipeline_result.research_card_paths,
-    )
     print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
     store_cfg = _event_alpha_alert_store_config_from_runtime()
     if run_mode in event_alpha_artifacts.NON_OPERATIONAL_RUN_MODES:
@@ -2389,6 +2394,7 @@ def event_alpha_cycle(
             run_mode=run_mode,
             artifact_namespace=artifact_namespace,
             research_card_paths=pipeline_result.research_card_paths,
+            core_opportunity_rows=latest_core_rows,
         )
     pipeline_result = replace(
         pipeline_result,
@@ -2856,6 +2862,20 @@ def _event_alpha_notify_cycle_body(
         run_mode=run_mode,
         artifact_namespace=artifact_namespace,
     )
+    pipeline_result, core_store_result = _write_event_core_opportunities_for_run(
+        pipeline_result,
+        now=now,
+        run_id=run_id,
+        profile=profile_for_run,
+        run_mode=run_mode,
+        artifact_namespace=artifact_namespace,
+        card_paths=(),
+    )
+    latest_core_rows = event_core_opportunity_store.load_core_opportunities(
+        _event_core_opportunity_store_config_from_runtime().path,
+        latest_run=True,
+        run_id=run_id,
+    ).rows
     card_write = None
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
@@ -2863,7 +2883,7 @@ def _event_alpha_notify_cycle_body(
         card_write = event_research_cards.write_research_cards(
             config.EVENT_RESEARCH_CARDS_DIR,
             watchlist_entries=watchlist.entries,
-            alert_rows=[],
+            alert_rows=latest_core_rows,
             route_decisions=pipeline_result.router_result.decisions,
             selected_tiers=config.EVENT_RESEARCH_CARDS_WRITE_TIERS,
             now=now,
@@ -2983,6 +3003,7 @@ def _event_alpha_notify_cycle_body(
         artifact_namespace=artifact_namespace,
         delivery_rows=delivery_rows,
         research_card_paths=pipeline_result.research_card_paths,
+        core_opportunity_rows=latest_core_rows,
     )
     pipeline_result = replace(
         pipeline_result,
@@ -3015,6 +3036,7 @@ def _event_alpha_notify_cycle_body(
         f"success={str(incident_store_result.success).lower()}"
         + (f" block={incident_store_result.block_reason}" if incident_store_result.block_reason else "")
     )
+    print(event_core_opportunity_store.format_core_opportunity_store_write_result(core_store_result))
     run_row = event_alpha_run_ledger.append_run_record(
         pipeline_result,
         cfg=_event_alpha_run_ledger_config_from_runtime(),

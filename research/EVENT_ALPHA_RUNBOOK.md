@@ -295,6 +295,16 @@ present. Raw hypothesis/watchlist/support rows remain useful for diagnostics,
 but they should not create separate visible duplicates or downgrade the final
 core opportunity.
 
+Research cards and alert snapshots must resolve through the same canonical
+store. A Core Opportunity Card should embed a `core_opportunity_id` that exists
+in `event_core_opportunities.jsonl` for the selected profile/namespace. If a
+source-noise, ticker-collision, or control row is useful for audit, it should be
+stored as diagnostic support with `diagnostic_support_for_core_opportunity_id`
+and `is_diagnostic_snapshot=true`, not as a new visible core id. The daily brief
+uses the research-card index grouping, so card groups and brief groups should
+agree by default. If they do not, run the artifact doctor before treating the
+bundle as ready for Pro-model review.
+
 Near-miss reporting has two operator buckets. `Near-Miss Candidates` are
 currently non-alertable/local candidates close to promotion but missing fixable
 evidence. `Upgrade Candidates` are already validated digest or watchlist rows
@@ -778,6 +788,20 @@ candidate may remain local-only. Fixture/e2e profiles may label old fixture
 context as `fixture_allowed_stale`; live-style profiles should prefer fresh
 provider snapshots.
 
+Market Freshness Readiness is split into core and support fields. Trust
+`core_market_freshness_status`, `core_market_context_source`,
+`core_market_context_age`, and `core_market_refresh_needed` for the visible
+opportunity. `support_rows_stale_or_missing_count` and
+`support_rows_needing_refresh_count` are diagnostics; stale support rows should
+not make a fresh canonical core look missing or contradictory.
+
+Source Coverage / Evidence Acquisition is also split. `evidence_plans_created`
+counts planning work, while `acquisition_requests_executed` and
+`provider_queries_executed` count actual execution. A run can execute
+acquisition requests even when no new plans were created in that report window,
+so use the executed/accepted/no-result/rejected counters instead of assuming a
+zero plan count means no provider work happened.
+
 `notify_llm_quality` is the live-style no-send quality profile for catalyst
 frame and signal-quality review. `notify_llm_quality_frame` is the fixture/no-send
 proof profile that exercises the same artifact shape with deterministic frame
@@ -1108,7 +1132,10 @@ mixed namespaces, provider health, budget rows, feedback/outcome IDs, and card
 coverage. Research card coverage counts real card Markdown files separately
 from `index.md`; `index.md` is required as navigation but cannot satisfy the
 card count by itself. Strict mode blocks current cards missing Artifact Lineage
-or a stable feedback target. Fresh alert snapshots must carry
+or a stable feedback target. When canonical core-store rows are present, strict
+mode also checks Core Opportunity Cards and non-diagnostic snapshots against the
+store, warns on diagnostic/source-noise rows with fake core ids, and reports
+daily-brief/index card-group mismatches. Fresh alert snapshots must carry
 `final_route_after_quality_gate`, `final_tier_after_quality_gate`,
 `alertable_after_quality_gate`, and a consistent quality verdict. Strict mode
 blocks fresh/current rows whose final route is alertable while the opportunity

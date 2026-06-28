@@ -51,6 +51,19 @@ def card_index_group(path: Path, *, card_groups: Mapping[Path | str, str] | None
     return _card_index_group(Path(path), card_groups=card_groups)
 
 
+def card_index_group_map(paths: Iterable[str | Path]) -> dict[Path, str]:
+    """Return card groups, preferring the local index.md when available."""
+    cards = [Path(path) for path in paths]
+    out: dict[Path, str] = {}
+    for index_path in _candidate_index_paths(cards):
+        out.update(_parse_index_groups(index_path))
+    for path in cards:
+        if path.name == "index.md":
+            continue
+        out.setdefault(path, _card_index_group(path))
+    return out
+
+
 def render_research_card(
     key: str,
     *,
@@ -618,6 +631,21 @@ def _selected_entries(
 ) -> list[event_watchlist.EventWatchlistEntry]:
     selected_by_key: dict[str, event_watchlist.EventWatchlistEntry] = {}
     all_by_key = {entry.key: entry for entry in entries}
+    alert_row_list = list(alert_rows)
+    stored_core_rows = [
+        dict(row) for row in alert_row_list
+        if isinstance(row, Mapping) and row.get("row_type") == "event_core_opportunity"
+    ]
+    if stored_core_rows:
+        ordered: list[event_watchlist.EventWatchlistEntry] = []
+        seen_core: set[str] = set()
+        for opportunity in event_core_opportunities.visible_core_opportunities(stored_core_rows):
+            if opportunity.core_opportunity_id in seen_core:
+                continue
+            ordered.append(_entry_from_core_opportunity(opportunity))
+            seen_core.add(opportunity.core_opportunity_id)
+        if ordered:
+            return ordered
     states = set(selected_tiers or {
         event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
         event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
@@ -641,7 +669,7 @@ def _selected_entries(
         for decision in decisions:
             if event_alpha_router.alertable_after_quality_gate(decision):
                 selected_by_key[decision.entry.key] = decision.entry
-    core_rows = [*decisions, *entries, *list(alert_rows)]
+    core_rows = [*decisions, *entries, *alert_row_list]
     visible_core = event_core_opportunities.visible_core_opportunities(core_rows)
     if visible_core:
         ordered: list[event_watchlist.EventWatchlistEntry] = []
@@ -837,6 +865,20 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
         "quality_state_block_reason",
         "feedback_target",
         "feedback_target_type",
+        "main_frame_type",
+        "main_frame_role",
+        "main_frame_subject",
+        "main_frame_actor",
+        "main_frame_object",
+        "main_frame_evidence_quote",
+        "frame_status",
+        "selected_main_catalyst_reason",
+        "rule_predicted_impact_path",
+        "llm_predicted_main_frame_type",
+        "frame_rule_disagreement",
+        "negated_frame_ids",
+        "corrective_frame_ids",
+        "frame_summary",
     ):
         value = row.get(key)
         if value not in (None, "", [], {}, ()):
@@ -943,6 +985,50 @@ def _render_index(
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _candidate_index_paths(paths: Iterable[Path]) -> tuple[Path, ...]:
+    indexes: list[Path] = []
+    parents: set[Path] = set()
+    for path in paths:
+        p = Path(path)
+        if p.name == "index.md":
+            indexes.append(p)
+        else:
+            parents.add(p.parent)
+    for parent in parents:
+        candidate = parent / "index.md"
+        if candidate.exists():
+            indexes.append(candidate)
+    return tuple(dict.fromkeys(indexes))
+
+
+def _parse_index_groups(path: Path) -> dict[Path, str]:
+    if not path.exists():
+        return {}
+    current: str | None = None
+    out: dict[Path, str] = {}
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            name = stripped[3:].strip()
+            current = name if name in CARD_INDEX_GROUPS else None
+            continue
+        if current is None or not stripped.startswith("- ["):
+            continue
+        match = re.search(r"\[([^\]]+\.md)\]\(([^)]+)\)", stripped)
+        if not match:
+            continue
+        target = Path(match.group(2))
+        if not target.is_absolute():
+            target = path.parent / target
+        out[target] = current
+        out[path.parent / match.group(1)] = current
+    return out
+
+
 def _card_index_group(path: Path, *, card_groups: Mapping[Path | str, str] | None = None) -> str:
     if card_groups:
         mapped = card_groups.get(path) or card_groups.get(str(path)) or card_groups.get(path.name)
@@ -1046,6 +1132,7 @@ def _find_alert(key: str, rows: list[Mapping[str, Any]]) -> Mapping[str, Any] | 
             str(row.get("alert_id") or ""),
             str(row.get("card_id") or ""),
             str(row.get("snapshot_id") or ""),
+            str(row.get("core_opportunity_id") or ""),
             str(row.get("event_id") or ""),
             str(row.get("hypothesis_id") or ""),
             str(row.get("incident_id") or ""),
@@ -1355,9 +1442,22 @@ def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
 
 
 def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) -> list[str]:
-    if entry is None or entry.relationship_type != "impact_hypothesis":
+    if entry is None:
         return []
     components = dict(entry.latest_score_components or {})
+    has_hypothesis_context = entry.relationship_type == "impact_hypothesis" or any(
+        components.get(key) not in (None, "", [], {}, ())
+        for key in (
+            "hypothesis_id",
+            "primary_hypothesis_id",
+            "supporting_hypothesis_ids",
+            "main_frame_type",
+            "main_frame_subject",
+            "impact_path_reason",
+        )
+    )
+    if not has_hypothesis_context:
+        return []
     validated_asset = components.get("validated_asset") if isinstance(components.get("validated_asset"), Mapping) else {}
     validated_symbol = components.get("validated_symbol") or validated_asset.get("symbol") or entry.symbol
     validated_coin_id = components.get("validated_coin_id") or validated_asset.get("coin_id") or entry.coin_id

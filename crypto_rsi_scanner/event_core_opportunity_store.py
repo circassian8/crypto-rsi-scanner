@@ -225,8 +225,28 @@ def _row_from_core_opportunity(
         "initial_opportunity_score": initial_score if initial_score is not None else item.opportunity_score_final,
         "market_refresh_attempted": _any_truthy(all_rows, ("market_refresh_attempted", "targeted_market_refresh_attempted")),
         "market_refresh_success": _any_truthy(all_rows, ("market_refresh_success", "targeted_market_refresh_success")),
+        "market_context_freshness_status": _first_text(all_rows, ("market_context_freshness_status",)),
+        "market_context_source": _first_text(all_rows, ("market_context_source",)),
+        "market_context_observed_at": _first_text(all_rows, ("market_context_observed_at",)),
+        "market_context_age_hours": _first_float(all_rows, ("market_context_age_hours",)),
+        "market_context_freshness_cap_applied": _any_truthy(all_rows, ("market_context_freshness_cap_applied",)),
+        "market_context_data_quality": _first_text(all_rows, ("market_context_data_quality",)),
         "market_confirmation_before": market_before,
         "market_confirmation_after": market_after,
+        "main_frame_type": _first_text(all_rows, ("main_frame_type",)),
+        "main_frame_role": _first_text(all_rows, ("main_frame_role",)),
+        "main_frame_subject": _first_text(all_rows, ("main_frame_subject",)),
+        "main_frame_actor": _first_text(all_rows, ("main_frame_actor",)),
+        "main_frame_object": _first_text(all_rows, ("main_frame_object",)),
+        "main_frame_evidence_quote": _first_text(all_rows, ("main_frame_evidence_quote",)),
+        "frame_status": _first_text(all_rows, ("frame_status", "catalyst_frame_status")),
+        "selected_main_catalyst_reason": _first_text(all_rows, ("selected_main_catalyst_reason",)),
+        "rule_predicted_impact_path": _first_text(all_rows, ("rule_predicted_impact_path",)),
+        "llm_predicted_main_frame_type": _first_text(all_rows, ("llm_predicted_main_frame_type",)),
+        "frame_rule_disagreement": _first_value(all_rows, ("frame_rule_disagreement",)),
+        "negated_frame_ids": _first_list(all_rows, ("negated_frame_ids",)),
+        "corrective_frame_ids": _first_list(all_rows, ("corrective_frame_ids",)),
+        "frame_summary": _first_list(all_rows, ("frame_summary",)),
         "evidence_acquisition_attempted": _any_truthy(all_rows, ("evidence_acquisition_attempted", "source_acquisition_attempted")),
         "evidence_acquisition_status": _first_text(all_rows, ("evidence_acquisition_status", "acquisition_status", "source_acquisition_status")),
         "evidence_quality_before": evidence_before,
@@ -296,6 +316,31 @@ def _first_float(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> fl
             if parsed is not None:
                 return parsed
     return None
+
+
+def _first_value(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> Any:
+    for row in rows:
+        components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else row.get("score_components")
+        for key in keys:
+            value = row.get(key)
+            if value in (None, "", [], {}, ()):
+                value = components.get(key) if isinstance(components, Mapping) else None
+            if value not in (None, "", [], {}, ()):
+                return value
+    return None
+
+
+def _first_list(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> list[Any]:
+    value = _first_value(rows, keys)
+    if value in (None, "", [], {}, ()):
+        return []
+    if isinstance(value, Mapping):
+        return [dict(value)]
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(";") if item.strip()]
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+        return list(value)
+    return [value]
 
 
 def _best_float(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> float | None:
