@@ -31,9 +31,11 @@ def build_quality_review(
     hypothesis_rows: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry | Mapping[str, Any]] = (),
     alert_rows: Iterable[Mapping[str, Any]] = (),
+    core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
     stale_warning: str | None = None,
 ) -> EventAlphaQualityReviewResult:
     rows = [
+        *_normalize_rows(core_opportunity_rows, source="core_opportunity"),
         *_normalize_rows(hypothesis_rows, source="hypothesis"),
         *_normalize_rows((_entry_row(entry) for entry in watchlist_entries), source="watchlist"),
         *_normalize_rows(alert_rows, source="alert_snapshot"),
@@ -48,40 +50,48 @@ def build_quality_review(
 
 def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
     rows = list(result.rows)
+    primary_rows = _primary_review_rows(rows)
+    diagnostic_rows = _diagnostic_review_rows(rows, primary_rows)
+    section_rows = primary_rows or rows
     lines = [
         "=" * 76,
         "EVENT ALPHA QUALITY REVIEW (research-only; no sends/trades)",
         "=" * 76,
         f"profile: {result.profile or 'default'}",
-        f"candidates: {len(rows)}",
+        f"candidates: {len(primary_rows) if primary_rows else len(rows)} core_or_primary ({len(rows)} total rows)",
         "fresh_vs_legacy: " + _fresh_legacy_summary(rows),
         "quality_coverage: " + _quality_coverage_summary(rows),
         "latest_run: " + _latest_run_summary(rows),
-        "opportunity_levels: " + _format_counts(_counts(rows, "opportunity_level")),
-        "impact_path_types: " + _format_counts(_counts(rows, "impact_path_type")),
-        "candidate_roles: " + _format_counts(_counts(rows, "candidate_role")),
-        "event_archetypes: " + _format_counts(_counts(rows, "event_archetype")),
-        "cause_statuses: " + _format_counts(_counts(rows, "cause_status")),
-        "market_reaction_confirmed: " + _format_counts(_counts(rows, "market_reaction_confirmed")),
-        "causal_mechanism_confirmed: " + _format_counts(_counts(rows, "causal_mechanism_confirmed")),
-        "evidence_specificity: " + _format_counts(_counts(rows, "evidence_specificity")),
-        "market_confirmation_levels: " + _format_counts(_counts(rows, "market_confirmation_level")),
+        "opportunity_levels: " + _format_counts(_counts(section_rows, "opportunity_level")),
+        "impact_path_types: " + _format_counts(_counts(section_rows, "impact_path_type")),
+        "candidate_roles: " + _format_counts(_counts(section_rows, "candidate_role")),
+        "event_archetypes: " + _format_counts(_counts(section_rows, "event_archetype")),
+        "cause_statuses: " + _format_counts(_counts(section_rows, "cause_status")),
+        "market_reaction_confirmed: " + _format_counts(_counts(section_rows, "market_reaction_confirmed")),
+        "causal_mechanism_confirmed: " + _format_counts(_counts(section_rows, "causal_mechanism_confirmed")),
+        "evidence_specificity: " + _format_counts(_counts(section_rows, "evidence_specificity")),
+        "market_confirmation_levels: " + _format_counts(_counts(section_rows, "market_confirmation_level")),
         "snapshot_quality_classifications: " + _format_counts(_counts(rows, "_snapshot_quality_classification")),
         "watchlist_state_quality: " + _format_counts(_counts(rows, "state_quality_classification")),
         "candidate_discovery_funnel: " + _format_counts(result.candidate_discovery_funnel),
+        f"operator_view: canonical_core_rows={len([row for row in rows if _is_core_review_row(row)])} support_or_diagnostic_rows={len(diagnostic_rows)}",
         "quality_note: unknown/insufficient_data rows are conservative local-only verdicts or legacy rows, not hidden promotions.",
         "",
         "Strong opportunities:",
     ]
     if result.stale_warning:
         lines.append("stale_artifact_warning: " + result.stale_warning)
-    lines.extend(_candidate_lines(_strong_opportunities(rows), limit=8))
+    lines.extend(_candidate_lines(_strong_opportunities(section_rows), limit=8))
     lines.extend(["", "Validated but market-unconfirmed:"])
-    lines.extend(_candidate_lines(_market_unconfirmed(rows), limit=8))
+    lines.extend(_candidate_lines(_market_unconfirmed(section_rows), limit=8))
+    lines.extend(["", "Watchlist opportunities:"])
+    lines.extend(_candidate_lines(_watchlist_opportunities(section_rows), limit=8))
+    lines.extend(["", "Near-miss candidates:"])
+    lines.extend(_candidate_lines(_near_miss_rows(section_rows), limit=8))
     lines.extend(["", "Weak co-occurrence / local-only:"])
-    lines.extend(_candidate_lines(_weak_local(rows), limit=8))
+    lines.extend(_candidate_lines(_weak_local(section_rows), limit=8))
     lines.extend(["", "Sector hypotheses awaiting validation:"])
-    lines.extend(_candidate_lines(_sector_pending(rows), limit=8))
+    lines.extend(_candidate_lines(_sector_pending(section_rows), limit=8))
     lines.extend(["", "Rejected candidates worth reviewing:"])
     lines.extend(_candidate_lines(_rejected_review(rows), limit=8))
     lines.extend(["", "Possible false positives:"])
@@ -91,17 +101,19 @@ def format_quality_review(result: EventAlphaQualityReviewResult) -> str:
     lines.extend(["", "Quality-Capped Watchlist Rows:"])
     lines.extend(_quality_capped_state_lines(rows, limit=8))
     lines.extend(["", "Market Freshness Readiness:"])
-    lines.extend(_market_freshness_readiness_lines(rows, limit=8))
+    lines.extend(_market_freshness_readiness_lines(section_rows, limit=8))
     lines.extend(["", "Top upgrade candidates:"])
-    lines.extend(_upgrade_lines(rows, limit=6))
+    lines.extend(_upgrade_lines(section_rows, limit=6))
     lines.extend(["", "Top downgrade risks:"])
-    lines.extend(_downgrade_lines(rows, limit=6))
+    lines.extend(_downgrade_lines(section_rows, limit=6))
     lines.extend(["", "Quality Tuning Suggestions:"])
-    lines.extend(_tuning_suggestion_lines(rows, result.candidate_discovery_funnel))
+    lines.extend(_tuning_suggestion_lines(section_rows, result.candidate_discovery_funnel))
+    lines.extend(["", "Diagnostics / support rows:"])
+    lines.extend(_diagnostic_summary_lines(diagnostic_rows, limit=8))
     lines.extend(["", "Gaps:"])
-    lines.append("- missing market confirmation: " + _format_count_list(_missing(rows, "market_confirmation_level", {"", "unknown", "none"})))
-    lines.append("- missing direct impact path: " + _format_count_list(_missing(rows, "impact_path_strength", {"", "unknown", "none", "weak"})))
-    lines.append("- blocked by source quality: " + _format_count_list(_source_quality_blocked(rows)))
+    lines.append("- missing market confirmation: " + _format_count_list(_missing(section_rows, "market_confirmation_level", {"", "unknown", "none"})))
+    lines.append("- missing direct impact path: " + _format_count_list(_missing(section_rows, "impact_path_strength", {"", "unknown", "none", "weak"})))
+    lines.append("- blocked by source quality: " + _format_count_list(_source_quality_blocked(section_rows)))
     lines.append("")
     lines.append("Research-only review; no notifications, trades, paper rows, live RSI rows, or event-fade state were changed.")
     return "\n".join(lines).rstrip()
@@ -137,6 +149,29 @@ def _normalize_rows(rows: Iterable[Mapping[str, Any]], *, source: str) -> list[d
         )
         out.append(data)
     return out
+
+
+def _primary_review_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    core_rows = [row for row in rows if _is_core_review_row(row)]
+    if core_rows:
+        return sorted(core_rows, key=lambda row: _row_rank(row), reverse=True)
+    return _dedupe_core_opportunity_rows(rows)
+
+
+def _is_core_review_row(row: Mapping[str, Any]) -> bool:
+    return str(row.get("_review_source") or "") == "core_opportunity" or str(row.get("row_type") or "") == "event_core_opportunity"
+
+
+def _diagnostic_review_rows(rows: list[dict[str, Any]], primary_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    primary_ids = {str(row.get("core_opportunity_id") or "").strip() for row in primary_rows if str(row.get("core_opportunity_id") or "").strip()}
+    diagnostics: list[dict[str, Any]] = []
+    for row in rows:
+        if _is_core_review_row(row):
+            continue
+        core_id = str(row.get("core_opportunity_id") or "").strip()
+        if event_core_opportunities.row_is_diagnostic(row) or (core_id and core_id in primary_ids):
+            diagnostics.append(row)
+    return diagnostics
 
 
 def _entry_row(entry: event_watchlist.EventWatchlistEntry | Mapping[str, Any]) -> dict[str, Any]:
@@ -307,12 +342,41 @@ def _market_unconfirmed(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def _watchlist_opportunities(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        row for row in rows
+        if str(row.get("opportunity_level") or "") == "watchlist"
+        or str(row.get("final_state_after_quality_gate") or row.get("state") or "") == "WATCHLIST"
+    ]
+
+
+def _near_miss_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if _row_is_already_promoted(row):
+            continue
+        if _false_positive_suspicion_reason(row):
+            continue
+        level = str(row.get("opportunity_level") or "")
+        impact = str(row.get("impact_path_type") or "")
+        try:
+            score = float(row.get("opportunity_score_final") or row.get("latest_score") or 0.0)
+        except (TypeError, ValueError):
+            score = 0.0
+        if level in {"exploratory", "local_only"} and score >= 50 and impact not in {"generic_cooccurrence_only", "insufficient_data"}:
+            out.append(row)
+    return out
+
+
 def _weak_local(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         row for row in rows
-        if str(row.get("opportunity_level") or "") in {"local_only", "exploratory", "unknown"}
-        or str(row.get("impact_path_type") or "") == "generic_cooccurrence_only"
-        or str(row.get("impact_path_strength") or "") in {"weak", "none"}
+        if not _row_is_already_promoted(row)
+        and (
+            str(row.get("opportunity_level") or "") in {"local_only", "exploratory", "unknown"}
+            or str(row.get("impact_path_type") or "") == "generic_cooccurrence_only"
+            or str(row.get("impact_path_strength") or "") in {"weak", "none"}
+        )
     ]
 
 
@@ -624,6 +688,8 @@ def _candidate_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
 def _upgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
     candidates = []
     for row in _dedupe_core_opportunity_rows(rows):
+        if _row_is_high_priority(row) or str(row.get("opportunity_level") or "") not in {"validated_digest", "watchlist"}:
+            continue
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=row.get("_components") or row)
         if not upgrade.upgrade_requirements:
             continue
@@ -658,7 +724,58 @@ def _downgrade_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
 
 
 def _dedupe_core_opportunity_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [dict(item.primary_row) for item in event_core_opportunities.aggregate_core_opportunities(rows)]
+    rows_list = [dict(row) for row in rows]
+    core_rows = [row for row in rows_list if _is_core_review_row(row)]
+    if core_rows:
+        return sorted(core_rows, key=lambda row: _row_rank(row), reverse=True)
+    return [dict(item.primary_row) for item in event_core_opportunities.aggregate_core_opportunities(rows_list)]
+
+
+def _row_is_high_priority(row: Mapping[str, Any]) -> bool:
+    return (
+        str(row.get("opportunity_level") or "") == "high_priority"
+        or str(row.get("final_route_after_quality_gate") or row.get("route") or "") == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
+        or str(row.get("final_state_after_quality_gate") or row.get("state") or "") == event_watchlist.EventWatchlistState.HIGH_PRIORITY.value
+    )
+
+
+def _row_is_already_promoted(row: Mapping[str, Any]) -> bool:
+    route = str(row.get("final_route_after_quality_gate") or row.get("route") or "")
+    level = str(row.get("opportunity_level") or "")
+    state = str(row.get("final_state_after_quality_gate") or row.get("state") or "")
+    return (
+        event_alpha_router.route_value_is_alertable(route)
+        or route in {
+            event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value,
+        }
+        or level in {"validated_digest", "watchlist", "high_priority"}
+        or state in {
+            event_watchlist.EventWatchlistState.WATCHLIST.value,
+            event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+            event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
+        }
+    )
+
+
+def _diagnostic_summary_lines(rows: list[dict[str, Any]], *, limit: int) -> list[str]:
+    if not rows:
+        return ["- none"]
+    out = [
+        f"- support_or_diagnostic_rows={len(rows)}",
+        "- by_source: " + _format_counts(_counts(rows, "_review_source")),
+    ]
+    for row in rows[:limit]:
+        out.append(
+            f"- {_label(row)}: source={row.get('_review_source') or 'row'} "
+            f"level={row.get('opportunity_level') or 'unknown'} "
+            f"path={row.get('impact_path_type') or 'unknown'} "
+            f"reason={row.get('why_other_rows_hidden') or row.get('quality_gate_block_reason') or row.get('quality_state_block_reason') or 'support'}"
+        )
+    if len(rows) > limit:
+        out.append(f"- +{len(rows) - limit} more support/diagnostic rows")
+    return out
 
 
 def _core_opportunity_key(row: Mapping[str, Any]) -> str:

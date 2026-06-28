@@ -4744,6 +4744,10 @@ def event_alpha_quality_review_report(
     artifacts = _event_alpha_quality_artifacts(context)
     result = event_alpha_quality_review.build_quality_review(
         profile=context.profile,
+        core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(
+            context.core_opportunity_store_path,
+            latest_run=True,
+        ).rows,
         hypothesis_rows=artifacts["hypotheses"].rows,
         watchlist_entries=artifacts["watchlist"].entries,
         alert_rows=artifacts["alerts"].rows,

@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Canonical core acquisition view owns source-evidence display
+**Status:** accepted
+**Decision:** Operator-facing cards, audits, quality review, and artifact
+doctor checks must display source-pack acquisition evidence through the
+canonical core opportunity view when `event_core_opportunities.jsonl` is
+available. Accepted/rejected evidence counts, reason codes, samples, source
+pack, provider failures, and before/after verdict metadata should be attached
+to the stored core row or joined through `CoreEvidenceAcquisitionView`.
+Support/control acquisition rows may remain available as diagnostics, but they
+must not override the primary core card, audit, quality-review section, market
+freshness summary, or upgrade-candidate list.
+**Why:** Source acquisition runs after multiple lower-level rows have been
+created. Reading those rows directly can make one promoted opportunity look
+accepted in JSONL, rejected in the card, weak in quality review, and upgradable
+in another section. The canonical core view is the operator contract.
+**Revisit when:** Event Alpha artifacts move from JSONL joins into a typed
+store with schema-enforced source-acquisition relations.
+
 ## 2026-06-28 - Core research cards use final quality-gated verdict copy
 **Status:** accepted
 **Decision:** Canonical Core Opportunity Cards must render their operator-facing

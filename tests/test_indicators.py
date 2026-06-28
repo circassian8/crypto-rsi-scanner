@@ -28041,6 +28041,104 @@ def test_event_core_opportunity_store_persists_canonical_rows():
         assert set(by_symbol) == {"AAVE", "MEME", "RUNE", "VELVET"}
 
 
+def test_core_evidence_acquisition_view_aggregates_canonical_rows():
+    from crypto_rsi_scanner import event_core_opportunity_store
+
+    rows = _canonical_core_fixture_rows()
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-acquisition-view",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(path, latest_run=True).rows
+    by_symbol = {row["symbol"]: row for row in core_rows}
+    acquisition_rows = [
+        {
+            "row_type": "event_evidence_acquisition",
+            "core_opportunity_id": by_symbol["VELVET"]["core_opportunity_id"],
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "source_pack": "proxy_preipo_rwa_pack",
+            "status": "accepted_evidence_found",
+            "accepted_evidence": [{
+                "title": "VELVET offers SpaceX pre-IPO tokenized stock exposure",
+                "reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+            }],
+            "evidence_quality_before": 60,
+            "evidence_quality_after": 91,
+            "opportunity_score_before": 70,
+            "opportunity_score_after": 92,
+            "opportunity_level_before": "validated_digest",
+            "opportunity_level_after": "high_priority",
+        },
+        {
+            "row_type": "event_evidence_acquisition",
+            "core_opportunity_id": by_symbol["RUNE"]["core_opportunity_id"],
+            "symbol": "RUNE",
+            "coin_id": "thorchain",
+            "source_pack": "security_shock_pack",
+            "status": "accepted_evidence_found",
+            "accepted_evidence": [{
+                "title": "RUNE exploit update: THORChain resumes trading after incident",
+                "reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+            }],
+        },
+        {
+            "row_type": "event_evidence_acquisition",
+            "core_opportunity_id": by_symbol["AAVE"]["core_opportunity_id"],
+            "symbol": "AAVE",
+            "coin_id": "aave",
+            "source_pack": "strategic_investment_pack",
+            "status": "no_results",
+        },
+        {
+            "row_type": "event_evidence_acquisition",
+            "core_opportunity_id": by_symbol["MEME"]["core_opportunity_id"],
+            "symbol": "MEME",
+            "coin_id": "memecore",
+            "source_pack": "market_anomaly_pack",
+            "status": "no_results",
+        },
+    ]
+
+    velvet = event_core_opportunity_store.core_evidence_acquisition_view_from_rows(
+        by_symbol["VELVET"]["core_opportunity_id"],
+        core_rows=[by_symbol["VELVET"]],
+        evidence_acquisition_rows=acquisition_rows,
+    )
+    rune = event_core_opportunity_store.core_evidence_acquisition_view_from_rows(
+        by_symbol["RUNE"]["core_opportunity_id"],
+        core_rows=[by_symbol["RUNE"]],
+        evidence_acquisition_rows=acquisition_rows,
+    )
+    aave = event_core_opportunity_store.core_evidence_acquisition_view_from_rows(
+        by_symbol["AAVE"]["core_opportunity_id"],
+        core_rows=[by_symbol["AAVE"]],
+        evidence_acquisition_rows=acquisition_rows,
+    )
+    meme = event_core_opportunity_store.core_evidence_acquisition_view_from_rows(
+        by_symbol["MEME"]["core_opportunity_id"],
+        core_rows=[by_symbol["MEME"]],
+        evidence_acquisition_rows=acquisition_rows,
+    )
+    assert velvet.accepted_evidence_count == 1
+    assert velvet.source_pack == "proxy_preipo_rwa_pack"
+    assert "cryptopanic_currency_tag_match" in velvet.accepted_reason_codes
+    assert "direct_token_mechanism" in velvet.accepted_reason_codes
+    assert velvet.accepted_evidence_samples[0]["title"].startswith("VELVET offers SpaceX")
+    assert rune.accepted_evidence_count == 1
+    assert "RUNE exploit update" in rune.accepted_evidence_samples[0]["title"]
+    assert aave.acquisition_status == "no_results"
+    assert aave.source_pack == "strategic_investment_pack"
+    assert meme.acquisition_status == "no_results"
+    assert meme.source_pack == "market_anomaly_pack"
+
+
 def test_event_core_opportunity_store_uses_refreshed_nested_market_context():
     from crypto_rsi_scanner import event_core_opportunity_store
 
@@ -28331,6 +28429,13 @@ def test_research_card_primary_fields_use_canonical_core_row():
         "main_frame_actor": "Velvet",
         "main_frame_object": "pre-IPO exposure",
         "frame_status": "validated",
+        "evidence_acquisition_accepted_count": 1,
+        "evidence_acquisition_accepted_evidence": [{
+            "title": "VELVET offers SpaceX pre-IPO tokenized stock exposure",
+            "reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+        }],
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+        "evidence_acquisition_results": {"status": "accepted_evidence_found", "accepted": 1, "rejected": 0},
     }
     stale_support = {
         **velvet,
@@ -28352,6 +28457,9 @@ def test_research_card_primary_fields_use_canonical_core_row():
     assert "- State / alert tier: HIGH_PRIORITY / HIGH_PRIORITY_RESEARCH" in card.markdown
     assert "- Source pack: proxy_preipo_rwa_pack" in card.markdown
     assert "- Evidence acquisition attempted: true" in card.markdown
+    assert "accepted=1" in card.markdown
+    assert "cryptopanic_currency_tag_match" in card.markdown
+    assert "VELVET offers SpaceX pre-IPO tokenized stock exposure" in card.markdown
     assert "- Opportunity verdict: high_priority / 92.0" in card.markdown
     assert "- Relationship: venue_value_capture" in card.markdown
     assert "- Quality gate: passed final quality gate (HIGH_PRIORITY_RESEARCH)" in card.markdown
@@ -28359,6 +28467,40 @@ def test_research_card_primary_fields_use_canonical_core_row():
     assert "Quality gate: local-only" not in card.markdown
     assert "validated impact hypothesis promoted to RADAR" not in card.markdown
     assert "STORE_ONLY" not in card.markdown.split("## Artifact Lineage", 1)[0]
+
+
+def test_quality_review_uses_core_opportunities_as_primary_sections():
+    from crypto_rsi_scanner import event_alpha_quality_review, event_core_opportunity_store
+
+    rows = _canonical_core_fixture_rows()
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-quality-review",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(path, latest_run=True).rows
+    review = event_alpha_quality_review.build_quality_review(
+        profile="market_refresh_smoke",
+        core_opportunity_rows=core_rows,
+        hypothesis_rows=rows,
+    )
+    text = event_alpha_quality_review.format_quality_review(review)
+    strong = text.split("Strong opportunities:", 1)[1].split("Validated but market-unconfirmed:", 1)[0]
+    weak = text.split("Weak co-occurrence / local-only:", 1)[1].split("Sector hypotheses awaiting validation:", 1)[0]
+    upgrades = text.split("Top upgrade candidates:", 1)[1].split("Top downgrade risks:", 1)[0]
+    freshness = text.split("Market Freshness Readiness:", 1)[1].split("Top upgrade candidates:", 1)[0]
+    assert "operator_view: canonical_core_rows=4" in text
+    assert "VELVET" in strong
+    assert "VELVET" not in weak
+    assert "VELVET" not in upgrades
+    assert "AAVE" in upgrades
+    assert "status=fresh source=missing" not in freshness
+    assert "support_or_diagnostic_rows=" in text
 
 
 def test_canonical_core_opportunity_view_loads_linked_artifacts():
@@ -28553,9 +28695,27 @@ def test_artifact_doctor_detects_canonical_core_rendering_mismatch_and_acquisiti
                 "- State / alert tier: HIGH_PRIORITY / STORE_ONLY",
                 "- Final route: STORE_ONLY",
                 "- Opportunity verdict: local_only / 0.0",
+                "- Source pack: market_anomaly_pack",
+                "- Evidence acquisition result: status=accepted_evidence_found evidence=accepted accepted=0 rejected=0 final=unchanged",
             ]),
             encoding="utf-8",
         )
+        acquisition_velvet = {
+            "row_type": "event_evidence_acquisition",
+            "run_id": "run-core-doctor-primary",
+            "profile": "market_refresh_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "market_refresh_smoke",
+            "core_opportunity_id": velvet["core_opportunity_id"],
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "source_pack": "proxy_preipo_rwa_pack",
+            "status": "accepted_evidence_found",
+            "accepted_evidence": [{
+                "title": "VELVET offers SpaceX pre-IPO tokenized stock exposure",
+                "reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+            }],
+        }
         acquisition_orphan = {
             "row_type": "event_evidence_acquisition",
             "run_id": "run-core-doctor-primary",
@@ -28576,15 +28736,19 @@ def test_artifact_doctor_detects_canonical_core_rendering_mismatch_and_acquisiti
                 "alertable": 0,
             }],
             core_opportunity_rows=core_rows,
-            evidence_acquisition_rows=[acquisition_orphan],
+            evidence_acquisition_rows=[acquisition_velvet, acquisition_orphan],
             card_paths=[stale_card],
             profile="market_refresh_smoke",
             artifact_namespace="market_refresh_smoke",
             strict=True,
         )
     assert doctor.card_primary_fields_mismatch_core_store == 1
+    assert doctor.card_evidence_acquisition_count_mismatch == 1
+    assert doctor.card_source_pack_mismatch_core_acquisition == 1
     assert doctor.evidence_acquisition_core_id_missing_from_store == 1
     assert any("card_primary_fields_mismatch_core_store=1" in item for item in doctor.blockers)
+    assert any("card_evidence_acquisition_count_mismatch=1" in item for item in doctor.blockers)
+    assert any("card_source_pack_mismatch_core_acquisition=1" in item for item in doctor.blockers)
     assert any("evidence_acquisition_core_id_missing_from_store=1" in item for item in doctor.blockers)
 
 

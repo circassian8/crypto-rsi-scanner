@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Make Event Alpha core opportunity views acquisition-aware · Codex
+**Why:** Evidence acquisition, cards, audits, and quality review could still
+disagree after canonical core rows existed. VELVET showed accepted
+CryptoPanic evidence in `event_evidence_acquisition.jsonl` while the card
+displayed accepted=0, and quality review could still mix support rows into
+operator sections.
+**Changes:**
+- Added a canonical `CoreEvidenceAcquisitionView` read model that joins core
+  rows with source-pack acquisition rows, accepted/rejected samples, reason
+  codes, provider failures, source pack, and before/after verdict metadata.
+- Core opportunity store rows now preserve accepted evidence counts, reason
+  codes, samples, source-pack status, and final acquisition metadata so cards
+  and audits render from canonical core data instead of shallow support rows.
+- Quality review now loads `event_core_opportunities.jsonl` through the
+  profile artifact context and uses canonical core rows as the primary
+  operator view; support/control rows are reported as diagnostics.
+- Artifact doctor now checks card/source-pack/acquisition consistency against
+  canonical core acquisition views.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` passed (515/515); `make
+event-alpha-signal-quality-eval PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-market-refresh-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-quality-validation-cycle PYTHON=python3`; `make verify
+PYTHON=python3`; and the requested manual smoke wrappers for VELVET audit,
+quality review, strict artifact doctor, and daily brief all exited 0.
+**Notes/risks:** Research-only artifact/presentation repair. No Telegram sends,
+paper/live rows, normal RSI writes, trading, or LLM/provider-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Audit Event Alpha artifacts and repair core-card quality copy · Codex
 **Why:** The post-implementation audit needed proof that fresh Event Alpha
 artifacts, reports, cards, and doctors agree end-to-end. Fresh cards exposed a

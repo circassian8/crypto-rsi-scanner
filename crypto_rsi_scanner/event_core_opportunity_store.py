@@ -96,6 +96,51 @@ class CanonicalCoreOpportunityView:
         return _first_text([self.canonical_core_row or {}], ("final_state_after_quality_gate", "state"))
 
 
+@dataclass(frozen=True)
+class CoreEvidenceAcquisitionView:
+    """Canonical source-acquisition read model for one core opportunity."""
+
+    core_opportunity_id: str
+    acquisition_attempted: bool = False
+    acquisition_status: str = "not_executed"
+    source_pack: str | None = None
+    accepted_evidence_count: int = 0
+    rejected_evidence_count: int = 0
+    accepted_reason_codes: tuple[str, ...] = ()
+    rejected_reason_codes: tuple[str, ...] = ()
+    accepted_evidence_samples: tuple[dict[str, Any], ...] = ()
+    rejected_evidence_samples: tuple[dict[str, Any], ...] = ()
+    provider_failures: tuple[str, ...] = ()
+    evidence_quality_before: float | None = None
+    evidence_quality_after: float | None = None
+    opportunity_score_before: float | None = None
+    opportunity_score_after: float | None = None
+    opportunity_level_before: str | None = None
+    opportunity_level_after: str | None = None
+    final_upgrade_status: str | None = None
+    no_upgrade_reason: str | None = None
+    diagnostic_rows: tuple[dict[str, Any], ...] = ()
+
+    def to_metadata(self) -> dict[str, Any]:
+        return {
+            "status": self.acquisition_status,
+            "source_pack": self.source_pack,
+            "accepted": self.accepted_evidence_count,
+            "rejected": self.rejected_evidence_count,
+            "accepted_reason_codes": self.accepted_reason_codes,
+            "rejected_reason_codes": self.rejected_reason_codes,
+            "provider_failures": self.provider_failures,
+            "evidence_quality_before": self.evidence_quality_before,
+            "evidence_quality_after": self.evidence_quality_after,
+            "opportunity_score_before": self.opportunity_score_before,
+            "opportunity_score_after": self.opportunity_score_after,
+            "opportunity_level_before": self.opportunity_level_before,
+            "opportunity_level_after": self.opportunity_level_after,
+            "final_upgrade_status": self.final_upgrade_status,
+            "no_upgrade_reason": self.no_upgrade_reason,
+        }
+
+
 def write_core_opportunities(
     rows: Iterable[Any],
     *,
@@ -318,6 +363,60 @@ def load_canonical_core_opportunity_view(
     )
 
 
+def load_core_evidence_acquisition_view(
+    profile: str | None,
+    artifact_namespace: str | None,
+    core_opportunity_id: str,
+    *,
+    core_store_path: str | Path | None = None,
+    evidence_acquisition_path: str | Path | None = None,
+    latest_run: bool = True,
+    include_legacy: bool = True,
+) -> CoreEvidenceAcquisitionView:
+    """Load the operator-facing source-acquisition state for one core opportunity."""
+    view = load_canonical_core_opportunity_view(
+        profile,
+        artifact_namespace,
+        core_opportunity_id,
+        core_store_path=core_store_path,
+        evidence_acquisition_path=evidence_acquisition_path,
+        latest_run=latest_run,
+        include_legacy=include_legacy,
+    )
+    if not view.found or not view.core_opportunity_id:
+        return CoreEvidenceAcquisitionView(core_opportunity_id=str(core_opportunity_id or "").strip())
+    return core_evidence_acquisition_view_from_rows(
+        view.core_opportunity_id,
+        core_rows=[view.canonical_core_row] if view.canonical_core_row else (),
+        evidence_acquisition_rows=view.evidence_acquisition_rows,
+        supporting_rows=(*view.supporting_rows, *view.diagnostic_rows),
+    )
+
+
+def core_evidence_acquisition_view_from_rows(
+    core_opportunity_id: str,
+    *,
+    core_rows: Iterable[Mapping[str, Any] | object] = (),
+    evidence_acquisition_rows: Iterable[Mapping[str, Any] | object] = (),
+    supporting_rows: Iterable[Mapping[str, Any] | object] = (),
+) -> CoreEvidenceAcquisitionView:
+    """Build a canonical acquisition view from already-loaded artifacts."""
+    core_row_list = [_row_dict(row) for row in core_rows]
+    identifiers = {str(core_opportunity_id or "").strip()}
+    for row in core_row_list:
+        identifiers.update(_row_identifier_values(row))
+    identifiers = {item for item in identifiers if item}
+    rows = []
+    for row in [
+        *_acquisition_candidate_rows(core_row_list),
+        *_acquisition_candidate_rows(evidence_acquisition_rows),
+        *_acquisition_candidate_rows(supporting_rows),
+    ]:
+        if _acquisition_row_matches_core(row, identifiers):
+            rows.append(row)
+    return _build_core_evidence_acquisition_view(core_opportunity_id, rows)
+
+
 def canonical_core_opportunity_view_from_rows(
     core_opportunity_id: str,
     *,
@@ -487,6 +586,15 @@ def _row_from_core_opportunity(
     post_level = _first_text(all_rows, ("post_refresh_opportunity_level", "refreshed_opportunity_level", "opportunity_level_after_market_refresh")) or item.opportunity_level
     post_score = _first_float(all_rows, ("post_refresh_opportunity_score", "refreshed_opportunity_score", "opportunity_score_after_market_refresh"))
     market_context = _best_market_context(all_rows)
+    acquisition = _build_core_evidence_acquisition_view(item.core_opportunity_id, all_rows)
+    source_pack = acquisition.source_pack or source_pack
+    evidence_before = acquisition.evidence_quality_before if acquisition.evidence_quality_before is not None else evidence_before
+    evidence_after = acquisition.evidence_quality_after if acquisition.evidence_quality_after is not None else evidence_after
+    evidence_score = evidence_after if evidence_after is not None else evidence_score
+    initial_level = acquisition.opportunity_level_before or initial_level
+    initial_score = acquisition.opportunity_score_before if acquisition.opportunity_score_before is not None else initial_score
+    post_level = acquisition.opportunity_level_after or post_level
+    post_score = acquisition.opportunity_score_after if acquisition.opportunity_score_after is not None else post_score
     support_ids = _row_ids(support)
     diagnostic_ids = _row_ids(diagnostics)
     return {
@@ -552,10 +660,23 @@ def _row_from_core_opportunity(
         "negated_frame_ids": _first_list(all_rows, ("negated_frame_ids",)),
         "corrective_frame_ids": _first_list(all_rows, ("corrective_frame_ids",)),
         "frame_summary": _first_list(all_rows, ("frame_summary",)),
-        "evidence_acquisition_attempted": _any_truthy(all_rows, ("evidence_acquisition_attempted", "source_acquisition_attempted")),
-        "evidence_acquisition_status": _first_text(all_rows, ("evidence_acquisition_status", "acquisition_status", "source_acquisition_status")),
+        "evidence_acquisition_attempted": acquisition.acquisition_attempted or _any_truthy(all_rows, ("evidence_acquisition_attempted", "source_acquisition_attempted")),
+        "evidence_acquisition_status": acquisition.acquisition_status or _first_text(all_rows, ("evidence_acquisition_status", "acquisition_status", "source_acquisition_status")),
         "evidence_acquisition_source_pack": source_pack,
         "source_pack": source_pack,
+        "evidence_acquisition_accepted_count": acquisition.accepted_evidence_count,
+        "evidence_acquisition_rejected_count": acquisition.rejected_evidence_count,
+        "evidence_acquisition_accepted_evidence": list(acquisition.accepted_evidence_samples),
+        "evidence_acquisition_rejected_samples": list(acquisition.rejected_evidence_samples),
+        "accepted_evidence_reason_codes": list(acquisition.accepted_reason_codes),
+        "rejected_evidence_reason_codes": list(acquisition.rejected_reason_codes),
+        "evidence_acquisition_provider_failures": list(acquisition.provider_failures),
+        "evidence_acquisition_results": {
+            **acquisition.to_metadata(),
+            "acquisition_evidence_status": _first_text(all_rows, ("acquisition_evidence_status",)),
+        },
+        "final_upgrade_status": acquisition.final_upgrade_status or _first_text(all_rows, ("final_upgrade_status", "acquisition_upgrade_status")),
+        "no_upgrade_reason": acquisition.no_upgrade_reason or _first_text(all_rows, ("no_upgrade_reason",)),
         "source_class": source_class,
         "evidence_specificity": evidence_specificity,
         "evidence_quality_score": evidence_score,
@@ -580,6 +701,282 @@ def _row_from_core_opportunity(
         "feedback_target_type": "core_opportunity_id",
         "generated_at": generated_at,
     }
+
+
+def _acquisition_candidate_rows(rows: Iterable[Mapping[str, Any] | object]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for item in rows:
+        row = _row_dict(item)
+        merged = _row_with_score_components(row)
+        if _row_has_acquisition_metadata(merged):
+            out.append(merged)
+    return out
+
+
+def _build_core_evidence_acquisition_view(
+    core_opportunity_id: str,
+    rows: Iterable[Mapping[str, Any]],
+) -> CoreEvidenceAcquisitionView:
+    clean_core = str(core_opportunity_id or "").strip()
+    primary: list[dict[str, Any]] = []
+    diagnostics: list[dict[str, Any]] = []
+    for raw in rows:
+        row = _row_with_score_components(raw)
+        if not _row_has_acquisition_metadata(row):
+            continue
+        if _is_diagnostic_acquisition_row(row, clean_core):
+            diagnostics.append(dict(row))
+        else:
+            primary.append(dict(row))
+    if not primary:
+        return CoreEvidenceAcquisitionView(
+            core_opportunity_id=clean_core,
+            diagnostic_rows=tuple(_unique_rows(diagnostics)),
+        )
+
+    accepted_samples = _unique_evidence_samples(
+        sample
+        for row in primary
+        for sample in _evidence_samples(row, ("evidence_acquisition_accepted_evidence", "accepted_evidence"))
+    )
+    rejected_samples = _unique_evidence_samples(
+        sample
+        for row in primary
+        for sample in _evidence_samples(row, ("evidence_acquisition_rejected_samples", "rejected_evidence_samples", "rejected_evidence"))
+    )
+    accepted_count = max(
+        len(accepted_samples),
+        *(_int_or_zero(_nested_result_value(row, "accepted")) for row in primary),
+        *(_int_or_zero(_first_value([row], ("evidence_acquisition_accepted_count", "accepted_evidence_count"))) for row in primary),
+    )
+    rejected_count = max(
+        len(rejected_samples),
+        *(_int_or_zero(_nested_result_value(row, "rejected")) for row in primary),
+        *(_int_or_zero(_first_value([row], ("evidence_acquisition_rejected_count", "rejected_evidence_count"))) for row in primary),
+    )
+    accepted_reasons = _unique_strings(
+        [
+            *(
+                str(reason)
+                for row in primary
+                for reason in _first_list([row], ("accepted_evidence_reason_codes",))
+                if str(reason or "").strip()
+            ),
+            *(
+                str(reason)
+                for sample in accepted_samples
+                for reason in _as_list_values(sample.get("reason_codes"))
+                if str(reason or "").strip()
+            ),
+        ]
+    )
+    rejected_reasons = _unique_strings(
+        [
+            *(
+                str(reason)
+                for row in primary
+                for reason in _first_list([row], ("rejected_evidence_reason_codes",))
+                if str(reason or "").strip()
+            ),
+            *(
+                str(reason)
+                for sample in rejected_samples
+                for reason in _as_list_values(sample.get("reason_codes"))
+                if str(reason or "").strip()
+            ),
+        ]
+    )
+    provider_failures = _unique_strings(
+        failure
+        for row in primary
+        for failure in (
+            *tuple(_first_list([row], ("evidence_acquisition_provider_failures", "provider_failures", "provider_coverage_gaps"))),
+            *tuple(_query_provider_failures(row)),
+        )
+        if str(failure or "").strip()
+    )
+    status = _best_acquisition_status(primary, accepted_count=accepted_count, rejected_count=rejected_count)
+    source_pack = _best_source_pack(primary, _first_text(primary, ("impact_path_type", "primary_impact_path")))
+    return CoreEvidenceAcquisitionView(
+        core_opportunity_id=clean_core,
+        acquisition_attempted=_any_truthy(primary, ("evidence_acquisition_attempted", "source_acquisition_attempted")) or status != "not_executed",
+        acquisition_status=status,
+        source_pack=source_pack,
+        accepted_evidence_count=accepted_count,
+        rejected_evidence_count=rejected_count,
+        accepted_reason_codes=tuple(accepted_reasons),
+        rejected_reason_codes=tuple(rejected_reasons),
+        accepted_evidence_samples=tuple(accepted_samples[:5]),
+        rejected_evidence_samples=tuple(rejected_samples[:5]),
+        provider_failures=tuple(provider_failures),
+        evidence_quality_before=_first_float(primary, ("evidence_quality_before", "evidence_acquisition_score_before", "evidence_quality_score_before")),
+        evidence_quality_after=_best_float(primary, ("evidence_quality_after", "evidence_acquisition_score_after", "evidence_quality_score_after", "post_refresh_evidence_quality_score")),
+        opportunity_score_before=_first_float(primary, ("opportunity_score_before", "opportunity_score_before_acquisition", "initial_opportunity_score")),
+        opportunity_score_after=_best_float(primary, ("opportunity_score_after", "opportunity_score_after_acquisition", "post_refresh_opportunity_score", "final_opportunity_score", "opportunity_score_final")),
+        opportunity_level_before=_first_text(primary, ("opportunity_level_before", "opportunity_level_before_acquisition", "initial_opportunity_level")),
+        opportunity_level_after=_first_text(primary, ("opportunity_level_after", "opportunity_level_after_acquisition", "post_refresh_opportunity_level", "final_opportunity_level", "opportunity_level")),
+        final_upgrade_status=_first_text(primary, ("final_upgrade_status", "acquisition_upgrade_status")),
+        no_upgrade_reason=_first_text(primary, ("no_upgrade_reason",)),
+        diagnostic_rows=tuple(_unique_rows(diagnostics)),
+    )
+
+
+def _row_with_score_components(row: Mapping[str, Any]) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for key in ("score_components", "latest_score_components"):
+        value = row.get(key)
+        if isinstance(value, Mapping):
+            merged.update(dict(value))
+    merged.update(dict(row))
+    return merged
+
+
+def _row_has_acquisition_metadata(row: Mapping[str, Any]) -> bool:
+    if str(row.get("row_type") or "") == "event_evidence_acquisition":
+        return True
+    return any(
+        key in row and row.get(key) not in (None, "", [], {}, ())
+        for key in (
+            "evidence_acquisition_attempted",
+            "source_acquisition_attempted",
+            "evidence_acquisition_status",
+            "acquisition_status",
+            "source_acquisition_status",
+            "evidence_acquisition_results",
+            "evidence_acquisition_accepted_evidence",
+            "accepted_evidence",
+            "evidence_acquisition_rejected_samples",
+            "rejected_evidence_samples",
+            "provider_failures",
+            "evidence_acquisition_provider_failures",
+        )
+    )
+
+
+def _is_diagnostic_acquisition_row(row: Mapping[str, Any], core_opportunity_id: str) -> bool:
+    status = str(row.get("core_opportunity_id_status") or "").strip()
+    if status == "diagnostic_support":
+        return True
+    diagnostic_target = str(row.get("diagnostic_support_for_core_opportunity_id") or "").strip()
+    if diagnostic_target and diagnostic_target == core_opportunity_id:
+        return True
+    return bool(row.get("is_diagnostic_snapshot"))
+
+
+def _acquisition_row_matches_core(row: Mapping[str, Any], identifiers: set[str]) -> bool:
+    explicit = str(row.get("core_opportunity_id") or "").strip()
+    if explicit:
+        return explicit in identifiers
+    return _row_matches_identifiers(row, identifiers)
+
+
+def _evidence_samples(row: Mapping[str, Any], keys: tuple[str, ...]) -> list[dict[str, Any]]:
+    samples: list[dict[str, Any]] = []
+    for key in keys:
+        value = row.get(key)
+        if value in (None, "", [], {}, ()):
+            nested = row.get("evidence_acquisition_results")
+            value = nested.get(key) if isinstance(nested, Mapping) else value
+        for sample in _as_sequence(value):
+            if isinstance(sample, Mapping):
+                samples.append(dict(sample))
+            elif str(sample or "").strip():
+                samples.append({"title": str(sample).strip()})
+    return samples
+
+
+def _unique_evidence_samples(samples: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for sample in samples:
+        normalized = dict(sample)
+        key = "|".join(str(normalized.get(field) or "").strip() for field in ("source_url", "title", "quote", "evidence_quote"))
+        if not key.strip("|"):
+            key = json.dumps(_json_ready(normalized), sort_keys=True, separators=(",", ":"))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(normalized)
+    return out
+
+
+def _query_provider_failures(row: Mapping[str, Any]) -> list[str]:
+    failures: list[str] = []
+    for query in _as_sequence(row.get("queries")):
+        if isinstance(query, Mapping):
+            failures.extend(str(item) for item in _as_sequence(query.get("provider_failures")) if str(item or "").strip())
+    return failures
+
+
+def _nested_result_value(row: Mapping[str, Any], key: str) -> Any:
+    nested = row.get("evidence_acquisition_results")
+    if isinstance(nested, Mapping):
+        return nested.get(key)
+    return None
+
+
+def _best_acquisition_status(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    accepted_count: int,
+    rejected_count: int,
+) -> str:
+    if accepted_count > 0:
+        return "accepted_evidence_found"
+    if rejected_count > 0:
+        return "rejected_results_only"
+    statuses = [
+        str(_first_text([row], ("evidence_acquisition_status", "acquisition_status", "source_acquisition_status", "status")) or "").strip()
+        for row in rows
+    ]
+    statuses = [status for status in statuses if status]
+    if not statuses:
+        return "not_executed"
+    rank = {
+        "accepted_evidence_found": 7,
+        "executed": 6,
+        "rejected_results_only": 5,
+        "no_results": 4,
+        "provider_backoff": 3,
+        "provider_unavailable": 3,
+        "failed_soft": 2,
+        "skipped_budget": 1,
+        "skipped_config": 1,
+        "planned": 0,
+        "not_executed": 0,
+    }
+    return sorted(statuses, key=lambda status: rank.get(status, 0), reverse=True)[0]
+
+
+def _unique_strings(values: Iterable[Any]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+    return out
+
+
+def _as_sequence(value: Any) -> list[Any]:
+    if value in (None, "", [], {}, ()):
+        return []
+    if isinstance(value, Mapping):
+        return [dict(value)]
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(";") if item.strip()]
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+        return list(value)
+    return [value]
+
+
+def _int_or_zero(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _load_alert_rows(path: str | Path | None) -> list[dict[str, Any]]:
@@ -850,6 +1247,7 @@ def _unique_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
         id_value = _first_text(
             [normalized],
             (
+                "acquisition_id",
                 "core_opportunity_id",
                 "diagnostic_support_for_core_opportunity_id",
                 "original_core_opportunity_id",

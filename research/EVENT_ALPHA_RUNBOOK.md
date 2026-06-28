@@ -54,6 +54,12 @@ evidence-acquisition rows, market-refresh rows, alert snapshots, card path, and
 feedback status through the canonical read model. Support/control artifacts are
 audit evidence attached to the core opportunity; they should not create a
 second visible truth for route, state, tier, or final opportunity verdict.
+Source-pack acquisition display follows the same rule: use the canonical
+core acquisition view for accepted/rejected counts, reason codes, samples,
+source pack, provider failures, and before/after verdicts. If a support row
+disagrees with the core row, keep it under diagnostics instead of letting it
+change the primary card, audit, quality-review section, market-freshness line,
+or upgrade-candidate list.
 
 ## Feedback And Calibration Loop
 

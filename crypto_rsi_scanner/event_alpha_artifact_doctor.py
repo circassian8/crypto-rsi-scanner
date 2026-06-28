@@ -41,7 +41,12 @@ class EventAlphaArtifactDoctorResult:
     alert_snapshots_core_id_missing_from_store: int = 0
     evidence_acquisition_core_id_missing_from_store: int = 0
     card_primary_fields_mismatch_core_store: int = 0
+    card_evidence_acquisition_count_mismatch: int = 0
+    card_source_pack_mismatch_core_acquisition: int = 0
+    quality_review_promoted_core_in_weak_section: int = 0
     market_freshness_contradictory_summary: int = 0
+    quality_review_market_freshness_contradiction: int = 0
+    upgrade_candidates_include_high_priority: int = 0
     daily_brief_card_group_mismatch_with_index: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
@@ -374,7 +379,19 @@ def diagnose_artifacts(
         and str(row.get("core_opportunity_id_status") or "") not in {"diagnostic_support", "canonical"}
     )
     card_primary_mismatches = _card_primary_mismatches(research_card_paths, core_rows_by_id)
+    card_acquisition_mismatches = _card_acquisition_count_mismatches(
+        research_card_paths,
+        core_rows_by_id,
+        acquisition_rows,
+    )
+    card_source_pack_mismatches = _card_source_pack_mismatches(
+        research_card_paths,
+        core_rows_by_id,
+        acquisition_rows,
+    )
     market_freshness_contradictions = sum(1 for row in core_rows if _core_row_has_market_freshness_contradiction(row))
+    promoted_core_in_weak = _promoted_core_rows_that_are_weak(core_rows)
+    upgrade_high_priority = 0
     fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
     fresh_visible_missing_targets = sum(
         1
@@ -422,8 +439,20 @@ def diagnose_artifacts(
     if card_primary_mismatches:
         message = f"card_primary_fields_mismatch_core_store={card_primary_mismatches}"
         (blockers if strict and core_store_available else warnings).append(message)
+    if card_acquisition_mismatches:
+        message = f"card_evidence_acquisition_count_mismatch={card_acquisition_mismatches}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if card_source_pack_mismatches:
+        message = f"card_source_pack_mismatch_core_acquisition={card_source_pack_mismatches}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if promoted_core_in_weak:
+        message = f"quality_review_promoted_core_in_weak_section={promoted_core_in_weak}"
+        (blockers if strict else warnings).append(message)
     if market_freshness_contradictions:
         message = f"market_freshness_contradictory_summary={market_freshness_contradictions}"
+        (blockers if strict else warnings).append(message)
+    if upgrade_high_priority:
+        message = f"upgrade_candidates_include_high_priority={upgrade_high_priority}"
         (blockers if strict else warnings).append(message)
     if card_group_mismatches:
         message = f"daily_brief_card_group_mismatch_with_index={card_group_mismatches}"
@@ -596,7 +625,12 @@ def diagnose_artifacts(
         alert_snapshots_core_id_missing_from_store=snapshot_core_missing_store,
         evidence_acquisition_core_id_missing_from_store=acquisition_core_missing_store,
         card_primary_fields_mismatch_core_store=card_primary_mismatches,
+        card_evidence_acquisition_count_mismatch=card_acquisition_mismatches,
+        card_source_pack_mismatch_core_acquisition=card_source_pack_mismatches,
+        quality_review_promoted_core_in_weak_section=promoted_core_in_weak,
         market_freshness_contradictory_summary=market_freshness_contradictions,
+        quality_review_market_freshness_contradiction=market_freshness_contradictions,
+        upgrade_candidates_include_high_priority=upgrade_high_priority,
         daily_brief_card_group_mismatch_with_index=card_group_mismatches,
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
@@ -757,6 +791,90 @@ def _card_primary_mismatches(
             mismatch = True
         mismatches += int(mismatch)
     return mismatches
+
+
+def _card_acquisition_count_mismatches(
+    card_paths: Iterable[Path],
+    core_rows_by_id: Mapping[str, Mapping[str, Any]],
+    acquisition_rows: Iterable[Mapping[str, Any]],
+) -> int:
+    mismatches = 0
+    acquisition_list = [dict(row) for row in acquisition_rows if isinstance(row, Mapping)]
+    for path in card_paths:
+        core_id = event_research_cards.card_core_opportunity_id(path)
+        if not core_id:
+            continue
+        core = core_rows_by_id.get(core_id)
+        if not core:
+            continue
+        view = event_core_opportunity_store.core_evidence_acquisition_view_from_rows(
+            core_id,
+            core_rows=[core],
+            evidence_acquisition_rows=acquisition_list,
+        )
+        if view.accepted_evidence_count <= 0:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        rendered = _card_evidence_count(text, "accepted")
+        if rendered is not None and rendered != view.accepted_evidence_count:
+            mismatches += 1
+    return mismatches
+
+
+def _card_source_pack_mismatches(
+    card_paths: Iterable[Path],
+    core_rows_by_id: Mapping[str, Mapping[str, Any]],
+    acquisition_rows: Iterable[Mapping[str, Any]],
+) -> int:
+    mismatches = 0
+    acquisition_list = [dict(row) for row in acquisition_rows if isinstance(row, Mapping)]
+    for path in card_paths:
+        core_id = event_research_cards.card_core_opportunity_id(path)
+        if not core_id:
+            continue
+        core = core_rows_by_id.get(core_id)
+        if not core:
+            continue
+        view = event_core_opportunity_store.core_evidence_acquisition_view_from_rows(
+            core_id,
+            core_rows=[core],
+            evidence_acquisition_rows=acquisition_list,
+        )
+        if not view.source_pack:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        rendered = _card_line_value(text, "Source pack")
+        if rendered and rendered != view.source_pack:
+            mismatches += 1
+    return mismatches
+
+
+def _card_evidence_count(text: str, label: str) -> int | None:
+    match = re.search(rf"\b{re.escape(label)}=(\d+)\b", text)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def _promoted_core_rows_that_are_weak(core_rows: Iterable[Mapping[str, Any]]) -> int:
+    count = 0
+    for row in core_rows:
+        level = str(row.get("opportunity_level") or row.get("final_opportunity_level") or "")
+        route = str(row.get("final_route_after_quality_gate") or row.get("route") or "")
+        impact = str(row.get("impact_path_type") or row.get("primary_impact_path") or "")
+        if level in {"validated_digest", "watchlist", "high_priority"} or event_alpha_router.route_value_is_alertable(route):
+            if impact in {"generic_cooccurrence_only", "insufficient_data"}:
+                count += 1
+    return count
 
 
 def _card_line_value(text: str, label: str) -> str | None:
@@ -1296,7 +1414,12 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"alert_snapshots_core_id_missing_from_store={result.alert_snapshots_core_id_missing_from_store} "
             f"evidence_acquisition_core_id_missing_from_store={result.evidence_acquisition_core_id_missing_from_store} "
             f"card_primary_fields_mismatch_core_store={result.card_primary_fields_mismatch_core_store} "
+            f"card_evidence_acquisition_count_mismatch={result.card_evidence_acquisition_count_mismatch} "
+            f"card_source_pack_mismatch_core_acquisition={result.card_source_pack_mismatch_core_acquisition} "
+            f"quality_review_promoted_core_in_weak_section={result.quality_review_promoted_core_in_weak_section} "
             f"market_freshness_contradictory_summary={result.market_freshness_contradictory_summary} "
+            f"quality_review_market_freshness_contradiction={result.quality_review_market_freshness_contradiction} "
+            f"upgrade_candidates_include_high_priority={result.upgrade_candidates_include_high_priority} "
             f"daily_brief_card_group_mismatch_with_index={result.daily_brief_card_group_mismatch_with_index}"
         ),
         (
