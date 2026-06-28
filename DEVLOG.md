@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Reconcile canonical core rendering artifacts · Codex
+**Why:** Event Alpha core-store rows were authoritative, but secondary artifacts
+could still disagree after card and evidence-acquisition writes. VELVET could
+be stored as high-priority while a research card or acquisition row displayed a
+stale `STORE_ONLY`/orphan-core view.
+**Changes:**
+- Backfilled generated research-card paths and feedback targets into existing
+  `event_core_opportunities.jsonl` rows instead of appending duplicate core
+  rows.
+- Reconciled source-pack evidence-acquisition rows to compatible canonical
+  core opportunity ids, preserving original ids as diagnostic metadata.
+- Made research-card rendering, opportunity audit, near-miss filtering, daily
+  brief freshness summaries, and artifact doctor checks prefer the reconciled
+  canonical core row before support/control rows.
+- Fixed canonical core market-context persistence so refreshed nested market
+  snapshots override stale top-level `missing` aliases.
+- Added regressions for canonical card fields, evidence-acquisition core-id
+  reconciliation, artifact-doctor mismatch detection, and refreshed nested
+  market context.
+**Verify:** `python3 tests/test_indicators.py` passed (512/512);
+`make event-alpha-signal-quality-eval PYTHON=python3`, `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`, `make
+event-alpha-market-refresh-smoke PYTHON=python3`, `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, `make
+event-alpha-quality-validation-cycle PYTHON=python3`, and `make verify
+PYTHON=python3` passed. Manual smoke: `make event-opportunity-audit
+PROFILE=evidence_acquisition_smoke TARGET=agg:3381ebd96566 PYTHON=python3`,
+`make event-alpha-daily-brief PROFILE=evidence_acquisition_smoke
+PYTHON=python3`, and `make event-alpha-artifact-doctor
+PROFILE=evidence_acquisition_smoke STRICT=1 PYTHON=python3` passed with no
+blockers.
+**Notes/risks:** Research-only artifact consistency change. No Telegram sends,
+paper/live rows, normal RSI writes, trading, or provider/LLM-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Make canonical core rows authoritative for cards and snapshots · Codex
 **Why:** Event Alpha was writing `event_core_opportunities.jsonl`, but research
 cards, daily-brief card groups, and alert snapshots could still create

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -28,6 +29,7 @@ class EventAlphaArtifactDoctorResult:
     core_opportunity_store_rows: int = 0
     visible_core_opportunities_missing_store_rows: int = 0
     duplicate_core_opportunity_store_rows: int = 0
+    core_opportunity_store_rows_missing_card_path: int = 0
     visible_core_opportunities_missing_cards: int = 0
     visible_core_opportunities_missing_feedback_targets: int = 0
     alert_snapshots_missing_core_opportunity_id: int = 0
@@ -37,6 +39,9 @@ class EventAlphaArtifactDoctorResult:
     orphan_core_opportunity_cards: int = 0
     diagnostic_snapshots_with_fake_core_id: int = 0
     alert_snapshots_core_id_missing_from_store: int = 0
+    evidence_acquisition_core_id_missing_from_store: int = 0
+    card_primary_fields_mismatch_core_store: int = 0
+    market_freshness_contradictory_summary: int = 0
     daily_brief_card_group_mismatch_with_index: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
@@ -103,6 +108,7 @@ def diagnose_artifacts(
     core_opportunity_rows: Iterable[Mapping[str, Any] | object] = (),
     watchlist_rows: Iterable[Mapping[str, Any] | object] = (),
     incident_rows: Iterable[Mapping[str, Any] | object] = (),
+    evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
@@ -124,6 +130,7 @@ def diagnose_artifacts(
     raw_core_rows = [_row(row) for row in core_opportunity_rows]
     raw_watchlist = [_row(row) for row in watchlist_rows]
     raw_incidents = [_row(row) for row in incident_rows]
+    raw_acquisition_rows = [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)]
     raw_legacy = sum(
         1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
         if event_alpha_artifacts.is_legacy_row(row)
@@ -179,6 +186,13 @@ def diagnose_artifacts(
     )
     incidents = event_alpha_artifacts.filter_artifact_rows(
         raw_incidents,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    acquisition_rows = event_alpha_artifacts.filter_artifact_rows(
+        raw_acquisition_rows,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -300,9 +314,15 @@ def diagnose_artifacts(
         for row in core_rows
         if str(row.get("core_opportunity_id") or "").strip()
     }
+    core_rows_by_id = {
+        str(row.get("core_opportunity_id") or "").strip(): row
+        for row in core_rows
+        if str(row.get("core_opportunity_id") or "").strip()
+    }
     core_store_available = bool(store_core_ids)
     visible_missing_store_rows = len(visible_core_ids - store_core_ids) if core_store_available else len(visible_core_ids)
     duplicate_store_rows = max(0, len(core_rows) - len(store_core_ids))
+    store_rows_missing_card_path = sum(1 for row in core_rows if not str(row.get("card_path") or row.get("research_card_path") or "").strip())
     visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids)
     visible_missing_targets = sum(
         1
@@ -346,6 +366,15 @@ def diagnose_artifacts(
         and str(row.get("core_opportunity_id") or "").strip() not in store_core_ids
         and not bool(row.get("is_diagnostic_snapshot"))
     )
+    acquisition_core_missing_store = sum(
+        1
+        for row in acquisition_rows
+        if str(row.get("core_opportunity_id") or "").strip()
+        and str(row.get("core_opportunity_id") or "").strip() not in store_core_ids
+        and str(row.get("core_opportunity_id_status") or "") not in {"diagnostic_support", "canonical"}
+    )
+    card_primary_mismatches = _card_primary_mismatches(research_card_paths, core_rows_by_id)
+    market_freshness_contradictions = sum(1 for row in core_rows if _core_row_has_market_freshness_contradiction(row))
     fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
     fresh_visible_missing_targets = sum(
         1
@@ -374,6 +403,9 @@ def diagnose_artifacts(
         (blockers if strict_core_store else warnings).append(message)
     if duplicate_store_rows:
         warnings.append(f"duplicate_core_opportunity_store_rows={duplicate_store_rows}")
+    if store_rows_missing_card_path:
+        message = f"core_opportunity_store_rows_missing_card_path={store_rows_missing_card_path}"
+        (blockers if strict and card_count else warnings).append(message)
     if core_cards_missing_store:
         message = f"core_cards_missing_store_row={core_cards_missing_store}"
         (blockers if strict and core_store_available else warnings).append(message)
@@ -384,6 +416,15 @@ def diagnose_artifacts(
     if snapshot_core_missing_store:
         message = f"alert_snapshots_core_id_missing_from_store={snapshot_core_missing_store}"
         (blockers if strict and core_store_available else warnings).append(message)
+    if acquisition_core_missing_store:
+        message = f"evidence_acquisition_core_id_missing_from_store={acquisition_core_missing_store}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if card_primary_mismatches:
+        message = f"card_primary_fields_mismatch_core_store={card_primary_mismatches}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if market_freshness_contradictions:
+        message = f"market_freshness_contradictory_summary={market_freshness_contradictions}"
+        (blockers if strict else warnings).append(message)
     if card_group_mismatches:
         message = f"daily_brief_card_group_mismatch_with_index={card_group_mismatches}"
         (blockers if strict and core_store_available else warnings).append(message)
@@ -543,6 +584,7 @@ def diagnose_artifacts(
         core_opportunity_store_rows=len(core_rows),
         visible_core_opportunities_missing_store_rows=visible_missing_store_rows,
         duplicate_core_opportunity_store_rows=duplicate_store_rows,
+        core_opportunity_store_rows_missing_card_path=store_rows_missing_card_path,
         visible_core_opportunities_missing_cards=visible_missing_cards,
         visible_core_opportunities_missing_feedback_targets=visible_missing_targets,
         alert_snapshots_missing_core_opportunity_id=snapshots_missing_core,
@@ -552,6 +594,9 @@ def diagnose_artifacts(
         orphan_core_opportunity_cards=orphan_core_cards,
         diagnostic_snapshots_with_fake_core_id=diagnostic_fake_core,
         alert_snapshots_core_id_missing_from_store=snapshot_core_missing_store,
+        evidence_acquisition_core_id_missing_from_store=acquisition_core_missing_store,
+        card_primary_fields_mismatch_core_store=card_primary_mismatches,
+        market_freshness_contradictory_summary=market_freshness_contradictions,
         daily_brief_card_group_mismatch_with_index=card_group_mismatches,
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
@@ -677,6 +722,58 @@ def _core_has_fresh_rows(opportunity: event_core_opportunities.CoreOpportunity) 
         not event_alpha_artifacts.is_legacy_row(row)
         for row in (opportunity.primary_row, *opportunity.supporting_rows)
     )
+
+
+def _card_primary_mismatches(
+    card_paths: Iterable[Path],
+    core_rows_by_id: Mapping[str, Mapping[str, Any]],
+) -> int:
+    mismatches = 0
+    for path in card_paths:
+        core_id = event_research_cards.card_core_opportunity_id(path)
+        if not core_id:
+            continue
+        core = core_rows_by_id.get(core_id)
+        if not core:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        route = str(core.get("final_route_after_quality_gate") or "").strip()
+        state = str(core.get("final_state_after_quality_gate") or "").strip()
+        level = str(core.get("final_opportunity_level") or core.get("opportunity_level") or "").strip()
+        route_line = _card_line_value(text, "Final route")
+        verdict_line = _card_line_value(text, "Opportunity verdict")
+        summary_line = _card_line_value(text, "State / alert tier")
+        mismatch = False
+        if route_line and route and route_line != route:
+            mismatch = True
+        if verdict_line and level and not verdict_line.startswith(level):
+            mismatch = True
+        if summary_line and state and not summary_line.startswith(f"{state} /"):
+            mismatch = True
+        if summary_line and route and not summary_line.endswith(f"/ {route}"):
+            mismatch = True
+        mismatches += int(mismatch)
+    return mismatches
+
+
+def _card_line_value(text: str, label: str) -> str | None:
+    match = re.search(rf"^-\s*{re.escape(label)}:\s*(.+?)\s*$", text, flags=re.MULTILINE)
+    return match.group(1).strip() if match else None
+
+
+def _core_row_has_market_freshness_contradiction(row: Mapping[str, Any]) -> bool:
+    status = str(row.get("market_context_freshness_status") or "").casefold()
+    source = str(row.get("market_context_source") or "").casefold()
+    age = row.get("market_context_age_hours")
+    cap = row.get("market_context_freshness_cap_applied")
+    if status not in {"fresh", "fixture_allowed_stale"}:
+        return False
+    if source not in {"", "missing", "unknown"}:
+        return False
+    return age in (None, "", "unknown") and bool(cap)
 
 
 def _quality_missing_summary(
@@ -1187,6 +1284,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"core_opportunity_store_rows={result.core_opportunity_store_rows} "
             f"visible_core_opportunities_missing_store_rows={result.visible_core_opportunities_missing_store_rows} "
             f"duplicate_core_opportunity_store_rows={result.duplicate_core_opportunity_store_rows} "
+            f"core_opportunity_store_rows_missing_card_path={result.core_opportunity_store_rows_missing_card_path} "
             f"visible_core_opportunities_missing_cards={result.visible_core_opportunities_missing_cards} "
             f"visible_core_opportunities_missing_feedback_targets={result.visible_core_opportunities_missing_feedback_targets} "
             f"alert_snapshots_missing_core_opportunity_id={result.alert_snapshots_missing_core_opportunity_id} "
@@ -1196,6 +1294,9 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"orphan_core_opportunity_cards={result.orphan_core_opportunity_cards} "
             f"diagnostic_snapshots_with_fake_core_id={result.diagnostic_snapshots_with_fake_core_id} "
             f"alert_snapshots_core_id_missing_from_store={result.alert_snapshots_core_id_missing_from_store} "
+            f"evidence_acquisition_core_id_missing_from_store={result.evidence_acquisition_core_id_missing_from_store} "
+            f"card_primary_fields_mismatch_core_store={result.card_primary_fields_mismatch_core_store} "
+            f"market_freshness_contradictory_summary={result.market_freshness_contradictory_summary} "
             f"daily_brief_card_group_mismatch_with_index={result.daily_brief_card_group_mismatch_with_index}"
         ),
         (

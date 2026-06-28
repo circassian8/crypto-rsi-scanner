@@ -399,6 +399,74 @@ def load_acquisition_results(path: str | Path, *, limit: int | None = None) -> l
     return rows[:limit] if limit and limit > 0 else rows
 
 
+def reconcile_acquisition_core_ids(
+    path: str | Path,
+    core_opportunity_rows: Iterable[Mapping[str, Any] | object],
+    *,
+    run_id: str | None = None,
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
+) -> int:
+    """Rewrite acquisition rows so they point at canonical core opportunities.
+
+    Acquisition planning can run before the final canonical core store is
+    written. This post-store reconciliation is artifact-only and keeps
+    evidence rows from carrying orphan pre-aggregation core IDs.
+    """
+    p = Path(path).expanduser()
+    if not p.exists():
+        return 0
+    rows: list[dict[str, Any]] = []
+    changed = 0
+    try:
+        with p.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    raw = json.loads(text)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(raw, dict):
+                    rows.append(raw)
+    except OSError:
+        return 0
+    for row in rows:
+        if row.get("row_type") != "event_evidence_acquisition":
+            continue
+        if run_id and str(row.get("run_id") or "") != str(run_id):
+            continue
+        if profile and str(row.get("profile") or "") != str(profile):
+            continue
+        if artifact_namespace and str(row.get("artifact_namespace") or row.get("namespace") or "") != str(artifact_namespace):
+            continue
+        resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, core_opportunity_rows)
+        canonical = resolution.canonical_core_opportunity_id
+        if not canonical:
+            continue
+        current = str(row.get("core_opportunity_id") or "").strip()
+        if current != canonical:
+            row["original_core_opportunity_id"] = current or None
+            row["core_opportunity_id"] = canonical
+            changed += 1
+        row["core_opportunity_id_status"] = resolution.resolution_status
+        if resolution.diagnostic_support_for_core_opportunity_id:
+            row["diagnostic_support_for_core_opportunity_id"] = resolution.diagnostic_support_for_core_opportunity_id
+        if resolution.warnings:
+            existing = row.get("warnings") if isinstance(row.get("warnings"), list) else []
+            row["warnings"] = list(dict.fromkeys([*existing, *resolution.warnings]))
+    if changed:
+        try:
+            with p.open("w", encoding="utf-8") as fh:
+                for row in rows:
+                    fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+                    fh.write("\n")
+        except OSError:
+            return 0
+    return changed
+
+
 def format_acquisition_report(rows: Iterable[Mapping[str, Any]]) -> str:
     data = [dict(row) for row in rows if isinstance(row, Mapping)]
     lines = [

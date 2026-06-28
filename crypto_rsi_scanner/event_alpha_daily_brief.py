@@ -851,7 +851,9 @@ def _source_coverage_summary_lines(
         (
             "- Evidence acquisition funnel: "
             f"evidence_plans_created={len(planned) or len(planned_attempted)}, "
+            f"llm_evidence_plans_created={len(planned)}, "
             f"acquisition_requests_executed={len(executed_rows)}, "
+            f"deterministic_acquisition_requests_executed={len(executed_rows)}, "
             f"provider_queries_executed={provider_queries}, "
             f"accepted_evidence_found={accepted}, "
             f"no_results={no_results}, "
@@ -1249,6 +1251,8 @@ def _market_freshness_readiness_lines(
         )
         statuses[status] = statuses.get(status, 0) + 1
         cap = _truthy(row.get("market_context_freshness_cap_applied") if row.get("market_context_freshness_cap_applied") is not None else components.get("market_context_freshness_cap_applied"))
+        if row.get("row_type") == "event_core_opportunity" and status in {"fresh", "fixture_allowed_stale"}:
+            cap = False
         if cap or status in {"stale", "unknown", "missing"}:
             refresh_needed.append(row)
         if cap or status == "stale":
@@ -1313,6 +1317,10 @@ def _core_market_freshness_line(item: event_core_opportunities.CoreOpportunity) 
     if not core_status:
         best = sorted(row_infos, key=lambda item_info: status_rank.get(item_info[0], 5))[0]
         core_status, core_source, core_age = best[0], best[1], best[2]
+    if core_status in {"fresh", "fixture_allowed_stale"} and core_source.casefold() in {"", "missing", "unknown"}:
+        core_source = "canonical_core_store"
+    if core_status in {"fresh", "fixture_allowed_stale"} and core_age.casefold() in {"", "unknown", "missing"}:
+        core_age = "n/a"
     support_infos = row_infos[1:] if len(row_infos) > 1 else ()
     support_gaps = sum(1 for status, _, _, cap, _ in support_infos if cap or status in {"stale", "unknown", "missing"})
     core_refresh_needed = core_status in {"", "stale", "unknown", "missing"}

@@ -133,7 +133,7 @@ def format_opportunity_audit(
         *_incident_lines(incident, row, components),
         "",
         "## Impact path decision",
-        f"- impact path: {components.get('impact_path_type') or row.get('impact_path_type') or 'unknown'}",
+        f"- impact path: {components.get('impact_path_type') or row.get('impact_path_type') or components.get('primary_impact_path') or row.get('primary_impact_path') or 'unknown'}",
         f"- strength: {components.get('impact_path_strength') or row.get('impact_path_strength') or 'unknown'}",
         f"- reason: {components.get('impact_path_reason') or row.get('impact_path_reason') or 'unknown'}",
         f"- digest gate: {components.get('digest_eligible_by_impact_path') if components.get('digest_eligible_by_impact_path') is not None else 'unknown'}",
@@ -278,9 +278,12 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
     merged = {**dict(components or {}), **dict(row or {})}
     pack_name = str(merged.get("source_pack") or "")
     if not pack_name:
+        impact_for_pack = str(merged.get("impact_path_type") or merged.get("primary_impact_path") or "")
+        if impact_for_pack.casefold() in {"proxy_attention", "proxy_exposure"}:
+            impact_for_pack = "venue_value_capture"
         pack = event_source_packs.source_pack_for_playbook(
             str(merged.get("playbook_type") or merged.get("latest_effective_playbook_type") or ""),
-            impact_path_type=str(merged.get("impact_path_type") or ""),
+            impact_path_type=impact_for_pack,
             impact_category=str(merged.get("impact_category") or ""),
         )
         pack_name = pack.name

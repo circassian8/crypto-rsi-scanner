@@ -798,6 +798,12 @@ def _candidate_from_row(
     level = str(quality.get("opportunity_level") or "local_only")
     final_route = _final_route_for_route(route) if route is not None else str(row.get("final_route_after_quality_gate") or row.get("route") or "")
     alertable = event_alpha_router.route_value_is_alertable(final_route) if final_route else False
+    if str(row.get("row_type") or "") == "event_core_opportunity" and (
+        alertable
+        or final_route == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
+        or level in {"validated_digest", "watchlist", "high_priority"}
+    ):
+        return None
     market_refresh_reasons = _market_refresh_reasons(quality, row)
     if level in {"watchlist", "high_priority"} and not market_refresh_reasons:
         return None

@@ -44,6 +44,15 @@ class EventCoreOpportunityStoreReadResult:
     filters: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class EventCoreOpportunityCardLinkUpdateResult:
+    path: Path
+    attempted: bool
+    success: bool
+    rows_updated: int = 0
+    block_reason: str | None = None
+
+
 def write_core_opportunities(
     rows: Iterable[Any],
     *,
@@ -132,6 +141,56 @@ def load_core_opportunities(
     )
 
 
+def update_core_opportunity_card_links(
+    path: str | Path,
+    card_paths: Iterable[str | Path],
+    *,
+    run_id: str | None = None,
+) -> EventCoreOpportunityCardLinkUpdateResult:
+    """Rewrite canonical rows with generated research-card paths.
+
+    The Event Alpha cycle writes core rows before rendering cards. Updating the
+    existing rows keeps the canonical store authoritative without appending a
+    second copy of the same core opportunities.
+    """
+    p = Path(path).expanduser()
+    card_by_core = _card_path_by_core_id(card_paths)
+    if not card_by_core:
+        return EventCoreOpportunityCardLinkUpdateResult(path=p, attempted=True, success=True, rows_updated=0)
+    try:
+        rows = _read_jsonl(p)
+        updated = 0
+        for row in rows:
+            if row.get("row_type") != "event_core_opportunity":
+                continue
+            if run_id and str(row.get("run_id") or "") != str(run_id):
+                continue
+            core_id = str(row.get("core_opportunity_id") or "").strip()
+            card_path = card_by_core.get(core_id)
+            if not card_path or row.get("card_path") == card_path:
+                continue
+            row["card_path"] = card_path
+            row["research_card_path"] = card_path
+            row.setdefault("feedback_target", core_id)
+            row.setdefault("feedback_target_type", "core_opportunity_id")
+            updated += 1
+        if updated:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            with p.open("w", encoding="utf-8") as fh:
+                for row in rows:
+                    fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+                    fh.write("\n")
+        return EventCoreOpportunityCardLinkUpdateResult(path=p, attempted=True, success=True, rows_updated=updated)
+    except Exception as exc:  # noqa: BLE001 - research artifacts must fail soft.
+        return EventCoreOpportunityCardLinkUpdateResult(
+            path=p,
+            attempted=True,
+            success=False,
+            rows_updated=0,
+            block_reason=f"{type(exc).__name__}: {exc}",
+        )
+
+
 def core_opportunities_from_rows(rows: Iterable[Mapping[str, Any]]) -> tuple[event_core_opportunities.CoreOpportunity, ...]:
     """Convert stored canonical rows back into CoreOpportunity objects."""
     return event_core_opportunities.aggregate_core_opportunities(rows)
@@ -190,10 +249,16 @@ def _row_from_core_opportunity(
     market_after = _best_float(all_rows, ("market_confirmation_after", "market_confirmation_score_after", "market_confirmation_score"))
     evidence_before = _best_float(all_rows, ("evidence_quality_before", "evidence_quality_score_before"))
     evidence_after = _best_float(all_rows, ("evidence_quality_after", "evidence_quality_score_after", "evidence_quality_score"))
+    source_pack = _best_source_pack(all_rows, item.primary_impact_path)
+    source_class = _first_text(all_rows, ("source_class",))
+    evidence_specificity = _first_text(all_rows, ("evidence_specificity",))
+    evidence_score = evidence_after if evidence_after is not None else _first_float(all_rows, ("evidence_quality_score",))
+    market_level = _first_text(all_rows, ("market_confirmation_level", "market_reaction_confirmation", "post_refresh_market_confirmation_level"))
     initial_level = _first_text(all_rows, ("initial_opportunity_level", "opportunity_level_before", "opportunity_level_pre_refresh")) or item.opportunity_level
     initial_score = _first_float(all_rows, ("initial_opportunity_score", "opportunity_score_before", "opportunity_score_pre_refresh"))
     post_level = _first_text(all_rows, ("post_refresh_opportunity_level", "refreshed_opportunity_level", "opportunity_level_after_market_refresh")) or item.opportunity_level
     post_score = _first_float(all_rows, ("post_refresh_opportunity_score", "refreshed_opportunity_score", "opportunity_score_after_market_refresh"))
+    market_context = _best_market_context(all_rows)
     support_ids = _row_ids(support)
     diagnostic_ids = _row_ids(diagnostics)
     return {
@@ -210,11 +275,21 @@ def _row_from_core_opportunity(
         "canonical_incident_name": item.canonical_incident_name,
         "candidate_role": item.candidate_role,
         "primary_impact_path": item.primary_impact_path,
+        "impact_path_type": item.primary_impact_path,
+        "relationship_type": item.primary_impact_path,
+        "playbook_type": item.primary_impact_path,
+        "effective_playbook_type": item.primary_impact_path,
+        "latest_playbook_type": item.primary_impact_path,
+        "state": item.final_state_after_quality_gate,
+        "tier": item.final_route_after_quality_gate,
+        "latest_tier": item.final_route_after_quality_gate,
+        "route": item.final_route_after_quality_gate,
         "primary_hypothesis_id": _first_text([primary], ("hypothesis_id", "primary_hypothesis_id")),
         "supporting_hypothesis_ids": list(item.supporting_hypothesis_ids),
         "supporting_categories": list(item.supporting_categories),
         "supporting_impact_paths": list(item.supporting_impact_paths),
         "supporting_evidence_quotes": list(item.supporting_evidence_quotes),
+        "evidence_quotes": list(item.supporting_evidence_quotes),
         "supporting_row_ids": support_ids,
         "diagnostic_row_ids": diagnostic_ids,
         "diagnostic_row_count": item.diagnostic_row_count,
@@ -225,12 +300,14 @@ def _row_from_core_opportunity(
         "initial_opportunity_score": initial_score if initial_score is not None else item.opportunity_score_final,
         "market_refresh_attempted": _any_truthy(all_rows, ("market_refresh_attempted", "targeted_market_refresh_attempted")),
         "market_refresh_success": _any_truthy(all_rows, ("market_refresh_success", "targeted_market_refresh_success")),
-        "market_context_freshness_status": _first_text(all_rows, ("market_context_freshness_status",)),
-        "market_context_source": _first_text(all_rows, ("market_context_source",)),
-        "market_context_observed_at": _first_text(all_rows, ("market_context_observed_at",)),
-        "market_context_age_hours": _first_float(all_rows, ("market_context_age_hours",)),
-        "market_context_freshness_cap_applied": _any_truthy(all_rows, ("market_context_freshness_cap_applied",)),
-        "market_context_data_quality": _first_text(all_rows, ("market_context_data_quality",)),
+        "market_context_freshness_status": market_context.get("market_context_freshness_status"),
+        "market_context_source": market_context.get("market_context_source"),
+        "market_context_observed_at": market_context.get("market_context_observed_at"),
+        "market_context_age_hours": market_context.get("market_context_age_hours"),
+        "market_context_freshness_cap_applied": bool(market_context.get("market_context_freshness_cap_applied")),
+        "market_context_data_quality": market_context.get("market_context_data_quality"),
+        "market_confirmation_score": market_after,
+        "market_confirmation_level": market_level,
         "market_confirmation_before": market_before,
         "market_confirmation_after": market_after,
         "main_frame_type": _first_text(all_rows, ("main_frame_type",)),
@@ -249,6 +326,11 @@ def _row_from_core_opportunity(
         "frame_summary": _first_list(all_rows, ("frame_summary",)),
         "evidence_acquisition_attempted": _any_truthy(all_rows, ("evidence_acquisition_attempted", "source_acquisition_attempted")),
         "evidence_acquisition_status": _first_text(all_rows, ("evidence_acquisition_status", "acquisition_status", "source_acquisition_status")),
+        "evidence_acquisition_source_pack": source_pack,
+        "source_pack": source_pack,
+        "source_class": source_class,
+        "evidence_specificity": evidence_specificity,
+        "evidence_quality_score": evidence_score,
         "evidence_quality_before": evidence_before,
         "evidence_quality_after": evidence_after,
         "post_refresh_opportunity_level": post_level,
@@ -259,12 +341,15 @@ def _row_from_core_opportunity(
         "opportunity_score_final": item.opportunity_score_final,
         "final_state_after_quality_gate": item.final_state_after_quality_gate,
         "final_route_after_quality_gate": item.final_route_after_quality_gate,
+        "final_tier_after_quality_gate": item.final_route_after_quality_gate,
         "final_verdict_source": _first_text(all_rows, ("final_verdict_source", "opportunity_verdict_source", "verdict_source")) or "core_opportunity_merge",
         "final_verdict_reason": _first_text(all_rows, ("final_verdict_reason", "quality_gate_block_reason", "route_reason", "opportunity_verdict_reason")),
         "why_opportunity_visible": item.why_opportunity_visible,
         "why_other_rows_hidden": item.why_other_rows_hidden,
         "card_path": str(card_path) if card_path else None,
+        "research_card_path": str(card_path) if card_path else None,
         "feedback_target": item.core_opportunity_id,
+        "feedback_target_type": "core_opportunity_id",
         "generated_at": generated_at,
     }
 
@@ -351,6 +436,132 @@ def _best_float(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> flo
         if parsed is not None
     ]
     return max(values) if values else None
+
+
+def _best_market_context(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    for row in rows:
+        components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else row.get("score_components")
+        for source in (row, components if isinstance(components, Mapping) else None):
+            if not isinstance(source, Mapping):
+                continue
+            candidates.append(_market_context_from_flat(source))
+            for key in ("market_context_after", "market_context", "market_data_context"):
+                nested = source.get(key)
+                if isinstance(nested, Mapping):
+                    candidates.append(_market_context_from_nested(nested))
+    candidates = [item for item in candidates if _market_context_has_value(item)]
+    if not candidates:
+        return {}
+    candidates.sort(key=_market_context_rank, reverse=True)
+    return candidates[0]
+
+
+def _market_context_from_flat(source: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "market_context_freshness_status": _text_or_none(source.get("market_context_freshness_status")),
+        "market_context_source": _text_or_none(source.get("market_context_source")),
+        "market_context_observed_at": _text_or_none(source.get("market_context_observed_at")),
+        "market_context_age_hours": _float_or_none(source.get("market_context_age_hours")),
+        "market_context_freshness_cap_applied": _truthy(source.get("market_context_freshness_cap_applied")),
+        "market_context_data_quality": _text_or_none(source.get("market_context_data_quality")),
+    }
+
+
+def _market_context_from_nested(source: Mapping[str, Any]) -> dict[str, Any]:
+    snapshot = source.get("market_snapshot") if isinstance(source.get("market_snapshot"), Mapping) else {}
+    data_quality = _text_or_none(source.get("data_quality")) or _text_or_none(snapshot.get("data_quality"))
+    observed_at = (
+        _text_or_none(source.get("timestamp"))
+        or _text_or_none(source.get("observed_at"))
+        or _text_or_none(snapshot.get("timestamp"))
+        or _text_or_none(snapshot.get("observed_at"))
+    )
+    age_seconds = _float_or_none(source.get("age_seconds"))
+    age_hours = _float_or_none(source.get("age_hours"))
+    if age_hours is None and age_seconds is not None:
+        age_hours = age_seconds / 3600.0
+    source_name = _text_or_none(source.get("source")) or _text_or_none(snapshot.get("source"))
+    freshness = _text_or_none(source.get("freshness_status")) or _text_or_none(source.get("market_context_freshness_status"))
+    if not freshness and data_quality in {"fresh", "fixture_allowed_stale", "stale", "missing", "unknown"}:
+        freshness = data_quality
+    if not freshness and observed_at:
+        freshness = "fresh"
+    cap_value = source.get("freshness_cap_applied", source.get("market_context_freshness_cap_applied"))
+    return {
+        "market_context_freshness_status": freshness,
+        "market_context_source": source_name,
+        "market_context_observed_at": observed_at,
+        "market_context_age_hours": age_hours,
+        "market_context_freshness_cap_applied": _truthy(cap_value),
+        "market_context_data_quality": data_quality,
+    }
+
+
+def _market_context_has_value(item: Mapping[str, Any]) -> bool:
+    return any(value not in (None, "", [], {}, ()) for value in item.values())
+
+
+def _market_context_rank(item: Mapping[str, Any]) -> tuple[int, int, int, int, int, int]:
+    status = str(item.get("market_context_freshness_status") or "").casefold()
+    source = str(item.get("market_context_source") or "").casefold()
+    data_quality = str(item.get("market_context_data_quality") or "").casefold()
+    observed_at = str(item.get("market_context_observed_at") or "").strip()
+    age = item.get("market_context_age_hours")
+    cap = bool(item.get("market_context_freshness_cap_applied"))
+    return (
+        3 if status == "fresh" else 2 if status == "fixture_allowed_stale" else 1 if status == "stale" else 0,
+        1 if source not in {"", "missing", "unknown"} else 0,
+        1 if data_quality not in {"", "missing", "unknown"} else 0,
+        1 if observed_at else 0,
+        1 if age not in (None, "", "unknown") else 0,
+        0 if cap else 1,
+    )
+
+
+def _text_or_none(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
+def _best_source_pack(rows: Iterable[Mapping[str, Any]], impact_path: str | None) -> str | None:
+    prioritized: list[str] = []
+    fallback: list[str] = []
+    for row in rows:
+        components = row.get("latest_score_components") if isinstance(row.get("latest_score_components"), Mapping) else row.get("score_components")
+        values = (
+            row.get("evidence_acquisition_source_pack"),
+            row.get("source_pack"),
+            components.get("evidence_acquisition_source_pack") if isinstance(components, Mapping) else None,
+            components.get("source_pack") if isinstance(components, Mapping) else None,
+        )
+        status = str(
+            row.get("evidence_acquisition_status")
+            or (components.get("evidence_acquisition_status") if isinstance(components, Mapping) else "")
+            or ""
+        )
+        for value in values:
+            text = str(value or "").strip()
+            if not text:
+                continue
+            if status == "accepted_evidence_found" or text != "market_anomaly_pack":
+                prioritized.append(text)
+            else:
+                fallback.append(text)
+    if prioritized:
+        return prioritized[0]
+    if fallback:
+        return fallback[0]
+    try:
+        from . import event_source_packs
+        impact = str(impact_path or "")
+        pack_impact = "venue_value_capture" if impact.casefold() in {"proxy_attention", "proxy_exposure"} else impact
+        return event_source_packs.source_pack_for_playbook(
+            "proxy_attention" if pack_impact.casefold() in {"venue_value_capture", "proxy_exposure"} else impact,
+            impact_path_type=pack_impact,
+        ).name
+    except Exception:  # noqa: BLE001 - optional source-pack helper.
+        return None
 
 
 def _any_truthy(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> bool:

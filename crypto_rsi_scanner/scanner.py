@@ -2355,6 +2355,13 @@ def event_alpha_cycle(
         latest_run=True,
         run_id=run_id,
     ).rows
+    event_evidence_acquisition.reconcile_acquisition_core_ids(
+        config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH,
+        latest_core_rows,
+        run_id=run_id,
+        profile=profile_for_run,
+        artifact_namespace=artifact_namespace,
+    )
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
         watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
@@ -2373,6 +2380,16 @@ def event_alpha_cycle(
             ),
         )
         pipeline_result = replace(pipeline_result, research_card_paths=card_write.card_paths)
+        event_core_opportunity_store.update_core_opportunity_card_links(
+            _event_core_opportunity_store_config_from_runtime().path,
+            card_write.card_paths,
+            run_id=run_id,
+        )
+        latest_core_rows = event_core_opportunity_store.load_core_opportunities(
+            _event_core_opportunity_store_config_from_runtime().path,
+            latest_run=True,
+            run_id=run_id,
+        ).rows
         print(event_research_cards.format_card_write_result(card_write))
         print("")
     print(event_alpha_pipeline.format_event_alpha_pipeline_report(pipeline_result))
@@ -2876,6 +2893,13 @@ def _event_alpha_notify_cycle_body(
         latest_run=True,
         run_id=run_id,
     ).rows
+    event_evidence_acquisition.reconcile_acquisition_core_ids(
+        config.EVENT_ALPHA_EVIDENCE_ACQUISITION_PATH,
+        latest_core_rows,
+        run_id=run_id,
+        profile=profile_for_run,
+        artifact_namespace=artifact_namespace,
+    )
     card_write = None
     if config.EVENT_RESEARCH_CARDS_AUTO_WRITE and pipeline_result.router_result is not None:
         watch_cfg = _event_watchlist_config_from_runtime()
@@ -2895,6 +2919,16 @@ def _event_alpha_notify_cycle_body(
             ),
         )
         pipeline_result = replace(pipeline_result, research_card_paths=card_write.card_paths)
+        event_core_opportunity_store.update_core_opportunity_card_links(
+            _event_core_opportunity_store_config_from_runtime().path,
+            card_write.card_paths,
+            run_id=run_id,
+        )
+        latest_core_rows = event_core_opportunity_store.load_core_opportunities(
+            _event_core_opportunity_store_config_from_runtime().path,
+            latest_run=True,
+            run_id=run_id,
+        ).rows
         print(event_research_cards.format_card_write_result(card_write))
         print("")
     storage = Storage(config.DB_PATH)
@@ -3216,6 +3250,7 @@ def event_alpha_notify_go_no_go(
         core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         card_paths=[str(path) for path in _research_card_markdown_paths(context.research_cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -3624,6 +3659,7 @@ def event_alpha_notification_checklist_report(
         core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -5621,6 +5657,7 @@ def event_alpha_artifact_doctor_report(
         core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],
@@ -5743,6 +5780,7 @@ def event_alpha_export_burn_in_pack(
         core_opportunity_rows=event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows,
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         llm_budget_rows=artifacts["budget_rows"],

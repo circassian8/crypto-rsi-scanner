@@ -27830,6 +27830,52 @@ def test_event_core_opportunity_store_persists_canonical_rows():
         assert set(by_symbol) == {"AAVE", "MEME", "RUNE", "VELVET"}
 
 
+def test_event_core_opportunity_store_uses_refreshed_nested_market_context():
+    from crypto_rsi_scanner import event_core_opportunity_store
+
+    rows = _canonical_core_fixture_rows()
+    velvet = dict(rows[0])
+    velvet.update({
+        "market_context_freshness_status": "fresh",
+        "market_context_source": "missing",
+        "market_context_age_hours": "unknown",
+        "market_context_data_quality": "missing",
+        "market_context_freshness_cap_applied": True,
+        "market_context_after": {
+            "timestamp": "2026-06-15T15:30:00+00:00",
+            "age_seconds": 1800,
+            "data_quality": "fresh",
+            "source": "fixture_targeted_market_refresh",
+            "market_snapshot": {
+                "symbol": "VELVET",
+                "coin_id": "velvet",
+                "source": "fixture_targeted_market_refresh",
+                "timestamp": "2026-06-15T15:30:00+00:00",
+            },
+        },
+    })
+    rows[0] = velvet
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        result = event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-market-context",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        assert result.success
+        loaded = event_core_opportunity_store.load_core_opportunities(path, latest_run=True)
+    stored = next(row for row in loaded.rows if row["symbol"] == "VELVET")
+    assert stored["market_context_freshness_status"] == "fresh"
+    assert stored["market_context_source"] == "fixture_targeted_market_refresh"
+    assert stored["market_context_data_quality"] == "fresh"
+    assert stored["market_context_age_hours"] == 0.5
+    assert stored["market_context_freshness_cap_applied"] is False
+
+
 def test_event_core_opportunity_store_prevents_stale_support_near_miss():
     from crypto_rsi_scanner import event_core_opportunity_store, event_near_miss
 
@@ -28039,6 +28085,166 @@ def test_research_cards_use_canonical_core_store_groups():
             for path, group in groups.items()
             if group == "Local-Only / Quality-Capped Cards"
         )
+        link_update = event_core_opportunity_store.update_core_opportunity_card_links(
+            store_path,
+            result.card_paths,
+            run_id="run-core-cards",
+        )
+        assert link_update.success
+        assert link_update.rows_updated == len(store_ids)
+        linked_rows = event_core_opportunity_store.load_core_opportunities(store_path, latest_run=True).rows
+        assert all(row.get("card_path") for row in linked_rows)
+
+
+def test_research_card_primary_fields_use_canonical_core_row():
+    from crypto_rsi_scanner import event_core_opportunity_store, event_research_cards
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        store_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=store_path),
+            run_id="run-core-card-primary",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        store_rows = event_core_opportunity_store.load_core_opportunities(store_path, latest_run=True).rows
+    velvet = next(row for row in store_rows if row["symbol"] == "VELVET")
+    stale_support = {
+        **velvet,
+        "row_type": "event_alpha_alert_snapshot",
+        "tier": "STORE_ONLY",
+        "state": "RADAR",
+        "route": "STORE_ONLY",
+        "opportunity_level": "local_only",
+        "opportunity_score_final": 0,
+        "impact_path_type": "insufficient_data",
+        "evidence_acquisition_attempted": False,
+        "evidence_acquisition_status": "not_executed",
+    }
+    card = event_research_cards.render_research_card(
+        velvet["core_opportunity_id"],
+        watchlist_entries=[],
+        alert_rows=[stale_support, velvet],
+    )
+    assert "- State / alert tier: HIGH_PRIORITY / HIGH_PRIORITY_RESEARCH" in card.markdown
+    assert "- Source pack: proxy_preipo_rwa_pack" in card.markdown
+    assert "- Evidence acquisition attempted: true" in card.markdown
+    assert "- Opportunity verdict: high_priority / 92.0" in card.markdown
+    assert "- Relationship: venue_value_capture" in card.markdown
+    assert "STORE_ONLY" not in card.markdown.split("## Artifact Lineage", 1)[0]
+
+
+def test_evidence_acquisition_rows_reconcile_to_canonical_core_store_ids():
+    import json
+    from crypto_rsi_scanner import event_core_opportunity_store, event_evidence_acquisition
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=core_path),
+            run_id="run-core-acquisition",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        meme_core = next(row["core_opportunity_id"] for row in core_rows if row["coin_id"] == "memecore")
+        acquisition_path = root / "event_evidence_acquisition.jsonl"
+        acquisition_path.write_text(
+            json.dumps({
+                "row_type": "event_evidence_acquisition",
+                "run_id": "run-core-acquisition",
+                "profile": "market_refresh_smoke",
+                "artifact_namespace": "market_refresh_smoke",
+                "core_opportunity_id": "core_legacy_memecore",
+                "hypothesis_id": "hyp-meme-core",
+                "incident_id": "incident-memecore",
+                "symbol": "MEME",
+                "coin_id": "memecore",
+            }) + "\n",
+            encoding="utf-8",
+        )
+        changed = event_evidence_acquisition.reconcile_acquisition_core_ids(
+            acquisition_path,
+            core_rows,
+            run_id="run-core-acquisition",
+            profile="market_refresh_smoke",
+            artifact_namespace="market_refresh_smoke",
+        )
+        rows = event_evidence_acquisition.load_acquisition_results(acquisition_path)
+    assert changed == 1
+    assert rows[0]["core_opportunity_id"] == meme_core
+    assert rows[0]["core_opportunity_id_status"] == "diagnostic_support"
+    assert rows[0]["original_core_opportunity_id"] == "core_legacy_memecore"
+
+
+def test_artifact_doctor_detects_canonical_core_rendering_mismatch_and_acquisition_orphan():
+    import json
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_core_opportunity_store
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=core_path),
+            run_id="run-core-doctor-primary",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        velvet = next(row for row in core_rows if row["symbol"] == "VELVET")
+        stale_card = root / "card_stale_velvet.md"
+        stale_card.write_text(
+            "\n".join([
+                "# VELVET Event Research Card",
+                "- Run ID: run-core-doctor-primary",
+                "- Profile: market_refresh_smoke",
+                "- Namespace: market_refresh_smoke",
+                f"- Core opportunity ID: {velvet['core_opportunity_id']}",
+                f"- Feedback target: {velvet['core_opportunity_id']}",
+                "- State / alert tier: HIGH_PRIORITY / STORE_ONLY",
+                "- Final route: STORE_ONLY",
+                "- Opportunity verdict: local_only / 0.0",
+            ]),
+            encoding="utf-8",
+        )
+        acquisition_orphan = {
+            "row_type": "event_evidence_acquisition",
+            "run_id": "run-core-doctor-primary",
+            "profile": "market_refresh_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "market_refresh_smoke",
+            "core_opportunity_id": "core_orphan",
+            "symbol": "MEME",
+            "coin_id": "memecore",
+        }
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-core-doctor-primary",
+                "profile": "market_refresh_smoke",
+                "run_mode": "burn_in",
+                "artifact_namespace": "market_refresh_smoke",
+                "success": True,
+                "alertable": 0,
+            }],
+            core_opportunity_rows=core_rows,
+            evidence_acquisition_rows=[acquisition_orphan],
+            card_paths=[stale_card],
+            profile="market_refresh_smoke",
+            artifact_namespace="market_refresh_smoke",
+            strict=True,
+        )
+    assert doctor.card_primary_fields_mismatch_core_store == 1
+    assert doctor.evidence_acquisition_core_id_missing_from_store == 1
+    assert any("card_primary_fields_mismatch_core_store=1" in item for item in doctor.blockers)
+    assert any("evidence_acquisition_core_id_missing_from_store=1" in item for item in doctor.blockers)
 
 
 def test_alert_snapshots_mark_source_noise_as_diagnostic_support():

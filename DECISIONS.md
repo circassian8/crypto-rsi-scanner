@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - CoreOpportunity store rows win after secondary artifact writes
+**Status:** accepted
+**Decision:** Event Alpha cycles may create secondary artifacts after the
+canonical core store is first written, such as research cards and source-pack
+evidence acquisition rows. Those secondary artifacts must be reconciled back to
+the canonical `event_core_opportunities.jsonl` rows before operator-facing
+reports are considered ready. Research-card paths and feedback targets should
+be written back onto the stored core rows, and evidence-acquisition rows whose
+temporary core ids resolve to a compatible stored core should carry the
+canonical `core_opportunity_id` plus diagnostic support metadata. Cards,
+audits, daily briefs, and artifact-doctor checks should read the reconciled
+canonical row first, with support/control rows used only as diagnostics.
+**Why:** Post-cycle artifacts can otherwise make a high-quality core opportunity
+look downgraded or fragmented: for example a VELVET core can be stored as
+high-priority while a support row/card still displays `STORE_ONLY`, or a source
+acquisition result can point at an orphan core id. Reconciliation keeps the
+operator view and Pro-model review bundle centered on one truthful object.
+**Revisit when:** Core opportunities, cards, evidence acquisition, and feedback
+targets are written transactionally in a single typed store.
+
 ## 2026-06-28 - Canonical core ids govern visible Event Alpha artifacts
 **Status:** accepted
 **Decision:** Visible Event Alpha research cards, daily-brief card groups, alert

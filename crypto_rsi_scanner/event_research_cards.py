@@ -84,6 +84,10 @@ def render_research_card(
     alert = _find_alert(clean_key, list(alert_rows))
     decision = _find_decision(clean_key, list(route_decisions))
     core = _find_card_core_opportunity(clean_key, entry, alert, decision, route_decisions)
+    if core is not None:
+        if entry is None or (alert is not None and alert.get("row_type") == "event_core_opportunity"):
+            entry = _entry_from_core_opportunity(core)
+        alert = _canonical_card_alert(core, alert)
     cluster = _find_cluster(clean_key, list(clusters), entry, alert)
     monitor_row = _find_monitor_row(clean_key, list(monitor_rows), entry, alert)
     feedback = _matching_rows(clean_key, list(feedback_rows), entry, alert)
@@ -794,12 +798,12 @@ def _entry_from_core_opportunity(
         source_count=int(_float_value(row.get("source_count")) or 0),
         highest_score=latest_score,
         latest_score=latest_score,
-        latest_tier=_first_text(row, "latest_tier", "tier", "final_tier_after_quality_gate") or "",
+        latest_tier=_first_text(row, "latest_tier", "tier", "final_tier_after_quality_gate", "final_route_after_quality_gate", "route") or "",
         latest_event_name=_first_text(row, "latest_event_name", "event_name", "canonical_incident_name") or opportunity.canonical_incident_name,
         latest_source=_first_text(row, "latest_source", "source", "provider"),
-        latest_playbook_type=_first_text(row, "effective_playbook_type", "playbook_type"),
+        latest_playbook_type=_first_text(row, "effective_playbook_type", "playbook_type", "primary_impact_path") or opportunity.primary_impact_path,
         latest_rule_playbook_type=_first_text(row, "rule_playbook_type"),
-        latest_effective_playbook_type=_first_text(row, "effective_playbook_type", "playbook_type"),
+        latest_effective_playbook_type=_first_text(row, "effective_playbook_type", "playbook_type", "primary_impact_path") or opportunity.primary_impact_path,
         latest_playbook_score=latest_score,
         latest_playbook_action=_first_text(row, "playbook_action"),
         latest_market_snapshot=_mapping_value(row.get("latest_market_snapshot")) or _mapping_value(row.get("market_snapshot")) or {},
@@ -844,7 +848,11 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
         "validated_symbol",
         "validated_coin_id",
         "candidate_role",
+        "primary_impact_path",
         "impact_path_type",
+        "relationship_type",
+        "impact_category",
+        "impact_path_reason",
         "opportunity_level",
         "opportunity_score_final",
         "initial_opportunity_score",
@@ -860,8 +868,31 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
         "final_verdict_reason",
         "market_data_freshness",
         "market_reaction_confirmation",
+        "market_context_freshness_status",
+        "market_context_source",
+        "market_context_observed_at",
+        "market_context_age_hours",
+        "market_context_freshness_cap_applied",
+        "market_context_data_quality",
+        "market_confirmation_score",
+        "market_confirmation_level",
+        "market_confirmation_after",
         "final_route_after_quality_gate",
+        "final_tier_after_quality_gate",
         "final_state_after_quality_gate",
+        "source_pack",
+        "evidence_acquisition_source_pack",
+        "evidence_acquisition_attempted",
+        "evidence_acquisition_status",
+        "evidence_acquisition_results",
+        "evidence_acquisition_accepted_count",
+        "evidence_acquisition_rejected_count",
+        "evidence_acquisition_accepted_evidence",
+        "accepted_evidence_reason_codes",
+        "source_class",
+        "evidence_specificity",
+        "evidence_quality_score",
+        "evidence_quality_after",
         "quality_state_block_reason",
         "feedback_target",
         "feedback_target_type",
@@ -891,6 +922,14 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
     components.setdefault("validated_coin_id", opportunity.coin_id)
     components.setdefault("candidate_role", opportunity.candidate_role)
     components.setdefault("impact_path_type", opportunity.primary_impact_path)
+    if opportunity.primary_impact_path and str(components.get("impact_path_type") or "").casefold() in {
+        "",
+        "unknown",
+        "insufficient_data",
+        "generic_cooccurrence_only",
+    }:
+        components["impact_path_type"] = opportunity.primary_impact_path
+    components.setdefault("relationship_type", opportunity.primary_impact_path)
     components.setdefault("opportunity_level", opportunity.opportunity_level)
     components.setdefault("opportunity_score_final", opportunity.opportunity_score_final)
     if components.get("final_opportunity_level") not in (None, ""):
@@ -1126,6 +1165,7 @@ def _strip_sensitive(markdown: str) -> str:
 def _find_alert(key: str, rows: list[Mapping[str, Any]]) -> Mapping[str, Any] | None:
     clean_key = key[3:] if key.startswith("ea:") else key
     key_l = clean_key.lower()
+    matches: list[Mapping[str, Any]] = []
     for row in rows:
         values = {
             str(row.get("alert_key") or ""),
@@ -1140,8 +1180,18 @@ def _find_alert(key: str, rows: list[Mapping[str, Any]]) -> Mapping[str, Any] | 
             str(row.get("asset_coin_id") or ""),
         }
         if clean_key in values or key_l in {value.lower() for value in values}:
-            return row
-    return None
+            matches.append(row)
+    if not matches:
+        return None
+    return sorted(
+        matches,
+        key=lambda row: (
+            str(row.get("row_type") or "") == "event_core_opportunity",
+            bool(row.get("final_route_after_quality_gate")),
+            _float_value(row.get("opportunity_score_final") or row.get("final_opportunity_score")) or 0.0,
+        ),
+        reverse=True,
+    )[0]
 
 
 def _find_decision(
@@ -1276,7 +1326,53 @@ def _value(entry: Any | None, alert: Mapping[str, Any] | None, entry_field: str,
         value = alert.get(alert_field)
         if value not in (None, ""):
             return value
+        if entry_field:
+            value = alert.get(entry_field)
+            if value not in (None, ""):
+                return value
     return None
+
+
+def _canonical_card_alert(
+    opportunity: event_core_opportunities.CoreOpportunity,
+    alert: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    row = dict(alert or {})
+    primary = dict(opportunity.primary_row or {})
+    for key, value in primary.items():
+        row.setdefault(key, value)
+    row.update({
+        "core_opportunity_id": opportunity.core_opportunity_id,
+        "symbol": opportunity.symbol,
+        "coin_id": opportunity.coin_id,
+        "asset_symbol": opportunity.symbol,
+        "asset_coin_id": opportunity.coin_id,
+        "event_name": opportunity.canonical_incident_name or row.get("event_name") or row.get("latest_event_name"),
+        "canonical_incident_name": opportunity.canonical_incident_name,
+        "candidate_role": opportunity.candidate_role,
+        "primary_impact_path": opportunity.primary_impact_path,
+        "impact_path_type": opportunity.primary_impact_path,
+        "relationship_type": opportunity.primary_impact_path,
+        "playbook_type": row.get("playbook_type") or row.get("effective_playbook_type") or opportunity.primary_impact_path,
+        "effective_playbook_type": row.get("effective_playbook_type") or row.get("playbook_type") or opportunity.primary_impact_path,
+        "state": opportunity.final_state_after_quality_gate,
+        "tier": opportunity.final_route_after_quality_gate,
+        "latest_tier": opportunity.final_route_after_quality_gate,
+        "route": opportunity.final_route_after_quality_gate,
+        "final_route_after_quality_gate": opportunity.final_route_after_quality_gate,
+        "final_tier_after_quality_gate": row.get("final_tier_after_quality_gate") or opportunity.final_route_after_quality_gate,
+        "final_state_after_quality_gate": opportunity.final_state_after_quality_gate,
+        "opportunity_level": opportunity.opportunity_level,
+        "opportunity_score_final": opportunity.opportunity_score_final,
+        "final_opportunity_level": row.get("final_opportunity_level") or opportunity.opportunity_level,
+        "final_opportunity_score": row.get("final_opportunity_score") or opportunity.opportunity_score_final,
+        "feedback_target": row.get("feedback_target") or opportunity.core_opportunity_id,
+        "feedback_target_type": row.get("feedback_target_type") or "core_opportunity_id",
+    })
+    components = _core_score_components(opportunity)
+    existing = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+    row["score_components"] = {**dict(existing), **components}
+    return row
 
 
 def _cluster_lines(cluster: event_graph.EventCluster | None) -> list[str]:
@@ -1364,9 +1460,12 @@ def _source_acquisition_lines(
         return ["- Source pack: unknown", "- Evidence acquisition: no local metadata."]
     pack_name = str(components.get("source_pack") or "")
     if not pack_name:
+        impact_for_pack = str(components.get("impact_path_type") or "")
+        if impact_for_pack.casefold() in {"proxy_attention", "proxy_exposure"}:
+            impact_for_pack = "venue_value_capture"
         pack = event_source_packs.source_pack_for_playbook(
             str(components.get("playbook_type") or components.get("latest_effective_playbook_type") or (entry.latest_playbook_type if entry else "") or ""),
-            impact_path_type=str(components.get("impact_path_type") or ""),
+            impact_path_type=impact_for_pack,
             impact_category=str(components.get("impact_category") or ""),
         )
         pack_name = pack.name

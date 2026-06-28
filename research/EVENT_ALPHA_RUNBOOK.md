@@ -305,6 +305,15 @@ uses the research-card index grouping, so card groups and brief groups should
 agree by default. If they do not, run the artifact doctor before treating the
 bundle as ready for Pro-model review.
 
+Card generation is a secondary artifact write. After cards are written, the
+cycle should backfill the generated card path, research-card path, and feedback
+target fields onto the already-stored core rows instead of appending duplicate
+core rows. Source-pack evidence acquisition rows should also be reconciled to
+the stored core opportunity id when a temporary acquisition id matches the same
+incident, validated asset, role, and impact-path family. Reconciled acquisition
+rows keep the original id for audit, but operator-facing cards, audits, daily
+briefs, and doctor checks should display the canonical core id first.
+
 Near-miss reporting has two operator buckets. `Near-Miss Candidates` are
 currently non-alertable/local candidates close to promotion but missing fixable
 evidence. `Upgrade Candidates` are already validated digest or watchlist rows
