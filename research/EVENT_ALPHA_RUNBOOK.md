@@ -362,6 +362,12 @@ uses the research-card index grouping, so card groups and brief groups should
 agree by default. If they do not, run the artifact doctor before treating the
 bundle as ready for Pro-model review.
 
+Core Opportunity Cards should also render their human-facing quality-gate text
+from the final core verdict fields (`final_route_after_quality_gate`,
+`final_state_after_quality_gate`, `opportunity_level`, and final verdict
+reason/source). Raw support-row gate reasons are useful diagnostics, but they
+must not make a final digest/high-priority core card say it is local-only.
+
 Card generation is a secondary artifact write. After cards are written, the
 cycle should backfill the generated card path, research-card path, and feedback
 target fields onto the already-stored core rows instead of appending duplicate

@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Core research cards use final quality-gated verdict copy
+**Status:** accepted
+**Decision:** Canonical Core Opportunity Cards must render their operator-facing
+quality-gate and promotion/local-only copy from the stored final core fields:
+`final_route_after_quality_gate`, `final_state_after_quality_gate`,
+`opportunity_level`, `opportunity_score_final`, and final verdict reason/source.
+They must not rerun raw validated-hypothesis digest eligibility against a
+synthetic card row when a canonical `core_opportunity_id` is present. Raw
+support/control row gate reasons may still appear as diagnostics, but they
+cannot override the final core verdict copy.
+**Why:** Core cards are the human review object. Re-evaluating a merged core as
+a raw hypothesis can make a digest/high-priority opportunity show stale
+`local-only` text from an old support row, creating operator confusion even when
+the route/state artifacts are correct.
+**Revisit when:** Core opportunities, support rows, cards, and alert snapshots
+move into a typed store that can enforce final-vs-support presentation fields
+by schema.
+
 ## 2026-06-28 - Feedback labels are calibration artifacts, not mutations
 **Status:** accepted
 **Decision:** Event Alpha feedback labels should be stored as enriched

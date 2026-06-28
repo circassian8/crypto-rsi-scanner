@@ -1584,8 +1584,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     validation_reasons = components.get("validation_reasons") or components.get("validation_reason") or []
     if isinstance(validation_reasons, str):
         validation_reasons = [validation_reasons]
-    gate_block = event_alpha_router.validated_hypothesis_digest_block_reason(entry)
-    gate_line = "passed for capped research digest" if gate_block is None else f"local-only: {gate_block}"
+    gate_line = _impact_hypothesis_quality_gate_line(entry, components)
     impact_path_reason = components.get("impact_path_reason") or "unknown"
     impact_path_type = components.get("impact_path_type") or "unknown"
     candidate_role = components.get("candidate_role") or "unknown"
@@ -1718,7 +1717,7 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Missing requirements: {'; '.join(str(item) for item in missing_requirements[:4]) if missing_requirements else 'none'}",
         f"- Quality gate: {gate_line}",
         f"- Local-only due to weak co-occurrence: {str('impact_path_not_validated' in gate_line or 'weak_validated_local_only' in gate_line or why_digest_ineligible != 'none').lower()}",
-        f"- Why promoted/local-only: {entry.suppressed_reason or 'validated impact hypothesis promoted to RADAR'}",
+        f"- Why promoted/local-only: {_impact_hypothesis_promotion_line(entry, components, gate_line)}",
         "- Safety label: catalyst link validated, but this is not a calibrated strategy or trade signal.",
         "- Why it may be wrong: " + _impact_hypothesis_wrong_line(components),
         "- What to verify manually: "
@@ -1740,6 +1739,54 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
             + event_alpha_reason_text.humanize_event_alpha_reasons(why_not_promoted, limit=4)
         )
     return lines
+
+
+def _impact_hypothesis_quality_gate_line(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, Any],
+) -> str:
+    """Return operator-facing quality gate text for a card context block.
+
+    Canonical core cards already carry final quality-gated route fields. Using
+    the raw validated-hypothesis router gate on their synthetic card entry can
+    create stale local-only text because the synthetic row is no longer an
+    ``impact_hypothesis`` relationship row.
+    """
+    final_route = str(components.get("final_route_after_quality_gate") or "").strip()
+    if components.get("core_opportunity_id") and final_route:
+        route_upper = final_route.upper()
+        if event_alpha_router.route_value_is_alertable(final_route):
+            return f"passed final quality gate ({route_upper})"
+        if route_upper in {"SUPPRESS_DUPLICATE", "SUPPRESS_IN_FLIGHT"}:
+            return f"passed quality gate; route suppressed ({route_upper})"
+        reason = (
+            components.get("quality_gate_block_reason")
+            or components.get("why_digest_ineligible")
+            or components.get("why_local_only")
+            or components.get("final_opportunity_level")
+            or components.get("opportunity_level")
+            or route_upper
+        )
+        return f"local-only: {reason}"
+    gate_block = event_alpha_router.validated_hypothesis_digest_block_reason(entry)
+    return "passed for capped research digest" if gate_block is None else f"local-only: {gate_block}"
+
+
+def _impact_hypothesis_promotion_line(
+    entry: event_watchlist.EventWatchlistEntry,
+    components: Mapping[str, Any],
+    gate_line: str,
+) -> str:
+    if entry.suppressed_reason:
+        return entry.suppressed_reason
+    final_reason = components.get("final_verdict_reason")
+    final_level = str(components.get("final_opportunity_level") or components.get("opportunity_level") or "").strip()
+    final_route = str(components.get("final_route_after_quality_gate") or "").strip()
+    if final_reason and (final_level or final_route):
+        return str(final_reason)
+    if gate_line.startswith("passed"):
+        return f"promoted by final verdict ({final_level or final_route or 'allowed'})"
+    return f"kept local-only by final verdict ({final_level or final_route or 'store-only'})"
 
 
 def _impact_hypothesis_wrong_line(components: Mapping[str, Any]) -> str:

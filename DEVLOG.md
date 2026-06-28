@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Audit Event Alpha artifacts and repair core-card quality copy · Codex
+**Why:** The post-implementation audit needed proof that fresh Event Alpha
+artifacts, reports, cards, and doctors agree end-to-end. Fresh cards exposed a
+presentation bug where canonical core cards could still show stale raw-row
+`local-only: not_impact_hypothesis` text inside the impact-hypothesis context
+even when the final core verdict was digest/high-priority.
+**Changes:**
+- Research-card impact-hypothesis copy now treats canonical core opportunity
+  final route/state/verdict fields as authoritative, only falling back to raw
+  validated-hypothesis digest checks for non-core rows.
+- Core card promotion/local-only text now reflects the final verdict instead of
+  defaulting to "promoted to RADAR" for every core context block.
+- Added a regression around a promoted VELVET core card with stale support-row
+  data so final quality-gated route copy cannot regress.
+- Ran a fresh artifact QA sweep across `catalyst_frame_e2e`,
+  `evidence_acquisition_smoke`, `market_refresh_smoke`, `quality_validation`,
+  and `notify_llm_quality_frame`.
+**Verify:** `python3 tests/test_indicators.py` passed (513/513);
+`make event-llm-eval PYTHON=python3`; `make event-llm-extract-eval
+PYTHON=python3`; `make event-alpha-eval PYTHON=python3`; `make
+event-alpha-signal-quality-eval PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-market-refresh-smoke PYTHON=python3`; `make
+event-alpha-quality-validation-cycle PYTHON=python3`; `make verify
+PYTHON=python3`. Strict artifact doctors had no blockers for the audited
+profiles, and a direct JSONL/Markdown invariant audit found zero remaining
+issues after the card-copy fix.
+**Notes/risks:** Research-only artifact/presentation repair. No Telegram sends,
+paper/live rows, normal RSI writes, trading, or LLM/provider-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Turn Event Alpha feedback into calibration data · Codex
 **Why:** Event Alpha cards and core opportunities were labelable, but feedback
 rows did not consistently retain enough core/card/source/market/frame context to

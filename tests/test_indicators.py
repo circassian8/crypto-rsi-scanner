@@ -28322,7 +28322,16 @@ def test_research_card_primary_fields_use_canonical_core_row():
             artifact_namespace="market_refresh_smoke",
         )
         store_rows = event_core_opportunity_store.load_core_opportunities(store_path, latest_run=True).rows
-    velvet = next(row for row in store_rows if row["symbol"] == "VELVET")
+    velvet = {
+        **next(row for row in store_rows if row["symbol"] == "VELVET"),
+        "validation_stage": "impact_path_validated",
+        "main_frame_type": "proxy_attention",
+        "main_frame_role": "main_catalyst",
+        "main_frame_subject": "SpaceX",
+        "main_frame_actor": "Velvet",
+        "main_frame_object": "pre-IPO exposure",
+        "frame_status": "validated",
+    }
     stale_support = {
         **velvet,
         "row_type": "event_alpha_alert_snapshot",
@@ -28345,6 +28354,10 @@ def test_research_card_primary_fields_use_canonical_core_row():
     assert "- Evidence acquisition attempted: true" in card.markdown
     assert "- Opportunity verdict: high_priority / 92.0" in card.markdown
     assert "- Relationship: venue_value_capture" in card.markdown
+    assert "- Quality gate: passed final quality gate (HIGH_PRIORITY_RESEARCH)" in card.markdown
+    assert "- Why promoted/local-only: promoted by final verdict (high_priority)" in card.markdown
+    assert "Quality gate: local-only" not in card.markdown
+    assert "validated impact hypothesis promoted to RADAR" not in card.markdown
     assert "STORE_ONLY" not in card.markdown.split("## Artifact Lineage", 1)[0]
 
 
