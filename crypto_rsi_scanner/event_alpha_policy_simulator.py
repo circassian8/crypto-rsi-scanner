@@ -91,8 +91,13 @@ def simulate_policy(
     profile: str | None = None,
     scenarios: Iterable[EventAlphaPolicyScenario] = DEFAULT_SCENARIOS,
     include_legacy: bool = False,
+    feedback_rows: Iterable[Mapping[str, Any]] = (),
+    missed_rows: Iterable[Mapping[str, Any]] = (),
 ) -> EventAlphaPolicySimulationResult:
     raw_items = [_normalize(row) for row in rows if isinstance(row, Mapping)]
+    feedback_by_key = _feedback_by_key(feedback_rows)
+    raw_items = [_with_feedback(row, feedback_by_key) for row in raw_items]
+    missed = [dict(row) for row in missed_rows if isinstance(row, Mapping)]
     legacy_conflicts = [
         row for row in raw_items
         if row.get("_snapshot_quality_classification") in _SIMULATOR_EXCLUDED_CLASSIFICATIONS
@@ -113,6 +118,9 @@ def simulate_policy(
             for row in items
             if _key(row) in selected and _is_weak_or_generic(row)
         )
+        selected_items = [row for row in items if _key(row) in selected]
+        useful = tuple(_key(row) for row in selected_items if row.get("feedback_label") == "useful")
+        junk = tuple(_key(row) for row in selected_items if row.get("feedback_label") == "junk")
         results.append({
             "scenario": scenario.name,
             "opportunity_threshold": scenario.opportunity_threshold,
@@ -125,6 +133,11 @@ def simulate_policy(
             "gained": gained,
             "lost": lost,
             "weak_or_generic_alertable": weak,
+            "known_useful_selected": useful,
+            "known_junk_selected": junk,
+            "known_useful_count": len(useful),
+            "known_junk_count": len(junk),
+            "missed_recall_candidates": _missed_recall_candidates(missed, scenario),
             "quality_warnings": _quality_warnings(items, selected),
             "legacy_conflicts_excluded": 0 if include_legacy else len(legacy_conflicts),
         })
@@ -157,6 +170,12 @@ def format_policy_simulation(result: EventAlphaPolicySimulationResult) -> str:
             lines.append("  lost: " + ", ".join(row["lost"][:6]))
         if row["weak_or_generic_alertable"]:
             lines.append("  warning_weak_or_generic_alertable: " + ", ".join(row["weak_or_generic_alertable"][:6]))
+        if row.get("known_junk_selected"):
+            lines.append("  known_junk_selected: " + ", ".join(row["known_junk_selected"][:6]))
+        if row.get("known_useful_selected"):
+            lines.append("  known_useful_selected: " + ", ".join(row["known_useful_selected"][:6]))
+        if row.get("missed_recall_candidates"):
+            lines.append("  missed_recall_candidates: " + ", ".join(row["missed_recall_candidates"][:6]))
         if row.get("quality_warnings"):
             lines.append("  quality_warnings: " + "; ".join(row["quality_warnings"][:6]))
     lines.append("")
@@ -178,6 +197,69 @@ def _normalize(row: Mapping[str, Any]) -> dict[str, Any]:
     else:
         data["_snapshot_quality_classification"] = event_alpha_alert_store.SNAPSHOT_CURRENT_CLEAN
     return data
+
+
+def _feedback_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        label = str(row.get("label") or row.get("feedback_label") or "").strip()
+        if not label:
+            continue
+        for key in _row_keys(row):
+            out[key] = label
+    return out
+
+
+def _with_feedback(row: Mapping[str, Any], feedback_by_key: Mapping[str, str]) -> dict[str, Any]:
+    out = dict(row)
+    label = next((feedback_by_key[key] for key in _row_keys(out) if key in feedback_by_key), None)
+    if label:
+        out["feedback_label"] = label
+    return out
+
+
+def _row_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
+    keys: list[str] = []
+    for field in (
+        "key",
+        "target",
+        "feedback_target",
+        "core_opportunity_id",
+        "alert_key",
+        "alert_id",
+        "card_id",
+        "hypothesis_id",
+        "incident_id",
+        "symbol",
+        "coin_id",
+        "asset_symbol",
+        "asset_coin_id",
+        "validated_symbol",
+        "validated_coin_id",
+    ):
+        value = str(row.get(field) or "").strip()
+        if not value:
+            continue
+        keys.append(value)
+        if value.startswith("ea:"):
+            keys.append(value[3:])
+        else:
+            keys.append(f"ea:{value}")
+    return tuple(dict.fromkeys(keys))
+
+
+def _missed_recall_candidates(rows: Iterable[Mapping[str, Any]], scenario: EventAlphaPolicyScenario) -> tuple[str, ...]:
+    out: list[str] = []
+    if scenario.name not in {"lower_opportunity_threshold", "allow_weak_macro_with_market_confirmation"}:
+        return ()
+    for row in rows:
+        stage = str(row.get("failure_stage") or "")
+        if stage in {"resolver_missed_asset", "candidate_not_resolved", "quality_gate_too_strict", "source_ingested_but_not_extracted"}:
+            key = str(row.get("feedback_target") or row.get("symbol") or row.get("coin_id") or stage)
+            out.append(key)
+    return tuple(dict.fromkeys(out))
 
 
 def _baseline_alertable(row: Mapping[str, Any]) -> bool:

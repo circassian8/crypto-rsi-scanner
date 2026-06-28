@@ -35,7 +35,10 @@ def format_calibration_report(
         ("feedback by playbook", "playbook_type"),
         ("feedback by source", "source"),
         ("feedback by provider", "source_provider"),
+        ("feedback by source domain", "source_domain"),
+        ("feedback by provider/domain", "provider_domain_key"),
         ("feedback by tier", "tier"),
+        ("feedback by route/lane", "route_lane_key"),
         ("LLM role usefulness", "llm_asset_role"),
         ("cluster confidence bucket", "cluster_confidence_bucket"),
         ("feedback by impact path type", "impact_path_type"),
@@ -46,6 +49,9 @@ def format_calibration_report(
         ("feedback by incident id", "incident_id"),
         ("feedback by evidence specificity", "evidence_specificity"),
         ("feedback by market confirmation level", "market_confirmation_level"),
+        ("feedback by market freshness", "market_context_freshness_status"),
+        ("feedback by catalyst frame status", "catalyst_frame_status"),
+        ("feedback by main frame type", "main_frame_type"),
         ("feedback by opportunity level", "opportunity_level"),
     ):
         line = _feedback_line(title, merged, field)
@@ -98,6 +104,10 @@ def build_calibration_priors(
         "provider_priors": _prior_group(merged, "source_provider", fallback_field="source", min_sample=min_sample),
         "llm_role_priors": _prior_group(merged, "llm_asset_role", min_sample=min_sample),
         "tier_priors": _prior_group(merged, "tier", min_sample=min_sample),
+        "source_pack_priors": _prior_group(merged, "source_pack", min_sample=min_sample),
+        "source_domain_priors": _prior_group(merged, "source_domain", min_sample=min_sample),
+        "market_confirmation_priors": _prior_group(merged, "market_confirmation_level", min_sample=min_sample),
+        "catalyst_frame_priors": _prior_group(merged, "main_frame_type", fallback_field="catalyst_frame_status", min_sample=min_sample),
         "research_only": True,
     }
     return payload
@@ -149,17 +159,16 @@ def _merge_feedback(
 ) -> list[dict[str, Any]]:
     feedback_by_key: dict[str, dict[str, Any]] = {}
     for row in feedback_rows:
-        key = str(row.get("key") or row.get("target") or "").strip()
-        if key:
+        for key in _row_keys(row):
             feedback_by_key[key] = row
     out: list[dict[str, Any]] = []
     matched_feedback_keys: set[str] = set()
     for row in alert_rows:
         merged = dict(row)
-        key = str(row.get("alert_key") or row.get("key") or "").strip()
-        feedback = feedback_by_key.get(key)
+        keys = _row_keys(row)
+        feedback = next((feedback_by_key[key] for key in keys if key in feedback_by_key), None)
         if feedback:
-            matched_feedback_keys.add(key)
+            matched_feedback_keys.update(keys)
             merged["feedback_label"] = feedback.get("label")
             merged["feedback_notes"] = feedback.get("notes")
             for key in (
@@ -173,34 +182,52 @@ def _merge_feedback(
                 "source_domain",
                 "source_pack",
                 "source_provider",
+                "source_provider_domain",
+                "market_context_freshness_status",
+                "catalyst_frame_status",
+                "main_frame_type",
+                "final_route_after_quality_gate",
+                "lane",
                 "accepted_evidence_reason_codes",
             ):
                 if not merged.get(key) and feedback.get(key):
                     merged[key] = feedback.get(key)
         merged["cluster_confidence_bucket"] = _cluster_bucket(row)
+        merged["provider_domain_key"] = _provider_domain_key(merged)
+        merged["route_lane_key"] = _route_lane_key(merged)
         out.append(merged)
     for row in feedback_rows:
-        key = str(row.get("key") or "").strip()
-        if key and key in matched_feedback_keys:
+        keys = _row_keys(row)
+        if keys and any(key in matched_feedback_keys for key in keys):
             continue
-        out.append({
+        feedback_only = {
             "playbook_type": row.get("playbook_type") or "unmatched",
             "source": row.get("source") or "feedback",
-            "tier": row.get("route") or "feedback",
+            "tier": row.get("final_route_after_quality_gate") or row.get("route") or "feedback",
             "feedback_label": row.get("label"),
             "llm_asset_role": row.get("llm_asset_role"),
             "impact_path_type": row.get("impact_path_type"),
             "candidate_role": row.get("candidate_role"),
             "incident_id": row.get("incident_id"),
             "source_class": row.get("source_class"),
+            "source_domain": row.get("source_domain") or row.get("source_provider_domain"),
             "source_pack": row.get("source_pack"),
             "source_provider": row.get("source_provider"),
+            "source_provider_domain": row.get("source_provider_domain"),
             "accepted_evidence_reason_codes": row.get("accepted_evidence_reason_codes"),
             "evidence_specificity": row.get("evidence_specificity"),
             "market_confirmation_level": row.get("market_confirmation_level"),
+            "market_context_freshness_status": row.get("market_context_freshness_status"),
+            "catalyst_frame_status": row.get("catalyst_frame_status"),
+            "main_frame_type": row.get("main_frame_type"),
+            "final_route_after_quality_gate": row.get("final_route_after_quality_gate") or row.get("route"),
+            "lane": row.get("lane"),
             "opportunity_level": row.get("opportunity_level"),
             "cluster_confidence_bucket": "unknown",
-        })
+        }
+        feedback_only["provider_domain_key"] = _provider_domain_key(feedback_only)
+        feedback_only["route_lane_key"] = _route_lane_key(feedback_only)
+        out.append(feedback_only)
     return out
 
 
@@ -211,8 +238,19 @@ def _feedback_line(title: str, rows: list[Mapping[str, Any]], field: str) -> str
         useful = sum(1 for row in items if row.get("feedback_label") == "useful")
         junk = sum(1 for row in items if row.get("feedback_label") == "junk")
         watch = sum(1 for row in items if row.get("feedback_label") == "watch")
-        if useful or junk or watch:
-            parts.append(f"{key}: useful={useful} junk={junk} watch={watch}")
+        ignored = sum(1 for row in items if row.get("feedback_label") in {"ignored", "ignore"})
+        labeled = useful + junk + watch + ignored
+        if labeled:
+            useful_rate = useful / labeled if labeled else 0.0
+            junk_rate = junk / labeled if labeled else 0.0
+            samples = ", ".join(_sample_targets(items, limit=2))
+            reasons = ", ".join(_sample_reasons(items, limit=2))
+            parts.append(
+                f"{key}: useful={useful} junk={junk} watch={watch} ignored={ignored} "
+                f"useful_rate={useful_rate:.0%} junk_rate={junk_rate:.0%}"
+                + (f" samples={samples}" if samples else "")
+                + (f" reasons={reasons}" if reasons else "")
+            )
     return f"{title}: " + "; ".join(parts) if parts else ""
 
 
@@ -264,6 +302,77 @@ def _recommendations(rows: list[Mapping[str, Any]], missed: list[Mapping[str, An
     if not recs:
         recs.append("collect more reviewed feedback/outcome rows before changing thresholds")
     return tuple(dict.fromkeys(recs))
+
+
+def _row_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
+    keys: list[str] = []
+    for field in (
+        "key",
+        "target",
+        "feedback_target",
+        "core_opportunity_id",
+        "alert_id",
+        "alert_key",
+        "card_id",
+        "hypothesis_id",
+        "incident_id",
+        "symbol",
+        "coin_id",
+        "asset_symbol",
+        "asset_coin_id",
+        "validated_symbol",
+        "validated_coin_id",
+    ):
+        value = str(row.get(field) or "").strip()
+        if not value:
+            continue
+        keys.append(value)
+        if value.startswith("ea:"):
+            keys.append(value[3:])
+        else:
+            keys.append(f"ea:{value}")
+    return tuple(dict.fromkeys(keys))
+
+
+def _provider_domain_key(row: Mapping[str, Any]) -> str:
+    provider = str(row.get("source_provider") or row.get("source") or "unknown")
+    domain = str(row.get("source_provider_domain") or row.get("source_domain") or "unknown")
+    return f"{provider}/{domain}"
+
+
+def _route_lane_key(row: Mapping[str, Any]) -> str:
+    route = str(row.get("final_route_after_quality_gate") or row.get("route") or row.get("tier") or "unknown")
+    lane = str(row.get("lane") or "unknown")
+    return f"{route}/{lane}"
+
+
+def _sample_targets(rows: Iterable[Mapping[str, Any]], *, limit: int) -> tuple[str, ...]:
+    out: list[str] = []
+    for row in rows:
+        value = str(
+            row.get("feedback_target")
+            or row.get("core_opportunity_id")
+            or row.get("alert_key")
+            or row.get("key")
+            or row.get("symbol")
+            or ""
+        ).strip()
+        if value:
+            out.append(value)
+        if len(out) >= limit:
+            break
+    return tuple(dict.fromkeys(out))
+
+
+def _sample_reasons(rows: Iterable[Mapping[str, Any]], *, limit: int) -> tuple[str, ...]:
+    out: list[str] = []
+    for row in rows:
+        value = str(row.get("feedback_notes") or row.get("notes") or row.get("why_local_only") or "").strip()
+        if value:
+            out.append(value[:80])
+        if len(out) >= limit:
+            break
+    return tuple(dict.fromkeys(out))
 
 
 def _prior_group(

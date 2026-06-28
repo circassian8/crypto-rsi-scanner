@@ -34,7 +34,7 @@ def export_signal_quality_cases(
     for row in alert_rows:
         if not isinstance(row, Mapping):
             continue
-        feedback = feedback_by_key.get(_key(row))
+        feedback = _matching_feedback(row, feedback_by_key)
         reason = _case_reason(row, feedback=feedback)
         if not reason:
             continue
@@ -85,10 +85,13 @@ def _feedback_by_key(rows: Iterable[Mapping[str, Any]]) -> dict[str, Mapping[str
     for row in rows:
         if not isinstance(row, Mapping):
             continue
-        key = str(row.get("key") or row.get("alert_key") or row.get("alert_id") or "")
-        if key:
+        for key in _row_keys(row):
             out[key] = row
     return out
+
+
+def _matching_feedback(row: Mapping[str, Any], feedback_by_key: Mapping[str, Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    return next((feedback_by_key[key] for key in _row_keys(row) if key in feedback_by_key), None)
 
 
 def _case_reason(row: Mapping[str, Any], *, feedback: Mapping[str, Any] | None) -> str | None:
@@ -97,6 +100,8 @@ def _case_reason(row: Mapping[str, Any], *, feedback: Mapping[str, Any] | None) 
         return "useful_feedback_positive_case"
     if label == "junk":
         return "junk_feedback_negative_case"
+    if label == "watch":
+        return "watch_feedback_borderline_case"
     if str(row.get("opportunity_level") or "") in {"local_only", "exploratory"}:
         return "local_only_weak_case"
     if row.get("rejected_candidate_assets") or row.get("rejected_validation_samples"):
@@ -110,16 +115,23 @@ def _case_from_row(row: Mapping[str, Any], *, reason: str, feedback: Mapping[str
     components = event_alpha_quality_fields.quality_components(row)
     symbol = row.get("symbol") or row.get("validated_symbol")
     coin_id = row.get("coin_id") or row.get("validated_coin_id")
+    feedback_label = (feedback or {}).get("label") or (feedback or {}).get("feedback")
+    expected_level = _expected_level_for_case(row, reason=reason, feedback_label=feedback_label)
     return {
         "case_id": _safe_case_id(row, reason),
         "reason_to_add_case": reason,
         "raw_evidence_summary": row.get("event_name") or row.get("latest_event_name") or row.get("title") or row.get("hypothesis_id") or "artifact row",
         "candidate_symbol": symbol,
         "candidate_coin_id": coin_id,
+        "core_opportunity_id": row.get("core_opportunity_id") or (feedback or {}).get("core_opportunity_id"),
+        "feedback_target": (feedback or {}).get("feedback_target") or (feedback or {}).get("target") or row.get("feedback_target"),
         "external_asset": row.get("external_asset"),
         "source_metadata": {
             "source": row.get("source") or row.get("latest_source"),
             "source_class": components.get("source_class"),
+            "source_provider": row.get("source_provider") or (feedback or {}).get("source_provider"),
+            "source_domain": row.get("source_domain") or (feedback or {}).get("source_domain"),
+            "source_pack": row.get("source_pack") or (feedback or {}).get("source_pack"),
             "evidence_specificity": components.get("evidence_specificity"),
         },
         "impact_path": {
@@ -143,10 +155,51 @@ def _case_from_row(row: Mapping[str, Any], *, reason: str, feedback: Mapping[str
             "why_local_only": components.get("why_local_only"),
             "why_not_watchlist": components.get("why_not_watchlist"),
         },
+        "expected_opportunity_level": expected_level,
+        "expected_route_behavior": _expected_route_behavior(expected_level),
         "expected_current_decision": row.get("route") or row.get("tier") or row.get("latest_tier") or components.get("opportunity_level"),
-        "suggested_expected_label": (feedback or {}).get("label") or (feedback or {}).get("feedback"),
+        "suggested_expected_label": feedback_label,
+        "why_this_should_become_eval_case": _why_eval_case(reason, feedback=feedback),
         "feedback": dict(feedback or {}),
     }
+
+
+def _expected_level_for_case(row: Mapping[str, Any], *, reason: str, feedback_label: object) -> str:
+    label = str(feedback_label or "").lower()
+    if label == "junk" or "negative" in reason:
+        return "local_only"
+    if label == "useful" or "positive" in reason:
+        return str(row.get("opportunity_level") or row.get("final_opportunity_level") or "validated_digest")
+    if label == "watch":
+        return "watchlist"
+    if "missed" in reason:
+        return "watchlist_or_validated_digest"
+    return str(row.get("opportunity_level") or row.get("final_opportunity_level") or "review")
+
+
+def _expected_route_behavior(level: str) -> str:
+    if level in {"local_only", "exploratory"}:
+        return "store_only_or_local_report"
+    if level in {"watchlist", "watchlist_or_validated_digest"}:
+        return "watchlist_if_quality_gates_pass"
+    if level == "high_priority":
+        return "high_priority_if_quality_gates_pass"
+    return "research_digest_if_quality_gates_pass"
+
+
+def _why_eval_case(reason: str, *, feedback: Mapping[str, Any] | None) -> str:
+    note = str((feedback or {}).get("notes") or "").strip()
+    if note:
+        return f"{reason}: {note}"
+    if reason == "missed_opportunity_recall_case":
+        return "missed opportunity should test source/resolver/quality recall"
+    if reason == "junk_feedback_negative_case":
+        return "operator marked this as junk; preserve or tighten rejection behavior"
+    if reason == "useful_feedback_positive_case":
+        return "operator marked this as useful; preserve or improve promotion behavior"
+    if reason == "watch_feedback_borderline_case":
+        return "operator marked this as watch; keep as threshold/borderline eval"
+    return reason
 
 
 def _safe_case_id(row: Mapping[str, Any], reason: str) -> str:
@@ -157,6 +210,36 @@ def _safe_case_id(row: Mapping[str, Any], reason: str) -> str:
 
 def _key(row: Mapping[str, Any]) -> str:
     return str(row.get("alert_key") or row.get("alert_id") or row.get("key") or row.get("hypothesis_id") or "")
+
+
+def _row_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
+    keys: list[str] = []
+    for field in (
+        "key",
+        "target",
+        "feedback_target",
+        "core_opportunity_id",
+        "alert_key",
+        "alert_id",
+        "card_id",
+        "hypothesis_id",
+        "incident_id",
+        "symbol",
+        "coin_id",
+        "asset_symbol",
+        "asset_coin_id",
+        "validated_symbol",
+        "validated_coin_id",
+    ):
+        value = str(row.get(field) or "").strip()
+        if not value:
+            continue
+        keys.append(value)
+        if value.startswith("ea:"):
+            keys.append(value[3:])
+        else:
+            keys.append(f"ea:{value}")
+    return tuple(dict.fromkeys(keys))
 
 
 def _dedupe_cases(cases: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:

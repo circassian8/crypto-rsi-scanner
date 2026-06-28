@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Feedback labels are calibration artifacts, not mutations
+**Status:** accepted
+**Decision:** Event Alpha feedback labels should be stored as enriched
+research artifacts tied to the best available review object: canonical core
+opportunity, research card, alert snapshot, or watchlist row. A label must
+preserve enough signal context to calibrate later: source pack/class/domain,
+impact path, candidate role, opportunity level, final route/lane, market
+confirmation/freshness, catalyst-frame status, provider metadata, and linked
+incident/hypothesis/watchlist identifiers. Useful/junk/watch/missed labels may
+feed calibration reports, proposed priors, policy simulations, and proposed
+signal-quality eval cases, but they must not directly change thresholds,
+routes, watchlist state, alerts, paper/live rows, normal RSI rows, or
+`TRIGGERED_FADE`.
+**Why:** Manual review is the only practical way to learn which Event Alpha
+signals are useful or junk, but mutating routing directly from sparse feedback
+would overfit and weaken safety boundaries. Enriched labels make learning
+auditable while keeping promotion decisions explicit.
+**Revisit when:** There is enough reviewed feedback/outcome data to propose a
+versioned, human-approved calibration prior or threshold change with holdout
+eval coverage.
+
 ## 2026-06-28 - Evidence absence is source-pack and coverage scoped
 **Status:** accepted
 **Decision:** Event Alpha source evidence must carry an explicit source

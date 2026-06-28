@@ -194,16 +194,24 @@ def fill_alert_outcomes(
         filled = dict(row)
         symbol = str(row.get("asset_symbol") or row.get("symbol") or "").upper()
         price_rows = prices.get(symbol, ())
-        if price_rows:
+        filled.setdefault("outcome_source", price_source)
+        if not symbol:
+            filled["outcome_status"] = "skipped_no_asset"
+            missing += 1
+        elif price_rows:
             outcome = _outcome_for_row(row, price_rows)
             if outcome:
                 filled.update(outcome)
                 filled["outcome_price_interval"] = interval
                 filled["outcome_price_source"] = price_source
+                filled["outcome_source"] = price_source
+                filled["outcome_status"] = "filled"
                 with_outcomes += 1
             else:
+                filled["outcome_status"] = "stale_market_data"
                 missing += 1
         else:
+            filled["outcome_status"] = "insufficient_market_data"
             missing += 1
         out_rows.append(filled)
     out = Path(out_path).expanduser()

@@ -30,6 +30,12 @@ def format_source_reliability_report(
         lines.append("No source reliability artifacts found.")
         return "\n".join(lines)
     lines.append(_feedback_by_provider_line(merged))
+    source_pack_line = _feedback_by_field_line("feedback by source pack", merged, "source_pack")
+    if source_pack_line:
+        lines.append(source_pack_line)
+    domain_line = _feedback_by_field_line("feedback by source domain", merged, "source_domain")
+    if domain_line:
+        lines.append(domain_line)
     line = _median_by_provider_line(merged, "primary_horizon_return", "median primary return")
     if line:
         lines.append(line)
@@ -50,21 +56,26 @@ def format_source_reliability_report(
 
 
 def _merge_feedback(alerts: list[dict[str, Any]], feedback: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    by_key = {
-        str(row.get("key") or row.get("target") or "").strip(): row
-        for row in feedback
-        if str(row.get("key") or row.get("target") or "").strip()
-    }
+    by_key: dict[str, dict[str, Any]] = {}
+    for row in feedback:
+        for key in _row_keys(row):
+            by_key[key] = row
     out: list[dict[str, Any]] = []
+    matched: set[str] = set()
     for alert in alerts:
         merged = dict(alert)
-        key = str(alert.get("alert_key") or alert.get("key") or "").strip()
-        if key in by_key:
-            merged["feedback_label"] = by_key[key].get("label")
-            merged["feedback_notes"] = by_key[key].get("notes")
+        feedback_row = next((by_key[key] for key in _row_keys(alert) if key in by_key), None)
+        if feedback_row:
+            matched.update(_row_keys(feedback_row))
+            merged["feedback_label"] = feedback_row.get("label")
+            merged["feedback_notes"] = feedback_row.get("notes")
+            for field in ("source_provider", "source_domain", "source_pack", "source_class"):
+                if not merged.get(field) and feedback_row.get(field):
+                    merged[field] = feedback_row.get(field)
         out.append(merged)
     for row in feedback:
-        if str(row.get("key") or "").strip():
+        keys = _row_keys(row)
+        if keys and any(key in matched for key in keys):
             continue
         out.append(dict(row))
     return out
@@ -87,6 +98,21 @@ def _feedback_by_provider_line(rows: list[Mapping[str, Any]]) -> str:
         watch = sum(1 for row in items if row.get("feedback_label") == "watch")
         parts.append(f"{provider}: useful={useful} junk={junk} watch={watch}")
     return "feedback by provider: " + "; ".join(parts) if parts else "feedback by provider: none"
+
+
+def _feedback_by_field_line(title: str, rows: list[Mapping[str, Any]], field: str) -> str:
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        key = str(row.get(field) or "unknown")
+        grouped.setdefault(key, []).append(row)
+    parts: list[str] = []
+    for key, items in sorted(grouped.items()):
+        useful = sum(1 for row in items if row.get("feedback_label") == "useful")
+        junk = sum(1 for row in items if row.get("feedback_label") == "junk")
+        watch = sum(1 for row in items if row.get("feedback_label") == "watch")
+        if useful or junk or watch:
+            parts.append(f"{key}: useful={useful} junk={junk} watch={watch}")
+    return f"{title}: " + "; ".join(parts) if parts else ""
 
 
 def _median_by_provider_line(rows: list[Mapping[str, Any]], field: str, title: str) -> str:
@@ -136,10 +162,11 @@ def _recommendations(
     for provider, items in sorted(_group(rows).items()):
         useful = sum(1 for row in items if row.get("feedback_label") == "useful")
         junk = sum(1 for row in items if row.get("feedback_label") == "junk")
+        confidence = "low confidence" if len(items) < 5 else "higher confidence"
         if useful > junk and useful >= 2:
-            recs.append(f"positive prior for {provider}; keep current source gate until larger sample")
+            recs.append(f"positive prior for {provider} ({confidence}); keep current source gate until larger sample")
         if junk > useful and junk >= 2:
-            recs.append(f"tighten or demote {provider}; junk feedback exceeds useful feedback")
+            recs.append(f"tighten or demote {provider} ({confidence}); junk feedback exceeds useful feedback")
     stage_counts: dict[str, int] = {}
     for row in missed:
         stage = str(row.get("failure_stage") or "unknown")
@@ -159,6 +186,32 @@ def _group(rows: Iterable[Mapping[str, Any]]) -> dict[str, list[Mapping[str, Any
     for row in rows:
         grouped.setdefault(_provider(row), []).append(row)
     return grouped
+
+
+def _row_keys(row: Mapping[str, Any]) -> tuple[str, ...]:
+    keys: list[str] = []
+    for field in (
+        "key",
+        "target",
+        "feedback_target",
+        "core_opportunity_id",
+        "alert_key",
+        "alert_id",
+        "card_id",
+        "hypothesis_id",
+        "incident_id",
+        "symbol",
+        "coin_id",
+    ):
+        value = str(row.get(field) or "").strip()
+        if not value:
+            continue
+        keys.append(value)
+        if value.startswith("ea:"):
+            keys.append(value[3:])
+        else:
+            keys.append(f"ea:{value}")
+    return tuple(dict.fromkeys(keys))
 
 
 def _float(value: object) -> float | None:

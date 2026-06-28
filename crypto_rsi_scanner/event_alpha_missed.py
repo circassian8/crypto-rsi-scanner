@@ -17,12 +17,20 @@ MISSED_SCHEMA_VERSION = "event_alpha_missed_v1"
 FAILURE_STAGES = (
     "outside_universe",
     "no_source_event",
+    "source_not_ingested",
+    "source_ingested_but_not_extracted",
     "no_catalyst_search_result",
     "resolver_missed_asset",
+    "candidate_not_resolved",
+    "impact_path_not_validated",
+    "market_confirmation_missing",
+    "quality_gate_too_strict",
     "llm_classified_noise",
     "low_score_suppressed",
     "watchlist_not_escalated",
     "provider_disabled",
+    "route_suppressed",
+    "artifact_missing",
     "unknown",
 )
 
@@ -39,6 +47,16 @@ class MissedOpportunity:
     failure_stage: str
     reason: str
     suggested_queries: tuple[str, ...]
+    feedback_target: str | None = None
+    event_description: str | None = None
+    source_url: str | None = None
+    source_text: str | None = None
+    why_it_mattered: str | None = None
+    approximate_time: str | None = None
+    expected_playbook: str | None = None
+    notes: str | None = None
+    linked_incident_id: str | None = None
+    linked_core_opportunity_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -149,6 +167,68 @@ def write_missed_rows(path: str | Path, rows: Iterable[MissedOpportunity]) -> in
     return count
 
 
+def build_manual_missed_opportunity(
+    *,
+    symbol: str,
+    coin_id: str | None = None,
+    event_description: str | None = None,
+    source_url: str | None = None,
+    source_text: str | None = None,
+    why_it_mattered: str | None = None,
+    approximate_time: str | None = None,
+    expected_playbook: str | None = None,
+    notes: str | None = None,
+    raw_events: Iterable[RawDiscoveredEvent] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    rejected_rows: Iterable[Mapping[str, Any]] = (),
+) -> MissedOpportunity:
+    """Build one manually recorded missed opportunity as a research artifact.
+
+    This is a label/eval workflow helper only. It does not create alerts,
+    watchlist state, paper trades, live RSI rows, or event-fade signals.
+    """
+    clean_symbol = str(symbol or "").upper().strip()
+    clean_coin = str(coin_id or "").strip()
+    stage, reason, linked_core = _manual_failure_stage(
+        clean_symbol,
+        clean_coin,
+        source_url=source_url,
+        source_text=source_text,
+        raw_events=raw_events,
+        core_rows=core_rows,
+        rejected_rows=rejected_rows,
+    )
+    target = f"missed:{clean_coin or clean_symbol}:{approximate_time or 'unknown_time'}"
+    return MissedOpportunity(
+        schema_version=MISSED_SCHEMA_VERSION,
+        row_type="event_alpha_missed",
+        symbol=clean_symbol,
+        coin_id=clean_coin,
+        name=clean_coin or clean_symbol,
+        move_window="manual",
+        return_pct=0.0,
+        failure_stage=stage,
+        reason=reason,
+        suggested_queries=_queries(clean_symbol, clean_coin or clean_symbol),
+        feedback_target=target,
+        event_description=_optional_str(event_description),
+        source_url=_optional_str(source_url),
+        source_text=_optional_str(source_text),
+        why_it_mattered=_optional_str(why_it_mattered),
+        approximate_time=_optional_str(approximate_time),
+        expected_playbook=_optional_str(expected_playbook),
+        notes=_optional_str(notes),
+        linked_incident_id=_linked_incident_id(clean_symbol, clean_coin, core_rows),
+        linked_core_opportunity_id=linked_core,
+    )
+
+
+def append_manual_missed_opportunity(path: str | Path, **kwargs: Any) -> MissedOpportunity:
+    row = build_manual_missed_opportunity(**kwargs)
+    write_missed_rows(path, [row])
+    return row
+
+
 def load_missed_rows(path: str | Path) -> list[dict[str, Any]]:
     p = Path(path).expanduser()
     if not p.exists():
@@ -230,6 +310,48 @@ def _failure_stage(
     if any(_entry_matches(entry, symbol, coin_id) for entry in watchlist_entries):
         return "watchlist_not_escalated", "The asset existed in watchlist state but did not escalate."
     return "no_source_event", "No prior Event Alpha source evidence, alert, or watchlist row was found."
+
+
+def _manual_failure_stage(
+    symbol: str,
+    coin_id: str,
+    *,
+    source_url: str | None,
+    source_text: str | None,
+    raw_events: Iterable[RawDiscoveredEvent],
+    core_rows: Iterable[Mapping[str, Any]],
+    rejected_rows: Iterable[Mapping[str, Any]],
+) -> tuple[str, str, str | None]:
+    matching_core = next((row for row in core_rows if _row_matches_mapping(row, symbol, coin_id)), None)
+    if matching_core:
+        core_id = str(matching_core.get("core_opportunity_id") or "")
+        level = str(matching_core.get("opportunity_level") or matching_core.get("final_opportunity_level") or "")
+        route = str(matching_core.get("final_route_after_quality_gate") or matching_core.get("route") or "")
+        if level in {"local_only", "exploratory"} or route in {"STORE_ONLY", "LOCAL_ONLY", "LOCAL_REPORT"}:
+            return "quality_gate_too_strict", "A matching core opportunity existed but quality routing kept it local-only.", core_id or None
+        return "route_suppressed", "A matching core opportunity existed but was not visible in the expected route.", core_id or None
+    if any(_row_matches_mapping(row, symbol, coin_id) for row in rejected_rows):
+        return "impact_path_not_validated", "A rejected candidate row matched the asset but failed validation.", None
+    if any(_raw_identity_hint(raw, symbol, coin_id) == "strong_identity" for raw in raw_events):
+        return "candidate_not_resolved", "Source evidence was ingested and mentioned the asset, but no resolved candidate/core exists.", None
+    if source_text and _contains_identity(source_text, symbol, coin_id):
+        return "source_not_ingested", "Manual source text mentions the asset, but no matching ingested source/core was found.", None
+    if source_url:
+        return "source_not_ingested", "A manual source URL was provided but no matching ingested source/core was found.", None
+    return "source_not_ingested", "No source URL/text or matching Event Alpha artifact was found for the missed opportunity.", None
+
+
+def _row_matches_mapping(row: Mapping[str, Any], symbol: str, coin_id: str) -> bool:
+    return _asset_key(row.get("symbol") or row.get("asset_symbol") or row.get("validated_symbol"), row.get("coin_id") or row.get("asset_coin_id") or row.get("validated_coin_id")) == _asset_key(symbol, coin_id)
+
+
+def _linked_incident_id(symbol: str, coin_id: str, rows: Iterable[Mapping[str, Any]]) -> str | None:
+    for row in rows:
+        if _row_matches_mapping(row, symbol, coin_id):
+            value = str(row.get("incident_id") or "")
+            if value:
+                return value
+    return None
 
 
 def _queries(symbol: str, name: str) -> tuple[str, ...]:
@@ -347,3 +469,9 @@ def _float(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+def _optional_str(value: object) -> str | None:
+    if value in (None, ""):
+        return None
+    return str(value)

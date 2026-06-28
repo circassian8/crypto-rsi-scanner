@@ -9291,6 +9291,8 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
         out_rows = [json.loads(line) for line in out_path.read_text(encoding="utf-8").splitlines()]
         velvet = next(row for row in out_rows if row.get("asset_symbol") == "TESTVELVET")
         assert velvet["outcome_price_interval"] == "1h"
+        assert velvet["outcome_status"] == "filled"
+        assert velvet["outcome_source"] == "fixture"
         assert velvet["return_1h"] is not None
         assert velvet["return_24h"] is not None
         assert velvet["return_72h"] is not None
@@ -9303,6 +9305,24 @@ def test_event_alpha_alert_store_snapshots_and_fills_outcomes():
             event_alpha_alert_store.load_alert_snapshots(out_path)
         )
         assert "outcomes:" in outcome_report
+
+        status_out = Path(tmp) / "status_outcomes.jsonl"
+        status_result = event_alpha_alert_store.fill_alert_outcomes(
+            [
+                {"observed_at": "2026-06-15T16:00:00+00:00", "asset_symbol": "TESTVELVET", "entry_reference_price": 10.0},
+                {"observed_at": "2026-06-15T16:00:00+00:00", "asset_symbol": "MEME", "entry_reference_price": 1.0},
+                {"observed_at": "2026-06-15T16:00:00+00:00", "entry_reference_price": 1.0},
+            ],
+            prices_path,
+            status_out,
+        )
+        status_rows = [json.loads(line) for line in status_out.read_text(encoding="utf-8").splitlines()]
+        assert [row["outcome_status"] for row in status_rows] == [
+            "filled",
+            "insufficient_market_data",
+            "skipped_no_asset",
+        ]
+        assert status_result.missing_price_rows == 2
         assert "MFE/MAE by playbook:" in outcome_report
         assert "Outcome metrics by playbook:" in outcome_report
 
@@ -13595,13 +13615,45 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
     assert metadata_only.rows[0].failure_stage == "no_source_event"
     assert "metadata_only_identity_hint" in metadata_only.rows[0].reason
 
+    manual_missing_source = event_alpha_missed.build_manual_missed_opportunity(
+        symbol="VELVET",
+        coin_id="velvet",
+        event_description="SpaceX pre-IPO proxy venue moved before catalyst",
+        source_url="https://example.test/velvet-spacex",
+        why_it_mattered="large move with proxy catalyst",
+        approximate_time="2026-06-18T12:00:00Z",
+        expected_playbook="proxy_attention",
+    )
+    assert manual_missing_source.failure_stage == "source_not_ingested"
+    assert manual_missing_source.feedback_target.startswith("missed:velvet")
+    assert "VELVET crypto catalyst" in manual_missing_source.suggested_queries
+
+    manual_quality_blocked = event_alpha_missed.build_manual_missed_opportunity(
+        symbol="MEME",
+        coin_id="memecore",
+        event_description="MemeCore moved but stayed local",
+        source_text="MemeCore volume surged after a vague catalyst.",
+        core_rows=[{
+            "core_opportunity_id": "core_memecore",
+            "symbol": "MEME",
+            "coin_id": "memecore",
+            "incident_id": "incident:meme",
+            "opportunity_level": "local_only",
+            "final_route_after_quality_gate": "STORE_ONLY",
+        }],
+    )
+    assert manual_quality_blocked.failure_stage == "quality_gate_too_strict"
+    assert manual_quality_blocked.linked_core_opportunity_id == "core_memecore"
+
     calibration = event_alpha_calibration.format_calibration_report(
         alerts,
         feedback_rows=[{"key": entry.key, "label": "useful"}],
-        missed_rows=[row.__dict__ for row in missed.rows],
+        missed_rows=[row.__dict__ for row in [*missed.rows, manual_missing_source, manual_quality_blocked]],
     )
     assert "feedback by playbook" in calibration
     assert "missed opportunities by failure stage" in calibration
+    assert "source_not_ingested=1" in calibration
+    assert "quality_gate_too_strict=1" in calibration
     assert "recommendations:" in calibration
 
     routed = event_alpha_router.EventAlphaRouteDecision(
@@ -26093,7 +26145,16 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
     assert "VELVET" in report
     assert "Weak co-occurrence / local-only" in report
     assert "Validated but market-unconfirmed" in report
-    sim = event_alpha_policy_simulator.simulate_policy(rows, profile="fixture")
+    missed_rows = [{"symbol": "MISS", "return_pct": 150, "failure_stage": "quality_gate_too_strict", "feedback_target": "missed:MISS"}]
+    sim = event_alpha_policy_simulator.simulate_policy(
+        rows,
+        profile="fixture",
+        feedback_rows=[
+            {"feedback_target": "velvet", "label": "useful"},
+            {"feedback_target": "btc-policy", "label": "junk"},
+        ],
+        missed_rows=missed_rows,
+    )
     text = event_alpha_policy_simulator.format_policy_simulation(sim)
     assert "lower_opportunity_threshold" in text
     assert "high_quality_only" in text
@@ -26104,19 +26165,31 @@ def test_event_alpha_quality_review_policy_simulation_and_export():
     assert max(low_counts) >= max(high_counts)
     assert "near-threshold" in next(row for row in sim.scenarios if row["scenario"] == "lower_opportunity_threshold")["gained"]
     assert "warning_weak_or_generic_alertable" not in text
+    assert "known_useful_selected" in text
+    assert "known_junk_selected" not in text
+    assert "missed_recall_candidates" in text
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "proposed.json"
         result = event_alpha_signal_quality_export.export_signal_quality_cases(
             out,
             alert_rows=rows,
-            feedback_rows=[{"key": "velvet", "label": "useful"}, {"key": "btc-policy", "label": "junk"}],
-            missed_rows=[{"symbol": "MISS", "return_pct": 150, "failure_stage": "no_source_event"}],
+            feedback_rows=[
+                {"feedback_target": "velvet", "label": "useful", "notes": "good proxy evidence"},
+                {"feedback_target": "btc-policy", "label": "junk", "notes": "weak macro cooccurrence"},
+                {"feedback_target": "openai-velvet", "label": "watch"},
+            ],
+            missed_rows=missed_rows,
         )
         payload = json.loads(out.read_text())
         assert result.cases_written >= 3
         assert any(case["reason_to_add_case"] == "useful_feedback_positive_case" for case in payload["cases"])
         assert any(case["reason_to_add_case"] == "junk_feedback_negative_case" for case in payload["cases"])
+        assert any(case["reason_to_add_case"] == "watch_feedback_borderline_case" for case in payload["cases"])
         assert any(case["reason_to_add_case"] == "missed_opportunity_recall_case" for case in payload["cases"])
+        useful_case = next(case for case in payload["cases"] if case["reason_to_add_case"] == "useful_feedback_positive_case")
+        assert useful_case["expected_route_behavior"] in {"high_priority_if_quality_gates_pass", "research_digest_if_quality_gates_pass"}
+        junk_case = next(case for case in payload["cases"] if case["reason_to_add_case"] == "junk_feedback_negative_case")
+        assert junk_case["expected_opportunity_level"] == "local_only"
         assert "OPENAI_API_KEY" not in out.read_text()
 
 
@@ -26371,6 +26444,7 @@ def test_event_alpha_quality_stale_warning_uses_quality_validation_reference():
 def test_feedback_and_calibration_include_signal_quality_fields():
     import tempfile
     from datetime import datetime, timezone
+    from pathlib import Path
     from crypto_rsi_scanner import event_alpha_calibration, event_feedback
 
     entry = _test_watchlist_entry(
@@ -26378,32 +26452,98 @@ def test_feedback_and_calibration_include_signal_quality_fields():
         symbol="VELVET",
         coin_id="velvet",
     )
+    core_id = "core_velvet_spacex"
     entry = __import__("dataclasses").replace(entry, latest_score_components={
+        "run_id": "run-velvet",
+        "profile": "catalyst_frame_e2e",
+        "artifact_namespace": "catalyst_frame_e2e",
+        "core_opportunity_id": core_id,
         "incident_id": "incident:velvet-spacex",
+        "hypothesis_id": "hyp:velvet",
         "impact_path_type": "proxy_exposure",
         "candidate_role": "proxy_venue",
         "evidence_specificity": "source_explains_mechanism",
         "market_confirmation_level": "moderate",
+        "market_context_freshness_status": "fresh",
         "opportunity_level": "watchlist",
         "source_class": "crypto_native",
+        "source_domain": "cryptopanic.com",
         "evidence_acquisition_source_pack": "proxy_preipo_rwa_pack",
         "evidence_acquisition_providers_used": ("cryptopanic",),
+        "catalyst_frame_status": "validated",
+        "main_frame_type": "proxy_exposure",
+        "final_route_after_quality_gate": "WATCHLIST",
+        "lane": "daily_digest",
         "accepted_evidence_reason_codes": ("cryptopanic_currency_tag_match", "direct_token_mechanism"),
     })
     with tempfile.TemporaryDirectory() as tmp:
-        cfg = event_feedback.EventFeedbackConfig(path=__import__("pathlib").Path(tmp) / "feedback.jsonl")
+        tmp_path = Path(tmp)
+        card_path = tmp_path / "velvet.md"
+        card_path.write_text(
+            "# Card\n\n"
+            "- Run ID: run-velvet\n"
+            "- Profile: catalyst_frame_e2e\n"
+            "- Namespace: catalyst_frame_e2e\n"
+            f"- Core opportunity ID: {core_id}\n"
+            f"- Feedback target: {core_id}\n",
+            encoding="utf-8",
+        )
+        context_row = {
+            "row_type": "event_core_opportunity",
+            "run_id": "run-velvet",
+            "profile": "catalyst_frame_e2e",
+            "artifact_namespace": "catalyst_frame_e2e",
+            "core_opportunity_id": core_id,
+            "feedback_target": core_id,
+            "feedback_target_type": "core_opportunity_id",
+            "card_path": str(card_path),
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "incident_id": "incident:velvet-spacex",
+            "hypothesis_id": "hyp:velvet",
+            "impact_path_type": "proxy_exposure",
+            "candidate_role": "proxy_venue",
+            "evidence_specificity": "source_explains_mechanism",
+            "source_class": "crypto_native",
+            "source_domain": "cryptopanic.com",
+            "source_provider": "cryptopanic",
+            "source_pack": "proxy_preipo_rwa_pack",
+            "accepted_evidence_reason_codes": ("cryptopanic_currency_tag_match", "direct_token_mechanism"),
+            "market_confirmation_level": "moderate",
+            "market_context_freshness_status": "fresh",
+            "catalyst_frame_status": "validated",
+            "main_frame_type": "proxy_exposure",
+            "opportunity_level": "watchlist",
+            "final_route_after_quality_gate": "WATCHLIST",
+            "lane": "daily_digest",
+        }
+        cfg = event_feedback.EventFeedbackConfig(path=tmp_path / "feedback.jsonl")
         record = event_feedback.mark_feedback(
-            entry.key,
+            str(card_path),
             "useful",
             watchlist_entries=[entry],
+            context_rows=[context_row],
+            card_paths=[card_path],
             cfg=cfg,
             now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
         )
         loaded = event_feedback.load_feedback(cfg.path)
     assert record.impact_path_type == "proxy_exposure"
     assert record.incident_id == "incident:velvet-spacex"
+    assert record.hypothesis_id == "hyp:velvet"
+    assert record.core_opportunity_id == core_id
+    assert record.feedback_target == core_id
+    assert record.card_path and record.card_path.endswith("velvet.md")
+    assert record.run_id == "run-velvet"
+    assert record.profile == "catalyst_frame_e2e"
+    assert record.artifact_namespace == "catalyst_frame_e2e"
     assert record.source_pack == "proxy_preipo_rwa_pack"
     assert record.source_provider == "cryptopanic"
+    assert record.source_provider_domain == "cryptopanic.com"
+    assert record.market_context_freshness_status == "fresh"
+    assert record.catalyst_frame_status == "validated"
+    assert record.main_frame_type == "proxy_exposure"
+    assert record.final_route_after_quality_gate == "WATCHLIST"
     assert "direct_token_mechanism" in record.accepted_evidence_reason_codes
     assert loaded.records[0].incident_id == "incident:velvet-spacex"
     report = event_alpha_calibration.format_calibration_report([], feedback_rows=[r.__dict__ for r in loaded.records])
@@ -26414,6 +26554,11 @@ def test_feedback_and_calibration_include_signal_quality_fields():
     assert "feedback by accepted evidence reason: cryptopanic_currency_tag_match: useful=1" in report
     assert "direct_token_mechanism: useful=1" in report
     assert "feedback by incident id: incident:velvet-spacex: useful=1" in report
+    assert "feedback by source domain: cryptopanic.com: useful=1" in report
+    assert "feedback by market freshness: fresh: useful=1" in report
+    assert "feedback by catalyst frame status: validated: useful=1" in report
+    assert "feedback by main frame type: proxy_exposure: useful=1" in report
+    assert "feedback by route/lane: WATCHLIST/daily_digest: useful=1" in report
 
 
 def test_event_alpha_signal_quality_make_targets_exist():

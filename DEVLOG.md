@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Turn Event Alpha feedback into calibration data · Codex
+**Why:** Event Alpha cards and core opportunities were labelable, but feedback
+rows did not consistently retain enough core/card/source/market/frame context to
+analyze useful vs junk signals or export proposed signal-quality eval cases.
+**Changes:**
+- Feedback marking can now resolve watchlist rows, canonical core rows, alert
+  snapshots, and research-card paths, then persist core id, card path, run,
+  profile, namespace, hypothesis/watchlist ids, final route/lane, source pack,
+  source/provider metadata, market freshness, and catalyst-frame fields.
+- Calibration reports now cohort labels by impact path, role, opportunity
+  level, source class/domain/pack/provider, route/lane, market confirmation,
+  market freshness, and catalyst frame; proposed priors include source-pack,
+  source-domain, market-confirmation, and frame cohorts.
+- Outcome fill artifacts now write explicit `outcome_status` values (`filled`,
+  `insufficient_market_data`, `stale_market_data`, `skipped_no_asset`) while
+  remaining local-fixture/research-only.
+- Signal-quality export now matches feedback by core/feedback/card/alert keys,
+  exports useful/junk/watch/missed cases with expected route behavior, and
+  carries source/core metadata for eval-case review.
+- Missed-opportunity helpers can build manual missed rows with source URL/text,
+  why-it-mattered notes, expected playbook, linked core/incident hints, and a
+  diagnostic failure stage.
+**Verify:** `python3 tests/test_indicators.py` passed (513/513);
+`make event-alpha-signal-quality-eval PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; `make
+event-alpha-quality-validation-cycle PYTHON=python3`; `make verify
+PYTHON=python3`. Manual smoke passed: `make event-alpha-feedback-readiness
+PROFILE=catalyst_frame_e2e PYTHON=python3`; `make event-feedback-useful
+PROFILE=catalyst_frame_e2e FEEDBACK_TARGET=agg:3381ebd96566 PYTHON=python3`;
+`make event-alpha-calibration-report PROFILE=catalyst_frame_e2e
+PYTHON=python3`; `make event-alpha-export-signal-quality-cases
+PROFILE=catalyst_frame_e2e PYTHON=python3`; `make event-opportunity-audit
+PROFILE=catalyst_frame_e2e TARGET=agg:3381ebd96566 PYTHON=python3`.
+**Notes/risks:** Research-only artifact and reporting changes. No Telegram
+sends, paper/live rows, normal RSI writes, trading, or LLM/provider-created
+`TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Harden Event Alpha source contracts and acquisition artifacts · Codex
 **Why:** The source registry and source-pack layer existed, but operator
 artifacts needed a sharper answer to “what does this source prove, what does it

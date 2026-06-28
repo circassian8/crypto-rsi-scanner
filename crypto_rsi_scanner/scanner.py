@@ -4644,6 +4644,11 @@ def _event_alpha_quality_artifacts(
     )
     watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=True)
+    core_opportunities = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    )
     feedback = event_feedback.load_feedback(context.feedback_path)
     missed = event_alpha_missed.load_missed_rows(context.missed_path)
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
@@ -4651,6 +4656,7 @@ def _event_alpha_quality_artifacts(
         "hypotheses": hypotheses,
         "watchlist": watchlist,
         "alerts": alerts,
+        "core_opportunities": core_opportunities,
         "feedback_rows": [record.__dict__ for record in feedback.records],
         "missed_rows": missed,
         "router": routed,
@@ -4796,7 +4802,12 @@ def event_alpha_policy_simulate_report(
     rows.extend(dict(row) for row in artifacts["hypotheses"].rows)
     rows.extend(_watchlist_entry_dict(entry) for entry in artifacts["watchlist"].entries)
     rows.extend(dict(row) for row in artifacts["alerts"].rows)
-    result = event_alpha_policy_simulator.simulate_policy(rows, profile=context.profile)
+    result = event_alpha_policy_simulator.simulate_policy(
+        rows,
+        profile=context.profile,
+        feedback_rows=artifacts["feedback_rows"],
+        missed_rows=artifacts["missed_rows"],
+    )
     print(_event_alpha_context_block(context))
     print(event_alpha_policy_simulator.format_policy_simulation(result))
 
@@ -4819,7 +4830,7 @@ def event_alpha_export_signal_quality_cases(
     target = Path(out_path).expanduser() if out_path else context.namespace_dir / "proposed_signal_quality_cases.json"
     result = event_alpha_signal_quality_export.export_signal_quality_cases(
         target,
-        alert_rows=artifacts["alerts"].rows,
+        alert_rows=[*artifacts["alerts"].rows, *artifacts["core_opportunities"].rows],
         feedback_rows=artifacts["feedback_rows"],
         missed_rows=artifacts["missed_rows"],
         hypothesis_rows=artifacts["hypotheses"].rows,
@@ -4853,13 +4864,32 @@ def event_feedback_mark(
         return
     if profile_name or artifact_namespace:
         try:
-            resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
+            context = resolve_event_alpha_artifact_context_for_report(profile_name, artifact_namespace)
         except ValueError as exc:
             print(f"Event feedback mark failed: {exc}")
             return
+    else:
+        context = None
     watch_cfg = _event_watchlist_config_from_runtime()
     watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
     feedback_cfg = _event_feedback_config_from_runtime(path)
+    context_rows: list[dict[str, Any]] = []
+    card_paths: tuple[Path, ...] = ()
+    if context is not None:
+        try:
+            alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path).rows
+            cores = event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True).rows
+            hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
+                context.impact_hypothesis_store_path,
+                limit=500,
+                latest_run=True,
+                include_legacy=True,
+            ).rows
+            context_rows = [*alerts, *cores, *hypotheses]
+            card_paths = tuple(path for path in Path(context.research_cards_dir).glob("*.md") if path.name != "index.md")
+        except Exception as exc:  # noqa: BLE001 - feedback marking should still allow manual unmatched rows.
+            if verbose:
+                print(f"Event feedback context warning: {exc}")
     try:
         record = event_feedback.mark_feedback(
             target,
@@ -4869,6 +4899,8 @@ def event_feedback_mark(
             marked_by=marked_by or "human",
             notes=notes,
             allow_unmatched=allow_unmatched,
+            context_rows=context_rows,
+            card_paths=card_paths,
         )
     except ValueError as exc:
         print(f"Event feedback mark failed: {exc}")

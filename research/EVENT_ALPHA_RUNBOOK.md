@@ -55,6 +55,38 @@ feedback status through the canonical read model. Support/control artifacts are
 audit evidence attached to the core opportunity; they should not create a
 second visible truth for route, state, tier, or final opportunity verdict.
 
+## Feedback And Calibration Loop
+
+Every reviewable card/core opportunity should have a stable feedback target.
+Use the card command or one of the shortcuts:
+
+```bash
+make event-alpha-feedback-readiness PROFILE=catalyst_frame_e2e
+make event-feedback-useful PROFILE=catalyst_frame_e2e FEEDBACK_TARGET=<core_or_card_target>
+make event-feedback-junk PROFILE=catalyst_frame_e2e FEEDBACK_TARGET=<core_or_card_target>
+make event-feedback-watch PROFILE=catalyst_frame_e2e FEEDBACK_TARGET=<core_or_card_target>
+make event-alpha-calibration-report PROFILE=catalyst_frame_e2e
+make event-alpha-export-signal-quality-cases PROFILE=catalyst_frame_e2e
+```
+
+Feedback rows are artifact-only labels. They should preserve the review target,
+core id, card path, run/profile/namespace, incident/hypothesis/watchlist ids,
+symbol/coin id, impact path, candidate role, opportunity level, final route and
+lane, source pack/class/provider/domain, evidence specificity, market
+confirmation/freshness, and catalyst-frame status. Calibration reports use
+those dimensions to show useful/junk/watch/ignored rates and sample targets;
+policy simulation uses them to show which threshold changes would admit known
+junk or keep useful candidates; signal-quality export turns useful/junk/watch
+and missed rows into proposed eval cases without modifying canonical fixtures.
+
+Missed opportunities can be stored as research rows with symbol/coin id, source
+URL or text, why it mattered, approximate time, expected playbook, and notes.
+The diagnostic failure stage should explain whether the source was not
+ingested, the candidate was not resolved, impact path failed validation, market
+confirmation was missing, quality gates were too strict, provider coverage was
+down, or the route was suppressed. These rows feed recall-oriented eval-case
+exports and source-reliability review only; they do not create alerts.
+
 ## Day-1 Notification Burn-In
 
 Use notification profiles when you want immediate Telegram research
