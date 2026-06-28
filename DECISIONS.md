@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Canonical core route follows final opportunity verdict
+**Status:** accepted
+**Decision:** Canonical CoreOpportunity rows must persist final route/tier fields
+that agree with the final opportunity verdict. If a core opportunity is
+`validated_digest`, `watchlist`, or `high_priority`, its
+`final_route_after_quality_gate` should be `RESEARCH_DIGEST` or
+`HIGH_PRIORITY_RESEARCH` unless a real quality block, quality-capped state,
+duplicate suppression, or `TRIGGERED_FADE` route applies. Strict artifact doctor
+must block fresh core rows that violate this route/verdict contract.
+**Why:** Operator-facing artifacts use the canonical core store as the shared
+truth. A digest-worthy core row with `STORE_ONLY` route text makes daily briefs,
+cards, feedback readiness, and Pro-model review disagree about whether an
+opportunity is local-only or digest-ready.
+**Revisit when:** Core opportunities move from JSONL artifacts into a typed
+store with schema-enforced final route/state/verdict columns.
+
 ## 2026-06-28 - Live-style burn-in requires an explicit no-send readiness gate
 **Status:** accepted
 **Decision:** Event Alpha live-style burn-in should have a dedicated no-send

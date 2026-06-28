@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_core_opportunities
+from . import event_alpha_router, event_core_opportunities, event_opportunity_verdict
 
 
 EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION = "event_core_opportunity_store_v1"
@@ -649,6 +649,13 @@ def _row_from_core_opportunity(
         }
     support_ids = _row_ids(support)
     diagnostic_ids = _row_ids(diagnostics)
+    final_route, route_adjustment_reason = _canonical_core_route(item, primary)
+    final_verdict_reason = (
+        _first_text(all_rows, ("final_verdict_reason", "quality_gate_block_reason", "route_reason", "opportunity_verdict_reason"))
+        or _default_core_verdict_reason(item.opportunity_level)
+    )
+    if route_adjustment_reason:
+        final_verdict_reason = _canonical_route_adjusted_verdict_reason(item.opportunity_level)
     return {
         "schema_version": EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION,
         "row_type": "event_core_opportunity",
@@ -669,9 +676,9 @@ def _row_from_core_opportunity(
         "effective_playbook_type": item.primary_impact_path,
         "latest_playbook_type": item.primary_impact_path,
         "state": item.final_state_after_quality_gate,
-        "tier": item.final_route_after_quality_gate,
-        "latest_tier": item.final_route_after_quality_gate,
-        "route": item.final_route_after_quality_gate,
+        "tier": final_route,
+        "latest_tier": final_route,
+        "route": final_route,
         "primary_hypothesis_id": _first_text([primary], ("hypothesis_id", "primary_hypothesis_id")),
         "supporting_hypothesis_ids": list(item.supporting_hypothesis_ids),
         "supporting_categories": list(item.supporting_categories),
@@ -758,10 +765,11 @@ def _row_from_core_opportunity(
         "opportunity_level": item.opportunity_level,
         "opportunity_score_final": item.opportunity_score_final,
         "final_state_after_quality_gate": item.final_state_after_quality_gate,
-        "final_route_after_quality_gate": item.final_route_after_quality_gate,
-        "final_tier_after_quality_gate": item.final_route_after_quality_gate,
+        "final_route_after_quality_gate": final_route,
+        "final_tier_after_quality_gate": final_route,
+        "canonical_route_adjustment_reason": route_adjustment_reason,
         "final_verdict_source": _first_text(all_rows, ("final_verdict_source", "opportunity_verdict_source", "verdict_source")) or "core_opportunity_merge",
-        "final_verdict_reason": _first_text(all_rows, ("final_verdict_reason", "quality_gate_block_reason", "route_reason", "opportunity_verdict_reason")),
+        "final_verdict_reason": final_verdict_reason,
         "why_opportunity_visible": item.why_opportunity_visible,
         "why_other_rows_hidden": item.why_other_rows_hidden,
         "card_path": str(card_path) if card_path else None,
@@ -770,6 +778,61 @@ def _row_from_core_opportunity(
         "feedback_target_type": "core_opportunity_id",
         "generated_at": generated_at,
     }
+
+
+def _canonical_core_route(
+    item: event_core_opportunities.CoreOpportunity,
+    primary: Mapping[str, Any],
+) -> tuple[str, str | None]:
+    current = str(item.final_route_after_quality_gate or "").strip()
+    if current in {
+        event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value,
+        event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+    }:
+        return current, None
+    if _core_route_quality_blocked(primary):
+        return current or event_alpha_router.EventAlphaRoute.STORE_ONLY.value, None
+    level = str(item.opportunity_level or "").strip()
+    if level == event_opportunity_verdict.OpportunityLevel.HIGH_PRIORITY.value:
+        return (
+            event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            f"core_route_derived_from_opportunity_level:{level}",
+        )
+    if level in {
+        event_opportunity_verdict.OpportunityLevel.WATCHLIST.value,
+        event_opportunity_verdict.OpportunityLevel.VALIDATED_DIGEST.value,
+    }:
+        return (
+            event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            f"core_route_derived_from_opportunity_level:{level}",
+        )
+    return current or event_alpha_router.EventAlphaRoute.STORE_ONLY.value, None
+
+
+def _core_route_quality_blocked(primary: Mapping[str, Any]) -> bool:
+    route, block = event_alpha_router.quality_gate_route_for_row(primary, require_quality=True)
+    if block:
+        return True
+    if route == event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value:
+        return False
+    if _truthy(primary.get("state_quality_capped")):
+        return True
+    return False
+
+
+def _default_core_verdict_reason(level: str | None) -> str:
+    level_text = str(level or "unknown").strip() or "unknown"
+    return f"Core opportunity verdict reached {level_text}."
+
+
+def _canonical_route_adjusted_verdict_reason(level: str | None) -> str:
+    level_text = str(level or "unknown").strip() or "unknown"
+    return (
+        f"Core opportunity verdict reached {level_text}; "
+        "final route derived from canonical opportunity level."
+    )
 
 
 def _accepted_evidence_source_summary(samples: Iterable[Mapping[str, Any]]) -> dict[str, Any]:

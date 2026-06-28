@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Repair canonical core route truth · Codex
+**Why:** A fresh live-style no-send audit found five canonical
+CoreOpportunity rows whose final opportunity verdict was `validated_digest`
+while the persisted final route still said `STORE_ONLY`. That made operator
+artifacts undercount digest opportunities even though fixture doctors were
+green.
+**Changes:**
+- Canonical core-store writes now derive `final_route_after_quality_gate`,
+  `route`, and `tier` from the final opportunity level when no quality block,
+  quality cap, suppression, or triggered-fade route applies.
+- Added a `canonical_route_adjustment_reason` and normalized final verdict copy
+  when stale primary-row local-only text conflicts with the final core route.
+- Extended artifact doctor strict checks with
+  `core_route_conflicts_with_opportunity_level`, which blocks fresh core rows
+  that persist digest/watchlist/high-priority verdicts as local/store-only
+  routes without a real gate.
+- Added regressions for route derivation and doctor conflict detection.
+- Regenerated catalyst-frame, evidence-acquisition, market-refresh,
+  quality-validation, and live no-send burn-in artifacts for review.
+**Verify:** `python3 tests/test_indicators.py` passed (522/522); regenerated
+all audit profiles; all profile reports ran; strict doctors for
+`catalyst_frame_e2e`, `evidence_acquisition_smoke`, `market_refresh_smoke`,
+`quality_validation`, and `live_burn_in_no_send` report
+`core_route_conflicts_with_opportunity_level=0`; direct JSONL/card inspection
+found no route/verdict mismatches, duplicate core ids, missing cards, or raw
+watchlist quality conflicts. Final verification also ran
+`make event-llm-eval PYTHON=python3`, `make event-llm-extract-eval
+PYTHON=python3`, `make event-alpha-eval PYTHON=python3`, `make
+event-alpha-signal-quality-eval PYTHON=python3`, and `make verify
+PYTHON=python3`.
+**Notes/risks:** Research-artifact repair only. No Telegram sends, paper
+trades, normal RSI rows, live DB writes, execution paths, or non-event-fade
+`TRIGGERED_FADE` paths were added. Live burn-in still shows expected fail-soft
+public-provider warnings such as GDELT 429 and RSS 403.
+
 ## 2026-06-28 — Add live-style Event Alpha no-send burn-in gate · Codex
 **Why:** Event Alpha needed a real live-style, no-send proof path before any
 notification promotion: provider gaps, source-pack coverage, cards, feedback

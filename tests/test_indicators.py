@@ -28288,6 +28288,52 @@ def test_event_core_opportunity_store_persists_canonical_rows():
         assert set(by_symbol) == {"AAVE", "MEME", "RUNE", "VELVET"}
 
 
+def test_event_core_opportunity_store_derives_route_from_final_verdict():
+    from crypto_rsi_scanner import event_alpha_router, event_core_opportunity_store, event_watchlist
+
+    rows = [{
+        "row_type": "event_impact_hypothesis",
+        "hypothesis_id": "hyp-digest-store-only",
+        "incident_id": "incident-digest-store-only",
+        "canonical_incident_name": "Digest-worthy core with stale route",
+        "symbol": "TEST",
+        "coin_id": "test-token",
+        "validated_symbol": "TEST",
+        "validated_coin_id": "test-token",
+        "candidate_role": "direct_subject",
+        "impact_path_type": "strategic_investment",
+        "impact_path_reason": "strategic_investment",
+        "opportunity_level": "validated_digest",
+        "opportunity_score_final": 72,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+        "final_verdict_reason": "Validated impact hypothesis kept local-only: stale primary route.",
+        "evidence_specificity": "direct_token_mechanism",
+        "source_class": "crypto_news",
+        "market_confirmation_level": "none",
+    }]
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        result = event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=path),
+            run_id="run-core-route-normalized",
+            profile="live_burn_in_no_send",
+            run_mode="notification_burn_in",
+            artifact_namespace="live_burn_in_no_send",
+        )
+        assert result.success
+        loaded = event_core_opportunity_store.load_core_opportunities(path, latest_run=True)
+
+    stored = loaded.rows[0]
+    assert stored["final_opportunity_level"] == "validated_digest"
+    assert stored["final_route_after_quality_gate"] == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
+    assert stored["route"] == event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value
+    assert stored["canonical_route_adjustment_reason"] == "core_route_derived_from_opportunity_level:validated_digest"
+    assert "final route derived from canonical opportunity level" in stored["final_verdict_reason"]
+    assert "local-only" not in stored["final_verdict_reason"]
+
+
 def test_core_evidence_acquisition_view_aggregates_canonical_rows():
     from crypto_rsi_scanner import event_core_opportunity_store
 
@@ -28535,6 +28581,52 @@ def test_event_alpha_artifact_doctor_reports_core_store_coverage():
         artifact_namespace="market_refresh_smoke",
     )
     assert missing.visible_core_opportunities_missing_store_rows == 1
+
+
+def test_event_alpha_artifact_doctor_blocks_core_route_verdict_conflict():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+
+    conflict = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-core-route-conflict",
+        "profile": "live_burn_in_no_send",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "live_burn_in_no_send",
+        "core_opportunity_id": "core_route_conflict",
+        "symbol": "TEST",
+        "coin_id": "test-token",
+        "candidate_role": "direct_subject",
+        "primary_impact_path": "strategic_investment",
+        "impact_path_type": "strategic_investment",
+        "evidence_specificity": "direct_token_mechanism",
+        "source_class": "crypto_news",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_level": "validated_digest",
+        "final_opportunity_score": 72,
+        "opportunity_score_final": 72,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+        "state_quality_capped": False,
+    }
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{
+            "run_id": "run-core-route-conflict",
+            "profile": "live_burn_in_no_send",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "live_burn_in_no_send",
+            "success": True,
+        }],
+        core_opportunity_rows=[conflict],
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        strict=True,
+    )
+
+    assert doctor.core_route_conflicts_with_opportunity_level == 1
+    assert doctor.status == "BLOCKED"
+    assert any("core_route_conflicts_with_opportunity_level=1" in item for item in doctor.blockers)
 
 
 def test_event_alpha_artifact_doctor_accepts_quality_blocked_local_card_group():
@@ -28791,7 +28883,7 @@ def test_research_card_primary_fields_use_canonical_core_row():
     assert "- Opportunity verdict: high_priority / 92.0" in card.markdown
     assert "- Relationship: venue_value_capture" in card.markdown
     assert "- Quality gate: passed final quality gate (HIGH_PRIORITY_RESEARCH)" in card.markdown
-    assert "- Why promoted/local-only: promoted by final verdict (high_priority)" in card.markdown
+    assert "- Why promoted/local-only: Core opportunity verdict reached high_priority." in card.markdown
     assert "Quality gate: local-only" not in card.markdown
     assert "validated impact hypothesis promoted to RADAR" not in card.markdown
     assert "STORE_ONLY" not in card.markdown.split("## Artifact Lineage", 1)[0]

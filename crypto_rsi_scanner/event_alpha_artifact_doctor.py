@@ -54,6 +54,7 @@ class EventAlphaArtifactDoctorResult:
     quality_review_market_freshness_contradiction: int = 0
     upgrade_candidates_include_high_priority: int = 0
     daily_brief_card_group_mismatch_with_index: int = 0
+    core_route_conflicts_with_opportunity_level: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -407,6 +408,7 @@ def diagnose_artifacts(
     audit_source_pack_mismatch = 0
     market_freshness_contradictions = sum(1 for row in core_rows if _core_row_has_market_freshness_contradiction(row))
     promoted_core_in_weak = _promoted_core_rows_that_are_weak(core_rows)
+    core_route_conflicts = _core_route_conflicts_with_opportunity_level(core_rows)
     upgrade_high_priority = 0
     fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
     fresh_visible_missing_targets = sum(
@@ -484,6 +486,9 @@ def diagnose_artifacts(
         (blockers if strict else warnings).append(message)
     if card_group_mismatches:
         message = f"daily_brief_card_group_mismatch_with_index={card_group_mismatches}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if core_route_conflicts:
+        message = f"core_route_conflicts_with_opportunity_level={core_route_conflicts}"
         (blockers if strict and core_store_available else warnings).append(message)
     if visible_missing_targets:
         message = f"visible_core_opportunities_missing_feedback_targets={visible_missing_targets}"
@@ -666,6 +671,7 @@ def diagnose_artifacts(
         quality_review_market_freshness_contradiction=market_freshness_contradictions,
         upgrade_candidates_include_high_priority=upgrade_high_priority,
         daily_brief_card_group_mismatch_with_index=card_group_mismatches,
+        core_route_conflicts_with_opportunity_level=core_route_conflicts,
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -1124,6 +1130,30 @@ def _missing_final_route_rows(alerts: Iterable[Mapping[str, Any]], *, legacy: bo
     return count
 
 
+def _core_route_conflicts_with_opportunity_level(rows: Iterable[Mapping[str, Any]]) -> int:
+    count = 0
+    for row in rows:
+        level = str(row.get("final_opportunity_level") or row.get("opportunity_level") or "").strip()
+        route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").strip()
+        if level not in {"validated_digest", "watchlist", "high_priority"}:
+            continue
+        if route in {
+            event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            event_alpha_router.EventAlphaRoute.TRIGGERED_FADE_RESEARCH.value,
+            event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+        }:
+            continue
+        if bool(row.get("state_quality_capped")):
+            continue
+        components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
+        _, block = event_alpha_router.quality_gate_route_for_row(row, components=components, require_quality=True)
+        if block:
+            continue
+        count += 1
+    return count
+
+
 def _row_has_alertable_quality_conflict(row: Mapping[str, Any]) -> bool:
     components = row.get("score_components") if isinstance(row.get("score_components"), Mapping) else {}
     data = event_alpha_quality_fields.ensure_quality_fields(row, components=components)
@@ -1562,7 +1592,8 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"market_freshness_contradictory_summary={result.market_freshness_contradictory_summary} "
             f"quality_review_market_freshness_contradiction={result.quality_review_market_freshness_contradiction} "
             f"upgrade_candidates_include_high_priority={result.upgrade_candidates_include_high_priority} "
-            f"daily_brief_card_group_mismatch_with_index={result.daily_brief_card_group_mismatch_with_index}"
+            f"daily_brief_card_group_mismatch_with_index={result.daily_brief_card_group_mismatch_with_index} "
+            f"core_route_conflicts_with_opportunity_level={result.core_route_conflicts_with_opportunity_level}"
         ),
         (
             "snapshot lineage: "

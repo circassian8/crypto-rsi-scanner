@@ -57,6 +57,14 @@ use the joined incident row before falling back to legacy per-row incident
 reconstruction. Support/control artifacts are audit evidence attached to the
 core opportunity; they should not create a second visible truth for route,
 state, tier, incident context, or final opportunity verdict.
+Canonical core route fields are part of that contract. A promoted final
+opportunity level (`validated_digest`, `watchlist`, or `high_priority`) should
+persist a matching research route (`RESEARCH_DIGEST` or
+`HIGH_PRIORITY_RESEARCH`) unless a real quality block, quality-capped state,
+duplicate suppression, or `TRIGGERED_FADE` route applies. Strict artifact doctor
+reports `core_route_conflicts_with_opportunity_level`; treat a nonzero value as
+a fresh artifact blocker before reviewing daily briefs, cards, or feedback
+queues.
 Source-pack acquisition display follows the same rule: use the canonical
 core acquisition view for accepted/rejected counts, reason codes, samples,
 source pack, provider failures, and before/after verdicts. If a support row
