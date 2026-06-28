@@ -21870,6 +21870,44 @@ def test_event_alpha_burn_in_readiness_requires_no_send_and_reviewable_artifacts
         assert "provider_coverage:" in text
         assert "manual review checklist:" in text
 
+        stale_inbox_feedback = event_alpha_feedback_readiness.EventAlphaFeedbackReadinessResult(
+            profile="live_burn_in_no_send",
+            artifact_namespace="live_burn_in_no_send",
+            cards_checked=1,
+            cards_with_lineage=1,
+            cards_with_feedback_target=1,
+            core_opportunity_cards_ready=1,
+            near_miss_cards_ready=0,
+            local_only_cards_ready=0,
+            alert_rows_checked=1,
+            alert_rows_with_feedback_targets=1,
+            inbox_review_items=1,
+            feedback_rows=0,
+            calibration_ready_rows=1,
+            visible_core_opportunities=1,
+            visible_core_opportunities_with_cards=1,
+            visible_core_opportunities_with_feedback_targets=1,
+            visible_core_opportunities_missing_cards=0,
+            visible_core_opportunities_missing_feedback_targets=0,
+            canonical_review_items=1,
+            canonical_review_items_with_cards=0,
+            canonical_review_items_with_feedback_targets=1,
+            blockers=("canonical_review_items_missing_cards",),
+        )
+        stale_inbox_result = event_alpha_burn_in_readiness.build_burn_in_readiness(
+            profile="live_burn_in_no_send",
+            artifact_namespace="live_burn_in_no_send",
+            run_rows=[run],
+            provider_status=provider_report,
+            artifact_doctor=doctor,
+            feedback_readiness=stale_inbox_feedback,
+            core_opportunity_rows=[{"core_opportunity_id": "core:velvet"}],
+            evidence_acquisition_rows=[{"accepted_evidence_count": 1}],
+            daily_brief_path=brief,
+        )
+        assert stale_inbox_result.feedback_readiness_ready is True
+        assert "feedback readiness has blockers" not in "\n".join(stale_inbox_result.blockers)
+
 
 def test_event_alpha_burn_in_readiness_blocks_send_and_delivery_rows():
     from crypto_rsi_scanner import (
@@ -28174,6 +28212,64 @@ def test_evidence_acquisition_core_opportunity_dedupes_supporting_rows():
     assert result.results[0].core_opportunity_id != "UNKNOWN"
 
 
+def test_evidence_acquisition_empty_and_provider_failures_return_complete_result():
+    from crypto_rsi_scanner import event_evidence_acquisition
+
+    disabled = event_evidence_acquisition.run_evidence_acquisition(
+        (),
+        cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(enabled=False),
+    )
+    assert disabled.status == "disabled"
+    assert disabled.results == ()
+    assert disabled.attempted == 0
+
+    no_candidates = event_evidence_acquisition.run_evidence_acquisition(
+        (),
+        cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(enabled=True),
+    )
+    assert no_candidates.status == "no_candidates"
+    assert no_candidates.results == ()
+    assert no_candidates.attempted == 0
+
+    class FailingProvider:
+        name = "fixture_dns_failure"
+
+        def search(self, queries, *, max_results_per_query, now=None):
+            raise OSError("DNS temporary failure in name resolution")
+
+    row = {
+        "hypothesis_id": "hyp:tao-provider-fail",
+        "core_opportunity_id": "agg:tao-provider-fail",
+        "symbol": "TAO",
+        "coin_id": "bittensor",
+        "validated_symbol": "TAO",
+        "validated_coin_id": "bittensor",
+        "external_asset": "Bittensor",
+        "playbook_type": "strategic_investment",
+        "impact_category": "strategic_investment_or_valuation",
+        "impact_path_type": "strategic_investment_or_valuation",
+        "candidate_role": "direct_subject",
+        "opportunity_level": "validated_digest",
+        "opportunity_score_final": 72,
+        "source_pack": "strategic_investment_pack",
+    }
+    failed = event_evidence_acquisition.run_evidence_acquisition(
+        (row,),
+        provider=FailingProvider(),
+        providers_by_hint={},
+        cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(
+            enabled=True,
+            max_candidates=1,
+            max_queries=1,
+        ),
+    )
+    assert failed.status == "failed_soft"
+    assert failed.attempted == 1
+    assert failed.results[0].status == "failed_soft"
+    assert failed.results[0].query_results[0].status == "failed_soft"
+    assert any("OSError" in warning for warning in failed.results[0].warnings)
+
+
 def test_event_near_miss_source_pack_and_operator_surfaces():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import (
@@ -29062,7 +29158,44 @@ def test_event_alpha_artifact_doctor_reports_core_store_coverage():
     )
     assert doctor.core_opportunity_store_rows == 4
     assert doctor.visible_core_opportunities_missing_store_rows == 0
+    assert doctor.core_opportunity_store_rows_missing_card_path == 4
     assert "core_opportunity_store_rows=4" in event_alpha_artifact_doctor.format_artifact_doctor_report(doctor)
+
+    with TemporaryDirectory() as tmp:
+        card_paths = []
+        for row in loaded.rows:
+            card = Path(tmp) / f"{row['core_opportunity_id']}.md"
+            card.write_text(
+                "\n".join([
+                    f"# {row.get('symbol') or 'Core'} Event Research Card",
+                    "- Generated at: 2026-06-28T00:00:00+00:00",
+                    "- Lineage status: current",
+                    "- legacy_lineage_missing: false",
+                    "- Run ID: run-core-doctor",
+                    "- Profile: market_refresh_smoke",
+                    "- Namespace: market_refresh_smoke",
+                    f"- Core opportunity ID: {row['core_opportunity_id']}",
+                    f"- Feedback target: {row['core_opportunity_id']}",
+                    "- Feedback target type: core_opportunity_id",
+                ]),
+                encoding="utf-8",
+            )
+            card_paths.append(card)
+        card_mapped = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-core-doctor",
+                "profile": "market_refresh_smoke",
+                "run_mode": "burn_in",
+                "artifact_namespace": "market_refresh_smoke",
+                "success": True,
+                "alertable": 0,
+            }],
+            core_opportunity_rows=loaded.rows,
+            card_paths=card_paths,
+            profile="market_refresh_smoke",
+            artifact_namespace="market_refresh_smoke",
+        )
+        assert card_mapped.core_opportunity_store_rows_missing_card_path == 0
 
     missing = event_alpha_artifact_doctor.diagnose_artifacts(
         run_rows=[{

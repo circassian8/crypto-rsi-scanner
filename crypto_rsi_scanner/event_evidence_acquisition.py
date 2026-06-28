@@ -249,6 +249,7 @@ class EventEvidenceAcquisitionRunResult:
     results: tuple[EvidenceAcquisitionResult, ...]
     path: Path | None = None
     rows_written: int = 0
+    status: str = "complete"
     warnings: tuple[str, ...] = ()
 
     @property
@@ -287,7 +288,13 @@ def run_evidence_acquisition(
     hypothesis_rows = tuple(hypotheses)
     observed = _as_utc(now or datetime.now(timezone.utc))
     if not cfg.enabled:
-        return EventEvidenceAcquisitionRunResult(hypotheses=hypothesis_rows)
+        return EventEvidenceAcquisitionRunResult(
+            hypotheses=hypothesis_rows,
+            results=(),
+            path=cfg.artifact_path,
+            status="disabled",
+            warnings=(),
+        )
 
     requests = _select_requests(
         hypothesis_rows,
@@ -295,7 +302,13 @@ def run_evidence_acquisition(
         max_candidates=cfg.max_candidates,
     )
     if not requests:
-        return EventEvidenceAcquisitionRunResult(hypotheses=hypothesis_rows)
+        return EventEvidenceAcquisitionRunResult(
+            hypotheses=hypothesis_rows,
+            results=(),
+            path=cfg.artifact_path,
+            status="no_candidates",
+            warnings=(),
+        )
 
     results: list[EvidenceAcquisitionResult] = []
     accepted_raw_by_hypothesis: dict[str, list[RawDiscoveredEvent]] = {}
@@ -355,6 +368,7 @@ def run_evidence_acquisition(
         results=finalized,
         path=cfg.artifact_path,
         rows_written=rows_written,
+        status=_run_result_status(finalized, artifact_warnings=warnings),
         warnings=tuple(dict.fromkeys(warnings)),
     )
 
@@ -1248,6 +1262,29 @@ def _aggregate_status(results: Iterable[EvidenceAcquisitionQueryResult]) -> str:
     if any(status == EvidenceAcquisitionStatus.FAILED_SOFT.value for status in statuses):
         return EvidenceAcquisitionStatus.FAILED_SOFT.value
     return EvidenceAcquisitionStatus.EXECUTED.value
+
+
+def _run_result_status(
+    results: Iterable[EvidenceAcquisitionResult],
+    *,
+    artifact_warnings: Iterable[str] = (),
+) -> str:
+    statuses = [str(result.status or "") for result in results]
+    if any(artifact_warnings):
+        return EvidenceAcquisitionStatus.FAILED_SOFT.value
+    if not statuses:
+        return "no_candidates"
+    if any(status == EvidenceAcquisitionStatus.FAILED_SOFT.value for status in statuses):
+        return EvidenceAcquisitionStatus.FAILED_SOFT.value
+    if any(status == EvidenceAcquisitionStatus.PROVIDER_BACKOFF.value for status in statuses):
+        return EvidenceAcquisitionStatus.PROVIDER_BACKOFF.value
+    if any(status == EvidenceAcquisitionStatus.PROVIDER_UNAVAILABLE.value for status in statuses):
+        return EvidenceAcquisitionStatus.PROVIDER_UNAVAILABLE.value
+    if all(status == EvidenceAcquisitionStatus.SKIPPED_BUDGET.value for status in statuses):
+        return EvidenceAcquisitionStatus.SKIPPED_BUDGET.value
+    if all(status == EvidenceAcquisitionStatus.SKIPPED_CONFIG.value for status in statuses):
+        return EvidenceAcquisitionStatus.SKIPPED_CONFIG.value
+    return "complete"
 
 
 def _budget_skipped_result(request: EvidenceAcquisitionRequest) -> EvidenceAcquisitionResult:

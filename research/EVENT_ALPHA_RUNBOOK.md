@@ -262,6 +262,15 @@ from no-send burn-in to guarded sends unless the operator has reviewed the core
 cards, near-miss/local-only sections, provider gaps, source-pack evidence
 absence semantics, and feedback targets.
 
+Evidence acquisition failures are expected live-path coverage states, not
+runtime failures. `disabled`, `no_candidates`, `provider_unavailable`,
+`provider_backoff`, `skipped_budget`, and `failed_soft` runs should appear as
+run-ledger/acquisition statuses with safe warnings while the cycle still writes
+cards, daily brief, doctor output, and readiness reports. Burn-in readiness is
+based on the current visible canonical core review queue: every visible core
+needs a card and feedback target, while stale support/inbox rows remain
+diagnostics rather than blockers when the canonical core surface is complete.
+
 Notification lanes are independent: a daily digest cooldown does not block an
 instant escalation, and instant escalation cooldown does not block a
 deterministic proxy-fade `TRIGGERED_FADE`. Triggered-fade notifications dedupe

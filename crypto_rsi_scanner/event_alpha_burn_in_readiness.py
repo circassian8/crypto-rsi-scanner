@@ -92,7 +92,8 @@ def build_burn_in_readiness(
 
     if artifact_doctor.blockers:
         blockers.append("strict artifact doctor has blockers")
-    if feedback_readiness.blockers and core_rows:
+    feedback_ready = _feedback_readiness_visible_core_ready(feedback_readiness)
+    if not feedback_ready and core_rows:
         blockers.append("feedback readiness has blockers for visible core opportunities")
 
     evidence_attempted = int((latest or {}).get("evidence_acquisition_attempted") or 0)
@@ -139,12 +140,34 @@ def build_burn_in_readiness(
         market_freshness_visible=market_visible,
         artifact_doctor_status=artifact_doctor.status,
         artifact_doctor_blockers=tuple(artifact_doctor.blockers),
-        feedback_readiness_ready=feedback_readiness.ready,
-        feedback_readiness_blockers=tuple(feedback_readiness.blockers),
+        feedback_readiness_ready=feedback_ready,
+        feedback_readiness_blockers=() if feedback_ready else tuple(feedback_readiness.blockers),
         blockers=clean_blockers,
         warnings=tuple(dict.fromkeys(str(item) for item in warnings if str(item))),
         review_commands=commands,
     )
+
+
+def _feedback_readiness_visible_core_ready(
+    result: event_alpha_feedback_readiness.EventAlphaFeedbackReadinessResult,
+) -> bool:
+    """Treat current visible core coverage as the burn-in reviewability source."""
+    if result.ready:
+        return True
+    if result.cards_checked and result.cards_with_lineage < result.cards_checked:
+        return False
+    if result.cards_checked and result.cards_with_feedback_target < result.cards_checked:
+        return False
+    if result.alert_rows_checked and result.alert_rows_with_feedback_targets < result.alert_rows_checked:
+        return False
+    if result.visible_core_opportunities:
+        return (
+            result.visible_core_opportunities_missing_cards <= 0
+            and result.visible_core_opportunities_missing_feedback_targets <= 0
+            and result.visible_core_opportunities_with_cards >= result.visible_core_opportunities
+            and result.visible_core_opportunities_with_feedback_targets >= result.visible_core_opportunities
+        )
+    return False
 
 
 def format_burn_in_readiness(result: EventAlphaBurnInReadinessResult) -> str:

@@ -338,6 +338,12 @@ def diagnose_artifacts(
     cards_missing_feedback_target = sum(1 for path in research_card_paths if not event_research_cards.card_feedback_target(path))
     card_group_map = event_research_cards.card_index_group_map(research_card_paths)
     card_core_ids = {value for path in research_card_paths for value in (event_research_cards.card_core_opportunity_id(path),) if value}
+    card_paths_by_core_id = {
+        value: path
+        for path in research_card_paths
+        for value in (event_research_cards.card_core_opportunity_id(path),)
+        if value
+    }
     card_feedback_targets = {value for path in research_card_paths for value in (event_research_cards.card_feedback_target(path),) if value}
     visible_core = (
         event_core_opportunity_store.core_opportunities_from_rows(core_rows)
@@ -359,7 +365,12 @@ def diagnose_artifacts(
     core_store_available = bool(store_core_ids)
     visible_missing_store_rows = len(visible_core_ids - store_core_ids) if core_store_available else len(visible_core_ids)
     duplicate_store_rows = max(0, len(core_rows) - len(store_core_ids))
-    store_rows_missing_card_path = sum(1 for row in core_rows if not str(row.get("card_path") or row.get("research_card_path") or "").strip())
+    store_rows_missing_card_path = sum(
+        1
+        for row in core_rows
+        if not str(row.get("card_path") or row.get("research_card_path") or "").strip()
+        and str(row.get("core_opportunity_id") or "").strip() not in card_paths_by_core_id
+    )
     visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids)
     visible_missing_targets = sum(
         1

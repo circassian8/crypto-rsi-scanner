@@ -17,6 +17,37 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Harden live burn-in acquisition and readiness · Codex
+**Why:** `event-alpha-live-burn-in-no-send` could still crash when evidence
+acquisition exited early or provider calls failed, and older/carded artifacts
+could make doctor/readiness reports look worse than the canonical core review
+surface actually was.
+**Changes:**
+- Evidence acquisition run results now always include `results`, `status`, path,
+  and warnings for disabled, no-candidate, provider-unavailable, skipped-budget,
+  failed-soft, and artifact-write-warning paths.
+- Event Alpha run ledgers persist `evidence_acquisition_run_status` so live
+  burn-in reports can distinguish no-candidate/disabled/failed-soft acquisition
+  runs from missing artifacts.
+- Artifact doctor now treats research-card metadata as a valid card-path mapping
+  for legacy core rows whose stored `card_path` was not backfilled.
+- Burn-in readiness now keys the feedback gate to visible canonical core card
+  and feedback-target coverage, while still leaving full artifact doctor/audit
+  checks intact.
+**Verify:** `python3 tests/test_indicators.py` passed (540/540). Also ran
+`make event-alpha-signal-quality-eval PYTHON=python3`, `make
+event-alpha-notification-format-smoke PYTHON=python3`, `make
+event-alpha-live-burn-in-no-send PYTHON=python3`, `make
+event-alpha-burn-in-readiness PROFILE=live_burn_in_no_send PYTHON=python3`,
+strict `make event-alpha-artifact-doctor PROFILE=live_burn_in_no_send STRICT=1
+PYTHON=python3`, `make event-alpha-evidence-acquisition-smoke PYTHON=python3`,
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, and manual
+`event-alpha-daily-brief`, `event-alpha-notification-inbox`, and
+`event-opportunity-audit` checks for `live_burn_in_no_send`.
+**Notes/risks:** The live no-send run completed with expected provider warnings
+(GDELT 429, RSS 403/backoff) and no sends. Strict doctor had no blockers; it
+still reports non-blocking hygiene warnings for weak/unqualified incident links.
+
 ## 2026-06-28 — Canonicalize Event Alpha notification delivery identity · Codex
 **Why:** A notify run could deliver a Telegram digest whose delivery ledger was
 keyed to a lower-level hypothesis row while cards, snapshots, daily brief, and

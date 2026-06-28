@@ -357,6 +357,7 @@ def _run_record(
         "evidence_acquisition_upgraded": _int(getattr(result, "evidence_acquisition_upgraded", 0)),
         "evidence_acquisition_rows_written": _int(getattr(acquisition, "rows_written", 0)) if acquisition is not None else 0,
         "evidence_acquisition_path": str(getattr(acquisition, "path", "") or ""),
+        "evidence_acquisition_run_status": str(getattr(acquisition, "status", "") or ""),
         "evidence_acquisition_status_counts": _evidence_acquisition_status_counts(acquisition),
         "candidates": _int(getattr(result, "candidates", 0)),
         "clusters": _int(getattr(result, "clusters", 0)),

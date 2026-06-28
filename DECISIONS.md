@@ -16,6 +16,21 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Evidence acquisition failures are artifact status, not crashes
+**Status:** accepted
+**Decision:** Event Alpha evidence acquisition must return a complete
+`EventEvidenceAcquisitionRunResult` for disabled, no-candidate, provider
+unavailable/backoff, skipped-budget, failed-soft, and artifact-write-warning
+paths. Live/no-send burn-in should record acquisition status and safe warnings
+in run ledgers/reports, then continue writing review artifacts. Provider
+failures or non-confirming statuses do not validate a candidate for digest or
+send promotion.
+**Why:** Live providers routinely 429, 403, timeout, or lack optional keys.
+Those conditions are expected research coverage gaps, not reasons to crash the
+cycle or silently promote weak rows.
+**Revisit when:** Evidence acquisition moves into a typed job table with retry
+state and operator-controlled provider retry workflows.
+
 ## 2026-06-28 - Telegram notifications use canonical core identity
 **Status:** accepted
 **Decision:** Event Alpha routed Telegram notifications must reconcile candidate

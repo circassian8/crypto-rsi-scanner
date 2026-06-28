@@ -5114,6 +5114,7 @@ def event_alpha_burn_in_readiness_report(
     provider_report = event_provider_status.build_event_discovery_provider_status(config)
     runs = event_alpha_run_ledger.load_run_records(context.run_ledger_path, limit=500)
     alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path, latest_only=False)
+    current_alerts = event_alpha_alert_store.load_alert_snapshots(context.alert_store_path)
     core_opportunities = event_core_opportunity_store.load_core_opportunities(
         context.core_opportunity_store_path,
         latest_run=True,
@@ -5131,7 +5132,7 @@ def event_alpha_burn_in_readiness_report(
     )
     inbox = event_alpha_notification_inbox.build_notification_inbox(
         notification_runs=notification_runs.rows,
-        alert_rows=alerts.rows,
+        alert_rows=current_alerts.rows,
         feedback_rows=feedback_rows,
         notification_delivery_rows=delivery_rows,
         watchlist_entries=watchlist.entries,
@@ -5147,7 +5148,7 @@ def event_alpha_burn_in_readiness_report(
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
         card_paths=_research_card_markdown_paths(context.research_cards_dir),
-        alert_rows=alerts.rows,
+        alert_rows=current_alerts.rows,
         feedback_rows=feedback_rows,
         watchlist_entries=watchlist.entries,
         core_opportunity_rows=core_opportunities.rows,
