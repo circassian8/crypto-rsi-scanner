@@ -4994,6 +4994,7 @@ def event_alpha_notification_inbox_report(
     *,
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
+    include_diagnostics: bool = False,
 ) -> None:
     """Print unreviewed Event Alpha notification/card follow-up queues."""
     _setup_event_discovery_logging(verbose)
@@ -5024,6 +5025,7 @@ def event_alpha_notification_inbox_report(
         feedback_rows=[record.__dict__ for record in feedback.records],
         notification_delivery_rows=delivery_rows,
         watchlist_entries=watchlist.entries,
+        core_opportunity_rows=core_opportunities.rows,
         research_cards_dir=context.research_cards_dir,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
@@ -5031,6 +5033,7 @@ def event_alpha_notification_inbox_report(
         alert_store_path=context.alert_store_path,
         feedback_path=context.feedback_path,
         outcomes_path=context.outcomes_path,
+        include_diagnostics=include_diagnostics,
     )
     print(event_alpha_notification_inbox.format_notification_inbox(result))
 
@@ -5070,6 +5073,7 @@ def event_alpha_feedback_readiness_report(
         feedback_rows=[record.__dict__ for record in feedback.records],
         notification_delivery_rows=delivery_rows,
         watchlist_entries=watchlist.entries,
+        core_opportunity_rows=core_opportunities.rows,
         research_cards_dir=context.research_cards_dir,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
@@ -9421,6 +9425,7 @@ def cli() -> None:
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
+            include_diagnostics=args.event_opportunity_audit_include_diagnostics,
         )
         return
     if args.event_alpha_notification_deliveries_report:

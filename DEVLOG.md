@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-28 — Make review surfaces core-opportunity-first · Codex
+**Why:** Notification inbox, feedback readiness, and opportunity audit still
+had paths that could surface diagnostic/support alert snapshots as if they were
+reviewable operator opportunities, or choose a diagnostic snapshot before the
+canonical core snapshot.
+**Changes:**
+- Notification inbox now builds canonical review items from
+  `event_core_opportunities.jsonl` first, resolves cards and feedback targets to
+  the core opportunity, and hides diagnostic/support snapshots by default.
+- Feedback readiness counts canonical review items/cards/feedback targets
+  separately from hidden diagnostics, so support rows cannot make readiness look
+  worse or better than the actual operator handoff.
+- Opportunity audit now prefers canonical snapshots for core reconciliation and
+  reports diagnostic/support snapshots only in the diagnostics view.
+- Artifact doctor gained review-surface checks for core item cards/feedback
+  targets, diagnostics visible by default, and non-canonical audit primaries.
+- Alert-snapshot loading keeps canonical and diagnostic snapshots for the same
+  core instead of collapsing them during JSONL de-duplication.
+**Verify:** `python3 tests/test_indicators.py` passed (536/536);
+`make event-alpha-signal-quality-eval PYTHON=python3`; `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`; strict `make
+event-alpha-artifact-doctor PROFILE=evidence_acquisition_smoke STRICT=1
+PYTHON=python3`; `make event-alpha-feedback-readiness
+PROFILE=evidence_acquisition_smoke PYTHON=python3`; `make
+event-opportunity-audit PROFILE=evidence_acquisition_smoke
+TARGET=agg:3381ebd96566 PYTHON=python3`; `make
+event-alpha-notification-inbox PROFILE=evidence_acquisition_smoke
+PYTHON=python3`; `make event-alpha-market-refresh-smoke PYTHON=python3`; `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`; `make
+event-alpha-quality-validation-cycle PYTHON=python3`; and `make verify
+PYTHON=python3` all passed.
+**Notes/risks:** Research-artifact presentation and readiness only. No
+Telegram sends, paper trades, normal RSI rows, live DB writes, execution paths,
+or non-event-fade `TRIGGERED_FADE` paths were added.
+
 ## 2026-06-28 — Keep diagnostic support snapshots non-alertable · Codex
 **Why:** Diagnostic/source-noise alert snapshots could link to a high-priority
 canonical CoreOpportunity for audit and then be re-promoted on load, inheriting

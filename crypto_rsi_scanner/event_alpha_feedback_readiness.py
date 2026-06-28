@@ -32,6 +32,11 @@ class EventAlphaFeedbackReadinessResult:
     visible_core_opportunities_with_feedback_targets: int = 0
     visible_core_opportunities_missing_cards: int = 0
     visible_core_opportunities_missing_feedback_targets: int = 0
+    canonical_review_items: int = 0
+    canonical_review_items_with_cards: int = 0
+    canonical_review_items_with_feedback_targets: int = 0
+    diagnostic_review_items_hidden: int = 0
+    diagnostic_review_items_with_feedback_targets: int = 0
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
@@ -63,7 +68,8 @@ def build_feedback_readiness(
     cards_with_lineage = sum(1 for path in research_cards if event_research_cards.card_has_current_lineage(path))
     cards_with_target = sum(1 for path in research_cards if event_research_cards.card_feedback_target(path))
     ready_by_group = _ready_card_groups(research_cards)
-    alert_targets = sum(1 for row in alerts if _alert_has_feedback_target(row))
+    required_alerts = [row for row in alerts if not event_alpha_notification_inbox.alert_snapshot_is_diagnostic(row)]
+    alert_targets = sum(1 for row in required_alerts if _alert_has_feedback_target(row))
     alert_core_reconciled = sum(1 for row in alerts if bool(row.get("snapshot_core_reconciled")))
     stale_snapshot_routes_capped = sum(1 for row in alerts if _snapshot_route_was_capped_by_core(row))
     snapshots_missing_core = sum(
@@ -72,6 +78,31 @@ def build_feedback_readiness(
     )
     calibration_ready = sum(1 for row in [*alerts, *(_entry_row(entry) for entry in entries)] if _row_has_calibration_fields(row))
     inbox_items = _inbox_review_count(inbox_result)
+    canonical_review_items = (
+        len(inbox_result.canonical_review_items)
+        if inbox_result is not None
+        else 0
+    )
+    canonical_review_items_with_cards = (
+        inbox_result.canonical_review_items_with_cards
+        if inbox_result is not None
+        else 0
+    )
+    canonical_review_items_with_targets = (
+        inbox_result.canonical_review_items_with_feedback_targets
+        if inbox_result is not None
+        else 0
+    )
+    diagnostic_review_items_hidden = (
+        len(inbox_result.diagnostic_review_items_hidden)
+        if inbox_result is not None
+        else 0
+    )
+    diagnostic_review_items_with_targets = (
+        inbox_result.diagnostic_review_items_with_feedback_targets
+        if inbox_result is not None
+        else 0
+    )
     visible_core = event_core_opportunities.visible_core_opportunities(core_rows or [*entries, *alerts])
     alert_core_targets = {
         str(row.get("core_opportunity_id") or "")
@@ -99,8 +130,12 @@ def build_feedback_readiness(
         blockers.append("research_cards_missing_lineage")
     if research_cards and cards_with_target < len(research_cards):
         blockers.append("research_cards_missing_feedback_target")
-    if alerts and alert_targets < len(alerts):
+    if required_alerts and alert_targets < len(required_alerts):
         blockers.append("alert_snapshots_missing_feedback_targets")
+    if canonical_review_items and canonical_review_items_with_cards < canonical_review_items:
+        blockers.append("canonical_review_items_missing_cards")
+    if canonical_review_items and canonical_review_items_with_targets < canonical_review_items:
+        blockers.append("canonical_review_items_missing_feedback_targets")
     if missing_cards:
         blockers.append("visible_core_opportunities_missing_cards")
     if missing_targets:
@@ -122,7 +157,7 @@ def build_feedback_readiness(
         core_opportunity_cards_ready=ready_by_group.get("Core Opportunity Cards", 0),
         near_miss_cards_ready=ready_by_group.get("Near-Miss Cards", 0),
         local_only_cards_ready=ready_by_group.get("Local-Only / Quality-Capped Cards", 0),
-        alert_rows_checked=len(alerts),
+        alert_rows_checked=len(required_alerts),
         alert_rows_with_feedback_targets=alert_targets,
         alert_rows_core_reconciled=alert_core_reconciled,
         stale_snapshot_routes_capped=stale_snapshot_routes_capped,
@@ -135,6 +170,11 @@ def build_feedback_readiness(
         visible_core_opportunities_with_feedback_targets=visible_with_targets,
         visible_core_opportunities_missing_cards=missing_cards,
         visible_core_opportunities_missing_feedback_targets=missing_targets,
+        canonical_review_items=canonical_review_items,
+        canonical_review_items_with_cards=canonical_review_items_with_cards,
+        canonical_review_items_with_feedback_targets=canonical_review_items_with_targets,
+        diagnostic_review_items_hidden=diagnostic_review_items_hidden,
+        diagnostic_review_items_with_feedback_targets=diagnostic_review_items_with_targets,
         blockers=tuple(dict.fromkeys(blockers)),
         warnings=tuple(dict.fromkeys(warnings)),
     )
@@ -175,6 +215,17 @@ def format_feedback_readiness(result: EventAlphaFeedbackReadinessResult) -> str:
             f"feedback_targets={result.visible_core_opportunities_missing_feedback_targets}"
         ),
         f"inbox_review_items: {result.inbox_review_items}",
+        (
+            "canonical_review_items: "
+            f"{result.canonical_review_items} "
+            f"cards={result.canonical_review_items_with_cards}/{result.canonical_review_items} "
+            f"feedback_targets={result.canonical_review_items_with_feedback_targets}/{result.canonical_review_items}"
+        ),
+        (
+            "diagnostic_review_items_hidden: "
+            f"{result.diagnostic_review_items_hidden} "
+            f"feedback_targets={result.diagnostic_review_items_with_feedback_targets}"
+        ),
         f"feedback_rows: {result.feedback_rows}",
         f"calibration_ready_rows: {result.calibration_ready_rows}",
         "blockers: " + (", ".join(result.blockers) if result.blockers else "none"),
@@ -236,6 +287,8 @@ def _entry_row(entry: event_watchlist.EventWatchlistEntry) -> dict[str, Any]:
 def _inbox_review_count(result: event_alpha_notification_inbox.EventAlphaNotificationInboxResult | None) -> int:
     if result is None:
         return 0
+    if result.canonical_review_items:
+        return sum(1 for item in result.canonical_review_items if not item.reviewed)
     return sum(len(getattr(result, field)) for field in (
         "sent_without_feedback",
         "partial_delivered_without_feedback",

@@ -188,7 +188,7 @@ def format_opportunity_audit(
         "- TRIGGERED_FADE was not created unless the row is already a deterministic proxy_fade/event_fade trigger.",
         "",
         "## Alert snapshot / core reconciliation",
-        *_snapshot_core_reconciliation_lines(core_view, row),
+        *_snapshot_core_reconciliation_lines(core_view, row, include_diagnostics=include_diagnostics),
         "",
         "## Notification and feedback status",
         f"- delivery status: {_value(row, 'delivered_status', 'delivery_state', default='not_delivered_or_unknown')}",
@@ -224,6 +224,8 @@ def format_opportunity_audit(
 def _snapshot_core_reconciliation_lines(
     core_view: event_core_opportunity_store.CanonicalCoreOpportunityView,
     row: Mapping[str, Any],
+    *,
+    include_diagnostics: bool = False,
 ) -> list[str]:
     snapshots = list(core_view.alert_snapshot_rows)
     if not snapshots and str(row.get("row_type") or "") == "event_alpha_alert_snapshot":
@@ -236,12 +238,13 @@ def _snapshot_core_reconciliation_lines(
             f"- canonical core final route/level: {core_route} / {core_level}",
             "- alertable after reconciliation: false",
         ]
-    snap = snapshots[0]
+    snap = _primary_snapshot_for_audit(snapshots)
     final_route = str(snap.get("final_route_after_quality_gate") or snap.get("route") or "")
     requested = str(snap.get("requested_route_before_core_reconciliation") or snap.get("requested_route_before_quality_gate") or "")
     status = str(snap.get("snapshot_core_resolution_status") or snap.get("core_resolution_status") or snap.get("core_opportunity_id_status") or "unknown")
-    return [
+    lines = [
         "- snapshot found: true",
+        f"- primary snapshot class: {snap.get('snapshot_class') or 'unknown'}",
         f"- snapshot route before reconciliation: {requested or 'unknown'}",
         f"- snapshot route after reconciliation: {final_route or 'unknown'}",
         f"- canonical core final route/level: {core_route} / {core_level}",
@@ -249,6 +252,55 @@ def _snapshot_core_reconciliation_lines(
         f"- reconciliation reason: {snap.get('snapshot_core_reconciliation_reason') or 'none'}",
         f"- alertable after reconciliation: {str(event_alpha_router.route_value_is_alertable(final_route)).lower()}",
     ]
+    diagnostics = [item for item in snapshots if _snapshot_is_diagnostic(item)]
+    if diagnostics:
+        if include_diagnostics:
+            lines.append("### Diagnostic/support snapshots")
+            for diag in diagnostics[:8]:
+                lines.append(
+                    "- diagnostic snapshot: "
+                    f"alert_id={diag.get('alert_id') or diag.get('snapshot_id') or 'unknown'} "
+                    f"class={diag.get('snapshot_class') or 'unknown'} "
+                    f"route={diag.get('final_route_after_quality_gate') or diag.get('route') or 'unknown'} "
+                    f"status={diag.get('snapshot_core_resolution_status') or diag.get('core_resolution_status') or 'unknown'} "
+                    f"alertable={str(event_alpha_router.route_value_is_alertable(str(diag.get('final_route_after_quality_gate') or diag.get('route') or ''))).lower()}"
+                )
+        else:
+            lines.append(f"- diagnostic/support snapshots hidden: {len(diagnostics)}")
+    return lines
+
+
+def _primary_snapshot_for_audit(snapshots: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    rows = [dict(row) for row in snapshots if isinstance(row, Mapping)]
+    if not rows:
+        return {}
+
+    def rank(row: Mapping[str, Any]) -> tuple[int, int, str]:
+        diagnostic = _snapshot_is_diagnostic(row)
+        snapshot_class = str(row.get("snapshot_class") or "")
+        status = str(row.get("snapshot_core_resolution_status") or row.get("core_resolution_status") or "")
+        canonical = (
+            snapshot_class == "canonical_core_snapshot"
+            or status in {"canonical", "core_reconciled"}
+            or bool(row.get("snapshot_core_reconciled"))
+        ) and not diagnostic
+        alertable = event_alpha_router.route_value_is_alertable(
+            str(row.get("final_route_after_quality_gate") or row.get("route") or "")
+        )
+        return (3 if canonical else 0, 1 if alertable and not diagnostic else 0, str(row.get("observed_at") or row.get("snapshot_id") or ""))
+
+    return max(rows, key=rank)
+
+
+def _snapshot_is_diagnostic(row: Mapping[str, Any]) -> bool:
+    return (
+        bool(row.get("is_diagnostic_snapshot"))
+        or str(row.get("snapshot_class") or "") == "diagnostic_support_snapshot"
+        or str(row.get("core_resolution_status") or "") == "diagnostic_support"
+        or str(row.get("snapshot_core_resolution_status") or "") == "diagnostic_support"
+        or str(row.get("core_opportunity_id_status") or "") == "diagnostic_support"
+        or event_core_opportunities.row_is_diagnostic(row)
+    )
 
 
 def _no_match_audit_report(

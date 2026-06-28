@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-28 - Operator review surfaces are canonical core-first
+**Status:** accepted
+**Decision:** Event Alpha notification inbox, feedback readiness, opportunity
+audit, and artifact doctor must treat canonical CoreOpportunity rows as the
+primary review surface when `event_core_opportunities.jsonl` is available.
+Canonical cards and core feedback targets are the review target. Alert
+snapshots, source-noise controls, and support rows are diagnostic attachments
+by default and should only appear when a diagnostics/legacy review mode is
+explicitly requested.
+**Why:** Operators and Pro-model reviewers need one stable item per opportunity
+to label, audit, and discuss. Letting support snapshots compete with canonical
+core rows makes VELVET-style opportunities appear as both high-priority and
+local/diagnostic, breaks feedback readiness counts, and can point feedback
+commands at ephemeral alert ids instead of durable `agg:...` core targets.
+**Revisit when:** The review UI moves to a typed relational view that can expose
+core opportunities and diagnostics as separate first-class entities.
+
 ## 2026-06-28 - Diagnostic support snapshots cannot inherit core alertability
 **Status:** accepted
 **Decision:** Event Alpha diagnostic/support alert snapshots may carry

@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import event_alpha_alert_store
 from . import event_alpha_notification_delivery as delivery
 from . import event_alpha_quality_fields
-from . import event_alpha_notifications, event_alpha_router, event_watchlist
+from . import (
+    event_alpha_notifications,
+    event_alpha_router,
+    event_core_opportunities,
+    event_core_opportunity_store,
+    event_research_cards,
+    event_watchlist,
+)
 
 _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS = {
     event_alpha_alert_store.SNAPSHOT_LEGACY_CONFLICT,
@@ -39,6 +46,13 @@ class EventAlphaNotificationInboxItem:
     quality_gate_block_reason: str = ""
     alertable_after_quality_gate: bool = True
     snapshot_quality_classification: str = ""
+    item_type: str = "core_opportunity"
+    is_diagnostic: bool = False
+    core_opportunity_id: str = ""
+    feedback_target: str = ""
+    feedback_target_type: str = ""
+    final_state_after_quality_gate: str = ""
+    opportunity_level: str = ""
 
 
 @dataclass(frozen=True)
@@ -68,6 +82,13 @@ class EventAlphaNotificationInboxResult:
     heartbeat_only_runs: tuple[dict[str, Any], ...]
     duplicate_or_in_flight_runs: tuple[dict[str, Any], ...]
     provider_degraded_runs: tuple[dict[str, Any], ...]
+    canonical_review_items: tuple[EventAlphaNotificationInboxItem, ...] = ()
+    diagnostic_review_items_hidden: tuple[EventAlphaNotificationInboxItem, ...] = ()
+    diagnostic_review_items: tuple[EventAlphaNotificationInboxItem, ...] = ()
+    canonical_review_items_with_cards: int = 0
+    canonical_review_items_with_feedback_targets: int = 0
+    diagnostic_review_items_with_feedback_targets: int = 0
+    include_diagnostics: bool = False
 
 
 def build_notification_inbox(
@@ -84,15 +105,19 @@ def build_notification_inbox(
     outcomes_path: str | Path | None = None,
     notification_delivery_rows: Iterable[Mapping[str, Any]] = (),
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
+    core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
     include_legacy_conflicts: bool = False,
+    include_diagnostics: bool = False,
 ) -> EventAlphaNotificationInboxResult:
     """Join notification, alert, card, and feedback artifacts into review queues."""
     runs = [dict(row) for row in notification_runs if isinstance(row, Mapping)]
     alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
     feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
     deliveries = [dict(row) for row in notification_delivery_rows if isinstance(row, Mapping)]
+    core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
     cards_dir = Path(research_cards_dir).expanduser()
     card_paths = _card_paths(cards_dir)
+    card_paths_by_core = _card_paths_by_core_id(cards_dir)
     reviewed_ids = _reviewed_ids(feedback)
     watch_by_alert = {
         event_alpha_router.alert_id_for_entry(entry): entry
@@ -100,34 +125,46 @@ def build_notification_inbox(
     }
     runs_by_id = {str(row.get("run_id") or ""): row for row in runs if row.get("run_id")}
     delivery_state_by_run = _latest_delivery_state_by_run(deliveries)
+    all_review_items = _build_event_alpha_review_items_from_rows(
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_diagnostics=True,
+        notification_runs=runs,
+        alert_rows=alerts,
+        feedback_rows=feedback,
+        research_cards_dir=cards_dir,
+        notification_delivery_rows=deliveries,
+        watchlist_entries=watchlist_entries,
+        core_opportunity_rows=core_rows,
+    )
+    canonical_review_items = tuple(item for item in all_review_items if not item.is_diagnostic)
+    diagnostic_review_items = tuple(item for item in all_review_items if item.is_diagnostic)
     items = [
-        _inbox_item(
-            row,
-            runs_by_id.get(str(row.get("run_id") or "")),
-            card_paths,
-            reviewed_ids,
-            delivery_state_by_run,
-        )
-        for row in alerts
+        item for item in all_review_items
+        if include_diagnostics or not item.is_diagnostic
     ]
     quality_gated_local_only = tuple(
         item for item in items
+        if not item.is_diagnostic
         if item.snapshot_quality_classification == event_alpha_alert_store.SNAPSHOT_QUALITY_GATED_LOCAL
         and not item.reviewed
     )
     legacy_quality_conflicts = tuple(
         item for item in items
+        if not item.is_diagnostic
         if item.snapshot_quality_classification in _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS
         and not item.reviewed
     )
     partial_delivered_without_feedback = tuple(
         item for item in items
+        if not item.is_diagnostic
         if item.delivery_state == delivery.STATE_PARTIAL_DELIVERED
         and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
         and not item.reviewed
     )
     sent_without_feedback = tuple(
         item for item in items
+        if not item.is_diagnostic
         if item.sent
         and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
         and item.delivery_state != delivery.STATE_PARTIAL_DELIVERED
@@ -135,6 +172,7 @@ def build_notification_inbox(
     )
     would_send_without_feedback = tuple(
         item for item in items
+        if not item.is_diagnostic
         if item.would_send
         and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
         and not item.sent
@@ -143,28 +181,44 @@ def build_notification_inbox(
     )
     would_send_blocked_without_feedback = tuple(
         item for item in items
+        if not item.is_diagnostic
         if item.blocked_by_guard
         and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
         and not item.reviewed
     )
     weak_validated_local_only = tuple(
         item for item in items
+        if not item.is_diagnostic
         if not item.quality_gate_block_reason and _is_weak_validated_local_only(item, alerts) and not item.reviewed
     )
     high_priority_unreviewed = tuple(
         item for item in items
-        if _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
-        and not item.reviewed and _is_high_priority(item)
+        if not item.is_diagnostic
+        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+        and not item.reviewed and item.item_type == "core_opportunity"
+        and not (item.sent or item.would_send or item.blocked_by_guard)
     )
     triggered_fade_unreviewed = tuple(
         item for item in items
-        if _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
+        if not item.is_diagnostic
+        and _countable_alertable(item, include_legacy_conflicts=include_legacy_conflicts)
         and not item.reviewed and _is_triggered_fade(item)
+        and not (item.sent or item.would_send or item.blocked_by_guard)
     )
-    exploratory_without_feedback = tuple(
+    near_miss_core_items = tuple(
+        item for item in items
+        if not item.is_diagnostic and item.item_type == "near_miss_core" and not item.reviewed
+    )
+    exploratory_delivery_items = tuple(
         item for item in _exploratory_items(deliveries, watch_by_alert, reviewed_ids, card_paths)
-        if not item.reviewed
+        if not item.reviewed and not _delivery_item_duplicates_core(item, canonical_review_items)
     )
+    exploratory_without_feedback = (*near_miss_core_items, *exploratory_delivery_items)
+    local_core_learning = tuple(
+        item for item in items
+        if not item.is_diagnostic and item.item_type == "local_core_learning" and not item.reviewed
+    )
+    quality_gated_local_only = tuple(dict.fromkeys((*quality_gated_local_only, *local_core_learning)))
     outcomes = _read_jsonl(Path(outcomes_path).expanduser()) if outcomes_path else []
     return EventAlphaNotificationInboxResult(
         profile=str(profile or "default"),
@@ -192,6 +246,45 @@ def build_notification_inbox(
         heartbeat_only_runs=tuple(row for row in runs if _heartbeat_only(row)),
         duplicate_or_in_flight_runs=tuple(row for row in runs if _delivery_suppressed_run(row, delivery_state_by_run)),
         provider_degraded_runs=tuple(row for row in runs if _provider_degraded(row)),
+        canonical_review_items=canonical_review_items,
+        diagnostic_review_items_hidden=diagnostic_review_items if not include_diagnostics else (),
+        diagnostic_review_items=diagnostic_review_items if include_diagnostics else (),
+        canonical_review_items_with_cards=sum(1 for item in canonical_review_items if item.card_path),
+        canonical_review_items_with_feedback_targets=sum(1 for item in canonical_review_items if item.feedback_target),
+        diagnostic_review_items_with_feedback_targets=sum(1 for item in diagnostic_review_items if item.feedback_target),
+        include_diagnostics=include_diagnostics,
+    )
+
+
+def build_event_alpha_review_items(
+    profile: str | None,
+    namespace: str | None,
+    include_diagnostics: bool = False,
+    *,
+    notification_runs: Iterable[Mapping[str, Any]] = (),
+    alert_rows: Iterable[Mapping[str, Any]] = (),
+    feedback_rows: Iterable[Mapping[str, Any]] = (),
+    research_cards_dir: str | Path | None = None,
+    notification_delivery_rows: Iterable[Mapping[str, Any]] = (),
+    watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
+    core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
+) -> tuple[EventAlphaNotificationInboxItem, ...]:
+    """Return canonical-core-first review items for inbox/readiness/reporting.
+
+    Core opportunities are the primary review objects. Alert snapshots linked to
+    source-noise/support rows are diagnostics and are hidden unless requested.
+    """
+    return _build_event_alpha_review_items_from_rows(
+        profile=profile,
+        artifact_namespace=namespace,
+        include_diagnostics=include_diagnostics,
+        notification_runs=notification_runs,
+        alert_rows=alert_rows,
+        feedback_rows=feedback_rows,
+        research_cards_dir=research_cards_dir,
+        notification_delivery_rows=notification_delivery_rows,
+        watchlist_entries=watchlist_entries,
+        core_opportunity_rows=core_opportunity_rows,
     )
 
 
@@ -215,6 +308,14 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
             f"cards={result.research_cards_read} "
             f"outcomes={result.outcome_rows_read}"
         ),
+        (
+            "review_items: "
+            f"canonical={len(result.canonical_review_items)} "
+            f"canonical_cards={result.canonical_review_items_with_cards} "
+            f"canonical_feedback_targets={result.canonical_review_items_with_feedback_targets} "
+            f"diagnostics_hidden={len(result.diagnostic_review_items_hidden)} "
+            f"diagnostics_visible={len(result.diagnostic_review_items)}"
+        ),
         "",
     ]
     _append_item_section(
@@ -234,8 +335,14 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
     _append_item_section(lines, "near-misses for optional review", result.exploratory_without_feedback, profile=result.profile)
     _append_item_section(lines, "local-only learning rows for optional review", (*result.quality_gated_local_only, *result.weak_validated_local_only), profile=result.profile)
     _append_item_section(lines, "legacy quality conflicts for migration review", result.legacy_quality_conflicts, profile=result.profile)
-    _append_item_section(lines, "high-priority cards not reviewed", result.high_priority_unreviewed, profile=result.profile)
+    _append_item_section(lines, "high-priority/watchlist/digest core opportunities not reviewed", result.high_priority_unreviewed, profile=result.profile)
     _append_item_section(lines, "triggered-fade cards not reviewed", result.triggered_fade_unreviewed, profile=result.profile)
+    if result.diagnostic_review_items:
+        _append_item_section(lines, "diagnostic/support snapshots", result.diagnostic_review_items, profile=result.profile)
+    elif result.diagnostic_review_items_hidden:
+        lines.append(f"diagnostic/support snapshots hidden by default: {len(result.diagnostic_review_items_hidden)}")
+        lines.append("- pass the diagnostics flag in local tooling to inspect source-noise/control snapshots")
+        lines.append("")
     _append_run_section(lines, "heartbeat-only runs", result.heartbeat_only_runs)
     _append_run_section(lines, "duplicate/in-flight suppressed runs", result.duplicate_or_in_flight_runs)
     _append_run_section(lines, "provider-degraded notification runs", result.provider_degraded_runs)
@@ -274,10 +381,366 @@ def _append_item_section(
         if item.snapshot_quality_classification:
             lines.append(f"  snapshot_classification: {item.snapshot_quality_classification}")
         lines.append(f"  reason: {item.reason}")
-        lines.append(f"  feedback_target: {item.alert_id}")
-        lines.append(f"  feedback_useful: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{item.alert_id}'")
-        lines.append(f"  feedback_junk: make event-feedback-junk PROFILE={profile} FEEDBACK_TARGET='{item.alert_id}'")
+        target = item.feedback_target or item.alert_id
+        lines.append(f"  feedback_target: {target}")
+        lines.append(f"  feedback_useful: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{target}'")
+        lines.append(f"  feedback_junk: make event-feedback-junk PROFILE={profile} FEEDBACK_TARGET='{target}'")
     lines.append("")
+
+
+def _build_event_alpha_review_items_from_rows(
+    *,
+    profile: str | None,
+    artifact_namespace: str | None,
+    include_diagnostics: bool,
+    notification_runs: Iterable[Mapping[str, Any]],
+    alert_rows: Iterable[Mapping[str, Any]],
+    feedback_rows: Iterable[Mapping[str, Any]],
+    research_cards_dir: str | Path | None,
+    notification_delivery_rows: Iterable[Mapping[str, Any]],
+    watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry],
+    core_opportunity_rows: Iterable[Mapping[str, Any]],
+) -> tuple[EventAlphaNotificationInboxItem, ...]:
+    runs = [dict(row) for row in notification_runs if isinstance(row, Mapping)]
+    alerts = [dict(row) for row in alert_rows if isinstance(row, Mapping)]
+    feedback = [dict(row) for row in feedback_rows if isinstance(row, Mapping)]
+    deliveries = [dict(row) for row in notification_delivery_rows if isinstance(row, Mapping)]
+    core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
+    cards_dir = Path(research_cards_dir).expanduser() if research_cards_dir else Path()
+    card_paths = _card_paths(cards_dir)
+    card_paths_by_core = _card_paths_by_core_id(cards_dir)
+    reviewed_ids = _reviewed_ids(feedback)
+    runs_by_id = {str(row.get("run_id") or ""): row for row in runs if row.get("run_id")}
+    delivery_state_by_run = _latest_delivery_state_by_run(deliveries)
+    core_items = (
+        event_core_opportunity_store.core_opportunities_from_rows(core_rows)
+        if core_rows
+        else ()
+    )
+    alerts_by_core = _alerts_by_core_id(alerts)
+    consumed_alert_ids: set[int] = set()
+    items: list[EventAlphaNotificationInboxItem] = []
+    for core in core_items:
+        if event_core_opportunities.core_opportunity_visibility_group(core, include_diagnostics=False) is None:
+            continue
+        snapshots = alerts_by_core.get(core.core_opportunity_id, [])
+        snapshot = _best_snapshot_for_core(row for row in snapshots if not alert_snapshot_is_diagnostic(row))
+        for row in snapshots:
+            consumed_alert_ids.add(id(row))
+        item = _inbox_item_from_core(
+            core,
+            snapshot=snapshot,
+            runs_by_id=runs_by_id,
+            card_paths_by_core=card_paths_by_core,
+            reviewed_ids=reviewed_ids,
+            delivery_state_by_run=delivery_state_by_run,
+        )
+        items.append(item)
+    core_store_available = bool(core_rows)
+    for alert in alerts:
+        if id(alert) in consumed_alert_ids:
+            if include_diagnostics and alert_snapshot_is_diagnostic(alert):
+                items.append(_diagnostic_item_from_alert(alert, runs_by_id, card_paths, reviewed_ids, delivery_state_by_run))
+            continue
+        diagnostic = alert_snapshot_is_diagnostic(alert) or core_store_available
+        item = _inbox_item(alert, runs_by_id.get(str(alert.get("run_id") or "")), card_paths, reviewed_ids, delivery_state_by_run)
+        if diagnostic:
+            item = _as_diagnostic_item(item, alert)
+            if include_diagnostics:
+                items.append(item)
+        else:
+            items.append(replace(
+                item,
+                item_type=_core_item_type_from_alert_stub(alert, item.alertable_after_quality_gate),
+                feedback_target=str(alert.get("feedback_target") or item.alert_id),
+                feedback_target_type=str(alert.get("feedback_target_type") or "alert_id"),
+                core_opportunity_id=str(alert.get("core_opportunity_id") or ""),
+            ))
+    return tuple(_dedupe_review_items(items))
+
+
+def _inbox_item_from_core(
+    core: event_core_opportunities.CoreOpportunity,
+    *,
+    snapshot: Mapping[str, Any] | None,
+    runs_by_id: Mapping[str, Mapping[str, Any]],
+    card_paths_by_core: Mapping[str, Path],
+    reviewed_ids: set[str],
+    delivery_state_by_run: Mapping[str, str],
+) -> EventAlphaNotificationInboxItem:
+    row = dict(snapshot or core.primary_row)
+    core_row = dict(core.primary_row)
+    core_id = core.core_opportunity_id
+    final_route = str(core.final_route_after_quality_gate or core_row.get("final_route_after_quality_gate") or core_row.get("route") or "")
+    final_state = str(core.final_state_after_quality_gate or core_row.get("final_state_after_quality_gate") or core_row.get("state") or "")
+    opportunity_level = str(core.opportunity_level or core_row.get("final_opportunity_level") or core_row.get("opportunity_level") or "")
+    tier = str(row.get("final_tier_after_quality_gate") or row.get("tier") or _tier_for_core(core, final_route))
+    run_id = str(row.get("run_id") or core_row.get("run_id") or "")
+    lane = _lane_for_alert({"final_route_after_quality_gate": final_route, "tier": tier, "playbook_type": core.primary_impact_path})
+    run = runs_by_id.get(run_id)
+    delivery_state = str(row.get("delivered_status") or row.get("delivery_state") or delivery_state_by_run.get(run_id) or "")
+    suppressed = delivery_state in (delivery.STATE_SKIPPED_DUPLICATE, delivery.STATE_SKIPPED_IN_FLIGHT)
+    blocked_by_guard = delivery_state == delivery.STATE_BLOCKED or _guard_blocked(run)
+    sent = (
+        _lane_count(run, "lane_counts_sent", lane) > 0
+        or delivery_state in (delivery.STATE_DELIVERED, delivery.STATE_PARTIAL_DELIVERED)
+    )
+    would_send = bool(_lane_count(run, "lane_counts_due", lane) or (run and _int(run.get("would_send_count")) > 0))
+    if suppressed or not event_alpha_router.route_value_is_alertable(final_route):
+        sent = False
+        would_send = False
+        blocked_by_guard = False
+    card_path = _card_path_for_core(core_id, core_row, card_paths_by_core)
+    feedback_target = (
+        event_research_cards.card_feedback_target(card_path) if card_path and card_path.exists() else None
+    ) or str(core_row.get("feedback_target") or core_id)
+    ids = _core_review_ids(core, row, feedback_target, card_path)
+    reviewed = bool(ids & reviewed_ids)
+    return EventAlphaNotificationInboxItem(
+        alert_id=str(row.get("alert_id") or core_id),
+        alert_key=str(row.get("alert_key") or core_id),
+        symbol=str(core.symbol or core_row.get("symbol") or core_row.get("validated_symbol") or "UNKNOWN"),
+        coin_id=str(core.coin_id or core_row.get("coin_id") or core_row.get("validated_coin_id") or "unknown"),
+        run_id=run_id,
+        tier=tier,
+        playbook=str(core_row.get("playbook_type") or core_row.get("effective_playbook_type") or core.primary_impact_path or "unknown"),
+        card_path=str(card_path) if card_path else "",
+        sent=sent,
+        would_send=would_send,
+        blocked_by_guard=blocked_by_guard,
+        delivery_state=delivery_state,
+        reviewed=reviewed,
+        reason=str(row.get("route_reason") or core.why_opportunity_visible or row.get("reason") or "review pending"),
+        final_route_after_quality_gate=final_route,
+        final_tier_after_quality_gate=tier,
+        quality_gate_block_reason=str(core_row.get("quality_gate_block_reason") or row.get("quality_gate_block_reason") or ""),
+        alertable_after_quality_gate=event_alpha_router.route_value_is_alertable(final_route),
+        snapshot_quality_classification=str(row.get("snapshot_quality_classification") or ""),
+        item_type=_core_item_type(core),
+        is_diagnostic=False,
+        core_opportunity_id=core_id,
+        feedback_target=feedback_target,
+        feedback_target_type=str(core_row.get("feedback_target_type") or "core_opportunity_id"),
+        final_state_after_quality_gate=final_state,
+        opportunity_level=opportunity_level,
+    )
+
+
+def _diagnostic_item_from_alert(
+    alert: Mapping[str, Any],
+    runs_by_id: Mapping[str, Mapping[str, Any]],
+    card_paths: Mapping[str, Path],
+    reviewed_ids: set[str],
+    delivery_state_by_run: Mapping[str, str],
+) -> EventAlphaNotificationInboxItem:
+    return _as_diagnostic_item(
+        _inbox_item(alert, runs_by_id.get(str(alert.get("run_id") or "")), card_paths, reviewed_ids, delivery_state_by_run),
+        alert,
+    )
+
+
+def alert_snapshot_is_diagnostic(row: Mapping[str, Any]) -> bool:
+    """Return true for support/control snapshots that should be hidden by default."""
+    return (
+        bool(row.get("is_diagnostic_snapshot"))
+        or str(row.get("snapshot_class") or "") == event_alpha_alert_store.SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT
+        or str(row.get("core_resolution_status") or "") == "diagnostic_support"
+        or str(row.get("snapshot_core_resolution_status") or "") == "diagnostic_support"
+        or str(row.get("core_opportunity_id_status") or "") == "diagnostic_support"
+        or event_core_opportunities.row_is_diagnostic(row)
+    )
+
+
+def _alerts_by_core_id(alerts: Iterable[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    for row in alerts:
+        core_id = str(row.get("core_opportunity_id") or row.get("diagnostic_support_for_core_opportunity_id") or "").strip()
+        if not core_id:
+            continue
+        out.setdefault(core_id, []).append(dict(row))
+    return out
+
+
+def _best_snapshot_for_core(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any] | None:
+    candidates = [dict(row) for row in rows if isinstance(row, Mapping)]
+    if not candidates:
+        return None
+
+    def rank(row: Mapping[str, Any]) -> tuple[int, int, int, str]:
+        diagnostic = alert_snapshot_is_diagnostic(row)
+        snapshot_class = str(row.get("snapshot_class") or "")
+        status = str(row.get("core_resolution_status") or row.get("snapshot_core_resolution_status") or "")
+        canonical = (
+            snapshot_class == event_alpha_alert_store.SNAPSHOT_CLASS_CANONICAL_CORE
+            or status in {"canonical", event_alpha_alert_store.SNAPSHOT_CORE_RECONCILED}
+            or bool(row.get("snapshot_core_reconciled"))
+        ) and not diagnostic
+        delivered = str(row.get("delivered_status") or row.get("delivery_state") or "") in {
+            delivery.STATE_DELIVERED,
+            delivery.STATE_PARTIAL_DELIVERED,
+        }
+        alertable = bool(row.get("alertable_after_quality_gate")) or event_alpha_router.route_value_is_alertable(
+            str(row.get("final_route_after_quality_gate") or row.get("route") or "")
+        )
+        return (
+            5 if canonical else 0,
+            3 if alertable and not diagnostic else 0,
+            2 if delivered else 0,
+            str(row.get("observed_at") or row.get("snapshot_id") or ""),
+        )
+
+    return max(candidates, key=rank)
+
+
+def _card_paths_by_core_id(cards_dir: Path) -> dict[str, Path]:
+    if not cards_dir or not cards_dir.exists():
+        return {}
+    out: dict[str, Path] = {}
+    for path in cards_dir.glob("*.md"):
+        if path.name == "index.md":
+            continue
+        core_id = event_research_cards.card_core_opportunity_id(path)
+        if core_id:
+            out.setdefault(core_id, path)
+    return out
+
+
+def _card_path_for_core(
+    core_id: str,
+    row: Mapping[str, Any],
+    paths_by_core: Mapping[str, Path],
+) -> Path | None:
+    for key in ("research_card_path", "card_path"):
+        value = str(row.get(key) or "").strip()
+        if value:
+            return Path(value)
+    return paths_by_core.get(core_id)
+
+
+def _core_review_ids(
+    core: event_core_opportunities.CoreOpportunity,
+    row: Mapping[str, Any],
+    feedback_target: str,
+    card_path: Path | None,
+) -> set[str]:
+    ids = {
+        core.core_opportunity_id,
+        core.symbol,
+        core.coin_id,
+        core.incident_id or "",
+        feedback_target,
+        str(row.get("alert_id") or ""),
+        str(row.get("alert_key") or ""),
+        str(row.get("card_id") or ""),
+        str(row.get("snapshot_id") or ""),
+    }
+    ids.update(str(value) for value in core.supporting_hypothesis_ids)
+    if card_path:
+        ids.update({str(card_path), card_path.name, card_path.stem})
+        card_target = event_research_cards.card_feedback_target(card_path) if card_path.exists() else None
+        if card_target:
+            ids.add(card_target)
+    ids = {item for item in ids if item}
+    ids.update(f"ea:{item}" for item in list(ids) if item and not item.startswith("ea:"))
+    ids.update(item[3:] for item in list(ids) if item.startswith("ea:"))
+    return ids
+
+
+def _core_item_type(core: event_core_opportunities.CoreOpportunity) -> str:
+    if core.is_high_priority or core.is_watchlist or core.is_validated_digest or core.alertable:
+        return "core_opportunity"
+    level = str(core.opportunity_level or "").casefold()
+    if level == "exploratory" or core.opportunity_score_final >= 50:
+        return "near_miss_core"
+    return "local_core_learning"
+
+
+def _core_item_type_from_alert_stub(alert: Mapping[str, Any], alertable_after_quality_gate: bool) -> str:
+    if alertable_after_quality_gate:
+        return "core_opportunity"
+    level = str(alert.get("opportunity_level") or alert.get("final_opportunity_level") or "").casefold()
+    score = _float(alert.get("opportunity_score_final") or alert.get("opportunity_score"))
+    if level == "exploratory" or score >= 50:
+        return "near_miss_core"
+    return "local_core_learning"
+
+
+def _tier_for_core(core: event_core_opportunities.CoreOpportunity, final_route: str) -> str:
+    route = str(final_route or "").upper()
+    if "TRIGGERED_FADE" in route:
+        return "TRIGGERED_FADE"
+    if "HIGH_PRIORITY" in route or core.is_high_priority:
+        return "HIGH_PRIORITY_WATCH"
+    if "RESEARCH_DIGEST" in route or "WATCHLIST" in route or core.is_watchlist or core.is_validated_digest:
+        return "RADAR_DIGEST"
+    return "STORE_ONLY"
+
+
+def _as_diagnostic_item(
+    item: EventAlphaNotificationInboxItem,
+    alert: Mapping[str, Any],
+) -> EventAlphaNotificationInboxItem:
+    item_type = _diagnostic_item_type(alert)
+    target = str(alert.get("feedback_target") or alert.get("diagnostic_row_id") or alert.get("alert_id") or item.alert_id)
+    return replace(
+        item,
+        item_type=item_type,
+        is_diagnostic=True,
+        sent=False,
+        would_send=False,
+        blocked_by_guard=False,
+        alertable_after_quality_gate=False,
+        core_opportunity_id=str(alert.get("core_opportunity_id") or ""),
+        feedback_target=target,
+        feedback_target_type=str(alert.get("feedback_target_type") or item_type),
+    )
+
+
+def _diagnostic_item_type(alert: Mapping[str, Any]) -> str:
+    classification = str(alert.get("snapshot_quality_classification") or event_alpha_alert_store.classify_alert_snapshot(alert))
+    snapshot_class = str(alert.get("snapshot_class") or "")
+    playbook = str(alert.get("playbook_type") or alert.get("effective_playbook_type") or alert.get("latest_effective_playbook_type") or "").casefold()
+    role = str(alert.get("candidate_role") or alert.get("asset_role") or "").casefold()
+    if "source_noise" in playbook or role in {"source_noise", "ticker_word_collision"}:
+        return "source_noise_control"
+    if snapshot_class == event_alpha_alert_store.SNAPSHOT_CLASS_DIAGNOSTIC_SUPPORT:
+        return "diagnostic_support_snapshot"
+    if classification == event_alpha_alert_store.SNAPSHOT_QUALITY_GATED_LOCAL:
+        return "quality_gated_local_support"
+    if classification in _INBOX_LEGACY_CONFLICT_CLASSIFICATIONS:
+        return "legacy_snapshot"
+    if snapshot_class == event_alpha_alert_store.SNAPSHOT_CLASS_ORPHAN:
+        return "orphan_snapshot"
+    return "diagnostic_support_snapshot"
+
+
+def _dedupe_review_items(items: Iterable[EventAlphaNotificationInboxItem]) -> list[EventAlphaNotificationInboxItem]:
+    out: list[EventAlphaNotificationInboxItem] = []
+    seen: set[tuple[str, str]] = set()
+    for item in items:
+        key = (
+            "diagnostic" if item.is_diagnostic else "core",
+            item.core_opportunity_id or item.feedback_target or item.alert_id,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
+def _delivery_item_duplicates_core(
+    item: EventAlphaNotificationInboxItem,
+    core_items: Iterable[EventAlphaNotificationInboxItem],
+) -> bool:
+    identifiers = {item.alert_id, item.alert_key, item.symbol, item.coin_id}
+    identifiers.update(value[3:] for value in list(identifiers) if value.startswith("ea:"))
+    for core in core_items:
+        core_ids = {core.alert_id, core.alert_key, core.core_opportunity_id, core.feedback_target, core.symbol, core.coin_id}
+        core_ids.update(value[3:] for value in list(core_ids) if value.startswith("ea:"))
+        if identifiers.intersection(value for value in core_ids if value):
+            return True
+    return False
 
 
 def _append_run_section(lines: list[str], title: str, rows: Iterable[Mapping[str, Any]]) -> None:
@@ -337,6 +800,12 @@ def _inbox_item(
         blocked_by_guard = False
     ids = _alert_ids(alert, alert_id, alert_key, card_id)
     reviewed = bool(ids & reviewed_ids)
+    diagnostic = alert_snapshot_is_diagnostic(alert)
+    item_type = _diagnostic_item_type(alert) if diagnostic else (
+        "core_opportunity"
+        if alertable_after_quality
+        else _core_item_type_from_alert_stub(alert, alertable_after_quality)
+    )
     return EventAlphaNotificationInboxItem(
         alert_id=alert_id,
         alert_key=alert_key,
@@ -357,6 +826,13 @@ def _inbox_item(
         quality_gate_block_reason=quality_block or "",
         alertable_after_quality_gate=alertable_after_quality,
         snapshot_quality_classification=classification,
+        item_type=item_type,
+        is_diagnostic=diagnostic,
+        core_opportunity_id=str(alert.get("core_opportunity_id") or ""),
+        feedback_target=str(alert.get("feedback_target") or alert_id),
+        feedback_target_type=str(alert.get("feedback_target_type") or "alert_id"),
+        final_state_after_quality_gate=str(alert.get("final_state_after_quality_gate") or alert.get("state") or ""),
+        opportunity_level=str(alert.get("final_opportunity_level") or alert.get("opportunity_level") or ""),
     )
 
 
@@ -635,6 +1111,13 @@ def _int(value: object) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _float(value: object) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _yes_no(value: bool) -> str:

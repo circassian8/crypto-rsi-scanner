@@ -1086,6 +1086,15 @@ runs. Duplicate and in-flight skips are not treated as fresh unreviewed alerts.
 Each alert row includes a feedback helper command such as
 `make event-feedback-useful PROFILE=notify_no_key FEEDBACK_TARGET='ea:...'`.
 
+When `event_core_opportunities.jsonl` exists, the inbox is core-first. It
+creates one canonical review item per visible CoreOpportunity, resolves the
+research card and feedback target from that core row, and hides source-noise or
+diagnostic/support alert snapshots unless diagnostics are explicitly requested.
+For example, a VELVET/SpaceX opportunity should use the canonical `agg:...`
+feedback target and card path; linked support snapshots are audit context, not
+separate review items. Feedback readiness and opportunity audit follow the same
+rule so readiness counts match the operator-visible cards.
+
 Use `make event-alpha-telegram-recipient-check PROFILE=notify_no_key` after
 configuring Telegram and the send guard. It sends a tiny research-only
 diagnostic to each configured/subscribed recipient, reports delivered/failed

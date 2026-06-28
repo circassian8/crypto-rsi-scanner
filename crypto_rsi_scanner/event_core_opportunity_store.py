@@ -1729,21 +1729,36 @@ def _unique_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
         if not isinstance(row, Mapping):
             continue
         normalized = dict(row)
-        id_value = _first_text(
-            [normalized],
-            (
-                "acquisition_id",
-                "core_opportunity_id",
-                "diagnostic_support_for_core_opportunity_id",
-                "original_core_opportunity_id",
-                "alert_id",
-                "snapshot_id",
-                "hypothesis_id",
-                "key",
-                "event_id",
-            ),
-        )
         row_type = str(normalized.get("row_type") or "row").strip()
+        if row_type == "event_alpha_alert_snapshot":
+            id_value = _first_text(
+                [normalized],
+                (
+                    "alert_id",
+                    "snapshot_id",
+                    "card_id",
+                    "alert_key",
+                    "core_opportunity_id",
+                ),
+            )
+            snapshot_class = str(normalized.get("snapshot_class") or normalized.get("core_resolution_status") or "").strip()
+            if id_value and snapshot_class:
+                id_value = f"{id_value}:{snapshot_class}"
+        else:
+            id_value = _first_text(
+                [normalized],
+                (
+                    "acquisition_id",
+                    "core_opportunity_id",
+                    "diagnostic_support_for_core_opportunity_id",
+                    "original_core_opportunity_id",
+                    "alert_id",
+                    "snapshot_id",
+                    "hypothesis_id",
+                    "key",
+                    "event_id",
+                ),
+            )
         dedupe_key = (
             f"{row_type}:{id_value}"
             if id_value

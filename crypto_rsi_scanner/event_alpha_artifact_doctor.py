@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_opportunity_verdict, event_research_cards, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_opportunity_verdict, event_research_cards, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 
@@ -85,6 +85,11 @@ class EventAlphaArtifactDoctorResult:
     diagnostic_support_snapshot_inherits_core_route: int = 0
     duplicate_alertable_snapshot_for_core: int = 0
     canonical_snapshot_missing_for_visible_core: int = 0
+    inbox_core_item_missing_card: int = 0
+    inbox_core_item_uses_alert_id_feedback_target_when_core_target_exists: int = 0
+    inbox_diagnostic_snapshot_visible_by_default: int = 0
+    audit_primary_snapshot_not_canonical_when_canonical_exists: int = 0
+    feedback_readiness_counts_diagnostic_as_required: int = 0
     fresh_quality_route_conflict_rows: int = 0
     legacy_quality_conflict_rows: int = 0
     alert_rows_missing_final_route: int = 0
@@ -433,7 +438,53 @@ def diagnose_artifacts(
         and _core_has_fresh_rows(item)
     )
     snapshots_missing_core = sum(1 for row in alerts if _alert_snapshot_should_have_core_id(row) and not str(row.get("core_opportunity_id") or "").strip())
-    snapshots_missing_feedback = sum(1 for row in alerts if _alert_snapshot_should_have_core_id(row) and not _alert_has_feedback_target(row))
+    snapshots_missing_feedback = sum(
+        1 for row in alerts
+        if _alert_snapshot_should_have_core_id(row)
+        and not _alert_snapshot_is_diagnostic(row)
+        and not _alert_has_feedback_target(row)
+    )
+    diagnostic_snapshots_missing_feedback = sum(
+        1 for row in alerts
+        if _alert_snapshot_is_diagnostic(row) and not _alert_has_feedback_target(row)
+    )
+    review_cards_dir = card_file_paths[0].parent if card_file_paths else None
+    review_items = event_alpha_notification_inbox.build_event_alpha_review_items(
+        profile,
+        artifact_namespace,
+        include_diagnostics=True,
+        notification_runs=runs,
+        alert_rows=alerts,
+        feedback_rows=feedback,
+        research_cards_dir=review_cards_dir,
+        notification_delivery_rows=delivery_rows,
+        core_opportunity_rows=core_rows,
+    )
+    default_review_items = event_alpha_notification_inbox.build_event_alpha_review_items(
+        profile,
+        artifact_namespace,
+        include_diagnostics=False,
+        notification_runs=runs,
+        alert_rows=alerts,
+        feedback_rows=feedback,
+        research_cards_dir=review_cards_dir,
+        notification_delivery_rows=delivery_rows,
+        core_opportunity_rows=core_rows,
+    )
+    inbox_core_missing_card = sum(
+        1 for item in review_items
+        if not item.is_diagnostic and item.core_opportunity_id and not item.card_path
+    )
+    inbox_core_alert_target = sum(
+        1 for item in review_items
+        if not item.is_diagnostic
+        and item.core_opportunity_id
+        and item.feedback_target
+        and item.feedback_target != item.core_opportunity_id
+        and item.feedback_target.startswith("ea:")
+    )
+    inbox_diag_visible_default = sum(1 for item in default_review_items if item.is_diagnostic)
+    audit_primary_not_canonical = _audit_primary_snapshot_not_canonical_when_canonical_exists(alerts, store_core_ids)
     if card_count and not index_present:
         message = "research cards exist but index.md was not found"
         (blockers if strict else warnings).append(message)
@@ -536,6 +587,26 @@ def diagnose_artifacts(
     if snapshots_missing_feedback:
         message = f"alert_snapshots_missing_feedback_target={snapshots_missing_feedback}"
         (blockers if strict else warnings).append(message)
+    if inbox_core_missing_card:
+        message = f"inbox_core_item_missing_card={inbox_core_missing_card}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if inbox_core_alert_target:
+        message = (
+            "inbox_core_item_uses_alert_id_feedback_target_when_core_target_exists="
+            f"{inbox_core_alert_target}"
+        )
+        (blockers if strict and core_store_available else warnings).append(message)
+    if inbox_diag_visible_default:
+        message = f"inbox_diagnostic_snapshot_visible_by_default={inbox_diag_visible_default}"
+        (blockers if strict else warnings).append(message)
+    if audit_primary_not_canonical:
+        message = f"audit_primary_snapshot_not_canonical_when_canonical_exists={audit_primary_not_canonical}"
+        (blockers if strict and core_store_available else warnings).append(message)
+    if diagnostic_snapshots_missing_feedback:
+        warnings.append(
+            "feedback_readiness_counts_diagnostic_as_required="
+            f"{diagnostic_snapshots_missing_feedback}"
+        )
     if alerts and not card_count and any(str(row.get("tier") or "") in {"HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"} for row in alerts):
         warnings.append("high-priority/triggered snapshots exist but no research cards were found")
     delivery_summary = _delivery.summarize_delivery_rows([row for row in delivery_rows if isinstance(row, Mapping)])
@@ -781,6 +852,11 @@ def diagnose_artifacts(
         diagnostic_support_snapshot_inherits_core_route=snapshot_core_conflicts["diagnostic_support_inherits_core_route"],
         duplicate_alertable_snapshot_for_core=snapshot_core_conflicts["duplicate_alertable_snapshot_for_core"],
         canonical_snapshot_missing_for_visible_core=snapshot_core_conflicts["canonical_snapshot_missing_for_visible_core"],
+        inbox_core_item_missing_card=inbox_core_missing_card,
+        inbox_core_item_uses_alert_id_feedback_target_when_core_target_exists=inbox_core_alert_target,
+        inbox_diagnostic_snapshot_visible_by_default=inbox_diag_visible_default,
+        audit_primary_snapshot_not_canonical_when_canonical_exists=audit_primary_not_canonical,
+        feedback_readiness_counts_diagnostic_as_required=diagnostic_snapshots_missing_feedback,
         fresh_quality_route_conflict_rows=fresh_route_conflicts,
         legacy_quality_conflict_rows=legacy_route_conflicts,
         alert_rows_missing_final_route=missing_final_route,
@@ -864,6 +940,58 @@ def _alert_snapshot_should_have_core_id(row: Mapping[str, Any]) -> bool:
         event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
         event_watchlist.EventWatchlistState.TRIGGERED_FADE.value,
     }
+
+
+def _alert_snapshot_is_diagnostic(row: Mapping[str, Any]) -> bool:
+    return event_alpha_notification_inbox.alert_snapshot_is_diagnostic(row)
+
+
+def _audit_primary_snapshot_not_canonical_when_canonical_exists(
+    alerts: Iterable[Mapping[str, Any]],
+    store_core_ids: set[str],
+) -> int:
+    by_core: dict[str, list[dict[str, Any]]] = {}
+    for row in alerts:
+        core_id = str(row.get("core_opportunity_id") or row.get("diagnostic_support_for_core_opportunity_id") or "").strip()
+        if not core_id or core_id not in store_core_ids:
+            continue
+        by_core.setdefault(core_id, []).append(dict(row))
+    conflicts = 0
+    for rows in by_core.values():
+        has_canonical = any(_snapshot_is_canonical(row) for row in rows)
+        if not has_canonical:
+            continue
+        primary = _best_snapshot_for_doctor(rows)
+        if not _snapshot_is_canonical(primary):
+            conflicts += 1
+    return conflicts
+
+
+def _best_snapshot_for_doctor(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    items = [dict(row) for row in rows]
+    if not items:
+        return {}
+
+    def rank(row: Mapping[str, Any]) -> tuple[int, int, str]:
+        diagnostic = _alert_snapshot_is_diagnostic(row)
+        return (
+            3 if _snapshot_is_canonical(row) else 0,
+            1 if event_alpha_router.route_value_is_alertable(str(row.get("final_route_after_quality_gate") or row.get("route") or "")) and not diagnostic else 0,
+            str(row.get("observed_at") or row.get("snapshot_id") or ""),
+        )
+
+    return max(items, key=rank)
+
+
+def _snapshot_is_canonical(row: Mapping[str, Any]) -> bool:
+    if _alert_snapshot_is_diagnostic(row):
+        return False
+    status = str(row.get("snapshot_core_resolution_status") or row.get("core_resolution_status") or "")
+    return (
+        str(row.get("snapshot_class") or "") == event_alpha_alert_store.SNAPSHOT_CLASS_CANONICAL_CORE
+        or status in {"canonical", event_alpha_alert_store.SNAPSHOT_CORE_RECONCILED}
+        or bool(row.get("snapshot_core_reconciled"))
+    )
 
 
 def _expected_card_group_for_store_core(
@@ -1838,6 +1966,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"diagnostic_support_snapshot_inherits_core_route={result.diagnostic_support_snapshot_inherits_core_route} "
             f"duplicate_alertable_snapshot_for_core={result.duplicate_alertable_snapshot_for_core} "
             f"canonical_snapshot_missing_for_visible_core={result.canonical_snapshot_missing_for_visible_core} "
+            f"inbox_core_item_missing_card={result.inbox_core_item_missing_card} "
+            f"inbox_core_item_uses_alert_id_feedback_target_when_core_target_exists={result.inbox_core_item_uses_alert_id_feedback_target_when_core_target_exists} "
+            f"inbox_diagnostic_snapshot_visible_by_default={result.inbox_diagnostic_snapshot_visible_by_default} "
+            f"audit_primary_snapshot_not_canonical_when_canonical_exists={result.audit_primary_snapshot_not_canonical_when_canonical_exists} "
+            f"feedback_readiness_counts_diagnostic_as_required={result.feedback_readiness_counts_diagnostic_as_required} "
             f"live_validated_without_confirmation={result.live_validated_without_confirmation} "
             f"live_sector_digest_without_asset={result.live_sector_digest_without_asset} "
             f"live_rejected_results_promoted={result.live_rejected_results_promoted} "

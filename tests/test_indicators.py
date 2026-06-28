@@ -12560,8 +12560,9 @@ def test_event_alpha_notification_inbox_queues_unreviewed_items():
         assert result.partial_delivered_without_feedback[0].alert_id == "ea:partial-key"
         assert len(result.would_send_without_feedback) == 1
         assert result.would_send_without_feedback[0].alert_id == "ea:trig-key"
-        assert len(result.high_priority_unreviewed) == 1
-        assert len(result.triggered_fade_unreviewed) == 1
+        assert len(result.high_priority_unreviewed) == 0
+        assert len(result.triggered_fade_unreviewed) == 0
+        assert len(result.canonical_review_items) == 3
         assert len(result.heartbeat_only_runs) == 1
         assert len(result.provider_degraded_runs) == 1
         text = event_alpha_notification_inbox.format_notification_inbox(result)
@@ -29923,6 +29924,406 @@ def test_diagnostic_support_snapshot_does_not_inherit_canonical_alertable_route(
     assert doctor.diagnostic_support_snapshot_inherits_core_route == 0
     assert doctor.duplicate_alertable_snapshot_for_core == 0
     assert not any("diagnostic_support_snapshot" in item for item in doctor.blockers)
+
+
+def test_notification_inbox_prefers_canonical_core_items_and_hides_diagnostics():
+    from crypto_rsi_scanner import (
+        event_alpha_notification_inbox,
+        event_alpha_router,
+        event_core_opportunity_store,
+        event_research_cards,
+        event_watchlist,
+    )
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=core_path),
+            run_id="run-core-review-items",
+            profile="evidence_acquisition_smoke",
+            run_mode="burn_in",
+            artifact_namespace="evidence_acquisition_smoke",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        cards = event_research_cards.write_research_cards(root / "cards", watchlist_entries=[], alert_rows=core_rows)
+        event_core_opportunity_store.update_core_opportunity_card_links(
+            core_path,
+            cards.card_paths,
+            run_id="run-core-review-items",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        velvet = next(row for row in core_rows if row["symbol"] == "VELVET")
+        canonical = {
+            "row_type": "event_alpha_alert_snapshot",
+            "run_id": "run-core-review-items",
+            "profile": "evidence_acquisition_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "evidence_acquisition_smoke",
+            "alert_id": "ea:velvet-canonical",
+            "alert_key": "incident-spacex|velvet|proxy_attention",
+            "core_opportunity_id": velvet["core_opportunity_id"],
+            "core_resolution_status": "canonical",
+            "snapshot_core_resolution_status": "core_reconciled",
+            "snapshot_class": "canonical_core_snapshot",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "tier": "HIGH_PRIORITY_WATCH",
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+            "opportunity_level": "high_priority",
+            "alertable_after_quality_gate": True,
+            "route_alertable": True,
+        }
+        diagnostic = {
+            **canonical,
+            "alert_id": "ea:velvet-support",
+            "alert_key": "incident-spacex|velvet|source_noise_control",
+            "core_resolution_status": "diagnostic_support",
+            "snapshot_core_resolution_status": "diagnostic_support",
+            "snapshot_class": "diagnostic_support_snapshot",
+            "is_diagnostic_snapshot": True,
+            "candidate_role": "source_noise",
+            "playbook_type": "source_noise_control",
+            "tier": "STORE_ONLY",
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "alertable_after_quality_gate": False,
+            "route_alertable": False,
+            "feedback_target": "ea:velvet-support",
+        }
+        inbox = event_alpha_notification_inbox.build_notification_inbox(
+            notification_runs=[{
+                "run_id": "run-core-review-items",
+                "profile": "evidence_acquisition_smoke",
+                "run_mode": "burn_in",
+                "artifact_namespace": "evidence_acquisition_smoke",
+                "would_send_count": 1,
+                "lane_counts_due": {"instant_escalation": 1},
+            }],
+            alert_rows=[diagnostic, canonical],
+            feedback_rows=[],
+            research_cards_dir=root / "cards",
+            profile="evidence_acquisition_smoke",
+            artifact_namespace="evidence_acquisition_smoke",
+            notification_runs_path=root / "runs.jsonl",
+            alert_store_path=root / "alerts.jsonl",
+            feedback_path=root / "feedback.jsonl",
+            core_opportunity_rows=core_rows,
+        )
+
+    velvet_item = next(item for item in inbox.canonical_review_items if item.symbol == "VELVET")
+    assert Path(velvet_item.card_path).name == Path(velvet["card_path"]).name
+    assert velvet_item.feedback_target == velvet["core_opportunity_id"]
+    assert velvet_item.core_opportunity_id == velvet["core_opportunity_id"]
+    assert any(item.alert_id == "ea:velvet-support" for item in inbox.diagnostic_review_items_hidden)
+    assert all(item.alert_id != "ea:velvet-support" for item in inbox.quality_gated_local_only)
+    assert all(item.alert_id != "ea:velvet-support" for item in inbox.exploratory_without_feedback)
+    text = event_alpha_notification_inbox.format_notification_inbox(inbox)
+    assert "card: not_written" not in text.split("VELVET/velvet", 1)[1].split("run_id:", 1)[0]
+    assert "feedback_target: ea:velvet-support" not in text
+
+    diagnostics = event_alpha_notification_inbox.build_notification_inbox(
+        notification_runs=[],
+        alert_rows=[diagnostic, canonical],
+        feedback_rows=[],
+        research_cards_dir=Path(velvet["card_path"]).parent,
+        profile="evidence_acquisition_smoke",
+        artifact_namespace="evidence_acquisition_smoke",
+        notification_runs_path=Path("/tmp/runs.jsonl"),
+        alert_store_path=Path("/tmp/alerts.jsonl"),
+        feedback_path=Path("/tmp/feedback.jsonl"),
+        core_opportunity_rows=[velvet],
+        include_diagnostics=True,
+    )
+    assert any(item.alert_id == "ea:velvet-support" for item in diagnostics.diagnostic_review_items)
+
+
+def test_feedback_readiness_counts_canonical_review_items_not_diagnostics():
+    from crypto_rsi_scanner import (
+        event_alpha_feedback_readiness,
+        event_alpha_notification_inbox,
+        event_alpha_router,
+        event_core_opportunity_store,
+        event_research_cards,
+        event_watchlist,
+    )
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        core_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            _canonical_core_fixture_rows(),
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=core_path),
+            run_id="run-feedback-canonical-review",
+            profile="evidence_acquisition_smoke",
+            run_mode="burn_in",
+            artifact_namespace="evidence_acquisition_smoke",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        cards = event_research_cards.write_research_cards(root / "cards", watchlist_entries=[], alert_rows=core_rows)
+        event_core_opportunity_store.update_core_opportunity_card_links(
+            core_path,
+            cards.card_paths,
+            run_id="run-feedback-canonical-review",
+        )
+        core_rows = event_core_opportunity_store.load_core_opportunities(core_path, latest_run=True).rows
+        velvet = next(row for row in core_rows if row["symbol"] == "VELVET")
+        canonical = {
+            "row_type": "event_alpha_alert_snapshot",
+            "run_id": "run-feedback-canonical-review",
+            "alert_id": "ea:velvet-canonical",
+            "alert_key": "incident-spacex|velvet|proxy_attention",
+            "core_opportunity_id": velvet["core_opportunity_id"],
+            "snapshot_class": "canonical_core_snapshot",
+            "core_resolution_status": "canonical",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+            "tier": "HIGH_PRIORITY_WATCH",
+            "feedback_target": velvet["core_opportunity_id"],
+        }
+        diagnostic_without_target = {
+            **canonical,
+            "alert_id": "ea:velvet-support",
+            "alert_key": "incident-spacex|velvet|source_noise_control",
+            "snapshot_class": "diagnostic_support_snapshot",
+            "core_resolution_status": "diagnostic_support",
+            "snapshot_core_resolution_status": "diagnostic_support",
+            "is_diagnostic_snapshot": True,
+            "candidate_role": "source_noise",
+            "playbook_type": "source_noise_control",
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "feedback_target": "",
+        }
+        inbox = event_alpha_notification_inbox.build_notification_inbox(
+            notification_runs=[],
+            alert_rows=[diagnostic_without_target, canonical],
+            feedback_rows=[],
+            research_cards_dir=root / "cards",
+            profile="evidence_acquisition_smoke",
+            artifact_namespace="evidence_acquisition_smoke",
+            notification_runs_path=root / "runs.jsonl",
+            alert_store_path=root / "alerts.jsonl",
+            feedback_path=root / "feedback.jsonl",
+            core_opportunity_rows=core_rows,
+        )
+        readiness = event_alpha_feedback_readiness.build_feedback_readiness(
+            profile="evidence_acquisition_smoke",
+            artifact_namespace="evidence_acquisition_smoke",
+            card_paths=cards.card_paths,
+            alert_rows=[diagnostic_without_target, canonical],
+            feedback_rows=[],
+            watchlist_entries=[],
+            core_opportunity_rows=core_rows,
+            inbox_result=inbox,
+        )
+
+    assert readiness.canonical_review_items >= 1
+    assert readiness.diagnostic_review_items_hidden >= 1
+    assert "alert_snapshots_missing_feedback_targets" not in readiness.blockers
+    assert "canonical_review_items_missing_feedback_targets" not in readiness.blockers
+
+
+def test_opportunity_audit_primary_snapshot_prefers_canonical_over_diagnostic():
+    from crypto_rsi_scanner import event_alpha_router, event_opportunity_audit, event_watchlist
+
+    core = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-audit-canonical-snapshot",
+        "profile": "evidence_acquisition_smoke",
+        "artifact_namespace": "evidence_acquisition_smoke",
+        "core_opportunity_id": "agg:3381ebd96566",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "candidate_role": "proxy_venue",
+        "primary_impact_path": "venue_value_capture",
+        "impact_path_type": "venue_value_capture",
+        "final_opportunity_level": "high_priority",
+        "opportunity_level": "high_priority",
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+        "feedback_target": "agg:3381ebd96566",
+    }
+    diagnostic = {
+        "row_type": "event_alpha_alert_snapshot",
+        "run_id": "run-audit-canonical-snapshot",
+        "alert_id": "ea:velvet-support",
+        "core_opportunity_id": "agg:3381ebd96566",
+        "snapshot_class": "diagnostic_support_snapshot",
+        "core_resolution_status": "diagnostic_support",
+        "snapshot_core_resolution_status": "diagnostic_support",
+        "is_diagnostic_snapshot": True,
+        "candidate_role": "source_noise",
+        "playbook_type": "source_noise_control",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+    }
+    canonical = {
+        **diagnostic,
+        "alert_id": "ea:velvet-canonical",
+        "snapshot_class": "canonical_core_snapshot",
+        "core_resolution_status": "canonical",
+        "snapshot_core_resolution_status": "core_reconciled",
+        "is_diagnostic_snapshot": False,
+        "candidate_role": "proxy_venue",
+        "playbook_type": "proxy_attention",
+        "tier": "HIGH_PRIORITY_WATCH",
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+        "alertable_after_quality_gate": True,
+    }
+
+    audit = event_opportunity_audit.format_opportunity_audit(
+        "agg:3381ebd96566",
+        core_opportunity_rows=[core],
+        alert_rows=[diagnostic, canonical],
+        profile="evidence_acquisition_smoke",
+    )
+    assert "- primary snapshot class: canonical_core_snapshot" in audit
+    assert "- snapshot route after reconciliation: HIGH_PRIORITY_RESEARCH" in audit
+    assert "- reconciliation status: core_reconciled" in audit
+    assert "diagnostic snapshot: alert_id=ea:velvet-support" not in audit
+
+    audit_with_diagnostics = event_opportunity_audit.format_opportunity_audit(
+        "agg:3381ebd96566",
+        core_opportunity_rows=[core],
+        alert_rows=[diagnostic, canonical],
+        profile="evidence_acquisition_smoke",
+        include_diagnostics=True,
+    )
+    assert "diagnostic snapshot: alert_id=ea:velvet-support" in audit_with_diagnostics
+
+
+def test_artifact_doctor_checks_core_first_review_surfaces():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router, event_watchlist
+
+    quality = {
+        "impact_path_strength": "strong",
+        "evidence_quality_score": 90,
+        "source_class": "cryptopanic_tagged",
+        "evidence_specificity": "direct_token_mechanism",
+        "market_confirmation_score": 88,
+        "market_confirmation_level": "strong",
+        "market_context_freshness_status": "fresh",
+        "market_context_age_hours": 0.1,
+        "market_context_stale": False,
+        "market_context_freshness_cap_applied": False,
+        "opportunity_verdict_reasons": ["impact_path_validated"],
+        "why_local_only": [],
+        "why_not_watchlist": [],
+        "manual_verification_items": [],
+        "upgrade_requirements": [],
+        "downgrade_warnings": [],
+    }
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        card = root / "card_agg_3381ebd96566.md"
+        card.write_text(
+            "\n".join([
+                "# VELVET core",
+                "",
+                "## Lineage",
+                "- Core opportunity ID: agg:3381ebd96566",
+                "- Feedback target: agg:3381ebd96566",
+            ]),
+            encoding="utf-8",
+        )
+        core = {
+            "row_type": "event_core_opportunity",
+            "schema_version": "event_core_opportunity_store_v1",
+            "run_id": "run-review-doctor",
+            "profile": "evidence_acquisition_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "evidence_acquisition_smoke",
+            "core_opportunity_id": "agg:3381ebd96566",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "candidate_role": "proxy_venue",
+            "impact_path_type": "venue_value_capture",
+            "final_opportunity_level": "high_priority",
+            "opportunity_level": "high_priority",
+            "final_opportunity_score": 92,
+            "opportunity_score_final": 92,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HIGH_PRIORITY.value,
+            "card_path": str(card),
+            "research_card_path": str(card),
+            "feedback_target": "agg:3381ebd96566",
+            **quality,
+        }
+        canonical = {
+            "row_type": "event_alpha_alert_snapshot",
+            "run_id": "run-review-doctor",
+            "profile": "evidence_acquisition_smoke",
+            "run_mode": "burn_in",
+            "artifact_namespace": "evidence_acquisition_smoke",
+            "alert_id": "ea:velvet-canonical",
+            "core_opportunity_id": "agg:3381ebd96566",
+            "snapshot_class": "canonical_core_snapshot",
+            "core_resolution_status": "canonical",
+            "snapshot_core_resolution_status": "core_reconciled",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "candidate_role": "proxy_venue",
+            "impact_path_type": "venue_value_capture",
+            "final_opportunity_level": "high_priority",
+            "opportunity_level": "high_priority",
+            "final_opportunity_score": 92,
+            "opportunity_score_final": 92,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "route": event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+            "tier": "HIGH_PRIORITY_WATCH",
+            "feedback_target": "agg:3381ebd96566",
+            **quality,
+        }
+        diagnostic = {
+            **canonical,
+            "alert_id": "ea:velvet-support",
+            "snapshot_class": "diagnostic_support_snapshot",
+            "core_resolution_status": "diagnostic_support",
+            "snapshot_core_resolution_status": "diagnostic_support",
+            "is_diagnostic_snapshot": True,
+            "candidate_role": "source_noise",
+            "impact_path_type": "insufficient_data",
+            "playbook_type": "source_noise_control",
+            "final_opportunity_level": "local_only",
+            "opportunity_level": "local_only",
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "route": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "feedback_target": "",
+        }
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-review-doctor",
+                "profile": "evidence_acquisition_smoke",
+                "run_mode": "burn_in",
+                "artifact_namespace": "evidence_acquisition_smoke",
+                "success": True,
+            }],
+            core_opportunity_rows=[core],
+            alert_rows=[diagnostic, canonical],
+            card_paths=[card],
+            profile="evidence_acquisition_smoke",
+            artifact_namespace="evidence_acquisition_smoke",
+            strict=True,
+        )
+    assert doctor.inbox_diagnostic_snapshot_visible_by_default == 0
+    assert doctor.audit_primary_snapshot_not_canonical_when_canonical_exists == 0
+    assert doctor.inbox_core_item_uses_alert_id_feedback_target_when_core_target_exists == 0
+    assert doctor.feedback_readiness_counts_diagnostic_as_required == 0
+    assert not any("inbox_diagnostic_snapshot_visible_by_default" in item for item in doctor.blockers)
+    assert not any("audit_primary_snapshot_not_canonical_when_canonical_exists" in item for item in doctor.blockers)
 
 
 def test_artifact_doctor_blocks_bad_diagnostic_support_snapshot_and_duplicate_canonical_alerts():
