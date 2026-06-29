@@ -17,6 +17,27 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Fix Event Alpha notification SLO CLI wrapper · Codex
+**Why:** A real `notify_llm_deep` Telegram send succeeded, but the follow-up
+SLO report crashed because the CLI passed the diagnostics flag into a wrapper
+that did not accept it.
+**Changes:**
+- Updated `event_alpha_notification_slo_report` to accept the optional
+  `include_diagnostics` flag used by the CLI while preserving existing SLO
+  report behavior.
+- Added a regression assertion that the operational SLO wrapper exposes the
+  diagnostics-compatible parameter, and refreshed the artifact-doctor preview
+  fixture to use the current portable preview-path contract.
+**Verify:** `make event-alpha-notification-slo-report PROFILE=notify_llm_deep
+PYTHON=python3`; targeted SLO/artifact-doctor regression calls; `python3
+tests/test_indicators.py` (559/559 passed); `python3 -m compileall -q
+crypto_rsi_scanner tests`; `make verify PYTHON=python3`.
+**Notes/risks:** The real send delivered the heartbeat notification before this
+fix. The `notify_llm_deep` namespace remains artifact-doctor blocked by stale
+pre-canonical rows and missing core card/feedback coverage, so use the
+rehearsal namespace for send-readiness gates until that artifact hygiene is
+cleaned.
+
 ## 2026-06-29 — Add one-cycle Event Alpha Telegram send gates · Codex
 **Why:** The deterministic no-send rehearsal is now clean, but the real-send
 operator path needed a separate preflight, explicit one-cycle send guard, and

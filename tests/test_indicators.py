@@ -12296,6 +12296,7 @@ def test_event_alpha_artifact_doctor_flags_notification_identity_and_preview_con
             "attempted_at": "2026-06-28T12:00:00+00:00",
             "delivered_at": "2026-06-28T12:00:01+00:00",
             "notification_preview_path": str(preview),
+            "notification_preview_relpath": str(preview),
         }
         result = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{
@@ -28849,7 +28850,9 @@ def test_event_alpha_scheduler_slo_and_notification_pack_are_redacted():
 
 def test_event_alpha_notification_operational_make_targets_exist():
     from pathlib import Path
+    import inspect
     import subprocess
+    from crypto_rsi_scanner import scanner
 
     text = Path("Makefile").read_text(encoding="utf-8")
     for target in (
@@ -28868,6 +28871,7 @@ def test_event_alpha_notification_operational_make_targets_exist():
         check=True,
     ).stdout
     assert "--event-alpha-environment-doctor --event-alpha-profile notify_no_key" in dry
+    assert "include_diagnostics" in inspect.signature(scanner.event_alpha_notification_slo_report).parameters
 
 
 def test_event_alpha_notification_slo_distinguishes_preview_config_and_delivery_failures():

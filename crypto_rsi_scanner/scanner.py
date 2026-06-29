@@ -3518,8 +3518,10 @@ def event_alpha_notification_slo_report(
     *,
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
+    include_diagnostics: bool = False,
 ) -> None:
     """Print SLO-style notification freshness and delivery health."""
+    _ = include_diagnostics
     _setup_event_discovery_logging(verbose)
     try:
         context = _event_alpha_report_context(profile_name or "notify_no_key", artifact_namespace)
