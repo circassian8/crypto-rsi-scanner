@@ -85,10 +85,15 @@ class EventAlphaArtifactDoctorResult:
     digest_item_rejected_results_only: int = 0
     strategic_broad_asset_digest_without_confirmation: int = 0
     notification_preview_missing: int = 0
+    notification_preview_relpath_missing: int = 0
+    notification_preview_path_unresolvable: int = 0
     notification_preview_run_summary_mismatch: int = 0
+    notification_preview_llm_summary_mismatch: int = 0
+    notification_preview_lane_counts_mismatch: int = 0
     notification_preview_core_count_mismatch: int = 0
     notification_preview_alertable_count_mismatch: int = 0
     notification_preview_missing_send_guard_status: int = 0
+    notification_preview_send_guard_status_missing: int = 0
     notification_preview_no_send_status_unclear: int = 0
     quality_fields_missing_count: int = 0
     hypothesis_rows_missing_opportunity_verdict: int = 0
@@ -734,10 +739,34 @@ def diagnose_artifacts(
         (blockers if strict else warnings).append(message)
     if delivery_conflicts["notification_preview_missing"]:
         warnings.append(f"notification_preview_missing={delivery_conflicts['notification_preview_missing']}")
+    if delivery_conflicts["notification_preview_relpath_missing"]:
+        message = (
+            "notification_preview_relpath_missing="
+            f"{delivery_conflicts['notification_preview_relpath_missing']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["notification_preview_path_unresolvable"]:
+        message = (
+            "notification_preview_path_unresolvable="
+            f"{delivery_conflicts['notification_preview_path_unresolvable']}"
+        )
+        (blockers if strict else warnings).append(message)
     if preview_conflicts["notification_preview_run_summary_mismatch"]:
         message = (
             "notification_preview_run_summary_mismatch="
             f"{preview_conflicts['notification_preview_run_summary_mismatch']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if preview_conflicts["notification_preview_llm_summary_mismatch"]:
+        message = (
+            "notification_preview_llm_summary_mismatch="
+            f"{preview_conflicts['notification_preview_llm_summary_mismatch']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if preview_conflicts["notification_preview_lane_counts_mismatch"]:
+        message = (
+            "notification_preview_lane_counts_mismatch="
+            f"{preview_conflicts['notification_preview_lane_counts_mismatch']}"
         )
         (blockers if strict else warnings).append(message)
     if preview_conflicts["notification_preview_core_count_mismatch"]:
@@ -756,6 +785,12 @@ def diagnose_artifacts(
         message = (
             "notification_preview_missing_send_guard_status="
             f"{preview_conflicts['notification_preview_missing_send_guard_status']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if preview_conflicts["notification_preview_send_guard_status_missing"]:
+        message = (
+            "notification_preview_send_guard_status_missing="
+            f"{preview_conflicts['notification_preview_send_guard_status_missing']}"
         )
         (blockers if strict else warnings).append(message)
     if preview_conflicts["notification_preview_no_send_status_unclear"]:
@@ -1012,10 +1047,15 @@ def diagnose_artifacts(
         digest_item_rejected_results_only=delivery_conflicts["digest_item_rejected_results_only"],
         strategic_broad_asset_digest_without_confirmation=delivery_conflicts["strategic_broad_asset_digest_without_confirmation"],
         notification_preview_missing=delivery_conflicts["notification_preview_missing"],
+        notification_preview_relpath_missing=delivery_conflicts["notification_preview_relpath_missing"],
+        notification_preview_path_unresolvable=delivery_conflicts["notification_preview_path_unresolvable"],
         notification_preview_run_summary_mismatch=preview_conflicts["notification_preview_run_summary_mismatch"],
+        notification_preview_llm_summary_mismatch=preview_conflicts["notification_preview_llm_summary_mismatch"],
+        notification_preview_lane_counts_mismatch=preview_conflicts["notification_preview_lane_counts_mismatch"],
         notification_preview_core_count_mismatch=preview_conflicts["notification_preview_core_count_mismatch"],
         notification_preview_alertable_count_mismatch=preview_conflicts["notification_preview_alertable_count_mismatch"],
         notification_preview_missing_send_guard_status=preview_conflicts["notification_preview_missing_send_guard_status"],
+        notification_preview_send_guard_status_missing=preview_conflicts["notification_preview_send_guard_status_missing"],
         notification_preview_no_send_status_unclear=preview_conflicts["notification_preview_no_send_status_unclear"],
         quality_fields_missing_count=quality["quality_fields_missing_count"],
         hypothesis_rows_missing_opportunity_verdict=quality["hypothesis_rows_missing_opportunity_verdict"],
@@ -1724,6 +1764,8 @@ def _notification_delivery_conflicts(
         "digest_item_rejected_results_only": 0,
         "strategic_broad_asset_digest_without_confirmation": 0,
         "notification_preview_missing": 0,
+        "notification_preview_relpath_missing": 0,
+        "notification_preview_path_unresolvable": 0,
     }
     scope = _normalize_delivery_strict_scope(strict_scope, latest_run_id=latest_run_id, strict=True)
     latest = _delivery.latest_rows_by_delivery(delivery_rows)
@@ -1743,6 +1785,28 @@ def _notification_delivery_conflicts(
                         out["legacy_pre_core_delivery_identity"] += 1
         if scope == "latest_run" and latest_run_id and not is_latest_run:
             continue
+        preview_relpath = str(row.get("notification_preview_relpath") or "").strip()
+        if not preview_relpath and is_latest_run:
+            out["notification_preview_relpath_missing"] += 1
+        path, _source = _delivery.resolve_notification_preview_path(
+            row,
+            artifact_namespace=row.get("artifact_namespace") or row.get("namespace"),
+        )
+        if path is None:
+            out["notification_preview_missing"] += 1
+            out["notification_preview_path_unresolvable"] += 1
+        else:
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                out["notification_preview_missing"] += 1
+                out["notification_preview_path_unresolvable"] += 1
+            else:
+                telegram_body = "\n".join(_telegram_preview_bodies(text)) or text
+                if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
+                    out["telegram_message_contains_absolute_path"] += 1
+                if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
+                    out["telegram_message_contains_raw_debug_dump"] += 1
         lane = str(row.get("lane") or "")
         if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
             continue
@@ -1768,21 +1832,6 @@ def _notification_delivery_conflicts(
                 out["digest_item_rejected_results_only"] += 1
             if _delivery_core_is_strategic_broad_asset_context(core):
                 out["strategic_broad_asset_digest_without_confirmation"] += 1
-        preview_path = str(row.get("notification_preview_path") or "").strip()
-        if not preview_path:
-            out["notification_preview_missing"] += 1
-            continue
-        path = Path(preview_path)
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            out["notification_preview_missing"] += 1
-            continue
-        telegram_body = "\n".join(_telegram_preview_bodies(text)) or text
-        if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
-            out["telegram_message_contains_absolute_path"] += 1
-        if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
-            out["telegram_message_contains_raw_debug_dump"] += 1
     return out
 
 
@@ -1795,9 +1844,12 @@ def _notification_preview_consistency_conflicts(
 ) -> dict[str, int]:
     out = {
         "notification_preview_run_summary_mismatch": 0,
+        "notification_preview_llm_summary_mismatch": 0,
+        "notification_preview_lane_counts_mismatch": 0,
         "notification_preview_core_count_mismatch": 0,
         "notification_preview_alertable_count_mismatch": 0,
         "notification_preview_missing_send_guard_status": 0,
+        "notification_preview_send_guard_status_missing": 0,
         "notification_preview_no_send_status_unclear": 0,
     }
     if not latest_run:
@@ -1819,6 +1871,9 @@ def _notification_preview_consistency_conflicts(
     if "raw_events" in summary:
         if _as_int(summary["raw_events"]) != _as_int(latest_run.get("raw_events")):
             out["notification_preview_run_summary_mismatch"] += 1
+    if "extraction_rows" in summary:
+        if _as_int(summary["extraction_rows"]) != _as_int(latest_run.get("extraction_rows")):
+            out["notification_preview_run_summary_mismatch"] += 1
     if "core_opportunities" in summary:
         expected_core = _as_int(latest_run.get("core_opportunity_rows_written"))
         if expected_core <= 0:
@@ -1832,9 +1887,24 @@ def _notification_preview_consistency_conflicts(
     if "alertable" in summary:
         if _as_int(summary["alertable"]) != _as_int(latest_run.get("alertable")):
             out["notification_preview_alertable_count_mismatch"] += 1
+    if "llm_calls" in summary:
+        if _as_int(summary["llm_calls"]) != _as_int(latest_run.get("llm_calls_attempted")):
+            out["notification_preview_llm_summary_mismatch"] += 1
+    if "llm_skips" in summary:
+        if _as_int(summary["llm_skips"]) != _as_int(latest_run.get("llm_skipped_due_budget")):
+            out["notification_preview_llm_summary_mismatch"] += 1
+    if "lane_due" in summary:
+        expected_due = sum(_as_int(value) for value in dict(latest_run.get("send_lane_items_attempted") or {}).values())
+        if _as_int(summary["lane_due"]) != expected_due:
+            out["notification_preview_lane_counts_mismatch"] += 1
+    if "lane_sent" in summary:
+        expected_sent = sum(_as_int(value) for value in dict(latest_run.get("send_lane_items_delivered") or {}).values())
+        if _as_int(summary["lane_sent"]) != expected_sent:
+            out["notification_preview_lane_counts_mismatch"] += 1
     has_guard_line = bool(re.search(r"(?im)^Send guard:\s*.+$", text))
     if not has_guard_line:
         out["notification_preview_missing_send_guard_status"] += 1
+        out["notification_preview_send_guard_status_missing"] += 1
     if _preview_is_no_send_or_blocked(delivery_rows, latest_run_id=latest_run_id) and not re.search(
         r"(?i)(no-send rehearsal|would_send_but_guard_disabled|send guard is disabled|blocked_by_send_guard|notifications paused)",
         text,
@@ -1853,11 +1923,14 @@ def _latest_preview_path(
     for row in latest:
         if latest_run_id and str(row.get("run_id") or "") != str(latest_run_id):
             continue
-        preview = str(row.get("notification_preview_path") or "").strip()
-        if not preview:
+        path, _source = _delivery.resolve_notification_preview_path(
+            row,
+            artifact_namespace=row.get("artifact_namespace") or row.get("namespace"),
+        )
+        if path is None:
             continue
         stamp = str(row.get("attempted_at") or row.get("delivered_at") or "")
-        candidates.append((stamp, preview))
+        candidates.append((stamp, str(path)))
     if not candidates:
         return None
     candidates.sort()
@@ -1880,6 +1953,17 @@ def _parse_notification_preview_summary(text: str) -> dict[str, Any]:
     alertable = re.search(r"(?im)^Alertable decisions:\s*(\d+)\b", bodies)
     if alertable:
         out["alertable"] = alertable.group(1)
+    extraction = re.search(r"(?im)^Extraction rows:\s*(\d+)\b", bodies)
+    if extraction:
+        out["extraction_rows"] = extraction.group(1)
+    llm = re.search(r"(?im)^LLM calls/skips:\s*(\d+)\s*/\s*(\d+)\b", bodies)
+    if llm:
+        out["llm_calls"] = llm.group(1)
+        out["llm_skips"] = llm.group(2)
+    lanes = re.search(r"(?im)^Delivery lanes:\s*due=(\d+)\s*[·-]\s*sent=(\d+)\b", bodies)
+    if lanes:
+        out["lane_due"] = lanes.group(1)
+        out["lane_sent"] = lanes.group(2)
     return out
 
 
@@ -2549,10 +2633,15 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"digest_rejected_only={result.digest_item_rejected_results_only} "
             f"strategic_broad_digest={result.strategic_broad_asset_digest_without_confirmation} "
             f"preview_missing={result.notification_preview_missing} "
+            f"preview_relpath_missing={result.notification_preview_relpath_missing} "
+            f"preview_unresolvable={result.notification_preview_path_unresolvable} "
             f"preview_run_mismatch={result.notification_preview_run_summary_mismatch} "
+            f"preview_llm_mismatch={result.notification_preview_llm_summary_mismatch} "
+            f"preview_lane_mismatch={result.notification_preview_lane_counts_mismatch} "
             f"preview_core_mismatch={result.notification_preview_core_count_mismatch} "
             f"preview_alertable_mismatch={result.notification_preview_alertable_count_mismatch} "
             f"preview_missing_send_guard={result.notification_preview_missing_send_guard_status} "
+            f"preview_send_guard_missing={result.notification_preview_send_guard_status_missing} "
             f"preview_no_send_unclear={result.notification_preview_no_send_status_unclear} "
             f"raw_debug_dump={result.telegram_message_contains_raw_debug_dump} "
             f"absolute_path={result.telegram_message_contains_absolute_path}"

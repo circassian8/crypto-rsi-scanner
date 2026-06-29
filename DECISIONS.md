@@ -28,6 +28,12 @@ events, extraction rows, core opportunities, alertable final routes, provider
 issues, LLM calls/skips, artifact-doctor status, and explicit no-send/send-guard
 state. Strict artifact doctor blocks fresh previews whose summary contradicts
 the latest run, lacks send-guard status, or uses unclear no-send wording.
+Delivery rows must store a portable `notification_preview_relpath` when a
+preview exists. Send-readiness, artifact doctor, inbox/audit-style consumers,
+and operator reports should resolve previews by relpath first, namespace
+default path second, and legacy absolute path only as a fallback; stale
+machine-specific `/Users/...` paths must not block another checkout when the
+namespace preview exists.
 **Why:** A rehearsal that writes real artifacts but previews `Raw events=0`,
 `Core opportunities=0`, or `Completed=no` makes a safe run look broken and can
 hide stale artifacts. A separate send-readiness gate gives the operator one

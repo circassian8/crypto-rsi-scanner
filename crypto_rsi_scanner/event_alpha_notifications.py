@@ -127,6 +127,7 @@ class DeliveryIdentity:
     identity_reconciled: bool = False
     identity_reconciliation_reason: str | None = None
     notification_preview_path: str | None = None
+    notification_preview_relpath: str | None = None
 
 
 SendFn = Callable[[str], bool | sender.NotificationSendAttemptResult | Mapping[str, Any]]
@@ -553,10 +554,14 @@ def send_notifications(
                 profile=profile,
                 card_map=card_map,
                 reason=block_reason,
-                pipeline_result=pipeline_result,
+                pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=block_reason),
             )
             if not writer.preview_sections:
-                writer.write_no_digest_preview(profile=profile, pipeline_result=pipeline_result, reason=block_reason)
+                writer.write_no_digest_preview(
+                    profile=profile,
+                    pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=block_reason),
+                    reason=block_reason,
+                )
         return _result(
             requested=True,
             attempted=False,
@@ -577,10 +582,14 @@ def send_notifications(
                 card_map=card_map,
                 reason=block_reason,
                 error_class="notifications_paused",
-                pipeline_result=pipeline_result,
+                pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=block_reason),
             )
             if not writer.preview_sections:
-                writer.write_no_digest_preview(profile=profile, pipeline_result=pipeline_result, reason=block_reason)
+                writer.write_no_digest_preview(
+                    profile=profile,
+                    pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=block_reason),
+                    reason=block_reason,
+                )
         return _result(
             requested=True,
             attempted=False,
@@ -594,7 +603,11 @@ def send_notifications(
     if would_send <= 0:
         reason = "; ".join(plan.blocked_by_lane.values()) or plan.heartbeat_reason or "no due notifications"
         if writer:
-            writer.write_no_digest_preview(profile=profile, pipeline_result=pipeline_result, reason=reason)
+            writer.write_no_digest_preview(
+                profile=profile,
+                pipeline_result=_notification_preview_result(pipeline_result, plan=plan, block_reason=reason),
+                reason=reason,
+            )
         return _result(
             requested=True,
             attempted=False,
@@ -726,7 +739,15 @@ def send_notifications(
                     identity=identity,
                 )
     if plan.heartbeat_due:
-        heartbeat_message = format_health_heartbeat(profile=profile, result=pipeline_result, now=observed)
+        heartbeat_message = format_health_heartbeat(
+            profile=profile,
+            result=_notification_preview_result(
+                pipeline_result,
+                plan=plan,
+                delivered_by_lane=delivered_by_lane,
+            ),
+            now=observed,
+        )
         heartbeat_identity = DeliveryIdentity(
             notification_item_ids=("heartbeat",),
             source_alert_ids=("heartbeat",),
@@ -735,6 +756,7 @@ def send_notifications(
             identity_reconciled=False,
             identity_reconciliation_reason="heartbeat",
             notification_preview_path=str(writer.preview_path) if writer else None,
+            notification_preview_relpath=delivery.notification_preview_relpath_for_path(writer.preview_path if writer else None),
         )
         if writer:
             writer.write_preview(
@@ -895,6 +917,7 @@ def _delivery_identity_for_decisions(
         identity_reconciled=reconciled,
         identity_reconciliation_reason="canonical_core_opportunity" if reconciled else "source_alert_identity",
         notification_preview_path=str(preview_path) if preview_path else None,
+        notification_preview_relpath=delivery.notification_preview_relpath_for_path(preview_path),
     )
 
 
@@ -913,6 +936,7 @@ def _identity_record_fields(identity: DeliveryIdentity | None) -> dict[str, Any]
         "identity_reconciled": identity.identity_reconciled,
         "identity_reconciliation_reason": identity.identity_reconciliation_reason,
         "notification_preview_path": identity.notification_preview_path,
+        "notification_preview_relpath": identity.notification_preview_relpath,
     }
 
 
@@ -1718,6 +1742,7 @@ class _DeliveryWriter:
                 identity_reconciled=False,
                 identity_reconciliation_reason="heartbeat",
                 notification_preview_path=str(self.preview_path),
+                notification_preview_relpath=delivery.notification_preview_relpath_for_path(self.preview_path),
             )
             self.write_preview(
                 message=message,
@@ -1817,7 +1842,7 @@ class _DeliveryWriter:
         pipeline_result: Any | None,
         reason: str,
     ) -> None:
-        warnings = tuple(str(item) for item in getattr(pipeline_result, "warnings", ()) or () if str(item))
+        warnings = tuple(str(item) for item in _value(pipeline_result, "warnings") or () if str(item))
         lane_due = _mapping_value(pipeline_result, "send_lane_items_attempted")
         lane_sent = _mapping_value(pipeline_result, "send_lane_items_delivered")
         lanes_due = sum(_safe_int(value) for value in lane_due.values())
@@ -1851,6 +1876,7 @@ class _DeliveryWriter:
             identity_reconciled=False,
             identity_reconciliation_reason="no_digest_candidates",
             notification_preview_path=str(self.preview_path),
+            notification_preview_relpath=delivery.notification_preview_relpath_for_path(self.preview_path),
         )
         self.write_preview(
             message="\n".join(lines),
@@ -2224,12 +2250,12 @@ def format_health_heartbeat(
 ) -> str:
     observed = _as_utc(now or datetime.now(timezone.utc))
     warnings = tuple(str(item) for item in _value(result, "warnings") or () if str(item))
-    partial = bool(getattr(result, "partial_results", False) or _provider_failure_count(warnings) > 0)
+    partial = bool(_value(result, "partial_results", False) or _provider_failure_count(warnings) > 0)
     lane_due = _mapping_value(result, "send_lane_items_attempted")
     lane_sent = _mapping_value(result, "send_lane_items_delivered")
     lanes_due = sum(_safe_int(value) for value in lane_due.values())
     lanes_sent = sum(_safe_int(value) for value in lane_sent.values())
-    lanes_blocked = max(0, _num(result, "send_would_send_items") - lanes_sent)
+    lane_status = _delivery_lane_status(result, send_guard_status=send_guard_status)
     llm_calls = _num(result, "llm_calls_attempted")
     llm_skipped = _num(result, "llm_skipped_due_budget")
     lines = [
@@ -2241,8 +2267,16 @@ def format_health_heartbeat(
         f"Completed: {_yes_no(bool(_value(result, 'cycle_completed', result is not None)))}",
         f"Raw events: {_num(result, 'raw_events')} · Core opportunities: {_num(result, 'core_opportunities')}",
         f"Extraction rows: {_num(result, 'extraction_rows')}",
-        f"Alertable decisions: {_num(result, 'alertable')} · Sent by this lane: heartbeat",
-        f"Delivery lanes: due={lanes_due} · sent={lanes_sent} · blocked={lanes_blocked}",
+        f"Alertable decisions: {_num(result, 'alertable')} · Alerts: {_num(result, 'alerts')}",
+        (
+            "Delivery lanes: "
+            f"due={lanes_due} · sent={lanes_sent} · "
+            f"would_send_but_guard_disabled={lane_status['would_send_but_guard_disabled']} · "
+            f"blocked_by_quality={lane_status['blocked_by_quality']} · "
+            f"blocked_by_cooldown={lane_status['blocked_by_cooldown']} · "
+            f"not_due={lane_status['not_due']}"
+        ),
+        f"Heartbeat: due={_yes_no(bool(_value(result, 'send_heartbeat_due', False)))} · sent={_yes_no(bool(_value(result, 'send_heartbeat_sent', False)))}",
         f"Provider issues: {_provider_failure_count(warnings)}",
         f"LLM calls/skips: {llm_calls}/{llm_skipped}",
         f"LLM budget: {'exhausted' if _runtime_budget_exhausted(warnings) else 'ok'}",
@@ -2510,12 +2544,113 @@ def _mapping_value(result: Any | None, attr: str) -> dict[str, Any]:
 
 
 def _num(result: Any | None, attr: str) -> int:
+    if attr == "llm_calls_attempted":
+        explicit = _value(result, attr, None)
+        if explicit is not None:
+            return _safe_int(explicit)
+        return _llm_stats_from_result(result)["calls_attempted"]
+    if attr == "llm_skipped_due_budget":
+        explicit = _value(result, attr, None)
+        if explicit is not None:
+            return _safe_int(explicit)
+        return _llm_stats_from_result(result)["skipped_due_budget"]
     if attr == "core_opportunities":
         value = _value(result, "core_opportunities", None)
         if value is None:
             value = _value(result, "core_opportunity_rows_written", 0)
         return _safe_int(value)
+    value = _value(result, attr, 0)
+    if isinstance(value, (list, tuple, set)):
+        return len(value)
     return _safe_int(_value(result, attr, 0))
+
+
+def _notification_preview_result(
+    result: Any | None,
+    *,
+    plan: EventAlphaNotificationPlan,
+    delivered_by_lane: Mapping[str, int] | None = None,
+    block_reason: str | None = None,
+) -> dict[str, Any]:
+    delivered = dict(delivered_by_lane or {lane: 0 for lane in LANES})
+    llm_stats = _llm_stats_from_result(result)
+    warnings = tuple(str(item) for item in _value(result, "warnings") or () if str(item))
+    return {
+        "profile": _value(result, "profile"),
+        "cycle_completed": bool(_value(result, "cycle_completed", result is not None)),
+        "partial_results": bool(_value(result, "partial_results", False)),
+        "warnings": warnings,
+        "raw_events": _num(result, "raw_events"),
+        "extraction_rows": _num(result, "extraction_rows"),
+        "core_opportunity_rows_written": _num(result, "core_opportunities"),
+        "alertable": _num(result, "alertable"),
+        "alerts": _num(result, "alerts"),
+        "send_lane_items_attempted": dict(plan.lane_counts),
+        "send_lane_items_delivered": delivered,
+        "send_would_send_items": int(plan.would_send_count or 0),
+        "send_heartbeat_due": bool(plan.heartbeat_due),
+        "send_heartbeat_sent": bool(delivered.get(LANE_HEALTH_HEARTBEAT, 0)),
+        "send_block_reason": block_reason,
+        "llm_calls_attempted": llm_stats["calls_attempted"],
+        "llm_skipped_due_budget": llm_stats["skipped_due_budget"],
+        "artifact_doctor_status": _value(result, "artifact_doctor_status", "not_run"),
+    }
+
+
+def _llm_stats_from_result(result: Any | None) -> dict[str, int]:
+    explicit_calls = _value(result, "llm_calls_attempted", None)
+    explicit_skips = _value(result, "llm_skipped_due_budget", None)
+    if explicit_calls is not None or explicit_skips is not None:
+        return {
+            "calls_attempted": _safe_int(explicit_calls),
+            "skipped_due_budget": _safe_int(explicit_skips),
+        }
+    stats = {"calls_attempted": 0, "skipped_due_budget": 0}
+    rows: list[Any] = []
+    for attr in ("extraction_rows", "catalyst_frame_rows", "relationship_rows"):
+        value = _value(result, attr, ())
+        if isinstance(value, Iterable) and not isinstance(value, (str, bytes, Mapping)):
+            rows.extend(list(value))
+    for row in rows:
+        status = str(getattr(row, "cache_status", "") or "")
+        if status == "miss":
+            stats["calls_attempted"] += 1
+        elif status == "skipped_budget":
+            stats["skipped_due_budget"] += 1
+        warnings = tuple(getattr(row, "warnings", ()) or ())
+        if any("budget exhausted" in str(warning).casefold() for warning in warnings):
+            stats["skipped_due_budget"] += 1
+    return stats
+
+
+def _delivery_lane_status(result: Any | None, *, send_guard_status: str | None) -> dict[str, int]:
+    due = sum(_safe_int(value) for value in _mapping_value(result, "send_lane_items_attempted").values())
+    sent = sum(_safe_int(value) for value in _mapping_value(result, "send_lane_items_delivered").values())
+    remaining = max(0, max(_num(result, "send_would_send_items"), due) - sent)
+    reason = " ".join(
+        str(value or "")
+        for value in (
+            send_guard_status,
+            _value(result, "send_block_reason"),
+        )
+    ).casefold()
+    out = {
+        "would_send_but_guard_disabled": 0,
+        "blocked_by_quality": 0,
+        "blocked_by_cooldown": 0,
+        "not_due": 0,
+    }
+    if remaining <= 0:
+        return out
+    if "send guard is disabled" in reason or "event alerts disabled" in reason or "rsi_event_alerts_enabled" in reason:
+        out["would_send_but_guard_disabled"] = remaining
+    elif "quality" in reason:
+        out["blocked_by_quality"] = remaining
+    elif "cooldown" in reason or "duplicate" in reason:
+        out["blocked_by_cooldown"] = remaining
+    elif due <= 0:
+        out["not_due"] = remaining
+    return out
 
 
 def _send_guard_status_line(reason: str, *, error_class: str = "guard_blocked") -> str:
@@ -2525,7 +2660,7 @@ def _send_guard_status_line(reason: str, *, error_class: str = "guard_blocked") 
     if "no due notifications" in lower or "no digest candidates" in lower:
         return "No due notification lanes."
     if "event alerts disabled" in lower or "rsi_event_alerts_enabled" in lower:
-        return "No-send rehearsal: would send, but send guard is disabled."
+        return "No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode."
     if "quality" in lower:
         return "Blocked by quality gate."
     if "cooldown" in lower or "duplicate" in lower:

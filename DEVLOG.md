@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Make notify_llm_deep rehearsal previews portable · Codex
+**Why:** The real `notify_llm_deep` no-send rehearsal could write delivery rows
+with a stale machine-specific `/Users/...` preview path and no portable
+`notification_preview_relpath`, causing send-readiness to fail in another
+checkout. The heartbeat preview also still under-reported extraction rows, LLM
+calls/skips, and due/blocked lane counts in some blocked no-send paths.
+**Changes:**
+- Delivery rows now persist `notification_preview_relpath` alongside legacy
+  absolute preview paths, and send-readiness/artifact-doctor resolution uses
+  relpath first, namespace default preview second, and absolute path only as a
+  fallback.
+- Send-readiness reports `notification_preview_path_resolved` plus
+  `notification_preview_path_source`, and no longer blocks on a stale absolute
+  path when the namespace-relative/default preview exists.
+- Heartbeat previews now render latest-run extraction rows, alert counts, LLM
+  calls/skips, heartbeat due/sent state, and detailed due/sent/guard-blocked/
+  quality/cooldown/not-due lane counts from the run/plan summary.
+- Artifact doctor strict checks now catch missing preview relpaths,
+  unresolvable previews, LLM summary mismatches, lane-count mismatches, and
+  missing send-guard status. Added a capped
+  `event-alpha-notify-llm-deep-real-no-send-rehearsal-fast` target for quicker
+  preview/readiness proof.
+**Verify:** `python3 tests/test_indicators.py` passed (553/553). Full Make
+verification list for this prompt was run after docs: `make
+event-alpha-signal-quality-eval PYTHON=python3`, `make
+event-alpha-notification-format-smoke PYTHON=python3`, `make
+event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3`, `make
+event-alpha-send-readiness PROFILE=notify_llm_deep_no_send_smoke PYTHON=python3`,
+`make event-alpha-live-burn-in-no-send PYTHON=python3`, `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`, `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, and `make verify
+PYTHON=python3`. Manual smoke also ran the fast deep no-send rehearsal,
+send-readiness, strict artifact doctor, and inbox for the rehearsal namespace.
+**Notes/risks:** This is preview/readiness artifact hardening only. It does not
+send Telegram in tests, trade, paper trade, write normal RSI rows, or create
+`TRIGGERED_FADE`.
+
 ## 2026-06-29 — Finish notify_llm_deep rehearsal readiness gate · Codex
 **Why:** The deep notification rehearsal preview could contradict the real run
 ledger (`Raw events=0`, `Core opportunities=0`, `Completed=no`) even after a

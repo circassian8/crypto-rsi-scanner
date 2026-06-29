@@ -103,6 +103,7 @@ class NotificationDeliveryRecord:
     identity_reconciled: bool = False
     identity_reconciliation_reason: str | None = None
     notification_preview_path: str | None = None
+    notification_preview_relpath: str | None = None
     attempted_at: str | None = None
     delivered_at: str | None = None
     error_class: str | None = None
@@ -141,6 +142,7 @@ class NotificationDeliveryRecord:
             "identity_reconciled": bool(self.identity_reconciled),
             "identity_reconciliation_reason": self.identity_reconciliation_reason,
             "notification_preview_path": self.notification_preview_path,
+            "notification_preview_relpath": self.notification_preview_relpath,
             "state": self.state,
             "attempted_at": self.attempted_at,
             "delivered_at": self.delivered_at,
@@ -257,6 +259,7 @@ def build_record(
     identity_reconciled: bool = False,
     identity_reconciliation_reason: str | None = None,
     notification_preview_path: str | None = None,
+    notification_preview_relpath: str | None = None,
     state: str,
     now: datetime,
     delivered_at: datetime | None = None,
@@ -292,6 +295,11 @@ def build_record(
         identity_reconciled=bool(identity_reconciled),
         identity_reconciliation_reason=str(identity_reconciliation_reason)[:200] if identity_reconciliation_reason else None,
         notification_preview_path=str(notification_preview_path) if notification_preview_path else None,
+        notification_preview_relpath=(
+            str(notification_preview_relpath)
+            if notification_preview_relpath
+            else notification_preview_relpath_for_path(notification_preview_path)
+        ),
         state=str(state),
         attempted_at=_iso(now),
         delivered_at=_iso(delivered_at) if delivered_at else None,
@@ -345,6 +353,81 @@ def load_delivery_records(path: str | Path) -> list[dict[str, Any]]:
     except OSError:
         return rows
     return rows
+
+
+def notification_preview_relpath_for_path(path: str | Path | None) -> str | None:
+    """Return a portable repo-relative preview path when possible."""
+    if not path:
+        return None
+    p = Path(path).expanduser()
+    try:
+        if p.is_absolute():
+            rel = p.resolve().relative_to(Path.cwd().resolve())
+            return rel.as_posix()
+    except (OSError, ValueError):
+        pass
+    if not p.is_absolute():
+        return p.as_posix()
+    parts = p.parts
+    if "event_fade_cache" in parts:
+        idx = parts.index("event_fade_cache")
+        return Path(*parts[idx:]).as_posix()
+    return None
+
+
+def default_notification_preview_relpath(
+    *,
+    artifact_namespace: str | None,
+    artifact_base_dir: str | Path | None = None,
+) -> str:
+    namespace = str(artifact_namespace or "default").strip() or "default"
+    base = Path(artifact_base_dir or os.getenv("RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR", "event_fade_cache")).expanduser()
+    path = base / namespace / "event_alpha_notification_preview.md"
+    return notification_preview_relpath_for_path(path) or path.as_posix()
+
+
+def resolve_notification_preview_path(
+    row: Mapping[str, Any] | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    artifact_base_dir: str | Path | None = None,
+    repo_root: str | Path | None = None,
+) -> tuple[Path | None, str]:
+    """Resolve a notification preview path in portable order.
+
+    Resolution order:
+    1. ``notification_preview_relpath`` under the current checkout.
+    2. Namespace default under the current artifact base.
+    3. Legacy ``notification_preview_path`` as an absolute/relative fallback.
+    """
+    row = row or {}
+    root = Path(repo_root or Path.cwd()).expanduser()
+    relpath = str(row.get("notification_preview_relpath") or "").strip()
+    if relpath:
+        candidate = Path(relpath).expanduser()
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        if candidate.exists():
+            return candidate, "relpath"
+    namespace = artifact_namespace or row.get("artifact_namespace") or row.get("namespace")
+    if namespace:
+        default_rel = default_notification_preview_relpath(
+            artifact_namespace=str(namespace),
+            artifact_base_dir=artifact_base_dir,
+        )
+        candidate = Path(default_rel).expanduser()
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        if candidate.exists():
+            return candidate, "namespace_default"
+    legacy = str(row.get("notification_preview_path") or "").strip()
+    if legacy:
+        candidate = Path(legacy).expanduser()
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        if candidate.exists():
+            return candidate, "absolute" if Path(legacy).expanduser().is_absolute() else "relpath"
+    return None, "missing"
 
 
 def find_recent_delivered(

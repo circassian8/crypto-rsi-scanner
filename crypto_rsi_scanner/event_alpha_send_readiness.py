@@ -24,6 +24,7 @@ class EventAlphaSendReadinessResult:
     send_guard_enabled: bool
     telegram_ready: bool
     preview_path: str | None
+    preview_path_source: str
     latest_run_completed: bool
     artifact_doctor_status: str
     alertable_items: int
@@ -83,7 +84,12 @@ def build_send_readiness(
         row for row in delivery.latest_rows_by_delivery(deliveries)
         if not latest_run_id or str(row.get("run_id") or "") == latest_run_id
     ]
-    resolved_preview = str(preview_path or _latest_preview_path(latest_deliveries) or "").strip() or None
+    resolved_preview_path, preview_source = _resolve_preview_path(
+        latest_deliveries,
+        explicit_path=preview_path,
+        artifact_namespace=artifact_namespace,
+    )
+    resolved_preview = str(resolved_preview_path) if resolved_preview_path else None
     blockers: list[str] = []
     warnings: list[str] = []
 
@@ -97,12 +103,16 @@ def build_send_readiness(
 
     if str(artifact_doctor.status or "").upper() == "BLOCKED" or artifact_doctor.blockers:
         blockers.append("strict artifact doctor has blockers")
-    if artifact_doctor.notification_preview_missing:
+    if artifact_doctor.notification_preview_missing and preview_source == "missing":
         blockers.append("notification preview is missing")
+    if artifact_doctor.notification_preview_path_unresolvable and preview_source == "missing":
+        blockers.append("notification preview path is unresolvable")
     if (
         artifact_doctor.notification_preview_run_summary_mismatch
         or artifact_doctor.notification_preview_core_count_mismatch
         or artifact_doctor.notification_preview_alertable_count_mismatch
+        or artifact_doctor.notification_preview_llm_summary_mismatch
+        or artifact_doctor.notification_preview_lane_counts_mismatch
     ):
         blockers.append("notification preview summary does not match latest run artifacts")
     if artifact_doctor.notification_preview_missing_send_guard_status:
@@ -170,6 +180,7 @@ def build_send_readiness(
         send_guard_enabled=bool(send_guard_enabled),
         telegram_ready=bool(telegram_ready),
         preview_path=resolved_preview,
+        preview_path_source=preview_source,
         latest_run_completed=completed,
         artifact_doctor_status=str(artifact_doctor.status or "unknown"),
         alertable_items=sum(1 for row in would_send_cores),
@@ -194,7 +205,8 @@ def format_send_readiness(result: EventAlphaSendReadinessResult) -> str:
         f"artifact_doctor_status: {result.artifact_doctor_status}",
         f"send_guard_enabled: {'yes' if result.send_guard_enabled else 'no'}",
         f"telegram_ready: {'yes' if result.telegram_ready else 'no'}",
-        f"notification_preview_path: {result.preview_path or 'missing'}",
+        f"notification_preview_path_resolved: {result.preview_path or 'missing'}",
+        f"notification_preview_path_source: {result.preview_path_source}",
         f"alertable_items_checked: {result.alertable_items}",
         f"delivery_rows_checked: {result.delivery_rows_checked}",
         f"core_rows_checked: {result.core_rows_checked}",
@@ -259,16 +271,34 @@ def _clean_optional(value: Any) -> str | None:
     return text or None
 
 
-def _latest_preview_path(rows: Iterable[Mapping[str, Any]]) -> str | None:
-    candidates = [
-        (str(row.get("attempted_at") or row.get("delivered_at") or ""), str(row.get("notification_preview_path") or ""))
-        for row in rows
-        if str(row.get("notification_preview_path") or "").strip()
-    ]
-    if not candidates:
-        return None
-    candidates.sort()
-    return candidates[-1][1]
+def _resolve_preview_path(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    explicit_path: str | Path | None,
+    artifact_namespace: str | None,
+) -> tuple[Path | None, str]:
+    if explicit_path:
+        path = Path(explicit_path).expanduser()
+        if path.exists():
+            return path, "explicit"
+    candidates: list[tuple[str, Path, str]] = []
+    for row in rows:
+        path, source = delivery.resolve_notification_preview_path(
+            row,
+            artifact_namespace=artifact_namespace,
+        )
+        if path is None:
+            continue
+        stamp = str(row.get("attempted_at") or row.get("delivered_at") or "")
+        candidates.append((stamp, path, source))
+    if candidates:
+        candidates.sort(key=lambda item: item[0])
+        return candidates[-1][1], candidates[-1][2]
+    default_path, default_source = delivery.resolve_notification_preview_path(
+        {},
+        artifact_namespace=artifact_namespace,
+    )
+    return default_path, default_source
 
 
 def _route_value(row: Mapping[str, Any]) -> str:

@@ -12324,6 +12324,7 @@ def test_event_alpha_artifact_doctor_blocks_preview_run_summary_mismatch():
     from crypto_rsi_scanner import event_alpha_artifact_doctor
 
     with TemporaryDirectory() as tmp:
+        namespace = "preview_mismatch_test"
         preview = Path(tmp) / "event_alpha_notification_preview.md"
         preview.write_text(
             "# Event Alpha Notification Preview\n\n"
@@ -12346,7 +12347,7 @@ def test_event_alpha_artifact_doctor_blocks_preview_run_summary_mismatch():
             "run_id": "run-1",
             "profile": "notify_llm_deep",
             "run_mode": "notification_burn_in",
-            "artifact_namespace": "notify_llm_deep_rehearsal",
+            "artifact_namespace": namespace,
             "alert_id": "heartbeat",
             "lane": "health_heartbeat",
             "route": "HEALTH_HEARTBEAT",
@@ -12362,7 +12363,7 @@ def test_event_alpha_artifact_doctor_blocks_preview_run_summary_mismatch():
                 "run_id": "run-1",
                 "profile": "notify_llm_deep",
                 "run_mode": "notification_burn_in",
-                "artifact_namespace": "notify_llm_deep_rehearsal",
+                "artifact_namespace": namespace,
                 "cycle_completed": True,
                 "raw_events": 159,
                 "core_opportunity_rows_written": 122,
@@ -12372,7 +12373,7 @@ def test_event_alpha_artifact_doctor_blocks_preview_run_summary_mismatch():
             core_opportunity_rows=[],
             delivery_rows=[delivery_row],
             profile="notify_llm_deep",
-            artifact_namespace="notify_llm_deep_rehearsal",
+            artifact_namespace=namespace,
             strict=True,
         )
         text = event_alpha_artifact_doctor.format_artifact_doctor_report(result)
@@ -12384,6 +12385,249 @@ def test_event_alpha_artifact_doctor_blocks_preview_run_summary_mismatch():
     assert result.status == "BLOCKED"
     assert "preview_run_mismatch=" in text
     assert "preview_core_mismatch=1" in text
+
+
+def test_event_alpha_send_readiness_resolves_preview_relpath_over_stale_absolute():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_notification_delivery,
+        event_alpha_send_readiness,
+    )
+
+    with TemporaryDirectory() as tmp:
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(tmp)
+            namespace = "portable_preview"
+            preview = Path("event_fade_cache") / namespace / "event_alpha_notification_preview.md"
+            preview.parent.mkdir(parents=True, exist_ok=True)
+            preview.write_text(
+                "# Event Alpha Notification Preview\n\n"
+                "## Lane 1: health_heartbeat\n\n"
+                "### Telegram Body\n\n"
+                "```html\n"
+                "<b>Event Alpha Heartbeat</b>\n"
+                "Completed: yes\n"
+                "Raw events: 1 · Core opportunities: 1\n"
+                "Extraction rows: 1\n"
+                "Alertable decisions: 0 · Alerts: 0\n"
+                "Delivery lanes: due=1 · sent=0 · would_send_but_guard_disabled=1 · blocked_by_quality=0 · blocked_by_cooldown=0 · not_due=0\n"
+                "Send guard: No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode.\n"
+                "LLM calls/skips: 2/3\n"
+                "```",
+                encoding="utf-8",
+            )
+            run = {
+                "row_type": "event_alpha_run",
+                "run_id": "run-1",
+                "profile": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": namespace,
+                "started_at": "2026-06-29T12:00:00+00:00",
+                "cycle_completed": True,
+                "success": True,
+                "raw_events": 1,
+                "extraction_rows": 1,
+                "core_opportunity_rows_written": 1,
+                "alertable": 0,
+                "llm_calls_attempted": 2,
+                "llm_skipped_due_budget": 3,
+                "send_lane_items_attempted": {"health_heartbeat": 1},
+                "send_lane_items_delivered": {"health_heartbeat": 0},
+            }
+            delivery_row = event_alpha_notification_delivery.build_record(
+                run_id="run-1",
+                alert_id="heartbeat",
+                profile="notify_llm_deep",
+                namespace=namespace,
+                lane="health_heartbeat",
+                route="HEALTH_HEARTBEAT",
+                content_hash="hash",
+                state=event_alpha_notification_delivery.STATE_BLOCKED,
+                now=datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc),
+                error_class="guard_blocked",
+                error_message="event alerts disabled",
+                notification_preview_path="/Users/old/checkout/event_fade_cache/portable_preview/event_alpha_notification_preview.md",
+                notification_preview_relpath=preview.as_posix(),
+            ).to_row()
+            delivery_row["run_mode"] = "notification_burn_in"
+            doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
+                status="OK",
+                profile="notify_llm_deep",
+                artifact_namespace=namespace,
+                run_rows=1,
+                alert_rows=0,
+                feedback_rows=0,
+                outcome_rows=0,
+                card_files=0,
+            )
+            result = event_alpha_send_readiness.build_send_readiness(
+                profile="notify_llm_deep",
+                artifact_namespace=namespace,
+                run_rows=[run],
+                core_opportunity_rows=[],
+                alert_rows=[],
+                delivery_rows=[delivery_row],
+                artifact_doctor=doctor,
+                send_guard_enabled=False,
+                telegram_ready=False,
+            )
+        finally:
+            os.chdir(old_cwd)
+
+    assert result.preview_path_source == "relpath"
+    assert result.preview_path and result.preview_path.endswith("event_alpha_notification_preview.md")
+    assert "notification preview path" not in "\n".join(result.blockers).lower()
+
+
+def test_event_alpha_send_readiness_resolves_namespace_default_when_absolute_stale():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_notification_delivery,
+        event_alpha_send_readiness,
+    )
+
+    with TemporaryDirectory() as tmp:
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(tmp)
+            namespace = "namespace_default_preview"
+            preview = Path("event_fade_cache") / namespace / "event_alpha_notification_preview.md"
+            preview.parent.mkdir(parents=True, exist_ok=True)
+            preview.write_text(
+                "# Event Alpha Notification Preview\n\n"
+                "## Lane 1: health_heartbeat\n\n"
+                "### Telegram Body\n\n"
+                "```html\n"
+                "<b>Event Alpha Heartbeat</b>\n"
+                "Completed: yes\n"
+                "Raw events: 0 · Core opportunities: 0\n"
+                "Extraction rows: 0\n"
+                "Alertable decisions: 0 · Alerts: 0\n"
+                "Delivery lanes: due=1 · sent=0 · would_send_but_guard_disabled=1 · blocked_by_quality=0 · blocked_by_cooldown=0 · not_due=0\n"
+                "Send guard: No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode.\n"
+                "LLM calls/skips: 0/0\n"
+                "```",
+                encoding="utf-8",
+            )
+            delivery_row = event_alpha_notification_delivery.build_record(
+                run_id="run-1",
+                alert_id="heartbeat",
+                profile="notify_llm_deep",
+                namespace=namespace,
+                lane="health_heartbeat",
+                route="HEALTH_HEARTBEAT",
+                content_hash="hash",
+                state=event_alpha_notification_delivery.STATE_BLOCKED,
+                now=datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc),
+                error_class="guard_blocked",
+                error_message="event alerts disabled",
+                notification_preview_path="/Users/old/checkout/event_fade_cache/namespace_default_preview/event_alpha_notification_preview.md",
+            ).to_row()
+            delivery_row["run_mode"] = "notification_burn_in"
+            delivery_row["notification_preview_relpath"] = None
+            doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
+                status="OK",
+                profile="notify_llm_deep",
+                artifact_namespace=namespace,
+                run_rows=1,
+                alert_rows=0,
+                feedback_rows=0,
+                outcome_rows=0,
+                card_files=0,
+            )
+            result = event_alpha_send_readiness.build_send_readiness(
+                profile="notify_llm_deep",
+                artifact_namespace=namespace,
+                run_rows=[{
+                    "row_type": "event_alpha_run",
+                    "run_id": "run-1",
+                    "profile": "notify_llm_deep",
+                    "run_mode": "notification_burn_in",
+                    "artifact_namespace": namespace,
+                    "started_at": "2026-06-29T12:00:00+00:00",
+                    "cycle_completed": True,
+                    "success": True,
+                }],
+                core_opportunity_rows=[],
+                alert_rows=[],
+                delivery_rows=[delivery_row],
+                artifact_doctor=doctor,
+                send_guard_enabled=False,
+                telegram_ready=False,
+            )
+        finally:
+            os.chdir(old_cwd)
+
+    assert result.preview_path_source == "namespace_default"
+    assert result.preview_path and result.preview_path.endswith("event_alpha_notification_preview.md")
+
+
+def test_event_alpha_send_readiness_blocks_missing_preview_file():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_notification_delivery,
+        event_alpha_send_readiness,
+    )
+
+    with TemporaryDirectory() as tmp:
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(tmp)
+            namespace = "missing_preview"
+            delivery_row = event_alpha_notification_delivery.build_record(
+                run_id="run-1",
+                alert_id="heartbeat",
+                profile="notify_llm_deep",
+                namespace=namespace,
+                lane="health_heartbeat",
+                route="HEALTH_HEARTBEAT",
+                content_hash="hash",
+                state=event_alpha_notification_delivery.STATE_BLOCKED,
+                now=datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc),
+                error_class="guard_blocked",
+                error_message="event alerts disabled",
+                notification_preview_path="/Users/old/checkout/event_fade_cache/missing_preview/event_alpha_notification_preview.md",
+            ).to_row()
+            delivery_row["run_mode"] = "notification_burn_in"
+            doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
+                status="OK",
+                profile="notify_llm_deep",
+                artifact_namespace=namespace,
+                run_rows=1,
+                alert_rows=0,
+                feedback_rows=0,
+                outcome_rows=0,
+                card_files=0,
+            )
+            result = event_alpha_send_readiness.build_send_readiness(
+                profile="notify_llm_deep",
+                artifact_namespace=namespace,
+                run_rows=[{
+                    "row_type": "event_alpha_run",
+                    "run_id": "run-1",
+                    "profile": "notify_llm_deep",
+                    "run_mode": "notification_burn_in",
+                    "artifact_namespace": namespace,
+                    "started_at": "2026-06-29T12:00:00+00:00",
+                    "cycle_completed": True,
+                    "success": True,
+                }],
+                core_opportunity_rows=[],
+                alert_rows=[],
+                delivery_rows=[delivery_row],
+                artifact_doctor=doctor,
+                send_guard_enabled=False,
+                telegram_ready=False,
+            )
+        finally:
+            os.chdir(old_cwd)
+
+    assert result.preview_path_source == "missing"
+    assert any("notification preview" in blocker for blocker in result.blockers)
 
 
 def test_event_alpha_artifact_doctor_blocks_digest_delivery_without_core_identity():
@@ -23339,7 +23583,9 @@ def test_event_alpha_blocked_heartbeat_preview_uses_pipeline_summary():
     assert "Core opportunities: 122" in text
     assert "Extraction rows: 11" in text
     assert "LLM calls/skips: 8/0" in text
+    assert "Delivery lanes: due=1 · sent=0 · would_send_but_guard_disabled=1" in text
     assert "No-send rehearsal: would send, but send guard is disabled." in text
+    assert "This is expected in rehearsal mode." in text
     assert "would_send_but_guard_disabled" in text
     assert "status_detail=would_send_but_guard_disabled" in report
     assert "Raw events: 0" not in text
@@ -27864,6 +28110,18 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "RSI_EVENT_ALERTS_ENABLED=0" in readiness
     assert "--event-alert-send" not in readiness
 
+    smoke_readiness = subprocess.run(
+        ["make", "-n", "event-alpha-send-readiness", "PROFILE=notify_llm_deep_no_send_smoke", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "--event-alpha-profile fixture" in smoke_readiness
+    assert "--event-alpha-artifact-namespace notify_llm_deep_no_send_smoke" in smoke_readiness
+    assert "--event-alpha-include-test-artifacts" in smoke_readiness
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in smoke_readiness
+
     rehearsal = subprocess.run(
         ["make", "-n", "event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate", "PYTHON=python3"],
         cwd=root,
@@ -27877,6 +28135,22 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "main.py --event-alpha-notify-fixture-smoke" in rehearsal
     assert "main.py --event-alpha-send-readiness" in rehearsal
     assert "--event-alert-send" not in rehearsal
+
+    fast = subprocess.run(
+        ["make", "-n", "event-alpha-notify-llm-deep-real-no-send-rehearsal-fast", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in fast
+    assert "RSI_EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS=180" in fast
+    assert "RSI_EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN=10" in fast
+    assert "RSI_EVENT_LLM_MAX_CALLS_PER_RUN=40" in fast
+    assert "main.py --event-alpha-notify-cycle" in fast
+    assert "main.py --event-alpha-artifact-doctor" in fast
+    assert "main.py --event-alpha-send-readiness" in fast
+    assert "--event-alert-send" in fast
 
 
 def test_event_alpha_notification_run_summary_flows_to_runs_doctor_and_brief():
