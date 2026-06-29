@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Enforce canonical notification delivery identity · Codex
+**Why:** A live-style daily digest delivery could still be recorded with a
+lower-level hypothesis/watchlist id and no `core_opportunity_id`, feedback
+target, or canonical card path. That made the inbox/audit path look like a
+different opportunity than the actual core row, and artifact doctor did not
+catch it.
+**Changes:**
+- Notification previews now keep one section per lane in
+  `event_alpha_notification_preview.md` instead of overwriting the file with
+  only the last lane.
+- Daily digest and instant-escalation delivery rows are now doctor-checked for
+  canonical core identity, feedback target, canonical card path, and canonical
+  alert id. Heartbeats and explicit legacy/external rows remain exempt.
+- Delivery-time confirmation guards now also block unconfirmed BTC/ETH/SOL
+  broad strategic/treasury/valuation context from digest promotion.
+- The fixture notification smoke now writes VELVET accepted high-priority,
+  AAVE accepted digest, and BTC/TAO rejected control core rows, and the new
+  `make event-alpha-notify-llm-deep-no-send-smoke` proves blocked would-send
+  delivery rows without Telegram.
+**Verify:** `python3 tests/test_indicators.py` passed (543/543). Also ran
+targeted notification regression tests, `make
+event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3`, strict artifact
+doctor on that no-send namespace, `make event-alpha-signal-quality-eval
+PYTHON=python3`, `make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`,
+`make event-alpha-quality-validation-cycle PYTHON=python3`, `make
+event-llm-eval PYTHON=python3`, `make event-llm-extract-eval PYTHON=python3`,
+`make event-alpha-eval PYTHON=python3`, and `make verify PYTHON=python3`. The
+no-send smoke wrote two blocked would-send rows with canonical `agg:...`
+identity, no fake sender delivery, and artifact doctor status `OK`.
+**Notes/risks:** This is notification artifact/UX hardening only. No trading,
+paper trading, normal RSI signal writes, or LLM-created `TRIGGERED_FADE` paths
+were added.
+
 ## 2026-06-28 — Harden live notification identity and broad-asset digest guards · Codex
 **Why:** A live-style notification artifact could still be misleading if a
 delivery used a lower-level source row identity, or if a BTC/ETH/SOL

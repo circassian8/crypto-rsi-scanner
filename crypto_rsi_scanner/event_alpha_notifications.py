@@ -995,7 +995,7 @@ def format_core_opportunity_telegram_digest(
 
 
 def _evidence_line(core: Mapping[str, Any]) -> str:
-    accepted = int(_float_or_none(core.get("accepted_evidence_count")) or 0)
+    accepted = _accepted_evidence_count(core)
     status = str(core.get("evidence_acquisition_status") or "unknown").strip()
     confirm = str(core.get("acquisition_confirmation_status") or "").strip()
     pack = str(core.get("source_pack") or "source pack unknown").strip()
@@ -1219,7 +1219,7 @@ def _core_notification_block_reason(core: Mapping[str, Any]) -> str | None:
         return "sector_or_missing_validated_asset_not_digest_eligible"
     status = str(core.get("evidence_acquisition_status") or "").strip()
     confirmation = str(core.get("acquisition_confirmation_status") or "").strip()
-    accepted = int(_float_or_none(core.get("accepted_evidence_count")) or 0)
+    accepted = _accepted_evidence_count(core)
     market = str(core.get("market_confirmation_level") or "").strip().casefold()
     freshness = str(core.get("market_context_freshness_status") or "").strip().casefold()
     source_class = str(core.get("source_class") or "").strip().casefold()
@@ -1242,6 +1242,8 @@ def _core_notification_block_reason(core: Mapping[str, Any]) -> str | None:
         "venue_value_capture",
         "fan_token_event",
     }
+    if _core_is_unconfirmed_broad_strategic_asset(core):
+        return "delivery_blocked_broad_strategic_asset_unconfirmed"
     if has_accepted_confirmation or has_strong_source or (has_market_confirmation and direct_event):
         return None
     if status == "rejected_results_only" or confirmation == "does_not_confirm":
@@ -1253,6 +1255,78 @@ def _core_notification_block_reason(core: Mapping[str, Any]) -> str | None:
     if status in {"provider_unavailable", "backoff", "skipped_config", "not_configured"}:
         return f"{status}_not_confirmation"
     return "live_confirmation_missing"
+
+
+def _accepted_evidence_count(core: Mapping[str, Any]) -> int:
+    for key in ("accepted_evidence_count", "evidence_acquisition_accepted_count", "accepted_count"):
+        value = _float_or_none(core.get(key))
+        if value is not None:
+            return max(0, int(value))
+    return 0
+
+
+def _core_is_unconfirmed_broad_strategic_asset(core: Mapping[str, Any]) -> bool:
+    """Block broad treasury/equity valuation context from digest delivery.
+
+    BTC/ETH/SOL can be valid Event Alpha candidates, but live-style notification
+    delivery should not promote broad Strategy/MSTR/treasury/equity valuation
+    articles unless the token impact was independently confirmed.
+    """
+    accepted = _accepted_evidence_count(core)
+    confirmation = str(core.get("acquisition_confirmation_status") or "").strip()
+    if accepted > 0 or confirmation == "confirms" or bool(core.get("acquisition_confirms_candidate")):
+        return False
+    symbol = str(core.get("symbol") or core.get("validated_symbol") or "").strip().upper()
+    coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or "").strip().casefold()
+    if symbol not in {"BTC", "ETH", "SOL"} and coin_id not in {"bitcoin", "ethereum", "solana"}:
+        return False
+    impact = str(core.get("impact_path_type") or core.get("primary_impact_path") or "").strip().casefold()
+    reason = str(core.get("impact_path_reason") or core.get("primary_impact_path_reason") or "").strip().casefold()
+    if impact not in {"strategic_investment", "strategic_investment_or_valuation", "valuation_event"} and reason not in {
+        "strategic_investment",
+        "treasury_context",
+        "external_equity_proxy_context",
+    }:
+        return False
+    text = " ".join(
+        str(core.get(key) or "")
+        for key in (
+            "canonical_incident_name",
+            "incident_canonical_name",
+            "latest_event_name",
+            "event_name",
+            "latest_source_title",
+            "source_title",
+            "latest_source",
+            "source",
+            "why_opportunity_visible",
+            "final_verdict_reason",
+        )
+    ).casefold()
+    broad_terms = (
+        "strategy",
+        "microstrategy",
+        "mstr",
+        "treasury",
+        "holdings",
+        "valuation",
+        "discount",
+        "premium",
+        "public company",
+        "market structure",
+        "equity valuation",
+        "shares",
+        "stock",
+    )
+    direct_terms = (
+        "protocol upgrade",
+        "network upgrade",
+        "spot etf approved",
+        "listing",
+        "unlock",
+        "exploit",
+    )
+    return any(term in text for term in broad_terms) and not any(term in text for term in direct_terms)
 
 
 def _route_enum_for_value(value: object) -> event_alpha_router.EventAlphaRoute:
@@ -1339,6 +1413,7 @@ class _DeliveryWriter:
         self.now = now
         self.existing = delivery.load_delivery_records(cfg.path)
         self.preview_path = Path(cfg.path).expanduser().parent / "event_alpha_notification_preview.md"
+        self.preview_sections: list[dict[str, Any]] = []
         self.counts: dict[str, int] = {
             delivery.STATE_DELIVERED: 0,
             delivery.STATE_PARTIAL_DELIVERED: 0,
@@ -1590,7 +1665,15 @@ class _DeliveryWriter:
                 )
                 alert_ids = list(identity.notification_item_ids)
                 route_label = _route_label(items)
-            self.write_preview(message=message, lane=lane, route=route_label, identity=identity, would_send=True, sent=False)
+            self.write_preview(
+                message=message,
+                lane=lane,
+                route=route_label,
+                identity=identity,
+                would_send=True,
+                sent=False,
+                status="blocked",
+            )
             self._append(
                 alert_ids=alert_ids,
                 lane=lane,
@@ -1614,7 +1697,15 @@ class _DeliveryWriter:
                 identity_reconciliation_reason="heartbeat",
                 notification_preview_path=str(self.preview_path),
             )
-            self.write_preview(message=message, lane=LANE_HEALTH_HEARTBEAT, route="HEALTH_HEARTBEAT", identity=identity, would_send=True, sent=False)
+            self.write_preview(
+                message=message,
+                lane=LANE_HEALTH_HEARTBEAT,
+                route="HEALTH_HEARTBEAT",
+                identity=identity,
+                would_send=True,
+                sent=False,
+                status="blocked",
+            )
             self._append(
                 alert_ids=["heartbeat"],
                 lane=LANE_HEALTH_HEARTBEAT,
@@ -1637,34 +1728,60 @@ class _DeliveryWriter:
         identity: DeliveryIdentity,
         would_send: bool,
         sent: bool,
+        status: str | None = None,
     ) -> None:
-        """Write the latest operator-visible Telegram body for local review."""
+        """Write operator-visible Telegram bodies for all lanes in this run."""
+        section_status = str(status or ("sent" if sent else "would_send"))
+        self.preview_sections.append(
+            {
+                "lane": lane,
+                "route": route,
+                "would_send": bool(would_send),
+                "sent": bool(sent),
+                "status": section_status,
+                "identity": identity,
+                "message": message,
+            }
+        )
         body = [
             "# Event Alpha Notification Preview",
             "",
             f"generated_at: {self.now.isoformat()}",
             f"profile: {self.profile or 'default'}",
             f"namespace: {self.namespace or 'default'}",
-            f"lane: {lane}",
-            f"route: {route}",
-            f"would_send: {str(bool(would_send)).lower()}",
-            f"sent: {str(bool(sent)).lower()}",
-            f"alert_id: {identity.alert_id or self._joined(identity.notification_item_ids)}",
-            f"core_opportunity_id: {identity.core_opportunity_id or 'none'}",
-            f"canonical_symbol: {identity.canonical_symbol or 'unknown'}",
-            f"canonical_coin_id: {identity.canonical_coin_id or 'unknown'}",
-            f"feedback_target: {identity.feedback_target or identity.core_opportunity_id or identity.alert_id or 'none'}",
-            "source_alert_ids: " + ", ".join(identity.source_alert_ids or ("none",)),
-            "notification_item_ids: " + ", ".join(identity.notification_item_ids or ("none",)),
-            f"identity_reconciled: {str(identity.identity_reconciled).lower()}",
-            f"identity_reconciliation_reason: {identity.identity_reconciliation_reason or 'none'}",
             "",
-            "## Telegram Body",
-            "",
-            "```html",
-            message,
-            "```",
+            f"sections: {len(self.preview_sections)}",
         ]
+        for idx, section in enumerate(self.preview_sections, start=1):
+            item_identity = section["identity"]
+            body.extend(
+                [
+                    "",
+                    f"## Lane {idx}: {section['lane']}",
+                    "",
+                    f"lane: {section['lane']}",
+                    f"route: {section['route']}",
+                    f"status: {section['status']}",
+                    f"would_send: {str(bool(section['would_send'])).lower()}",
+                    f"sent: {str(bool(section['sent'])).lower()}",
+                    f"alert_id: {item_identity.alert_id or self._joined(item_identity.notification_item_ids)}",
+                    f"core_opportunity_id: {item_identity.core_opportunity_id or 'none'}",
+                    f"canonical_symbol: {item_identity.canonical_symbol or 'unknown'}",
+                    f"canonical_coin_id: {item_identity.canonical_coin_id or 'unknown'}",
+                    f"canonical_card_path: {item_identity.canonical_card_path or 'none'}",
+                    f"feedback_target: {item_identity.feedback_target or item_identity.core_opportunity_id or item_identity.alert_id or 'none'}",
+                    "source_alert_ids: " + ", ".join(item_identity.source_alert_ids or ("none",)),
+                    "notification_item_ids: " + ", ".join(item_identity.notification_item_ids or ("none",)),
+                    f"identity_reconciled: {str(item_identity.identity_reconciled).lower()}",
+                    f"identity_reconciliation_reason: {item_identity.identity_reconciliation_reason or 'none'}",
+                    "",
+                    "### Telegram Body",
+                    "",
+                    "```html",
+                    str(section["message"]),
+                    "```",
+                ]
+            )
         try:
             self.preview_path.parent.mkdir(parents=True, exist_ok=True)
             self.preview_path.write_text("\n".join(body) + "\n", encoding="utf-8")

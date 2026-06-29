@@ -167,15 +167,22 @@ Routed Telegram notifications are core-opportunity-first. When
 decisions to the canonical `core_opportunity_id` before formatting, dedupe, and
 delivery-ledger writes. Lower-level watchlist/hypothesis ids are retained as
 `source_alert_ids` for audit, but the delivered item, feedback target, and card
-reference should point at the `agg:...` core opportunity. The rendered Telegram
+reference should point at the `agg:...` core opportunity. Fresh daily digest and
+instant-escalation delivery rows must carry `core_opportunity_id`,
+`canonical_symbol`, `canonical_coin_id`, `canonical_card_path`,
+`feedback_target`, requested/source ids, and identity reconciliation metadata.
+Rows that cannot satisfy that contract must remain explicit diagnostics/legacy
+rows, not delivered core-opportunity notifications. The rendered Telegram
 body is intentionally compact: it shows candidate, catalyst, route/level,
 impact role, evidence status, market status, and check-next text, while hiding
 raw alert ids, card ids, full local paths, and repeated boilerplate. Each
-delivery attempt writes the last operator-visible body to
-`event_alpha_notification_preview.md`; use:
+delivery attempt appends its lane section to
+`event_alpha_notification_preview.md`, so a run with both high-priority and
+daily digest lanes can be reviewed in one file. Use:
 
 ```bash
 make event-alpha-notification-format-smoke PYTHON=python3
+make event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3
 make event-alpha-notification-deliveries-report PROFILE=fixture PYTHON=python3
 ```
 
@@ -185,7 +192,8 @@ delivery. A core row whose evidence acquisition is `rejected_results_only`,
 unless another strong confirmation exists: accepted source-pack evidence,
 official/structured/tagged source evidence, or fresh non-generic market
 confirmation on a real impact path. Artifact doctor strict mode checks delivery
-identity/core-store mismatches, noncanonical alert ids, rejected-only digest
+identity/core-store mismatches, missing core ids, missing feedback targets,
+missing canonical card paths, noncanonical alert ids, rejected-only digest
 items, missing previews, raw debug dumps, and absolute local paths in previewed
 Telegram bodies.
 

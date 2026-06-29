@@ -5289,6 +5289,7 @@ def event_alpha_notify_fixture_smoke(
         shutil.rmtree(context.namespace_dir, ignore_errors=True)
     _apply_event_alpha_context_to_config(context)
     _normalize_profile_paths()
+    no_send = str(os.getenv("RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND", "0")).strip().lower() in {"1", "true", "yes", "on"}
     run_id = event_alpha_run_ledger.run_id_for(now, "fixture")
     entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -5345,6 +5346,60 @@ def event_alpha_notify_fixture_smoke(
         alertable=True,
         reason="Fixture high-priority state escalation for notification smoke.",
         lane=event_alpha_router.EventAlphaRouteLane.INSTANT_ESCALATION,
+    )
+    aave_entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="fixture-aave-kraken|aave|strategic_investment",
+        cluster_id="fixture-aave-kraken|strategic_investment|2026-06-15",
+        event_id="fixture-notify-aave",
+        coin_id="aave",
+        symbol="AAVE",
+        relationship_type="strategic_investment",
+        external_asset="Kraken",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        previous_state=None,
+        first_seen_at=now.isoformat(),
+        last_seen_at=now.isoformat(),
+        source_count=2,
+        highest_score=78,
+        latest_score=78,
+        latest_tier="WATCHLIST",
+        latest_event_name="Kraken takes strategic stake in Aave ecosystem",
+        latest_source="Crypto news fixture",
+        latest_playbook_type="strategic_investment_or_valuation",
+        latest_rule_playbook_type="strategic_investment_or_valuation",
+        latest_effective_playbook_type="strategic_investment_or_valuation",
+        latest_playbook_score=78,
+        latest_playbook_action="watchlist",
+        latest_market_snapshot={},
+        latest_score_components={
+            "core_opportunity_id": "agg:fixture-aave-kraken",
+            "hypothesis_id": "hypothesis:fixture-aave-kraken",
+            "impact_path_type": "strategic_investment_or_valuation",
+            "impact_path_reason": "strategic_investment",
+            "candidate_role": "direct_subject",
+            "source_class": "crypto_news",
+            "evidence_specificity": "direct_token_mechanism",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "accepted_evidence_count": 1,
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 78,
+        },
+        incident_id="incident:fixture-aave-kraken",
+        hypothesis_id="hypothesis:fixture-aave-kraken",
+        should_alert=True,
+        material_change_reasons=("fixture_notification_digest",),
+    )
+    aave_decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=aave_entry,
+        route=event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+        alertable=True,
+        reason="Fixture accepted source evidence for strategic stake digest.",
+        lane=event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
     )
     core_source_row = {
         "row_type": "event_impact_hypothesis",
@@ -5430,8 +5485,90 @@ def event_alpha_notify_fixture_smoke(
         "latest_source": "Strategy valuation fixture",
         "why_opportunity_visible": "Fixture control: broad treasury valuation context is not direct BTC confirmation.",
     }
+    aave_core_source_row = {
+        "row_type": "event_impact_hypothesis",
+        "core_opportunity_id": "agg:fixture-aave-kraken",
+        "key": aave_entry.key,
+        "hypothesis_id": aave_entry.hypothesis_id,
+        "incident_id": aave_entry.incident_id,
+        "event_id": aave_entry.event_id,
+        "symbol": aave_entry.symbol,
+        "coin_id": aave_entry.coin_id,
+        "validated_symbol": aave_entry.symbol,
+        "validated_coin_id": aave_entry.coin_id,
+        "canonical_incident_name": aave_entry.latest_event_name,
+        "candidate_role": "direct_subject",
+        "impact_category": "strategic_investment_or_valuation",
+        "impact_path_type": "strategic_investment_or_valuation",
+        "impact_path_strength": "medium",
+        "impact_path_reason": "strategic_investment",
+        "relationship_type": "strategic_investment",
+        "opportunity_level": "validated_digest",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_score_final": 78,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RADAR.value,
+        "source_class": "crypto_news",
+        "evidence_specificity": "direct_token_mechanism",
+        "evidence_quality_score": 86,
+        "market_confirmation_score": 0,
+        "market_confirmation_level": "none",
+        "market_context_freshness_status": "missing",
+        "evidence_acquisition_status": "accepted_evidence_found",
+        "evidence_acquisition_accepted_count": 1,
+        "accepted_evidence_count": 1,
+        "acquisition_confirmation_status": "confirms",
+        "accepted_evidence_reason_codes": ["direct_token_mechanism"],
+        "accepted_evidence_samples": [
+            {
+                "title": "Kraken takes strategic stake in Aave ecosystem",
+                "provider": "crypto_news_fixture",
+                "source_url": "https://example.invalid/aave-kraken",
+            }
+        ],
+        "source_pack": "strategic_investment_pack",
+        "latest_source": "Crypto news fixture",
+        "latest_source_title": "Kraken takes strategic stake in Aave ecosystem",
+        "why_opportunity_visible": "Accepted direct source evidence validates the AAVE/Kraken relationship.",
+        "upgrade_requirements": ["verify primary source", "wait for market confirmation"],
+    }
+    tao_control = {
+        "row_type": "event_impact_hypothesis",
+        "core_opportunity_id": "agg:fixture-tao-rejected",
+        "key": "fixture-tao|bittensor|strategic_context",
+        "hypothesis_id": "hypothesis:fixture-tao-rejected",
+        "incident_id": "incident:fixture-tao-strategic",
+        "symbol": "TAO",
+        "coin_id": "bittensor",
+        "validated_symbol": "TAO",
+        "validated_coin_id": "bittensor",
+        "canonical_incident_name": "Broad AI infrastructure article mentions Bittensor without impact evidence",
+        "candidate_role": "direct_subject",
+        "impact_category": "strategic_investment_or_valuation",
+        "impact_path_type": "strategic_investment_or_valuation",
+        "impact_path_strength": "weak",
+        "impact_path_reason": "weak_cooccurrence_only",
+        "opportunity_level": "local_only",
+        "final_opportunity_level": "local_only",
+        "opportunity_score_final": 38,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+        "source_class": "broad_news",
+        "evidence_specificity": "weak_cooccurrence",
+        "evidence_quality_score": 40,
+        "market_confirmation_score": 0,
+        "market_confirmation_level": "none",
+        "market_context_freshness_status": "missing",
+        "evidence_acquisition_status": "rejected_results_only",
+        "evidence_acquisition_rejected_count": 1,
+        "accepted_evidence_count": 0,
+        "acquisition_confirmation_status": "does_not_confirm",
+        "source_pack": "strategic_investment_pack",
+        "latest_source": "Broad AI fixture",
+        "why_opportunity_visible": "Fixture control: broad AI/TAO co-occurrence is not validated impact evidence.",
+    }
     core_write = event_core_opportunity_store.write_core_opportunities(
-        [core_source_row, weak_btc_control],
+        [core_source_row, aave_core_source_row, weak_btc_control, tao_control],
         cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(context.core_opportunity_store_path),
         now=now,
         run_id=run_id,
@@ -5445,9 +5582,9 @@ def event_alpha_notify_fixture_smoke(
     ).rows
     card_write = event_research_cards.write_research_cards(
         context.research_cards_dir,
-        watchlist_entries=[entry],
+        watchlist_entries=[entry, aave_entry],
         alert_rows=core_rows,
-        route_decisions=[decision],
+        route_decisions=[decision, aave_decision],
         now=now,
         lineage_context=_event_alpha_card_lineage_context(
             run_id=run_id,
@@ -5468,6 +5605,8 @@ def event_alpha_notify_fixture_smoke(
     core_by_id = {str(row.get("core_opportunity_id") or ""): row for row in core_rows}
     canonical_core = core_by_id.get("agg:fixture-velvet-spacex") or (core_rows[0] if core_rows else {})
     btc_core = core_by_id.get("agg:fixture-btc-rejected") or {}
+    aave_core = core_by_id.get("agg:fixture-aave-kraken") or {}
+    tao_core = core_by_id.get("agg:fixture-tao-rejected") or {}
     snapshot_path = _write_fixture_alert_snapshot(
         context,
         entry=entry,
@@ -5475,6 +5614,14 @@ def event_alpha_notify_fixture_smoke(
         run_id=run_id,
         observed_at=now,
         core_row=canonical_core,
+    )
+    _write_fixture_alert_snapshot(
+        context,
+        entry=aave_entry,
+        decision=aave_decision,
+        run_id=run_id,
+        observed_at=now,
+        core_row=aave_core,
     )
     btc_entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
@@ -5537,10 +5684,71 @@ def event_alpha_notify_fixture_smoke(
         observed_at=now,
         core_row=btc_core,
     )
+    tao_entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="fixture-tao|bittensor|strategic_context",
+        cluster_id="fixture-tao|strategic_context|2026-06-15",
+        event_id="fixture-tao-rejected",
+        coin_id="bittensor",
+        symbol="TAO",
+        relationship_type="strategic_investment_or_valuation",
+        external_asset="AI infrastructure",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+        previous_state=None,
+        first_seen_at=now.isoformat(),
+        last_seen_at=now.isoformat(),
+        source_count=1,
+        highest_score=38,
+        latest_score=38,
+        latest_tier="STORE_ONLY",
+        latest_event_name="Broad AI infrastructure article mentions Bittensor without impact evidence",
+        latest_source="Broad AI fixture",
+        latest_playbook_type="strategic_investment_or_valuation",
+        latest_rule_playbook_type="strategic_investment_or_valuation",
+        latest_effective_playbook_type="strategic_investment_or_valuation",
+        latest_playbook_score=38,
+        latest_playbook_action="store_only",
+        latest_market_snapshot={},
+        latest_score_components={
+            "core_opportunity_id": "agg:fixture-tao-rejected",
+            "hypothesis_id": "hypothesis:fixture-tao-rejected",
+            "impact_path_type": "strategic_investment_or_valuation",
+            "impact_path_reason": "weak_cooccurrence_only",
+            "candidate_role": "direct_subject",
+            "source_class": "broad_news",
+            "evidence_acquisition_status": "rejected_results_only",
+            "accepted_evidence_count": 0,
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+            "opportunity_level": "local_only",
+            "opportunity_score_final": 38,
+        },
+        incident_id="incident:fixture-tao-strategic",
+        hypothesis_id="hypothesis:fixture-tao-rejected",
+        should_alert=False,
+        suppressed_reason="rejected_results_only_not_confirmation",
+    )
+    tao_decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=tao_entry,
+        route=event_alpha_router.EventAlphaRoute.STORE_ONLY,
+        alertable=False,
+        reason="Fixture control: rejected-only TAO context is local-only.",
+        lane=event_alpha_router.EventAlphaRouteLane.LOCAL_ONLY,
+    )
+    _write_fixture_alert_snapshot(
+        context,
+        entry=tao_entry,
+        decision=tao_decision,
+        run_id=run_id,
+        observed_at=now,
+        core_row=tao_core,
+    )
     fake_storage = _FixtureNotificationStorage()
     delivered_messages: list[str] = []
     notification_cfg = event_alpha_notifications.EventAlphaNotificationConfig(
-        enabled=True,
+        enabled=not no_send,
         mode="research_only",
         notification_scope=event_alpha_notifications.NOTIFICATION_SCOPE_NAMESPACE,
         profile_name=context.profile,
@@ -5568,7 +5776,7 @@ def event_alpha_notify_fixture_smoke(
         )
 
     send_result = event_alpha_notifications.send_notifications(
-        [decision],
+        [decision, aave_decision],
         storage=fake_storage,
         cfg=notification_cfg,
         send_fn=_fake_sender,
@@ -5581,6 +5789,7 @@ def event_alpha_notify_fixture_smoke(
         run_id=run_id,
         namespace=context.artifact_namespace,
     )
+    snapshot_rows_written = 4
     pipeline_result = SimpleNamespace(
         run_id=run_id,
         profile=context.profile,
@@ -5624,7 +5833,7 @@ def event_alpha_notify_fixture_smoke(
         research_cards_dir=str(context.research_cards_dir),
         snapshot_write_attempted=True,
         snapshot_write_success=True,
-        snapshot_rows_written=2,
+        snapshot_rows_written=snapshot_rows_written,
         snapshot_write_block_reason=None,
         notification_delivery_records_written=send_result.delivery_records_written,
         notification_deliveries_delivered=send_result.deliveries_delivered,
@@ -5659,6 +5868,7 @@ def event_alpha_notify_fixture_smoke(
         "EVENT ALPHA NOTIFICATION FIXTURE SMOKE (fake sender)",
         "=" * 76,
         f"run_id: {run_id}",
+        f"mode: {'no-send guarded preview' if no_send else 'fake sender'}",
         f"fake_sender_delivered: {len(delivered_messages)}",
         f"delivery_path: {delivery_cfg.path}",
         f"delivery_records_written: {send_result.delivery_records_written}",

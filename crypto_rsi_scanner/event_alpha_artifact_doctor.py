@@ -68,6 +68,9 @@ class EventAlphaArtifactDoctorResult:
     deliveries_partial_delivered: int = 0
     deliveries_failed: int = 0
     delivery_identity_mismatch_core_store: int = 0
+    delivery_core_id_missing: int = 0
+    delivery_feedback_target_missing: int = 0
+    delivery_card_path_missing: int = 0
     delivery_alert_id_not_canonical: int = 0
     telegram_message_contains_absolute_path: int = 0
     telegram_message_contains_raw_debug_dump: int = 0
@@ -643,6 +646,15 @@ def diagnose_artifacts(
             f"{delivery_conflicts['delivery_identity_mismatch_core_store']}"
         )
         (blockers if strict else warnings).append(message)
+    if delivery_conflicts["delivery_core_id_missing"]:
+        message = f"delivery_core_id_missing={delivery_conflicts['delivery_core_id_missing']}"
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["delivery_feedback_target_missing"]:
+        message = f"delivery_feedback_target_missing={delivery_conflicts['delivery_feedback_target_missing']}"
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["delivery_card_path_missing"]:
+        message = f"delivery_card_path_missing={delivery_conflicts['delivery_card_path_missing']}"
+        (blockers if strict else warnings).append(message)
     if delivery_conflicts["delivery_alert_id_not_canonical"]:
         message = (
             "delivery_alert_id_not_canonical="
@@ -902,6 +914,9 @@ def diagnose_artifacts(
         deliveries_partial_delivered=delivery_summary.partial_delivered,
         deliveries_failed=delivery_summary.failed,
         delivery_identity_mismatch_core_store=delivery_conflicts["delivery_identity_mismatch_core_store"],
+        delivery_core_id_missing=delivery_conflicts["delivery_core_id_missing"],
+        delivery_feedback_target_missing=delivery_conflicts["delivery_feedback_target_missing"],
+        delivery_card_path_missing=delivery_conflicts["delivery_card_path_missing"],
         delivery_alert_id_not_canonical=delivery_conflicts["delivery_alert_id_not_canonical"],
         telegram_message_contains_absolute_path=delivery_conflicts["telegram_message_contains_absolute_path"],
         telegram_message_contains_raw_debug_dump=delivery_conflicts["telegram_message_contains_raw_debug_dump"],
@@ -1599,6 +1614,9 @@ def _notification_delivery_conflicts(
 ) -> dict[str, int]:
     out = {
         "delivery_identity_mismatch_core_store": 0,
+        "delivery_core_id_missing": 0,
+        "delivery_feedback_target_missing": 0,
+        "delivery_card_path_missing": 0,
         "delivery_alert_id_not_canonical": 0,
         "telegram_message_contains_absolute_path": 0,
         "telegram_message_contains_raw_debug_dump": 0,
@@ -1615,9 +1633,17 @@ def _notification_delivery_conflicts(
         core_id = str(row.get("core_opportunity_id") or "").strip()
         alert_id = str(row.get("alert_id") or "").strip()
         core = core_rows_by_id.get(core_id) if core_id else None
+        requires_core = _delivery_requires_core_identity(row)
+        if requires_core:
+            if not core_id:
+                out["delivery_core_id_missing"] += 1
+            if not str(row.get("feedback_target") or "").strip():
+                out["delivery_feedback_target_missing"] += 1
+            if not str(row.get("canonical_card_path") or "").strip():
+                out["delivery_card_path_missing"] += 1
         if core_id and not core:
             out["delivery_identity_mismatch_core_store"] += 1
-        if core_id and alert_id and alert_id != core_id and lane != "triggered_fade":
+        if requires_core and alert_id and (not core_id or alert_id != core_id) and lane != "triggered_fade":
             out["delivery_alert_id_not_canonical"] += 1
         if core and lane in {"daily_digest", "instant_escalation"}:
             if _delivery_core_lacks_live_confirmation(core):
@@ -1636,7 +1662,7 @@ def _notification_delivery_conflicts(
         except OSError:
             out["notification_preview_missing"] += 1
             continue
-        telegram_body = text.split("## Telegram Body", 1)[-1]
+        telegram_body = "\n".join(_telegram_preview_bodies(text)) or text
         if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
             out["telegram_message_contains_absolute_path"] += 1
         if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
@@ -1644,12 +1670,37 @@ def _notification_delivery_conflicts(
     return out
 
 
+def _delivery_requires_core_identity(row: Mapping[str, Any]) -> bool:
+    lane = str(row.get("lane") or "").strip()
+    if lane not in {"daily_digest", "instant_escalation"}:
+        return False
+    reason = str(row.get("identity_reconciliation_reason") or "").strip().casefold()
+    if reason in {"legacy", "legacy_delivery", "external", "source_alert_identity_legacy"}:
+        return False
+    if str(row.get("legacy") or "").casefold() in {"1", "true", "yes"}:
+        return False
+    return True
+
+
+def _telegram_preview_bodies(text: str) -> tuple[str, ...]:
+    bodies = re.findall(r"```html\n(.*?)```", text, flags=re.DOTALL)
+    if bodies:
+        return tuple(bodies)
+    if "Telegram Body" in text:
+        return (text.split("Telegram Body", 1)[-1],)
+    return ()
+
+
 def _delivery_core_lacks_live_confirmation(core: Mapping[str, Any]) -> bool:
     if not event_alpha_router.route_value_is_alertable(core.get("final_route_after_quality_gate") or core.get("route")):
         return False
     status = str(core.get("evidence_acquisition_status") or "").strip()
     confirmation = str(core.get("acquisition_confirmation_status") or "").strip()
-    accepted = _as_int(core.get("accepted_evidence_count"))
+    accepted = max(
+        _as_int(core.get("accepted_evidence_count")),
+        _as_int(core.get("evidence_acquisition_accepted_count")),
+        _as_int(core.get("accepted_count")),
+    )
     source_class = str(core.get("source_class") or "").strip()
     market = str(core.get("market_confirmation_level") or "").casefold()
     freshness = str(core.get("market_context_freshness_status") or "").casefold()
@@ -2213,6 +2264,9 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             "notification deliveries: "
             f"rows={result.delivery_rows} partial={result.deliveries_partial_delivered} failed={result.deliveries_failed} "
             f"identity_mismatch={result.delivery_identity_mismatch_core_store} "
+            f"core_missing={result.delivery_core_id_missing} "
+            f"feedback_missing={result.delivery_feedback_target_missing} "
+            f"card_missing={result.delivery_card_path_missing} "
             f"alert_id_not_canonical={result.delivery_alert_id_not_canonical} "
             f"digest_without_confirmation={result.digest_item_without_live_confirmation} "
             f"digest_rejected_only={result.digest_item_rejected_results_only} "

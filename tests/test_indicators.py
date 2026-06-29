@@ -209,6 +209,14 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     )
     assert "--event-alpha-notify-fixture-smoke" in fixture_smoke_dry
     assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=fixture_notify_smoke" in fixture_smoke_dry
+    deep_no_send_smoke_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-notify-llm-deep-no-send-smoke", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-notify-fixture-smoke" in deep_no_send_smoke_dry
+    assert "RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND=1" in deep_no_send_smoke_dry
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_no_send_smoke" in deep_no_send_smoke_dry
     assert "check-python:" in makefile
     assert "bootstrap:" in makefile
     assert "python3 -m venv .venv" in makefile
@@ -12049,6 +12057,7 @@ def test_event_alpha_notification_uses_canonical_core_identity_and_compact_messa
     assert rows[0]["core_opportunity_id"] == "agg:ffdcb488dbed"
     assert rows[0]["canonical_symbol"] == "BTC"
     assert rows[0]["canonical_coin_id"] == "bitcoin"
+    assert rows[0]["canonical_card_path"] == "/tmp/local/cards/agg-ffdcb488dbed.md"
     assert rows[0]["feedback_target"] == "agg:ffdcb488dbed"
     assert rows[0]["identity_reconciled"] is True
     assert rows[0]["source_alert_ids"] == [decision.alert_id]
@@ -12140,6 +12149,84 @@ def test_event_alpha_notification_blocks_rejected_only_core_digest():
     assert any("rejected_results_only_not_confirmation" in warning for warning in plan.canonicalization_warnings)
 
 
+def test_event_alpha_notification_blocks_unconfirmed_broad_strategic_asset_digest():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router, event_watchlist
+
+    class FakeStorage:
+        def __init__(self):
+            self.meta = {}
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+    now = datetime(2026, 6, 28, 12, 0, tzinfo=timezone.utc)
+    entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="hypothesis|incident:mstr|bitcoin|strategic_context",
+        cluster_id="incident:mstr",
+        event_id="incident:mstr",
+        coin_id="bitcoin",
+        symbol="BTC",
+        relationship_type="impact_hypothesis",
+        external_asset="Strategy",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RADAR.value,
+        previous_state=None,
+        first_seen_at=now.isoformat(),
+        last_seen_at=now.isoformat(),
+        hypothesis_id="hypothesis:btc-strategy",
+        source_count=1,
+        highest_score=76,
+        latest_score=76,
+        latest_tier="WATCHLIST",
+        latest_event_name="Strategy valuation discount versus Bitcoin treasury holdings",
+        latest_source="fixture",
+        latest_score_components={"hypothesis_id": "hypothesis:btc-strategy"},
+        should_alert=True,
+    )
+    decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=entry,
+        route=event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+        alertable=True,
+        reason="pre-core strategic digest",
+        lane=event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+    )
+    broad_core = {
+        "core_opportunity_id": "agg:btc-strategy",
+        "primary_hypothesis_id": "hypothesis:btc-strategy",
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "canonical_incident_name": "Strategy valuation discount versus Bitcoin treasury holdings",
+        "latest_source_title": "MSTR valuation discount widens versus Bitcoin holdings",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_score_final": 76,
+        "final_route_after_quality_gate": "RESEARCH_DIGEST",
+        "impact_path_type": "strategic_investment_or_valuation",
+        "impact_path_reason": "treasury_context",
+        "source_class": "crypto_news",
+        "evidence_acquisition_status": "planned",
+        "acquisition_confirmation_status": "unresolved",
+        "accepted_evidence_count": 0,
+        "market_confirmation_level": "none",
+        "market_context_freshness_status": "missing",
+    }
+    plan = event_alpha_notifications.build_notification_plan(
+        [decision],
+        storage=FakeStorage(),
+        cfg=event_alpha_notifications.EventAlphaNotificationConfig(enabled=True, daily_digest_cooldown_hours=0),
+        now=now,
+        core_opportunity_rows=[broad_core],
+    )
+    assert event_alpha_notifications.LANE_DAILY_DIGEST not in plan.decisions_by_lane
+    assert plan.would_send_count == 0
+    assert any("delivery_blocked_broad_strategic_asset_unconfirmed" in warning for warning in plan.canonicalization_warnings)
+
+
 def test_event_alpha_artifact_doctor_flags_notification_identity_and_preview_conflicts():
     from crypto_rsi_scanner import event_alpha_artifact_doctor
 
@@ -12208,11 +12295,75 @@ def test_event_alpha_artifact_doctor_flags_notification_identity_and_preview_con
             strict=True,
         )
     assert result.delivery_alert_id_not_canonical == 1
+    assert result.delivery_feedback_target_missing == 1
+    assert result.delivery_card_path_missing == 1
     assert result.digest_item_without_live_confirmation == 1
     assert result.digest_item_rejected_results_only == 1
     assert result.strategic_broad_asset_digest_without_confirmation == 1
     assert result.telegram_message_contains_absolute_path == 1
     assert result.telegram_message_contains_raw_debug_dump == 1
+    assert result.status == "BLOCKED"
+
+
+def test_event_alpha_artifact_doctor_blocks_digest_delivery_without_core_identity():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        preview = Path(tmp) / "event_alpha_notification_preview.md"
+        preview.write_text(
+            "# Event Alpha Notification Preview\n\n"
+            "## Lane 1: daily_digest\n\n"
+            "### Telegram Body\n\n"
+            "```html\n"
+            "<b>Event Alpha Research Digest</b>\n"
+            "TAO / bittensor\n"
+            "```",
+            encoding="utf-8",
+        )
+        delivery_row = {
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "delivery-missing-core",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep",
+            "alert_id": "ea:hypothesis|incident:8ba9e42c8d86|bittensor",
+            "lane": "daily_digest",
+            "route": "RESEARCH_DIGEST",
+            "state": "delivered",
+            "attempted_at": "2026-06-28T12:00:00+00:00",
+            "delivered_at": "2026-06-28T12:00:01+00:00",
+            "notification_preview_path": str(preview),
+            "identity_reconciliation_reason": "source_alert_identity",
+        }
+        heartbeat = dict(
+            delivery_row,
+            delivery_id="delivery-heartbeat",
+            alert_id="heartbeat",
+            lane="health_heartbeat",
+            route="HEALTH_HEARTBEAT",
+            identity_reconciliation_reason="heartbeat",
+        )
+        result = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-1",
+                "row_type": "event_alpha_run",
+                "profile": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": "notify_llm_deep",
+                "alertable": 1,
+                "snapshot_write_success": True,
+                "snapshot_rows_written": 1,
+            }],
+            core_opportunity_rows=[],
+            delivery_rows=[delivery_row, heartbeat],
+            strict=True,
+        )
+    assert result.delivery_core_id_missing == 1
+    assert result.delivery_feedback_target_missing == 1
+    assert result.delivery_card_path_missing == 1
+    assert result.delivery_alert_id_not_canonical == 1
+    assert result.notification_preview_missing == 0
     assert result.status == "BLOCKED"
 
 
@@ -13280,9 +13431,9 @@ def test_event_alpha_notify_fixture_smoke_writes_namespaced_artifacts():
                 scanner.event_alpha_notify_fixture_smoke(event_now="2026-06-15T16:00:00Z")
             text = out.getvalue()
             assert "EVENT ALPHA NOTIFICATION FIXTURE SMOKE" in text
-            assert "fake_sender_delivered: 1" in text
-            assert "delivery_records_written: 1" in text
-            assert "delivery_delivered: 1" in text
+            assert "fake_sender_delivered: 2" in text
+            assert "delivery_records_written: 2" in text
+            assert "delivery_delivered: 2" in text
             assert "No live providers, Telegram sends" in text
             namespace = base / "fixture_notify_smoke"
             assert (namespace / "event_alpha_notification_runs.jsonl").exists()
@@ -13292,7 +13443,7 @@ def test_event_alpha_notify_fixture_smoke_writes_namespaced_artifacts():
             assert (namespace / "research_cards" / "index.md").exists()
             delivery_rows = delivery.load_delivery_records(namespace / "event_alpha_notification_deliveries.jsonl")
             summary = delivery.summarize_delivery_rows(delivery_rows)
-            assert summary.delivered == 1
+            assert summary.delivered == 2
             notification_rows = [
                 json.loads(line)
                 for line in (namespace / "event_alpha_notification_runs.jsonl").read_text(encoding="utf-8").splitlines()
@@ -13300,8 +13451,9 @@ def test_event_alpha_notify_fixture_smoke_writes_namespaced_artifacts():
             ]
             assert notification_rows[-1]["artifact_namespace"] == "fixture_notify_smoke"
             assert notification_rows[-1]["lane_counts_sent"]["instant_escalation"] == 1
-            assert notification_rows[-1]["delivery_records_written"] == 1
-            assert notification_rows[-1]["deliveries_delivered"] == 1
+            assert notification_rows[-1]["lane_counts_sent"]["daily_digest"] == 1
+            assert notification_rows[-1]["delivery_records_written"] == 2
+            assert notification_rows[-1]["deliveries_delivered"] == 2
             assert notification_rows[-1]["telegram_ready"] is False
     finally:
         for name, value in original.items():

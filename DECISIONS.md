@@ -38,8 +38,16 @@ items through canonical CoreOpportunity rows before delivery when the core store
 is available. Delivery ledger `alert_id` / dedupe item identity should use the
 canonical `core_opportunity_id`; lower-level router/watchlist/hypothesis ids
 must be preserved only as `source_alert_ids` / requested identity metadata.
+Daily digest and instant-escalation delivery rows must also persist
+`core_opportunity_id`, `canonical_symbol`, `canonical_coin_id`,
+`canonical_card_path`, `feedback_target`, requested/source ids, and
+identity-reconciliation metadata unless they are explicitly legacy/external
+diagnostics. Artifact doctor strict mode blocks fresh core-required delivery
+rows that miss those fields or keep a lower-level `ea:...` alert id.
 Telegram digest bodies should be compact operator summaries, not raw router
 debug dumps, and should omit full local paths and pipe-delimited internal ids.
+The local notification preview is multi-lane, so preview/review artifacts must
+show every planned/sent/blocked lane from the run, not just the last message.
 Live/send digest rows with non-confirming acquisition statuses such as
 `rejected_results_only`, `no_results`, or `skipped_budget` must remain
 local-only unless accepted evidence, a strong official/tagged source, or fresh
