@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-29 - Real Event Alpha sends require ledger-backed rehearsal readiness
+**Status:** accepted
+**Decision:** Before enabling real Telegram delivery for `notify_llm_deep`, the
+operator must run a real-profile no-send rehearsal under the
+`notify_llm_deep_rehearsal` namespace and pass
+`make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal`. Notification
+heartbeat/no-digest previews must summarize the latest run ledger and canonical
+core store rather than independent defaults, including completed status, raw
+events, extraction rows, core opportunities, alertable final routes, provider
+issues, LLM calls/skips, artifact-doctor status, and explicit no-send/send-guard
+state. Strict artifact doctor blocks fresh previews whose summary contradicts
+the latest run, lacks send-guard status, or uses unclear no-send wording.
+**Why:** A rehearsal that writes real artifacts but previews `Raw events=0`,
+`Core opportunities=0`, or `Completed=no` makes a safe run look broken and can
+hide stale artifacts. A separate send-readiness gate gives the operator one
+deterministic final check before flipping `RSI_EVENT_ALERTS_ENABLED=1`.
+**Revisit when:** Event Alpha notifications move to a typed operational UI that
+renders previews/readiness directly from a single delivery-run record.
+
 ## 2026-06-28 - Evidence acquisition failures are artifact status, not crashes
 **Status:** accepted
 **Decision:** Event Alpha evidence acquisition must return a complete

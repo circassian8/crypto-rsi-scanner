@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Finish notify_llm_deep rehearsal readiness gate · Codex
+**Why:** The deep notification rehearsal preview could contradict the real run
+ledger (`Raw events=0`, `Core opportunities=0`, `Completed=no`) even after a
+successful run, and no final artifact gate existed to stop real Telegram sends
+when preview/delivery/core artifacts were stale or unclear.
+**Changes:**
+- Heartbeat and no-digest notification previews now use the latest run summary
+  and canonical core counts, include extraction rows, alertable decisions,
+  delivery lane counts, provider issue counts, LLM call/skip counts, artifact
+  doctor status, and explicit no-send/send-guard wording.
+- Blocked delivery previews/reports distinguish `would_send_but_guard_disabled`,
+  send-guard blocks, quality-gate blocks, cooldown blocks, and not-due lanes.
+- Artifact doctor now checks preview/run summary consistency, core-count
+  consistency, alertable-count consistency, and missing/unclear send guard
+  status in strict mode.
+- Added `event_alpha_send_readiness.py`, CLI/Make wiring, and a repeatable
+  no-send deterministic `notify_llm_deep` fixture rehearsal. The readiness gate
+  requires a completed latest run, strict doctor with no blockers, a matching
+  preview, canonical delivery identity, confirmation for alertable cores, and
+  clear Telegram/send-guard state.
+- Bounded catalyst-frame LLM calls by the notification runtime deadline so a
+  slow read cannot hang the rest of the rehearsal.
+**Verify:** `python3 tests/test_indicators.py` passed (550/550);
+`make event-alpha-signal-quality-eval PYTHON=python3`, `make
+event-alpha-notification-format-smoke PYTHON=python3`, `make
+event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3`, `make
+event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate PYTHON=python3`,
+`make event-alpha-notify-llm-deep-real-no-send-rehearsal PYTHON=python3`,
+`make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal
+PYTHON=python3`, `make event-alpha-live-burn-in-no-send PYTHON=python3`,
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`, `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, `make
+event-alpha-daily-brief PROFILE=notify_llm_deep_rehearsal PYTHON=python3`,
+`make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal
+PYTHON=python3`, `make event-alpha-artifact-doctor
+PROFILE=notify_llm_deep_rehearsal STRICT=1 PYTHON=python3`, and `make verify
+PYTHON=python3` all passed. The real deep rehearsal ended with no send-readiness
+blockers and `READY_FOR_NO_SEND_REHEARSAL_REVIEW: yes`.
+**Notes/risks:** This is artifact, preview, and readiness hardening only. It
+does not send Telegram during tests, trade, paper trade, write normal RSI rows,
+or create `TRIGGERED_FADE`. Provider warnings from GDELT/RSS/CryptoPanic remain
+fail-soft live-source noise.
+
 ## 2026-06-29 — Add real notify_llm_deep no-send rehearsal · Codex
 **Why:** Fixture notification smokes were green, but old real-profile
 `notify_llm_deep` delivery rows could still look like current blockers. The

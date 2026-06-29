@@ -105,6 +105,7 @@ from . import event_alpha_router
 from . import event_alpha_policy_simulator
 from . import event_alpha_quality_review
 from . import event_alpha_quality_coverage
+from . import event_alpha_send_readiness
 from . import event_alpha_signal_quality
 from . import event_alpha_signal_quality_export
 from . import event_alpha_scheduler
@@ -2742,6 +2743,8 @@ def _event_alpha_notify_cycle_body(
                 extraction_cfg = replace(extraction_cfg, deadline_at=llm_deadline_at)
             extraction_provider = _event_llm_extraction_provider(extraction_cfg)
             catalyst_frame_cfg = _event_llm_catalyst_frame_config_from_runtime()
+            if llm_deadline_at is not None:
+                catalyst_frame_cfg = replace(catalyst_frame_cfg, deadline_at=llm_deadline_at)
             catalyst_frame_provider = _event_llm_catalyst_frame_provider(catalyst_frame_cfg)
             relationship_cfg = _event_llm_config_from_runtime()
             if llm_deadline_at is not None:
@@ -5287,8 +5290,9 @@ def event_alpha_notify_fixture_smoke(
     """Run a local fake-sender Event Alpha notification smoke."""
     _setup_event_discovery_logging(verbose)
     now = _event_research_now(event_now)
+    fixture_profile = str(os.getenv("RSI_EVENT_ALPHA_NOTIFY_FIXTURE_PROFILE", "fixture") or "fixture")
     context = event_alpha_artifacts.context_from_profile(
-        "fixture",
+        fixture_profile,
         run_mode="test",
         base_dir=config.EVENT_ALPHA_ARTIFACT_BASE_DIR,
         artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "fixture_notify_smoke",
@@ -5298,7 +5302,7 @@ def event_alpha_notify_fixture_smoke(
     _apply_event_alpha_context_to_config(context)
     _normalize_profile_paths()
     no_send = str(os.getenv("RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND", "0")).strip().lower() in {"1", "true", "yes", "on"}
-    run_id = event_alpha_run_ledger.run_id_for(now, "fixture")
+    run_id = event_alpha_run_ledger.run_id_for(now, context.profile)
     entry = event_watchlist.EventWatchlistEntry(
         schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
         row_type="event_watchlist_state",
@@ -6322,6 +6326,76 @@ def event_alpha_artifact_doctor_report(
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_artifact_doctor.format_artifact_doctor_report(result))
+
+
+def event_alpha_send_readiness_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
+) -> None:
+    """Print final read-only readiness before enabling real Event Alpha sends."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    artifact_namespace = artifact_namespace or context.artifact_namespace
+    profile_name = profile_name or (context.profile if context.profile != "default" else None)
+    artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
+    delivery_rows = event_alpha_notification_delivery.load_delivery_records(
+        event_alpha_notification_delivery.deliveries_path_for_context(context)
+    )
+    core_rows = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    ).rows
+    card_paths = [str(path) for path in _research_card_markdown_paths(context.research_cards_dir, include_index=True)]
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=artifacts["runs"].rows,
+        alert_rows=artifacts["alerts"].rows,
+        feedback_rows=artifacts["feedback_rows"],
+        outcome_rows=artifacts["outcome_rows"],
+        hypothesis_rows=artifacts["hypotheses"].rows,
+        core_opportunity_rows=core_rows,
+        watchlist_rows=artifacts["watchlist"].entries,
+        incident_rows=artifacts["incidents"].rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
+        card_paths=card_paths,
+        provider_health_rows=artifacts["provider_rows"],
+        llm_budget_rows=artifacts["budget_rows"],
+        delivery_rows=delivery_rows,
+        profile=profile_name,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+        inspected_alert_store_path=context.alert_store_path,
+        strict=True,
+        delivery_strict_scope="latest_run",
+    )
+    result = event_alpha_send_readiness.build_send_readiness(
+        profile=profile_name,
+        artifact_namespace=artifact_namespace,
+        run_rows=artifacts["runs"].rows,
+        core_opportunity_rows=core_rows,
+        alert_rows=artifacts["alerts"].rows,
+        delivery_rows=delivery_rows,
+        artifact_doctor=doctor,
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    print(_event_alpha_context_block(context))
+    print(event_alpha_send_readiness.format_send_readiness(result))
 
 
 def event_alpha_tuning_worksheet_report(
@@ -8985,6 +9059,11 @@ def cli() -> None:
         help="Print day-1 Event Alpha notification startup checklist.",
     )
     parser.add_argument(
+        "--event-alpha-send-readiness",
+        action="store_true",
+        help="Check latest notification rehearsal artifacts before enabling real Event Alpha Telegram sends.",
+    )
+    parser.add_argument(
         "--event-alpha-send-test",
         action="store_true",
         help="Send one guarded research-only Event Alpha heartbeat without running providers.",
@@ -9872,6 +9951,15 @@ def cli() -> None:
         return
     if args.event_alpha_notification_checklist:
         event_alpha_notification_checklist_report(verbose=args.verbose, profile_name=args.event_alpha_profile)
+        return
+    if args.event_alpha_send_readiness:
+        event_alpha_send_readiness_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+        )
         return
     if args.event_alpha_send_test:
         event_alpha_send_test(

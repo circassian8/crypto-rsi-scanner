@@ -11,13 +11,14 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import event_catalyst_frames, event_claim_semantics
 from .event_models import NormalizedEvent, RawDiscoveredEvent
 from .event_resolver import clean_text
-from .llm_providers.base import LLMCatalystFrameProvider
+from .llm_providers.base import LLMCatalystFrameProvider, LLMProviderResult
 
 
 LLM_CATALYST_FRAME_SCHEMA_VERSION = "event_llm_catalyst_frames_v1"
@@ -111,6 +112,7 @@ class EventLLMCatalystFrameConfig:
     only_ambiguous: bool = True
     require_evidence_quotes: bool = True
     prompt_version: str = "llm_catalyst_frames_v1"
+    deadline_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -200,7 +202,7 @@ def analyze_raw_events(
     for raw in selected:
         event = events_by_raw_id.get(raw.raw_id) if events_by_raw_id else None
         packet = build_catalyst_frame_packet(raw, event=event, cfg=cfg)
-        provider_result = provider.analyze_catalyst_frames(packet)
+        provider_result = _analyze_catalyst_frames_with_deadline(provider, packet, cfg=cfg)
         warnings: list[str] = []
         if provider_result.warning:
             warnings.append(provider_result.warning)
@@ -226,6 +228,31 @@ def analyze_raw_events(
             frame_required_reason=required_reason,
         ))
     return tuple(rows)
+
+
+def _analyze_catalyst_frames_with_deadline(
+    provider: LLMCatalystFrameProvider,
+    packet: Mapping[str, Any],
+    *,
+    cfg: EventLLMCatalystFrameConfig,
+) -> LLMProviderResult:
+    if _deadline_exhausted(cfg.deadline_at):
+        return LLMProviderResult(warning=_deadline_warning())
+    remaining = _remaining_deadline_seconds(cfg.deadline_at)
+    if remaining is None or not hasattr(provider, "timeout"):
+        return provider.analyze_catalyst_frames(packet)
+    try:
+        original_timeout = float(getattr(provider, "timeout"))
+    except (TypeError, ValueError):
+        return provider.analyze_catalyst_frames(packet)
+    bounded_timeout = max(1.0, min(original_timeout, remaining))
+    if bounded_timeout <= 1.0 and remaining <= 1.0:
+        return LLMProviderResult(warning=_deadline_warning())
+    try:
+        setattr(provider, "timeout", bounded_timeout)
+        return provider.analyze_catalyst_frames(packet)
+    finally:
+        setattr(provider, "timeout", original_timeout)
 
 
 def build_catalyst_frame_packet(
@@ -483,6 +510,24 @@ def _clamp_float(value: Any) -> float:
         return max(0.0, min(1.0, float(value)))
     except (TypeError, ValueError):
         return 0.0
+
+
+def _deadline_exhausted(deadline_at: datetime | None) -> bool:
+    if deadline_at is None:
+        return False
+    deadline = deadline_at.replace(tzinfo=timezone.utc) if deadline_at.tzinfo is None else deadline_at.astimezone(timezone.utc)
+    return datetime.now(timezone.utc) >= deadline
+
+
+def _remaining_deadline_seconds(deadline_at: datetime | None) -> float | None:
+    if deadline_at is None:
+        return None
+    deadline = deadline_at.replace(tzinfo=timezone.utc) if deadline_at.tzinfo is None else deadline_at.astimezone(timezone.utc)
+    return max(0.0, (deadline - datetime.now(timezone.utc)).total_seconds())
+
+
+def _deadline_warning() -> str:
+    return "LLM catalyst-frame analysis skipped: notification runtime deadline exhausted"
 
 
 def default_fixture_path() -> Path:

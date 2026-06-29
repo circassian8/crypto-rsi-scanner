@@ -12320,6 +12320,72 @@ def test_event_alpha_artifact_doctor_flags_notification_identity_and_preview_con
     assert result.status == "BLOCKED"
 
 
+def test_event_alpha_artifact_doctor_blocks_preview_run_summary_mismatch():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        preview = Path(tmp) / "event_alpha_notification_preview.md"
+        preview.write_text(
+            "# Event Alpha Notification Preview\n\n"
+            "## Lane 1: health_heartbeat\n\n"
+            "status: blocked\n"
+            "would_send: true\n"
+            "sent: false\n\n"
+            "### Telegram Body\n\n"
+            "```html\n"
+            "<b>Event Alpha Heartbeat</b>\n"
+            "Completed: no\n"
+            "Raw events: 0 · Core opportunities: 0\n"
+            "Alertable decisions: 0 · Sent by this lane: heartbeat\n"
+            "```",
+            encoding="utf-8",
+        )
+        delivery_row = {
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "heartbeat-blocked",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep_rehearsal",
+            "alert_id": "heartbeat",
+            "lane": "health_heartbeat",
+            "route": "HEALTH_HEARTBEAT",
+            "state": "blocked",
+            "error_class": "guard_blocked",
+            "error_message_safe": "event alerts disabled",
+            "attempted_at": "2026-06-29T12:00:00+00:00",
+            "notification_preview_path": str(preview),
+        }
+        result = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "row_type": "event_alpha_run",
+                "run_id": "run-1",
+                "profile": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": "notify_llm_deep_rehearsal",
+                "cycle_completed": True,
+                "raw_events": 159,
+                "core_opportunity_rows_written": 122,
+                "alertable": 0,
+                "success": True,
+            }],
+            core_opportunity_rows=[],
+            delivery_rows=[delivery_row],
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep_rehearsal",
+            strict=True,
+        )
+        text = event_alpha_artifact_doctor.format_artifact_doctor_report(result)
+
+    assert result.notification_preview_run_summary_mismatch >= 1
+    assert result.notification_preview_core_count_mismatch == 1
+    assert result.notification_preview_missing_send_guard_status == 1
+    assert result.notification_preview_no_send_status_unclear == 1
+    assert result.status == "BLOCKED"
+    assert "preview_run_mismatch=" in text
+    assert "preview_core_mismatch=1" in text
+
+
 def test_event_alpha_artifact_doctor_blocks_digest_delivery_without_core_identity():
     from crypto_rsi_scanner import event_alpha_artifact_doctor
 
@@ -12380,6 +12446,108 @@ def test_event_alpha_artifact_doctor_blocks_digest_delivery_without_core_identit
     assert result.delivery_alert_id_not_canonical == 1
     assert result.notification_preview_missing == 0
     assert result.status == "BLOCKED"
+
+
+def test_event_alpha_send_readiness_accepts_clean_no_send_rehearsal():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_notification_delivery,
+        event_alpha_send_readiness,
+    )
+
+    with TemporaryDirectory() as tmp:
+        preview = Path(tmp) / "event_alpha_notification_preview.md"
+        preview.write_text(
+            "# Event Alpha Notification Preview\n\n"
+            "## Lane 1: health_heartbeat\n\n"
+            "status: would_send_but_guard_disabled\n\n"
+            "### Telegram Body\n\n"
+            "```html\n"
+            "<b>Event Alpha Heartbeat</b>\n"
+            "Completed: yes\n"
+            "Raw events: 159 · Core opportunities: 1\n"
+            "Alertable decisions: 1 · Sent by this lane: heartbeat\n"
+            "Send guard: No-send rehearsal: would send, but send guard is disabled.\n"
+            "```",
+            encoding="utf-8",
+        )
+        doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
+            status="OK",
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep_rehearsal",
+            run_rows=1,
+            alert_rows=1,
+            feedback_rows=0,
+            outcome_rows=0,
+            card_files=1,
+        )
+        run = {
+            "row_type": "event_alpha_run",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep_rehearsal",
+            "started_at": "2026-06-29T12:00:00+00:00",
+            "cycle_completed": True,
+            "success": True,
+            "raw_events": 159,
+            "core_opportunity_rows_written": 1,
+            "alertable": 1,
+        }
+        core = {
+            "row_type": "event_core_opportunity",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep_rehearsal",
+            "core_opportunity_id": "agg:velvet",
+            "symbol": "VELVET",
+            "final_route_after_quality_gate": "HIGH_PRIORITY_RESEARCH",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "accepted_evidence_count": 1,
+            "acquisition_confirmation_status": "confirms",
+            "effective_playbook_type": "proxy_attention",
+        }
+        delivery_row = event_alpha_notification_delivery.build_record(
+            run_id="run-1",
+            alert_id="agg:velvet",
+            profile="notify_llm_deep",
+            namespace="notify_llm_deep_rehearsal",
+            lane="instant_escalation",
+            route="HIGH_PRIORITY_RESEARCH",
+            content_hash="hash",
+            state=event_alpha_notification_delivery.STATE_BLOCKED,
+            now=datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc),
+            error_class="guard_blocked",
+            error_message="event alerts disabled",
+            core_opportunity_id="agg:velvet",
+            canonical_symbol="VELVET",
+            canonical_coin_id="velvet",
+            canonical_card_path="cards/velvet.md",
+            feedback_target="agg:velvet",
+            notification_preview_path=str(preview),
+        ).to_row()
+        delivery_row["run_mode"] = "notification_burn_in"
+        result = event_alpha_send_readiness.build_send_readiness(
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep_rehearsal",
+            run_rows=[run],
+            core_opportunity_rows=[core],
+            alert_rows=[],
+            delivery_rows=[delivery_row],
+            artifact_doctor=doctor,
+            send_guard_enabled=False,
+            telegram_ready=False,
+        )
+        text = event_alpha_send_readiness.format_send_readiness(result)
+
+    assert result.ready is True
+    assert result.no_send_rehearsal is True
+    assert "READY_FOR_NO_SEND_REHEARSAL_REVIEW: yes" in text
+    assert "READY_FOR_EVENT_ALPHA_SEND: no" in text
+    assert "no-send rehearsal: send guard disabled" in text
+    assert "Blockers:\n- none" in text
 
 
 def test_event_alpha_artifact_doctor_scopes_delivery_identity_to_latest_run():
@@ -23117,6 +23285,68 @@ def test_event_alpha_notification_send_blocked_when_disabled_records_blocked():
         assert any(row["state"] == "blocked" for row in delivery.load_delivery_records(dcfg.path))
 
 
+def test_event_alpha_blocked_heartbeat_preview_uses_pipeline_summary():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notification_delivery, event_alpha_notifications
+
+    with TemporaryDirectory() as tmp:
+        delivery_path = Path(tmp) / "event_alpha_notification_deliveries.jsonl"
+        pipeline = SimpleNamespace(
+            profile="notify_llm_deep",
+            cycle_completed=True,
+            partial_results=False,
+            warnings=(),
+            raw_events=159,
+            core_opportunity_rows_written=122,
+            alertable=0,
+            extraction_rows=11,
+            send_would_send_items=1,
+            send_lane_items_attempted={event_alpha_notifications.LANE_HEALTH_HEARTBEAT: 1},
+            send_lane_items_delivered={event_alpha_notifications.LANE_HEALTH_HEARTBEAT: 0},
+            llm_calls_attempted=8,
+            llm_skipped_due_budget=0,
+            artifact_doctor_status="OK",
+        )
+        result = event_alpha_notifications.send_notifications(
+            [],
+            storage=_NotifyFakeStorage(),
+            cfg=event_alpha_notifications.EventAlphaNotificationConfig(
+                enabled=False,
+                health_heartbeat_enabled=True,
+                health_heartbeat_cooldown_hours=0,
+            ),
+            send_fn=lambda message: True,
+            now=datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc),
+            profile="notify_llm_deep",
+            pipeline_result=pipeline,
+            include_health_heartbeat=True,
+            delivery_cfg=event_alpha_notification_delivery.NotificationDeliveryConfig(path=delivery_path),
+            run_id="run-rehearsal",
+            namespace="notify_llm_deep_rehearsal",
+        )
+        preview = Path(tmp) / "event_alpha_notification_preview.md"
+        text = preview.read_text(encoding="utf-8")
+        report = event_alpha_notification_delivery.format_delivery_report(
+            event_alpha_notification_delivery.load_delivery_records(delivery_path),
+            path=delivery_path,
+            profile="notify_llm_deep",
+            namespace="notify_llm_deep_rehearsal",
+        )
+
+    assert result.deliveries_blocked == 1
+    assert "Completed: yes" in text
+    assert "Raw events: 159" in text
+    assert "Core opportunities: 122" in text
+    assert "Extraction rows: 11" in text
+    assert "LLM calls/skips: 8/0" in text
+    assert "No-send rehearsal: would send, but send guard is disabled." in text
+    assert "would_send_but_guard_disabled" in text
+    assert "status_detail=would_send_but_guard_disabled" in report
+    assert "Raw events: 0" not in text
+    assert "Core opportunities: 0" not in text
+    assert "Completed: no" not in text
+
+
 def test_event_alpha_exploratory_digest_surfaces_suppressed_rows_without_alerting():
     import tempfile
     from datetime import datetime, timezone
@@ -23664,6 +23894,73 @@ def test_llm_catalyst_frame_fixture_validation_and_downstream_use():
     assert thor_validation.selected_main_frame is not None
     assert thor_validation.selected_main_frame.frame_type == "exploit_security_event"
     assert thor_validation.frame_rule_disagreement is False
+
+
+def test_llm_catalyst_frame_runtime_deadline_skips_and_bounds_timeout():
+    from datetime import datetime, timedelta, timezone
+    from crypto_rsi_scanner import event_llm_catalyst_frames
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.base import LLMProviderResult
+
+    now = datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc)
+    raw = RawDiscoveredEvent(
+        raw_id="aave_kraken_deadline",
+        provider="fixture_news",
+        fetched_at=now,
+        published_at=now,
+        source_url="https://alpha.example/aave-deadline",
+        title="Kraken considers strategic stake in Aave",
+        body="Kraken could acquire a stake in Aave after earlier exploit context.",
+        raw_json={},
+        source_confidence=0.90,
+        content_hash="aave_kraken_deadline",
+    )
+
+    class ProbeProvider:
+        name = "probe"
+
+        def __init__(self):
+            self.timeout = 30.0
+            self.calls = 0
+            self.seen_timeouts = []
+
+        def analyze_catalyst_frames(self, packet):
+            self.calls += 1
+            self.seen_timeouts.append(float(self.timeout))
+            return LLMProviderResult(warning="probe warning")
+
+    expired_provider = ProbeProvider()
+    expired_rows = event_llm_catalyst_frames.analyze_raw_events(
+        (raw,),
+        expired_provider,
+        cfg=event_llm_catalyst_frames.EventLLMCatalystFrameConfig(
+            enabled=True,
+            max_rows_per_run=1,
+            min_source_score=0.0,
+            only_ambiguous=False,
+            deadline_at=datetime(2000, 1, 1, tzinfo=timezone.utc),
+        ),
+    )
+    assert expired_provider.calls == 0
+    assert expired_rows
+    assert any("runtime deadline exhausted" in warning for warning in expired_rows[0].warnings)
+
+    bounded_provider = ProbeProvider()
+    bounded_rows = event_llm_catalyst_frames.analyze_raw_events(
+        (raw,),
+        bounded_provider,
+        cfg=event_llm_catalyst_frames.EventLLMCatalystFrameConfig(
+            enabled=True,
+            max_rows_per_run=1,
+            min_source_score=0.0,
+            only_ambiguous=False,
+            deadline_at=datetime.now(timezone.utc) + timedelta(seconds=5),
+        ),
+    )
+    assert bounded_provider.calls == 1
+    assert bounded_rows and any("probe warning" in warning for warning in bounded_rows[0].warnings)
+    assert 1.0 <= bounded_provider.seen_timeouts[0] <= 5.0
+    assert bounded_provider.timeout == 30.0
 
 
 def test_event_alpha_operating_cycle_applies_llm_catalyst_frame_validation():
@@ -27547,6 +27844,39 @@ def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock(
         assert "--score" not in out
         assert "paper" not in out
         assert "main.py --event-alpha-notify-cycle" in out
+
+
+def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    readiness = subprocess.run(
+        ["make", "-n", "event-alpha-send-readiness", "PROFILE=notify_llm_deep_rehearsal", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "main.py --event-alpha-send-readiness" in readiness
+    assert "--event-alpha-profile notify_llm_deep" in readiness
+    assert "--event-alpha-artifact-namespace notify_llm_deep_rehearsal" in readiness
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in readiness
+    assert "--event-alert-send" not in readiness
+
+    rehearsal = subprocess.run(
+        ["make", "-n", "event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "RSI_EVENT_ALPHA_NOTIFY_FIXTURE_PROFILE=notify_llm_deep" in rehearsal
+    assert "RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND=1" in rehearsal
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in rehearsal
+    assert "main.py --event-alpha-notify-fixture-smoke" in rehearsal
+    assert "main.py --event-alpha-send-readiness" in rehearsal
+    assert "--event-alert-send" not in rehearsal
 
 
 def test_event_alpha_notification_run_summary_flows_to_runs_doctor_and_brief():

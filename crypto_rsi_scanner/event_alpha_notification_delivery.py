@@ -541,6 +541,9 @@ def _section(title: str, rows: list[dict[str, Any]], limit: int) -> list[str]:
             f"- {stamp} lane={row.get('lane') or 'unknown'} item={identity} "
             f"route={row.get('route') or 'n/a'} key={str(row.get('dedupe_key') or row.get('content_hash') or '')[:12]}"
         )
+        status_detail = _delivery_status_detail(row)
+        if status_detail:
+            detail += f" status_detail={status_detail}"
         if row.get("source_alert_ids") and row.get("identity_reconciled"):
             detail += " source_alerts=" + ",".join(str(item) for item in row.get("source_alert_ids") or [])
         if row.get("error_class"):
@@ -553,6 +556,25 @@ def _section(title: str, rows: list[dict[str, Any]], limit: int) -> list[str]:
 
 def _filter_state(rows: Iterable[Mapping[str, Any]], state: str) -> list[dict[str, Any]]:
     return [dict(row) for row in rows if str(row.get("state") or "") == state]
+
+
+def _delivery_status_detail(row: Mapping[str, Any]) -> str:
+    state = str(row.get("state") or "")
+    error_class = str(row.get("error_class") or "").casefold()
+    error = str(row.get("error_message_safe") or "").casefold()
+    if state == STATE_BLOCKED:
+        if error_class == "guard_blocked" and ("event alerts disabled" in error or "rsi_event_alerts_enabled" in error):
+            return "would_send_but_guard_disabled"
+        if "quality" in error:
+            return "blocked_by_quality_gate"
+        if "cooldown" in error or "duplicate" in error:
+            return "blocked_by_cooldown"
+        return "blocked_by_send_guard"
+    if state == STATE_SKIPPED_DUPLICATE:
+        return "blocked_by_cooldown"
+    if state == STATE_SKIPPED_IN_FLIGHT:
+        return "skipped_in_flight"
+    return ""
 
 
 def _row_rank(row: Mapping[str, Any]) -> tuple[int, str]:

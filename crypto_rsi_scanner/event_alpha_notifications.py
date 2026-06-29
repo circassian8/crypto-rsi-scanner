@@ -548,7 +548,13 @@ def send_notifications(
     if not cfg.enabled or cfg.mode != "research_only":
         block_reason = "event alerts disabled" if not cfg.enabled else "event alert mode is not research_only"
         if writer:
-            writer.record_blocked(plan, profile=profile, card_map=card_map, reason=block_reason)
+            writer.record_blocked(
+                plan,
+                profile=profile,
+                card_map=card_map,
+                reason=block_reason,
+                pipeline_result=pipeline_result,
+            )
             if not writer.preview_sections:
                 writer.write_no_digest_preview(profile=profile, pipeline_result=pipeline_result, reason=block_reason)
         return _result(
@@ -571,6 +577,7 @@ def send_notifications(
                 card_map=card_map,
                 reason=block_reason,
                 error_class="notifications_paused",
+                pipeline_result=pipeline_result,
             )
             if not writer.preview_sections:
                 writer.write_no_digest_preview(profile=profile, pipeline_result=pipeline_result, reason=block_reason)
@@ -1639,7 +1646,9 @@ class _DeliveryWriter:
         card_map: dict[str, Any],
         reason: str,
         error_class: str = "guard_blocked",
+        pipeline_result: Any | None = None,
     ) -> None:
+        status_detail = _blocked_preview_status_detail(reason, error_class=error_class)
         for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST, LANE_EXPLORATORY_DIGEST):
             exploratory = lane == LANE_EXPLORATORY_DIGEST
             items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
@@ -1680,7 +1689,7 @@ class _DeliveryWriter:
                 identity=identity,
                 would_send=True,
                 sent=False,
-                status="blocked",
+                status=status_detail,
             )
             self._append(
                 alert_ids=alert_ids,
@@ -1695,7 +1704,12 @@ class _DeliveryWriter:
                 error_message=reason,
             )
         if plan.heartbeat_due:
-            message = format_health_heartbeat(profile=profile)
+            message = format_health_heartbeat(
+                profile=profile,
+                result=pipeline_result,
+                now=self.now,
+                send_guard_status=_send_guard_status_line(reason, error_class=error_class),
+            )
             identity = DeliveryIdentity(
                 notification_item_ids=("heartbeat",),
                 source_alert_ids=("heartbeat",),
@@ -1712,7 +1726,7 @@ class _DeliveryWriter:
                 identity=identity,
                 would_send=True,
                 sent=False,
-                status="blocked",
+                status=status_detail,
             )
             self._append(
                 alert_ids=["heartbeat"],
@@ -1804,16 +1818,25 @@ class _DeliveryWriter:
         reason: str,
     ) -> None:
         warnings = tuple(str(item) for item in getattr(pipeline_result, "warnings", ()) or () if str(item))
+        lane_due = _mapping_value(pipeline_result, "send_lane_items_attempted")
+        lane_sent = _mapping_value(pipeline_result, "send_lane_items_delivered")
+        lanes_due = sum(_safe_int(value) for value in lane_due.values())
+        lanes_sent = sum(_safe_int(value) for value in lane_sent.values())
         lines = [
             "<b>Event Alpha Notification Rehearsal</b>",
             "<i>Research-only / unvalidated. Not a trade signal.</i>",
-            f"Profile: {_esc(profile or getattr(pipeline_result, 'profile', None) or 'default')}",
+            f"Profile: {_esc(profile or _value(pipeline_result, 'profile') or 'default')}",
             "Mode: no-send rehearsal / preview only",
             "Status: no digest candidates would be sent",
             f"Reason: {_esc(reason or 'no due notifications')}",
+            f"Completed: {_yes_no(bool(_value(pipeline_result, 'cycle_completed', pipeline_result is not None)))}",
             f"Raw events: {_num(pipeline_result, 'raw_events')} · Core opportunities: {_num(pipeline_result, 'core_opportunities')}",
+            f"Extraction rows: {_num(pipeline_result, 'extraction_rows')}",
             f"Alertable decisions: {_num(pipeline_result, 'alertable')}",
+            f"Delivery lanes: due={lanes_due} · sent={lanes_sent} · blocked={max(0, _num(pipeline_result, 'send_would_send_items') - lanes_sent)}",
             f"Provider issues: {_provider_failure_count(warnings)}",
+            f"LLM calls/skips: {_num(pipeline_result, 'llm_calls_attempted')}/{_num(pipeline_result, 'llm_skipped_due_budget')}",
+            f"Send guard: {_send_guard_status_line(reason)}",
         ]
         if warnings:
             lines.append("Top issues: " + _esc("; ".join(_truncate_text(item, 90) for item in warnings[:3])))
@@ -2197,23 +2220,36 @@ def format_health_heartbeat(
     profile: str | None,
     result: Any | None = None,
     now: datetime | None = None,
+    send_guard_status: str | None = None,
 ) -> str:
     observed = _as_utc(now or datetime.now(timezone.utc))
-    warnings = tuple(str(item) for item in getattr(result, "warnings", ()) or () if str(item))
+    warnings = tuple(str(item) for item in _value(result, "warnings") or () if str(item))
     partial = bool(getattr(result, "partial_results", False) or _provider_failure_count(warnings) > 0)
+    lane_due = _mapping_value(result, "send_lane_items_attempted")
+    lane_sent = _mapping_value(result, "send_lane_items_delivered")
+    lanes_due = sum(_safe_int(value) for value in lane_due.values())
+    lanes_sent = sum(_safe_int(value) for value in lane_sent.values())
+    lanes_blocked = max(0, _num(result, "send_would_send_items") - lanes_sent)
+    llm_calls = _num(result, "llm_calls_attempted")
+    llm_skipped = _num(result, "llm_skipped_due_budget")
     lines = [
         "<b>Event Alpha Heartbeat</b>",
         "<i>Research-only / unvalidated. Not a trade signal.</i>",
-        f"Profile: {_esc(profile or getattr(result, 'profile', None) or 'default')}",
+        f"Profile: {_esc(profile or _value(result, 'profile') or 'default')}",
         f"Generated: {_esc(observed.isoformat())}",
         f"Status: {_esc('degraded' if partial else 'ok')}",
-        f"Completed: {_yes_no(bool(getattr(result, 'cycle_completed', result is not None)))}",
+        f"Completed: {_yes_no(bool(_value(result, 'cycle_completed', result is not None)))}",
         f"Raw events: {_num(result, 'raw_events')} · Core opportunities: {_num(result, 'core_opportunities')}",
+        f"Extraction rows: {_num(result, 'extraction_rows')}",
         f"Alertable decisions: {_num(result, 'alertable')} · Sent by this lane: heartbeat",
+        f"Delivery lanes: due={lanes_due} · sent={lanes_sent} · blocked={lanes_blocked}",
         f"Provider issues: {_provider_failure_count(warnings)}",
+        f"LLM calls/skips: {llm_calls}/{llm_skipped}",
         f"LLM budget: {'exhausted' if _runtime_budget_exhausted(warnings) else 'ok'}",
-        f"Artifact doctor: {_esc(getattr(result, 'artifact_doctor_status', 'not_run') if result is not None else 'not_run')}",
+        f"Artifact doctor: {_esc(_value(result, 'artifact_doctor_status', 'not_run') if result is not None else 'not_run')}",
     ]
+    if send_guard_status:
+        lines.append(f"Send guard: {_esc(send_guard_status)}")
     if warnings:
         lines.append("Top issues: " + _esc("; ".join(_truncate_text(item, 90) for item in warnings[:3])))
     else:
@@ -2453,11 +2489,63 @@ def _esc(value: object) -> str:
     return html.escape(str(value), quote=False)
 
 
-def _num(result: Any | None, attr: str) -> int:
+def _value(result: Any | None, attr: str, default: Any = None) -> Any:
+    if result is None:
+        return default
+    if isinstance(result, Mapping):
+        return result.get(attr, default)
+    return getattr(result, attr, default)
+
+
+def _safe_int(value: Any) -> int:
     try:
-        return int(getattr(result, attr, 0) or 0)
+        return int(value or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _mapping_value(result: Any | None, attr: str) -> dict[str, Any]:
+    value = _value(result, attr, {})
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _num(result: Any | None, attr: str) -> int:
+    if attr == "core_opportunities":
+        value = _value(result, "core_opportunities", None)
+        if value is None:
+            value = _value(result, "core_opportunity_rows_written", 0)
+        return _safe_int(value)
+    return _safe_int(_value(result, attr, 0))
+
+
+def _send_guard_status_line(reason: str, *, error_class: str = "guard_blocked") -> str:
+    lower = str(reason or "").casefold()
+    if error_class == "notifications_paused":
+        return "Notifications paused: would send only after the local pause is cleared."
+    if "no due notifications" in lower or "no digest candidates" in lower:
+        return "No due notification lanes."
+    if "event alerts disabled" in lower or "rsi_event_alerts_enabled" in lower:
+        return "No-send rehearsal: would send, but send guard is disabled."
+    if "quality" in lower:
+        return "Blocked by quality gate."
+    if "cooldown" in lower or "duplicate" in lower:
+        return "Blocked by cooldown or duplicate guard."
+    return "Blocked by send guard."
+
+
+def _blocked_preview_status_detail(reason: str, *, error_class: str = "guard_blocked") -> str:
+    lower = str(reason or "").casefold()
+    if error_class == "notifications_paused":
+        return "blocked_by_send_guard"
+    if "no due notifications" in lower or "no digest candidates" in lower:
+        return "not_due"
+    if "event alerts disabled" in lower or "rsi_event_alerts_enabled" in lower:
+        return "would_send_but_guard_disabled"
+    if "quality" in lower:
+        return "blocked_by_quality_gate"
+    if "cooldown" in lower or "duplicate" in lower:
+        return "blocked_by_cooldown"
+    return "blocked_by_send_guard"
 
 
 def _yes_no(value: bool) -> str:
