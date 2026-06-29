@@ -1133,8 +1133,24 @@ make event-alpha-notify-fixture-smoke
 RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-telegram-recipient-check PROFILE=notify_no_key
 ```
 
-For deeper LLM notification burn-in, use the scheduled target only after the
-real no-send rehearsal and send-readiness gate pass:
+For deeper LLM notification burn-in, first run the fast deterministic final
+check. It rebuilds the fixture rehearsal namespace, proves VELVET/AAVE
+would-send with canonical core identity, excludes weak controls, runs strict
+artifact checks, and never calls live providers or Telegram:
+
+```bash
+make event-alpha-telegram-no-send-final-check-fast PYTHON=python3
+make event-alpha-telegram-send-readiness-final PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=python3
+```
+
+Inspect the printed
+`event_fade_cache/notify_llm_deep_fixture_rehearsal/event_alpha_notification_preview.md`
+before trusting the notification copy. If the final recommendation is
+`NOT_READY`, do not enable sends.
+
+If you also want a live-provider rehearsal, run it separately. This path may call
+configured live providers, may hit public-provider backoff/403/429 errors, and
+may take several minutes:
 
 ```bash
 make event-alpha-notify-llm-deep-real-no-send-rehearsal PYTHON=python3
@@ -1151,19 +1167,27 @@ for a capped preview/readiness smoke before the longer rehearsal. Before any
 real send, confirm send-readiness reports a resolvable preview path, a clear
 send/no-send guard state, explicit delivery status fields, matching
 heartbeat/run-ledger summary numbers, and no rejected-only candidate that would
-send. For the one-command no-send final checklist, run:
+send. For the full real-profile one-command no-send final checklist, run:
 
 ```bash
 make event-alpha-telegram-no-send-final-check PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 ```
 
-That target runs the capped no-send rehearsal, strict artifact doctor,
+That target runs the capped live-provider no-send rehearsal, strict artifact doctor,
 send-readiness, go/no-go, compact inbox, and daily brief, and prints the local
 `event_alpha_notification_preview.md` path for inspection.
 
 It uses the `notify_llm_deep` profile with bounded run/day LLM budgets, source
 enrichment, optional CryptoPanic when the key is present, run locks, and the
 same `RSI_EVENT_ALERTS_ENABLED=1` Telegram send guard.
+
+Do not use stale `notify_llm_deep` namespace artifacts for send-readiness if
+go/no-go or artifact doctor warns:
+
+```text
+This namespace contains pre-canonical notification delivery rows. Do not use it
+for send-readiness. Run notify_llm_deep_rehearsal or fixture final check.
+```
 
 The checklist reports `READY_TO_PREVIEW`, `READY_TO_NOTIFY_NOW`, blockers,
 warnings, source readiness, provider backoff, cooldown meta keys, LLM budget,

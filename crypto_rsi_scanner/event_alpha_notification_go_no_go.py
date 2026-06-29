@@ -57,6 +57,10 @@ class EventAlphaNotificationGoNoGoResult:
 RECOMMEND_READY_NO_SEND_REVIEW = "READY_FOR_NO_SEND_REVIEW"
 RECOMMEND_READY_SEND = "READY_FOR_SEND"
 RECOMMEND_NOT_READY = "NOT_READY"
+STALE_PRE_CANONICAL_WARNING = (
+    "This namespace contains pre-canonical notification delivery rows. Do not use it "
+    "for send-readiness. Run notify_llm_deep_rehearsal or fixture final check."
+)
 
 
 def build_go_no_go(
@@ -79,6 +83,7 @@ def build_go_no_go(
     pause_reason: str = "",
     send_readiness: Any | None = None,
     delivery_rows: Iterable[Mapping[str, Any]] = (),
+    delivery_history_rows: Iterable[Mapping[str, Any]] = (),
 ) -> EventAlphaNotificationGoNoGoResult:
     """Build a deterministic readiness decision from existing runtime checks."""
     lock_state = str(getattr(lock_status, "state", "unknown") or "unknown")
@@ -126,6 +131,7 @@ def build_go_no_go(
     warnings.extend(f"send-readiness: {item}" for item in readiness_warnings)
 
     delivery_rows_list = [dict(row) for row in delivery_rows if isinstance(row, Mapping)]
+    delivery_history_list = [dict(row) for row in delivery_history_rows if isinstance(row, Mapping)]
     delivery_status_explicit = _delivery_rows_have_explicit_status(delivery_rows_list)
     canonical_identity = _delivery_rows_have_canonical_identity(delivery_rows_list)
     rejected_selected = _readiness_has_rejected_or_unconfirmed_candidate(readiness_blockers)
@@ -149,6 +155,8 @@ def build_go_no_go(
             blockers.append("delivery rows are missing canonical identity")
         if rejected_selected:
             blockers.append("rejected-only or unconfirmed candidate selected")
+    if _has_stale_pre_canonical_delivery_rows(delivery_history_list, latest_run_id=latest_run_id):
+        warnings.append(STALE_PRE_CANONICAL_WARNING)
 
     path_blockers = [
         blocker for blocker in blockers
@@ -368,6 +376,31 @@ def _delivery_rows_have_canonical_identity(rows: Iterable[Mapping[str, Any]]) ->
 
 def _has_alert_delivery_rows(rows: Iterable[Mapping[str, Any]]) -> bool:
     return any(str(row.get("lane") or "") in {"daily_digest", "instant_escalation", "triggered_fade"} for row in rows)
+
+
+def _has_stale_pre_canonical_delivery_rows(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    latest_run_id: str | None,
+) -> bool:
+    for row in rows:
+        lane = str(row.get("lane") or "").strip()
+        if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
+            continue
+        if latest_run_id and str(row.get("run_id") or "").strip() == latest_run_id:
+            continue
+        reason = str(row.get("identity_reconciliation_reason") or "").strip().casefold()
+        legacy = str(row.get("legacy") or "").strip().casefold() in {"1", "true", "yes"}
+        pre_canonical_reason = reason in {"legacy", "legacy_delivery", "external", "source_alert_identity_legacy"}
+        missing_identity = not str(row.get("core_opportunity_id") or "").strip() or not str(
+            row.get("feedback_target") or ""
+        ).strip()
+        missing_status = not str(row.get("delivery_state") or "").strip() or not str(
+            row.get("status_detail") or ""
+        ).strip()
+        if legacy or pre_canonical_reason or missing_identity or missing_status:
+            return True
+    return False
 
 
 def _readiness_has_rejected_or_unconfirmed_candidate(blockers: Iterable[str]) -> bool:

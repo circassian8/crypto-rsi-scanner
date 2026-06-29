@@ -3329,6 +3329,7 @@ def event_alpha_notify_go_no_go(
         pause_reason=pause_state.reason,
         send_readiness=readiness,
         delivery_rows=latest_delivery_rows,
+        delivery_history_rows=delivery_rows,
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_notification_go_no_go.format_go_no_go(result))

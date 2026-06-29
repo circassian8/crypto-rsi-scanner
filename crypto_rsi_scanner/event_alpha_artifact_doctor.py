@@ -10,6 +10,11 @@ from typing import Any, Iterable, Mapping
 from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_opportunity_verdict, event_research_cards, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
+STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
+    "This namespace contains pre-canonical notification delivery rows. Do not use it "
+    "for send-readiness. Run notify_llm_deep_rehearsal or fixture final check."
+)
+
 
 @dataclass(frozen=True)
 class EventAlphaArtifactDoctorResult:
@@ -835,6 +840,8 @@ def diagnose_artifacts(
             "legacy_pre_core_delivery_identity="
             f"{delivery_conflicts['legacy_pre_core_delivery_identity']}"
         )
+    if delivery_conflicts["stale_delivery_identity_missing_core"] or delivery_conflicts["legacy_pre_core_delivery_identity"]:
+        warnings.append(STALE_PRE_CANONICAL_NOTIFICATION_WARNING)
     quality = _quality_missing_summary(
         hypotheses=hypotheses,
         watchlist=watchlist,

@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Add fast Event Alpha Telegram final check · Codex
+**Why:** The full `notify_llm_deep` no-send final check can still spend minutes
+in provider-failure environments. Operators need a fast deterministic last
+check for formatting, canonical identity, preview path, and send-readiness
+without touching live providers.
+**Changes:**
+- Added `make event-alpha-telegram-no-send-final-check-fast`, which rebuilds
+  the deterministic `notify_llm_deep_fixture_rehearsal` namespace, runs
+  go/no-go, strict artifact doctor, compact inbox, daily brief, and final
+  readiness trust checks, then prints the preview path, core ids, and a no-send
+  reminder.
+- Added `make event-alpha-telegram-send-readiness-final` as a read-only
+  namespace trust gate that prints go/no-go, strict doctor, resolved preview
+  path, and final recommendation, and fails on `NOT_READY`.
+- Go/no-go and artifact doctor now warn explicitly when a namespace contains
+  stale pre-canonical notification delivery rows and should not be trusted for
+  send-readiness.
+- Updated Make help, runbook, roadmap, and decisions to distinguish the fast
+  deterministic check, the slower live-provider no-send rehearsal, and actual
+  guarded sends.
+**Verify:** `python3 tests/test_indicators.py`, notification/eval smokes, fast
+final check, evidence/catalyst smoke, and `make verify PYTHON=python3` run after
+this doc update before commit/push.
+**Notes/risks:** Research-only notification workflow polish. No Telegram sends
+in tests, no live trading, no paper trading, no normal RSI rows, and no
+LLM/provider path can create `TRIGGERED_FADE`.
+
 ## 2026-06-29 — Finalize Event Alpha notification go/no-go · Codex
 **Why:** The deep notification rehearsal had artifact-level readiness checks,
 but operators still needed one compact final go/no-go report and a readable

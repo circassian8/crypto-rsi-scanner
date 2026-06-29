@@ -12911,6 +12911,7 @@ def test_event_alpha_artifact_doctor_scopes_delivery_identity_to_latest_run():
     assert latest.delivery_core_id_missing == 0
     assert latest.delivery_feedback_target_missing == 0
     assert latest.delivery_card_path_missing == 0
+    assert "pre-canonical notification delivery rows" in latest_text
     assert any("run-1" in warning and "zero alert snapshots" in warning for warning in latest.warnings)
     assert "strict_scope=latest_run" in latest_text
     assert all_rows.status == "BLOCKED"
@@ -28135,6 +28136,57 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
         assert "notification_preview_path_source: relpath" in text
         assert "would_send_lanes: daily_digest" in text
         assert "canonical_delivery_identity: yes" in text
+        stale_text = go.format_go_no_go(
+            go.build_go_no_go(
+                profile="notify_llm_deep",
+                artifact_namespace="notify_llm_deep",
+                telegram_ready=False,
+                send_guard_enabled=False,
+                lock_status=SimpleNamespace(state="missing", message="no lock"),
+                provider_status=provider_status,
+                provider_health_rows={},
+                delivery_ledger_path=tmp_path / "deliveries.jsonl",
+                notification_run_ledger_path=tmp_path / "runs.jsonl",
+                research_cards_dir=tmp_path / "cards",
+                artifact_doctor_status="OK",
+                cooldown_status={},
+                llm_budget_status="provider=openai max_run=200",
+                clock_status={"now": "2026-06-20T12:00:00Z", "warnings": ()},
+                send_readiness=readiness,
+                delivery_rows=[row],
+                delivery_history_rows=[
+                    {
+                        "run_id": "old-run",
+                        "lane": "daily_digest",
+                        "identity_reconciliation_reason": "source_alert_identity_legacy",
+                    },
+                    row,
+                ],
+            )
+        )
+        assert "pre-canonical notification delivery rows" in stale_text
+        fresh_text = go.format_go_no_go(
+            go.build_go_no_go(
+                profile="notify_llm_deep",
+                artifact_namespace="notify_llm_deep_fixture_rehearsal",
+                telegram_ready=False,
+                send_guard_enabled=False,
+                lock_status=SimpleNamespace(state="missing", message="no lock"),
+                provider_status=provider_status,
+                provider_health_rows={},
+                delivery_ledger_path=tmp_path / "deliveries.jsonl",
+                notification_run_ledger_path=tmp_path / "runs.jsonl",
+                research_cards_dir=tmp_path / "cards",
+                artifact_doctor_status="OK",
+                cooldown_status={},
+                llm_budget_status="provider=openai max_run=200",
+                clock_status={"now": "2026-06-20T12:00:00Z", "warnings": ()},
+                send_readiness=readiness,
+                delivery_rows=[row],
+                delivery_history_rows=[row],
+            )
+        )
+        assert "pre-canonical notification delivery rows" not in fresh_text
 
         real_send = go.build_go_no_go(
             profile="notify_llm_deep",
@@ -28185,6 +28237,11 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
+    makefile = (root / "Makefile").read_text(encoding="utf-8")
+    assert "Fast deterministic fixture final check" in makefile
+    assert "Full real-profile no-send rehearsal" in makefile
+    assert "Startup send commands after review" in makefile
+
     readiness = subprocess.run(
         ["make", "-n", "event-alpha-send-readiness", "PROFILE=notify_llm_deep_rehearsal", "PYTHON=python3"],
         cwd=root,
@@ -28270,6 +28327,36 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal BURN_IN_REVIEW=1" in final_check
     assert "event-alpha-daily-brief PROFILE=notify_llm_deep_rehearsal" in final_check
     assert "RSI_EVENT_ALERTS_ENABLED=0" in final_check
+    assert "Full Event Alpha no-send final check" in final_check
+
+    fast_final = subprocess.run(
+        ["make", "-n", "event-alpha-telegram-no-send-final-check-fast", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "Fast deterministic Event Alpha final check" in fast_final
+    assert "event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate" in fast_final
+    assert "PROFILE=notify_llm_deep_fixture_rehearsal" in fast_final
+    assert "event-alpha-telegram-send-readiness-final PROFILE=notify_llm_deep_fixture_rehearsal" in fast_final
+    assert "main.py --event-alpha-notify-cycle" not in fast_final
+    assert "GDELT" not in fast_final
+    assert "CryptoPanic" not in fast_final
+    assert "No Telegram send occurred" in fast_final
+
+    trust_target = subprocess.run(
+        ["make", "-n", "event-alpha-telegram-send-readiness-final", "PROFILE=notify_llm_deep_fixture_rehearsal", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "main.py --event-alpha-notify-go-no-go" in trust_target
+    assert "main.py --event-alpha-artifact-doctor" in trust_target
+    assert "--event-alpha-artifact-doctor-strict" in trust_target
+    assert "Final recommendation:" in trust_target
+    assert "main.py --event-alpha-notify-cycle" not in trust_target
 
 
 def test_event_alpha_notification_run_summary_flows_to_runs_doctor_and_brief():

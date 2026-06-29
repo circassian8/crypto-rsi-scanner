@@ -19,26 +19,37 @@ decision, rationale, and revisit condition.
 ## 2026-06-29 - Real Event Alpha sends require ledger-backed rehearsal readiness
 **Status:** accepted
 **Decision:** Before enabling real Telegram delivery for `notify_llm_deep`, the
-operator must run a real-profile no-send rehearsal under the
-`notify_llm_deep_rehearsal` namespace and pass
+operator should first run the deterministic fixture final check
+`make event-alpha-telegram-no-send-final-check-fast`. It must use the
+`notify_llm_deep_fixture_rehearsal` namespace, avoid live providers, avoid
+Telegram sends, and prove canonical delivery identity with VELVET/AAVE would-send
+fixture rows plus rejected weak controls. The optional full live-provider
+rehearsal remains separate under `notify_llm_deep_rehearsal`; it may call live
+providers, take several minutes, and should pass
 `make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal` plus
-`make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal`. Notification
-heartbeat/no-digest previews must summarize the latest run ledger and canonical
-core store rather than independent defaults, including completed status, raw
-events, extraction rows, core opportunities, alertable final routes, provider
-issues, LLM calls/skips, artifact-doctor status, and explicit no-send/send-guard
-state. Strict artifact doctor blocks fresh previews whose summary contradicts
-the latest run, lacks send-guard status, or uses unclear no-send wording.
-Delivery rows must store a portable `notification_preview_relpath` when a
-preview exists. Delivery rows for fresh rehearsals/sends must also persist
-explicit `delivery_mode`, `delivery_state`, `status_detail`,
-`send_guard_enabled`, `would_send`, `sent`, and `failed` fields so no-send
-rehearsals, quality/cooldown blocks, provider failures, and successful sends are
-machine-checkable without report-only inference. Send-readiness, artifact
-doctor, inbox/audit-style consumers, and operator reports should resolve
-previews by relpath first, namespace default path second, and legacy absolute
-path only as a fallback; stale machine-specific `/Users/...` paths must not
-block another checkout when the namespace preview exists.
+`make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal` before real
+sends. `make event-alpha-telegram-send-readiness-final PROFILE=<namespace>` is a
+read-only trust target for existing artifacts: it prints the resolved preview
+path, strict doctor status, and final recommendation, then fails on `NOT_READY`.
+Notification heartbeat/no-digest previews must summarize the latest run ledger
+and canonical core store rather than independent defaults, including completed
+status, raw events, extraction rows, core opportunities, alertable final routes,
+provider issues, LLM calls/skips, artifact-doctor status, and explicit
+no-send/send-guard state. Strict artifact doctor blocks fresh previews whose
+summary contradicts the latest run, lacks send-guard status, or uses unclear
+no-send wording. Delivery rows must store a portable
+`notification_preview_relpath` when a preview exists. Delivery rows for fresh
+rehearsals/sends must also persist explicit `delivery_mode`, `delivery_state`,
+`status_detail`, `send_guard_enabled`, `would_send`, `sent`, and `failed` fields
+so no-send rehearsals, quality/cooldown blocks, provider failures, and successful
+sends are machine-checkable without report-only inference. Send-readiness,
+artifact doctor, inbox/audit-style consumers, and operator reports should resolve
+previews by relpath first, namespace default path second, and legacy absolute path
+only as a fallback; stale machine-specific `/Users/...` paths must not block
+another checkout when the namespace preview exists. Namespaces with
+pre-canonical delivery rows must warn operators not to use that namespace for
+send-readiness and to rerun `notify_llm_deep_rehearsal` or the fixture final
+check instead.
 **Why:** A rehearsal that writes real artifacts but previews `Raw events=0`,
 `Core opportunities=0`, or `Completed=no` makes a safe run look broken and can
 hide stale artifacts. Explicit delivery status fields prevent ambiguous
