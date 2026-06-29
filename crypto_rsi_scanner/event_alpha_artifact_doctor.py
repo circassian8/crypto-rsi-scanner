@@ -72,6 +72,11 @@ class EventAlphaArtifactDoctorResult:
     delivery_strict_scope: str = "all_rows"
     deliveries_partial_delivered: int = 0
     deliveries_failed: int = 0
+    delivery_status_missing: int = 0
+    delivery_status_detail_missing: int = 0
+    delivery_mode_missing: int = 0
+    delivery_state_inconsistent: int = 0
+    delivery_would_send_sent_failed_inconsistent: int = 0
     delivery_identity_mismatch_core_store: int = 0
     delivery_core_id_missing: int = 0
     legacy_pre_core_delivery_identity: int = 0
@@ -707,6 +712,27 @@ def diagnose_artifacts(
             f"{delivery_conflicts['delivery_alert_id_not_canonical']}"
         )
         (blockers if strict else warnings).append(message)
+    if delivery_conflicts["delivery_status_missing"]:
+        message = f"delivery_status_missing={delivery_conflicts['delivery_status_missing']}"
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["delivery_status_detail_missing"]:
+        message = (
+            "delivery_status_detail_missing="
+            f"{delivery_conflicts['delivery_status_detail_missing']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["delivery_mode_missing"]:
+        message = f"delivery_mode_missing={delivery_conflicts['delivery_mode_missing']}"
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["delivery_state_inconsistent"]:
+        message = f"delivery_state_inconsistent={delivery_conflicts['delivery_state_inconsistent']}"
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["delivery_would_send_sent_failed_inconsistent"]:
+        message = (
+            "delivery_would_send_sent_failed_inconsistent="
+            f"{delivery_conflicts['delivery_would_send_sent_failed_inconsistent']}"
+        )
+        (blockers if strict else warnings).append(message)
     if delivery_conflicts["digest_item_without_live_confirmation"]:
         message = (
             "digest_item_without_live_confirmation="
@@ -1034,6 +1060,11 @@ def diagnose_artifacts(
         delivery_strict_scope=effective_delivery_scope,
         deliveries_partial_delivered=delivery_summary.partial_delivered,
         deliveries_failed=delivery_summary.failed,
+        delivery_status_missing=delivery_conflicts["delivery_status_missing"],
+        delivery_status_detail_missing=delivery_conflicts["delivery_status_detail_missing"],
+        delivery_mode_missing=delivery_conflicts["delivery_mode_missing"],
+        delivery_state_inconsistent=delivery_conflicts["delivery_state_inconsistent"],
+        delivery_would_send_sent_failed_inconsistent=delivery_conflicts["delivery_would_send_sent_failed_inconsistent"],
         delivery_identity_mismatch_core_store=delivery_conflicts["delivery_identity_mismatch_core_store"],
         delivery_core_id_missing=delivery_conflicts["delivery_core_id_missing"],
         legacy_pre_core_delivery_identity=delivery_conflicts["legacy_pre_core_delivery_identity"],
@@ -1766,6 +1797,11 @@ def _notification_delivery_conflicts(
         "notification_preview_missing": 0,
         "notification_preview_relpath_missing": 0,
         "notification_preview_path_unresolvable": 0,
+        "delivery_status_missing": 0,
+        "delivery_status_detail_missing": 0,
+        "delivery_mode_missing": 0,
+        "delivery_state_inconsistent": 0,
+        "delivery_would_send_sent_failed_inconsistent": 0,
     }
     scope = _normalize_delivery_strict_scope(strict_scope, latest_run_id=latest_run_id, strict=True)
     latest = _delivery.latest_rows_by_delivery(delivery_rows)
@@ -1785,6 +1821,9 @@ def _notification_delivery_conflicts(
                         out["legacy_pre_core_delivery_identity"] += 1
         if scope == "latest_run" and latest_run_id and not is_latest_run:
             continue
+        status_conflicts = _delivery_status_field_conflicts(row)
+        for key, value in status_conflicts.items():
+            out[key] += value
         preview_relpath = str(row.get("notification_preview_relpath") or "").strip()
         if not preview_relpath and is_latest_run:
             out["notification_preview_relpath_missing"] += 1
@@ -1832,6 +1871,56 @@ def _notification_delivery_conflicts(
                 out["digest_item_rejected_results_only"] += 1
             if _delivery_core_is_strategic_broad_asset_context(core):
                 out["strategic_broad_asset_digest_without_confirmation"] += 1
+    return out
+
+
+def _delivery_status_field_conflicts(row: Mapping[str, Any]) -> dict[str, int]:
+    out = {
+        "delivery_status_missing": 0,
+        "delivery_status_detail_missing": 0,
+        "delivery_mode_missing": 0,
+        "delivery_state_inconsistent": 0,
+        "delivery_would_send_sent_failed_inconsistent": 0,
+    }
+    delivery_mode = str(row.get("delivery_mode") or "").strip()
+    delivery_state = str(row.get("delivery_state") or "").strip()
+    status_detail = str(row.get("status_detail") or "").strip()
+    if not delivery_state:
+        out["delivery_status_missing"] += 1
+    if not status_detail:
+        out["delivery_status_detail_missing"] += 1
+    if not delivery_mode:
+        out["delivery_mode_missing"] += 1
+    if not delivery_state or not status_detail or not delivery_mode:
+        return out
+
+    state = str(row.get("state") or "")
+    sent = _boolish(row.get("sent"))
+    failed = _boolish(row.get("failed"))
+    would_send = _boolish(row.get("would_send"))
+    guard_enabled = _boolish(row.get("send_guard_enabled"))
+    if delivery_state == _delivery.DELIVERY_STATE_SENT and not sent:
+        out["delivery_state_inconsistent"] += 1
+    if delivery_state == _delivery.DELIVERY_STATE_FAILED and not failed:
+        out["delivery_state_inconsistent"] += 1
+    if delivery_state == _delivery.DELIVERY_STATE_BLOCKED and (sent or failed):
+        out["delivery_state_inconsistent"] += 1
+    if sent and failed:
+        out["delivery_would_send_sent_failed_inconsistent"] += 1
+    if sent and status_detail != _delivery.STATUS_DETAIL_SENT:
+        out["delivery_would_send_sent_failed_inconsistent"] += 1
+    if state == _delivery.STATE_BLOCKED and sent:
+        out["delivery_would_send_sent_failed_inconsistent"] += 1
+    if status_detail == _delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED and guard_enabled:
+        out["delivery_would_send_sent_failed_inconsistent"] += 1
+    if sent and not guard_enabled:
+        out["delivery_would_send_sent_failed_inconsistent"] += 1
+    if would_send and not (sent or failed) and delivery_state not in {
+        _delivery.DELIVERY_STATE_BLOCKED,
+        _delivery.DELIVERY_STATE_PREVIEW,
+        _delivery.DELIVERY_STATE_SUPPRESSED,
+    }:
+        out["delivery_would_send_sent_failed_inconsistent"] += 1
     return out
 
 
@@ -2143,6 +2232,13 @@ def _as_int(value: Any) -> int:
         return int(float(value))
     except (TypeError, ValueError):
         return 0
+
+
+def _boolish(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().casefold()
+    return text in {"1", "true", "yes", "y", "on"}
 
 
 def _row_has_alertable_quality_conflict(row: Mapping[str, Any]) -> bool:
@@ -2617,6 +2713,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         (
             "notification deliveries: "
             f"rows={result.delivery_rows} partial={result.deliveries_partial_delivered} failed={result.deliveries_failed} "
+            f"status_missing={result.delivery_status_missing} "
+            f"status_detail_missing={result.delivery_status_detail_missing} "
+            f"mode_missing={result.delivery_mode_missing} "
+            f"state_inconsistent={result.delivery_state_inconsistent} "
+            f"would_send_inconsistent={result.delivery_would_send_sent_failed_inconsistent} "
             f"latest_run_id={result.latest_run_id or 'none'} "
             f"strict_scope={result.delivery_strict_scope} "
             f"latest_run_rows={result.latest_run_delivery_rows} "

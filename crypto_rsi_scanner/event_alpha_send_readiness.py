@@ -119,6 +119,16 @@ def build_send_readiness(
         blockers.append("notification preview is missing send/no-send guard status")
     if artifact_doctor.notification_preview_no_send_status_unclear:
         blockers.append("notification preview no-send/blocked wording is unclear")
+    if getattr(artifact_doctor, "delivery_status_missing", 0):
+        blockers.append("delivery rows are missing explicit delivery_state")
+    if getattr(artifact_doctor, "delivery_status_detail_missing", 0):
+        blockers.append("delivery rows are missing explicit status_detail")
+    if getattr(artifact_doctor, "delivery_mode_missing", 0):
+        blockers.append("delivery rows are missing explicit delivery_mode")
+    if getattr(artifact_doctor, "delivery_state_inconsistent", 0):
+        blockers.append("delivery rows have inconsistent delivery_state")
+    if getattr(artifact_doctor, "delivery_would_send_sent_failed_inconsistent", 0):
+        blockers.append("delivery rows have inconsistent would_send/sent/failed flags")
 
     if not resolved_preview:
         blockers.append("notification preview path was not recorded")
@@ -136,6 +146,22 @@ def build_send_readiness(
         if not latest_run_id or str(row.get("run_id") or "") == latest_run_id
     }
     for row in latest_deliveries:
+        status_detail = str(row.get("status_detail") or "").strip()
+        delivery_state = str(row.get("delivery_state") or "").strip()
+        delivery_mode = str(row.get("delivery_mode") or "").strip()
+        if not delivery_state:
+            blockers.append("delivery row missing explicit delivery_state")
+        if not status_detail:
+            blockers.append("delivery row missing explicit status_detail")
+        if not delivery_mode:
+            blockers.append("delivery row missing explicit delivery_mode")
+        if bool(row.get("sent")) and not send_guard_enabled:
+            blockers.append("delivery row says sent while send guard is disabled")
+        if (
+            status_detail == delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
+            and bool(row.get("send_guard_enabled"))
+        ):
+            blockers.append("no-send rehearsal delivery row has send_guard_enabled=true")
         lane = str(row.get("lane") or "")
         if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
             continue

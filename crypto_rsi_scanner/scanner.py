@@ -5051,6 +5051,7 @@ def event_alpha_notification_inbox_report(
     profile_name: str | None = None,
     artifact_namespace: str | None = None,
     include_diagnostics: bool = False,
+    burn_in_review: bool = False,
 ) -> None:
     """Print unreviewed Event Alpha notification/card follow-up queues."""
     _setup_event_discovery_logging(verbose)
@@ -5091,7 +5092,7 @@ def event_alpha_notification_inbox_report(
         outcomes_path=context.outcomes_path,
         include_diagnostics=include_diagnostics,
     )
-    print(event_alpha_notification_inbox.format_notification_inbox(result))
+    print(event_alpha_notification_inbox.format_notification_inbox(result, burn_in_review=burn_in_review))
 
 
 def event_alpha_feedback_readiness_report(
@@ -9089,6 +9090,11 @@ def cli() -> None:
         help="Print unreviewed Event Alpha notification/card follow-up queues.",
     )
     parser.add_argument(
+        "--event-alpha-burn-in-review",
+        action="store_true",
+        help="Print a compact burn-in notification review inbox instead of the full row-level inbox.",
+    )
+    parser.add_argument(
         "--event-alpha-notification-deliveries-report",
         action="store_true",
         help="Print the research-only Event Alpha notification delivery ledger for a profile/namespace.",
@@ -9989,6 +9995,7 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
             include_diagnostics=args.event_opportunity_audit_include_diagnostics,
+            burn_in_review=args.event_alpha_burn_in_review,
         )
         return
     if args.event_alpha_notification_deliveries_report:

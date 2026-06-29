@@ -46,6 +46,27 @@ STATES = (
     STATE_SKIPPED_IN_FLIGHT,
     STATE_BLOCKED,
 )
+
+DELIVERY_MODE_LIVE_SEND = "live_send"
+DELIVERY_MODE_NO_SEND_REHEARSAL = "no_send_rehearsal"
+DELIVERY_MODE_FIXTURE_SMOKE = "fixture_smoke"
+DELIVERY_MODE_PREVIEW_ONLY = "preview_only"
+
+DELIVERY_STATE_SENT = "sent"
+DELIVERY_STATE_FAILED = "failed"
+DELIVERY_STATE_BLOCKED = "blocked"
+DELIVERY_STATE_NOT_DUE = "not_due"
+DELIVERY_STATE_SUPPRESSED = "suppressed"
+DELIVERY_STATE_PREVIEW = "preview"
+
+STATUS_DETAIL_SENT = "sent"
+STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED = "would_send_but_guard_disabled"
+STATUS_DETAIL_BLOCKED_BY_SEND_GUARD = "blocked_by_send_guard"
+STATUS_DETAIL_BLOCKED_BY_QUALITY_GATE = "blocked_by_quality_gate"
+STATUS_DETAIL_BLOCKED_BY_COOLDOWN = "blocked_by_cooldown"
+STATUS_DETAIL_NOT_DUE = "not_due"
+STATUS_DETAIL_PROVIDER_FAILURE = "provider_failure"
+STATUS_DETAIL_PREVIEW_ONLY = "preview_only"
 TERMINAL_STATES = (
     STATE_DELIVERED,
     STATE_PARTIAL_DELIVERED,
@@ -104,6 +125,13 @@ class NotificationDeliveryRecord:
     identity_reconciliation_reason: str | None = None
     notification_preview_path: str | None = None
     notification_preview_relpath: str | None = None
+    delivery_mode: str | None = None
+    delivery_state: str | None = None
+    status_detail: str | None = None
+    send_guard_enabled: bool | None = None
+    would_send: bool | None = None
+    sent: bool | None = None
+    failed: bool | None = None
     attempted_at: str | None = None
     delivered_at: str | None = None
     error_class: str | None = None
@@ -143,6 +171,13 @@ class NotificationDeliveryRecord:
             "identity_reconciliation_reason": self.identity_reconciliation_reason,
             "notification_preview_path": self.notification_preview_path,
             "notification_preview_relpath": self.notification_preview_relpath,
+            "delivery_mode": self.delivery_mode,
+            "delivery_state": self.delivery_state,
+            "status_detail": self.status_detail,
+            "send_guard_enabled": self.send_guard_enabled,
+            "would_send": self.would_send,
+            "sent": self.sent,
+            "failed": self.failed,
             "state": self.state,
             "attempted_at": self.attempted_at,
             "delivered_at": self.delivered_at,
@@ -260,6 +295,13 @@ def build_record(
     identity_reconciliation_reason: str | None = None,
     notification_preview_path: str | None = None,
     notification_preview_relpath: str | None = None,
+    delivery_mode: str | None = None,
+    delivery_state: str | None = None,
+    status_detail: str | None = None,
+    send_guard_enabled: bool | None = None,
+    would_send: bool | None = None,
+    sent: bool | None = None,
+    failed: bool | None = None,
     state: str,
     now: datetime,
     delivered_at: datetime | None = None,
@@ -273,6 +315,20 @@ def build_record(
     failed_chunks: int = 0,
     channel_summary: Mapping[str, Any] | None = None,
 ) -> NotificationDeliveryRecord:
+    normalized = normalize_delivery_status(
+        state=state,
+        profile=profile,
+        namespace=namespace,
+        error_class=error_class,
+        error_message=error_message,
+        delivery_mode=delivery_mode,
+        delivery_state=delivery_state,
+        status_detail=status_detail,
+        send_guard_enabled=send_guard_enabled,
+        would_send=would_send,
+        sent=sent,
+        failed=failed,
+    )
     return NotificationDeliveryRecord(
         delivery_id=delivery_id_for(str(run_id), str(lane), str(content_hash)),
         run_id=str(run_id),
@@ -300,6 +356,13 @@ def build_record(
             if notification_preview_relpath
             else notification_preview_relpath_for_path(notification_preview_path)
         ),
+        delivery_mode=normalized["delivery_mode"],
+        delivery_state=normalized["delivery_state"],
+        status_detail=normalized["status_detail"],
+        send_guard_enabled=normalized["send_guard_enabled"],
+        would_send=normalized["would_send"],
+        sent=normalized["sent"],
+        failed=normalized["failed"],
         state=str(state),
         attempted_at=_iso(now),
         delivered_at=_iso(delivered_at) if delivered_at else None,
@@ -313,6 +376,107 @@ def build_record(
         failed_chunks=int(failed_chunks or 0),
         channel_summary=_redact_mapping(channel_summary or {}),
     )
+
+
+def normalize_delivery_status(
+    *,
+    state: str,
+    profile: str | None = None,
+    namespace: str | None = None,
+    error_class: str | None = None,
+    error_message: str | None = None,
+    delivery_mode: str | None = None,
+    delivery_state: str | None = None,
+    status_detail: str | None = None,
+    send_guard_enabled: bool | None = None,
+    would_send: bool | None = None,
+    sent: bool | None = None,
+    failed: bool | None = None,
+) -> dict[str, Any]:
+    """Normalize legacy delivery state into explicit operator-facing fields."""
+    legacy_state = str(state or "")
+    error_class_text = str(error_class or "").casefold()
+    error_text = str(error_message or "").casefold()
+    inferred_detail = status_detail or _delivery_status_detail(
+        {
+            "state": legacy_state,
+            "error_class": error_class,
+            "error_message_safe": error_message,
+        }
+    )
+    if not inferred_detail:
+        if legacy_state in (STATE_DELIVERED, STATE_PARTIAL_DELIVERED):
+            inferred_detail = STATUS_DETAIL_SENT
+        elif legacy_state == STATE_FAILED:
+            inferred_detail = STATUS_DETAIL_PROVIDER_FAILURE
+        elif legacy_state in (STATE_SKIPPED_DUPLICATE, STATE_SKIPPED_IN_FLIGHT):
+            inferred_detail = STATUS_DETAIL_BLOCKED_BY_COOLDOWN
+        elif legacy_state in (STATE_PLANNED, STATE_SENDING):
+            inferred_detail = STATUS_DETAIL_PREVIEW_ONLY
+        else:
+            inferred_detail = STATUS_DETAIL_NOT_DUE
+
+    inferred_state = delivery_state
+    if not inferred_state:
+        if legacy_state in (STATE_DELIVERED, STATE_PARTIAL_DELIVERED):
+            inferred_state = DELIVERY_STATE_SENT
+        elif legacy_state == STATE_FAILED:
+            inferred_state = DELIVERY_STATE_FAILED
+        elif legacy_state == STATE_BLOCKED:
+            inferred_state = DELIVERY_STATE_BLOCKED
+        elif legacy_state in (STATE_SKIPPED_DUPLICATE, STATE_SKIPPED_IN_FLIGHT):
+            inferred_state = DELIVERY_STATE_SUPPRESSED
+        elif legacy_state in (STATE_PLANNED, STATE_SENDING):
+            inferred_state = DELIVERY_STATE_PREVIEW
+        else:
+            inferred_state = DELIVERY_STATE_NOT_DUE
+
+    inferred_sent = bool(sent) if sent is not None else inferred_state == DELIVERY_STATE_SENT
+    inferred_failed = bool(failed) if failed is not None else inferred_state == DELIVERY_STATE_FAILED
+    if would_send is None:
+        inferred_would_send = inferred_state in {
+            DELIVERY_STATE_SENT,
+            DELIVERY_STATE_FAILED,
+            DELIVERY_STATE_BLOCKED,
+            DELIVERY_STATE_PREVIEW,
+        }
+    else:
+        inferred_would_send = bool(would_send)
+    if send_guard_enabled is None:
+        guard_disabled = (
+            inferred_detail == STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
+            or (
+                error_class_text == "guard_blocked"
+                and ("event alerts disabled" in error_text or "rsi_event_alerts_enabled" in error_text)
+            )
+        )
+        inferred_send_guard = not guard_disabled
+    else:
+        inferred_send_guard = bool(send_guard_enabled)
+
+    if delivery_mode:
+        inferred_mode = str(delivery_mode)
+    else:
+        profile_text = str(profile or "").casefold()
+        namespace_text = str(namespace or "").casefold()
+        if inferred_detail == STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED:
+            inferred_mode = DELIVERY_MODE_NO_SEND_REHEARSAL
+        elif "fixture" in profile_text or "fixture" in namespace_text or "smoke" in namespace_text:
+            inferred_mode = DELIVERY_MODE_FIXTURE_SMOKE
+        elif inferred_state == DELIVERY_STATE_PREVIEW:
+            inferred_mode = DELIVERY_MODE_PREVIEW_ONLY
+        else:
+            inferred_mode = DELIVERY_MODE_LIVE_SEND
+
+    return {
+        "delivery_mode": inferred_mode,
+        "delivery_state": inferred_state,
+        "status_detail": inferred_detail,
+        "send_guard_enabled": inferred_send_guard,
+        "would_send": inferred_would_send,
+        "sent": inferred_sent,
+        "failed": inferred_failed,
+    }
 
 
 def append_delivery_record(
@@ -642,6 +806,9 @@ def _filter_state(rows: Iterable[Mapping[str, Any]], state: str) -> list[dict[st
 
 
 def _delivery_status_detail(row: Mapping[str, Any]) -> str:
+    explicit = str(row.get("status_detail") or "").strip()
+    if explicit:
+        return explicit
     state = str(row.get("state") or "")
     error_class = str(row.get("error_class") or "").casefold()
     error = str(row.get("error_message_safe") or "").casefold()

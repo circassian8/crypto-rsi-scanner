@@ -29,15 +29,21 @@ issues, LLM calls/skips, artifact-doctor status, and explicit no-send/send-guard
 state. Strict artifact doctor blocks fresh previews whose summary contradicts
 the latest run, lacks send-guard status, or uses unclear no-send wording.
 Delivery rows must store a portable `notification_preview_relpath` when a
-preview exists. Send-readiness, artifact doctor, inbox/audit-style consumers,
-and operator reports should resolve previews by relpath first, namespace
-default path second, and legacy absolute path only as a fallback; stale
-machine-specific `/Users/...` paths must not block another checkout when the
-namespace preview exists.
+preview exists. Delivery rows for fresh rehearsals/sends must also persist
+explicit `delivery_mode`, `delivery_state`, `status_detail`,
+`send_guard_enabled`, `would_send`, `sent`, and `failed` fields so no-send
+rehearsals, quality/cooldown blocks, provider failures, and successful sends are
+machine-checkable without report-only inference. Send-readiness, artifact
+doctor, inbox/audit-style consumers, and operator reports should resolve
+previews by relpath first, namespace default path second, and legacy absolute
+path only as a fallback; stale machine-specific `/Users/...` paths must not
+block another checkout when the namespace preview exists.
 **Why:** A rehearsal that writes real artifacts but previews `Raw events=0`,
 `Core opportunities=0`, or `Completed=no` makes a safe run look broken and can
-hide stale artifacts. A separate send-readiness gate gives the operator one
-deterministic final check before flipping `RSI_EVENT_ALERTS_ENABLED=1`.
+hide stale artifacts. Explicit delivery status fields prevent ambiguous
+blocked/would-send rows from being mistaken for real failures or successful
+sends. A separate send-readiness gate gives the operator one deterministic
+final check before flipping `RSI_EVENT_ALERTS_ENABLED=1`.
 **Revisit when:** Event Alpha notifications move to a typed operational UI that
 renders previews/readiness directly from a single delivery-run record.
 

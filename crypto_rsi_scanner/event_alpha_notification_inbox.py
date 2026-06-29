@@ -288,7 +288,9 @@ def build_event_alpha_review_items(
     )
 
 
-def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
+def format_notification_inbox(result: EventAlphaNotificationInboxResult, *, burn_in_review: bool = False) -> str:
+    if burn_in_review:
+        return _format_notification_inbox_burn_in_review(result)
     lines = [
         "=" * 76,
         "EVENT ALPHA NOTIFICATION INBOX (research-only / review queue)",
@@ -350,6 +352,48 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult) -> str:
     return "\n".join(lines).rstrip()
 
 
+def _format_notification_inbox_burn_in_review(result: EventAlphaNotificationInboxResult) -> str:
+    sent_or_partial = (*result.sent_without_feedback, *result.partial_delivered_without_feedback)
+    would_send = (*result.would_send_without_feedback, *result.would_send_blocked_without_feedback)
+    active = (*sent_or_partial, *would_send, *result.high_priority_unreviewed, *result.triggered_fade_unreviewed)
+    local_count = len(result.quality_gated_local_only) + len(result.weak_validated_local_only)
+    lines = [
+        "=" * 76,
+        "EVENT ALPHA BURN-IN REVIEW INBOX (research-only)",
+        "=" * 76,
+        f"profile: {result.profile}",
+        f"artifact_namespace: {result.artifact_namespace}",
+        (
+            "summary: "
+            f"sent_or_partial={len(sent_or_partial)} "
+            f"would_send={len(would_send)} "
+            f"active_unreviewed={len(active)} "
+            f"near_miss={len(result.exploratory_without_feedback)} "
+            f"local_or_quality_capped={local_count} "
+            f"provider_degraded_runs={len(result.provider_degraded_runs)} "
+            f"diagnostics_hidden={len(result.diagnostic_review_items_hidden)}"
+        ),
+        "",
+    ]
+    _append_compact_item_section(lines, "Would-send / sent core opportunities", active, profile=result.profile, limit=12)
+    _append_compact_item_section(lines, "Near-miss candidates", result.exploratory_without_feedback, profile=result.profile, limit=8)
+    if local_count:
+        lines.append(f"Local-only / quality-capped rows: {local_count}")
+        lines.append("- collapsed in burn-in review; use the full inbox or quality review for row-level diagnostics")
+        lines.append("")
+    else:
+        lines.append("Local-only / quality-capped rows: 0")
+        lines.append("- none")
+        lines.append("")
+    _append_run_section(lines, "provider-degraded notification runs", result.provider_degraded_runs)
+    if result.diagnostic_review_items_hidden:
+        lines.append(f"Diagnostic/support rows hidden: {len(result.diagnostic_review_items_hidden)}")
+        lines.append("- rerun with diagnostics enabled for source-noise/control row details")
+        lines.append("")
+    lines.append("Burn-in review is artifact-only; it does not send, trade, paper trade, or alter Event Alpha tiers.")
+    return "\n".join(lines).rstrip()
+
+
 def _append_item_section(
     lines: list[str],
     title: str,
@@ -390,6 +434,43 @@ def _append_item_section(
         lines.append(f"  feedback_target: {target}")
         lines.append(f"  feedback_useful: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{target}'")
         lines.append(f"  feedback_junk: make event-feedback-junk PROFILE={profile} FEEDBACK_TARGET='{target}'")
+    lines.append("")
+
+
+def _append_compact_item_section(
+    lines: list[str],
+    title: str,
+    items: Iterable[EventAlphaNotificationInboxItem],
+    *,
+    profile: str,
+    limit: int,
+) -> None:
+    rows = list(dict.fromkeys(items))
+    lines.append(f"{title}: {len(rows)}")
+    if not rows:
+        lines.append("- none")
+        lines.append("")
+        return
+    for idx, item in enumerate(rows[: max(0, limit)], start=1):
+        target = item.feedback_target or item.alert_id
+        lane_status = "sent" if item.sent else ("would-send" if item.would_send or item.blocked_by_guard else "review")
+        lines.append(
+            f"{idx}. {item.symbol or 'UNKNOWN'}/{item.coin_id or 'unknown'} "
+            f"{lane_status} tier={item.tier or 'unknown'} playbook={item.playbook or 'unknown'}"
+        )
+        lines.append(
+            f"   core_id: {item.core_opportunity_id or item.alert_id} · "
+            f"state={item.final_state_after_quality_gate or item.delivery_state or 'unknown'} "
+            f"route={item.final_route_after_quality_gate or 'unknown'}"
+        )
+        if item.card_path:
+            lines.append(f"   card: {item.card_path}")
+        lines.append(f"   feedback: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{target}'")
+        if item.quality_gate_block_reason:
+            lines.append(f"   gate: {item.quality_gate_block_reason}")
+        lines.append(f"   why: {item.reason}")
+    if len(rows) > limit:
+        lines.append(f"- +{len(rows) - limit} more in the full notification inbox")
     lines.append("")
 
 

@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Make Event Alpha delivery status explicit · Codex
+**Why:** The deep notification rehearsal could infer useful delivery status in
+reports, but the delivery ledger itself still allowed fresh rows with
+machine-readable status fields missing. That made send-readiness vulnerable to
+ambiguous blocked/would-send rows before real Telegram sends.
+**Changes:**
+- Delivery rows now persist explicit `delivery_mode`, `delivery_state`,
+  `status_detail`, `send_guard_enabled`, `would_send`, `sent`, and `failed`
+  fields while keeping legacy `state` compatibility.
+- Artifact doctor and send-readiness now block fresh/latest-run rows with
+  missing or contradictory delivery status fields, while legacy rows remain
+  readable and can be audited separately.
+- Added a compact `--event-alpha-burn-in-review` inbox view for phone-friendly
+  burn-in triage, plus `BURN_IN_REVIEW=1 make event-alpha-notification-inbox`.
+- Added the explicit
+  `make event-alpha-notify-llm-deep-real-no-send-rehearsal-with-fixture-candidate`
+  alias and tightened fast-rehearsal caps for catalyst search/source
+  enrichment/LLM/evidence acquisition.
+**Verify:** `python3 tests/test_indicators.py` passed (558/558). Full Make
+verification is run after this doc update before commit/push.
+**Notes/risks:** Research-only artifact/readiness work. No Telegram sends in
+tests, no trades, no paper trades, no normal RSI rows, and no LLM/provider path
+can create `TRIGGERED_FADE`.
+
 ## 2026-06-29 — Make notify_llm_deep rehearsal previews portable · Codex
 **Why:** The real `notify_llm_deep` no-send rehearsal could write delivery rows
 with a stale machine-specific `/Users/...` preview path and no portable

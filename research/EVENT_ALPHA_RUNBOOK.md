@@ -194,6 +194,7 @@ make event-alpha-notify-llm-deep-real-no-send-rehearsal PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-daily-brief PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal BURN_IN_REVIEW=1 PYTHON=python3
 make event-alpha-artifact-doctor PROFILE=notify_llm_deep_rehearsal STRICT=1 EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE=latest_run PYTHON=python3
 ```
 
@@ -205,6 +206,15 @@ make event-alpha-notify-llm-deep-real-no-send-rehearsal-fast PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 ```
 
+For a deterministic delivery-plan rehearsal that injects fixture VELVET/AAVE/BTC
+core opportunities through the same `notify_llm_deep` notification planning
+path, use:
+
+```bash
+make event-alpha-notify-llm-deep-real-no-send-rehearsal-with-fixture-candidate PYTHON=python3
+make event-alpha-send-readiness PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=python3
+```
+
 This target uses the actual `notify_llm_deep` profile and passes
 `--event-alert-send`, but forces `RSI_EVENT_ALERTS_ENABLED=0`, so the delivery
 path writes would-send/blocked ledgers and
@@ -213,13 +223,16 @@ preview, send-readiness report, daily brief, inbox, deliveries report, and
 strict doctor output before running any `RSI_EVENT_ALERTS_ENABLED=1` command. A
 passing send-readiness report requires the latest run to be complete, strict
 artifact doctor to have no blockers, preview counts to match the run ledger,
-delivery rows to carry canonical core identity, `notification_preview_path_source`
-to resolve through `relpath` or `namespace_default` when possible, no
-rejected-only/no-market candidate to be would-send eligible, and Telegram
-token/chat id to be present when the send guard is enabled. The heartbeat
-preview should show the same completed/raw-event/extraction/core-opportunity/
-LLM call/skip and delivery-lane due/sent/blocked numbers as the latest run
-ledger. Use
+delivery rows to carry canonical core identity and explicit `delivery_mode`,
+`delivery_state`, `status_detail`, `send_guard_enabled`, `would_send`, `sent`,
+and `failed` fields, `notification_preview_path_source` to resolve through
+`relpath` or `namespace_default` when possible, no rejected-only/no-market
+candidate to be would-send eligible, and Telegram token/chat id to be present
+when the send guard is enabled. The heartbeat preview should show the same
+completed/raw-event/extraction/core-opportunity/LLM call/skip and delivery-lane
+due/sent/blocked numbers as the latest run ledger. No-send rehearsal rows
+should say `would_send_but_guard_disabled` and should not be counted as provider
+delivery failures. Use
 `EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE=all_rows` only when intentionally
 auditing old delivery rows; the default/latest-run scope proves the fresh run
 while reporting stale pre-core delivery identity rows as migration diagnostics.
@@ -1121,6 +1134,7 @@ real no-send rehearsal and send-readiness gate pass:
 make event-alpha-notify-llm-deep-real-no-send-rehearsal PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal BURN_IN_REVIEW=1 PYTHON=python3
 make event-alpha-daily-brief PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notify-llm-deep-scheduled
 ```
@@ -1128,8 +1142,9 @@ make event-alpha-notify-llm-deep-scheduled
 Use `make event-alpha-notify-llm-deep-real-no-send-rehearsal-fast PYTHON=python3`
 for a capped preview/readiness smoke before the longer rehearsal. Before any
 real send, confirm send-readiness reports a resolvable preview path, a clear
-send/no-send guard state, matching heartbeat/run-ledger summary numbers, and no
-rejected-only candidate that would send.
+send/no-send guard state, explicit delivery status fields, matching
+heartbeat/run-ledger summary numbers, and no rejected-only candidate that would
+send.
 
 It uses the `notify_llm_deep` profile with bounded run/day LLM budgets, source
 enrichment, optional CryptoPanic when the key is present, run locks, and the

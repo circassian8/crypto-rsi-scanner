@@ -32272,6 +32272,273 @@ def _canonical_core_fixture_rows() -> list[dict[str, object]]:
     ]
 
 
+def test_notification_delivery_records_persist_explicit_status_fields():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+
+    delivered = delivery.build_record(
+        run_id="run-delivered",
+        alert_id="core-1",
+        profile="notify_no_key",
+        namespace="notify_no_key",
+        lane="daily_digest",
+        route="RESEARCH_DIGEST",
+        content_hash="hash-delivered",
+        state=delivery.STATE_DELIVERED,
+        now=datetime(2026, 6, 29, 12, tzinfo=timezone.utc),
+        delivered_at=datetime(2026, 6, 29, 12, tzinfo=timezone.utc),
+        delivered_count=1,
+    ).to_row()
+    assert delivered["delivery_state"] == delivery.DELIVERY_STATE_SENT
+    assert delivered["status_detail"] == delivery.STATUS_DETAIL_SENT
+    assert delivered["delivery_mode"] == delivery.DELIVERY_MODE_LIVE_SEND
+    assert delivered["send_guard_enabled"] is True
+    assert delivered["would_send"] is True
+    assert delivered["sent"] is True
+    assert delivered["failed"] is False
+
+    blocked = delivery.build_record(
+        run_id="run-blocked",
+        alert_id="heartbeat",
+        profile="notify_llm_deep",
+        namespace="notify_llm_deep_rehearsal",
+        lane="health_heartbeat",
+        route="HEALTH_HEARTBEAT",
+        content_hash="hash-blocked",
+        state=delivery.STATE_BLOCKED,
+        now=datetime(2026, 6, 29, 12, tzinfo=timezone.utc),
+        error_class="guard_blocked",
+        error_message="event alerts disabled; RSI_EVENT_ALERTS_ENABLED=1 required",
+    ).to_row()
+    assert blocked["delivery_state"] == delivery.DELIVERY_STATE_BLOCKED
+    assert blocked["status_detail"] == delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
+    assert blocked["delivery_mode"] == delivery.DELIVERY_MODE_NO_SEND_REHEARSAL
+    assert blocked["send_guard_enabled"] is False
+    assert blocked["would_send"] is True
+    assert blocked["sent"] is False
+    assert blocked["failed"] is False
+
+
+def test_artifact_doctor_blocks_latest_delivery_rows_missing_explicit_status():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(tmp)
+            namespace = "status_missing"
+            preview = Path("event_fade_cache") / namespace / "event_alpha_notification_preview.md"
+            preview.parent.mkdir(parents=True, exist_ok=True)
+            preview.write_text(
+                "# Event Alpha Notification Preview\n\n"
+                "## Lane 1: health_heartbeat\n\n"
+                "### Telegram Body\n\n"
+                "```html\n"
+                "<b>Event Alpha Heartbeat</b>\n"
+                "Completed: yes\n"
+                "Raw events: 0 · Core opportunities: 0\n"
+                "Extraction rows: 0\n"
+                "Alertable decisions: 0 · Alerts: 0\n"
+                "Delivery lanes: due=1 · sent=0 · would_send_but_guard_disabled=1 · blocked_by_quality=0 · blocked_by_cooldown=0 · not_due=0\n"
+                "Send guard: No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode.\n"
+                "LLM calls/skips: 0/0\n"
+                "```",
+                encoding="utf-8",
+            )
+            run = {
+                "row_type": "event_alpha_run",
+                "run_id": "run-status",
+                "profile": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": namespace,
+                "cycle_completed": True,
+                "success": True,
+                "raw_events": 0,
+                "extraction_rows": 0,
+                "core_opportunity_rows_written": 0,
+                "alertable": 0,
+                "alerts": 0,
+                "llm_calls_attempted": 0,
+                "llm_skipped_due_budget": 0,
+                "send_lane_items_attempted": {"health_heartbeat": 1},
+                "send_lane_items_delivered": {"health_heartbeat": 0},
+            }
+            legacy_delivery = {
+                "row_type": "event_alpha_notification_delivery",
+                "run_id": "run-status",
+                "alert_id": "heartbeat",
+                "profile": "notify_llm_deep",
+                "namespace": namespace,
+                "artifact_namespace": namespace,
+                "lane": "health_heartbeat",
+                "route": "HEALTH_HEARTBEAT",
+                "content_hash": "hash",
+                "state": "blocked",
+                "error_class": "guard_blocked",
+                "error_message_safe": "event alerts disabled",
+                "notification_preview_relpath": preview.as_posix(),
+                "attempted_at": "2026-06-29T12:00:00+00:00",
+            }
+            result = event_alpha_artifact_doctor.diagnose_artifacts(
+                run_rows=[run],
+                delivery_rows=[legacy_delivery],
+                profile="notify_llm_deep",
+                artifact_namespace=namespace,
+                strict=True,
+                delivery_strict_scope="latest_run",
+            )
+        finally:
+            os.chdir(old_cwd)
+    assert result.status == "BLOCKED"
+    assert result.delivery_status_missing == 1
+    assert result.delivery_status_detail_missing == 1
+    assert result.delivery_mode_missing == 1
+    text = event_alpha_artifact_doctor.format_artifact_doctor_report(result)
+    assert "status_missing=1" in text
+    assert "delivery_status_missing=1" in "\n".join(result.blockers)
+
+
+def test_send_readiness_blocks_missing_delivery_status_fields():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_send_readiness
+
+    doctor = event_alpha_artifact_doctor.EventAlphaArtifactDoctorResult(
+        status="BLOCKED",
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep_rehearsal",
+        run_rows=1,
+        alert_rows=0,
+        feedback_rows=0,
+        outcome_rows=0,
+        card_files=0,
+        delivery_status_missing=1,
+        delivery_status_detail_missing=1,
+        delivery_mode_missing=1,
+        blockers=("delivery_status_missing=1",),
+    )
+    result = event_alpha_send_readiness.build_send_readiness(
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep_rehearsal",
+        run_rows=[{
+            "run_id": "run-status",
+            "profile": "notify_llm_deep",
+            "artifact_namespace": "notify_llm_deep_rehearsal",
+            "cycle_completed": True,
+            "success": True,
+        }],
+        core_opportunity_rows=[],
+        alert_rows=[],
+        delivery_rows=[{
+            "row_type": "event_alpha_notification_delivery",
+            "run_id": "run-status",
+            "profile": "notify_llm_deep",
+            "namespace": "notify_llm_deep_rehearsal",
+            "artifact_namespace": "notify_llm_deep_rehearsal",
+            "lane": "health_heartbeat",
+            "state": "blocked",
+        }],
+        artifact_doctor=doctor,
+        send_guard_enabled=False,
+        telegram_ready=False,
+        preview_path="/tmp/missing-preview.md",
+    )
+    blockers = "\n".join(result.blockers)
+    assert "delivery rows are missing explicit delivery_state" in blockers
+    assert "delivery row missing explicit delivery_state" in blockers
+    assert result.ready is False
+
+
+def test_notification_inbox_burn_in_review_collapses_low_value_rows():
+    from crypto_rsi_scanner import event_alpha_notification_inbox
+
+    item = event_alpha_notification_inbox.EventAlphaNotificationInboxItem(
+        alert_id="core_velvet",
+        alert_key="core_velvet",
+        core_opportunity_id="core_velvet",
+        symbol="VELVET",
+        coin_id="velvet",
+        run_id="run-1",
+        tier="HIGH_PRIORITY_WATCH",
+        playbook="proxy_attention",
+        card_path="/tmp/cards/core_velvet.md",
+        sent=False,
+        would_send=True,
+        blocked_by_guard=True,
+        delivery_state="blocked",
+        reviewed=False,
+        reason="high-priority accepted evidence",
+        final_route_after_quality_gate="HIGH_PRIORITY_RESEARCH",
+        final_state_after_quality_gate="HIGH_PRIORITY",
+        alertable_after_quality_gate=True,
+        feedback_target="core_velvet",
+    )
+    local = event_alpha_notification_inbox.EventAlphaNotificationInboxItem(
+        alert_id="core_noise",
+        alert_key="core_noise",
+        core_opportunity_id="core_noise",
+        symbol="BTC",
+        coin_id="bitcoin",
+        run_id="run-1",
+        tier="STORE_ONLY",
+        playbook="source_noise_control",
+        card_path="",
+        sent=False,
+        would_send=False,
+        blocked_by_guard=False,
+        delivery_state="",
+        reviewed=False,
+        reason="quality gated",
+        alertable_after_quality_gate=False,
+        feedback_target="core_noise",
+    )
+    result = event_alpha_notification_inbox.EventAlphaNotificationInboxResult(
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep_rehearsal",
+        notification_runs_path=Path("/tmp/runs.jsonl"),
+        alert_store_path=Path("/tmp/alerts.jsonl"),
+        feedback_path=Path("/tmp/feedback.jsonl"),
+        research_cards_dir=Path("/tmp/cards"),
+        outcomes_path=None,
+        notification_runs_read=1,
+        alert_rows_read=2,
+        feedback_rows_read=0,
+        research_cards_read=1,
+        outcome_rows_read=0,
+        sent_without_feedback=(),
+        partial_delivered_without_feedback=(),
+        would_send_without_feedback=(),
+        would_send_blocked_without_feedback=(item,),
+        weak_validated_local_only=(),
+        quality_gated_local_only=(local,),
+        legacy_quality_conflicts=(),
+        exploratory_without_feedback=(),
+        high_priority_unreviewed=(),
+        triggered_fade_unreviewed=(),
+        heartbeat_only_runs=(),
+        duplicate_or_in_flight_runs=(),
+        provider_degraded_runs=({"run_id": "run-1", "warnings": ["gdelt timeout"]},),
+        canonical_review_items=(item, local),
+        diagnostic_review_items_hidden=(local,),
+    )
+    text = event_alpha_notification_inbox.format_notification_inbox(result, burn_in_review=True)
+    assert "EVENT ALPHA BURN-IN REVIEW INBOX" in text
+    assert "Would-send / sent core opportunities: 1" in text
+    assert "VELVET/velvet" in text
+    assert "Local-only / quality-capped rows: 1" in text
+    assert "collapsed in burn-in review" in text
+    assert "provider-degraded notification runs: 1" in text
+
+
+def test_event_alpha_rehearsal_make_targets_include_fixture_and_fast_caps():
+    makefile = Path("Makefile").read_text(encoding="utf-8")
+    assert "event-alpha-notify-llm-deep-real-no-send-rehearsal-with-fixture-candidate" in makefile
+    assert "event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate" in makefile
+    fast = makefile.split("event-alpha-notify-llm-deep-real-no-send-rehearsal-fast:", 1)[1].split("event-alpha-send-readiness:", 1)[0]
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in fast
+    assert "RSI_EVENT_CATALYST_SEARCH_MAX_ANOMALIES=5" in fast
+    assert "RSI_EVENT_LLM_MAX_CALLS_PER_RUN=40" in fast
+    assert "RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES=5" in fast
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0
