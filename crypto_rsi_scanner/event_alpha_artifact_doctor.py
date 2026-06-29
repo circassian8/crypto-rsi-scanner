@@ -91,6 +91,12 @@ class EventAlphaArtifactDoctorResult:
     delivery_alert_id_not_canonical: int = 0
     telegram_message_contains_absolute_path: int = 0
     telegram_message_contains_raw_debug_dump: int = 0
+    research_review_digest_missing_confirmation_label: int = 0
+    research_review_digest_contains_strict_alertable: int = 0
+    research_review_digest_contains_hard_gated_candidate: int = 0
+    research_review_digest_too_many_items: int = 0
+    research_review_digest_missing_feedback_target: int = 0
+    research_review_digest_absolute_path: int = 0
     digest_item_without_live_confirmation: int = 0
     digest_item_rejected_results_only: int = 0
     strategic_broad_asset_digest_without_confirmation: int = 0
@@ -768,6 +774,25 @@ def diagnose_artifacts(
             f"{delivery_conflicts['telegram_message_contains_raw_debug_dump']}"
         )
         (blockers if strict else warnings).append(message)
+    for key in (
+        "research_review_digest_missing_confirmation_label",
+        "research_review_digest_contains_strict_alertable",
+        "research_review_digest_contains_hard_gated_candidate",
+        "research_review_digest_too_many_items",
+        "research_review_digest_missing_feedback_target",
+        "research_review_digest_absolute_path",
+    ):
+        if delivery_conflicts[key]:
+            message = f"{key}={delivery_conflicts[key]}"
+            if key in {
+                "research_review_digest_contains_strict_alertable",
+                "research_review_digest_contains_hard_gated_candidate",
+                "research_review_digest_missing_feedback_target",
+                "research_review_digest_absolute_path",
+            }:
+                (blockers if strict else warnings).append(message)
+            else:
+                warnings.append(message)
     if delivery_conflicts["notification_preview_missing"]:
         warnings.append(f"notification_preview_missing={delivery_conflicts['notification_preview_missing']}")
     if delivery_conflicts["notification_preview_relpath_missing"]:
@@ -1081,6 +1106,12 @@ def diagnose_artifacts(
         delivery_alert_id_not_canonical=delivery_conflicts["delivery_alert_id_not_canonical"],
         telegram_message_contains_absolute_path=delivery_conflicts["telegram_message_contains_absolute_path"],
         telegram_message_contains_raw_debug_dump=delivery_conflicts["telegram_message_contains_raw_debug_dump"],
+        research_review_digest_missing_confirmation_label=delivery_conflicts["research_review_digest_missing_confirmation_label"],
+        research_review_digest_contains_strict_alertable=delivery_conflicts["research_review_digest_contains_strict_alertable"],
+        research_review_digest_contains_hard_gated_candidate=delivery_conflicts["research_review_digest_contains_hard_gated_candidate"],
+        research_review_digest_too_many_items=delivery_conflicts["research_review_digest_too_many_items"],
+        research_review_digest_missing_feedback_target=delivery_conflicts["research_review_digest_missing_feedback_target"],
+        research_review_digest_absolute_path=delivery_conflicts["research_review_digest_absolute_path"],
         digest_item_without_live_confirmation=delivery_conflicts["digest_item_without_live_confirmation"],
         digest_item_rejected_results_only=delivery_conflicts["digest_item_rejected_results_only"],
         strategic_broad_asset_digest_without_confirmation=delivery_conflicts["strategic_broad_asset_digest_without_confirmation"],
@@ -1798,6 +1829,12 @@ def _notification_delivery_conflicts(
         "delivery_alert_id_not_canonical": 0,
         "telegram_message_contains_absolute_path": 0,
         "telegram_message_contains_raw_debug_dump": 0,
+        "research_review_digest_missing_confirmation_label": 0,
+        "research_review_digest_contains_strict_alertable": 0,
+        "research_review_digest_contains_hard_gated_candidate": 0,
+        "research_review_digest_too_many_items": 0,
+        "research_review_digest_missing_feedback_target": 0,
+        "research_review_digest_absolute_path": 0,
         "digest_item_without_live_confirmation": 0,
         "digest_item_rejected_results_only": 0,
         "strategic_broad_asset_digest_without_confirmation": 0,
@@ -1838,6 +1875,7 @@ def _notification_delivery_conflicts(
             row,
             artifact_namespace=row.get("artifact_namespace") or row.get("namespace"),
         )
+        telegram_body = ""
         if path is None:
             out["notification_preview_missing"] += 1
             out["notification_preview_path_unresolvable"] += 1
@@ -1854,11 +1892,25 @@ def _notification_delivery_conflicts(
                 if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
                     out["telegram_message_contains_raw_debug_dump"] += 1
         lane = str(row.get("lane") or "")
+        core_id = str(row.get("core_opportunity_id") or "").strip()
+        core = core_rows_by_id.get(core_id) if core_id else None
+        if lane == "research_review_digest":
+            if "Not alertable" not in telegram_body or "Missing confirmation" not in telegram_body:
+                out["research_review_digest_missing_confirmation_label"] += 1
+            if re.search(r"/Users/|/tmp/|/private/tmp/", telegram_body):
+                out["research_review_digest_absolute_path"] += 1
+            if len(re.findall(r"(?m)^\d+\.\s*<b>", telegram_body)) > 10:
+                out["research_review_digest_too_many_items"] += 1
+            if not str(row.get("feedback_target") or "").strip():
+                out["research_review_digest_missing_feedback_target"] += 1
+            if core:
+                if _research_review_core_is_alertable(core):
+                    out["research_review_digest_contains_strict_alertable"] += 1
+                if _research_review_core_is_hard_gated(core):
+                    out["research_review_digest_contains_hard_gated_candidate"] += 1
         if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
             continue
-        core_id = str(row.get("core_opportunity_id") or "").strip()
         alert_id = str(row.get("alert_id") or "").strip()
-        core = core_rows_by_id.get(core_id) if core_id else None
         requires_core = _delivery_requires_core_identity(row)
         if requires_core:
             if not core_id:
@@ -2230,6 +2282,50 @@ def _delivery_core_is_strategic_broad_asset_context(core: Mapping[str, Any]) -> 
             "premium",
             "public company",
             "market structure",
+        )
+    )
+
+
+def _research_review_core_is_alertable(core: Mapping[str, Any]) -> bool:
+    route = str(core.get("final_route_after_quality_gate") or core.get("route") or "")
+    level = str(core.get("final_opportunity_level") or core.get("opportunity_level") or "").strip()
+    if event_alpha_router.route_value_is_alertable(route):
+        return True
+    return level in {"validated_digest", "watchlist", "high_priority"}
+
+
+def _research_review_core_is_hard_gated(core: Mapping[str, Any]) -> bool:
+    symbol = str(core.get("symbol") or core.get("validated_symbol") or "").strip().upper()
+    coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or "").strip().casefold()
+    if symbol == "SECTOR" or coin_id.startswith("sector"):
+        return True
+    fields = " ".join(
+        str(core.get(key) or "").casefold()
+        for key in (
+            "candidate_role",
+            "relationship_type",
+            "impact_path_type",
+            "impact_path_reason",
+            "playbook_type",
+            "effective_playbook_type",
+            "quality_gate_block_reason",
+            "why_not_promoted",
+            "why_local_only",
+            "why_not_watchlist",
+            "snapshot_class",
+        )
+    )
+    return any(
+        token in fields
+        for token in (
+            "source_noise",
+            "ticker_word_collision",
+            "ticker_collision",
+            "word_collision",
+            "generic_cooccurrence_only",
+            "source_noise_control",
+            "ambiguous_control",
+            "diagnostic_support",
         )
     )
 
@@ -2752,7 +2848,13 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"preview_send_guard_missing={result.notification_preview_send_guard_status_missing} "
             f"preview_no_send_unclear={result.notification_preview_no_send_status_unclear} "
             f"raw_debug_dump={result.telegram_message_contains_raw_debug_dump} "
-            f"absolute_path={result.telegram_message_contains_absolute_path}"
+            f"absolute_path={result.telegram_message_contains_absolute_path} "
+            f"research_review_missing_label={result.research_review_digest_missing_confirmation_label} "
+            f"research_review_alertable={result.research_review_digest_contains_strict_alertable} "
+            f"research_review_hard_gated={result.research_review_digest_contains_hard_gated_candidate} "
+            f"research_review_too_many={result.research_review_digest_too_many_items} "
+            f"research_review_feedback_missing={result.research_review_digest_missing_feedback_target} "
+            f"research_review_absolute_path={result.research_review_digest_absolute_path}"
         ),
         (
             "quality fields: "

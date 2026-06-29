@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-29 - Keep research-review notifications separate from alert lanes
+**Status:** accepted
+**Decision:** Event Alpha may send a separate `research_review_digest` lane for
+operator review of near-miss/exploratory candidates during burn-in, but this
+lane is not a strict alert lane and does not count as alertable. It must be
+disabled by default for normal profiles unless explicitly enabled, carry its own
+cooldown/dedupe state, and clearly label messages as research review only,
+not alertable, missing confirmation, and not a trade signal. It may include
+non-alertable exploratory/local rows only after identity, score, and hard-gate
+filters pass; source-noise, ticker collisions, generic co-occurrence,
+sector-only rows by default, diagnostics/support rows, and already alertable
+rows must stay out. It cannot create `TRIGGERED_FADE`, loosen quality gates,
+route normal RSI alerts, write paper/live rows, or imply execution.
+**Why:** Burn-in needs useful operator feedback even when strict routes have no
+alertable decisions. Mixing near-misses into daily digest/high-priority lanes
+would blur the meaning of alertable Event Alpha decisions.
+**Revisit when:** A reviewed feedback/outcome sample proves the review lane is
+too noisy or too restrictive, or when Event Alpha notification promotion rules
+are redesigned around a new validated quality policy.
+
 ## 2026-06-29 - Real Event Alpha sends require ledger-backed rehearsal readiness
 **Status:** accepted
 **Decision:** Before enabling real Telegram delivery for `notify_llm_deep`, the

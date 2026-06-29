@@ -76,12 +76,13 @@ class EventAlphaNotificationInboxResult:
     weak_validated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
     quality_gated_local_only: tuple[EventAlphaNotificationInboxItem, ...]
     legacy_quality_conflicts: tuple[EventAlphaNotificationInboxItem, ...]
-    exploratory_without_feedback: tuple[EventAlphaNotificationInboxItem, ...]
-    high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
-    triggered_fade_unreviewed: tuple[EventAlphaNotificationInboxItem, ...]
-    heartbeat_only_runs: tuple[dict[str, Any], ...]
-    duplicate_or_in_flight_runs: tuple[dict[str, Any], ...]
-    provider_degraded_runs: tuple[dict[str, Any], ...]
+    research_review_without_feedback: tuple[EventAlphaNotificationInboxItem, ...] = ()
+    exploratory_without_feedback: tuple[EventAlphaNotificationInboxItem, ...] = ()
+    high_priority_unreviewed: tuple[EventAlphaNotificationInboxItem, ...] = ()
+    triggered_fade_unreviewed: tuple[EventAlphaNotificationInboxItem, ...] = ()
+    heartbeat_only_runs: tuple[dict[str, Any], ...] = ()
+    duplicate_or_in_flight_runs: tuple[dict[str, Any], ...] = ()
+    provider_degraded_runs: tuple[dict[str, Any], ...] = ()
     canonical_review_items: tuple[EventAlphaNotificationInboxItem, ...] = ()
     diagnostic_review_items_hidden: tuple[EventAlphaNotificationInboxItem, ...] = ()
     diagnostic_review_items: tuple[EventAlphaNotificationInboxItem, ...] = ()
@@ -210,8 +211,30 @@ def build_notification_inbox(
         if not item.is_diagnostic and item.item_type == "near_miss_core" and not item.reviewed
     )
     exploratory_delivery_items = tuple(
-        item for item in _exploratory_items(deliveries, watch_by_alert, reviewed_ids, card_paths)
+        item for item in _digest_delivery_items(
+            deliveries,
+            watch_by_alert,
+            reviewed_ids,
+            card_paths,
+            lane=event_alpha_notifications.LANE_EXPLORATORY_DIGEST,
+            default_tier="EXPLORATORY",
+            default_playbook="exploratory",
+            default_reason="exploratory digest item; low-confidence/store-only row needs review",
+        )
         if not item.reviewed and not _delivery_item_duplicates_core(item, canonical_review_items)
+    )
+    research_review_delivery_items = tuple(
+        item for item in _digest_delivery_items(
+            deliveries,
+            watch_by_alert,
+            reviewed_ids,
+            card_paths,
+            lane=event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST,
+            default_tier="RESEARCH_REVIEW",
+            default_playbook="research_review_digest",
+            default_reason="research-review digest item; not alertable and missing confirmation",
+        )
+        if not item.reviewed
     )
     exploratory_without_feedback = (*near_miss_core_items, *exploratory_delivery_items)
     local_core_learning = tuple(
@@ -240,6 +263,7 @@ def build_notification_inbox(
         weak_validated_local_only=weak_validated_local_only,
         quality_gated_local_only=quality_gated_local_only,
         legacy_quality_conflicts=legacy_quality_conflicts,
+        research_review_without_feedback=research_review_delivery_items,
         exploratory_without_feedback=exploratory_without_feedback,
         high_priority_unreviewed=high_priority_unreviewed,
         triggered_fade_unreviewed=triggered_fade_unreviewed,
@@ -334,6 +358,7 @@ def format_notification_inbox(result: EventAlphaNotificationInboxResult, *, burn
     )
     _append_item_section(lines, "would-send core opportunities blocked by preview mode", result.would_send_without_feedback, profile=result.profile)
     _append_item_section(lines, "would-send core opportunities blocked by guard without feedback", result.would_send_blocked_without_feedback, profile=result.profile)
+    _append_item_section(lines, "research-review candidates needing feedback", result.research_review_without_feedback, profile=result.profile)
     _append_item_section(lines, "near-misses for optional review", result.exploratory_without_feedback, profile=result.profile)
     _append_item_section(lines, "local-only learning rows for optional review", (*result.quality_gated_local_only, *result.weak_validated_local_only), profile=result.profile)
     _append_item_section(lines, "legacy quality conflicts for migration review", result.legacy_quality_conflicts, profile=result.profile)
@@ -368,6 +393,7 @@ def _format_notification_inbox_burn_in_review(result: EventAlphaNotificationInbo
             f"sent_or_partial={len(sent_or_partial)} "
             f"would_send={len(would_send)} "
             f"active_unreviewed={len(active)} "
+            f"research_review={len(result.research_review_without_feedback)} "
             f"near_miss={len(result.exploratory_without_feedback)} "
             f"local_or_quality_capped={local_count} "
             f"provider_degraded_runs={len(result.provider_degraded_runs)} "
@@ -376,6 +402,7 @@ def _format_notification_inbox_burn_in_review(result: EventAlphaNotificationInbo
         "",
     ]
     _append_compact_item_section(lines, "Would-send / sent core opportunities", active, profile=result.profile, limit=12)
+    _append_compact_item_section(lines, "Research-review candidates", result.research_review_without_feedback, profile=result.profile, limit=8)
     _append_compact_item_section(lines, "Near-miss candidates", result.exploratory_without_feedback, profile=result.profile, limit=8)
     if local_count:
         lines.append(f"Local-only / quality-capped rows: {local_count}")
@@ -922,24 +949,34 @@ def _inbox_item(
     )
 
 
-def _exploratory_items(
+def _digest_delivery_items(
     deliveries: Iterable[Mapping[str, Any]],
     watch_by_alert: Mapping[str, event_watchlist.EventWatchlistEntry],
     reviewed_ids: set[str],
     card_paths: Mapping[str, Path],
+    *,
+    lane: str,
+    default_tier: str,
+    default_playbook: str,
+    default_reason: str,
 ) -> list[EventAlphaNotificationInboxItem]:
     items: list[EventAlphaNotificationInboxItem] = []
     for row in delivery.latest_rows_by_delivery(deliveries):
-        if str(row.get("lane") or "") != event_alpha_notifications.LANE_EXPLORATORY_DIGEST:
+        if str(row.get("lane") or "") != lane:
             continue
         state = str(row.get("state") or "")
         alert_ids = [part.strip() for part in str(row.get("alert_id") or "").split(",") if part.strip()]
         if not alert_ids:
-            alert_ids = ["ea:exploratory"]
+            alert_ids = [f"ea:{lane}"]
         for alert_id in alert_ids:
             entry = watch_by_alert.get(alert_id)
             key = alert_id[3:] if alert_id.startswith("ea:") else alert_id
+            core_id = str(row.get("core_opportunity_id") or "").strip()
+            symbol = str(row.get("canonical_symbol") or getattr(entry, "symbol", "") or "UNKNOWN")
+            coin_id = str(row.get("canonical_coin_id") or getattr(entry, "coin_id", "") or "unknown")
             ids = {alert_id, key}
+            if core_id:
+                ids.add(core_id)
             if entry is not None:
                 ids.update({entry.key, entry.event_id, entry.coin_id, entry.symbol, f"ea:{entry.key}"})
             reviewed = bool(ids & reviewed_ids)
@@ -949,12 +986,12 @@ def _exploratory_items(
             items.append(EventAlphaNotificationInboxItem(
                 alert_id=alert_id,
                 alert_key=key,
-                symbol=str(getattr(entry, "symbol", "") or "UNKNOWN"),
-                coin_id=str(getattr(entry, "coin_id", "") or "unknown"),
+                symbol=symbol,
+                coin_id=coin_id,
                 run_id=str(row.get("run_id") or ""),
-                tier=str(getattr(entry, "latest_tier", "") or "EXPLORATORY"),
-                playbook=str(getattr(entry, "latest_playbook_type", "") or "exploratory"),
-                card_path=str(card_path) if card_path else "",
+                tier=str(getattr(entry, "latest_tier", "") or default_tier),
+                playbook=str(getattr(entry, "latest_playbook_type", "") or default_playbook),
+                card_path=str(row.get("canonical_card_path") or card_path or ""),
                 sent=sent,
                 would_send=would_send,
                 blocked_by_guard=state == delivery.STATE_BLOCKED,
@@ -962,8 +999,12 @@ def _exploratory_items(
                 reviewed=reviewed,
                 reason=(
                     str(getattr(entry, "suppressed_reason", "") or "")
-                    or "exploratory digest item; low-confidence/store-only row needs review"
+                    or str(row.get("status_detail") or "")
+                    or default_reason
                 ),
+                core_opportunity_id=core_id,
+                feedback_target=str(row.get("feedback_target") or core_id or alert_id),
+                feedback_target_type=str(row.get("feedback_target_type") or ("core_opportunity_id" if core_id else "alert_id")),
             ))
     return items
 

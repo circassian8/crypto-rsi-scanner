@@ -368,6 +368,24 @@ rows, and has its own cooldown/dedupe state. Source-noise and ticker-collision
 controls are excluded by default unless
 `RSI_EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_CONTROLS=1`.
 
+Event Alpha also has a stricter `research_review_digest` lane for near-miss
+review leads during burn-in. It is separate from daily digest, instant
+escalation, triggered fade, exploratory digest, and heartbeat lanes. It is
+research-review only: each Telegram body must say the candidates are not
+alertable, are missing confirmation, and are not trade signals. Eligibility is
+intentionally narrow: exploratory or explicitly allowed local-only level,
+validated symbol/coin id, score above
+`RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_MIN_SCORE`, not already alertable, not
+sector-only unless configured, and not source-noise/ticker-collision/
+generic-cooccurrence/diagnostic/support/control. By default it sends only when
+strict alert lanes have no due candidates; set
+`RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_SEND_WITH_ALERTS=1` only when the
+operator explicitly wants review leads alongside strict alerts. Smoke it with:
+
+```
+make event-alpha-research-review-digest-smoke PYTHON=python3
+```
+
 Event Alpha can also write `HYPOTHESIS` watchlist rows. A hypothesis means the
 radar inferred that an external catalyst may affect a crypto sector or seed
 asset set, but direct candidate validation is incomplete. External entities

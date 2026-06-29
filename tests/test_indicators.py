@@ -23736,6 +23736,246 @@ def test_event_alpha_exploratory_digest_truncates_compact_numbered_blocks():
     assert len(text) <= 3900
 
 
+def _research_review_decision(symbol="DOGE", *, score=66, level="exploratory", playbook="meme_attention"):
+    decision = _notify_suppressed_decision(
+        symbol,
+        playbook=playbook,
+        relationship="proxy_attention",
+        score=score,
+        reason="missing independent source confirmation",
+    )
+    decision.entry.latest_score_components.update({
+        "core_opportunity_id": f"agg:{symbol.lower()}-research-review",
+        "opportunity_level": level,
+        "opportunity_score_final": score,
+        "impact_path_type": playbook,
+        "candidate_role": "candidate_asset",
+        "market_confirmation_score": 70,
+        "source_quality": 58,
+        "why_not_watchlist": "missing independent source confirmation",
+        "upgrade_requirements": ["find independent catalyst evidence", "verify liquidity and organic volume"],
+    })
+    return decision
+
+
+def test_event_alpha_research_review_digest_surfaces_near_misses_without_alerting():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery, event_alpha_notifications as notif
+
+    namespace = "research_review_digest_unit"
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, namespace)
+        dcfg = delivery.config_for_context(ctx)
+        storage = _NotifyFakeStorage()
+        now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+        decision = _research_review_decision("DOGE", score=66)
+        cfg = notif.EventAlphaNotificationConfig(
+            enabled=False,
+            research_review_digest_enabled=True,
+            research_review_digest_min_score=60,
+            research_review_digest_max_items=3,
+        )
+        plan = notif.build_notification_plan([decision], storage=storage, cfg=cfg, now=now)
+        assert plan.decision_count == 0
+        assert plan.lane_counts[notif.LANE_RESEARCH_REVIEW_DIGEST] == 1
+        assert plan.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 0
+        assert plan.would_send_count == 1
+        text = notif.format_research_review_telegram_digest(plan.research_review_items, profile="notify_llm_deep", cfg=cfg)
+        assert "Event Alpha Research Review" in text
+        assert "Not alertable. Missing confirmation. Not a trade signal." in text
+        assert "DOGE / doge" in text
+        assert "Why not alertable: missing confirmation" in text
+        assert "What would upgrade: find independent catalyst" in text
+        assert "alert_id=" not in text
+        assert "card_id=" not in text
+        assert "research_card=" not in text
+        assert "/Users/" not in text
+        assert "{" not in text
+
+        result = notif.send_notifications(
+            [decision],
+            storage=storage,
+            cfg=cfg,
+            now=now,
+            profile="notify_llm_deep",
+            send_fn=lambda message: True,
+            delivery_cfg=dcfg,
+            run_id="run-review",
+            namespace=namespace,
+        )
+        assert not result.attempted
+        assert result.deliveries_blocked == 1
+        assert result.lane_items_attempted[notif.LANE_RESEARCH_REVIEW_DIGEST] == 1
+        rows = delivery.load_delivery_records(dcfg.path)
+        assert rows[-1]["lane"] == notif.LANE_RESEARCH_REVIEW_DIGEST
+        assert rows[-1]["state"] == delivery.STATE_BLOCKED
+
+
+def test_event_alpha_research_review_digest_policy_excludes_controls_and_strict_alerts():
+    from dataclasses import replace
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router
+
+    now = datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc)
+    good = _research_review_decision("DOGE", score=66)
+    noise = _research_review_decision("BTC", score=90, playbook="source_noise_control")
+    generic = _research_review_decision("HYPE", score=90)
+    generic.entry.latest_score_components["impact_path_type"] = "generic_cooccurrence_only"
+    sector = _research_review_decision("SECTOR", score=90)
+    strict = _notify_route_decision(
+        "SOL",
+        event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+        event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+    )
+    cfg = notif.EventAlphaNotificationConfig(
+        enabled=True,
+        research_review_digest_enabled=True,
+        research_review_digest_min_score=60,
+        daily_digest_cooldown_hours=0,
+    )
+    plan = notif.build_notification_plan([good, noise, generic, sector], storage=_NotifyFakeStorage(), cfg=cfg, now=now)
+    assert [item.decision.alert_id for item in plan.research_review_items] == [good.alert_id]
+
+    blocked_by_strict = notif.build_notification_plan([strict, good], storage=_NotifyFakeStorage(), cfg=cfg, now=now)
+    assert blocked_by_strict.lane_counts[notif.LANE_DAILY_DIGEST] == 1
+    assert blocked_by_strict.lane_counts[notif.LANE_RESEARCH_REVIEW_DIGEST] == 0
+    assert "strict alert lane has due candidates" in blocked_by_strict.blocked_by_lane[notif.LANE_RESEARCH_REVIEW_DIGEST]
+
+    with_alerts = notif.build_notification_plan(
+        [strict, good],
+        storage=_NotifyFakeStorage(),
+        cfg=replace(cfg, research_review_digest_send_with_alerts=True),
+        now=now,
+    )
+    assert with_alerts.lane_counts[notif.LANE_DAILY_DIGEST] == 1
+    assert with_alerts.lane_counts[notif.LANE_RESEARCH_REVIEW_DIGEST] == 1
+
+
+def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor as doctor,
+        event_alpha_notification_delivery as delivery,
+        event_alpha_notification_inbox as inbox,
+        event_alpha_notifications as notif,
+        event_alpha_router,
+    )
+
+    namespace = "research_review_digest_unit_doctor"
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = _notify_artifact_context(tmp, namespace)
+        dcfg = delivery.config_for_context(ctx)
+        decision = _research_review_decision("DOGE", score=66)
+        core_row = {
+            "core_opportunity_id": "agg:doge-research-review",
+            "key": decision.entry.key,
+            "symbol": "DOGE",
+            "coin_id": "dogecoin",
+            "validated_symbol": "DOGE",
+            "validated_coin_id": "dogecoin",
+            "final_opportunity_level": "exploratory",
+            "opportunity_score_final": 66,
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+            "impact_path_type": "meme_attention",
+            "candidate_role": "candidate_asset",
+            "profile": "fixture",
+            "artifact_namespace": namespace,
+            "run_mode": "test",
+        }
+        sent_result = notif.send_notifications(
+            [decision],
+            storage=_NotifyFakeStorage(),
+            cfg=notif.EventAlphaNotificationConfig(
+                enabled=False,
+                research_review_digest_enabled=True,
+                research_review_digest_min_score=60,
+            ),
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+            profile="fixture",
+            send_fn=lambda message: True,
+            delivery_cfg=dcfg,
+            run_id="run-review",
+            namespace=namespace,
+            core_opportunity_rows=[core_row],
+        )
+        rows = delivery.load_delivery_records(dcfg.path)
+        assert sent_result.deliveries_blocked == 1
+        result = inbox.build_notification_inbox(
+            notification_runs=[],
+            alert_rows=[],
+            feedback_rows=[],
+            research_cards_dir=Path(tmp),
+            profile="fixture",
+            artifact_namespace=namespace,
+            notification_runs_path=Path(tmp) / "runs.jsonl",
+            alert_store_path=Path(tmp) / "alerts.jsonl",
+            feedback_path=Path(tmp) / "feedback.jsonl",
+            notification_delivery_rows=rows,
+            core_opportunity_rows=[core_row],
+        )
+        assert len(result.research_review_without_feedback) == 1
+        assert result.research_review_without_feedback[0].feedback_target == "agg:doge-research-review"
+        report = inbox.format_notification_inbox(result)
+        assert "research-review candidates needing feedback" in report
+
+        clean = doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "run-review", "profile": "fixture", "artifact_namespace": namespace, "run_mode": "test"}],
+            delivery_rows=rows,
+            core_opportunity_rows=[core_row],
+            profile="fixture",
+            artifact_namespace=namespace,
+            include_test_artifacts=True,
+            strict=True,
+            delivery_strict_scope="latest_run",
+        )
+        assert clean.research_review_digest_contains_hard_gated_candidate == 0
+        assert clean.research_review_digest_contains_strict_alertable == 0
+
+        bad_preview = Path(tmp) / "bad_preview.md"
+        bad_preview.write_text(
+            "# Event Alpha Notification Preview\n\n```html\n1. <b>BAD</b>\nCard: /Users/example/card.md\n```\n",
+            encoding="utf-8",
+        )
+        bad_row = {
+            **rows[-1],
+            "run_id": "bad-run",
+            "notification_preview_path": str(bad_preview),
+            "notification_preview_relpath": delivery.notification_preview_relpath_for_path(bad_preview),
+            "feedback_target": "",
+            "core_opportunity_id": "agg:bad-alertable",
+        }
+        bad_core = {
+            "core_opportunity_id": "agg:bad-alertable",
+            "symbol": "BAD",
+            "coin_id": "bad",
+            "final_opportunity_level": "validated_digest",
+            "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+            "impact_path_type": "generic_cooccurrence_only",
+            "profile": "fixture",
+            "artifact_namespace": namespace,
+            "run_mode": "test",
+        }
+        bad = doctor.diagnose_artifacts(
+            run_rows=[{"run_id": "bad-run", "profile": "fixture", "artifact_namespace": namespace, "run_mode": "test"}],
+            delivery_rows=[bad_row],
+            core_opportunity_rows=[bad_core],
+            profile="fixture",
+            artifact_namespace=namespace,
+            include_test_artifacts=True,
+            strict=True,
+            delivery_strict_scope="latest_run",
+        )
+        assert bad.research_review_digest_missing_confirmation_label == 1
+        assert bad.research_review_digest_contains_strict_alertable == 1
+        assert bad.research_review_digest_contains_hard_gated_candidate == 1
+        assert bad.research_review_digest_missing_feedback_target == 1
+        assert bad.research_review_digest_absolute_path == 1
+        assert bad.status == "BLOCKED"
+
+
 def test_event_alpha_notification_quality_modes_filter_lanes():
     from dataclasses import replace
     from datetime import datetime, timezone

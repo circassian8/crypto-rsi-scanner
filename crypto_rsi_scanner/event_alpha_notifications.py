@@ -22,6 +22,7 @@ from . import event_alpha_pipeline, event_alpha_router, event_watchlist
 LANE_DAILY_DIGEST = "daily_digest"
 LANE_INSTANT_ESCALATION = "instant_escalation"
 LANE_TRIGGERED_FADE = "triggered_fade"
+LANE_RESEARCH_REVIEW_DIGEST = "research_review_digest"
 LANE_EXPLORATORY_DIGEST = "exploratory_digest"
 LANE_HEALTH_HEARTBEAT = "health_heartbeat"
 
@@ -29,6 +30,7 @@ LANES = (
     LANE_DAILY_DIGEST,
     LANE_INSTANT_ESCALATION,
     LANE_TRIGGERED_FADE,
+    LANE_RESEARCH_REVIEW_DIGEST,
     LANE_EXPLORATORY_DIGEST,
     LANE_HEALTH_HEARTBEAT,
 )
@@ -37,6 +39,7 @@ LAST_SENT_META_KEYS = {
     LANE_DAILY_DIGEST: "event_alpha_last_sent_daily_digest_at",
     LANE_INSTANT_ESCALATION: "event_alpha_last_sent_instant_escalation_at",
     LANE_TRIGGERED_FADE: "event_alpha_last_sent_triggered_fade_at",
+    LANE_RESEARCH_REVIEW_DIGEST: "event_alpha_last_sent_research_review_digest_at",
     LANE_EXPLORATORY_DIGEST: "event_alpha_last_sent_exploratory_digest_at",
     LANE_HEALTH_HEARTBEAT: "event_alpha_last_sent_health_heartbeat_at",
 }
@@ -71,6 +74,13 @@ class EventAlphaNotificationConfig:
     exploratory_digest_include_rejection_reasons: bool = True
     exploratory_digest_include_raw_evidence: bool = True
     exploratory_digest_include_controls: bool = False
+    research_review_digest_enabled: bool = False
+    research_review_digest_max_items: int = 3
+    research_review_digest_min_score: float = 60.0
+    research_review_digest_cooldown_hours: float = 12.0
+    research_review_digest_include_local_only: bool = False
+    research_review_digest_include_sector: bool = False
+    research_review_digest_send_with_alerts: bool = False
     quality_mode: str = "validated_digest"
 
 
@@ -83,6 +93,15 @@ class EventAlphaExploratoryDigestItem:
 
 
 @dataclass(frozen=True)
+class EventAlphaResearchReviewDigestItem:
+    decision: event_alpha_router.EventAlphaRouteDecision
+    rank_score: float
+    why_included: tuple[str, ...] = ()
+    why_not_alertable: tuple[str, ...] = ()
+    what_would_upgrade: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class EventAlphaNotificationPlan:
     all_decisions: tuple[event_alpha_router.EventAlphaRouteDecision, ...] = ()
     decisions_by_lane: dict[str, list[event_alpha_router.EventAlphaRouteDecision]] = field(default_factory=dict)
@@ -90,6 +109,7 @@ class EventAlphaNotificationPlan:
     heartbeat_due: bool = False
     heartbeat_reason: str = "heartbeat disabled"
     exploratory_items: tuple[EventAlphaExploratoryDigestItem, ...] = ()
+    research_review_items: tuple[EventAlphaResearchReviewDigestItem, ...] = ()
     cooldown_status: dict[str, dict[str, Any]] = field(default_factory=dict)
     notification_scope: str = NOTIFICATION_SCOPE_GLOBAL
     scope_value: str = NOTIFICATION_SCOPE_GLOBAL
@@ -103,11 +123,17 @@ class EventAlphaNotificationPlan:
 
     @property
     def would_send_count(self) -> int:
-        return self.decision_count + len(self.exploratory_items) + (1 if self.heartbeat_due else 0)
+        return (
+            self.decision_count
+            + len(self.research_review_items)
+            + len(self.exploratory_items)
+            + (1 if self.heartbeat_due else 0)
+        )
 
     @property
     def lane_counts(self) -> dict[str, int]:
         counts = {lane: len(self.decisions_by_lane.get(lane, ())) for lane in LANES}
+        counts[LANE_RESEARCH_REVIEW_DIGEST] = len(self.research_review_items)
         counts[LANE_EXPLORATORY_DIGEST] = len(self.exploratory_items)
         counts[LANE_HEALTH_HEARTBEAT] = 1 if self.heartbeat_due else 0
         return counts
@@ -199,6 +225,23 @@ def build_notification_plan(
             blocked[LANE_TRIGGERED_FADE] = f"{blocked_count} triggered fade item(s) already sent"
 
     exploratory_items: tuple[EventAlphaExploratoryDigestItem, ...] = ()
+    research_review_items: tuple[EventAlphaResearchReviewDigestItem, ...] = ()
+    strict_due_count = sum(
+        len(by_lane.get(lane, ()))
+        for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST)
+    )
+    if cfg.research_review_digest_enabled:
+        selected = select_research_review_candidates(all_decisions, cfg=cfg, now=observed)
+        if selected:
+            if strict_due_count and not cfg.research_review_digest_send_with_alerts:
+                blocked[LANE_RESEARCH_REVIEW_DIGEST] = "strict alert lane has due candidates"
+            else:
+                due, reason = lane_due(storage, LANE_RESEARCH_REVIEW_DIGEST, cfg=cfg, now=observed)
+                if due:
+                    research_review_items = selected
+                else:
+                    blocked[LANE_RESEARCH_REVIEW_DIGEST] = reason
+
     if cfg.exploratory_digest_enabled and quality_mode == "exploratory_only":
         selected = select_exploratory_candidates(all_decisions, cfg=cfg, now=observed)
         if selected:
@@ -223,6 +266,7 @@ def build_notification_plan(
         heartbeat_due=heartbeat_due,
         heartbeat_reason=heartbeat_reason,
         exploratory_items=exploratory_items,
+        research_review_items=research_review_items,
         cooldown_status=cooldown_status_by_lane(storage, cfg=cfg, now=observed),
         notification_scope=_clean_scope(cfg.notification_scope),
         scope_value=_scope_value(cfg),
@@ -284,6 +328,64 @@ def select_exploratory_candidates(
         reverse=True,
     )
     return tuple(items[: max(0, int(cfg.exploratory_digest_max_items or 0))])
+
+
+def select_research_review_candidates(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    cfg: EventAlphaNotificationConfig,
+    now: datetime | None = None,
+) -> tuple[EventAlphaResearchReviewDigestItem, ...]:
+    """Pick near-miss/local research candidates without making them alertable."""
+    _ = now
+    if not cfg.research_review_digest_enabled or cfg.research_review_digest_max_items <= 0:
+        return ()
+    min_score = float(cfg.research_review_digest_min_score or 0.0)
+    items: list[EventAlphaResearchReviewDigestItem] = []
+    for decision in decisions:
+        if bool(getattr(decision, "alertable", False)) or event_alpha_router.alertable_after_quality_gate(decision):
+            continue
+        entry = decision.entry
+        components = dict(getattr(entry, "latest_score_components", {}) or {})
+        symbol = str(getattr(entry, "symbol", "") or components.get("validated_symbol") or "").strip()
+        coin_id = str(getattr(entry, "coin_id", "") or components.get("validated_coin_id") or "").strip()
+        if not symbol or not coin_id:
+            continue
+        if _research_review_is_sector(symbol, coin_id) and not cfg.research_review_digest_include_sector:
+            continue
+        level = _research_review_level(decision)
+        if level == "local_only" and not cfg.research_review_digest_include_local_only:
+            continue
+        if level not in {"exploratory", "local_only"}:
+            continue
+        score = _research_review_score(decision)
+        if score < min_score:
+            continue
+        hard_gate = _research_review_hard_gate_reason(decision)
+        if hard_gate:
+            continue
+        rank, why = _research_review_rank(entry, components, score)
+        why_not = _research_review_not_alertable_reasons(decision, components)
+        upgrade = _research_review_upgrade_steps(entry, decision, components)
+        items.append(
+            EventAlphaResearchReviewDigestItem(
+                decision=decision,
+                rank_score=rank,
+                why_included=tuple(why),
+                why_not_alertable=tuple(why_not),
+                what_would_upgrade=tuple(upgrade),
+            )
+        )
+    items.sort(
+        key=lambda item: (
+            item.rank_score,
+            _research_review_score(item.decision),
+            item.decision.entry.last_seen_at,
+            item.decision.entry.symbol,
+        ),
+        reverse=True,
+    )
+    return tuple(items[: max(0, int(cfg.research_review_digest_max_items or 0))])
 
 
 def _is_promoted_or_validated_exploratory(
@@ -351,6 +453,225 @@ def _filter_alertable_by_quality_mode(
 
 def _route_value(decision: object) -> str:
     return event_alpha_router.final_route_value(decision)
+
+
+def _research_review_level(decision: event_alpha_router.EventAlphaRouteDecision) -> str:
+    entry = decision.entry
+    components = dict(getattr(entry, "latest_score_components", {}) or {})
+    for key in ("final_opportunity_level", "opportunity_level", "opportunity_verdict"):
+        value = str(components.get(key) or "").strip()
+        if value:
+            return value
+    return str(
+        getattr(decision, "opportunity_level", None)
+        or getattr(entry, "opportunity_level", None)
+        or ""
+    ).strip()
+
+
+def _research_review_score(decision: event_alpha_router.EventAlphaRouteDecision) -> float:
+    entry = decision.entry
+    components = dict(getattr(entry, "latest_score_components", {}) or {})
+    for value in (
+        getattr(decision, "opportunity_score_final", None),
+        components.get("final_opportunity_score"),
+        components.get("opportunity_score_final"),
+        getattr(entry, "opportunity_score_final", None),
+        getattr(entry, "latest_score", None),
+    ):
+        parsed = _float_or_none(value)
+        if parsed is not None:
+            return parsed
+    return 0.0
+
+
+def _research_review_is_sector(symbol: object, coin_id: object) -> bool:
+    symbol_text = str(symbol or "").strip().upper()
+    coin_text = str(coin_id or "").strip().casefold()
+    return symbol_text == "SECTOR" or coin_text.startswith("sector") or coin_text in {
+        "sports_fan_proxy",
+        "rwa_preipo_proxy",
+        "ai_ipo_proxy",
+        "market_anomaly",
+    }
+
+
+def _research_review_hard_gate_reason(decision: event_alpha_router.EventAlphaRouteDecision) -> str | None:
+    entry = decision.entry
+    components = dict(getattr(entry, "latest_score_components", {}) or {})
+    fields = " ".join(
+        str(value or "").casefold()
+        for value in (
+            getattr(entry, "latest_playbook_type", None),
+            getattr(entry, "latest_rule_playbook_type", None),
+            getattr(entry, "latest_effective_playbook_type", None),
+            getattr(entry, "relationship_type", None),
+            getattr(entry, "latest_llm_asset_role", None),
+            getattr(entry, "candidate_role", None),
+            getattr(entry, "impact_path_type", None),
+            components.get("candidate_role"),
+            components.get("asset_role"),
+            components.get("llm_asset_role"),
+            components.get("relationship_type"),
+            components.get("impact_path_type"),
+            components.get("impact_path_reason"),
+            components.get("snapshot_class"),
+            components.get("row_classification"),
+            getattr(decision, "quality_gate_block_reason", None),
+            getattr(decision, "reason", None),
+            getattr(entry, "suppressed_reason", None),
+        )
+    )
+    blockers = {
+        "source_noise": "source_noise",
+        "ticker_word_collision": "ticker_collision",
+        "ticker_collision": "ticker_collision",
+        "word_collision": "ticker_collision",
+        "generic_cooccurrence_only": "generic_cooccurrence_only",
+        "source_noise_control": "source_noise_control",
+        "ambiguous_control": "ambiguous_control",
+        "diagnostic_support": "diagnostic_support",
+        "support_row": "support_row",
+    }
+    for token, reason in blockers.items():
+        if token in fields:
+            return reason
+    if str(components.get("is_diagnostic_snapshot") or "").strip().casefold() in {"1", "true", "yes"}:
+        return "diagnostic_snapshot"
+    return None
+
+
+def _research_review_rank(
+    entry: Any,
+    components: Mapping[str, Any],
+    score: float,
+) -> tuple[float, list[str]]:
+    market = max(
+        _component_score(components, "market_confirmation_score"),
+        _component_score(components, "market_move_volume"),
+    )
+    source_quality = max(
+        _component_score(components, "evidence_quality_score"),
+        _component_score(components, "source_quality"),
+    )
+    freshness = _component_score(components, "novelty_freshness")
+    cluster = _component_score(components, "cluster_confidence")
+    rank = score + 0.35 * market + 0.25 * source_quality + 0.15 * freshness + 0.15 * cluster
+    reasons: list[str] = []
+    if score:
+        reasons.append(f"near-miss score {score:g}")
+    if market >= 25:
+        reasons.append(f"market confirmation {market:g}")
+    if source_quality >= 40:
+        reasons.append(f"source quality {source_quality:g}")
+    if getattr(entry, "external_asset", None) or getattr(entry, "event_time", None):
+        reasons.append("has catalyst context")
+    if cluster >= 40:
+        reasons.append(f"cluster confidence {cluster:g}")
+    if freshness >= 40:
+        reasons.append("fresh opportunity")
+    if not reasons:
+        reasons.append("selected for manual research review")
+    return rank, reasons
+
+
+def _research_review_not_alertable_reasons(
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    components: Mapping[str, Any],
+) -> list[str]:
+    reasons: list[str] = []
+    for key in (
+        "why_not_promoted",
+        "quality_gate_block_reason",
+        "why_not_watchlist",
+        "why_local_only",
+        "live_confirmation_reason",
+        "no_upgrade_reason",
+    ):
+        value = components.get(key)
+        if value:
+            reasons.extend(_as_list(value))
+    if getattr(decision, "quality_gate_block_reason", None):
+        reasons.append(str(decision.quality_gate_block_reason))
+    if getattr(decision.entry, "suppressed_reason", None):
+        reasons.append(str(decision.entry.suppressed_reason))
+    if getattr(decision, "reason", None):
+        reasons.append(str(decision.reason))
+    cleaned = [_human_reason(item) for item in reasons if str(item or "").strip()]
+    if not cleaned:
+        cleaned.append("missing confirmation for strict alert lanes")
+    return list(dict.fromkeys(cleaned))[:3]
+
+
+def _research_review_upgrade_steps(
+    entry: Any,
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    components: Mapping[str, Any],
+) -> list[str]:
+    steps: list[str] = []
+    for key in ("what_would_upgrade", "upgrade_requirements", "manual_verification_items"):
+        steps.extend(str(item) for item in _as_list(components.get(key)) if str(item or "").strip())
+    if not steps:
+        steps.extend(_exploratory_verify_steps(entry, _suppression_reason(decision)))
+    return list(dict.fromkeys(step.replace("_", " ") for step in steps if step))[:3]
+
+
+def format_research_review_telegram_digest(
+    items: Iterable[EventAlphaResearchReviewDigestItem],
+    *,
+    profile: str | None = None,
+    card_path_by_alert_id: Mapping[str, str | Path] | None = None,
+    cfg: EventAlphaNotificationConfig | None = None,
+) -> str:
+    """Render near-miss research-review candidates for Telegram burn-in."""
+    cfg = cfg or EventAlphaNotificationConfig()
+    keep = list(items)
+    max_items = max(1, min(10, int(cfg.research_review_digest_max_items or 3)))
+    lines = [
+        "<b>Event Alpha Research Review</b>",
+        "<i>Not alertable. Missing confirmation. Not a trade signal.</i>",
+        f"Profile: {_esc(profile or 'unknown')}",
+        f"Items: {len(keep)}",
+    ]
+    if not keep:
+        lines.append("No research-review candidates.")
+        return "\n".join(lines)
+    displayed = 0
+    max_chars = 3900
+    for item in keep[:max_items]:
+        decision = item.decision
+        entry = decision.entry
+        level = _human_level(_research_review_level(decision))
+        score = _research_review_score(decision)
+        card_label = _telegram_card_basename(decision, card_path_by_alert_id)
+        feedback_target = _telegram_feedback_target(decision)
+        block = [
+            "",
+            f"{displayed + 1}. <b>{_esc(entry.symbol or 'UNKNOWN')} / {_esc(entry.coin_id or 'unknown')}</b>",
+            f"   Level: {_esc(level)} · Score: {_esc(f'{score:g}')}",
+            f"   Catalyst: {_esc(_candidate_catalyst_text(entry))}",
+            f"   Impact path: {_esc(_human_playbook(entry.impact_path_type or entry.latest_effective_playbook_type or entry.latest_playbook_type or entry.relationship_type))}",
+            f"   Why surfaced: {_esc(_human_why(item.why_included))}",
+            f"   Why not alertable: {_esc(_human_why_not_alertable(item.why_not_alertable))}",
+            f"   What would upgrade: {_esc(_human_check_next(item.what_would_upgrade))}",
+            f"   Card: {_esc(card_label)}",
+            f"   Feedback target: {_esc(feedback_target)}",
+        ]
+        candidate_lines = [*lines, *block]
+        remaining = len(keep) - displayed - 1
+        footer = ["Research cards and feedback commands are available in local artifacts/inbox."]
+        if remaining > 0:
+            footer.insert(0, f"+{remaining} more in local daily brief.")
+        if len("\n".join([*candidate_lines, "", *footer])) > max_chars:
+            break
+        lines = candidate_lines
+        displayed += 1
+    if len(keep) > displayed:
+        lines.append("")
+        lines.append(f"+{len(keep) - displayed} more in local daily brief.")
+    lines.append("")
+    lines.append("Research cards and feedback commands are available in local artifacts/inbox.")
+    return "\n".join(lines)
 
 
 def format_exploratory_telegram_digest(
@@ -622,12 +943,38 @@ def send_notifications(
     delivered_by_lane = {lane: 0 for lane in LANES}
     attempted = False
     block_reasons: list[str] = []
-    for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST, LANE_EXPLORATORY_DIGEST):
+    for lane in (
+        LANE_TRIGGERED_FADE,
+        LANE_INSTANT_ESCALATION,
+        LANE_DAILY_DIGEST,
+        LANE_RESEARCH_REVIEW_DIGEST,
+        LANE_EXPLORATORY_DIGEST,
+    ):
+        research_review = lane == LANE_RESEARCH_REVIEW_DIGEST
         exploratory = lane == LANE_EXPLORATORY_DIGEST
-        items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
+        if research_review:
+            items = list(plan.research_review_items)
+        else:
+            items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
         if not items:
             continue
-        if exploratory:
+        if research_review:
+            message = format_research_review_telegram_digest(
+                items,
+                profile=profile,
+                card_path_by_alert_id=card_map,
+                cfg=cfg,
+            )
+            identity = _delivery_identity_for_decisions(
+                [item.decision for item in items],
+                core_row_by_alert_id=plan.core_row_by_alert_id,
+                card_path_by_alert_id=card_map,
+                lane=lane,
+                preview_path=writer.preview_path if writer else None,
+            )
+            alert_ids = list(identity.notification_item_ids)
+            route_label = "RESEARCH_REVIEW_DIGEST"
+        elif exploratory:
             message = format_exploratory_telegram_digest(
                 items,
                 profile=profile,
@@ -1556,7 +1903,7 @@ class _DeliveryWriter:
         if lane_key == LANE_HEALTH_HEARTBEAT:
             status = "degraded" if _heartbeat_degraded(message) else "healthy"
             return f"{day}|{status}"
-        if lane_key in {LANE_DAILY_DIGEST, LANE_EXPLORATORY_DIGEST}:
+        if lane_key in {LANE_DAILY_DIGEST, LANE_RESEARCH_REVIEW_DIGEST, LANE_EXPLORATORY_DIGEST}:
             digest_bucket = joined or "digest"
             return f"{day}|{digest_bucket}"
         return joined or lane_key
@@ -1753,12 +2100,38 @@ class _DeliveryWriter:
         pipeline_result: Any | None = None,
     ) -> None:
         status_detail = _blocked_preview_status_detail(reason, error_class=error_class)
-        for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST, LANE_EXPLORATORY_DIGEST):
+        for lane in (
+            LANE_TRIGGERED_FADE,
+            LANE_INSTANT_ESCALATION,
+            LANE_DAILY_DIGEST,
+            LANE_RESEARCH_REVIEW_DIGEST,
+            LANE_EXPLORATORY_DIGEST,
+        ):
+            research_review = lane == LANE_RESEARCH_REVIEW_DIGEST
             exploratory = lane == LANE_EXPLORATORY_DIGEST
-            items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
+            if research_review:
+                items = list(plan.research_review_items)
+            else:
+                items = list(plan.exploratory_items if exploratory else plan.decisions_by_lane.get(lane, []))
             if not items:
                 continue
-            if exploratory:
+            if research_review:
+                message = format_research_review_telegram_digest(
+                    items,
+                    profile=profile,
+                    card_path_by_alert_id=card_map,
+                    cfg=EventAlphaNotificationConfig(),
+                )
+                identity = _delivery_identity_for_decisions(
+                    [item.decision for item in items],
+                    core_row_by_alert_id=plan.core_row_by_alert_id,
+                    card_path_by_alert_id=card_map,
+                    lane=lane,
+                    preview_path=self.preview_path,
+                )
+                alert_ids = list(identity.notification_item_ids)
+                route_label = "RESEARCH_REVIEW_DIGEST"
+            elif exploratory:
                 message = format_exploratory_telegram_digest(items, profile=profile, card_path_by_alert_id=card_map)
                 identity = _delivery_identity_for_decisions(
                     [item.decision for item in items],
@@ -2186,6 +2559,79 @@ def _human_reason(value: object) -> str:
     return text.replace("_", " ") if text else "not alertable yet"
 
 
+def _human_level(value: object) -> str:
+    text = str(value or "").strip()
+    mapping = {
+        "local_only": "local-only research",
+        "exploratory": "exploratory research",
+        "validated_digest": "validated digest",
+        "watchlist": "watchlist",
+        "high_priority": "high priority",
+    }
+    return mapping.get(text, text.replace("_", " ") if text else "research review")
+
+
+def _candidate_catalyst_text(entry: Any) -> str:
+    for value in (
+        getattr(entry, "latest_event_name", None),
+        getattr(entry, "external_asset", None),
+        getattr(entry, "event_id", None),
+    ):
+        text = str(value or "").strip()
+        if text:
+            return _truncate_text(text.replace("|", " / "), 96)
+    return "catalyst not confirmed"
+
+
+def _human_why_not_alertable(reasons: Iterable[str]) -> str:
+    output: list[str] = []
+    for reason in reasons:
+        text = _human_reason(reason)
+        lower = text.casefold()
+        if "confirmation" in lower and "missing" in lower:
+            output.append("missing confirmation")
+        elif "rejected results only" in lower:
+            output.append("evidence search rejected the link")
+        elif "skipped budget" in lower:
+            output.append("evidence search unresolved")
+        elif "local only" in lower:
+            output.append("quality gate kept it local-only")
+        elif "watchlist" in lower and "not" in lower:
+            output.append("watchlist requirements not met")
+        elif text:
+            output.append(text)
+    if not output:
+        output.append("missing confirmation")
+    return "; ".join(dict.fromkeys(output[:3]))
+
+
+def _telegram_card_basename(
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    card_path_by_alert_id: Mapping[str, str | Path] | None,
+) -> str:
+    card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
+    for key in _decision_identity_keys(decision):
+        path = card_paths.get(key)
+        if path:
+            name = Path(str(path)).name
+            return name or "local card"
+    return "local artifacts"
+
+
+def _telegram_feedback_target(decision: event_alpha_router.EventAlphaRouteDecision) -> str:
+    components = dict(getattr(decision.entry, "latest_score_components", {}) or {})
+    for value in (
+        components.get("core_opportunity_id"),
+        components.get("canonical_core_opportunity_id"),
+        getattr(decision.entry, "hypothesis_id", None),
+        decision.alert_id,
+    ):
+        text = str(value or "").strip()
+        if text:
+            return text
+    return "local inbox"
+
+
 def _human_status(state: object, tier: object, reason: object) -> str:
     state_text = _human_state(state or tier)
     reason_text = _human_reason(reason)
@@ -2430,6 +2876,7 @@ def format_preview(
         f"would_send_daily_digest: {'yes' if plan.lane_counts.get(LANE_DAILY_DIGEST, 0) else 'no'}",
         f"would_send_instant_alerts: {plan.lane_counts.get(LANE_INSTANT_ESCALATION, 0)}",
         f"would_send_triggered_fade: {plan.lane_counts.get(LANE_TRIGGERED_FADE, 0)}",
+        f"would_send_research_review_digest: {plan.lane_counts.get(LANE_RESEARCH_REVIEW_DIGEST, 0)}",
         f"would_send_exploratory_digest: {plan.lane_counts.get(LANE_EXPLORATORY_DIGEST, 0)}",
         f"would_send_health_heartbeat: {'yes' if plan.heartbeat_due else 'no'}",
         f"research_card_auto_write: {'yes' if card_auto_write else 'no'}",
@@ -2483,6 +2930,8 @@ def _cooldown_hours(lane: str, cfg: EventAlphaNotificationConfig) -> float:
         return cfg.daily_digest_cooldown_hours
     if lane == LANE_INSTANT_ESCALATION:
         return cfg.instant_escalation_cooldown_hours
+    if lane == LANE_RESEARCH_REVIEW_DIGEST:
+        return cfg.research_review_digest_cooldown_hours
     if lane == LANE_EXPLORATORY_DIGEST:
         return cfg.exploratory_digest_cooldown_hours
     if lane == LANE_HEALTH_HEARTBEAT:
@@ -2507,6 +2956,7 @@ def _count_meta_key(lane: str, now: datetime, cfg: EventAlphaNotificationConfig 
         LANE_DAILY_DIGEST: "daily_digest",
         LANE_INSTANT_ESCALATION: "instant",
         LANE_TRIGGERED_FADE: "triggered",
+        LANE_RESEARCH_REVIEW_DIGEST: "research_review",
         LANE_EXPLORATORY_DIGEST: "exploratory",
         LANE_HEALTH_HEARTBEAT: "health_heartbeat",
     }[_clean_lane(lane)]

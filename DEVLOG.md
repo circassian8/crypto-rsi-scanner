@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Add Event Alpha research-review digest lane · Codex
+**Why:** During notification burn-in, strict alert lanes can correctly send only
+a heartbeat even when there are useful near-miss candidates worth operator
+review. The user wanted those review leads delivered without weakening
+high-priority/watchlist/validated-digest gates.
+**Changes:**
+- Added a separate `research_review_digest` notification lane with its own
+  config, cooldown, delivery ledger records, preview rendering, inbox section,
+  daily-brief section, and strict artifact-doctor checks.
+- The lane selects only non-alertable exploratory/local near-misses with
+  validated identity and sufficient score, excluding strict alertable rows,
+  sector-only rows by default, source-noise, ticker collisions,
+  generic-cooccurrence rows, diagnostics, and support/control rows.
+- Added Telegram copy that clearly says the item is research review only,
+  not alertable, missing confirmation, and not a trade signal, while hiding raw
+  ids, absolute paths, JSON dumps, and enum spam.
+- Added `make event-alpha-research-review-digest-smoke`, fixture near-miss
+  coverage, burn-in profile defaults, `.env.example` knobs, tests, and runbook
+  notes.
+**Verify:** `python3 tests/test_indicators.py` (562/562 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`python3 main.py --event-alpha-daily-brief --event-alpha-profile fixture
+--event-alpha-artifact-namespace research_review_digest_smoke
+--event-alpha-include-test-artifacts`; `make verify PYTHON=python3`.
+**Notes/risks:** Research-only. This lane does not make candidates alertable,
+does not alter strict alert gates, and cannot create `TRIGGERED_FADE`. Tests and
+smokes do not send Telegram.
+
 ## 2026-06-29 — Fix Event Alpha notification SLO CLI wrapper · Codex
 **Why:** A real `notify_llm_deep` Telegram send succeeded, but the follow-up
 SLO report crashed because the CLI passed the diagnostics flag into a wrapper

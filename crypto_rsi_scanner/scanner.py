@@ -1569,6 +1569,13 @@ def _event_alpha_notification_config_from_runtime(
         exploratory_digest_include_rejection_reasons=config.EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_REJECTION_REASONS,
         exploratory_digest_include_raw_evidence=config.EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_RAW_EVIDENCE,
         exploratory_digest_include_controls=config.EVENT_ALPHA_EXPLORATORY_DIGEST_INCLUDE_CONTROLS,
+        research_review_digest_enabled=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED,
+        research_review_digest_max_items=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_MAX_ITEMS,
+        research_review_digest_min_score=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_MIN_SCORE,
+        research_review_digest_cooldown_hours=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_COOLDOWN_HOURS,
+        research_review_digest_include_local_only=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_INCLUDE_LOCAL_ONLY,
+        research_review_digest_include_sector=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_INCLUDE_SECTOR,
+        research_review_digest_send_with_alerts=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_SEND_WITH_ALERTS,
         quality_mode=config.EVENT_ALPHA_NOTIFICATION_QUALITY_MODE,
     )
 
@@ -5615,8 +5622,46 @@ def event_alpha_notify_fixture_smoke(
         "latest_source": "Broad AI fixture",
         "why_opportunity_visible": "Fixture control: broad AI/TAO co-occurrence is not validated impact evidence.",
     }
+    doge_near_miss = {
+        "row_type": "event_impact_hypothesis",
+        "core_opportunity_id": "agg:fixture-doge-near-miss",
+        "key": "fixture-doge|dogecoin|exploratory_meme_catalyst",
+        "hypothesis_id": "hypothesis:fixture-doge-near-miss",
+        "incident_id": "incident:fixture-doge-catalyst",
+        "symbol": "DOGE",
+        "coin_id": "dogecoin",
+        "validated_symbol": "DOGE",
+        "validated_coin_id": "dogecoin",
+        "canonical_incident_name": "DOGE jumps on unconfirmed meme catalyst chatter",
+        "candidate_role": "candidate_asset",
+        "impact_category": "meme_attention",
+        "impact_path_type": "meme_attention",
+        "impact_path_strength": "medium",
+        "impact_path_reason": "market_confirmation_without_source_confirmation",
+        "relationship_type": "proxy_attention",
+        "opportunity_level": "exploratory",
+        "final_opportunity_level": "exploratory",
+        "opportunity_score_final": 66,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+        "source_class": "crypto_news",
+        "evidence_specificity": "candidate_context",
+        "evidence_quality_score": 58,
+        "market_confirmation_score": 72,
+        "market_confirmation_level": "moderate",
+        "market_context_freshness_status": "fresh",
+        "evidence_acquisition_status": "skipped_budget",
+        "accepted_evidence_count": 0,
+        "acquisition_confirmation_status": "unresolved",
+        "source_pack": "meme_attention_pack",
+        "latest_source": "Meme catalyst fixture",
+        "latest_source_title": "DOGE jumps on unconfirmed meme catalyst chatter",
+        "why_opportunity_visible": "Strong fresh move with a possible catalyst clue, but no independent confirmation yet.",
+        "why_not_watchlist": "missing independent source confirmation",
+        "upgrade_requirements": ["find independent catalyst evidence", "verify liquidity and organic volume"],
+    }
     core_write = event_core_opportunity_store.write_core_opportunities(
-        [core_source_row, aave_core_source_row, weak_btc_control, tao_control],
+        [core_source_row, aave_core_source_row, weak_btc_control, tao_control, doge_near_miss],
         cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(context.core_opportunity_store_path),
         now=now,
         run_id=run_id,
@@ -5655,6 +5700,7 @@ def event_alpha_notify_fixture_smoke(
     btc_core = core_by_id.get("agg:fixture-btc-rejected") or {}
     aave_core = core_by_id.get("agg:fixture-aave-kraken") or {}
     tao_core = core_by_id.get("agg:fixture-tao-rejected") or {}
+    doge_core = core_by_id.get("agg:fixture-doge-near-miss") or {}
     snapshot_path = _write_fixture_alert_snapshot(
         context,
         entry=entry,
@@ -5793,6 +5839,70 @@ def event_alpha_notify_fixture_smoke(
         observed_at=now,
         core_row=tao_core,
     )
+    doge_entry = event_watchlist.EventWatchlistEntry(
+        schema_version=event_watchlist.WATCHLIST_SCHEMA_VERSION,
+        row_type="event_watchlist_state",
+        key="fixture-doge|dogecoin|exploratory_meme_catalyst",
+        cluster_id="fixture-doge|meme_attention|2026-06-15",
+        event_id="fixture-doge-near-miss",
+        coin_id="dogecoin",
+        symbol="DOGE",
+        relationship_type="proxy_attention",
+        external_asset="meme catalyst chatter",
+        event_time=None,
+        state=event_watchlist.EventWatchlistState.RAW_EVIDENCE.value,
+        previous_state=None,
+        first_seen_at=now.isoformat(),
+        last_seen_at=now.isoformat(),
+        source_count=1,
+        highest_score=66,
+        latest_score=66,
+        latest_tier="STORE_ONLY",
+        latest_event_name="DOGE jumps on unconfirmed meme catalyst chatter",
+        latest_source="Meme catalyst fixture",
+        latest_playbook_type="meme_attention",
+        latest_rule_playbook_type="meme_attention",
+        latest_effective_playbook_type="meme_attention",
+        latest_playbook_score=66,
+        latest_playbook_action="store_only",
+        latest_market_snapshot={"return_24h": 0.31, "return_72h": 0.66, "volume_mcap": 0.22},
+        latest_score_components={
+            "core_opportunity_id": "agg:fixture-doge-near-miss",
+            "hypothesis_id": "hypothesis:fixture-doge-near-miss",
+            "impact_path_type": "meme_attention",
+            "impact_path_reason": "market_confirmation_without_source_confirmation",
+            "candidate_role": "candidate_asset",
+            "source_class": "crypto_news",
+            "evidence_acquisition_status": "skipped_budget",
+            "accepted_evidence_count": 0,
+            "market_confirmation_score": 72,
+            "market_confirmation_level": "moderate",
+            "market_context_freshness_status": "fresh",
+            "opportunity_level": "exploratory",
+            "opportunity_score_final": 66,
+            "why_not_watchlist": "missing independent source confirmation",
+            "upgrade_requirements": ["find independent catalyst evidence", "verify liquidity and organic volume"],
+        },
+        incident_id="incident:fixture-doge-catalyst",
+        hypothesis_id="hypothesis:fixture-doge-near-miss",
+        should_alert=False,
+        suppressed_reason="missing independent source confirmation",
+    )
+    doge_decision = event_alpha_router.EventAlphaRouteDecision(
+        entry=doge_entry,
+        route=event_alpha_router.EventAlphaRoute.STORE_ONLY,
+        alertable=False,
+        reason="Fixture near-miss: strong move needs independent catalyst confirmation.",
+        lane=event_alpha_router.EventAlphaRouteLane.LOCAL_ONLY,
+    )
+    _write_fixture_alert_snapshot(
+        context,
+        entry=doge_entry,
+        decision=doge_decision,
+        run_id=run_id,
+        observed_at=now,
+        core_row=doge_core,
+    )
     fake_storage = _FixtureNotificationStorage()
     delivered_messages: list[str] = []
     notification_cfg = event_alpha_notifications.EventAlphaNotificationConfig(
@@ -5805,6 +5915,13 @@ def event_alpha_notify_fixture_smoke(
         instant_escalation_cooldown_hours=0,
         max_instant_per_day=10,
         health_heartbeat_enabled=False,
+        research_review_digest_enabled=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED,
+        research_review_digest_max_items=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_MAX_ITEMS,
+        research_review_digest_min_score=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_MIN_SCORE,
+        research_review_digest_cooldown_hours=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_COOLDOWN_HOURS,
+        research_review_digest_include_local_only=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_INCLUDE_LOCAL_ONLY,
+        research_review_digest_include_sector=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_INCLUDE_SECTOR,
+        research_review_digest_send_with_alerts=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_SEND_WITH_ALERTS,
     )
     delivery_cfg = _event_alpha_notification_delivery_config_from_runtime(context)
 
@@ -5824,7 +5941,7 @@ def event_alpha_notify_fixture_smoke(
         )
 
     send_result = event_alpha_notifications.send_notifications(
-        [decision, aave_decision],
+        [decision, aave_decision, doge_decision] if config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED else [decision, aave_decision],
         storage=fake_storage,
         cfg=notification_cfg,
         send_fn=_fake_sender,
@@ -5837,7 +5954,7 @@ def event_alpha_notify_fixture_smoke(
         run_id=run_id,
         namespace=context.artifact_namespace,
     )
-    snapshot_rows_written = 4
+    snapshot_rows_written = 5
     pipeline_result = SimpleNamespace(
         run_id=run_id,
         profile=context.profile,

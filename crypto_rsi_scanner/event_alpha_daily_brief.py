@@ -585,6 +585,41 @@ def build_daily_brief(
     lines.extend(["", "### Legacy Quality Conflicts"])
     conflicts = _legacy_quality_conflicts(alerts)
     lines.extend(_legacy_quality_conflict_lines(conflicts[:8]))
+    research_review = event_alpha_notifications.select_research_review_candidates(
+        decisions,
+        cfg=event_alpha_notifications.EventAlphaNotificationConfig(
+            research_review_digest_enabled=True,
+            research_review_digest_max_items=5,
+            research_review_digest_min_score=60,
+            research_review_digest_include_local_only=False,
+        ),
+        now=generated,
+    )
+    research_review = tuple(
+        item for item in research_review
+        if event_core_opportunities.incident_asset_key_for_values(
+            getattr(item.decision.entry, "incident_id", None),
+            item.decision.entry.coin_id,
+            item.decision.entry.symbol,
+        ) not in promoted_core_asset_keys
+        and event_core_opportunities.asset_key_for_values(item.decision.entry.coin_id, item.decision.entry.symbol)
+        not in promoted_core_assets
+    )
+    lines.extend(["", "### Research Review Digest"])
+    review_due = _lane_count(latest_notification, "lane_counts_due", event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST)
+    review_sent = _lane_count(latest_notification, "lane_counts_sent", event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST)
+    lines.append(f"- Lane count sent/due: {review_sent}/{review_due}")
+    lines.append("- Near-miss research review only; not alertable, missing confirmation, and not a trade signal.")
+    if research_review:
+        for item in research_review[:5]:
+            entry = item.decision.entry
+            lines.append(
+                f"- {entry.symbol}/{entry.coin_id} level={event_alpha_notifications._research_review_level(item.decision) or 'unknown'} "
+                f"score={event_alpha_notifications._research_review_score(item.decision):g} "
+                f"why_not_alertable={'; '.join(item.why_not_alertable) or 'missing confirmation'}"
+            )
+    else:
+        lines.append("- None.")
     exploratory = event_alpha_notifications.select_exploratory_candidates(
         decisions,
         cfg=event_alpha_notifications.EventAlphaNotificationConfig(
