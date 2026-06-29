@@ -65,10 +65,17 @@ class EventAlphaArtifactDoctorResult:
     legacy_rows_skipped: int = 0
     legacy_rows_counted: int = 0
     delivery_rows: int = 0
+    latest_run_id: str | None = None
+    latest_run_delivery_rows: int = 0
+    legacy_delivery_rows: int = 0
+    stale_delivery_rows: int = 0
+    delivery_strict_scope: str = "all_rows"
     deliveries_partial_delivered: int = 0
     deliveries_failed: int = 0
     delivery_identity_mismatch_core_store: int = 0
     delivery_core_id_missing: int = 0
+    legacy_pre_core_delivery_identity: int = 0
+    stale_delivery_identity_missing_core: int = 0
     delivery_feedback_target_missing: int = 0
     delivery_card_path_missing: int = 0
     delivery_alert_id_not_canonical: int = 0
@@ -161,6 +168,7 @@ def diagnose_artifacts(
     inspected_alert_store_path: str | Path | None = None,
     strict: bool = False,
     strict_legacy: bool = False,
+    delivery_strict_scope: str | None = None,
 ) -> EventAlphaArtifactDoctorResult:
     """Diagnose cross-artifact lineage, mode, and profile/namespace cleanliness."""
     raw_runs = [dict(row) for row in run_rows if isinstance(row, Mapping)]
@@ -246,6 +254,12 @@ def diagnose_artifacts(
     external_snapshot_runs = 0
     if not runs:
         blockers.append("no matching operational/burn-in run rows found")
+    latest_run_id = _latest_run_id(runs)
+    effective_delivery_scope = _normalize_delivery_strict_scope(
+        delivery_strict_scope,
+        latest_run_id=latest_run_id,
+        strict=strict,
+    )
     run_ids = {str(row.get("run_id") or "") for row in runs if row.get("run_id")}
     alert_run_ids = {str(row.get("run_id") or "") for row in alerts if row.get("run_id")}
     alert_counts_by_run_id: dict[str, int] = {}
@@ -260,6 +274,12 @@ def diagnose_artifacts(
         if not alertable:
             continue
         run_id = str(row.get("run_id") or "").strip()
+        stale_for_latest_scope = (
+            effective_delivery_scope == "latest_run"
+            and bool(latest_run_id)
+            and bool(run_id)
+            and run_id != latest_run_id
+        )
         matching = alert_counts_by_run_id.get(run_id, 0)
         availability = event_alpha_artifacts.classify_snapshot_availability(
             row,
@@ -287,17 +307,24 @@ def diagnose_artifacts(
                         strict=strict,
                     )
             else:
-                blockers.append(f"alertable run {row.get('run_id') or 'unknown'} has no successful snapshot write")
+                message = f"alertable run {row.get('run_id') or 'unknown'} has no successful snapshot write"
+                (warnings if stale_for_latest_scope else blockers).append(message)
         elif int(row.get("alertable") or 0) > 0 and int(row.get("snapshot_rows_written") or 0) <= 0:
-            blockers.append(f"alertable run {row.get('run_id') or 'unknown'} wrote zero alert snapshots")
+            message = f"alertable run {row.get('run_id') or 'unknown'} wrote zero alert snapshots"
+            (warnings if stale_for_latest_scope else blockers).append(message)
         elif availability != event_alpha_artifacts.SNAPSHOT_AVAILABLE:
-            _record_snapshot_availability_issue(
-                row,
-                availability,
-                blockers=blockers,
-                warnings=warnings,
-                strict=strict,
-            )
+            if stale_for_latest_scope:
+                warnings.append(
+                    f"stale alertable run {row.get('run_id') or 'unknown'} has snapshot availability={availability}"
+                )
+            else:
+                _record_snapshot_availability_issue(
+                    row,
+                    availability,
+                    blockers=blockers,
+                    warnings=warnings,
+                    strict=strict,
+                )
     orphan_alerts = sorted(alert_run_ids - run_ids)
     if orphan_alerts:
         warnings.append(f"alert snapshots reference unknown run_id(s): {', '.join(orphan_alerts[:5])}")
@@ -639,6 +666,8 @@ def diagnose_artifacts(
     delivery_conflicts = _notification_delivery_conflicts(
         delivery_rows=[row for row in delivery_rows if isinstance(row, Mapping)],
         core_rows_by_id=core_rows_by_id,
+        latest_run_id=latest_run_id,
+        strict_scope=effective_delivery_scope,
     )
     if delivery_conflicts["delivery_identity_mismatch_core_store"]:
         message = (
@@ -693,6 +722,16 @@ def diagnose_artifacts(
         (blockers if strict else warnings).append(message)
     if delivery_conflicts["notification_preview_missing"]:
         warnings.append(f"notification_preview_missing={delivery_conflicts['notification_preview_missing']}")
+    if delivery_conflicts["stale_delivery_identity_missing_core"]:
+        warnings.append(
+            "stale_delivery_identity_missing_core="
+            f"{delivery_conflicts['stale_delivery_identity_missing_core']}"
+        )
+    if delivery_conflicts["legacy_pre_core_delivery_identity"]:
+        warnings.append(
+            "legacy_pre_core_delivery_identity="
+            f"{delivery_conflicts['legacy_pre_core_delivery_identity']}"
+        )
     quality = _quality_missing_summary(
         hypotheses=hypotheses,
         watchlist=watchlist,
@@ -911,10 +950,17 @@ def diagnose_artifacts(
             if event_alpha_artifacts.is_legacy_row(row)
         ),
         delivery_rows=delivery_summary.rows,
+        latest_run_id=latest_run_id,
+        latest_run_delivery_rows=delivery_conflicts["latest_run_delivery_rows"],
+        legacy_delivery_rows=delivery_conflicts["legacy_delivery_rows"],
+        stale_delivery_rows=delivery_conflicts["stale_delivery_rows"],
+        delivery_strict_scope=effective_delivery_scope,
         deliveries_partial_delivered=delivery_summary.partial_delivered,
         deliveries_failed=delivery_summary.failed,
         delivery_identity_mismatch_core_store=delivery_conflicts["delivery_identity_mismatch_core_store"],
         delivery_core_id_missing=delivery_conflicts["delivery_core_id_missing"],
+        legacy_pre_core_delivery_identity=delivery_conflicts["legacy_pre_core_delivery_identity"],
+        stale_delivery_identity_missing_core=delivery_conflicts["stale_delivery_identity_missing_core"],
         delivery_feedback_target_missing=delivery_conflicts["delivery_feedback_target_missing"],
         delivery_card_path_missing=delivery_conflicts["delivery_card_path_missing"],
         delivery_alert_id_not_canonical=delivery_conflicts["delivery_alert_id_not_canonical"],
@@ -1611,10 +1657,17 @@ def _notification_delivery_conflicts(
     *,
     delivery_rows: Iterable[Mapping[str, Any]],
     core_rows_by_id: Mapping[str, Mapping[str, Any]],
+    latest_run_id: str | None = None,
+    strict_scope: str = "all_rows",
 ) -> dict[str, int]:
     out = {
+        "latest_run_delivery_rows": 0,
+        "legacy_delivery_rows": 0,
+        "stale_delivery_rows": 0,
         "delivery_identity_mismatch_core_store": 0,
         "delivery_core_id_missing": 0,
+        "legacy_pre_core_delivery_identity": 0,
+        "stale_delivery_identity_missing_core": 0,
         "delivery_feedback_target_missing": 0,
         "delivery_card_path_missing": 0,
         "delivery_alert_id_not_canonical": 0,
@@ -1625,8 +1678,24 @@ def _notification_delivery_conflicts(
         "strategic_broad_asset_digest_without_confirmation": 0,
         "notification_preview_missing": 0,
     }
+    scope = _normalize_delivery_strict_scope(strict_scope, latest_run_id=latest_run_id, strict=True)
     latest = _delivery.latest_rows_by_delivery(delivery_rows)
     for row in latest:
+        row_run_id = str(row.get("run_id") or "").strip()
+        is_latest_run = bool(latest_run_id and row_run_id == latest_run_id)
+        if latest_run_id:
+            if is_latest_run:
+                out["latest_run_delivery_rows"] += 1
+            else:
+                out["stale_delivery_rows"] += 1
+                if _delivery_is_legacy_pre_core_identity(row):
+                    out["legacy_delivery_rows"] += 1
+                if _delivery_lacks_core_identity(row):
+                    out["stale_delivery_identity_missing_core"] += 1
+                    if _delivery_is_legacy_pre_core_identity(row):
+                        out["legacy_pre_core_delivery_identity"] += 1
+        if scope == "latest_run" and latest_run_id and not is_latest_run:
+            continue
         lane = str(row.get("lane") or "")
         if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
             continue
@@ -1668,6 +1737,43 @@ def _notification_delivery_conflicts(
         if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
             out["telegram_message_contains_raw_debug_dump"] += 1
     return out
+
+
+def _normalize_delivery_strict_scope(
+    value: str | None,
+    *,
+    latest_run_id: str | None,
+    strict: bool,
+) -> str:
+    cleaned = str(value or "").strip().casefold()
+    if cleaned in {"latest_run", "all_rows", "legacy_included"}:
+        return cleaned
+    if strict and latest_run_id:
+        return "latest_run"
+    return "all_rows"
+
+
+def _latest_run_id(run_rows: Iterable[Mapping[str, Any]]) -> str | None:
+    ids = [str(row.get("run_id") or "").strip() for row in run_rows if str(row.get("run_id") or "").strip()]
+    if not ids:
+        return None
+    return sorted(ids)[-1]
+
+
+def _delivery_lacks_core_identity(row: Mapping[str, Any]) -> bool:
+    lane = str(row.get("lane") or "").strip()
+    if lane not in {"daily_digest", "instant_escalation"}:
+        return False
+    return not str(row.get("core_opportunity_id") or "").strip()
+
+
+def _delivery_is_legacy_pre_core_identity(row: Mapping[str, Any]) -> bool:
+    reason = str(row.get("identity_reconciliation_reason") or "").strip().casefold()
+    if reason in {"legacy", "legacy_delivery", "external", "source_alert_identity_legacy"}:
+        return True
+    if str(row.get("legacy") or "").casefold() in {"1", "true", "yes"}:
+        return True
+    return _delivery_lacks_core_identity(row) and not str(row.get("feedback_target") or "").strip()
 
 
 def _delivery_requires_core_identity(row: Mapping[str, Any]) -> bool:
@@ -2263,8 +2369,15 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
         (
             "notification deliveries: "
             f"rows={result.delivery_rows} partial={result.deliveries_partial_delivered} failed={result.deliveries_failed} "
+            f"latest_run_id={result.latest_run_id or 'none'} "
+            f"strict_scope={result.delivery_strict_scope} "
+            f"latest_run_rows={result.latest_run_delivery_rows} "
+            f"stale_rows={result.stale_delivery_rows} "
+            f"legacy_rows={result.legacy_delivery_rows} "
             f"identity_mismatch={result.delivery_identity_mismatch_core_store} "
             f"core_missing={result.delivery_core_id_missing} "
+            f"stale_core_missing={result.stale_delivery_identity_missing_core} "
+            f"legacy_pre_core_identity={result.legacy_pre_core_delivery_identity} "
             f"feedback_missing={result.delivery_feedback_target_missing} "
             f"card_missing={result.delivery_card_path_missing} "
             f"alert_id_not_canonical={result.delivery_alert_id_not_canonical} "

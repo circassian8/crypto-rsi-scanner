@@ -84,6 +84,7 @@ class EventAlphaExploratoryDigestItem:
 
 @dataclass(frozen=True)
 class EventAlphaNotificationPlan:
+    all_decisions: tuple[event_alpha_router.EventAlphaRouteDecision, ...] = ()
     decisions_by_lane: dict[str, list[event_alpha_router.EventAlphaRouteDecision]] = field(default_factory=dict)
     blocked_by_lane: dict[str, str] = field(default_factory=dict)
     heartbeat_due: bool = False
@@ -215,6 +216,7 @@ def build_notification_plan(
 
     by_lane = {lane: items for lane, items in by_lane.items() if items}
     return EventAlphaNotificationPlan(
+        all_decisions=tuple(all_decisions),
         decisions_by_lane=by_lane,
         blocked_by_lane=blocked,
         heartbeat_due=heartbeat_due,
@@ -547,6 +549,8 @@ def send_notifications(
         block_reason = "event alerts disabled" if not cfg.enabled else "event alert mode is not research_only"
         if writer:
             writer.record_blocked(plan, profile=profile, card_map=card_map, reason=block_reason)
+            if not writer.preview_sections:
+                writer.write_no_digest_preview(profile=profile, pipeline_result=pipeline_result, reason=block_reason)
         return _result(
             requested=True,
             attempted=False,
@@ -568,6 +572,8 @@ def send_notifications(
                 reason=block_reason,
                 error_class="notifications_paused",
             )
+            if not writer.preview_sections:
+                writer.write_no_digest_preview(profile=profile, pipeline_result=pipeline_result, reason=block_reason)
         return _result(
             requested=True,
             attempted=False,
@@ -580,6 +586,8 @@ def send_notifications(
         )
     if would_send <= 0:
         reason = "; ".join(plan.blocked_by_lane.values()) or plan.heartbeat_reason or "no due notifications"
+        if writer:
+            writer.write_no_digest_preview(profile=profile, pipeline_result=pipeline_result, reason=reason)
         return _result(
             requested=True,
             attempted=False,
@@ -1787,6 +1795,49 @@ class _DeliveryWriter:
             self.preview_path.write_text("\n".join(body) + "\n", encoding="utf-8")
         except OSError:
             return
+
+    def write_no_digest_preview(
+        self,
+        *,
+        profile: str | None,
+        pipeline_result: Any | None,
+        reason: str,
+    ) -> None:
+        warnings = tuple(str(item) for item in getattr(pipeline_result, "warnings", ()) or () if str(item))
+        lines = [
+            "<b>Event Alpha Notification Rehearsal</b>",
+            "<i>Research-only / unvalidated. Not a trade signal.</i>",
+            f"Profile: {_esc(profile or getattr(pipeline_result, 'profile', None) or 'default')}",
+            "Mode: no-send rehearsal / preview only",
+            "Status: no digest candidates would be sent",
+            f"Reason: {_esc(reason or 'no due notifications')}",
+            f"Raw events: {_num(pipeline_result, 'raw_events')} · Core opportunities: {_num(pipeline_result, 'core_opportunities')}",
+            f"Alertable decisions: {_num(pipeline_result, 'alertable')}",
+            f"Provider issues: {_provider_failure_count(warnings)}",
+        ]
+        if warnings:
+            lines.append("Top issues: " + _esc("; ".join(_truncate_text(item, 90) for item in warnings[:3])))
+        else:
+            lines.append("Top issues: none")
+        lines.append("Next: inspect daily brief, inbox, and strict artifact doctor before enabling Telegram.")
+        identity = DeliveryIdentity(
+            notification_item_ids=("no_digest_candidates",),
+            source_alert_ids=("none",),
+            requested_alert_id="no_digest_candidates",
+            alert_id="no_digest_candidates",
+            identity_reconciled=False,
+            identity_reconciliation_reason="no_digest_candidates",
+            notification_preview_path=str(self.preview_path),
+        )
+        self.write_preview(
+            message="\n".join(lines),
+            lane=LANE_DAILY_DIGEST,
+            route="NO_DIGEST_CANDIDATES",
+            identity=identity,
+            would_send=False,
+            sent=False,
+            status="no_digest_candidates",
+        )
 
 
 def _route_label(items: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:

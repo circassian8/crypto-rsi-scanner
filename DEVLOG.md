@@ -17,6 +17,44 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Add real notify_llm_deep no-send rehearsal · Codex
+**Why:** Fixture notification smokes were green, but old real-profile
+`notify_llm_deep` delivery rows could still look like current blockers. The
+operator needs a fresh real-profile no-send rehearsal that writes the same
+artifacts as a scheduled run without contacting Telegram, plus doctor output
+that separates latest-run safety from stale legacy rows.
+**Changes:**
+- Added `make event-alpha-notify-llm-deep-real-no-send-rehearsal`, which runs
+  the actual `notify_llm_deep` profile with `--event-alert-send` while forcing
+  `RSI_EVENT_ALERTS_ENABLED=0`, then writes/prints daily brief, inbox,
+  deliveries report, and strict artifact doctor output under the
+  `notify_llm_deep_rehearsal` namespace.
+- Notification delivery now writes `event_alpha_notification_preview.md` even
+  when a guarded rehearsal has no digest candidates, with a concise no-send
+  preview instead of an empty/missing preview file.
+- Artifact doctor delivery checks now report `latest_run_id`,
+  latest/stale/legacy delivery-row counts, stale/legacy missing-core identity
+  counters, and a configurable delivery strict scope (`latest_run` by default
+  when a latest run is available; `all_rows` for migration sweeps).
+- Added regression tests for no-candidate previews, latest-run delivery scoping,
+  and the real no-send rehearsal Make target guard.
+**Verify:** `python3 tests/test_indicators.py` passed (545/545);
+`python3 -m compileall -q crypto_rsi_scanner tests` passed; `make
+event-alpha-signal-quality-eval PYTHON=python3`, `make
+event-alpha-notification-format-smoke PYTHON=python3`, `make
+event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3`, `make
+event-alpha-live-burn-in-no-send PYTHON=python3`, `make
+event-alpha-evidence-acquisition-smoke PYTHON=python3`, `make
+event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`, and `make verify
+PYTHON=python3` all passed. The real `notify_llm_deep` rehearsal wrote 122
+visible core opportunities and 122/122 card coverage, had zero alertable
+research decisions, recorded one heartbeat would-send item blocked by
+`RSI_EVENT_ALERTS_ENABLED=0`, and strict artifact doctor reported no blockers.
+**Notes/risks:** This is notification artifact and operator UX hardening only.
+It does not send Telegram unless the existing send guard is explicitly enabled,
+and it does not change Event Alpha scoring, trading, paper trading, normal RSI
+rows, or `TRIGGERED_FADE` rules.
+
 ## 2026-06-29 — Enforce canonical notification delivery identity · Codex
 **Why:** A live-style daily digest delivery could still be recorded with a
 lower-level hypothesis/watchlist id and no `core_opportunity_id`, feedback

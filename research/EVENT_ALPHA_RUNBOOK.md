@@ -186,6 +186,26 @@ make event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3
 make event-alpha-notification-deliveries-report PROFILE=fixture PYTHON=python3
 ```
 
+Before enabling Telegram delivery for the real deep LLM path, run the
+real-profile no-send rehearsal:
+
+```bash
+make event-alpha-notify-llm-deep-real-no-send-rehearsal PYTHON=python3
+make event-alpha-daily-brief PROFILE=notify_llm_deep PYTHON=python3
+make event-alpha-notification-inbox PROFILE=notify_llm_deep PYTHON=python3
+make event-alpha-artifact-doctor PROFILE=notify_llm_deep STRICT=1 EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE=latest_run PYTHON=python3
+```
+
+This target uses the actual `notify_llm_deep` profile and passes
+`--event-alert-send`, but forces `RSI_EVENT_ALERTS_ENABLED=0`, so the delivery
+path writes would-send/blocked ledgers and
+`event_alpha_notification_preview.md` without contacting Telegram. Inspect the
+preview, daily brief, inbox, deliveries report, and strict doctor output before
+running any `RSI_EVENT_ALERTS_ENABLED=1` command. Use
+`EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE=all_rows` only when intentionally
+auditing old delivery rows; the default/latest-run scope proves the fresh run
+while reporting stale pre-core delivery identity rows as migration diagnostics.
+
 Live-style notification profiles also re-check confirmation before digest
 delivery. A core row whose evidence acquisition is `rejected_results_only`,
 `no_results`, `skipped_budget`, or otherwise non-confirming stays local-only

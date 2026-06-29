@@ -48,15 +48,24 @@ Telegram digest bodies should be compact operator summaries, not raw router
 debug dumps, and should omit full local paths and pipe-delimited internal ids.
 The local notification preview is multi-lane, so preview/review artifacts must
 show every planned/sent/blocked lane from the run, not just the last message.
+No-send rehearsals must still write an operator preview even when there are no
+digest candidates, so a missing `event_alpha_notification_preview.md` is treated
+as an artifact gap rather than a normal quiet run.
 Live/send digest rows with non-confirming acquisition statuses such as
 `rejected_results_only`, `no_results`, or `skipped_budget` must remain
 local-only unless accepted evidence, a strong official/tagged source, or fresh
 non-generic market confirmation independently supports the opportunity.
+Artifact doctor strict delivery checks should evaluate the latest run by
+default when a latest run exists, while labeling older missing-core delivery
+rows as stale/legacy diagnostics. Operators can still request all-row strict
+delivery checks for migration sweeps.
 **Why:** Operators and Pro-model reviewers need delivery artifacts, daily
 briefs, cards, inbox items, and feedback targets to point at the same durable
 opportunity. Sending a lower-level row while the canonical core says a different
 asset or local-only verdict makes the Telegram output misleading and can promote
-weak evidence despite quality gates.
+weak evidence despite quality gates. Latest-run scoping lets a fresh rehearsal
+prove current safety without hiding old unsafe rows from explicit migration
+review.
 **Revisit when:** Notifications are backed by a typed core-opportunity delivery
 table with schema-enforced source/support/core relationships.
 

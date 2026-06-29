@@ -89,6 +89,8 @@ EVENT_ALPHA_LAUNCHD_OUT ?= research/generated_$(PROFILE).plist
 EVENT_ALPHA_INCLUDE_LEGACY_ARG = $(if $(filter 1 true yes,$(INCLUDE_LEGACY)),--event-alpha-include-legacy-artifacts,)
 EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG = $(if $(filter 1 true yes,$(STRICT)),--event-alpha-artifact-doctor-strict,)
 EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG = $(if $(filter 1 true yes,$(STRICT_LEGACY)),--event-alpha-artifact-doctor-strict-legacy,)
+EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE ?=
+EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE_ARG = $(if $(strip $(EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE)),--event-alpha-artifact-doctor-delivery-scope $(EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE),)
 EVENT_ALPHA_IGNORE_BACKOFF_ARG = $(if $(filter 1 true yes,$(IGNORE_BACKOFF)),--ignore-provider-backoff,)
 EVENT_ALPHA_INCLUDE_DIAGNOSTICS_ARG = $(if $(filter 1 true yes,$(INCLUDE_DIAGNOSTICS)),--event-opportunity-audit-include-diagnostics,)
 EVENT_ALPHA_PROVIDER_SELECTOR_ARGS = $(if $(strip $(PROVIDER_KEY)),--provider-key $(PROVIDER_KEY),) $(if $(strip $(PROVIDER_SERVICE)),--service $(PROVIDER_SERVICE),) $(if $(strip $(PROVIDER_ROLE)),--role $(PROVIDER_ROLE),) $(if $(filter 1 true yes,$(PROVIDER_ALL)),--all,)
@@ -179,6 +181,7 @@ help:
 	@echo "  make event-alpha-notify-fixture-smoke  Run local fake-sender notification smoke"
 	@echo "  make event-alpha-notification-format-smoke  Run fake-sender notification formatting + doctor smoke"
 	@echo "  make event-alpha-notify-llm-deep-no-send-smoke  Run guarded deep-notify no-send delivery ledger smoke"
+	@echo "  make event-alpha-notify-llm-deep-real-no-send-rehearsal  Run real notify_llm_deep profile with sends guarded off"
 	@echo "  make event-alpha-day1-start  Run no-send day-1 startup checks for notify_no_key"
 	@echo "  Startup send commands after review: RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-send-test PROFILE=notify_no_key; RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-no-key"
 	@echo "  make event-alpha-send-test PROFILE=notify_no_key  Send one guarded research-only heartbeat"
@@ -917,6 +920,30 @@ event-alpha-notify-llm-deep-no-send-smoke:
 	$(PYTHON) main.py --event-alpha-notification-deliveries-report --event-alpha-profile fixture --event-alpha-artifact-namespace notify_llm_deep_no_send_smoke
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace notify_llm_deep_no_send_smoke --event-alpha-include-test-artifacts
 
+event-alpha-notify-llm-deep-real-no-send-rehearsal: PROFILE = notify_llm_deep
+event-alpha-notify-llm-deep-real-no-send-rehearsal:
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_rehearsal \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	RSI_EVENT_ALPHA_NOTIFY_LOCK_ENABLED=1 \
+	RSI_EVENT_ALPHA_NOTIFY_ALLOW_OVERLAP=0 \
+	RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_BY_CONTENT=0 \
+	RSI_EVENT_ALPHA_NOTIFICATION_DEDUPE_WINDOW_HOURS=0 \
+	RSI_EVENT_RESEARCH_CARDS_WRITE_LIMIT=250 \
+	$(PYTHON) main.py --event-alpha-notify-cycle --event-alpha-profile notify_llm_deep --event-alert-send
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_rehearsal \
+	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_rehearsal
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_rehearsal \
+	$(PYTHON) main.py --event-alpha-notification-inbox --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_rehearsal
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_rehearsal \
+	$(PYTHON) main.py --event-alpha-notification-deliveries-report --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_rehearsal
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_rehearsal \
+	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_rehearsal --event-alpha-artifact-doctor-strict --event-alpha-artifact-doctor-delivery-scope latest_run
+
 event-alpha-day1-start: PROFILE = notify_no_key
 event-alpha-day1-start:
 	$(MAKE) event-alpha-preflight PROFILE=notify_no_key PYTHON=$(PYTHON)
@@ -1220,7 +1247,7 @@ event-alpha-artifact-doctor:
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_ALPHA_FEEDBACK_PATH=$(EVENT_ALPHA_PROFILE_DIR)/event_alpha_feedback.jsonl \
 	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
-	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE_ARG)
 
 event-alpha-tuning-worksheet:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \

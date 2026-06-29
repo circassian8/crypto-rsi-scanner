@@ -217,6 +217,17 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "--event-alpha-notify-fixture-smoke" in deep_no_send_smoke_dry
     assert "RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND=1" in deep_no_send_smoke_dry
     assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_no_send_smoke" in deep_no_send_smoke_dry
+    deep_rehearsal_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-notify-llm-deep-real-no-send-rehearsal", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-notify-cycle --event-alpha-profile notify_llm_deep --event-alert-send" in deep_rehearsal_dry
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in deep_rehearsal_dry
+    assert "RSI_EVENT_ALERTS_ENABLED=1" not in deep_rehearsal_dry
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_rehearsal" in deep_rehearsal_dry
+    assert "RSI_EVENT_RESEARCH_CARDS_WRITE_LIMIT=250" in deep_rehearsal_dry
+    assert "--event-alpha-artifact-doctor-delivery-scope latest_run" in deep_rehearsal_dry
     assert "check-python:" in makefile
     assert "bootstrap:" in makefile
     assert "python3 -m venv .venv" in makefile
@@ -12146,6 +12157,10 @@ def test_event_alpha_notification_blocks_rejected_only_core_digest():
     )
     assert event_alpha_notifications.LANE_DAILY_DIGEST not in plan.decisions_by_lane
     assert plan.would_send_count == 0
+    assert len(plan.all_decisions) == 1
+    assert plan.all_decisions[0].alertable is False
+    assert plan.all_decisions[0].final_route_after_quality_gate == "STORE_ONLY"
+    assert plan.all_decisions[0].quality_gate_block_reason == "rejected_results_only_not_confirmation"
     assert any("rejected_results_only_not_confirmation" in warning for warning in plan.canonicalization_warnings)
 
 
@@ -12367,6 +12382,127 @@ def test_event_alpha_artifact_doctor_blocks_digest_delivery_without_core_identit
     assert result.status == "BLOCKED"
 
 
+def test_event_alpha_artifact_doctor_scopes_delivery_identity_to_latest_run():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        preview = Path(tmp) / "event_alpha_notification_preview.md"
+        preview.write_text(
+            "# Event Alpha Notification Preview\n\n"
+            "## Lane 1: daily_digest\n\n"
+            "### Telegram Body\n\n"
+            "```html\n"
+            "<b>Event Alpha Research Digest</b>\n"
+            "VELVET / velvet\n"
+            "```",
+            encoding="utf-8",
+        )
+        old_bad = {
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "delivery-old",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep_rehearsal",
+            "alert_id": "ea:hypothesis|incident:old|tao",
+            "lane": "daily_digest",
+            "route": "RESEARCH_DIGEST",
+            "state": "delivered",
+            "attempted_at": "2026-06-28T12:00:00+00:00",
+            "delivered_at": "2026-06-28T12:00:01+00:00",
+            "notification_preview_path": str(preview),
+            "identity_reconciliation_reason": "source_alert_identity",
+        }
+        current_clean = {
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "delivery-new",
+            "run_id": "run-2",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep_rehearsal",
+            "alert_id": "agg:velvet-spacex",
+            "requested_alert_id": "agg:velvet-spacex",
+            "core_opportunity_id": "agg:velvet-spacex",
+            "canonical_symbol": "VELVET",
+            "canonical_coin_id": "velvet",
+            "canonical_card_path": "research_cards/velvet.md",
+            "feedback_target": "agg:velvet-spacex",
+            "lane": "daily_digest",
+            "route": "RESEARCH_DIGEST",
+            "state": "blocked",
+            "attempted_at": "2026-06-29T12:00:00+00:00",
+            "notification_preview_path": str(preview),
+            "identity_reconciliation_reason": "canonical_core_opportunity",
+        }
+        core = {
+            "row_type": "event_core_opportunity",
+            "run_id": "run-2",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep_rehearsal",
+            "core_opportunity_id": "agg:velvet-spacex",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "final_opportunity_level": "validated_digest",
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "impact_path_type": "tokenized_stock_venue",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "acquisition_confirmation_status": "confirms",
+            "accepted_evidence_count": 1,
+            "market_confirmation_level": "fresh",
+            "market_context_freshness_status": "fresh",
+        }
+        runs = [
+            {
+                "run_id": "run-1",
+                "row_type": "event_alpha_run",
+                "profile": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": "notify_llm_deep_rehearsal",
+                "alertable": 1,
+                "snapshot_write_success": True,
+                "snapshot_rows_written": 0,
+            },
+            {
+                "run_id": "run-2",
+                "row_type": "event_alpha_run",
+                "profile": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "artifact_namespace": "notify_llm_deep_rehearsal",
+                "alertable": 0,
+                "snapshot_write_success": True,
+                "snapshot_rows_written": 0,
+            },
+        ]
+        latest = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=runs,
+            core_opportunity_rows=[core],
+            delivery_rows=[old_bad, current_clean],
+            strict=True,
+        )
+        all_rows = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=runs,
+            core_opportunity_rows=[core],
+            delivery_rows=[old_bad, current_clean],
+            strict=True,
+            delivery_strict_scope="all_rows",
+        )
+    latest_text = event_alpha_artifact_doctor.format_artifact_doctor_report(latest)
+    assert latest.latest_run_id == "run-2"
+    assert latest.latest_run_delivery_rows == 1
+    assert latest.stale_delivery_rows == 1
+    assert latest.stale_delivery_identity_missing_core == 1
+    assert latest.delivery_core_id_missing == 0
+    assert latest.delivery_feedback_target_missing == 0
+    assert latest.delivery_card_path_missing == 0
+    assert any("run-1" in warning and "zero alert snapshots" in warning for warning in latest.warnings)
+    assert "strict_scope=latest_run" in latest_text
+    assert all_rows.status == "BLOCKED"
+    assert all_rows.delivery_core_id_missing == 1
+    assert any("run-1" in blocker and "zero alert snapshots" in blocker for blocker in all_rows.blockers)
+    assert all_rows.delivery_strict_scope == "all_rows"
+
+
 def test_event_alpha_notification_disabled_records_would_send_and_heartbeat():
     from datetime import datetime, timezone
     from types import SimpleNamespace
@@ -12404,6 +12540,44 @@ def test_event_alpha_notification_disabled_records_would_send_and_heartbeat():
     assert result.lane_items_attempted[event_alpha_notifications.LANE_INSTANT_ESCALATION] == 1
     assert result.lane_items_attempted[event_alpha_notifications.LANE_HEALTH_HEARTBEAT] == 1
     assert sent == []
+
+
+def test_event_alpha_notification_no_candidate_rehearsal_writes_preview():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notification_delivery, event_alpha_notifications
+
+    class FakeStorage:
+        def __init__(self):
+            self.meta = {}
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+    with TemporaryDirectory() as tmp:
+        delivery_path = Path(tmp) / "event_alpha_notification_deliveries.jsonl"
+        result = event_alpha_notifications.send_notifications(
+            [],
+            storage=FakeStorage(),
+            cfg=event_alpha_notifications.EventAlphaNotificationConfig(enabled=True, daily_digest_cooldown_hours=0),
+            send_fn=lambda message: True,
+            now=datetime(2026, 6, 29, 12, 0, tzinfo=timezone.utc),
+            profile="notify_llm_deep",
+            include_health_heartbeat=False,
+            delivery_cfg=event_alpha_notification_delivery.NotificationDeliveryConfig(path=delivery_path),
+            run_id="run-no-candidates",
+            namespace="notify_llm_deep_rehearsal",
+        )
+        preview = Path(tmp) / "event_alpha_notification_preview.md"
+        text = preview.read_text(encoding="utf-8")
+    assert result.attempted is False
+    assert result.would_send_items == 0
+    assert "Status: no digest candidates would be sent" in text
+    assert "Mode: no-send rehearsal / preview only" in text
+    assert "/Users/" not in text
+    assert "research_card=" not in text
 
 
 def test_event_alpha_notification_runs_and_checklist_report_guard_state():

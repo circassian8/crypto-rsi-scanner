@@ -2947,6 +2947,14 @@ def _event_alpha_notify_cycle_body(
         )
     finally:
         storage.close()
+    if pipeline_result.router_result is not None and notification_plan.all_decisions:
+        pipeline_result = replace(
+            pipeline_result,
+            router_result=replace(
+                pipeline_result.router_result,
+                decisions=list(notification_plan.all_decisions),
+            ),
+        )
     send_result = event_alpha_pipeline.EventAlphaSendResult(
         requested=False,
         lane_items_attempted=notification_plan.lane_counts,
@@ -6269,6 +6277,7 @@ def event_alpha_artifact_doctor_report(
     include_legacy_artifacts: bool = False,
     strict: bool = False,
     strict_legacy: bool = False,
+    delivery_strict_scope: str | None = None,
 ) -> None:
     """Print artifact lineage/namespace diagnostics for Event Alpha."""
     _setup_event_discovery_logging(verbose)
@@ -6309,6 +6318,7 @@ def event_alpha_artifact_doctor_report(
         inspected_alert_store_path=_event_alpha_alert_store_config_from_runtime().path,
         strict=strict or bool(config.EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT),
         strict_legacy=strict_legacy,
+        delivery_strict_scope=delivery_strict_scope,
     )
     print(_event_alpha_context_block(context))
     print(event_alpha_artifact_doctor.format_artifact_doctor_report(result))
@@ -9490,6 +9500,12 @@ def cli() -> None:
         help="With strict artifact doctor, also escalate legacy quality-route conflicts to blockers.",
     )
     parser.add_argument(
+        "--event-alpha-artifact-doctor-delivery-scope",
+        choices=("latest_run", "all_rows", "legacy_included"),
+        default=None,
+        help="Scope strict notification-delivery identity checks; default checks the latest run when available.",
+    )
+    parser.add_argument(
         "--event-alpha-profile-report",
         metavar="PROFILE",
         help="Print an Event Alpha operational profile without running the cycle.",
@@ -10142,6 +10158,7 @@ def cli() -> None:
             include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
             strict=args.event_alpha_artifact_doctor_strict,
             strict_legacy=args.event_alpha_artifact_doctor_strict_legacy,
+            delivery_strict_scope=args.event_alpha_artifact_doctor_delivery_scope,
         )
         return
     if args.event_alpha_tuning_worksheet:
