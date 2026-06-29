@@ -1429,6 +1429,86 @@ def _float_or_none(value: Any) -> float | None:
         return None
 
 
+def _preview_summary_lines(sections: Iterable[Mapping[str, Any]]) -> list[str]:
+    rows = [dict(section) for section in sections]
+    would_send = [row for row in rows if bool(row.get("would_send"))]
+    sent = [row for row in rows if bool(row.get("sent"))]
+    guard_blocked = [
+        row for row in would_send
+        if str(row.get("status") or "") == delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED
+    ]
+    quality_blocked = [
+        row for row in rows
+        if "quality" in str(row.get("status") or "").casefold()
+    ]
+    cooldown_blocked = [
+        row for row in rows
+        if "cooldown" in str(row.get("status") or "").casefold()
+    ]
+    not_due = [row for row in rows if not bool(row.get("would_send")) and not bool(row.get("sent"))]
+    core_ids = {
+        str(getattr(row.get("identity"), "core_opportunity_id", "") or "").strip()
+        for row in rows
+        if str(getattr(row.get("identity"), "core_opportunity_id", "") or "").strip()
+    }
+    blocked_confirmation = [
+        row for row in rows
+        if any(
+            token in " ".join(str(row.get(field) or "") for field in ("status", "route", "message")).casefold()
+            for token in ("rejected", "unconfirmed", "no_market", "no-market", "confirmation")
+        )
+    ]
+    lane_parts = []
+    for row in rows:
+        lane = str(row.get("lane") or "unknown")
+        status = str(row.get("status") or "unknown")
+        if bool(row.get("sent")):
+            label = "sent"
+        elif bool(row.get("would_send")) and status == delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED:
+            label = "would_send_but_guard_disabled"
+        elif bool(row.get("would_send")):
+            label = status or "would_send"
+        else:
+            label = "not_due"
+        lane_parts.append(f"{lane}={label}")
+    send_guard = (
+        "disabled (no-send rehearsal)"
+        if guard_blocked
+        else ("enabled" if sent else "not observed")
+    )
+    mode = "no-send rehearsal" if guard_blocked else ("send attempt" if sent else "preview")
+    lines = [
+        f"- Mode: {mode}",
+        f"- Would send: {'yes' if would_send else 'no'}",
+        f"- Lanes: {', '.join(lane_parts) if lane_parts else 'none'}",
+        f"- Lane counts: due={len(would_send)} · sent={len(sent)} · would_send_but_guard_disabled={len(guard_blocked)} · blocked_by_quality={len(quality_blocked)} · blocked_by_cooldown={len(cooldown_blocked)} · not_due={len(not_due)}",
+        f"- Candidates included: {len(core_ids)}",
+        f"- Candidates blocked by confirmation: {len(blocked_confirmation)}",
+        "- Provider issues: see Telegram body/run ledger",
+        f"- Send guard: {send_guard}",
+    ]
+    if guard_blocked:
+        lines.append("- No-send rehearsal: would send, but send guard is disabled. This is expected in rehearsal mode.")
+    lines.append("- Recommendation: inspect this preview, inbox, and strict doctor before enabling Telegram sends.")
+    return lines
+
+
+def _preview_path_label(path: str | None) -> str:
+    text = str(path or "").strip()
+    if not text:
+        return "none"
+    normalized = text.replace("\\", "/")
+    marker = "/event_fade_cache/"
+    if marker in normalized:
+        return "event_fade_cache/" + normalized.split(marker, 1)[1]
+    if normalized.startswith("event_fade_cache/"):
+        return normalized
+    try:
+        return Path(text).name or "local_card"
+    except (OSError, ValueError):
+        return "local_card"
+
+
 class _DeliveryWriter:
     """Append-only delivery recorder used by ``send_notifications``.
 
@@ -1797,6 +1877,10 @@ class _DeliveryWriter:
             f"profile: {self.profile or 'default'}",
             f"namespace: {self.namespace or 'default'}",
             "",
+            "## Preview Summary",
+            "",
+            *_preview_summary_lines(self.preview_sections),
+            "",
             f"sections: {len(self.preview_sections)}",
         ]
         for idx, section in enumerate(self.preview_sections, start=1):
@@ -1815,7 +1899,7 @@ class _DeliveryWriter:
                     f"core_opportunity_id: {item_identity.core_opportunity_id or 'none'}",
                     f"canonical_symbol: {item_identity.canonical_symbol or 'unknown'}",
                     f"canonical_coin_id: {item_identity.canonical_coin_id or 'unknown'}",
-                    f"canonical_card_path: {item_identity.canonical_card_path or 'none'}",
+                    f"canonical_card_path: {_preview_path_label(item_identity.canonical_card_path)}",
                     f"feedback_target: {item_identity.feedback_target or item_identity.core_opportunity_id or item_identity.alert_id or 'none'}",
                     "source_alert_ids: " + ", ".join(item_identity.source_alert_ids or ("none",)),
                     "notification_item_ids: " + ", ".join(item_identity.notification_item_ids or ("none",)),

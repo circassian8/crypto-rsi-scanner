@@ -192,6 +192,7 @@ real-profile no-send rehearsal:
 ```bash
 make event-alpha-notify-llm-deep-real-no-send-rehearsal PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-daily-brief PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal BURN_IN_REVIEW=1 PYTHON=python3
@@ -204,6 +205,7 @@ capped rehearsal:
 ```bash
 make event-alpha-notify-llm-deep-real-no-send-rehearsal-fast PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 ```
 
 For a deterministic delivery-plan rehearsal that injects fixture VELVET/AAVE/BTC
@@ -213,6 +215,7 @@ path, use:
 ```bash
 make event-alpha-notify-llm-deep-real-no-send-rehearsal-with-fixture-candidate PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=python3
+make event-alpha-send-go-no-go PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=python3
 ```
 
 This target uses the actual `notify_llm_deep` profile and passes
@@ -228,7 +231,10 @@ delivery rows to carry canonical core identity and explicit `delivery_mode`,
 and `failed` fields, `notification_preview_path_source` to resolve through
 `relpath` or `namespace_default` when possible, no rejected-only/no-market
 candidate to be would-send eligible, and Telegram token/chat id to be present
-when the send guard is enabled. The heartbeat preview should show the same
+when the send guard is enabled. The go/no-go report should then show
+`READY_FOR_NO_SEND_REVIEW` for a clean rehearsal with the send guard disabled,
+or `READY_FOR_SEND` only when both the send guard and Telegram credentials are
+enabled. The heartbeat preview should show the same
 completed/raw-event/extraction/core-opportunity/LLM call/skip and delivery-lane
 due/sent/blocked numbers as the latest run ledger. No-send rehearsal rows
 should say `would_send_but_guard_disabled` and should not be counted as provider
@@ -1133,6 +1139,7 @@ real no-send rehearsal and send-readiness gate pass:
 ```bash
 make event-alpha-notify-llm-deep-real-no-send-rehearsal PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal BURN_IN_REVIEW=1 PYTHON=python3
 make event-alpha-daily-brief PROFILE=notify_llm_deep_rehearsal PYTHON=python3
@@ -1144,7 +1151,15 @@ for a capped preview/readiness smoke before the longer rehearsal. Before any
 real send, confirm send-readiness reports a resolvable preview path, a clear
 send/no-send guard state, explicit delivery status fields, matching
 heartbeat/run-ledger summary numbers, and no rejected-only candidate that would
-send.
+send. For the one-command no-send final checklist, run:
+
+```bash
+make event-alpha-telegram-no-send-final-check PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+```
+
+That target runs the capped no-send rehearsal, strict artifact doctor,
+send-readiness, go/no-go, compact inbox, and daily brief, and prints the local
+`event_alpha_notification_preview.md` path for inspection.
 
 It uses the `notify_llm_deep` profile with bounded run/day LLM budgets, source
 enrichment, optional CryptoPanic when the key is present, run locks, and the

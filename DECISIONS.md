@@ -21,7 +21,8 @@ decision, rationale, and revisit condition.
 **Decision:** Before enabling real Telegram delivery for `notify_llm_deep`, the
 operator must run a real-profile no-send rehearsal under the
 `notify_llm_deep_rehearsal` namespace and pass
-`make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal`. Notification
+`make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal` plus
+`make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal`. Notification
 heartbeat/no-digest previews must summarize the latest run ledger and canonical
 core store rather than independent defaults, including completed status, raw
 events, extraction rows, core opportunities, alertable final routes, provider
@@ -42,8 +43,10 @@ block another checkout when the namespace preview exists.
 `Core opportunities=0`, or `Completed=no` makes a safe run look broken and can
 hide stale artifacts. Explicit delivery status fields prevent ambiguous
 blocked/would-send rows from being mistaken for real failures or successful
-sends. A separate send-readiness gate gives the operator one deterministic
-final check before flipping `RSI_EVENT_ALERTS_ENABLED=1`.
+sends. Separate send-readiness and go/no-go gates give the operator one
+deterministic final check and an explicit recommendation:
+`READY_FOR_NO_SEND_REVIEW`, `READY_FOR_SEND`, or `NOT_READY`, before flipping
+`RSI_EVENT_ALERTS_ENABLED=1`.
 **Revisit when:** Event Alpha notifications move to a typed operational UI that
 renders previews/readiness directly from a single delivery-run record.
 

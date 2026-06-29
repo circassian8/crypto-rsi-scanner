@@ -12083,6 +12083,10 @@ def test_event_alpha_notification_uses_canonical_core_identity_and_compact_messa
     assert "/tmp/local/cards" not in message
     assert "source_alert_ids:" in preview
     assert "agg:ffdcb488dbed" in preview
+    assert "## Preview Summary" in preview
+    assert "Candidates included: 1" in preview
+    assert "Recommendation: inspect this preview" in preview
+    assert "/tmp/local/cards" not in preview
 
 
 def test_event_alpha_notification_blocks_rejected_only_core_digest():
@@ -28041,8 +28045,8 @@ def test_event_alpha_notification_go_no_go_reports_send_blockers():
     assert result.ready_to_send_now is False
     assert "ready_to_send_now: no" in text
     assert "fresh notification lock is held" in text
-    assert "telegram config is missing" in text
-    assert "RSI_EVENT_ALERTS_ENABLED is not set" in text
+    assert "real-send blocked: telegram config is missing" in text
+    assert "real-send blocked: RSI_EVENT_ALERTS_ENABLED is not set" in text
     assert "provider(s) currently in backoff" in text
     assert "provider health: make event-alpha-provider-health-report PROFILE=notify_no_key" in text
     assert "provider reset: make event-alpha-provider-health-reset PROFILE=notify_no_key PROVIDER_KEY=all CONFIRM=1" in text
@@ -28068,6 +28072,90 @@ def test_event_alpha_notification_go_no_go_reports_send_blockers():
     )
     no_backoff_text = go.format_go_no_go(no_backoff)
     assert "provider reset:" not in no_backoff_text
+
+
+def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recommendation():
+    from types import SimpleNamespace
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
+    from crypto_rsi_scanner import event_alpha_notification_go_no_go as go
+
+    with TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        preview_path = tmp_path / "event_alpha_notification_preview.md"
+        preview_path.write_text("# preview\n", encoding="utf-8")
+        provider_status = SimpleNamespace(ready_event_source_count=2, ready_enrichment_count=1)
+        readiness = SimpleNamespace(
+            ready=True,
+            blockers=(),
+            warnings=("no-send rehearsal: send guard disabled; real Telegram sends remain blocked",),
+            latest_run_id="run-1",
+            latest_run_completed=True,
+            preview_path=str(preview_path),
+            preview_path_source="relpath",
+            alertable_items=2,
+        )
+        row = {
+            "run_id": "run-1",
+            "lane": "daily_digest",
+            "delivery_state": delivery.STATE_BLOCKED,
+            "status_detail": delivery.STATUS_DETAIL_WOULD_SEND_GUARD_DISABLED,
+            "delivery_mode": "guarded_no_send",
+            "would_send": True,
+            "sent": False,
+            "failed": False,
+            "core_opportunity_id": "agg:velvet",
+            "canonical_symbol": "VELVET",
+            "canonical_coin_id": "velvet",
+            "feedback_target": "agg:velvet",
+        }
+        no_send = go.build_go_no_go(
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep_rehearsal",
+            telegram_ready=False,
+            send_guard_enabled=False,
+            lock_status=SimpleNamespace(state="missing", message="no lock"),
+            provider_status=provider_status,
+            provider_health_rows={},
+            delivery_ledger_path=tmp_path / "deliveries.jsonl",
+            notification_run_ledger_path=tmp_path / "runs.jsonl",
+            research_cards_dir=tmp_path / "cards",
+            artifact_doctor_status="OK",
+            cooldown_status={},
+            llm_budget_status="provider=openai max_run=200",
+            clock_status={"now": "2026-06-20T12:00:00Z", "warnings": ()},
+            send_readiness=readiness,
+            delivery_rows=[row],
+        )
+        text = go.format_go_no_go(no_send)
+        assert no_send.final_recommendation == go.RECOMMEND_READY_NO_SEND_REVIEW
+        assert no_send.ready_to_send_now is False
+        assert "final_recommendation: READY_FOR_NO_SEND_REVIEW" in text
+        assert "latest_run_id: run-1" in text
+        assert "notification_preview_path_source: relpath" in text
+        assert "would_send_lanes: daily_digest" in text
+        assert "canonical_delivery_identity: yes" in text
+
+        real_send = go.build_go_no_go(
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep_rehearsal",
+            telegram_ready=True,
+            send_guard_enabled=True,
+            lock_status=SimpleNamespace(state="missing", message="no lock"),
+            provider_status=provider_status,
+            provider_health_rows={},
+            delivery_ledger_path=tmp_path / "deliveries.jsonl",
+            notification_run_ledger_path=tmp_path / "runs.jsonl",
+            research_cards_dir=tmp_path / "cards",
+            artifact_doctor_status="OK",
+            cooldown_status={},
+            llm_budget_status="provider=openai max_run=200",
+            clock_status={"now": "2026-06-20T12:00:00Z", "warnings": ()},
+            send_readiness=readiness,
+            delivery_rows=[{**row, "status_detail": delivery.STATUS_DETAIL_SENT, "delivery_state": delivery.STATE_DELIVERED, "sent": True}],
+        )
+        assert real_send.final_recommendation == go.RECOMMEND_READY_SEND
+        assert real_send.ready_to_send_now is True
 
 
 def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock():
@@ -28110,6 +28198,19 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "RSI_EVENT_ALERTS_ENABLED=0" in readiness
     assert "--event-alert-send" not in readiness
 
+    go_no_go = subprocess.run(
+        ["make", "-n", "event-alpha-send-go-no-go", "PROFILE=notify_llm_deep_fixture_rehearsal", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "main.py --event-alpha-notify-go-no-go" in go_no_go
+    assert "--event-alpha-profile notify_llm_deep" in go_no_go
+    assert "--event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal" in go_no_go
+    assert "--event-alpha-include-test-artifacts" in go_no_go
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in go_no_go
+
     smoke_readiness = subprocess.run(
         ["make", "-n", "event-alpha-send-readiness", "PROFILE=notify_llm_deep_no_send_smoke", "PYTHON=python3"],
         cwd=root,
@@ -28134,6 +28235,9 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "RSI_EVENT_ALERTS_ENABLED=0" in rehearsal
     assert "main.py --event-alpha-notify-fixture-smoke" in rehearsal
     assert "main.py --event-alpha-send-readiness" in rehearsal
+    assert "main.py --event-alpha-notify-go-no-go" in rehearsal
+    assert "main.py --event-alpha-notification-inbox" in rehearsal
+    assert "main.py --event-alpha-daily-brief" in rehearsal
     assert "--event-alert-send" not in rehearsal
 
     fast = subprocess.run(
@@ -28151,6 +28255,21 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "main.py --event-alpha-artifact-doctor" in fast
     assert "main.py --event-alpha-send-readiness" in fast
     assert "--event-alert-send" in fast
+
+    final_check = subprocess.run(
+        ["make", "-n", "event-alpha-telegram-no-send-final-check", "PROFILE=notify_llm_deep_rehearsal", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "event-alpha-notify-llm-deep-real-no-send-rehearsal-fast" in final_check
+    assert "event-alpha-artifact-doctor PROFILE=notify_llm_deep_rehearsal STRICT=1" in final_check
+    assert "event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal" in final_check
+    assert "event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal" in final_check
+    assert "event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal BURN_IN_REVIEW=1" in final_check
+    assert "event-alpha-daily-brief PROFILE=notify_llm_deep_rehearsal" in final_check
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in final_check
 
 
 def test_event_alpha_notification_run_summary_flows_to_runs_doctor_and_brief():

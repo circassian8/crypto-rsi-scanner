@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 
 @dataclass(frozen=True)
@@ -41,6 +41,22 @@ class EventAlphaNotificationGoNoGoResult:
     provider_reset_command: str | None
     delivery_report_command: str
     notification_inbox_command: str
+    latest_run_id: str | None = None
+    latest_run_completed: bool | None = None
+    notification_preview_exists: bool | None = None
+    notification_preview_path_resolved: str | None = None
+    notification_preview_path_source: str | None = None
+    delivery_rows_have_explicit_status: bool | None = None
+    canonical_delivery_identity: bool | None = None
+    rejected_or_unconfirmed_selected: bool | None = None
+    alertable_candidates_count: int | None = None
+    would_send_lanes: tuple[str, ...] = ()
+    final_recommendation: str = "NOT_READY"
+
+
+RECOMMEND_READY_NO_SEND_REVIEW = "READY_FOR_NO_SEND_REVIEW"
+RECOMMEND_READY_SEND = "READY_FOR_SEND"
+RECOMMEND_NOT_READY = "NOT_READY"
 
 
 def build_go_no_go(
@@ -61,6 +77,8 @@ def build_go_no_go(
     clock_status: Mapping[str, Any],
     notifications_paused: bool = False,
     pause_reason: str = "",
+    send_readiness: Any | None = None,
+    delivery_rows: Iterable[Mapping[str, Any]] = (),
 ) -> EventAlphaNotificationGoNoGoResult:
     """Build a deterministic readiness decision from existing runtime checks."""
     lock_state = str(getattr(lock_status, "state", "unknown") or "unknown")
@@ -87,10 +105,11 @@ def build_go_no_go(
         warnings.append("notification lock is stale and can be recovered by the cycle")
     if fixed_clock_blocked:
         blockers.append("fixed research clock blocks notification sends")
+    real_send_blockers: list[str] = []
     if not telegram_ready:
-        blockers.append("telegram config is missing")
+        real_send_blockers.append("telegram config is missing")
     if not send_guard_enabled:
-        blockers.append("RSI_EVENT_ALERTS_ENABLED is not set")
+        real_send_blockers.append("RSI_EVENT_ALERTS_ENABLED is not set")
     if notifications_paused:
         blockers.append(f"notifications paused: {pause_reason or 'operator pause'}")
     if str(artifact_doctor_status).upper() == "BLOCKED":
@@ -99,6 +118,37 @@ def build_go_no_go(
         warnings.append("no active event sources; only heartbeat/would-send accounting may run")
     if backoff_count:
         warnings.append(f"{backoff_count} provider(s) currently in backoff")
+
+    readiness_blockers = tuple(str(item) for item in getattr(send_readiness, "blockers", ()) or ())
+    readiness_warnings = tuple(str(item) for item in getattr(send_readiness, "warnings", ()) or ())
+    if readiness_blockers:
+        blockers.extend(f"send-readiness: {item}" for item in readiness_blockers)
+    warnings.extend(f"send-readiness: {item}" for item in readiness_warnings)
+
+    delivery_rows_list = [dict(row) for row in delivery_rows if isinstance(row, Mapping)]
+    delivery_status_explicit = _delivery_rows_have_explicit_status(delivery_rows_list)
+    canonical_identity = _delivery_rows_have_canonical_identity(delivery_rows_list)
+    rejected_selected = _readiness_has_rejected_or_unconfirmed_candidate(readiness_blockers)
+    would_send_lanes = _would_send_lanes(delivery_rows_list)
+    latest_run_id = str(getattr(send_readiness, "latest_run_id", "") or "") or None
+    latest_run_completed = getattr(send_readiness, "latest_run_completed", None)
+    preview_path = str(getattr(send_readiness, "preview_path", "") or "") or None
+    preview_exists = bool(preview_path and Path(preview_path).expanduser().exists())
+    preview_source = str(getattr(send_readiness, "preview_path_source", "") or "") or None
+
+    if send_readiness is not None:
+        if not getattr(send_readiness, "ready", False):
+            blockers.append("send-readiness is not ready")
+        if latest_run_completed is False:
+            blockers.append("latest run did not complete")
+        if not preview_exists:
+            blockers.append("notification preview is missing")
+        if not delivery_status_explicit and delivery_rows_list:
+            blockers.append("delivery rows are missing explicit status fields")
+        if not canonical_identity and _has_alert_delivery_rows(delivery_rows_list):
+            blockers.append("delivery rows are missing canonical identity")
+        if rejected_selected:
+            blockers.append("rejected-only or unconfirmed candidate selected")
 
     path_blockers = [
         blocker for blocker in blockers
@@ -109,7 +159,15 @@ def build_go_no_go(
         }
     ]
     ready_to_preview = not path_blockers
-    ready_to_send = ready_to_preview and not blockers
+    ready_to_review = ready_to_preview and not blockers
+    ready_to_send = ready_to_review and not real_send_blockers
+    recommendation = _final_recommendation(
+        send_guard_enabled=bool(send_guard_enabled),
+        telegram_ready=bool(telegram_ready),
+        ready_to_review=ready_to_review,
+        ready_to_send=ready_to_send,
+        send_readiness=send_readiness,
+    )
     next_command = _next_command(str(profile or "notify_no_key"), ready_to_send)
     clean_profile = str(profile or "notify_no_key")
     return EventAlphaNotificationGoNoGoResult(
@@ -134,7 +192,7 @@ def build_go_no_go(
         cooldown_status={str(key): dict(value) for key, value in cooldown_status.items()},
         clock_line=_clock_line(clock_status),
         blockers=tuple(dict.fromkeys(blockers)),
-        warnings=tuple(dict.fromkeys(warnings)),
+        warnings=tuple(dict.fromkeys([*warnings, *(f"real-send blocked: {item}" for item in real_send_blockers)])),
         next_command=next_command,
         provider_health_report_command=f"make event-alpha-provider-health-report PROFILE={clean_profile}",
         provider_reset_command=(
@@ -144,6 +202,17 @@ def build_go_no_go(
         ),
         delivery_report_command=f"make event-alpha-notification-deliveries-report PROFILE={clean_profile}",
         notification_inbox_command=f"make event-alpha-notification-inbox PROFILE={clean_profile}",
+        latest_run_id=latest_run_id,
+        latest_run_completed=bool(latest_run_completed) if latest_run_completed is not None else None,
+        notification_preview_exists=preview_exists if send_readiness is not None else None,
+        notification_preview_path_resolved=preview_path,
+        notification_preview_path_source=preview_source,
+        delivery_rows_have_explicit_status=delivery_status_explicit if send_readiness is not None else None,
+        canonical_delivery_identity=canonical_identity if send_readiness is not None else None,
+        rejected_or_unconfirmed_selected=rejected_selected if send_readiness is not None else None,
+        alertable_candidates_count=getattr(send_readiness, "alertable_items", None),
+        would_send_lanes=would_send_lanes,
+        final_recommendation=recommendation,
     )
 
 
@@ -156,6 +225,12 @@ def format_go_no_go(result: EventAlphaNotificationGoNoGoResult) -> str:
         f"artifact_namespace: {result.artifact_namespace}",
         f"ready_to_preview: {_yes_no(result.ready_to_preview)}",
         f"ready_to_send_now: {_yes_no(result.ready_to_send_now)}",
+        f"final_recommendation: {result.final_recommendation}",
+        f"latest_run_id: {result.latest_run_id or 'none'}",
+        (
+            "latest_run_completed: "
+            + ("unknown" if result.latest_run_completed is None else _yes_no(result.latest_run_completed))
+        ),
         f"telegram_ready: {_yes_no(result.telegram_ready)}",
         f"send_guard_enabled: {_yes_no(result.send_guard_enabled)}",
         f"clock: {result.clock_line}",
@@ -170,6 +245,38 @@ def format_go_no_go(result: EventAlphaNotificationGoNoGoResult) -> str:
         f"notification_run_ledger_writable: {_yes_no(result.notification_run_ledger_writable)}",
         f"research_cards_writable: {_yes_no(result.research_cards_writable)}",
         f"artifact_doctor_status: {result.artifact_doctor_status}",
+        (
+            "notification_preview_exists: "
+            + ("unknown" if result.notification_preview_exists is None else _yes_no(result.notification_preview_exists))
+        ),
+        f"notification_preview_path_resolved: {result.notification_preview_path_resolved or 'missing'}",
+        f"notification_preview_path_source: {result.notification_preview_path_source or 'unknown'}",
+        (
+            "delivery_rows_have_explicit_status: "
+            + (
+                "unknown"
+                if result.delivery_rows_have_explicit_status is None
+                else _yes_no(result.delivery_rows_have_explicit_status)
+            )
+        ),
+        (
+            "canonical_delivery_identity: "
+            + (
+                "unknown"
+                if result.canonical_delivery_identity is None
+                else _yes_no(result.canonical_delivery_identity)
+            )
+        ),
+        (
+            "rejected_only_or_no_market_selected: "
+            + (
+                "unknown"
+                if result.rejected_or_unconfirmed_selected is None
+                else _yes_no(result.rejected_or_unconfirmed_selected)
+            )
+        ),
+        f"alertable_candidates_count: {result.alertable_candidates_count if result.alertable_candidates_count is not None else 'unknown'}",
+        f"would_send_lanes: {', '.join(result.would_send_lanes) if result.would_send_lanes else 'none'}",
         f"LLM budget: {result.llm_budget_status}",
         f"notifications_paused: {_yes_no(result.notifications_paused)}"
         + (f" ({result.pause_reason})" if result.pause_reason else ""),
@@ -235,3 +342,61 @@ def _clock_line(clock_status: Mapping[str, Any]) -> str:
 
 def _yes_no(value: bool) -> str:
     return "yes" if value else "no"
+
+
+def _delivery_rows_have_explicit_status(rows: Iterable[Mapping[str, Any]]) -> bool:
+    rows_list = list(rows)
+    if not rows_list:
+        return True
+    required = ("delivery_state", "status_detail", "delivery_mode", "would_send", "sent", "failed")
+    return all(all(key in row and row.get(key) not in (None, "") for key in required) for row in rows_list)
+
+
+def _delivery_rows_have_canonical_identity(rows: Iterable[Mapping[str, Any]]) -> bool:
+    alert_lanes = {"daily_digest", "instant_escalation", "triggered_fade"}
+    scoped = [row for row in rows if str(row.get("lane") or "") in alert_lanes]
+    if not scoped:
+        return True
+    return all(
+        bool(str(row.get("core_opportunity_id") or "").strip())
+        and bool(str(row.get("canonical_symbol") or "").strip())
+        and bool(str(row.get("canonical_coin_id") or "").strip())
+        and bool(str(row.get("feedback_target") or "").strip())
+        for row in scoped
+    )
+
+
+def _has_alert_delivery_rows(rows: Iterable[Mapping[str, Any]]) -> bool:
+    return any(str(row.get("lane") or "") in {"daily_digest", "instant_escalation", "triggered_fade"} for row in rows)
+
+
+def _readiness_has_rejected_or_unconfirmed_candidate(blockers: Iterable[str]) -> bool:
+    text = "\n".join(str(item) for item in blockers).casefold()
+    return any(token in text for token in ("rejected", "unconfirmed", "accepted/live confirmation", "no-market"))
+
+
+def _would_send_lanes(rows: Iterable[Mapping[str, Any]]) -> tuple[str, ...]:
+    lanes = []
+    for row in rows:
+        if bool(row.get("would_send")):
+            lane = str(row.get("lane") or "").strip()
+            if lane:
+                lanes.append(lane)
+    return tuple(dict.fromkeys(lanes))
+
+
+def _final_recommendation(
+    *,
+    send_guard_enabled: bool,
+    telegram_ready: bool,
+    ready_to_review: bool,
+    ready_to_send: bool,
+    send_readiness: Any | None,
+) -> str:
+    if send_readiness is not None and not getattr(send_readiness, "ready", False):
+        return RECOMMEND_NOT_READY
+    if ready_to_send and send_guard_enabled and telegram_ready:
+        return RECOMMEND_READY_SEND
+    if ready_to_review:
+        return RECOMMEND_READY_NO_SEND_REVIEW
+    return RECOMMEND_NOT_READY

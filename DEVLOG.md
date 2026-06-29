@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Finalize Event Alpha notification go/no-go · Codex
+**Why:** The deep notification rehearsal had artifact-level readiness checks,
+but operators still needed one compact final go/no-go report and a readable
+preview summary before enabling real Telegram sends.
+**Changes:**
+- `--event-alpha-notify-go-no-go` now inspects the same profile/namespace
+  artifacts as send-readiness, including latest run completion, preview path
+  resolution, explicit delivery status, canonical core identity, alertable item
+  count, would-send lanes, and a final `READY_FOR_NO_SEND_REVIEW` /
+  `READY_FOR_SEND` / `NOT_READY` recommendation.
+- Notification previews now include a concise top-level summary with mode,
+  would-send status, lane counts, included candidates, send-guard wording, and
+  operator next step; preview card paths are rendered as portable labels rather
+  than machine-local absolute paths.
+- Added `make event-alpha-send-go-no-go` and
+  `make event-alpha-telegram-no-send-final-check`; the deterministic deep
+  fixture rehearsal now also runs go/no-go, burn-in inbox, and daily brief
+  checks.
+**Verify:** `python3 tests/test_indicators.py` passed (559/559). Full prompt
+verification and export run after this doc update before commit/push.
+**Notes/risks:** Research-only notification readiness/UX polish. No Telegram
+sends in tests, no trades, no paper trades, no normal RSI rows, and no
+LLM/provider path can create `TRIGGERED_FADE`.
+
 ## 2026-06-29 — Make Event Alpha delivery status explicit · Codex
 **Why:** The deep notification rehearsal could infer useful delivery status in
 reports, but the delivery ledger itself still allowed fresh rows with
