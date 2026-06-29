@@ -109,10 +109,12 @@ def format_final_check(result: EventAlphaTelegramFinalCheckResult) -> str:
         f"- artifact namespace: {result.artifact_namespace}",
         f"- preview: {result.preview_path or 'missing'}",
         f"- doctor: {result.doctor_status}",
+        f"- candidate count: {len(result.core_ids)}",
         f"- would-send lanes: {_join(result.would_send_lanes)}",
         f"- core IDs: {_join(result.core_ids)}",
         f"- sends performed: {result.sends_performed}",
         f"- providers: {result.provider_summary}",
+        f"- provider warnings: {_provider_warning_summary(result.warnings)}",
         f"- telegram configured: {'yes' if result.telegram_ready else 'no'}",
         f"- send guard enabled: {'yes' if result.send_guard_enabled else 'no'}",
         f"- next command to inspect preview: {result.inspect_preview_command}",
@@ -162,13 +164,17 @@ def _is_alert_lane(row: Mapping[str, Any]) -> bool:
 
 
 def _real_send_command(profile: str) -> str:
-    if profile == "notify_llm_deep":
-        return "RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-llm-deep-scheduled PYTHON=python3"
-    if profile == "notify_llm":
-        return "RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-llm-scheduled PYTHON=python3"
-    if profile == "notify_no_key":
-        return "RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-no-key-scheduled PYTHON=python3"
-    return f"RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-cycle PROFILE={profile} PYTHON=python3"
+    clean = str(profile or "notify_llm_deep")
+    return f"RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 make event-alpha-telegram-send-one-cycle PROFILE={clean} PYTHON=python3"
+
+
+def _provider_warning_summary(warnings: Iterable[str]) -> str:
+    items = [
+        str(item)
+        for item in warnings
+        if any(token in str(item).lower() for token in ("provider", "backoff", "source", "enrichment"))
+    ]
+    return f"{len(items)} warning(s)" if items else "none"
 
 
 def _join(values: Iterable[str]) -> str:

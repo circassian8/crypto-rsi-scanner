@@ -36,6 +36,16 @@ compact final check before real sends.
 read-only trust targets for existing artifacts: they print the compact final
 status, resolved preview path, strict doctor status, would-send lanes, core ids,
 send count, provider summary, and next commands, then fail on `NOT_READY`.
+The approved first real-send path is one cycle only:
+`RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 make event-alpha-telegram-send-one-cycle PROFILE=notify_llm_deep`.
+That target must refuse before reaching the sender unless the send guard is
+enabled, Telegram token/chat config is present, and either a fresh
+`event-alpha-telegram-one-cycle-send-preflight` marker exists or `CONFIRM=1` is
+passed. It must rerun the compact final check against the rehearsal namespace
+immediately before sending and print the preview path plus the fact that it will
+send Telegram messages. After any real one-cycle send, operators should run
+`make event-alpha-telegram-post-send-audit PROFILE=notify_llm_deep`; if anything
+looks wrong, pause with `make event-alpha-notification-pause PROFILE=notify_llm_deep REASON='...'`.
 Notification heartbeat/no-digest previews must summarize the latest run ledger
 and canonical core store rather than independent defaults, including completed
 status, raw events, extraction rows, core opportunities, alertable final routes,

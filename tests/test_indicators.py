@@ -28324,7 +28324,9 @@ def test_event_alpha_scheduled_make_targets_use_profile_lock_and_no_fixed_clock(
 
 
 def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
+    import os
     import subprocess
+    from tempfile import TemporaryDirectory
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
@@ -28333,6 +28335,10 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "Full real-profile no-send rehearsal" in makefile
     assert "Startup send commands after review" in makefile
     assert "event-alpha-telegram-final-send-checklist" in makefile
+    assert "event-alpha-telegram-one-cycle-send-preflight" in makefile
+    assert "event-alpha-telegram-send-one-cycle" in makefile
+    assert "event-alpha-telegram-post-send-audit" in makefile
+    assert "event-alpha-notification-pause" in makefile
 
     readiness = subprocess.run(
         ["make", "-n", "event-alpha-send-readiness", "PROFILE=notify_llm_deep_rehearsal", "PYTHON=python3"],
@@ -28456,6 +28462,50 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "--event-alpha-include-test-artifacts" in trust_target
     assert "main.py --event-alpha-notify-cycle" not in trust_target
 
+    one_cycle_preflight = subprocess.run(
+        ["make", "-n", "event-alpha-telegram-one-cycle-send-preflight", "PROFILE=notify_llm_deep_fixture_rehearsal", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "main.py --event-alpha-telegram-final-check" in one_cycle_preflight
+    assert "--event-alpha-profile notify_llm_deep" in one_cycle_preflight
+    assert "--event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal" in one_cycle_preflight
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in one_cycle_preflight
+    assert "event_alpha_one_cycle_send_preflight_passed.marker" in one_cycle_preflight
+    assert "main.py --event-alpha-notify-cycle" not in one_cycle_preflight
+
+    guarded_send = subprocess.run(
+        ["make", "-n", "event-alpha-telegram-send-one-cycle", "PROFILE=notify_llm_deep", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "Refusing Event Alpha one-cycle Telegram send: set RSI_EVENT_ALERTS_ENABLED=1" in guarded_send
+    assert "Refusing Event Alpha one-cycle Telegram send: run make event-alpha-telegram-one-cycle-send-preflight" in guarded_send
+    assert "TELEGRAM_BOT_TOKEN" in guarded_send
+    assert "This will send Telegram messages." in guarded_send
+    assert "--event-alpha-artifact-namespace notify_llm_deep_rehearsal" in guarded_send
+    assert "main.py --event-alpha-telegram-final-check" in guarded_send
+    assert "main.py --event-alpha-notify-cycle" in guarded_send
+    assert "--event-alert-send" in guarded_send
+
+    post_send_audit = subprocess.run(
+        ["make", "-n", "event-alpha-telegram-post-send-audit", "PROFILE=notify_llm_deep", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "main.py --event-alpha-artifact-doctor" in post_send_audit
+    assert "--event-alpha-artifact-doctor-delivery-scope latest_run" in post_send_audit
+    assert "main.py --event-alpha-notification-deliveries-report" in post_send_audit
+    assert "main.py --event-alpha-notification-inbox" in post_send_audit
+    assert "main.py --event-alpha-feedback-readiness" in post_send_audit
+    assert "main.py --event-alpha-telegram-final-check" in post_send_audit
+
     checklist = subprocess.run(
         ["make", "-n", "event-alpha-telegram-final-send-checklist", "PROFILE=notify_llm_deep_rehearsal", "PYTHON=python3"],
         cwd=root,
@@ -28465,9 +28515,60 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     ).stdout
     assert "Event Alpha Telegram final-send checklist" in checklist
     assert "make event-alpha-telegram-no-send-final-check PROFILE=notify_llm_deep_rehearsal" in checklist
-    assert "RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-llm-deep-scheduled" in checklist
+    assert "make event-alpha-telegram-one-cycle-send-preflight PROFILE=notify_llm_deep_rehearsal" in checklist
+    assert "RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 make event-alpha-telegram-send-one-cycle PROFILE=notify_llm_deep" in checklist
     assert "main.py --event-alpha-telegram-final-check" in checklist
     assert "main.py --event-alpha-notify-cycle" not in checklist
+
+    with TemporaryDirectory() as tmp:
+        refused = subprocess.run(
+            [
+                "make",
+                "event-alpha-telegram-send-one-cycle",
+                "PROFILE=notify_llm_deep",
+                "EVENT_ALPHA_ARTIFACT_BASE_DIR=" + tmp,
+                "PYTHON=python3",
+            ],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "RSI_EVENT_ALERTS_ENABLED": "0"},
+        )
+        assert refused.returncode != 0
+        assert "set RSI_EVENT_ALERTS_ENABLED=1" in (refused.stdout + refused.stderr)
+
+        no_confirm = subprocess.run(
+            [
+                "make",
+                "event-alpha-telegram-send-one-cycle",
+                "PROFILE=notify_llm_deep",
+                "EVENT_ALPHA_ARTIFACT_BASE_DIR=" + tmp,
+                "PYTHON=python3",
+            ],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "RSI_EVENT_ALERTS_ENABLED": "1"},
+        )
+        assert no_confirm.returncode != 0
+        assert "CONFIRM=1" in (no_confirm.stdout + no_confirm.stderr)
+
+        no_telegram = subprocess.run(
+            [
+                "make",
+                "event-alpha-telegram-send-one-cycle",
+                "PROFILE=notify_llm_deep",
+                "EVENT_ALPHA_ARTIFACT_BASE_DIR=" + tmp,
+                "CONFIRM=1",
+                "PYTHON=python3",
+            ],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "RSI_EVENT_ALERTS_ENABLED": "1", "TELEGRAM_BOT_TOKEN": "", "TELEGRAM_CHAT_ID": ""},
+        )
+        assert no_telegram.returncode != 0
+        assert "missing TELEGRAM_BOT_TOKEN" in (no_telegram.stdout + no_telegram.stderr)
 
 
 def test_event_alpha_notification_run_summary_flows_to_runs_doctor_and_brief():

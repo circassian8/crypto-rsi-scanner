@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Add one-cycle Event Alpha Telegram send gates · Codex
+**Why:** The deterministic no-send rehearsal is now clean, but the real-send
+operator path needed a separate preflight, explicit one-cycle send guard, and
+post-send audit so Telegram can be re-enabled safely for exactly one cycle.
+**Changes:**
+- Added `make event-alpha-telegram-one-cycle-send-preflight`, which reuses the
+  compact final artifact check, writes a profile-scoped preflight marker, and
+  never sends Telegram.
+- Added `make event-alpha-telegram-send-one-cycle`, which refuses unless
+  `RSI_EVENT_ALERTS_ENABLED=1`, Telegram token/chat config is present,
+  `CONFIRM=1` or a preflight marker exists, and the rehearsal namespace passes
+  the compact final check immediately before sending.
+- Added `make event-alpha-telegram-post-send-audit` and the
+  `make event-alpha-notification-pause` alias so the operator can audit the
+  delivered lanes/items immediately and pause sends with an obvious command.
+- Updated compact final-check copy, Make help, tests, roadmap, decisions, and
+  the Event Alpha runbook to point real sends through the guarded one-cycle
+  target instead of a scheduled target.
+**Verify:** `python3 tests/test_indicators.py` (559/559 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-telegram-one-cycle-send-preflight PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=python3`;
+`make event-alpha-telegram-send-readiness-final PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Research-only notification operations. Tests do not send
+Telegram. No trading, paper trading, normal RSI rows, or provider/LLM-created
+`TRIGGERED_FADE`.
+
 ## 2026-06-29 — Add fast Event Alpha Telegram final check · Codex
 **Why:** The full `notify_llm_deep` no-send final check can still spend minutes
 in provider-failure environments. Operators need a fast deterministic last

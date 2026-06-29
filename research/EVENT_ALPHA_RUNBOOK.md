@@ -1155,12 +1155,12 @@ may take several minutes:
 
 ```bash
 make event-alpha-notify-llm-deep-real-no-send-rehearsal PYTHON=python3
+make event-alpha-telegram-one-cycle-send-preflight PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal BURN_IN_REVIEW=1 PYTHON=python3
 make event-alpha-daily-brief PROFILE=notify_llm_deep_rehearsal PYTHON=python3
-make event-alpha-notify-llm-deep-scheduled
 ```
 
 Use `make event-alpha-notify-llm-deep-real-no-send-rehearsal-fast PYTHON=python3`
@@ -1173,6 +1173,39 @@ send. For a compact read-only final checklist over any existing namespace, run:
 ```bash
 make event-alpha-telegram-final-send-checklist PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-telegram-send-readiness-final PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+```
+
+The safe one-cycle re-enable workflow is:
+
+```bash
+# 1. Deterministic no-send fixture check.
+make event-alpha-telegram-no-send-final-check-fast PYTHON=python3
+
+# 2. Inspect the fixture preview first.
+sed -n '1,180p' event_fade_cache/notify_llm_deep_fixture_rehearsal/event_alpha_notification_preview.md
+
+# 3. Run a real-profile no-send rehearsal.
+make event-alpha-notify-llm-deep-real-no-send-rehearsal-fast PYTHON=python3
+
+# 4. Gate the rehearsal and review inbox output.
+make event-alpha-telegram-one-cycle-send-preflight PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+make event-alpha-notification-inbox PROFILE=notify_llm_deep_rehearsal BURN_IN_REVIEW=1 PYTHON=python3
+
+# 5. Inspect the real-profile preview.
+sed -n '1,180p' event_fade_cache/notify_llm_deep_rehearsal/event_alpha_notification_preview.md
+
+# 6. Only if the preview is acceptable, send exactly one guarded cycle.
+RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 make event-alpha-telegram-send-one-cycle PROFILE=notify_llm_deep PYTHON=python3
+
+# 7. Audit immediately after the send.
+make event-alpha-telegram-post-send-audit PROFILE=notify_llm_deep PYTHON=python3
+```
+
+If anything looks wrong after a send, pause the namespace before the next run:
+
+```bash
+make event-alpha-notification-pause PROFILE=notify_llm_deep REASON='operator review after one-cycle send'
 ```
 
 For the full real-profile one-command no-send final checklist, run:
