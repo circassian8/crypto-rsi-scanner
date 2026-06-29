@@ -103,7 +103,7 @@ EVENT_ALPHA_NOTIFY_DEDUPE_WINDOW_HOURS = $(if $(filter $(EVENT_ALPHA_NOTIFY_EVER
 EVENT_ALPHA_TEST_ARTIFACT_PROFILES = quality_validation catalyst_frame_validation catalyst_frame_e2e notify_llm_quality_frame evidence_acquisition_smoke fixture_notify_smoke notification_format_smoke notify_llm_deep_no_send_smoke notify_llm_deep_fixture_rehearsal
 EVENT_ALPHA_INCLUDE_TEST_ARG = $(if $(filter $(EVENT_ALPHA_TEST_ARTIFACT_PROFILES),$(PROFILE)),--event-alpha-include-test-artifacts,)
 
-.PHONY: help check-python bootstrap export-src export-src-with-artifacts verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-catalyst-frame-validation-cycle event-alpha-catalyst-frame-e2e-cycle event-alpha-notify-llm-quality-frame-smoke event-alpha-market-refresh-smoke event-alpha-evidence-acquisition-smoke event-alpha-quality-frame-live-smoke event-alpha-frame-quality-loop event-alpha-signal-quality-eval event-alpha-quality-review event-alpha-quality-coverage-report event-alpha-quality-validation-cycle event-alpha-notify-llm-quality-validation-cycle event-alpha-notify-llm-quality-fresh-cycle event-alpha-quality-live-smoke event-alpha-live-burn-in-no-send event-alpha-burn-in-readiness event-alpha-policy-simulate event-alpha-export-signal-quality-cases event-alpha-quality-loop event-alpha-quality-loop-llm event-opportunity-audit event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-notify-cycle event-alpha-notify-no-key event-alpha-notify-llm event-alpha-notify-preview event-alpha-notify-go-no-go event-alpha-send-go-no-go event-alpha-telegram-no-send-final-check-fast event-alpha-telegram-no-send-final-check event-alpha-telegram-send-readiness-final event-alpha-environment-doctor event-alpha-pause-notifications event-alpha-resume-notifications event-alpha-scheduler-status event-alpha-generate-launchd event-alpha-notification-slo-report event-alpha-export-notification-pack event-alpha-notification-checklist event-alpha-send-readiness event-alpha-notification-runs-report event-alpha-notification-inbox event-alpha-notification-deliveries-report event-alpha-notification-retry-failed event-alpha-notify-no-key-scheduled event-alpha-notify-llm-scheduled event-alpha-notify-llm-deep-scheduled event-alpha-notify-llm-quality-scheduled event-alpha-provider-health-report event-alpha-provider-health-reset event-alpha-day1-start event-alpha-day1-start-llm event-alpha-notify-fixture-smoke event-alpha-notification-format-smoke event-alpha-notify-llm-deep-no-send-smoke event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-fast event-alpha-notify-start-no-key event-alpha-notify-start-llm event-alpha-send-test event-alpha-telegram-recipient-check event-alpha-runs-report event-alpha-status event-alpha-preflight event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-alpha-feedback-readiness event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-near-miss-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-incidents-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
+.PHONY: help check-python bootstrap export-src export-src-with-artifacts verify test smoke-alerts backtest-fixture backtest-costs score score-json score-cohorts report event-fade-report event-discovery-report event-discovery-status event-discovery-runs event-discovery-refresh event-discovery-refresh-configured event-discovery-refresh-public-rss event-discovery-refresh-gdelt event-discovery-refresh-polymarket event-discovery-binance-listen event-llm-eval event-llm-extract-eval event-alpha-eval event-alpha-catalyst-frame-validation-cycle event-alpha-catalyst-frame-e2e-cycle event-alpha-notify-llm-quality-frame-smoke event-alpha-market-refresh-smoke event-alpha-evidence-acquisition-smoke event-alpha-quality-frame-live-smoke event-alpha-frame-quality-loop event-alpha-signal-quality-eval event-alpha-quality-review event-alpha-quality-coverage-report event-alpha-quality-validation-cycle event-alpha-notify-llm-quality-validation-cycle event-alpha-notify-llm-quality-fresh-cycle event-alpha-quality-live-smoke event-alpha-live-burn-in-no-send event-alpha-burn-in-readiness event-alpha-policy-simulate event-alpha-export-signal-quality-cases event-alpha-quality-loop event-alpha-quality-loop-llm event-opportunity-audit event-alpha-no-key-report event-catalyst-search-fixture-report event-alpha-cycle event-alpha-cycle-llm event-alpha-cycle-search event-alpha-cycle-search-llm event-alpha-cycle-send event-alpha-cycle-profile event-alpha-cycle-profile-send event-alpha-notify-cycle event-alpha-notify-no-key event-alpha-notify-llm event-alpha-notify-preview event-alpha-notify-go-no-go event-alpha-send-go-no-go event-alpha-telegram-no-send-final-check-fast event-alpha-telegram-no-send-final-check event-alpha-telegram-send-readiness-final event-alpha-telegram-final-send-checklist event-alpha-environment-doctor event-alpha-pause-notifications event-alpha-resume-notifications event-alpha-scheduler-status event-alpha-generate-launchd event-alpha-notification-slo-report event-alpha-export-notification-pack event-alpha-notification-checklist event-alpha-send-readiness event-alpha-notification-runs-report event-alpha-notification-inbox event-alpha-notification-deliveries-report event-alpha-notification-retry-failed event-alpha-notify-no-key-scheduled event-alpha-notify-llm-scheduled event-alpha-notify-llm-deep-scheduled event-alpha-notify-llm-quality-scheduled event-alpha-provider-health-report event-alpha-provider-health-reset event-alpha-day1-start event-alpha-day1-start-llm event-alpha-notify-fixture-smoke event-alpha-notification-format-smoke event-alpha-notify-llm-deep-no-send-smoke event-alpha-notify-llm-deep-fixture-rehearsal-artifacts event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-with-fixture-candidate event-alpha-notify-llm-deep-real-no-send-rehearsal-fast event-alpha-notify-start-no-key event-alpha-notify-start-llm event-alpha-send-test event-alpha-telegram-recipient-check event-alpha-runs-report event-alpha-status event-alpha-preflight event-alpha-daily-report event-alpha-daily-llm-report event-alpha-daily-send event-alpha-health event-alpha-health-guard event-alpha-artifact-doctor event-alpha-v1-readiness event-alpha-tuning-worksheet event-alpha-export-burn-in-pack event-alpha-launchd-template event-alpha-open-items event-alpha-daily-brief event-alpha-prune-artifacts event-alpha-replay event-alpha-priors-shadow-report event-alpha-burn-in-no-key event-alpha-burn-in-llm event-alpha-weekly-review event-alpha-burn-in-scorecard event-alpha-burn-in-checklist event-alpha-feedback-readiness event-feedback-useful event-feedback-junk event-feedback-watch event-alpha-alerts-report event-alpha-fill-outcomes event-watchlist-refresh event-watchlist-report event-watchlist-monitor event-alpha-router-report event-alpha-missed-report event-alpha-near-miss-report event-alpha-calibration-report event-source-reliability-report event-alpha-calibration-export-priors event-alpha-export-eval-cases event-alpha-explain-last-run event-research-cards event-research-cards-write event-feedback-report event-incidents-report event-alert-no-key-report event-alert-no-key-llm-report event-alert-no-key-send event-fade-auto-report event-fade-export-sample event-fade-export-cache-sample event-fade-review-sample event-fade-labeling-queue event-fade-review-packet event-fade-export-review-template event-fade-apply-review-template event-fade-check-review-template event-fade-check-review-bundle event-fade-apply-review-bundle event-fade-review-applied-bundle event-fade-fill-review-bundle-outcomes event-fade-review-bundle event-fade-cache-review-bundle event-fade-review-cycle event-fade-configured-review-cycle event-fade-public-rss-review-cycle event-fade-gdelt-review-cycle event-fade-polymarket-review-cycle event-fade-no-key-review-cycle event-fade-merge-sample event-fade-export-outcome-prices event-fade-fill-outcomes status backup-db verify-restore maintenance rotate-logs launchd-status install-maintenance-agent restart-listener universe-audit refresh-universe-audit dry-run dry-run-fixture
 
 help:
 	@echo "Targets:"
@@ -171,8 +171,9 @@ help:
 	@echo "  make event-alpha-notification-checklist PROFILE=notify_no_key  Check preview/send readiness without sending"
 	@echo "  make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal  Final artifact gate before enabling Event Alpha Telegram sends"
 	@echo "  make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal  Final artifact-backed send go/no-go report"
-	@echo "  make event-alpha-telegram-no-send-final-check-fast  Fast deterministic fixture final check; no live providers or Telegram sends"
-	@echo "  make event-alpha-telegram-send-readiness-final PROFILE=notify_llm_deep_fixture_rehearsal  Read-only final trust check for an existing namespace"
+	@echo "  make event-alpha-telegram-no-send-final-check-fast  Fast deterministic fixture final check with compact output; no live providers or Telegram sends"
+	@echo "  make event-alpha-telegram-send-readiness-final PROFILE=notify_llm_deep_fixture_rehearsal  Compact read-only final trust check for an existing namespace"
+	@echo "  make event-alpha-telegram-final-send-checklist PROFILE=notify_llm_deep_rehearsal  Print compact final-send checklist without sending"
 	@echo "  make event-alpha-telegram-no-send-final-check PROFILE=notify_llm_deep_rehearsal  Full real-profile no-send rehearsal; may call live providers and take several minutes"
 	@echo "  make event-alpha-notify-no-key  Run day-1 no-key notification burn-in; sends only with RSI_EVENT_ALERTS_ENABLED=1"
 	@echo "  make event-alpha-notify-llm  Run day-1 LLM notification burn-in; sends only with RSI_EVENT_ALERTS_ENABLED=1"
@@ -932,7 +933,7 @@ event-alpha-notify-llm-deep-no-send-smoke:
 	$(PYTHON) main.py --event-alpha-notification-deliveries-report --event-alpha-profile fixture --event-alpha-artifact-namespace notify_llm_deep_no_send_smoke
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile fixture --event-alpha-artifact-namespace notify_llm_deep_no_send_smoke --event-alpha-include-test-artifacts
 
-event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate:
+event-alpha-notify-llm-deep-fixture-rehearsal-artifacts:
 	rm -rf $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_fixture_rehearsal
 	env $(EVENT_FIXTURE_NOW_ENV) \
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
@@ -940,6 +941,8 @@ event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate:
 	RSI_EVENT_ALPHA_NOTIFY_FIXTURE_PROFILE=notify_llm_deep \
 	RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND=1 \
 	$(PYTHON) main.py --event-alpha-notify-fixture-smoke
+
+event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate: event-alpha-notify-llm-deep-fixture-rehearsal-artifacts
 	$(PYTHON) main.py --event-alpha-notification-deliveries-report --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict --event-alpha-artifact-doctor-delivery-scope latest_run
 	RSI_EVENT_ALERTS_ENABLED=0 \
@@ -1026,32 +1029,39 @@ event-alpha-send-go-no-go:
 
 event-alpha-telegram-send-readiness-final: PROFILE = notify_llm_deep_fixture_rehearsal
 event-alpha-telegram-send-readiness-final:
-	@tmp=$$(mktemp); \
-	trap 'rm -f "$$tmp"' EXIT; \
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
 	$(if $(filter notify_llm_deep_rehearsal notify_llm_deep_no_send_smoke notify_llm_deep_fixture_rehearsal,$(PROFILE)),RSI_EVENT_ALERTS_ENABLED=0,) \
-	$(PYTHON) main.py --event-alpha-notify-go-no-go --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) | tee "$$tmp"; \
-	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
-	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) --event-alpha-artifact-doctor-strict --event-alpha-artifact-doctor-delivery-scope latest_run; \
-	preview=$$(sed -n 's/^notification_preview_path_resolved: //p' "$$tmp" | tail -1); \
-	recommendation=$$(sed -n 's/^final_recommendation: //p' "$$tmp" | tail -1); \
-	echo "Notification preview: $$preview"; \
-	echo "Final recommendation: $$recommendation"; \
-	if [ "$$recommendation" = "NOT_READY" ] || [ -z "$$recommendation" ]; then exit 1; fi
+	$(PYTHON) main.py --event-alpha-telegram-final-check --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
 
 event-alpha-telegram-no-send-final-check-fast:
-	@echo "Fast deterministic Event Alpha final check: fixture candidates only; no live providers; no Telegram sends."
-	$(MAKE) event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate PYTHON=$(PYTHON) EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR)
-	$(MAKE) event-alpha-send-go-no-go PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=$(PYTHON)
-	$(MAKE) event-alpha-artifact-doctor PROFILE=notify_llm_deep_fixture_rehearsal STRICT=1 EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE=latest_run PYTHON=$(PYTHON)
-	$(MAKE) event-alpha-notification-inbox PROFILE=notify_llm_deep_fixture_rehearsal BURN_IN_REVIEW=1 PYTHON=$(PYTHON)
-	$(MAKE) event-alpha-daily-brief PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=$(PYTHON)
-	$(MAKE) event-alpha-telegram-send-readiness-final PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=$(PYTHON)
-	@echo "Notification preview: $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_fixture_rehearsal/event_alpha_notification_preview.md"
-	@$(PYTHON) -c 'import json, pathlib; p=pathlib.Path("$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_fixture_rehearsal/event_core_opportunities.jsonl"); ids=[]; [ids.append(json.loads(line).get("core_opportunity_id")) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()] if p.exists() else None; ids=[i for i in ids if i]; print("Core IDs included: " + (", ".join(ids[:12]) + (f" (+{len(ids)-12} more)" if len(ids) > 12 else "") if ids else "none"))'
-	@echo "No Telegram send occurred; this target forces deterministic no-send fixture artifacts."
+	@tmp=$$(mktemp -d); \
+	trap 'rm -rf "$$tmp"' EXIT; \
+	echo "Fast deterministic Event Alpha final check: fixture candidates only; no live providers; no Telegram sends."; \
+	rm -rf $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_fixture_rehearsal; \
+	env $(EVENT_FIXTURE_NOW_ENV) \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_fixture_rehearsal \
+	RSI_EVENT_ALPHA_NOTIFY_FIXTURE_PROFILE=notify_llm_deep \
+	RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND=1 \
+	$(PYTHON) main.py --event-alpha-notify-fixture-smoke > "$$tmp/rehearsal.out" 2>&1 || { echo "fixture rehearsal failed; captured output:"; cat "$$tmp/rehearsal.out"; exit 1; }; \
+	$(PYTHON) main.py --event-alpha-notification-inbox --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal --event-alpha-burn-in-review > "$$tmp/inbox.out" 2>&1 || { echo "burn-in inbox failed; captured output:"; cat "$$tmp/inbox.out"; exit 1; }; \
+	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal --event-alpha-include-test-artifacts > "$$tmp/daily_brief.out" 2>&1 || { echo "daily brief failed; captured output:"; cat "$$tmp/daily_brief.out"; exit 1; }; \
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_fixture_rehearsal \
+	RSI_EVENT_ALERTS_ENABLED=0 \
+	$(PYTHON) main.py --event-alpha-telegram-final-check --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal --event-alpha-include-test-artifacts
+
+event-alpha-telegram-final-send-checklist: PROFILE = notify_llm_deep_rehearsal
+event-alpha-telegram-final-send-checklist:
+	@echo "Event Alpha Telegram final-send checklist (no send is performed)."
+	@echo "1. no-send rehearsal: make event-alpha-telegram-no-send-final-check PROFILE=$(PROFILE) PYTHON=$(PYTHON)"
+	@echo "2. inspect preview: make event-alpha-notify-preview PROFILE=$(PROFILE) PYTHON=$(PYTHON)"
+	@echo "3. real send, if approved: RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-llm-deep-scheduled PYTHON=$(PYTHON)"
+	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
+	$(if $(filter notify_llm_deep_rehearsal notify_llm_deep_no_send_smoke notify_llm_deep_fixture_rehearsal,$(PROFILE)),RSI_EVENT_ALERTS_ENABLED=0,) \
+	$(PYTHON) main.py --event-alpha-telegram-final-check --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
 
 event-alpha-telegram-no-send-final-check: PROFILE = notify_llm_deep_rehearsal
 event-alpha-telegram-no-send-final-check:

@@ -23,14 +23,19 @@ operator should first run the deterministic fixture final check
 `make event-alpha-telegram-no-send-final-check-fast`. It must use the
 `notify_llm_deep_fixture_rehearsal` namespace, avoid live providers, avoid
 Telegram sends, and prove canonical delivery identity with VELVET/AAVE would-send
-fixture rows plus rejected weak controls. The optional full live-provider
-rehearsal remains separate under `notify_llm_deep_rehearsal`; it may call live
-providers, take several minutes, and should pass
-`make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal` plus
-`make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal` before real
-sends. `make event-alpha-telegram-send-readiness-final PROFILE=<namespace>` is a
-read-only trust target for existing artifacts: it prints the resolved preview
-path, strict doctor status, and final recommendation, then fails on `NOT_READY`.
+fixture rows plus rejected weak controls. The fast target must not call
+recursive Make; it should rebuild fixture artifacts directly, capture noisy
+support-report output, and print the compact
+`main.py --event-alpha-telegram-final-check` result only. The optional full
+live-provider rehearsal remains separate under `notify_llm_deep_rehearsal`; it
+may call live providers, take several minutes, and should pass
+`make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal` plus a
+compact final check before real sends.
+`make event-alpha-telegram-send-readiness-final PROFILE=<namespace>` and
+`make event-alpha-telegram-final-send-checklist PROFILE=<namespace>` are
+read-only trust targets for existing artifacts: they print the compact final
+status, resolved preview path, strict doctor status, would-send lanes, core ids,
+send count, provider summary, and next commands, then fail on `NOT_READY`.
 Notification heartbeat/no-digest previews must summarize the latest run ledger
 and canonical core store rather than independent defaults, including completed
 status, raw events, extraction rows, core opportunities, alertable final routes,

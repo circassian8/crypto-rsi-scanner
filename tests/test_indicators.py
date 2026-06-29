@@ -28076,10 +28076,12 @@ def test_event_alpha_notification_go_no_go_reports_send_blockers():
 
 
 def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recommendation():
+    from dataclasses import replace
     from types import SimpleNamespace
     from pathlib import Path
     from crypto_rsi_scanner import event_alpha_notification_delivery as delivery
     from crypto_rsi_scanner import event_alpha_notification_go_no_go as go
+    from crypto_rsi_scanner import event_alpha_telegram_final_check as final_check
 
     with TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
@@ -28136,6 +28138,61 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
         assert "notification_preview_path_source: relpath" in text
         assert "would_send_lanes: daily_digest" in text
         assert "canonical_delivery_identity: yes" in text
+        final = final_check.build_final_check(
+            go_no_go_result=no_send,
+            doctor_status="OK",
+            delivery_rows=[row],
+            core_rows=[
+                {
+                    "run_id": "run-1",
+                    "core_opportunity_id": "agg:velvet",
+                    "final_route_after_quality_gate": "RESEARCH_DIGEST",
+                }
+            ],
+        )
+        compact = final_check.format_final_check(final)
+        assert final.status == go.RECOMMEND_READY_NO_SEND_REVIEW
+        assert final.preview_path == str(preview_path)
+        assert final.sends_performed == 0
+        assert final.core_ids == ("agg:velvet",)
+        assert "Final Telegram no-send check:" in compact
+        assert "- status: READY_FOR_NO_SEND_REVIEW" in compact
+        assert "- would-send lanes: daily_digest" in compact
+        assert "- sends performed: 0" in compact
+        assert "EVENT ALPHA NOTIFICATION GO/NO-GO" not in compact
+        blocked = final_check.build_final_check(
+            go_no_go_result=no_send,
+            doctor_status="BLOCKED",
+            doctor_blockers=("strict artifact doctor has blockers",),
+            delivery_rows=[row],
+            core_rows=[],
+        )
+        assert blocked.status == go.RECOMMEND_NOT_READY
+        assert any("strict artifact doctor" in item for item in blocked.blockers)
+        missing_preview = final_check.build_final_check(
+            go_no_go_result=replace(no_send, notification_preview_exists=False),
+            doctor_status="OK",
+            delivery_rows=[row],
+            core_rows=[],
+        )
+        assert missing_preview.status == go.RECOMMEND_NOT_READY
+        assert any("preview is missing" in item for item in missing_preview.blockers)
+        identity_mismatch = final_check.build_final_check(
+            go_no_go_result=replace(no_send, canonical_delivery_identity=False),
+            doctor_status="OK",
+            delivery_rows=[row],
+            core_rows=[],
+        )
+        assert identity_mismatch.status == go.RECOMMEND_NOT_READY
+        assert any("canonical core identity" in item for item in identity_mismatch.blockers)
+        rejected_selected = final_check.build_final_check(
+            go_no_go_result=replace(no_send, rejected_or_unconfirmed_selected=True),
+            doctor_status="OK",
+            delivery_rows=[row],
+            core_rows=[],
+        )
+        assert rejected_selected.status == go.RECOMMEND_NOT_READY
+        assert any("rejected-only or unconfirmed" in item for item in rejected_selected.blockers)
         stale_text = go.format_go_no_go(
             go.build_go_no_go(
                 profile="notify_llm_deep",
@@ -28165,6 +28222,40 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
             )
         )
         assert "pre-canonical notification delivery rows" in stale_text
+        stale_go = go.build_go_no_go(
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            telegram_ready=False,
+            send_guard_enabled=False,
+            lock_status=SimpleNamespace(state="missing", message="no lock"),
+            provider_status=provider_status,
+            provider_health_rows={},
+            delivery_ledger_path=tmp_path / "deliveries.jsonl",
+            notification_run_ledger_path=tmp_path / "runs.jsonl",
+            research_cards_dir=tmp_path / "cards",
+            artifact_doctor_status="OK",
+            cooldown_status={},
+            llm_budget_status="provider=openai max_run=200",
+            clock_status={"now": "2026-06-20T12:00:00Z", "warnings": ()},
+            send_readiness=readiness,
+            delivery_rows=[row],
+            delivery_history_rows=[
+                {
+                    "run_id": "old-run",
+                    "lane": "daily_digest",
+                    "identity_reconciliation_reason": "source_alert_identity_legacy",
+                },
+                row,
+            ],
+        )
+        stale_final = final_check.build_final_check(
+            go_no_go_result=stale_go,
+            doctor_status="OK",
+            delivery_rows=[row],
+            core_rows=[],
+        )
+        assert stale_final.status == go.RECOMMEND_NOT_READY
+        assert any("stale pre-canonical" in item for item in stale_final.blockers)
         fresh_text = go.format_go_no_go(
             go.build_go_no_go(
                 profile="notify_llm_deep",
@@ -28238,9 +28329,10 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
 
     root = Path(__file__).resolve().parents[1]
     makefile = (root / "Makefile").read_text(encoding="utf-8")
-    assert "Fast deterministic fixture final check" in makefile
+    assert "Fast deterministic fixture final check with compact output" in makefile
     assert "Full real-profile no-send rehearsal" in makefile
     assert "Startup send commands after review" in makefile
+    assert "event-alpha-telegram-final-send-checklist" in makefile
 
     readiness = subprocess.run(
         ["make", "-n", "event-alpha-send-readiness", "PROFILE=notify_llm_deep_rehearsal", "PYTHON=python3"],
@@ -28337,13 +28429,19 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
         check=True,
     ).stdout
     assert "Fast deterministic Event Alpha final check" in fast_final
-    assert "event-alpha-notify-llm-deep-rehearsal-with-fixture-candidate" in fast_final
-    assert "PROFILE=notify_llm_deep_fixture_rehearsal" in fast_final
-    assert "event-alpha-telegram-send-readiness-final PROFILE=notify_llm_deep_fixture_rehearsal" in fast_final
+    assert "main.py --event-alpha-notify-fixture-smoke" in fast_final
+    assert "RSI_EVENT_ALPHA_NOTIFY_FIXTURE_PROFILE=notify_llm_deep" in fast_final
+    assert "event-alpha-notify-llm-deep-fixture-rehearsal-artifacts" not in fast_final
+    assert "$(MAKE)" not in fast_final
+    assert "main.py --event-alpha-notification-inbox" in fast_final
+    assert "main.py --event-alpha-daily-brief" in fast_final
+    assert "main.py --event-alpha-telegram-final-check" in fast_final
+    assert "--event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal" in fast_final
     assert "main.py --event-alpha-notify-cycle" not in fast_final
+    assert "event-alpha-send-go-no-go" not in fast_final
+    assert "event-alpha-telegram-send-readiness-final" not in fast_final
     assert "GDELT" not in fast_final
     assert "CryptoPanic" not in fast_final
-    assert "No Telegram send occurred" in fast_final
 
     trust_target = subprocess.run(
         ["make", "-n", "event-alpha-telegram-send-readiness-final", "PROFILE=notify_llm_deep_fixture_rehearsal", "PYTHON=python3"],
@@ -28352,11 +28450,24 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
         text=True,
         check=True,
     ).stdout
-    assert "main.py --event-alpha-notify-go-no-go" in trust_target
-    assert "main.py --event-alpha-artifact-doctor" in trust_target
-    assert "--event-alpha-artifact-doctor-strict" in trust_target
-    assert "Final recommendation:" in trust_target
+    assert "main.py --event-alpha-telegram-final-check" in trust_target
+    assert "--event-alpha-profile notify_llm_deep" in trust_target
+    assert "--event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal" in trust_target
+    assert "--event-alpha-include-test-artifacts" in trust_target
     assert "main.py --event-alpha-notify-cycle" not in trust_target
+
+    checklist = subprocess.run(
+        ["make", "-n", "event-alpha-telegram-final-send-checklist", "PROFILE=notify_llm_deep_rehearsal", "PYTHON=python3"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    assert "Event Alpha Telegram final-send checklist" in checklist
+    assert "make event-alpha-telegram-no-send-final-check PROFILE=notify_llm_deep_rehearsal" in checklist
+    assert "RSI_EVENT_ALERTS_ENABLED=1 make event-alpha-notify-llm-deep-scheduled" in checklist
+    assert "main.py --event-alpha-telegram-final-check" in checklist
+    assert "main.py --event-alpha-notify-cycle" not in checklist
 
 
 def test_event_alpha_notification_run_summary_flows_to_runs_doctor_and_brief():

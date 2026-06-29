@@ -23,23 +23,36 @@ in provider-failure environments. Operators need a fast deterministic last
 check for formatting, canonical identity, preview path, and send-readiness
 without touching live providers.
 **Changes:**
-- Added `make event-alpha-telegram-no-send-final-check-fast`, which rebuilds
-  the deterministic `notify_llm_deep_fixture_rehearsal` namespace, runs
-  go/no-go, strict artifact doctor, compact inbox, daily brief, and final
-  readiness trust checks, then prints the preview path, core ids, and a no-send
-  reminder.
-- Added `make event-alpha-telegram-send-readiness-final` as a read-only
-  namespace trust gate that prints go/no-go, strict doctor, resolved preview
-  path, and final recommendation, and fails on `NOT_READY`.
+- Added `event_alpha_telegram_final_check.py` and
+  `main.py --event-alpha-telegram-final-check`, a compact read-only final
+  Telegram gate built from existing run, delivery, core, doctor, readiness, and
+  go/no-go artifacts.
+- Reworked `make event-alpha-telegram-no-send-final-check-fast` so it no longer
+  uses recursive Make. It rebuilds deterministic
+  `notify_llm_deep_fixture_rehearsal` artifacts, captures noisy report output,
+  then prints only the compact final check: status, preview path, strict doctor
+  status, would-send lanes, core ids, send count, provider summary, and next
+  commands.
+- Added `make event-alpha-telegram-send-readiness-final` and
+  `make event-alpha-telegram-final-send-checklist` as read-only compact gates
+  for existing namespaces; both fail through the compact check when the
+  namespace is `NOT_READY`.
 - Go/no-go and artifact doctor now warn explicitly when a namespace contains
   stale pre-canonical notification delivery rows and should not be trusted for
   send-readiness.
 - Updated Make help, runbook, roadmap, and decisions to distinguish the fast
   deterministic check, the slower live-provider no-send rehearsal, and actual
   guarded sends.
-**Verify:** `python3 tests/test_indicators.py`, notification/eval smokes, fast
-final check, evidence/catalyst smoke, and `make verify PYTHON=python3` run after
-this doc update before commit/push.
+**Verify:** `python3 tests/test_indicators.py` (559/559 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-no-send-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-telegram-send-readiness-final PROFILE=notify_llm_deep_fixture_rehearsal PYTHON=python3`;
+`make event-alpha-live-burn-in-no-send PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make verify PYTHON=python3`.
 **Notes/risks:** Research-only notification workflow polish. No Telegram sends
 in tests, no live trading, no paper trading, no normal RSI rows, and no
 LLM/provider path can create `TRIGGERED_FADE`.

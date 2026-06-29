@@ -109,6 +109,7 @@ from . import event_alpha_send_readiness
 from . import event_alpha_signal_quality
 from . import event_alpha_signal_quality_export
 from . import event_alpha_scheduler
+from . import event_alpha_telegram_final_check
 from . import event_alpha_tuning
 from . import event_alpha_telegram_recipient_check
 from . import event_alpha_v1_readiness
@@ -6431,6 +6432,115 @@ def event_alpha_send_readiness_report(
     print(event_alpha_send_readiness.format_send_readiness(result))
 
 
+def event_alpha_telegram_final_check_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+    include_legacy_artifacts: bool = False,
+) -> None:
+    """Print a compact final no-send/send readiness summary for Telegram."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name or "notify_llm_deep",
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        raise SystemExit(1) from exc
+    artifact_namespace = artifact_namespace or context.artifact_namespace
+    profile_name = profile_name or context.profile
+    artifacts = _event_alpha_local_artifacts(run_limit=500, latest_alerts=False)
+    delivery_path = event_alpha_notification_delivery.deliveries_path_for_context(context)
+    delivery_rows = event_alpha_notification_delivery.load_delivery_records(delivery_path)
+    core_rows = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    ).rows
+    card_paths = [str(path) for path in _research_card_markdown_paths(context.research_cards_dir, include_index=True)]
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=artifacts["runs"].rows,
+        alert_rows=artifacts["alerts"].rows,
+        feedback_rows=artifacts["feedback_rows"],
+        outcome_rows=artifacts["outcome_rows"],
+        hypothesis_rows=artifacts["hypotheses"].rows,
+        core_opportunity_rows=core_rows,
+        watchlist_rows=artifacts["watchlist"].entries,
+        incident_rows=artifacts["incidents"].rows,
+        evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
+        card_paths=card_paths,
+        provider_health_rows=artifacts["provider_rows"],
+        llm_budget_rows=artifacts["budget_rows"],
+        delivery_rows=delivery_rows,
+        profile=profile_name,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+        inspected_alert_store_path=context.alert_store_path,
+        strict=True,
+        delivery_strict_scope="latest_run",
+    )
+    readiness = event_alpha_send_readiness.build_send_readiness(
+        profile=profile_name,
+        artifact_namespace=artifact_namespace,
+        run_rows=artifacts["runs"].rows,
+        core_opportunity_rows=core_rows,
+        alert_rows=artifacts["alerts"].rows,
+        delivery_rows=delivery_rows,
+        artifact_doctor=doctor,
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    latest_delivery_rows = [
+        row for row in event_alpha_notification_delivery.latest_rows_by_delivery(delivery_rows)
+        if not readiness.latest_run_id or str(row.get("run_id") or "") == readiness.latest_run_id
+    ]
+    provider_status = event_provider_status.build_event_discovery_provider_status(config)
+    lock_status = event_alpha_run_lock.inspect_run_lock(
+        context,
+        stale_minutes=config.EVENT_ALPHA_NOTIFY_LOCK_STALE_MINUTES,
+    )
+    pause_state = _event_alpha_notification_pause_state(context)
+    go_result = event_alpha_notification_go_no_go.build_go_no_go(
+        profile=profile_name,
+        artifact_namespace=artifact_namespace,
+        telegram_ready=bool(config.TELEGRAM_BOT_TOKEN and config.TELEGRAM_CHAT_IDS),
+        send_guard_enabled=bool(config.EVENT_ALERTS_ENABLED),
+        lock_status=lock_status,
+        provider_status=provider_status,
+        provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
+        delivery_ledger_path=delivery_path,
+        notification_run_ledger_path=context.notification_runs_path,
+        research_cards_dir=context.research_cards_dir,
+        artifact_doctor_status=doctor.status,
+        cooldown_status={},
+        llm_budget_status=_event_alpha_llm_budget_status(),
+        clock_status=_event_clock_status(),
+        notifications_paused=pause_state.paused,
+        pause_reason=pause_state.reason,
+        send_readiness=readiness,
+        delivery_rows=latest_delivery_rows,
+        delivery_history_rows=delivery_rows,
+    )
+    result = event_alpha_telegram_final_check.build_final_check(
+        go_no_go_result=go_result,
+        doctor_status=doctor.status,
+        doctor_blockers=doctor.blockers,
+        doctor_warnings=doctor.warnings,
+        delivery_rows=delivery_rows,
+        core_rows=core_rows,
+    )
+    print(event_alpha_telegram_final_check.format_final_check(result))
+    if result.status == event_alpha_notification_go_no_go.RECOMMEND_NOT_READY:
+        raise SystemExit(1)
+
+
 def event_alpha_tuning_worksheet_report(
     verbose: bool = False,
     *,
@@ -9097,6 +9207,11 @@ def cli() -> None:
         help="Check latest notification rehearsal artifacts before enabling real Event Alpha Telegram sends.",
     )
     parser.add_argument(
+        "--event-alpha-telegram-final-check",
+        action="store_true",
+        help="Print compact final Event Alpha Telegram no-send/readiness result from existing artifacts.",
+    )
+    parser.add_argument(
         "--event-alpha-send-test",
         action="store_true",
         help="Send one guarded research-only Event Alpha heartbeat without running providers.",
@@ -9998,6 +10113,15 @@ def cli() -> None:
         return
     if args.event_alpha_send_readiness:
         event_alpha_send_readiness_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+            include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+        )
+        return
+    if args.event_alpha_telegram_final_check:
+        event_alpha_telegram_final_check_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,
