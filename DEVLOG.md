@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-29 — Add Event Alpha source coverage dashboard · Codex
+**Why:** Live/rehearsal runs can stay quiet because source-pack evidence is
+missing, degraded, skipped by budget, or rejected. Operators needed one
+research-only view that answers which provider/source pack would most improve
+the next run without weakening alert gates.
+**Changes:**
+- Added `event_alpha_source_coverage.py`, a read-only source-pack dashboard
+  that combines provider readiness, provider health, evidence-acquisition rows,
+  and canonical core rows into configured/missing/healthy/degraded provider
+  coverage, non-confirming acquisition outcomes, meaningful-absence flags, and
+  candidate coverage blockers.
+- Added `main.py --event-alpha-source-coverage-report` and
+  `make event-alpha-source-coverage-report PROFILE=...`.
+- Added daily-brief copy that names the data source most likely to improve the
+  next run, plus source-pack vocabulary for CoinGecko/DefiLlama market and
+  protocol metrics. DefiLlama is treated as market-confirmation evidence, not
+  impact-path validation.
+- Added offline tests for the coverage report, Make target, and DefiLlama source
+  registry semantics.
+**Verify:** `python3 tests/test_indicators.py` (563/563 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep_rehearsal
+PYTHON=python3`; `make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Research-only. The report does not send, trade, paper trade,
+write normal RSI rows, promote candidates, or create `TRIGGERED_FADE`.
+
 ## 2026-06-29 — Add Event Alpha research-review digest lane · Codex
 **Why:** During notification burn-in, strict alert lanes can correctly send only
 a heartbeat even when there are useful near-miss candidates worth operator

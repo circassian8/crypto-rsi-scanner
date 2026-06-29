@@ -176,7 +176,19 @@ _SUPPLY_HINTS = ("etherscan", "arkham", "dune", "tokenomist")
 _CRYPTO_NEWS_HINTS = ("coindesk", "cointelegraph", "decrypt", "theblock", "blockworks", "cryptoslate")
 _SEO_HINTS = ("price prediction", "coupon", "invite code", "best crypto to buy", "sponsored")
 _MARKET_RECAP_HINTS = ("market recap", "daily recap", "weekly recap", "top gainers", "crypto prices today")
-_MARKET_DATA_HINTS = ("coingecko", "coinmarketcap", "ohlcv", "klines", "price snapshot", "market data")
+_MARKET_DATA_HINTS = (
+    "coingecko",
+    "coinmarketcap",
+    "defillama",
+    "tvl",
+    "protocol fees",
+    "protocol revenue",
+    "dex volume",
+    "ohlcv",
+    "klines",
+    "price snapshot",
+    "market data",
+)
 
 _PLAYBOOKS_BY_SOURCE_CLASS: dict[str, tuple[str, ...]] = {
     SourceClass.OFFICIAL_PROJECT.value: (

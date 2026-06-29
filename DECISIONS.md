@@ -16,6 +16,27 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-29 - Source coverage reports diagnose gaps, not eligibility
+**Status:** accepted
+**Decision:** Event Alpha source coverage reports may combine provider
+readiness, provider health, source-pack definitions, evidence-acquisition
+outcomes, and canonical core rows to show which source pack or provider is
+missing, degraded, budget-skipped, rejected-only, or otherwise not confirming.
+These reports and daily-brief recommendations are operator diagnostics only.
+They cannot validate a candidate, promote an opportunity, loosen live
+confirmation requirements, create `TRIGGERED_FADE`, send Telegram, write normal
+RSI rows, paper trade, or imply execution. Market/protocol metric sources such
+as CoinGecko and DefiLlama may support market confirmation or source-pack
+coverage vocabulary, but they do not by themselves prove catalyst impact-path
+validation or official confirmation.
+**Why:** Live burn-in needs to explain why useful-looking rows remain local or
+near-miss, and which source would most improve the next run. That explanation
+must not become an implicit bypass around strict source, identity, impact-path,
+market, and route gates.
+**Revisit when:** Source coverage moves from JSONL/report artifacts into a
+typed provider job system with reviewed source-reliability priors and explicit
+promotion rules.
+
 ## 2026-06-29 - Keep research-review notifications separate from alert lanes
 **Status:** accepted
 **Decision:** Event Alpha may send a separate `research_review_digest` lane for

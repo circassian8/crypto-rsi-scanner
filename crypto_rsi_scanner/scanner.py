@@ -108,6 +108,7 @@ from . import event_alpha_quality_coverage
 from . import event_alpha_send_readiness
 from . import event_alpha_signal_quality
 from . import event_alpha_signal_quality_export
+from . import event_alpha_source_coverage
 from . import event_alpha_scheduler
 from . import event_alpha_telegram_final_check
 from . import event_alpha_tuning
@@ -4435,6 +4436,39 @@ def event_alpha_provider_health_report(
     print(_event_alpha_context_block(context))
     print(f"provider_health_path: {context.provider_health_path}")
     print(event_provider_health.format_provider_health_report(rows))
+
+
+def event_alpha_source_coverage_report(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print source-pack coverage for Event Alpha research artifacts."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "no_key_live", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    provider_report = event_provider_status.build_event_discovery_provider_status(config)
+    provider_rows = event_provider_health.load_provider_health(context.provider_health_path)
+    acquisition_rows = event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path)
+    core_rows = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    ).rows
+    report = event_alpha_source_coverage.build_source_coverage_report(
+        provider_status_report=provider_report,
+        provider_health_rows=provider_rows,
+        evidence_acquisition_rows=acquisition_rows,
+        core_opportunity_rows=core_rows,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    )
+    print(_event_alpha_context_block(context))
+    print(event_alpha_source_coverage.format_source_coverage_report(report))
 
 
 def event_alpha_provider_health_reset(
@@ -9376,6 +9410,11 @@ def cli() -> None:
         help="Print profile-scoped Event Alpha provider health/backoff rows.",
     )
     parser.add_argument(
+        "--event-alpha-source-coverage-report",
+        action="store_true",
+        help="Print source-pack provider/evidence coverage for Event Alpha research artifacts.",
+    )
+    parser.add_argument(
         "--event-alpha-provider-health-reset",
         action="store_true",
         help="Clear selected profile-scoped provider health backoff state. Requires --confirm.",
@@ -10296,6 +10335,13 @@ def cli() -> None:
         return
     if args.event_alpha_provider_health_report:
         event_alpha_provider_health_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_source_coverage_report:
+        event_alpha_source_coverage_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,

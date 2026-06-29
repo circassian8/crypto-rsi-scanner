@@ -47,6 +47,24 @@ and source-pack sufficiency booleans. Treat these rows as audit evidence; they
 can improve a local research verdict only after deterministic identity,
 catalyst-link, impact-path, source-quality, and quality-gate checks pass.
 
+Use the source coverage dashboard when a run produces few or no strict
+research-alert decisions and you need to see whether the blocker is missing
+CryptoPanic/exchange/calendar/unlock/derivatives/market evidence, provider
+backoff, budget skipping, or rejected-only acquisition results:
+
+```bash
+make event-alpha-source-coverage-report PROFILE=notify_llm_deep_rehearsal PYTHON=python3
+make event-alpha-source-coverage-report PROFILE=notify_llm_deep PYTHON=python3
+```
+
+The dashboard is read-only. It reports configured, missing, healthy, and
+degraded providers by source pack; accepted/rejected/skipped acquisition
+outcomes; whether evidence absence is meaningful; and the provider/source pack
+most likely to improve the next run. Treat CoinGecko and DefiLlama-style rows as
+market/protocol metric evidence only: they can support market confirmation or
+source coverage, but they do not prove official confirmation or catalyst
+impact-path validation by themselves.
+
 The operator-facing opportunity spine is the canonical CoreOpportunity view.
 When `event_core_opportunities.jsonl` exists, cards and audits should read the
 stored core row plus its linked support rows, diagnostic/control rows,

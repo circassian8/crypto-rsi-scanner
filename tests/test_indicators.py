@@ -564,6 +564,103 @@ def test_event_provider_status_formats_burn_in_readiness_summary_and_pack_gaps()
     assert "api_token=missing" in text
 
 
+def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_gaps():
+    from crypto_rsi_scanner import event_alpha_source_coverage
+
+    cfg = _event_provider_status_cfg(
+        EVENT_DISCOVERY_GDELT_LIVE=True,
+        EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=True,
+        EVENT_DISCOVERY_PROJECT_BLOG_RSS_URLS=("https://example.test/rss",),
+        EVENT_DISCOVERY_UNIVERSE_LIVE=True,
+    )
+    provider_report = event_provider_status.build_event_discovery_provider_status(cfg)
+    provider_health_rows = {
+        "gdelt:event_source": {
+            "provider_service": "gdelt",
+            "provider_role": "event_source",
+            "consecutive_failures": 2,
+        },
+        "rss:catalyst_search": {
+            "provider_service": "rss",
+            "provider_role": "catalyst_search",
+            "consecutive_failures": 1,
+        },
+        "coingecko:universe": {
+            "provider_service": "coingecko",
+            "provider_role": "universe",
+            "consecutive_failures": 0,
+        },
+    }
+    acquisition_rows = [
+        {
+            "source_pack": "proxy_preipo_rwa_pack",
+            "status": "skipped_budget",
+            "symbol": "VELVET",
+        },
+        {
+            "source_pack": "security_shock_pack",
+            "status": "accepted_evidence_found",
+            "symbol": "RUNE",
+            "accepted_evidence": [{"title": "RUNE exploit update"}],
+        },
+        {
+            "source_pack": "listing_liquidity_pack",
+            "status": "rejected_results_only",
+            "symbol": "TEST",
+        },
+        {
+            "source_pack": "perp_listing_squeeze_pack",
+            "status": "provider_unavailable",
+            "symbol": "PERP",
+        },
+    ]
+    core_rows = [
+        {
+            "source_pack": "proxy_preipo_rwa_pack",
+            "symbol": "VELVET",
+            "live_confirmation_reason": "source_pack_confirmation_missing",
+        },
+    ]
+
+    report = event_alpha_source_coverage.build_source_coverage_report(
+        provider_status_report=provider_report,
+        provider_health_rows=provider_health_rows,
+        evidence_acquisition_rows=acquisition_rows,
+        core_opportunity_rows=core_rows,
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep",
+    )
+    by_pack = {pack.source_pack: pack for pack in report.packs}
+    proxy = by_pack["proxy_preipo_rwa_pack"]
+    security = by_pack["security_shock_pack"]
+    listing = by_pack["listing_liquidity_pack"]
+    market = by_pack["market_anomaly_pack"]
+    perp = by_pack["perp_listing_squeeze_pack"]
+
+    assert "cryptopanic" in proxy.missing_providers
+    assert "gdelt" in proxy.degraded_or_backoff_providers
+    assert "project_blog_rss" in proxy.degraded_or_backoff_providers
+    assert proxy.evidence_absence_meaningful is False
+    assert proxy.skipped_budget_count == 1
+    assert proxy.candidates_blocked_by_coverage_gap == 2
+    assert security.accepted_evidence_count == 1
+    assert "cryptopanic" in security.missing_providers
+    assert listing.rejected_only_count == 1
+    assert perp.provider_unavailable_count == 1
+    assert "coingecko" in market.healthy_providers
+    assert "defillama" in market.missing_providers
+    assert market.evidence_absence_meaningful is True
+
+    text = event_alpha_source_coverage.format_source_coverage_report(report)
+    assert "EVENT ALPHA SOURCE COVERAGE" in text
+    assert "proxy_preipo_rwa_pack" in text
+    assert "missing providers: cryptopanic" in text
+    assert "evidence absence meaningful: false" in text
+    assert "accepted=1" in text
+    assert "Most useful next data source:" in text
+    assert "No alerts, sends, trades" in text
+
+
 def test_config_load_url_list_dedupes_comments_and_inline_notes():
     import tempfile
     from pathlib import Path
@@ -22748,6 +22845,7 @@ def test_makefile_has_event_alpha_burn_in_and_priors_targets():
     text = __import__("pathlib").Path("Makefile").read_text(encoding="utf-8")
     assert "event-alpha-priors-shadow-report:" in text
     assert "event-alpha-burn-in-no-key:" in text
+    assert "event-alpha-source-coverage-report:" in text
     assert "event-alpha-burn-in-llm:" in text
     assert "event-alpha-burn-in-scorecard:" in text
     assert "event-alpha-burn-in-checklist:" in text
@@ -29526,6 +29624,14 @@ def test_event_source_registry_v2_provider_semantics():
     assert market_data.source_mission == "market_confirmation"
     assert "market_confirmation" in market_data.can_prove
     assert "impact_path_validation" in market_data.cannot_prove
+    defillama = event_source_registry.assess_source(
+        {"provider": "defillama", "title": "AAVE TVL and protocol fees snapshot"},
+        symbol="AAVE",
+        coin_id="aave",
+    )
+    assert defillama.source_class == "market_data"
+    assert "market_confirmation" in defillama.can_prove
+    assert "impact_path_validation" in defillama.cannot_prove
 
     seo = event_source_registry.assess_source(
         {"provider": "rss", "title": "Best crypto to buy price prediction market recap"},

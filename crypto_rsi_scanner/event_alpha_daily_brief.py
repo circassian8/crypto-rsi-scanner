@@ -947,6 +947,7 @@ def _source_coverage_summary_lines(
         1 for row in executed_rows
         if str(row.get("status") or "") == event_evidence_acquisition.EvidenceAcquisitionStatus.REJECTED_RESULTS_ONLY.value
     )
+    next_source = _source_coverage_next_source(gaps, executed_rows)
     return [
         f"- Source registry: {summary}",
         (
@@ -961,8 +962,39 @@ def _source_coverage_summary_lines(
             f"rejected_only={rejected_only}"
         ),
         f"- Source coverage gaps: {len(gaps)} candidate(s) need healthier or more specific source coverage.",
+        f"- What data source would most improve next run: {next_source}",
         "- Evidence absence rule: broad/degraded RSS/GDELT/Polymarket gaps are not treated as strong negative proof.",
     ]
+
+
+def _source_coverage_next_source(
+    gaps: Iterable[event_near_miss.EventNearMissCandidate],
+    acquisition_rows: Iterable[Mapping[str, Any]],
+) -> str:
+    pack_counts: dict[str, int] = {}
+    for item in gaps:
+        pack = str(item.source_pack or "market_anomaly_pack")
+        pack_counts[pack] = pack_counts.get(pack, 0) + 1
+    for row in acquisition_rows:
+        status = str(row.get("status") or "")
+        if status not in {"skipped_budget", "no_results", "rejected_results_only", "provider_unavailable", "provider_backoff", "failed_soft"}:
+            continue
+        pack = str(row.get("source_pack") or "market_anomaly_pack")
+        pack_counts[pack] = pack_counts.get(pack, 0) + 1
+    if not pack_counts:
+        return "none; current source-pack evidence is not the main blocker"
+    pack = sorted(pack_counts, key=lambda key: (-pack_counts[key], key))[0]
+    suggestions = {
+        "proxy_preipo_rwa_pack": "CryptoPanic tagged token news or official project source",
+        "strategic_investment_pack": "CryptoPanic/official project confirmation plus DefiLlama protocol metrics",
+        "security_shock_pack": "CryptoPanic tagged exploit coverage or official project update",
+        "listing_liquidity_pack": "official Binance/Bybit exchange announcement",
+        "fan_sports_pack": "sports fixture plus fan-token/project source",
+        "market_anomaly_pack": "CryptoPanic tagged catalyst, official exchange/project source, or DefiLlama metrics",
+        "unlock_supply_pack": "Tokenomist/structured unlock source",
+        "perp_listing_squeeze_pack": "official perp listing plus Coinalyze OI/funding",
+    }
+    return suggestions.get(pack, f"{pack} source-pack evidence")
 
 
 def _provider_health_by_pack_lines(provider_health_rows: Mapping[str, Mapping[str, Any]]) -> list[str]:
