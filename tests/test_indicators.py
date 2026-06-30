@@ -34431,6 +34431,48 @@ def test_notification_inbox_burn_in_review_collapses_low_value_rows():
         alertable_after_quality_gate=False,
         feedback_target="core_noise",
     )
+    doge = event_alpha_notification_inbox.EventAlphaNotificationInboxItem(
+        alert_id="core_doge",
+        alert_key="core_doge",
+        core_opportunity_id="core_doge",
+        symbol="DOGE",
+        coin_id="dogecoin",
+        run_id="run-1",
+        tier="RESEARCH_REVIEW",
+        playbook="market_anomaly",
+        card_path="/tmp/cards/core_doge.md",
+        sent=False,
+        would_send=False,
+        blocked_by_guard=False,
+        delivery_state="",
+        reviewed=False,
+        reason="near-miss score 64; missing confirmation; fresh opportunity",
+        final_route_after_quality_gate="LOCAL_REPORT",
+        final_state_after_quality_gate="RADAR",
+        alertable_after_quality_gate=False,
+        feedback_target="core_doge",
+        item_type="near_miss_core",
+    )
+    diagnostic = event_alpha_notification_inbox.EventAlphaNotificationInboxItem(
+        alert_id="core_btc_noise",
+        alert_key="core_btc_noise",
+        core_opportunity_id="core_btc_noise",
+        symbol="BTC",
+        coin_id="bitcoin",
+        run_id="run-1",
+        tier="STORE_ONLY",
+        playbook="source_noise_control",
+        card_path="/tmp/cards/core_btc_noise.md",
+        sent=False,
+        would_send=False,
+        blocked_by_guard=False,
+        delivery_state="",
+        reviewed=False,
+        reason="source_noise publisher suffix; diagnostic only",
+        alertable_after_quality_gate=False,
+        feedback_target="core_btc_noise",
+        is_diagnostic=True,
+    )
     result = event_alpha_notification_inbox.EventAlphaNotificationInboxResult(
         profile="notify_llm_deep",
         artifact_namespace="notify_llm_deep_rehearsal",
@@ -34451,19 +34493,31 @@ def test_notification_inbox_burn_in_review_collapses_low_value_rows():
         weak_validated_local_only=(),
         quality_gated_local_only=(local,),
         legacy_quality_conflicts=(),
+        research_review_without_feedback=(doge,),
         exploratory_without_feedback=(),
         high_priority_unreviewed=(),
         triggered_fade_unreviewed=(),
         heartbeat_only_runs=(),
         duplicate_or_in_flight_runs=(),
         provider_degraded_runs=({"run_id": "run-1", "warnings": ["gdelt timeout"]},),
-        canonical_review_items=(item, local),
-        diagnostic_review_items_hidden=(local,),
+        canonical_review_items=(item, doge, local),
+        diagnostic_review_items_hidden=(diagnostic,),
     )
+    queue = event_alpha_notification_inbox.build_ranked_review_queue(result)
+    assert queue[0].category == event_alpha_notification_inbox.REVIEW_QUEUE_HIGH_PRIORITY_WOULD_SEND
+    assert queue[0].symbol == "VELVET"
+    assert any(row.symbol == "DOGE" and row.category == event_alpha_notification_inbox.REVIEW_QUEUE_RESEARCH_REVIEW_NEAR_MISS for row in queue)
+    assert not any(row.symbol == "BTC" for row in queue)
     text = event_alpha_notification_inbox.format_notification_inbox(result, burn_in_review=True)
     assert "EVENT ALPHA BURN-IN REVIEW INBOX" in text
+    assert "Ranked review queue:" in text
+    assert "1. [high-priority would-send] VELVET/velvet" in text
+    assert "[research-review near-miss] DOGE/dogecoin" in text
+    assert "BTC/bitcoin" not in text
     assert "Would-send / sent core opportunities: 1" in text
     assert "VELVET/velvet" in text
+    assert "card=core_velvet.md" in text
+    assert "/tmp/cards" not in text
     assert "Local-only / quality-capped rows: 1" in text
     assert "collapsed in burn-in review" in text
     assert "provider-degraded notification runs: 1" in text

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -56,6 +57,20 @@ class EventAlphaNotificationInboxItem:
 
 
 @dataclass(frozen=True)
+class EventAlphaReviewQueueItem:
+    category: str
+    rank_score: float
+    symbol: str
+    coin_id: str
+    tier: str
+    route: str
+    reason: str
+    card_basename: str
+    feedback_target: str
+    source_item: EventAlphaNotificationInboxItem
+
+
+@dataclass(frozen=True)
 class EventAlphaNotificationInboxResult:
     profile: str
     artifact_namespace: str
@@ -90,6 +105,25 @@ class EventAlphaNotificationInboxResult:
     canonical_review_items_with_feedback_targets: int = 0
     diagnostic_review_items_with_feedback_targets: int = 0
     include_diagnostics: bool = False
+
+
+REVIEW_QUEUE_STRICT_ALERTABLE = "strict_alertable"
+REVIEW_QUEUE_HIGH_PRIORITY_WOULD_SEND = "high_priority_would_send"
+REVIEW_QUEUE_DIGEST_WOULD_SEND = "digest_would_send"
+REVIEW_QUEUE_RESEARCH_REVIEW_NEAR_MISS = "research_review_near_miss"
+REVIEW_QUEUE_UPGRADE_CANDIDATE = "upgrade_candidate"
+REVIEW_QUEUE_LOCAL_ONLY_LEARNING_ROW = "local_only_learning_row"
+REVIEW_QUEUE_DIAGNOSTIC_ONLY = "diagnostic_only"
+
+_REVIEW_QUEUE_WEIGHTS = {
+    REVIEW_QUEUE_STRICT_ALERTABLE: 700.0,
+    REVIEW_QUEUE_HIGH_PRIORITY_WOULD_SEND: 650.0,
+    REVIEW_QUEUE_DIGEST_WOULD_SEND: 600.0,
+    REVIEW_QUEUE_RESEARCH_REVIEW_NEAR_MISS: 500.0,
+    REVIEW_QUEUE_UPGRADE_CANDIDATE: 420.0,
+    REVIEW_QUEUE_LOCAL_ONLY_LEARNING_ROW: 250.0,
+    REVIEW_QUEUE_DIAGNOSTIC_ONLY: 50.0,
+}
 
 
 def build_notification_inbox(
@@ -312,6 +346,73 @@ def build_event_alpha_review_items(
     )
 
 
+def build_ranked_review_queue(
+    result: EventAlphaNotificationInboxResult,
+    *,
+    include_diagnostics: bool = False,
+    limit: int | None = None,
+) -> tuple[EventAlphaReviewQueueItem, ...]:
+    """Return a compact operator queue ranked for burn-in review.
+
+    The queue is a presentation layer only. It does not alter route decisions,
+    delivery state, feedback rows, or Event Alpha scoring.
+    """
+    queue: list[EventAlphaReviewQueueItem] = []
+
+    def add(items: Iterable[EventAlphaNotificationInboxItem], category: str) -> None:
+        for item in items:
+            if item.is_diagnostic and not include_diagnostics:
+                continue
+            queue.append(_review_queue_item(item, category))
+
+    strict = tuple(
+        item for item in (
+            *result.sent_without_feedback,
+            *result.partial_delivered_without_feedback,
+            *result.would_send_without_feedback,
+            *result.would_send_blocked_without_feedback,
+            *result.high_priority_unreviewed,
+            *result.triggered_fade_unreviewed,
+        )
+        if _item_alertable(item)
+    )
+    high = tuple(item for item in strict if _item_high_priority(item))
+    digest = tuple(item for item in strict if item not in high)
+    add(high, REVIEW_QUEUE_HIGH_PRIORITY_WOULD_SEND)
+    add(digest, REVIEW_QUEUE_DIGEST_WOULD_SEND)
+    add(result.research_review_without_feedback, REVIEW_QUEUE_RESEARCH_REVIEW_NEAR_MISS)
+    add(result.exploratory_without_feedback, REVIEW_QUEUE_UPGRADE_CANDIDATE)
+    local_learning = (*result.quality_gated_local_only, *result.weak_validated_local_only)
+    if not include_diagnostics:
+        local_learning = tuple(item for item in local_learning if not _item_is_diagnostic_control(item))
+    add(local_learning, REVIEW_QUEUE_LOCAL_ONLY_LEARNING_ROW)
+    if include_diagnostics:
+        add(result.diagnostic_review_items, REVIEW_QUEUE_DIAGNOSTIC_ONLY)
+    else:
+        add(result.diagnostic_review_items_hidden, REVIEW_QUEUE_DIAGNOSTIC_ONLY)
+        queue = [item for item in queue if item.category != REVIEW_QUEUE_DIAGNOSTIC_ONLY]
+
+    deduped: dict[str, EventAlphaReviewQueueItem] = {}
+    for item in queue:
+        key = item.feedback_target or item.source_item.core_opportunity_id or item.source_item.alert_id
+        prior = deduped.get(key)
+        if prior is None or item.rank_score > prior.rank_score:
+            deduped[key] = item
+    ranked = sorted(
+        deduped.values(),
+        key=lambda item: (
+            item.rank_score,
+            _category_weight(item.category),
+            item.symbol,
+            item.coin_id,
+        ),
+        reverse=True,
+    )
+    if limit is not None:
+        ranked = ranked[: max(0, int(limit))]
+    return tuple(ranked)
+
+
 def format_notification_inbox(result: EventAlphaNotificationInboxResult, *, burn_in_review: bool = False) -> str:
     if burn_in_review:
         return _format_notification_inbox_burn_in_review(result)
@@ -382,6 +483,7 @@ def _format_notification_inbox_burn_in_review(result: EventAlphaNotificationInbo
     would_send = (*result.would_send_without_feedback, *result.would_send_blocked_without_feedback)
     active = (*sent_or_partial, *would_send, *result.high_priority_unreviewed, *result.triggered_fade_unreviewed)
     local_count = len(result.quality_gated_local_only) + len(result.weak_validated_local_only)
+    queue = build_ranked_review_queue(result, limit=12)
     lines = [
         "=" * 76,
         "EVENT ALPHA BURN-IN REVIEW INBOX (research-only)",
@@ -401,6 +503,7 @@ def _format_notification_inbox_burn_in_review(result: EventAlphaNotificationInbo
         ),
         "",
     ]
+    _append_review_queue_section(lines, "Ranked review queue", queue, profile=result.profile, limit=12)
     _append_compact_item_section(lines, "Would-send / sent core opportunities", active, profile=result.profile, limit=12)
     _append_compact_item_section(lines, "Research-review candidates", result.research_review_without_feedback, profile=result.profile, limit=8)
     _append_compact_item_section(lines, "Near-miss candidates", result.exploratory_without_feedback, profile=result.profile, limit=8)
@@ -419,6 +522,152 @@ def _format_notification_inbox_burn_in_review(result: EventAlphaNotificationInbo
         lines.append("")
     lines.append("Burn-in review is artifact-only; it does not send, trade, paper trade, or alter Event Alpha tiers.")
     return "\n".join(lines).rstrip()
+
+
+def _append_review_queue_section(
+    lines: list[str],
+    title: str,
+    items: Iterable[EventAlphaReviewQueueItem],
+    *,
+    profile: str,
+    limit: int,
+) -> None:
+    rows = list(items)
+    lines.append(f"{title}: {len(rows)}")
+    if not rows:
+        lines.append("- none")
+        lines.append("")
+        return
+    for idx, item in enumerate(rows[: max(0, limit)], start=1):
+        lines.append(
+            f"{idx}. [{_human_queue_category(item.category)}] {item.symbol or 'UNKNOWN'}/{item.coin_id or 'unknown'} "
+            f"score={item.rank_score:g} tier={item.tier or 'unknown'} route={item.route or 'unknown'}"
+        )
+        lines.append(
+            f"   why: {item.reason or 'selected for operator review'} · "
+            f"card={item.card_basename or 'not_written'} · feedback={item.feedback_target or item.source_item.alert_id}"
+        )
+        lines.append(
+            f"   command: make event-feedback-watch PROFILE={profile} FEEDBACK_TARGET='{item.feedback_target or item.source_item.alert_id}'"
+        )
+    if len(rows) > limit:
+        lines.append(f"- +{len(rows) - limit} more in the full notification inbox")
+    lines.append("")
+
+
+def _review_queue_item(item: EventAlphaNotificationInboxItem, category: str) -> EventAlphaReviewQueueItem:
+    score = _category_weight(category) + _item_score_hint(item) + _freshness_bonus(item) - _missing_evidence_penalty(item)
+    return EventAlphaReviewQueueItem(
+        category=category,
+        rank_score=round(score, 2),
+        symbol=item.symbol,
+        coin_id=item.coin_id,
+        tier=item.tier,
+        route=item.final_route_after_quality_gate,
+        reason=item.reason,
+        card_basename=_card_label(item.card_path),
+        feedback_target=item.feedback_target or item.alert_id,
+        source_item=item,
+    )
+
+
+def _category_weight(category: str) -> float:
+    return _REVIEW_QUEUE_WEIGHTS.get(category, 0.0)
+
+
+def _item_alertable(item: EventAlphaNotificationInboxItem) -> bool:
+    return bool(item.alertable_after_quality_gate) or event_alpha_router.route_value_is_alertable(item.final_route_after_quality_gate)
+
+
+def _item_high_priority(item: EventAlphaNotificationInboxItem) -> bool:
+    text = " ".join(str(part or "") for part in (
+        item.tier,
+        item.final_route_after_quality_gate,
+        item.final_state_after_quality_gate,
+        item.opportunity_level,
+        item.reason,
+    )).casefold()
+    return "high_priority" in text or "triggered_fade" in text
+
+
+def _item_is_diagnostic_control(item: EventAlphaNotificationInboxItem) -> bool:
+    text = " ".join(str(part or "") for part in (
+        item.playbook,
+        item.item_type,
+        item.reason,
+        item.quality_gate_block_reason,
+        item.opportunity_level,
+    )).casefold()
+    return bool(item.is_diagnostic) or any(token in text for token in (
+        "source_noise",
+        "ticker_collision",
+        "word_collision",
+        "diagnostic",
+        "control",
+    ))
+
+
+def _item_score_hint(item: EventAlphaNotificationInboxItem) -> float:
+    text = " ".join(str(part or "") for part in (
+        item.reason,
+        item.tier,
+        item.opportunity_level,
+        item.final_route_after_quality_gate,
+    ))
+    scores = [float(match.group(1)) for match in re.finditer(r"(?:score|rank|level)[=: ]+([0-9]+(?:\.[0-9]+)?)", text, flags=re.IGNORECASE)]
+    if scores:
+        return max(scores)
+    if _item_high_priority(item):
+        return 90.0
+    if "watchlist" in text.casefold():
+        return 75.0
+    if "digest" in text.casefold():
+        return 65.0
+    if item.item_type == "near_miss_core":
+        return 60.0
+    if item.opportunity_level == "local_only":
+        return 30.0
+    return 45.0
+
+
+def _freshness_bonus(item: EventAlphaNotificationInboxItem) -> float:
+    text = item.reason.casefold()
+    if "fresh" in text or "novel" in text:
+        return 8.0
+    if "stale" in text or "legacy" in text:
+        return -8.0
+    return 0.0
+
+
+def _missing_evidence_penalty(item: EventAlphaNotificationInboxItem) -> float:
+    text = " ".join(str(part or "") for part in (
+        item.reason,
+        item.quality_gate_block_reason,
+    )).casefold()
+    penalty = 0.0
+    for token in ("missing", "unconfirmed", "no_results", "rejected", "source_noise", "generic"):
+        if token in text:
+            penalty += 4.0
+    return min(20.0, penalty)
+
+
+def _human_queue_category(category: str) -> str:
+    return {
+        REVIEW_QUEUE_STRICT_ALERTABLE: "strict alert",
+        REVIEW_QUEUE_HIGH_PRIORITY_WOULD_SEND: "high-priority would-send",
+        REVIEW_QUEUE_DIGEST_WOULD_SEND: "digest would-send",
+        REVIEW_QUEUE_RESEARCH_REVIEW_NEAR_MISS: "research-review near-miss",
+        REVIEW_QUEUE_UPGRADE_CANDIDATE: "upgrade candidate",
+        REVIEW_QUEUE_LOCAL_ONLY_LEARNING_ROW: "local-only learning",
+        REVIEW_QUEUE_DIAGNOSTIC_ONLY: "diagnostic only",
+    }.get(category, category.replace("_", " "))
+
+
+def _card_label(path: str) -> str:
+    text = str(path or "").strip()
+    if not text:
+        return ""
+    return Path(text).name or text
 
 
 def _append_item_section(
@@ -491,7 +740,7 @@ def _append_compact_item_section(
             f"route={item.final_route_after_quality_gate or 'unknown'}"
         )
         if item.card_path:
-            lines.append(f"   card: {item.card_path}")
+            lines.append(f"   card: {_card_label(item.card_path)}")
         lines.append(f"   feedback: make event-feedback-useful PROFILE={profile} FEEDBACK_TARGET='{target}'")
         if item.quality_gate_block_reason:
             lines.append(f"   gate: {item.quality_gate_block_reason}")

@@ -196,6 +196,22 @@ would blur the meaning of alertable Event Alpha decisions.
 too noisy or too restrictive, or when Event Alpha notification promotion rules
 are redesigned around a new validated quality policy.
 
+## 2026-06-30 - Ranked burn-in review queues are presentation-only
+**Status:** accepted
+**Decision:** Event Alpha burn-in inboxes may rank and group operator review
+items across strict would-send, digest would-send, research-review near-miss,
+upgrade, local-only learning, and diagnostic categories. This queue is a
+display layer only: it must not mutate watchlist/core state, route decisions,
+alert tiers, notification eligibility, feedback rows, quality gates, or event
+fade eligibility. Source-noise, ticker-collision, support/control diagnostics,
+and other low-value controls stay hidden by default in the compact queue and
+must remain available only through explicit diagnostic/full review surfaces.
+**Why:** Operators need a short phone-friendly queue during burn-in, but making
+diagnostics prominent or letting queue order feed back into alerting would blur
+strict alert semantics.
+**Revisit when:** The feedback loop has enough useful/junk labels to justify a
+new reviewed prioritization policy with explicit tests and promotion rules.
+
 ## 2026-06-29 - Real Event Alpha sends require ledger-backed rehearsal readiness
 **Status:** accepted
 **Decision:** Before enabling real Telegram delivery for `notify_llm_deep`, the

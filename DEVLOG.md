@@ -17,6 +17,31 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Polish Event Alpha burn-in review queue · Codex
+**Why:** Research-review burn-in needs a small operator-facing queue instead of
+row dumps, while source-noise/control diagnostics stay out of the default
+phone-friendly inbox.
+**Changes:**
+- Added a ranked Event Alpha review queue model for strict would-send items,
+  high-priority/digest lanes, research-review near-misses, upgrade candidates,
+  local-only learning rows, and diagnostics.
+- The burn-in inbox now shows a compact ranked queue first, with card basenames
+  instead of absolute paths and feedback commands per item.
+- Diagnostic/source-noise/ticker-collision controls are hidden from the default
+  ranked queue and remain available through full diagnostic surfaces; local-only
+  row counts stay collapsed in burn-in review.
+- Added regression coverage proving VELVET ranks first, DOGE appears as a
+  research-review near-miss, BTC control noise is hidden by default, and local
+  card paths are not exposed in the compact inbox.
+**Verify:** `python3 tests/test_indicators.py` (574/574 passed);
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-research-review-no-send-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Presentation-only. This does not change Event Alpha scoring,
+quality gates, alertability, Telegram send guards, paper/live rows, normal RSI
+rows, or `TRIGGERED_FADE` ownership.
+
 ## 2026-06-30 — Add Event Alpha LLM analyst tools · Codex
 **Why:** Catalyst-frame analysis is not the only useful LLM layer. Operators
 also need constrained source triage, evidence planning, contradiction checks,

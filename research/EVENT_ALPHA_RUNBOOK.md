@@ -485,6 +485,16 @@ candidates and no-send guard enabled. It should write a blocked
 fields show candidates but the delivery ledger has no research-review row, treat
 the rehearsal as not ready.
 
+The burn-in inbox starts with a compact ranked review queue. It ranks strict
+would-send rows, digest rows, research-review near-misses, upgrade candidates,
+and non-diagnostic local learning rows by final score, review value, freshness,
+and missing-evidence penalties. This ranking is presentation-only and does not
+change routes or tiers. Source-noise, ticker-collision, support/control rows,
+and other diagnostics are hidden from the compact queue by default; use the full
+inbox, quality review, or diagnostic mode when you need row-level forensic
+detail. Card references in compact output should be basenames, not absolute
+machine paths.
+
 Event Alpha can also write `HYPOTHESIS` watchlist rows. A hypothesis means the
 radar inferred that an external catalyst may affect a crypto sector or seed
 asset set, but direct candidate validation is incomplete. External entities
