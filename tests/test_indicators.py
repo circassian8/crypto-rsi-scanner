@@ -13288,6 +13288,27 @@ def test_event_alpha_notification_uses_canonical_core_identity_and_compact_messa
     assert "/tmp/local/cards" not in preview
 
 
+def test_event_alpha_core_digest_includes_all_alertable_items_without_inbox_overflow():
+    from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router
+
+    decisions = [
+        _notify_route_decision(
+            f"CORE{i}",
+            event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+            event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+        )
+        for i in range(18)
+    ]
+
+    message = notif.format_core_opportunity_telegram_digest(decisions, profile="notify_llm_deep")
+
+    assert "Items: 18" in message
+    assert "1. CORE0 / core0" in message
+    assert "18. CORE17 / core17" in message
+    assert "more in the local notification inbox" not in message
+    assert "more in local notification inbox" not in message
+
+
 def test_event_alpha_notification_blocks_rejected_only_core_digest():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alpha_notifications, event_alpha_router, event_watchlist
@@ -25182,7 +25203,7 @@ def test_event_alpha_exploratory_digest_excludes_controls_and_has_own_cooldown()
     assert with_controls.lane_counts[notif.LANE_EXPLORATORY_DIGEST] == 1
 
 
-def test_event_alpha_exploratory_digest_truncates_compact_numbered_blocks():
+def test_event_alpha_exploratory_digest_includes_all_compact_numbered_blocks():
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alpha_notifications as notif
 
@@ -25201,9 +25222,9 @@ def test_event_alpha_exploratory_digest_truncates_compact_numbered_blocks():
     text = notif.format_exploratory_telegram_digest(plan.exploratory_items, profile="notify_no_key", cfg=cfg)
     assert "1. <b>LONG0 / Long0</b>" in text
     assert "8. <b>LONG7 / Long7</b>" in text
-    assert "9. <b>" not in text
-    assert "+4 more in local notification inbox." in text
-    assert len(text) <= 3900
+    assert "12. <b>LONG11 / Long11</b>" in text
+    assert "more in local notification inbox" not in text
+    assert "more in the local notification inbox" not in text
 
 
 def _research_review_decision(symbol="DOGE", *, score=66, level="exploratory", playbook="meme_attention"):

@@ -17,6 +17,25 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Send all Event Alpha digest items to Telegram · Codex
+**Why:** The live Event Alpha digest was hiding routed candidates behind a
+`+N more in the local notification inbox` footer. The operator wants every
+selected notification item delivered to Telegram, relying on the structured
+Telegram sender's chunking instead of truncating the digest body.
+**Changes:**
+- Removed the hard three-item cap from canonical core-opportunity Telegram
+  digests and stopped emitting the local-inbox overflow footer.
+- Removed formatter-side truncation from exploratory and research-review
+  Telegram digests so all selected lane items render in the outgoing message.
+- Added regressions proving core and exploratory digest bodies include all
+  selected items and do not hide candidates behind local-inbox overflow text.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (581/581 passed);
+`make verify PYTHON=python3`.
+**Notes/risks:** This is a formatting/delivery-fidelity change only. Event Alpha
+routing, scoring, quality gates, `TRIGGERED_FADE` invariants, paper trading, live
+RSI rows, and execution behavior are unchanged.
+
 ## 2026-06-30 — Harden CryptoPanic Growth Weekly integration · Codex
 **Why:** The configured CryptoPanic key is on the Growth Weekly plan, which uses
 `/api/growth_weekly/v2/posts/` with `auth_token` and a smaller parameter

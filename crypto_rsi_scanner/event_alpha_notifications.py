@@ -625,8 +625,8 @@ def format_research_review_telegram_digest(
 ) -> str:
     """Render near-miss research-review candidates for Telegram burn-in."""
     cfg = cfg or EventAlphaNotificationConfig()
+    _ = cfg  # Kept for API compatibility; all review items are rendered.
     keep = list(items)
-    max_items = max(1, min(10, int(cfg.research_review_digest_max_items or 3)))
     lines = [
         "<b>Event Alpha Research Review</b>",
         "<i>Not alertable. Missing confirmation. Not a trade signal.</i>",
@@ -637,8 +637,7 @@ def format_research_review_telegram_digest(
         lines.append("No research-review candidates.")
         return "\n".join(lines)
     displayed = 0
-    max_chars = 3900
-    for item in keep[:max_items]:
+    for item in keep:
         decision = item.decision
         entry = decision.entry
         level = _human_level(_research_review_level(decision))
@@ -657,18 +656,8 @@ def format_research_review_telegram_digest(
             f"   Card: {_esc(card_label)}",
             f"   Feedback target: {_esc(feedback_target)}",
         ]
-        candidate_lines = [*lines, *block]
-        remaining = len(keep) - displayed - 1
-        footer = ["Research cards and feedback commands are available in local artifacts/inbox."]
-        if remaining > 0:
-            footer.insert(0, f"+{remaining} more in local daily brief.")
-        if len("\n".join([*candidate_lines, "", *footer])) > max_chars:
-            break
-        lines = candidate_lines
+        lines.extend(block)
         displayed += 1
-    if len(keep) > displayed:
-        lines.append("")
-        lines.append(f"+{len(keep) - displayed} more in local daily brief.")
     lines.append("")
     lines.append("Research cards and feedback commands are available in local artifacts/inbox.")
     return "\n".join(lines)
@@ -684,8 +673,8 @@ def format_exploratory_telegram_digest(
     """Render low-confidence Event Alpha evidence for Telegram burn-in review."""
     cfg = cfg or EventAlphaNotificationConfig()
     _ = card_path_by_alert_id  # internal paths stay in artifacts/inbox, not Telegram.
+    _ = cfg  # Kept for API compatibility; all exploratory items are rendered.
     keep = list(items)
-    max_items = max(1, min(10, int(cfg.exploratory_digest_max_items or 10)))
     lines = [
         "<b>🟡 Exploratory Event Alpha Digest</b>",
         "<i>Low-confidence research leads — not trade signals</i>",
@@ -698,9 +687,7 @@ def format_exploratory_telegram_digest(
         return "\n".join(lines)
     footer = "Research cards and feedback commands are available in local artifacts/inbox."
     displayed = 0
-    truncated = 0
-    max_chars = 3900
-    for item in keep[:max_items]:
+    for item in keep:
         decision = item.decision
         entry = decision.entry
         block = [
@@ -714,21 +701,8 @@ def format_exploratory_telegram_digest(
             f"   Check next: {_esc(_human_check_next(item.what_to_verify))}",
             f"   Risk: {_esc(_human_risk(entry, decision))}",
         ]
-        candidate_lines = [*lines, *block]
-        remaining_after_this = len(keep) - displayed - 1
-        candidate_footer = [footer]
-        if remaining_after_this > 0:
-            candidate_footer.insert(0, f"+{remaining_after_this} more in local notification inbox.")
-        if len("\n".join([*candidate_lines, "", *candidate_footer])) > max_chars:
-            truncated = len(keep) - displayed
-            break
-        lines = candidate_lines
+        lines.extend(block)
         displayed += 1
-    if len(keep) > displayed:
-        truncated = max(truncated, len(keep) - displayed)
-    if truncated:
-        lines.append("")
-        lines.append(f"+{truncated} more in local notification inbox.")
     lines.append("")
     lines.append(footer)
     return "\n".join(lines)
@@ -1006,7 +980,6 @@ def send_notifications(
                 card_path_by_alert_id=card_map,
                 core_row_by_alert_id=plan.core_row_by_alert_id,
                 pipeline_result=pipeline_result,
-                max_items=3,
             )
             identity = _delivery_identity_for_decisions(
                 items,
@@ -1303,7 +1276,7 @@ def format_core_opportunity_telegram_digest(
     card_path_by_alert_id: Mapping[str, object] | None = None,
     core_row_by_alert_id: Mapping[str, Mapping[str, Any]] | None = None,
     pipeline_result: Any | None = None,
-    max_items: int = 3,
+    max_items: int | None = None,
 ) -> str:
     """Render a compact human-facing digest keyed by canonical core opportunities."""
     keep = [decision for decision in decisions if event_alpha_router.alertable_after_quality_gate(decision)]
@@ -1335,7 +1308,7 @@ def format_core_opportunity_telegram_digest(
             continue
         if core_id:
             seen_core.add(core_id)
-        if displayed >= max(1, int(max_items or 1)):
+        if max_items is not None and displayed >= max(1, int(max_items or 1)):
             break
         entry = decision.entry
         symbol = str(core.get("symbol") or core.get("validated_symbol") or entry.symbol or "UNKNOWN")
@@ -1380,10 +1353,6 @@ def format_core_opportunity_telegram_digest(
             lines.append(f"Card: {_esc(Path(str(card)).name)}")
         if core_id:
             lines.append(f"Feedback target: {_esc(core_id)}")
-    hidden = max(0, len(keep) - displayed)
-    if hidden:
-        lines.append("")
-        lines.append(f"+{hidden} more in the local notification inbox.")
     lines.append("")
     lines.append("Research cards and feedback commands are available in local artifacts/inbox.")
     return "\n".join(lines)
@@ -2157,7 +2126,6 @@ class _DeliveryWriter:
                     profile=profile,
                     card_path_by_alert_id=card_map,
                     core_row_by_alert_id=plan.core_row_by_alert_id,
-                    max_items=3,
                 )
                 identity = _delivery_identity_for_decisions(
                     items,
