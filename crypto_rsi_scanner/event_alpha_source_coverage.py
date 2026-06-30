@@ -101,7 +101,12 @@ class EventAlphaSourceCoveragePack:
     missing_providers: tuple[str, ...]
     healthy_providers: tuple[str, ...]
     degraded_or_backoff_providers: tuple[str, ...]
+    provider_coverage_status: str
+    provider_role_statuses: tuple[str, ...]
     evidence_absence_meaningful: bool
+    coverage_gap_reason: str | None = None
+    providers_missing_for_confirmation: tuple[str, ...] = ()
+    providers_degraded_for_confirmation: tuple[str, ...] = ()
     candidates_blocked_by_coverage_gap: int = 0
     accepted_evidence_count: int = 0
     rejected_only_count: int = 0
@@ -116,7 +121,14 @@ class EventAlphaSourceCoveragePack:
             "missing_providers": list(self.missing_providers),
             "healthy_providers": list(self.healthy_providers),
             "degraded_or_backoff_providers": list(self.degraded_or_backoff_providers),
+            "provider_coverage_status": self.provider_coverage_status,
+            "source_pack_coverage_status": self.provider_coverage_status,
+            "provider_role_statuses": list(self.provider_role_statuses),
             "evidence_absence_meaningful": self.evidence_absence_meaningful,
+            "coverage_gap_reason": self.coverage_gap_reason,
+            "source_coverage_gap_reason": self.coverage_gap_reason,
+            "providers_missing_for_confirmation": list(self.providers_missing_for_confirmation),
+            "providers_degraded_for_confirmation": list(self.providers_degraded_for_confirmation),
             "candidates_blocked_by_coverage_gap": self.candidates_blocked_by_coverage_gap,
             "accepted_evidence_count": self.accepted_evidence_count,
             "rejected_only_count": self.rejected_only_count,
@@ -184,6 +196,27 @@ def build_source_coverage_report(
         unavailable = sum(1 for row in pack_rows if _status(row) in {"provider_unavailable", "provider_backoff", "failed_soft", "skipped_config"})
         blocked = _coverage_blocked_count(pack_name, pack_rows=pack_rows, core_rows=core_rows)
         absence_meaningful = _evidence_absence_meaningful(pack_name, healthy, degraded)
+        coverage_status = _pack_coverage_status(
+            configured_for_pack=configured_for_pack,
+            missing=missing,
+            healthy=healthy,
+            degraded=degraded,
+            provider_unavailable_count=unavailable,
+        )
+        coverage_gap_reason = _coverage_gap_reason(
+            coverage_status=coverage_status,
+            missing=missing,
+            degraded=degraded,
+            blocked=blocked,
+            skipped_budget=skipped_budget,
+            rejected_only=rejected_only,
+            provider_unavailable=unavailable,
+        )
+        role_statuses = _provider_role_statuses_for_pack(
+            provider_health_rows or {},
+            preferred=preferred,
+            now=observed,
+        )
         recommended_actions = _pack_recommended_actions(
             pack_name,
             missing=missing,
@@ -200,7 +233,12 @@ def build_source_coverage_report(
                 missing_providers=_sorted_tuple(missing),
                 healthy_providers=_sorted_tuple(healthy),
                 degraded_or_backoff_providers=_sorted_tuple(degraded),
+                provider_coverage_status=coverage_status,
+                provider_role_statuses=role_statuses,
                 evidence_absence_meaningful=absence_meaningful,
+                coverage_gap_reason=coverage_gap_reason,
+                providers_missing_for_confirmation=_sorted_tuple(missing),
+                providers_degraded_for_confirmation=_sorted_tuple(degraded),
                 candidates_blocked_by_coverage_gap=blocked,
                 accepted_evidence_count=accepted,
                 rejected_only_count=rejected_only,
@@ -240,7 +278,12 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
                 f"  missing providers: {_join(pack.missing_providers)}",
                 f"  healthy providers: {_join(pack.healthy_providers)}",
                 f"  degraded/backoff providers: {_join(pack.degraded_or_backoff_providers)}",
+                f"  provider coverage status: {pack.provider_coverage_status}",
+                f"  provider role health: {_join(pack.provider_role_statuses)}",
                 f"  evidence absence meaningful: {str(pack.evidence_absence_meaningful).lower()}",
+                f"  coverage gap reason: {pack.coverage_gap_reason or 'none'}",
+                f"  providers missing for confirmation: {_join(pack.providers_missing_for_confirmation)}",
+                f"  providers degraded for confirmation: {_join(pack.providers_degraded_for_confirmation)}",
                 (
                     "  acquisition outcomes: "
                     f"accepted={pack.accepted_evidence_count} "
@@ -306,6 +349,24 @@ def _provider_effective_status(provider: str, health_by_provider: Mapping[str, s
     return str(health_by_provider.get(provider) or "healthy")
 
 
+def _provider_role_statuses_for_pack(
+    rows: Mapping[str, Mapping[str, Any]],
+    *,
+    preferred: Iterable[str],
+    now: datetime,
+) -> tuple[str, ...]:
+    preferred_set = set(preferred)
+    out: list[str] = []
+    for key, row in sorted(rows.items()):
+        alias = _provider_alias(row, fallback_key=str(key))
+        if alias not in preferred_set:
+            continue
+        role = str(row.get("provider_role") or row.get("provider_kind") or "unclassified").strip() or "unclassified"
+        status = event_provider_health.provider_health_status(row, now=now)
+        out.append(f"{alias}:{role}={status}")
+    return tuple(dict.fromkeys(out))
+
+
 def _status(row: Mapping[str, Any]) -> str:
     return str(row.get("status") or row.get("evidence_acquisition_status") or "").strip()
 
@@ -364,6 +425,61 @@ def _evidence_absence_meaningful(
     pack = event_source_packs.get_source_pack(pack_name)
     preferred = set(pack.preferred_providers)
     return bool((healthy_set & preferred) & _HIGH_SPECIFICITY_PROVIDERS)
+
+
+def _pack_coverage_status(
+    *,
+    configured_for_pack: Iterable[str],
+    missing: Iterable[str],
+    healthy: Iterable[str],
+    degraded: Iterable[str],
+    provider_unavailable_count: int,
+) -> str:
+    configured_set = set(configured_for_pack)
+    missing_set = set(missing)
+    healthy_set = set(healthy)
+    degraded_set = set(degraded)
+    if provider_unavailable_count and not healthy_set:
+        return "unavailable"
+    if not configured_set:
+        return "not_configured"
+    if degraded_set and not healthy_set:
+        return "degraded"
+    if healthy_set and not missing_set and not degraded_set and not provider_unavailable_count:
+        return "complete"
+    if healthy_set:
+        return "partial"
+    return "unavailable"
+
+
+def _coverage_gap_reason(
+    *,
+    coverage_status: str,
+    missing: Iterable[str],
+    degraded: Iterable[str],
+    blocked: int,
+    skipped_budget: int,
+    rejected_only: int,
+    provider_unavailable: int,
+) -> str | None:
+    reasons: list[str] = []
+    if coverage_status in {"not_configured", "degraded", "unavailable", "partial"}:
+        reasons.append(f"source_pack_coverage_{coverage_status}")
+    missing_values = _sorted_tuple(missing)
+    degraded_values = _sorted_tuple(degraded)
+    if missing_values:
+        reasons.append("missing:" + ",".join(missing_values))
+    if degraded_values:
+        reasons.append("degraded:" + ",".join(degraded_values))
+    if skipped_budget:
+        reasons.append("skipped_budget_not_confirmation")
+    if rejected_only:
+        reasons.append("rejected_results_only_not_confirmation")
+    if provider_unavailable:
+        reasons.append("provider_unavailable_not_confirmation")
+    if blocked:
+        reasons.append("candidates_blocked_by_coverage_gap")
+    return ";".join(reasons) if reasons else None
 
 
 def _recommendation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:

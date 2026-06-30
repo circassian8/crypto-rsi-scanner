@@ -575,7 +575,7 @@ def test_event_provider_status_formats_burn_in_readiness_summary_and_pack_gaps()
 
 
 def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_gaps():
-    from crypto_rsi_scanner import event_alpha_source_coverage
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_source_coverage
 
     cfg = _event_provider_status_cfg(
         EVENT_DISCOVERY_GDELT_LIVE=True,
@@ -650,6 +650,11 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "cryptopanic" in proxy.missing_providers
     assert "gdelt" in proxy.degraded_or_backoff_providers
     assert "project_blog_rss" in proxy.degraded_or_backoff_providers
+    assert proxy.provider_coverage_status == "degraded"
+    assert "source_pack_coverage_degraded" in str(proxy.coverage_gap_reason)
+    assert "cryptopanic" in proxy.providers_missing_for_confirmation
+    assert "project_blog_rss" in proxy.providers_degraded_for_confirmation
+    assert "project_blog_rss:catalyst_search=degraded" in proxy.provider_role_statuses
     assert proxy.evidence_absence_meaningful is False
     assert proxy.skipped_budget_count == 1
     assert proxy.candidates_blocked_by_coverage_gap == 2
@@ -658,12 +663,15 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert any("evidence-acquisition query/candidate budget" in item for item in proxy.recommended_actions)
     assert security.accepted_evidence_count == 1
     assert "cryptopanic" in security.missing_providers
+    assert listing.provider_coverage_status == "not_configured"
     assert listing.rejected_only_count == 1
     assert any("rejected evidence samples" in item for item in listing.recommended_actions)
+    assert perp.provider_coverage_status == "unavailable"
     assert perp.provider_unavailable_count == 1
     assert any("provider health report/reset" in item for item in perp.recommended_actions)
     assert "coingecko" in market.healthy_providers
     assert "defillama" in market.missing_providers
+    assert market.provider_coverage_status == "partial"
     assert any("DefiLlama" in item for item in market.recommended_actions)
     assert market.evidence_absence_meaningful is True
 
@@ -671,12 +679,37 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "EVENT ALPHA SOURCE COVERAGE" in text
     assert "proxy_preipo_rwa_pack" in text
     assert "missing providers: cryptopanic" in text
+    assert "provider coverage status: degraded" in text
+    assert "provider role health: gdelt:event_source=degraded, project_blog_rss:catalyst_search=degraded" in text
+    assert "providers missing for confirmation: cryptopanic, polymarket" in text
     assert "evidence absence meaningful: false" in text
     assert "accepted=1" in text
     assert "Most useful next data source:" in text
     assert "recommended actions:" in text
     assert "configure CryptoPanic token/news coverage" in text
     assert "No alerts, sends, trades" in text
+
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        core_opportunity_rows=[
+            {
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "notify_llm_deep",
+                "run_mode": "test",
+                "core_opportunity_id": "agg:bad-source-coverage",
+                "source_pack": "proxy_preipo_rwa_pack",
+                "provider_coverage_status": "degraded",
+                "evidence_absence_is_meaningful": True,
+                "providers_missing_for_confirmation": ("cryptopanic",),
+            }
+        ],
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep",
+        include_test_artifacts=True,
+        strict=True,
+    )
+    assert doctor.degraded_provider_absence_marked_meaningful == 1
+    assert doctor.missing_provider_recommendations_missing == 1
+    assert any("degraded_provider_absence_marked_meaningful=1" in item for item in doctor.blockers)
 
 
 def test_config_load_url_list_dedupes_comments_and_inline_notes():

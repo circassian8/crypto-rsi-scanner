@@ -68,6 +68,15 @@ market/protocol metric evidence only: they can support market confirmation or
 source coverage, but they do not prove official confirmation or catalyst
 impact-path validation by themselves.
 
+Each source-pack row now also prints pack-level `provider_coverage_status`,
+role-specific provider health, explicit coverage-gap reasons, and the providers
+missing or degraded for confirmation. A provider may be healthy for one role and
+degraded for another, for example RSS event intake versus RSS catalyst search.
+Interpret `degraded`, `unavailable`, and `not_configured` as unknown coverage,
+not as proof that no confirming evidence exists. Artifact doctor flags missing
+coverage metadata, missing provider recommendations, and contradictions where a
+degraded/unavailable/not-configured pack is treated as meaningful absence.
+
 The operator-facing opportunity spine is the canonical CoreOpportunity view.
 When `event_core_opportunities.jsonl` exists, cards and audits should read the
 stored core row plus its linked support rows, diagnostic/control rows,

@@ -64,6 +64,9 @@ class EventAlphaArtifactDoctorResult:
     live_sector_digest_without_asset: int = 0
     live_rejected_results_promoted: int = 0
     live_skipped_budget_promoted: int = 0
+    source_pack_provider_status_missing: int = 0
+    missing_provider_recommendations_missing: int = 0
+    degraded_provider_absence_marked_meaningful: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -506,6 +509,7 @@ def diagnose_artifacts(
     promoted_core_in_weak = _promoted_core_rows_that_are_weak(core_rows)
     core_route_conflicts = _core_route_conflicts_with_opportunity_level(core_rows)
     live_confirmation_conflicts = _live_confirmation_conflicts(core_rows, profile=profile, artifact_namespace=artifact_namespace)
+    source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     upgrade_high_priority = 0
     fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
     fresh_visible_missing_targets = sum(
@@ -657,6 +661,22 @@ def diagnose_artifacts(
             f"{live_confirmation_conflicts['live_skipped_budget_promoted']}"
         )
         (blockers if strict and core_store_available else warnings).append(message)
+    if source_coverage_conflicts["source_pack_provider_status_missing"]:
+        warnings.append(
+            "source_pack_provider_status_missing="
+            f"{source_coverage_conflicts['source_pack_provider_status_missing']}"
+        )
+    if source_coverage_conflicts["missing_provider_recommendations_missing"]:
+        warnings.append(
+            "missing_provider_recommendations_missing="
+            f"{source_coverage_conflicts['missing_provider_recommendations_missing']}"
+        )
+    if source_coverage_conflicts["degraded_provider_absence_marked_meaningful"]:
+        message = (
+            "degraded_provider_absence_marked_meaningful="
+            f"{source_coverage_conflicts['degraded_provider_absence_marked_meaningful']}"
+        )
+        (blockers if strict else warnings).append(message)
     if visible_missing_targets:
         message = f"visible_core_opportunities_missing_feedback_targets={visible_missing_targets}"
         (blockers if strict and fresh_visible_missing_targets else warnings).append(message)
@@ -1101,6 +1121,9 @@ def diagnose_artifacts(
         live_sector_digest_without_asset=live_confirmation_conflicts["live_sector_digest_without_asset"],
         live_rejected_results_promoted=live_confirmation_conflicts["live_rejected_results_promoted"],
         live_skipped_budget_promoted=live_confirmation_conflicts["live_skipped_budget_promoted"],
+        source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
+        missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
+        degraded_provider_absence_marked_meaningful=source_coverage_conflicts["degraded_provider_absence_marked_meaningful"],
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -1834,6 +1857,53 @@ def _live_confirmation_conflicts(
         if status == "skipped_budget":
             out["live_skipped_budget_promoted"] += 1
     return out
+
+
+def _source_coverage_metadata_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    out = {
+        "source_pack_provider_status_missing": 0,
+        "missing_provider_recommendations_missing": 0,
+        "degraded_provider_absence_marked_meaningful": 0,
+    }
+    for row in rows:
+        source_pack = str(row.get("source_pack") or row.get("evidence_acquisition_source_pack") or "").strip()
+        if not source_pack:
+            continue
+        status = str(row.get("source_pack_coverage_status") or row.get("provider_coverage_status") or "").strip()
+        has_source_coverage_metadata = any(
+            key in row
+            for key in (
+                "source_pack_coverage_status",
+                "provider_coverage_status",
+                "providers_missing_for_confirmation",
+                "providers_degraded_for_confirmation",
+                "source_coverage_recommended_actions",
+                "recommended_actions",
+            )
+        )
+        if has_source_coverage_metadata and not status:
+            out["source_pack_provider_status_missing"] += 1
+        missing = _tuple_value(row.get("providers_missing_for_confirmation"))
+        degraded = _tuple_value(row.get("providers_degraded_for_confirmation"))
+        recs = _tuple_value(row.get("source_coverage_recommended_actions") or row.get("recommended_actions"))
+        if (missing or degraded) and not recs:
+            out["missing_provider_recommendations_missing"] += 1
+        absence = bool(row.get("evidence_absence_is_meaningful") or row.get("evidence_absence_meaningful"))
+        if status in {"degraded", "unavailable", "not_configured"} and absence:
+            out["degraded_provider_absence_marked_meaningful"] += 1
+    return out
+
+
+def _tuple_value(value: Any) -> tuple[str, ...]:
+    if value is None or value == "":
+        return ()
+    if isinstance(value, str):
+        return tuple(item.strip() for item in value.split(",") if item.strip())
+    if isinstance(value, Mapping):
+        return tuple(str(key) for key in value if str(key).strip())
+    if isinstance(value, Iterable):
+        return tuple(str(item) for item in value if str(item).strip())
+    return (str(value),)
 
 
 def _notification_delivery_conflicts(
@@ -2828,7 +2898,10 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"live_validated_without_confirmation={result.live_validated_without_confirmation} "
             f"live_sector_digest_without_asset={result.live_sector_digest_without_asset} "
             f"live_rejected_results_promoted={result.live_rejected_results_promoted} "
-            f"live_skipped_budget_promoted={result.live_skipped_budget_promoted}"
+            f"live_skipped_budget_promoted={result.live_skipped_budget_promoted} "
+            f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
+            f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
+            f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful}"
         ),
         (
             "snapshot lineage: "

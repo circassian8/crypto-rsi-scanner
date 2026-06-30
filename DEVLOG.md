@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Harden Event Alpha source-system coverage semantics · Codex
+**Why:** Source coverage reports needed to distinguish missing providers,
+role-specific degradation, and non-confirming evidence more explicitly so
+operators can tell when an absence is a coverage gap instead of negative proof.
+**Changes:**
+- Added pack-level `provider_coverage_status` / `source_pack_coverage_status`,
+  role-specific provider health, explicit coverage-gap reasons, and
+  missing/degraded confirmation-provider lists to source coverage rows and
+  reports.
+- Added artifact-doctor checks for source-coverage metadata gaps,
+  missing provider recommendations, and contradictory meaningful-absence claims
+  when coverage is degraded, unavailable, or not configured.
+- Expanded source coverage tests to cover degraded role health, unavailable and
+  not-configured packs, explicit gap reasons, and strict-doctor warnings.
+- Updated roadmap, decision notes, and the Event Alpha runbook to record the
+  new source-system interpretation.
+**Verify:** `python3 tests/test_indicators.py` (563/563 passed);
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep_rehearsal
+PYTHON=python3`; `make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Research-only. This adds diagnostics and artifact-doctor
+guardrails only; it does not change source eligibility, alert routing, normal
+RSI alerts, paper/live writes, or `TRIGGERED_FADE`.
+
 ## 2026-06-30 — Operationalize notify-deep research-review digest · Codex
 **Why:** The fixture research-review digest worked, but real-profile
 `notify_llm_deep` rehearsals did not expose research-review lane accounting, so

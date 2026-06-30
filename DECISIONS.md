@@ -22,6 +22,15 @@ decision, rationale, and revisit condition.
 readiness, provider health, source-pack definitions, evidence-acquisition
 outcomes, and canonical core rows to show which source pack or provider is
 missing, degraded, budget-skipped, rejected-only, or otherwise not confirming.
+Coverage diagnostics must separate source-pack status from provider role health:
+one provider can be healthy for event intake while degraded for catalyst search,
+and a pack can be `complete`, `partial`, `degraded`, `unavailable`, or
+`not_configured` without changing eligibility by itself. Rows should carry
+explicit gap reasons and list providers missing or degraded for confirmation so
+operators know what to fix next. Degraded, unavailable, or not-configured
+coverage means absence is a coverage gap, not negative proof; strict artifact
+doctor may block fresh artifacts that mark such absence as meaningful without an
+accepted alternative source.
 These reports and daily-brief recommendations are operator diagnostics only.
 They cannot validate a candidate, promote an opportunity, loosen live
 confirmation requirements, create `TRIGGERED_FADE`, send Telegram, write normal
