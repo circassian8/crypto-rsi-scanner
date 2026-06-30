@@ -22,6 +22,7 @@ from . import (
     event_evidence_quality,
     event_impact_hypotheses,
     event_llm_evidence_planner,
+    event_source_enrichment,
     event_source_packs,
     event_source_registry,
 )
@@ -920,6 +921,7 @@ def _validate_raw_result(
         "currency_tags": currency_tags,
         "cryptopanic_currency_tag_match": assessment.cryptopanic_currency_tag_match,
         "narrative_heat": assessment.narrative_heat,
+        "source_enrichment": event_source_enrichment.source_enrichment_metadata(raw),
         **exchange_metadata,
         **structured_metadata,
         "query": plan_query.query,

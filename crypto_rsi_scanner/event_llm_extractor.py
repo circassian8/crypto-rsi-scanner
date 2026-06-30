@@ -24,6 +24,7 @@ from .event_llm_extraction_models import (
     EventLLMRawEventExtraction,
 )
 from .event_models import RawDiscoveredEvent
+from . import event_source_enrichment
 from .event_resolver import clean_text, strip_publisher_suffix
 from .llm_providers.base import LLMExtractionProvider, LLMProviderResult
 
@@ -351,7 +352,7 @@ def build_raw_event_packet(raw_event: RawDiscoveredEvent, *, prompt_version: str
     payload = raw_event.raw_json or {}
     event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else {}
     enrichment_payload = payload.get("source_enrichment") if isinstance(payload.get("source_enrichment"), Mapping) else {}
-    body = str(enrichment_payload.get("enriched_text") or raw_event.body or "")
+    body = str(event_source_enrichment.enriched_text_for_llm(raw_event) or raw_event.body or "")
     source_origin = _source_origin(raw_event.source_url) or raw_event.provider
     return {
         "schema_version": LLM_EXTRACTION_SCHEMA_VERSION,
@@ -365,6 +366,7 @@ def build_raw_event_packet(raw_event: RawDiscoveredEvent, *, prompt_version: str
         "title": raw_event.title,
         "clean_title": strip_publisher_suffix(raw_event.title),
         "body": body,
+        "source_enrichment": event_source_enrichment.source_enrichment_metadata(raw_event),
         "source_confidence": raw_event.source_confidence,
         "content_hash": raw_event.content_hash,
         "event_payload": {

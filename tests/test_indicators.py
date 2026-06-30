@@ -611,7 +611,14 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
             "source_pack": "security_shock_pack",
             "status": "accepted_evidence_found",
             "symbol": "RUNE",
-            "accepted_evidence": [{"title": "RUNE exploit update"}],
+            "accepted_evidence": [{
+                "title": "RUNE exploit update",
+                "source_enrichment": {
+                    "article_quality_status": "good",
+                    "cleaner_version": "source_enrichment_cleaner_test",
+                    "boilerplate_ratio": 0.1,
+                },
+            }],
         },
         {
             "source_pack": "listing_liquidity_pack",
@@ -662,6 +669,7 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert any("RSS" in item or "project/blog RSS" in item for item in proxy.recommended_actions)
     assert any("evidence-acquisition query/candidate budget" in item for item in proxy.recommended_actions)
     assert security.accepted_evidence_count == 1
+    assert "good=1" in security.article_quality_counts
     assert "cryptopanic" in security.missing_providers
     assert listing.provider_coverage_status == "not_configured"
     assert listing.rejected_only_count == 1
@@ -684,6 +692,7 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "providers missing for confirmation: coinalyze, cryptopanic, geckoterminal, polymarket" in text
     assert "evidence absence meaningful: false" in text
     assert "accepted=1" in text
+    assert "article quality: good=1" in text
     assert "Most useful next data source:" in text
     assert "recommended actions:" in text
     assert "configure CryptoPanic token/news coverage" in text
@@ -8566,7 +8575,11 @@ def test_event_source_enrichment_extracts_and_reuses_cache():
     <div>BTC $104000 +2.1% ETH $2500 -1.0% SOL $150 +4.4%</div>
     <article><h1>SpaceX pre-IPO exposure</h1>
     <p>Velvet Capital is named in the full article, but not the RSS summary.</p>
-    <p>Hyperliquid HYPE token traders are watching the proxy venue.</p></article></body></html>
+    <p>Hyperliquid HYPE token traders are watching the proxy venue.</p>
+    <p>The article explains the candidate asset, the external SpaceX catalyst,
+    and the direct proxy mechanism clearly enough to pass source-quality gating.</p>
+    <p>This extra body copy keeps the synthetic fixture above the thin article
+    threshold while preserving the expected article text.</p></article></body></html>
     """
     calls = {"count": 0}
 
@@ -8648,6 +8661,265 @@ def test_event_source_enrichment_uses_fixture_text_for_example_test_urls():
     assert "Velvet Capital" in result.enriched_text
     annotated = event_source_enrichment.annotate_raw_event_with_enrichment(result)
     assert annotated.raw_json["source_enrichment"]["status"] == "fixture_text_used"
+
+
+def test_event_source_enrichment_article_quality_statuses_and_llm_body_gate():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_llm_extractor, event_source_enrichment
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def raw_event(raw_id: str, url: str, title: str, body: str = "RSS summary says SpaceX pre-IPO exposure.") -> RawDiscoveredEvent:
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="rss",
+            fetched_at=now,
+            published_at=now,
+            source_url=url,
+            title=title,
+            body=body,
+            raw_json={},
+            source_confidence=0.9,
+            content_hash=raw_id,
+        )
+
+    cfg = event_source_enrichment.EventSourceEnrichmentConfig(enabled=True, min_source_confidence=0.5)
+    google_raw = raw_event(
+        "google-placeholder",
+        "https://news.google.com/rss/articles/placeholder?oc=5",
+        "SpaceX pre-IPO exposure - Google News",
+    )
+    google = event_source_enrichment.enrich_source_text(
+        google_raw,
+        cfg=cfg,
+        fetch_fn=lambda *_: "<html><title>Google News</title><body>Google News</body></html>",
+    )
+    assert google.article is not None
+    assert google.article.article_quality_status == event_source_enrichment.ARTICLE_QUALITY_REDIRECT_PLACEHOLDER
+    google_packet = event_llm_extractor.build_raw_event_packet(event_source_enrichment.annotate_raw_event_with_enrichment(google))
+    assert google_packet["body"] == google_raw.body
+    assert google_packet["source_enrichment"]["article_quality_status"] == "redirect_placeholder"
+
+    ticker_html = """
+    <html><body>
+    BTC $60000 +1% ETH $1500 -2% SOL $70 +3% XRP $1 +4% DOGE $0.10 +5%
+    ADA $0.50 +1% BNB $500 -1% TRX $0.30 +2% LINK $8 +4% HYPE $50 +5%
+    <article><h1>SpaceX pre-IPO exposure</h1>
+    <p>Velvet Capital lets users trade tokenized SpaceX pre-IPO exposure with a clear proxy mechanism.</p>
+    <p>This paragraph adds enough real article text to avoid the thin-page detector while the ticker sidebar remains obvious.</p>
+    <p>Independent source context says the proxy venue narrative is the catalyst, not a generic price table.</p>
+    </article></body></html>
+    """
+    ticker = event_source_enrichment.enrich_source_text(
+        raw_event("ticker-sidebar", "https://cointelegraph.com/news/spacex-pre-ipo-exposure", "SpaceX pre-IPO exposure"),
+        cfg=cfg,
+        fetch_fn=lambda *_: ticker_html,
+    )
+    assert ticker.article is not None
+    assert ticker.article.ticker_sidebar_detected is True
+    assert ticker.article.article_quality_status == event_source_enrichment.ARTICLE_QUALITY_BOILERPLATE_HEAVY
+
+    good_html = """
+    <html><head><title>Velvet offers SpaceX exposure</title>
+    <meta name="author" content="Reporter">
+    <meta property="article:published_time" content="2026-06-18T10:00:00Z">
+    <link rel="canonical" href="https://example.com/velvet-spacex"></head>
+    <body><article><h1>Velvet offers SpaceX exposure</h1>
+    <p>Velvet Capital lets users trade tokenized SpaceX pre-IPO exposure through its crypto venue.</p>
+    <p>The article explains why VELVET token demand may respond to the external SpaceX catalyst.</p>
+    <p>It includes the candidate asset, the external catalyst, and a direct mechanism rather than sidebar boilerplate.</p>
+    <p>Operators still need market confirmation before any research alert can be promoted.</p></article></body></html>
+    """
+    good = event_source_enrichment.enrich_source_text(
+        raw_event("good-article", "https://coindesk.com/markets/velvet-spacex", "Velvet offers SpaceX exposure"),
+        cfg=cfg,
+        fetch_fn=lambda *_: good_html,
+    )
+    assert good.article is not None
+    assert good.article.article_quality_status == event_source_enrichment.ARTICLE_QUALITY_GOOD
+    assert good.article.canonical_url == "https://example.com/velvet-spacex"
+    assert good.triage is not None
+    assert good.triage.decision == event_source_enrichment.SOURCE_TRIAGE_SEND_TO_LLM
+
+    blocked = event_source_enrichment.enrich_source_text(
+        raw_event("anti-bot", "https://news.example/blocked", "SpaceX pre-IPO exposure blocked"),
+        cfg=cfg,
+        fetch_fn=lambda *_: {"body": "<html><body>Checking your browser. Verify you are human.</body></html>", "status_code": 403},
+    )
+    assert blocked.article is not None
+    assert blocked.article.article_quality_status == event_source_enrichment.ARTICLE_QUALITY_PAYWALL_OR_BLOCKED
+    assert blocked.triage is not None
+    assert blocked.triage.decision == event_source_enrichment.SOURCE_TRIAGE_REJECT
+
+
+def test_event_source_enrichment_triage_and_fixture_source_quality_judge():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_source_enrichment
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMSourceQualityProvider
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def raw_event(raw_id: str, provider: str, url: str, body: str, raw_json=None) -> RawDiscoveredEvent:
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider=provider,
+            fetched_at=now,
+            published_at=now,
+            source_url=url,
+            title="AAVE strategic investment and listing catalyst",
+            body=body,
+            raw_json=raw_json or {},
+            source_confidence=0.9,
+            content_hash=raw_id,
+        )
+
+    article = event_source_enrichment.EventArticleExtraction(
+        extractor_version=event_source_enrichment.SOURCE_ENRICHMENT_EXTRACTOR_VERSION,
+        cleaner_version="source_enrichment_cleaner_test",
+        fetched_url="https://www.binance.com/en/support/announcement/aave",
+        final_url="https://www.binance.com/en/support/announcement/aave",
+        canonical_url="https://www.binance.com/en/support/announcement/aave",
+        body_text=(
+            "Binance announces AAVEUSDT spot listing and explains the trading pair, token identity, "
+            "and catalyst mechanics for AAVE liquidity. The official announcement is long enough "
+            "to be treated as a real article for source triage."
+        ),
+        body_char_count=220,
+        article_quality_status=event_source_enrichment.ARTICLE_QUALITY_GOOD,
+    )
+    official = event_source_enrichment.triage_source(
+        raw_event("official", "binance_announcements", "https://www.binance.com/en/support/announcement/aave", article.body_text),
+        article=article,
+    )
+    assert official.source_is_official is True
+    assert official.source_has_direct_token_mechanism is True
+    assert official.decision == event_source_enrichment.SOURCE_TRIAGE_SEND_TO_LLM
+
+    cryptopanic = event_source_enrichment.triage_source(
+        raw_event(
+            "cryptopanic",
+            "cryptopanic_news",
+            "https://cryptopanic.com/news/rune",
+            "RUNE token exploit coverage explains the hack catalyst and THORChain protocol impact.",
+            raw_json={"currency_tags": ["RUNE"]},
+        ),
+        article=article,
+    )
+    assert cryptopanic.source_has_direct_token_mechanism is True
+    assert cryptopanic.decision == event_source_enrichment.SOURCE_TRIAGE_SEND_TO_LLM
+
+    seo_article = event_source_enrichment.EventArticleExtraction(
+        extractor_version="x",
+        cleaner_version="x",
+        fetched_url="https://seo.example/binance-guide",
+        final_url="https://seo.example/binance-guide",
+        canonical_url=None,
+        body_text="Register Binance now with referral code USD777 and sign up now for lifetime fee bonus.",
+        body_char_count=95,
+        article_quality_status=event_source_enrichment.ARTICLE_QUALITY_BOILERPLATE_HEAVY,
+        warnings=("boilerplate_heavy",),
+    )
+    seo = event_source_enrichment.triage_source(
+        raw_event("seo", "rss", "https://seo.example/binance-guide", seo_article.body_text),
+        article=seo_article,
+    )
+    assert seo.source_is_affiliate_or_seo is True
+    assert seo.decision == event_source_enrichment.SOURCE_TRIAGE_DIAGNOSTIC_ONLY
+
+    recap = event_source_enrichment.triage_source(
+        raw_event("recap", "rss", "https://news.example/market-recap", "Market recap and price prediction for AAVE token today."),
+        article=article,
+    )
+    assert recap.source_is_recapped_news is True
+    assert recap.source_quality_score < official.source_quality_score
+
+    prediction_context = event_source_enrichment.triage_source(
+        raw_event("poly", "polymarket", "https://polymarket.com/event/world-cup", "Prediction market context for World Cup odds."),
+        article=article,
+    )
+    assert prediction_context.decision == event_source_enrichment.SOURCE_TRIAGE_RAW_OBSERVATION
+
+    annotated = event_source_enrichment.annotate_raw_event_with_enrichment(
+        event_source_enrichment.EventSourceEnrichmentResult(
+            raw_event=raw_event("seo-judge", "rss", "https://seo.example/binance-guide", seo_article.body_text),
+            enriched_text=seo_article.body_text,
+            article=seo_article,
+            triage=seo,
+            status=seo_article.article_quality_status,
+        )
+    )
+    provider = FixtureLLMSourceQualityProvider(cases={
+        "seo-judge": {
+            "is_real_article": True,
+            "article_quality_status": "good",
+            "source_quality_score": 95,
+            "reason": "LLM incorrectly trusts the page",
+            "warnings": [],
+        },
+        "real-judge": {
+            "is_real_article": True,
+            "article_quality_status": "good",
+            "source_quality_score": 88,
+            "reason": "real article",
+            "warnings": [],
+        },
+        "boilerplate-judge": {
+            "is_real_article": False,
+            "article_quality_status": "boilerplate_heavy",
+            "source_quality_score": 22,
+            "reason": "mostly navigation",
+            "warnings": ["boilerplate"],
+        },
+    })
+    unsafe = event_source_enrichment.run_source_quality_judge(
+        annotated,
+        provider=provider,
+        cfg=event_source_enrichment.EventSourceQualityJudgeConfig(enabled=True, min_importance_score=0),
+    )
+    assert unsafe is not None
+    assert unsafe.is_real_article is False
+    assert unsafe.source_quality_score <= 35
+    assert "deterministic_triage_override" in unsafe.warnings
+
+    real_raw = event_source_enrichment.annotate_raw_event_with_enrichment(
+        event_source_enrichment.EventSourceEnrichmentResult(
+            raw_event=raw_event("real-judge", "rss", "https://coindesk.com/aave", article.body_text),
+            enriched_text=article.body_text,
+            article=article,
+            triage=official,
+            status=article.article_quality_status,
+        )
+    )
+    real = event_source_enrichment.run_source_quality_judge(
+        real_raw,
+        provider=provider,
+        cfg=event_source_enrichment.EventSourceQualityJudgeConfig(enabled=True, min_importance_score=0),
+    )
+    assert real is not None
+    assert real.is_real_article is True
+    assert real.article_quality_status == "good"
+
+    boilerplate = event_source_enrichment.run_source_quality_judge(
+        RawDiscoveredEvent(
+            raw_id="boilerplate-judge",
+            provider="fixture",
+            fetched_at=now,
+            published_at=now,
+            source_url="https://fixture.test/boilerplate",
+            title="Boilerplate source",
+            body="Boilerplate",
+            raw_json={},
+            source_confidence=0.9,
+            content_hash="boilerplate-judge",
+        ),
+        provider=provider,
+        cfg=event_source_enrichment.EventSourceQualityJudgeConfig(enabled=True, min_importance_score=0),
+    )
+    assert boilerplate is not None
+    assert boilerplate.article_quality_status == "boilerplate_heavy"
+    assert boilerplate.is_real_article is False
 
 
 def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
@@ -9673,7 +9945,12 @@ def test_event_alpha_pipeline_source_enrichment_runs_before_llm_extraction():
             min_source_confidence=0.50,
         ),
         source_enrichment_fetch_fn=lambda url, timeout: (
-            "<html><body>Velvet Capital users can trade SpaceX pre-IPO exposure.</body></html>"
+            "<html><body><article>"
+            "Velvet Capital users can trade SpaceX pre-IPO exposure through a tokenized venue. "
+            "The source names Velvet Capital, the SpaceX pre-IPO catalyst, and the direct proxy mechanism. "
+            "This additional paragraph keeps the fixture above the thin-page threshold while preserving "
+            "the exact quote used by the offline LLM extraction fixture."
+            "</article></body></html>"
         ),
         refresh_watchlist=False,
         route=False,

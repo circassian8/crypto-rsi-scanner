@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - Article enrichment quality gates LLM source text
+**Status:** accepted
+**Decision:** Event Alpha source enrichment must persist auditable article
+extraction metadata before downstream LLM extraction or catalyst-frame analysis
+uses fetched article bodies. Enriched source rows should record extractor and
+cleaner versions, fetched/final/canonical URLs, redirect chain, title/byline/
+source/published metadata when available, body text, body length, boilerplate
+ratio, ticker-sidebar detection, deterministic source triage, and an
+`article_quality_status` such as `good`, `thin`, `boilerplate_heavy`,
+`redirect_placeholder`, `paywall_or_blocked`, `fetch_failed`, or
+`fixture_text_used`. Only good or fixture text can replace the raw source
+summary in LLM packets; placeholders, blocked pages, boilerplate-heavy pages,
+affiliate/SEO pages, market recaps, and context-only prediction-market pages
+remain raw observations or diagnostics unless another strict source path
+confirms them. Optional LLM source-quality judging is advisory and constrained
+by deterministic triage; it cannot override hard deterministic quality caps.
+**Why:** Bad fetched text, especially Google News placeholders, ticker sidebars,
+and referral/SEO pages, can poison LLM extraction, catalyst frames, evidence
+scoring, and operator notifications if treated as reliable article evidence.
+**Revisit when:** The source-enrichment layer moves to a typed extraction
+service with domain-specific cleaners and reviewed precision/recall metrics.
+
 ## 2026-06-30 - Derivatives, DEX liquidity, and protocol metrics are market evidence only
 **Status:** accepted
 **Decision:** Event Alpha may use Coinalyze-style derivatives snapshots,

@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Rebuild source enrichment quality gates · Codex
+**Why:** Google News placeholders, ticker-sidebar pages, blocked pages, and
+affiliate/SEO article text can poison Event Alpha LLM extraction, catalyst
+frames, evidence scoring, and notification quality if treated like reliable
+source bodies.
+**Changes:**
+- Source enrichment cache rows now use schema v3 and persist extractor/cleaner
+  versions, fetched/final/canonical URLs, redirect chains, article metadata,
+  cleaned body text, body length, boilerplate ratio, ticker-sidebar detection,
+  article quality status, and deterministic source triage metadata.
+- LLM raw-event extraction and catalyst-frame packets now only consume enriched
+  article bodies when the quality gate says the body is usable (`good` or
+  `fixture_text_used`); placeholders, blocked pages, thin pages, boilerplate,
+  SEO/referral pages, recap pages, and context-only prediction-market rows stay
+  as raw summaries or diagnostics.
+- Added a fixture-backed optional source-quality judge interface whose output is
+  constrained by deterministic triage, so unsafe LLM source-quality output
+  cannot override hard quality caps.
+- Evidence acquisition samples now carry source-enrichment metadata, and cards,
+  opportunity audits, daily briefs, and source-coverage reports show article
+  quality when evidence rows include it.
+- Expanded tests for Google News placeholders, anti-bot/403 pages, ticker-heavy
+  boilerplate pages, fixture text, good articles, triage decisions, source
+  quality judge fixtures, LLM body gating, and article-quality source coverage.
+**Verify:** `python3 tests/test_indicators.py` (568/568 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=evidence_acquisition_smoke
+PYTHON=python3`; `make verify PYTHON=python3`; `python3 -m compileall -q
+crypto_rsi_scanner tests`.
+**Notes/risks:** Research-only. Article/source quality can cap or diagnose LLM
+source text, but it cannot validate candidates, send Telegram, trade, paper
+trade, write normal RSI rows, or create `TRIGGERED_FADE`.
+
 ## 2026-06-30 — Add advanced Event Alpha market confirmation · Codex
 **Why:** Event Alpha source and impact-path validation was stronger, but
 operator-facing market confirmation was still too spot-price-centric. Derivative

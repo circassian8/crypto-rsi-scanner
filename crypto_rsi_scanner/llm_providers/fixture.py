@@ -162,6 +162,62 @@ class FixtureLLMCatalystFrameProvider:
             return self._cases
 
 
+class FixtureLLMSourceQualityProvider:
+    name = "fixture"
+
+    def __init__(
+        self,
+        path: str | Path | None = None,
+        *,
+        required: bool = False,
+        cases: Mapping[str, Mapping[str, Any]] | None = None,
+    ) -> None:
+        self.path = Path(path).expanduser() if path else _default_source_quality_fixture_path()
+        self.required = required
+        self._cases: dict[str, dict[str, Any]] | None = {str(key): dict(value) for key, value in cases.items()} if cases else None
+
+    def judge_source_quality(self, packet: Mapping[str, Any]) -> LLMProviderResult:
+        cases = self._load_cases()
+        for key in _source_quality_packet_keys(packet):
+            raw = cases.get(key)
+            if raw is not None:
+                return LLMProviderResult(raw=dict(raw))
+        return LLMProviderResult(warning=f"fixture LLM source quality not found for raw event {packet.get('raw_id')}")
+
+    def _load_cases(self) -> dict[str, dict[str, Any]]:
+        if self._cases is not None:
+            return self._cases
+        if self.path is None or not self.path.exists():
+            if self.required:
+                raise FileNotFoundError(f"fixture LLM source-quality cases not found: {self.path}")
+            log.warning("Fixture LLM source-quality cases missing: %s", self.path)
+            self._cases = {}
+            return self._cases
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            outputs = raw.get("llm_source_quality", raw) if isinstance(raw, dict) else raw
+            if not isinstance(outputs, list):
+                raise ValueError("fixture LLM source-quality cases must be a list or {'llm_source_quality': [...]}")
+            cases: dict[str, dict[str, Any]] = {}
+            for item in outputs:
+                if not isinstance(item, Mapping):
+                    raise ValueError("fixture LLM source-quality entries must be objects")
+                judgment = item.get("judgment") if isinstance(item.get("judgment"), Mapping) else item
+                keys = _source_quality_case_keys(item)
+                if not keys:
+                    raise ValueError("fixture LLM source-quality case missing case_id/raw_id/source_url")
+                for key in keys:
+                    cases[key] = dict(judgment)
+            self._cases = cases
+            return cases
+        except Exception as exc:  # noqa: BLE001
+            if self.required:
+                raise
+            log.warning("Fixture LLM source-quality load failed: %s", exc)
+            self._cases = {}
+            return self._cases
+
+
 def _default_fixture_path() -> Path:
     return Path(__file__).resolve().parents[2] / "fixtures" / "event_discovery" / "llm_golden_cases.json"
 
@@ -172,6 +228,10 @@ def _default_extraction_fixture_path() -> Path:
 
 def _default_catalyst_frame_fixture_path() -> Path:
     return Path(__file__).resolve().parents[2] / "fixtures" / "event_discovery" / "llm_catalyst_frame_cases.json"
+
+
+def _default_source_quality_fixture_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "fixtures" / "event_discovery" / "llm_source_quality_cases.json"
 
 
 def _case_keys(item: Mapping[str, Any]) -> tuple[str, ...]:
@@ -236,6 +296,24 @@ def _catalyst_frame_case_keys(item: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def _catalyst_frame_packet_keys(packet: Mapping[str, Any]) -> tuple[str, ...]:
+    raw_keys = (
+        packet.get("case_id"),
+        packet.get("raw_id"),
+        packet.get("source_url"),
+    )
+    return tuple(str(key) for key in raw_keys if key)
+
+
+def _source_quality_case_keys(item: Mapping[str, Any]) -> tuple[str, ...]:
+    raw_keys = (
+        item.get("case_id"),
+        item.get("raw_id"),
+        item.get("source_url"),
+    )
+    return tuple(str(key) for key in raw_keys if key)
+
+
+def _source_quality_packet_keys(packet: Mapping[str, Any]) -> tuple[str, ...]:
     raw_keys = (
         packet.get("case_id"),
         packet.get("raw_id"),

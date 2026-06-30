@@ -72,6 +72,19 @@ and source-pack sufficiency booleans. Treat these rows as audit evidence; they
 can improve a local research verdict only after deterministic identity,
 catalyst-link, impact-path, source-quality, and quality-gate checks pass.
 
+Source enrichment is now quality-gated before LLM extraction or catalyst-frame
+analysis can consume fetched article bodies. Enrichment cache rows should carry
+`extractor_version`, `cleaner_version`, fetched/final/canonical URLs, redirect
+chain, title/byline/source/published metadata when available, `body_char_count`,
+`boilerplate_ratio`, `ticker_sidebar_detected`, deterministic `source_triage`,
+and `article_quality_status`. Only `good` and `fixture_text_used` bodies replace
+the original provider summary in LLM packets. `redirect_placeholder`,
+`paywall_or_blocked`, `fetch_failed`, `thin`, `boilerplate_heavy`,
+affiliate/SEO, recap, and context-only prediction-market rows should remain
+raw observations or diagnostics unless another strict evidence source validates
+the token and catalyst. Cards, audits, daily briefs, and source coverage reports
+show article-quality status when evidence rows carry enrichment metadata.
+
 Use the source coverage dashboard when a run produces few or no strict
 research-alert decisions and you need to see whether the blocker is missing
 CryptoPanic/exchange/calendar/unlock/derivatives/market evidence, provider

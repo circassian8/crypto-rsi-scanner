@@ -31,3 +31,10 @@ class LLMCatalystFrameProvider(Protocol):
 
     def analyze_catalyst_frames(self, packet: Mapping[str, Any]) -> LLMProviderResult:
         """Return one structured catalyst-frame analysis for raw event evidence."""
+
+
+class LLMSourceQualityProvider(Protocol):
+    name: str
+
+    def judge_source_quality(self, packet: Mapping[str, Any]) -> LLMProviderResult:
+        """Return one structured source-quality judgment for raw source evidence."""

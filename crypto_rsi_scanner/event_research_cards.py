@@ -1679,6 +1679,7 @@ def _source_acquisition_lines(
             if accepted_evidence
             else "none"
         ),
+        "- Article/source quality: " + _source_enrichment_summary(accepted_evidence),
         "- Evidence needed: " + ("; ".join(str(item) for item in list(needed or ())[:5]) if needed else "; ".join(pack.minimum_evidence[:4])),
         f"- Planned queries: {len(queries or ()) if isinstance(queries, Iterable) and not isinstance(queries, (str, bytes, Mapping)) else 0}",
         "- Provider/source gaps: " + ("; ".join(str(item) for item in list(failures or ())[:4]) if failures else "none"),
@@ -1754,7 +1755,38 @@ def _accepted_evidence_sample_text(item: object) -> str:
     materiality = item.get("unlock_materiality")
     if materiality:
         details.append(f"materiality={materiality}")
+    enrichment = item.get("source_enrichment") if isinstance(item.get("source_enrichment"), Mapping) else {}
+    quality_status = enrichment.get("article_quality_status")
+    if quality_status:
+        details.append(f"article={quality_status}")
     return title + (f" ({'; '.join(details)})" if details else "")
+
+
+def _source_enrichment_summary(items: object) -> str:
+    if not isinstance(items, Iterable) or isinstance(items, (str, bytes, Mapping)):
+        return "not available"
+    parts: list[str] = []
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        enrichment = item.get("source_enrichment") if isinstance(item.get("source_enrichment"), Mapping) else {}
+        status = enrichment.get("article_quality_status")
+        cleaner = enrichment.get("cleaner_version")
+        ratio = enrichment.get("boilerplate_ratio")
+        triage = enrichment.get("source_triage_decision")
+        warnings = enrichment.get("warnings") or ()
+        if status:
+            detail = f"{status}"
+            if cleaner:
+                detail += f" cleaner={cleaner}"
+            if ratio not in (None, ""):
+                detail += f" boilerplate={ratio}"
+            if triage:
+                detail += f" triage={triage}"
+            if warnings:
+                detail += " warnings=" + ",".join(str(warning) for warning in list(warnings)[:3])
+            parts.append(detail)
+    return "; ".join(parts[:3]) if parts else "not available"
 
 
 def _human_contract_value(value: object) -> str:

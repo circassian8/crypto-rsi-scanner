@@ -948,18 +948,25 @@ def _source_coverage_summary_lines(
         if str(row.get("status") or "") == event_evidence_acquisition.EvidenceAcquisitionStatus.REJECTED_RESULTS_ONLY.value
     )
     accepted_by_source_class: dict[str, int] = {}
+    article_quality_counts: dict[str, int] = {}
     for row in executed_rows:
-        evidence_items = row.get("accepted_evidence") or ()
-        if isinstance(evidence_items, Mapping):
-            evidence_items = (evidence_items,)
-        for evidence in evidence_items:
-            if not isinstance(evidence, Mapping):
-                continue
+        evidence_items = (*_evidence_items(row.get("accepted_evidence")), *_evidence_items(row.get("rejected_evidence_samples") or row.get("rejected_evidence")))
+        accepted_items = _evidence_items(row.get("accepted_evidence"))
+        for evidence in accepted_items:
             source_class = str(evidence.get("source_class") or "unknown")
             accepted_by_source_class[source_class] = accepted_by_source_class.get(source_class, 0) + 1
+        for evidence in evidence_items:
+            enrichment = evidence.get("source_enrichment") if isinstance(evidence.get("source_enrichment"), Mapping) else {}
+            status = str(enrichment.get("article_quality_status") or "").strip()
+            if status:
+                article_quality_counts[status] = article_quality_counts.get(status, 0) + 1
     accepted_source_text = ", ".join(
         f"{source_class}={count}"
         for source_class, count in sorted(accepted_by_source_class.items(), key=lambda item: (-item[1], item[0]))
+    ) or "none"
+    article_quality_text = ", ".join(
+        f"{status}={count}"
+        for status, count in sorted(article_quality_counts.items(), key=lambda item: (-item[1], item[0]))
     ) or "none"
     next_source = _source_coverage_next_source(gaps, executed_rows)
     return [
@@ -976,6 +983,7 @@ def _source_coverage_summary_lines(
             f"rejected_only={rejected_only}"
         ),
         f"- Accepted evidence by source class: {accepted_source_text}",
+        f"- Source enrichment article quality: {article_quality_text}",
         f"- Source coverage gaps: {len(gaps)} candidate(s) need healthier or more specific source coverage.",
         f"- What data source would most improve next run: {next_source}",
         "- Evidence absence rule: broad/degraded RSS/GDELT/Polymarket gaps are not treated as strong negative proof.",
@@ -1010,6 +1018,14 @@ def _source_coverage_next_source(
         "perp_listing_squeeze_pack": "official perp listing plus Coinalyze OI/funding",
     }
     return suggestions.get(pack, f"{pack} source-pack evidence")
+
+
+def _evidence_items(value: object) -> tuple[Mapping[str, Any], ...]:
+    if isinstance(value, Mapping):
+        return (value,)
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+        return tuple(item for item in value if isinstance(item, Mapping))
+    return ()
 
 
 def _provider_health_by_pack_lines(provider_health_rows: Mapping[str, Mapping[str, Any]]) -> list[str]:

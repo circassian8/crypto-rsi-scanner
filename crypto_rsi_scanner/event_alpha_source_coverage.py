@@ -112,6 +112,7 @@ class EventAlphaSourceCoveragePack:
     rejected_only_count: int = 0
     skipped_budget_count: int = 0
     provider_unavailable_count: int = 0
+    article_quality_counts: tuple[str, ...] = ()
     recommended_actions: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
@@ -134,6 +135,7 @@ class EventAlphaSourceCoveragePack:
             "rejected_only_count": self.rejected_only_count,
             "skipped_budget_count": self.skipped_budget_count,
             "provider_unavailable_count": self.provider_unavailable_count,
+            "article_quality_counts": list(self.article_quality_counts),
             "recommended_actions": list(self.recommended_actions),
         }
 
@@ -194,6 +196,7 @@ def build_source_coverage_report(
         rejected_only = sum(1 for row in pack_rows if _status(row) == "rejected_results_only")
         skipped_budget = sum(1 for row in pack_rows if _status(row) == "skipped_budget")
         unavailable = sum(1 for row in pack_rows if _status(row) in {"provider_unavailable", "provider_backoff", "failed_soft", "skipped_config"})
+        article_quality_counts = _article_quality_counts(pack_rows)
         blocked = _coverage_blocked_count(pack_name, pack_rows=pack_rows, core_rows=core_rows)
         absence_meaningful = _evidence_absence_meaningful(pack_name, healthy, degraded)
         coverage_status = _pack_coverage_status(
@@ -244,6 +247,7 @@ def build_source_coverage_report(
                 rejected_only_count=rejected_only,
                 skipped_budget_count=skipped_budget,
                 provider_unavailable_count=unavailable,
+                article_quality_counts=article_quality_counts,
                 recommended_actions=recommended_actions,
             )
         )
@@ -291,6 +295,7 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
                     f"skipped_budget={pack.skipped_budget_count} "
                     f"provider_unavailable={pack.provider_unavailable_count}"
                 ),
+                f"  article quality: {_join(pack.article_quality_counts)}",
                 f"  candidates blocked by coverage gap: {pack.candidates_blocked_by_coverage_gap}",
                 f"  recommended actions: {_join(pack.recommended_actions)}",
             ]
@@ -384,6 +389,25 @@ def _accepted_count(row: Mapping[str, Any]) -> int:
     if isinstance(accepted, tuple):
         return len(accepted)
     return 1 if accepted else 0
+
+
+def _article_quality_counts(rows: Iterable[Mapping[str, Any]]) -> tuple[str, ...]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        for evidence in (*_evidence_items(row.get("accepted_evidence")), *_evidence_items(row.get("rejected_evidence_samples") or row.get("rejected_evidence"))):
+            enrichment = evidence.get("source_enrichment") if isinstance(evidence.get("source_enrichment"), Mapping) else {}
+            status = str(enrichment.get("article_quality_status") or "").strip()
+            if status:
+                counts[status] = counts.get(status, 0) + 1
+    return tuple(f"{key}={value}" for key, value in sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
+def _evidence_items(value: object) -> tuple[Mapping[str, Any], ...]:
+    if isinstance(value, Mapping):
+        return (value,)
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+        return tuple(item for item in value if isinstance(item, Mapping))
+    return ()
 
 
 def _coverage_blocked_count(

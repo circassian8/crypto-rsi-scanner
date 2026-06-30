@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_catalyst_frames, event_claim_semantics
+from . import event_catalyst_frames, event_claim_semantics, event_source_enrichment
 from .event_models import NormalizedEvent, RawDiscoveredEvent
 from .event_resolver import clean_text
 from .llm_providers.base import LLMCatalystFrameProvider, LLMProviderResult
@@ -263,8 +263,7 @@ def build_catalyst_frame_packet(
 ) -> dict[str, Any]:
     cfg = cfg or EventLLMCatalystFrameConfig()
     payload = raw_event.raw_json if isinstance(raw_event.raw_json, Mapping) else {}
-    enrichment = payload.get("source_enrichment") if isinstance(payload.get("source_enrichment"), Mapping) else {}
-    enriched_text = str(enrichment.get("enriched_text") or "") if cfg.use_enriched_text else ""
+    enriched_text = event_source_enrichment.enriched_text_for_llm(raw_event) if cfg.use_enriched_text else ""
     packet = {
         "schema_version": LLM_CATALYST_FRAME_SCHEMA_VERSION,
         "prompt_version": cfg.prompt_version,
@@ -277,6 +276,7 @@ def build_catalyst_frame_packet(
         "title": raw_event.title,
         "body": raw_event.body,
         "enriched_text": enriched_text,
+        "source_enrichment": event_source_enrichment.source_enrichment_metadata(raw_event),
         "event": {
             "event_id": event.event_id,
             "event_name": event.event_name,
@@ -481,9 +481,7 @@ def _quote_found(quote: str, source_text: str) -> bool:
 
 
 def _enriched_text(raw: RawDiscoveredEvent) -> str:
-    payload = raw.raw_json if isinstance(raw.raw_json, Mapping) else {}
-    enrichment = payload.get("source_enrichment") if isinstance(payload.get("source_enrichment"), Mapping) else {}
-    return str(enrichment.get("enriched_text") or "")
+    return event_source_enrichment.enriched_text_for_llm(raw)
 
 
 def _string(value: Any) -> str:
