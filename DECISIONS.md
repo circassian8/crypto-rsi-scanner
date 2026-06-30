@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - Structured calendar and unlock evidence has pack-specific proof obligations
+**Status:** accepted
+**Decision:** Event Alpha may treat CoinMarketCal-style structured calendar
+events and Tokenomist-style structured unlock rows as first-class source-pack
+evidence only when they preserve explicit token identity, event-time provenance,
+source class/mission, source confidence, and playbook-specific structured
+metadata. Structured calendar rows can prove dated project/direct-token catalyst
+evidence when the event type is specific enough, such as mainnet launch or
+protocol upgrade; low-authority calendar items such as generic AMAs stay
+local/review-only unless other stronger evidence exists. Structured unlock rows
+can prove supply/unlock evidence only when unlock size/materiality is known and
+the unlock is not stale; small, missing-materiality, or stale unlock rows cannot
+by themselves satisfy validated digest/watchlist/high-priority source-pack
+requirements. These sources still route through deterministic resolver,
+identity, catalyst-link, impact-path, source-quality, live-confirmation, router,
+and `event_fade.py` gates, and cannot send Telegram, write normal RSI rows,
+paper trade, live trade, or create `TRIGGERED_FADE`.
+**Why:** Structured calendars and unlock feeds are higher authority than broad
+news for dated catalysts and supply pressure, but over-promoting generic
+calendar posts or unquantified unlocks would make live burn-in too noisy.
+**Revisit when:** Reviewed outcomes show specific calendar categories or unlock
+materiality thresholds need playbook-specific calibration.
+
 ## 2026-06-30 - CryptoPanic tags and exchange announcements are first-class evidence
 **Status:** accepted
 **Decision:** Event Alpha may treat matching CryptoPanic currency-tag evidence

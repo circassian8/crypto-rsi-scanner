@@ -8,6 +8,7 @@ evidence planning only; they do not create alert tiers or event-fade triggers.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
 from . import event_source_registry
@@ -98,16 +99,37 @@ SOURCE_PACKS: dict[str, SourcePack] = {
         ),
         preferred_providers=("tokenomist", "project_blog_rss", "etherscan", "arkham", "dune"),
         minimum_evidence=("unlock size", "unlock time", "circulating/float impact"),
-        validation_requirements=("structured_unlock_source", "supply_pressure", "token_identity"),
-        sufficient_for_validated_digest=("structured_unlock_source", "token_identity"),
-        required_for_watchlist=("structured_unlock_source", "supply_pressure", "market_confirmation"),
-        required_for_high_priority=("structured_unlock_source", "large_unlock", "thin_liquidity"),
+        validation_requirements=("structured_unlock_source", "unlock_materiality", "token_identity"),
+        sufficient_for_validated_digest=("structured_unlock_source", "token_identity", "material_unlock"),
+        required_for_watchlist=("structured_unlock_source", "material_unlock", "market_confirmation"),
+        required_for_high_priority=("structured_unlock_source", "large_unlock", "strong_market_confirmation"),
         impact_path_validating_sources=(
             event_source_registry.SourceClass.STRUCTURED_UNLOCK.value,
             event_source_registry.SourceClass.SUPPLY_DATA.value,
         ),
         impact_path_families=("unlock_supply_event", "unlock_supply_pressure"),
         supply_refresh_required=True,
+    ),
+    "project_event_pack": SourcePack(
+        name="project_event_pack",
+        playbooks=("direct_event", "project_event", "mainnet_launch", "protocol_upgrade"),
+        preferred_source_classes=(
+            event_source_registry.SourceClass.OFFICIAL_PROJECT.value,
+            event_source_registry.SourceClass.STRUCTURED_CALENDAR.value,
+            event_source_registry.SourceClass.CRYPTO_NEWS.value,
+        ),
+        preferred_providers=("project_blog_rss", "coinmarketcal", "coindar", "messari", "cryptopanic"),
+        minimum_evidence=("dated project event", "token/project identity", "event category"),
+        validation_requirements=("event_time_confirmation", "token_identity", "direct_project_event"),
+        sufficient_for_validated_digest=("event_time_confirmation", "token_identity", "direct_project_event"),
+        required_for_watchlist=("event_time_confirmation", "token_identity", "market_confirmation"),
+        required_for_high_priority=("event_time_confirmation", "token_identity", "strong_market_confirmation"),
+        impact_path_validating_sources=(
+            event_source_registry.SourceClass.OFFICIAL_PROJECT.value,
+            event_source_registry.SourceClass.STRUCTURED_CALENDAR.value,
+        ),
+        impact_path_families=("direct_token_event", "direct_protocol_event", "project_event"),
+        market_refresh_required=True,
     ),
     "proxy_preipo_rwa_pack": SourcePack(
         name="proxy_preipo_rwa_pack",
@@ -322,6 +344,8 @@ def source_pack_for_playbook(
         return SOURCE_PACKS["listing_liquidity_pack"]
     if "unlock" in text or "vesting" in text or "supply" in text:
         return SOURCE_PACKS["unlock_supply_pack"]
+    if any(term in text for term in ("mainnet", "hard fork", "hard_fork", "protocol_upgrade", "direct_protocol", "project_event", "governance")):
+        return SOURCE_PACKS["project_event_pack"]
     if "spacex" in text or "preipo" in text or "pre-ipo" in text or "rwa" in text or "tokenized_stock" in text or "venue_value_capture" in text:
         return SOURCE_PACKS["proxy_preipo_rwa_pack"]
     if "ai_ipo" in text or "openai" in text or "anthropic" in text:
@@ -370,10 +394,28 @@ def evaluate_pack_evidence(
         missing.append("derivatives_confirmation")
     if selected.supply_refresh_required and not _has_field(row, ("supply_pressure", "unlock_pct_circulating", "supply_event")):
         missing.append("supply_confirmation")
+    if selected.name == "unlock_supply_pack":
+        if _unlock_pct_normalized(row) is None:
+            missing.append("needs_supply_materiality")
+        elif not _unlock_is_material(row):
+            missing.append("unlock_not_material")
+        if _unlock_is_stale(row):
+            missing.append("stale_unlock_data")
+    if selected.name == "project_event_pack" and _calendar_event_is_low_authority(row):
+        missing.append("low_authority_calendar_event")
     met_tokens = _met_requirement_tokens(row, assessment=assessment, impact_path_validating=impact_path_validating)
     digest_sufficient = _requirements_met(selected.sufficient_for_validated_digest, met_tokens)
     watchlist_ready = digest_sufficient and _requirements_met(selected.required_for_watchlist, met_tokens)
     high_priority_ready = watchlist_ready and _requirements_met(selected.required_for_high_priority, met_tokens)
+    digest_blockers = {
+        "source_is_context_only",
+        "impact_path_validating_source",
+        "needs_supply_materiality",
+        "unlock_not_material",
+        "stale_unlock_data",
+        "low_authority_calendar_event",
+    }
+    digest_allowed = digest_sufficient and not context_only and not any(reason in digest_blockers for reason in missing)
     return {
         **selected.to_metadata(),
         **assessment.to_metadata(),
@@ -383,9 +425,9 @@ def evaluate_pack_evidence(
         "source_pack_met_requirements": tuple(sorted(met_tokens)),
         "source_pack_missing_evidence": tuple(dict.fromkeys(missing)),
         "source_pack_requirements_met": not missing and assessment.provider_coverage_status == event_source_registry.ProviderCoverageStatus.COMPLETE.value,
-        "source_pack_validated_digest_sufficient": digest_sufficient and not context_only,
-        "source_pack_watchlist_requirements_met": watchlist_ready and not context_only,
-        "source_pack_high_priority_requirements_met": high_priority_ready and not context_only,
+        "source_pack_validated_digest_sufficient": digest_allowed,
+        "source_pack_watchlist_requirements_met": watchlist_ready and digest_allowed,
+        "source_pack_high_priority_requirements_met": high_priority_ready and digest_allowed,
     }
 
 
@@ -428,7 +470,9 @@ def _met_requirement_tokens(
     if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_PROJECT.value:
         tokens.update({"official_project_source", "official_source", "official_or_second_source"})
     if assessment.source_class == event_source_registry.SourceClass.STRUCTURED_UNLOCK.value:
-        tokens.update({"structured_unlock_source", "supply_pressure"})
+        tokens.update({"structured_unlock_source", "event_time_confirmation", "supply_confirmation"})
+    if assessment.source_class == event_source_registry.SourceClass.STRUCTURED_CALENDAR.value:
+        tokens.update({"structured_calendar_source", "event_time_confirmation"})
     if assessment.source_class == event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value:
         tokens.update({"second_source_confirmation", "official_or_second_source", "source_quality"})
     if _has_field(row, ("market_confirmation_score", "market_confirmation", "return_24h", "volume_zscore_24h")):
@@ -439,11 +483,17 @@ def _met_requirement_tokens(
     if _has_field(row, ("derivatives_crowding", "funding_rate", "open_interest_24h_change_pct")):
         tokens.add("derivatives_confirmation")
     if _has_field(row, ("supply_pressure", "unlock_pct_circulating", "supply_event")):
-        tokens.update({"supply_confirmation", "supply_pressure"})
+        tokens.add("supply_confirmation")
+    if _unlock_is_material(row):
+        tokens.update({"supply_pressure", "unlock_materiality", "material_unlock"})
+    if _unlock_is_large(row):
+        tokens.add("large_unlock")
     text = " ".join(str(row.get(key) or "") for key in ("title", "body", "event_name", "impact_path_type", "impact_category")).casefold()
     if any(term in text for term in ("meme", "election", "proxy", "attention")):
         tokens.add("meme_or_proxy_attention_path")
-    if "large unlock" in text or (_float_from_row(row, ("unlock_pct_circulating",)) or 0.0) >= 5.0:
+    if _calendar_direct_project_event(row, text):
+        tokens.update({"direct_project_event", "direct_protocol_event", "direct_token_event"})
+    if "large unlock" in text:
         tokens.add("large_unlock")
     if "thin liquidity" in text:
         tokens.add("thin_liquidity")
@@ -482,3 +532,80 @@ def _float_from_row(row: Mapping[str, Any], keys: Iterable[str]) -> float | None
             except (TypeError, ValueError, AttributeError):
                 continue
     return None
+
+
+def _unlock_pct_normalized(row: Mapping[str, Any]) -> float | None:
+    value = _float_from_row(row, ("unlock_pct_circulating", "percent_of_circulating_supply"))
+    if value is None:
+        supply = row.get("supply") if isinstance(row.get("supply"), Mapping) else {}
+        try:
+            raw = supply.get("unlock_pct_circulating") or supply.get("percent_of_circulating_supply")
+            value = float(raw) if raw not in (None, "") else None
+        except (TypeError, ValueError, AttributeError):
+            value = None
+    if value is None:
+        return None
+    return value / 100.0 if value > 1.0 else value
+
+
+def _unlock_is_material(row: Mapping[str, Any]) -> bool:
+    materiality = str(row.get("unlock_materiality") or "").casefold()
+    if materiality in {"material", "large"}:
+        return True
+    pct = _unlock_pct_normalized(row)
+    return pct is not None and pct >= 0.05
+
+
+def _unlock_is_large(row: Mapping[str, Any]) -> bool:
+    materiality = str(row.get("unlock_materiality") or "").casefold()
+    if materiality == "large":
+        return True
+    pct = _unlock_pct_normalized(row)
+    return pct is not None and pct >= 0.10
+
+
+def _unlock_is_stale(row: Mapping[str, Any]) -> bool:
+    unlock_time = _datetime_from_row(row, ("unlock_time", "unlock_date", "event_time", "timestamp"))
+    observed_at = _datetime_from_row(row, ("as_of", "observed_at", "evaluated_at", "run_started_at"))
+    if unlock_time is None or observed_at is None:
+        return False
+    return unlock_time < observed_at
+
+
+def _datetime_from_row(row: Mapping[str, Any], keys: Iterable[str]) -> datetime | None:
+    for key in keys:
+        for source in (row, row.get("event") if isinstance(row.get("event"), Mapping) else {}, row.get("supply") if isinstance(row.get("supply"), Mapping) else {}):
+            try:
+                value = source.get(key)  # type: ignore[union-attr]
+            except AttributeError:
+                continue
+            if value in (None, ""):
+                continue
+            if isinstance(value, datetime):
+                return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+            text = str(value).replace("Z", "+00:00")
+            try:
+                parsed = datetime.fromisoformat(text)
+            except ValueError:
+                continue
+            return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+    return None
+
+
+def _calendar_direct_project_event(row: Mapping[str, Any], text: str) -> bool:
+    event_type = str(row.get("event_type") or row.get("calendar_event_type") or "").casefold()
+    event_payload = row.get("event") if isinstance(row.get("event"), Mapping) else {}
+    event_type = event_type or str(event_payload.get("event_type") or "").casefold()
+    category = str(row.get("event_category") or event_payload.get("event_category") or "").casefold()
+    source = " ".join((text, event_type, category))
+    return any(term in source for term in ("mainnet", "hard fork", "protocol upgrade", "protocol_upgrade", "governance", "tge", "airdrop"))
+
+
+def _calendar_event_is_low_authority(row: Mapping[str, Any]) -> bool:
+    event_payload = row.get("event") if isinstance(row.get("event"), Mapping) else {}
+    event_type = str(row.get("event_type") or event_payload.get("event_type") or "").casefold()
+    category = str(row.get("event_category") or event_payload.get("event_category") or "").casefold()
+    confidence = _float_from_row(row, ("source_confidence", "confidence"))
+    if event_type in {"community_ama", "crypto_calendar_event"} or "ama" in category or "community" in category:
+        return True
+    return confidence is not None and confidence < 0.75

@@ -17,6 +17,42 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Promote structured calendar and unlock source packs · Codex
+**Why:** CoinMarketCal-style dated catalysts and Tokenomist-style unlock rows
+were parsed, but Event Alpha did not preserve enough structured proof or enforce
+enough pack-specific obligations to make them first-class evidence in source
+coverage, acquisition, cards, and audits.
+**Changes:**
+- CoinMarketCal normalization now preserves structured calendar metadata
+  including event-time provenance, source class/mission, event category,
+  confirmation/source confidence, original source URL, and token identity.
+- Tokenomist normalization now preserves structured unlock metadata including
+  event-time provenance, unlock type/category, token identity, normalized unlock
+  percentage, materiality, and structured supply source class.
+- Source registry and source packs now expose structured calendar/unlock source
+  contracts, add a `project_event_pack`, require material/non-stale unlock
+  evidence for digest/watchlist promotion, and keep low-authority calendar rows
+  local/review-only.
+- Evidence acquisition, research cards, opportunity audits, provider wiring,
+  and LLM evidence planning now understand `coinmarketcal` and `tokenomist`
+  provider evidence as bounded research acquisition sources with compact
+  structured metadata in accepted samples.
+- Expanded fixture tests for provider parsing, source-pack sufficiency,
+  material/stale unlock gates, project-event calendar gates, and structured
+  Tokenomist acquisition/card/audit display.
+**Verify:** `python3 tests/test_indicators.py` (566/566 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=evidence_acquisition_smoke
+PYTHON=python3`; `make verify PYTHON=python3`;
+`python3 -m compileall -q crypto_rsi_scanner tests`.
+**Notes/risks:** Research-only. Structured calendar/unlock evidence can support
+source-pack confirmation only through deterministic identity, catalyst-link,
+impact-path, source-quality, live-confirmation, router, and `event_fade.py`
+gates. It does not send Telegram, write normal RSI rows, trade, paper trade, or
+create `TRIGGERED_FADE`.
+
 ## 2026-06-30 — Make CryptoPanic and exchange evidence first-class · Codex
 **Why:** CryptoPanic token-tagged news and official exchange announcements are
 the highest-value confirmation sources for several Event Alpha source packs, but

@@ -51,6 +51,21 @@ path. Official exchange rows should preserve the exchange, normalized event kind
 `exchange_product_event`), product type, symbols, pairs/contracts,
 announcement time, and source URL so cards and audits can show exactly what the
 official source proves.
+Structured calendar and unlock rows have narrower but stronger contracts.
+CoinMarketCal-style rows should preserve `event_time_source=structured_calendar`,
+`source_class=structured_calendar`, event category/type, event-time confidence,
+confirmation/source confidence, source URL/original source URL, and token
+identity. They can support direct project-event source packs only when the
+calendar item is specific enough to explain a dated catalyst, such as mainnet
+launch, hard fork, protocol upgrade, governance, TGE, listing, or delisting;
+generic calendar entries such as AMAs remain local/review evidence unless
+another stronger source validates the impact path. Tokenomist-style rows should
+preserve `event_time_source=structured_unlock`, `source_class=structured_unlock`,
+unlock type/category, unlock percentage, materiality, event time, and token
+identity. Unlock/supply source packs require material, non-stale supply pressure
+before a row can support digest/watchlist promotion; small, missing-size, or
+stale unlock rows explain what is missing but should not become confirming
+evidence by themselves.
 Source-pack acquisition rows now persist the attempted plan, execution results,
 query execution statuses, provider coverage statuses, accepted/rejected samples,
 and source-pack sufficiency booleans. Treat these rows as audit evidence; they

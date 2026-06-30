@@ -74,15 +74,44 @@ def _raw_event(row: Mapping[str, Any], provider: str) -> RawDiscoveredEvent | No
     published_at = _first_dt(row, ("published_at", "created_at", "createdAt", "date_added"))
     fetched_at = _first_dt(row, ("fetched_at", "updated_at", "updatedAt")) or published_at or datetime.now(timezone.utc)
     source_url = row.get("source_url") or row.get("proof_url") or row.get("url")
+    original_source_url = row.get("original_source_url") or row.get("source_url") or row.get("proof_url")
     event_type = _event_type(row, title, body)
+    coin = _primary_coin(row)
+    confidence = _source_confidence(row, confirmed=_confirmed(row))
     payload = dict(row)
     payload["event"] = {
         "event_name": title,
         "event_type": event_type,
         "event_time": event_time.isoformat() if event_time else None,
         "event_time_confidence": 0.90 if event_time else 0.0,
-        "confidence": float(row.get("source_confidence") or 0.82),
+        "event_time_source": "structured_calendar" if event_time else None,
+        "confidence": confidence,
         "description": _description_with_coins(row, body or title),
+        "event_category": _event_category(row, event_type),
+        "source_class": "structured_calendar",
+        "source_mission": "catalyst_validation",
+        "calendar_confirmed": _confirmed(row),
+        "calendar_original_source_url": str(original_source_url) if original_source_url else None,
+        "calendar_source_url": str(source_url) if source_url else None,
+        "token_id": coin.get("id"),
+        "token_symbol": coin.get("symbol"),
+        "token_name": coin.get("name"),
+    }
+    payload["calendar"] = {
+        "coin_id": coin.get("id"),
+        "symbol": coin.get("symbol"),
+        "name": coin.get("name"),
+        "event_category": payload["event"]["event_category"],
+        "event_type": event_type,
+        "event_time": event_time.isoformat() if event_time else None,
+        "event_time_confidence": payload["event"]["event_time_confidence"],
+        "event_time_source": payload["event"]["event_time_source"],
+        "confirmed": _confirmed(row),
+        "source_confidence": confidence,
+        "source_class": "structured_calendar",
+        "source_mission": "catalyst_validation",
+        "source_url": str(source_url) if source_url else None,
+        "original_source_url": str(original_source_url) if original_source_url else None,
     }
     raw_id = str(row.get("raw_id") or row.get("id") or f"{provider}:{content_hash(payload)[:16]}")
     return RawDiscoveredEvent(
@@ -94,7 +123,7 @@ def _raw_event(row: Mapping[str, Any], provider: str) -> RawDiscoveredEvent | No
         title=title,
         body=payload["event"]["description"],
         raw_json=payload,
-        source_confidence=float(row.get("source_confidence") or 0.82),
+        source_confidence=confidence,
         content_hash=content_hash(payload),
     )
 
@@ -107,15 +136,86 @@ def _event_type(row: Mapping[str, Any], title: str, body: str) -> str:
     ]))
     if "airdrop" in text:
         return "airdrop"
+    if "delisting" in text or "delist" in text:
+        return "exchange_delisting"
+    if "perp" in text or "perpetual" in text or "futures" in text:
+        return "perp_listing"
+    if "listing" in text or "listed on" in text or "trading pair" in text:
+        return "exchange_listing"
     if "mainnet" in text:
         return "mainnet_launch"
+    if "hard fork" in text:
+        return "protocol_upgrade"
     if "governance" in text or "vote" in text:
         return "governance"
     if "upgrade" in text or "hard fork" in text:
         return "protocol_upgrade"
     if "tge" in text or "token generation" in text:
         return "tge"
+    if "unlock" in text or "vesting" in text:
+        return "token_unlock"
+    if "ama" in text or "community call" in text:
+        return "community_ama"
     return "crypto_calendar_event"
+
+
+def _event_category(row: Mapping[str, Any], event_type: str) -> str:
+    category = row.get("category")
+    if category not in (None, ""):
+        return str(category)
+    categories = row.get("categories")
+    if isinstance(categories, Iterable) and not isinstance(categories, (str, bytes, Mapping)):
+        first = next((str(item) for item in categories if str(item).strip()), "")
+        if first:
+            return first
+    return event_type
+
+
+def _primary_coin(row: Mapping[str, Any]) -> dict[str, str | None]:
+    coins = row.get("coins")
+    if isinstance(coins, Iterable) and not isinstance(coins, (str, bytes, Mapping)):
+        for coin in coins:
+            if isinstance(coin, Mapping):
+                return {
+                    "id": _text_or_none(coin.get("id") or coin.get("coin_id")),
+                    "name": _text_or_none(coin.get("name")),
+                    "symbol": _text_or_none(coin.get("symbol"), upper=True),
+                }
+    return {
+        "id": _text_or_none(row.get("coin_id") or row.get("token_id")),
+        "name": _text_or_none(row.get("coin_name") or row.get("token_name")),
+        "symbol": _text_or_none(row.get("symbol") or row.get("token_symbol"), upper=True),
+    }
+
+
+def _confirmed(row: Mapping[str, Any]) -> bool:
+    value = row.get("confirmed", row.get("is_confirmed", row.get("proof_verified")))
+    if isinstance(value, bool):
+        return value
+    if value in (None, ""):
+        return bool(row.get("proof_url") or row.get("original_source_url"))
+    return str(value).strip().casefold() in {"1", "true", "yes", "confirmed", "verified"}
+
+
+def _source_confidence(row: Mapping[str, Any], *, confirmed: bool) -> float:
+    try:
+        value = float(row.get("source_confidence")) if row.get("source_confidence") not in (None, "") else None
+    except (TypeError, ValueError):
+        value = None
+    if value is None:
+        value = 0.88 if confirmed else 0.72
+    if value > 1.0:
+        value = value / 100.0
+    if not confirmed:
+        value = min(value, 0.74)
+    return max(0.0, min(1.0, value))
+
+
+def _text_or_none(value: object, *, upper: bool = False) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    return text.upper() if upper else text
 
 
 def _description_with_coins(row: Mapping[str, Any], description: str) -> str:

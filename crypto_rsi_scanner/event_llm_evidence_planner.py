@@ -207,6 +207,9 @@ def _query_plan(request: EvidencePlannerRequest, pack: event_source_packs.Source
     elif pack.name == "unlock_supply_pack":
         queries.append(EvidencePlanQuery(f"{symbol} token unlock vesting schedule", "tokenomist", "supply_confirmation"))
         queries.append(EvidencePlanQuery(f"{symbol} unlock official announcement", "project_blog_rss", "official_confirmation"))
+    elif pack.name == "project_event_pack":
+        queries.append(EvidencePlanQuery(f"{symbol} project event calendar", "coinmarketcal", "event_time_confirmation"))
+        queries.append(EvidencePlanQuery(f"{symbol} mainnet upgrade official announcement", "project_blog_rss", "official_confirmation"))
     elif pack.name == "fan_sports_pack":
         queries.append(EvidencePlanQuery(f"{symbol} fan token {catalyst} match", "sports_fixtures", "event_time_confirmation"))
         queries.append(EvidencePlanQuery(f"{symbol} fan token demand {catalyst}", "cryptopanic", "impact_path_validation"))

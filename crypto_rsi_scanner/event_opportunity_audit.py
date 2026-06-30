@@ -503,6 +503,18 @@ def _accepted_evidence_sample_text(item: object) -> str:
         contract_text = contracts if isinstance(contracts, str) else ",".join(str(contract) for contract in list(contracts)[:4] if str(contract))
         if contract_text:
             details.append(f"contracts={contract_text}")
+    event_time = item.get("structured_event_time")
+    if event_time:
+        details.append(f"event_time={event_time}")
+    category = item.get("calendar_event_category")
+    if category:
+        details.append(f"category={category}")
+    unlock_pct = item.get("unlock_pct_circulating")
+    if unlock_pct not in (None, ""):
+        details.append(f"unlock_pct={unlock_pct}")
+    materiality = item.get("unlock_materiality")
+    if materiality:
+        details.append(f"materiality={materiality}")
     return title + (f" ({'; '.join(details)})" if details else "")
 
 

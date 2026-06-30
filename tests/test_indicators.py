@@ -1810,10 +1810,18 @@ def test_event_discovery_structured_calendar_providers_parse_fixtures():
     assert len(unlock_events) == 1
     assert calendar_events[0].provider == "coinmarketcal"
     assert calendar_events[0].raw_json["event"]["event_type"] == "mainnet_launch"
+    assert calendar_events[0].raw_json["event"]["event_time_source"] == "structured_calendar"
+    assert calendar_events[0].raw_json["event"]["source_class"] == "structured_calendar"
+    assert calendar_events[0].raw_json["calendar"]["symbol"] == "TESTCAL"
+    assert calendar_events[0].raw_json["calendar"]["event_category"] == "mainnet"
     assert "TESTCAL" in (calendar_events[0].body or "")
     assert unlock_events[0].provider == "tokenomist"
     assert unlock_events[0].raw_json["event"]["event_type"] == "token_unlock"
+    assert unlock_events[0].raw_json["event"]["event_time_source"] == "structured_unlock"
+    assert unlock_events[0].raw_json["event"]["source_class"] == "structured_unlock"
     assert unlock_events[0].raw_json["supply"]["unlock_pct_circulating"] == 0.12
+    assert unlock_events[0].raw_json["supply"]["unlock_type"] == "cliff"
+    assert unlock_events[0].raw_json["supply"]["unlock_materiality"] == "large"
 
     with tempfile.TemporaryDirectory() as tmp:
         bad_path = Path(tmp) / "bad_calendar.json"
@@ -29842,6 +29850,7 @@ def test_event_source_packs_and_feed_coverage_semantics():
         "listing_liquidity_pack",
         "perp_listing_squeeze_pack",
         "unlock_supply_pack",
+        "project_event_pack",
         "proxy_preipo_rwa_pack",
         "ai_ipo_proxy_pack",
         "security_shock_pack",
@@ -29875,6 +29884,8 @@ def test_event_source_packs_and_feed_coverage_semantics():
         impact_path_type="protocol_business_event",
     )
     assert protocol_business.name == "protocol_business_event_pack"
+    project_event = event_source_packs.source_pack_for_playbook("direct_event", impact_path_type="direct_protocol_event")
+    assert project_event.name == "project_event_pack"
 
     pack_eval = event_source_packs.evaluate_pack_evidence(
         {
@@ -29906,6 +29917,96 @@ def test_event_source_packs_and_feed_coverage_semantics():
     assert listing_eval["source_pack_validated_digest_sufficient"] is True
     assert listing_eval["source_pack_watchlist_requirements_met"] is True
     assert listing_eval["source_pack_impact_path_validating_source"] is True
+
+    unlock = event_source_packs.source_pack_for_playbook("unlock_supply_pressure")
+    large_unlock_eval = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "tokenomist",
+            "title": "TESTUNLOCK token cliff unlock",
+            "playbook_type": "unlock_supply_pressure",
+            "symbol": "TESTUNLOCK",
+            "coin_id": "testunlock",
+            "unlock_pct_circulating": 0.12,
+            "event_time": "2026-07-01T00:00:00Z",
+            "as_of": "2026-06-20T00:00:00Z",
+            "market_confirmation_score": 72,
+        },
+        pack=unlock,
+    )
+    assert large_unlock_eval["source_pack_validated_digest_sufficient"] is True
+    assert large_unlock_eval["source_pack_watchlist_requirements_met"] is True
+    assert "material_unlock" in large_unlock_eval["source_pack_met_requirements"]
+    small_unlock_eval = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "tokenomist",
+            "title": "SMALL token small unlock",
+            "playbook_type": "unlock_supply_pressure",
+            "symbol": "SMALL",
+            "coin_id": "small-token",
+            "unlock_pct_circulating": 0.01,
+        },
+        pack=unlock,
+    )
+    assert small_unlock_eval["source_pack_validated_digest_sufficient"] is False
+    assert "unlock_not_material" in small_unlock_eval["source_pack_missing_evidence"]
+    missing_supply_eval = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "tokenomist",
+            "title": "MISS token unlock",
+            "playbook_type": "unlock_supply_pressure",
+            "symbol": "MISS",
+            "coin_id": "missing-supply",
+        },
+        pack=unlock,
+    )
+    assert missing_supply_eval["source_pack_validated_digest_sufficient"] is False
+    assert "needs_supply_materiality" in missing_supply_eval["source_pack_missing_evidence"]
+    stale_unlock_eval = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "tokenomist",
+            "title": "STALE token unlock",
+            "playbook_type": "unlock_supply_pressure",
+            "symbol": "STALE",
+            "coin_id": "stale-token",
+            "unlock_pct_circulating": 0.20,
+            "event_time": "2026-06-01T00:00:00Z",
+            "as_of": "2026-06-20T00:00:00Z",
+        },
+        pack=unlock,
+    )
+    assert stale_unlock_eval["source_pack_validated_digest_sufficient"] is False
+    assert "stale_unlock_data" in stale_unlock_eval["source_pack_missing_evidence"]
+
+    calendar_eval = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "coinmarketcal",
+            "title": "TESTCAL mainnet launch",
+            "playbook_type": "direct_event",
+            "impact_path_type": "direct_protocol_event",
+            "symbol": "TESTCAL",
+            "coin_id": "testcal",
+            "event_type": "mainnet_launch",
+            "event_time": "2026-07-01T00:00:00Z",
+        },
+        pack=project_event,
+    )
+    assert calendar_eval["source_pack_validated_digest_sufficient"] is True
+    assert "event_time_confirmation" in calendar_eval["source_pack_met_requirements"]
+    ama_eval = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "coinmarketcal",
+            "title": "TESTCAL community AMA",
+            "playbook_type": "direct_event",
+            "impact_path_type": "direct_protocol_event",
+            "symbol": "TESTCAL",
+            "coin_id": "testcal",
+            "event_type": "community_ama",
+            "event_time": "2026-07-01T00:00:00Z",
+        },
+        pack=project_event,
+    )
+    assert ama_eval["source_pack_validated_digest_sufficient"] is False
+    assert "low_authority_calendar_event" in ama_eval["source_pack_missing_evidence"]
 
     feed_403 = event_source_registry.feed_health_from_fetch(
         feed_url="https://example.test/rss",
@@ -30288,7 +30389,11 @@ def test_event_near_miss_source_pack_and_operator_surfaces():
 
 def test_event_evidence_acquisition_executes_fixture_searches():
     from datetime import datetime, timezone
-    from crypto_rsi_scanner import event_catalyst_search, event_evidence_acquisition, event_impact_hypotheses
+    from crypto_rsi_scanner import (
+        event_catalyst_search,
+        event_evidence_acquisition,
+        event_impact_hypotheses,
+    )
     from crypto_rsi_scanner.event_models import RawDiscoveredEvent
 
     rune = event_impact_hypotheses.EventImpactHypothesis(
@@ -30392,6 +30497,92 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         assert "token_identity_validation" in rows[0]["source_can_prove"]
         assert "security_or_regulatory_shock" in rows[0]["source_useful_playbooks"]
         assert "official_confirmation" in rows[0]["source_cannot_prove"]
+
+
+def test_event_evidence_acquisition_accepts_structured_tokenomist_unlocks():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_catalyst_search,
+        event_evidence_acquisition,
+        event_impact_hypotheses,
+        event_opportunity_audit,
+        event_research_cards,
+    )
+    from crypto_rsi_scanner.event_providers.tokenomist import TokenomistProvider
+
+    _coinmarketcal_path, tokenomist_path = _structured_calendar_fixture_paths()
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+    unlock = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:testunlock-acquisition",
+        event_cluster_id="cluster:testunlock",
+        event_type="token_unlock",
+        external_asset="Test Unlock",
+        impact_category="unlock_supply_pressure",
+        candidate_sectors=("direct_token_events",),
+        candidate_symbols=("TESTUNLOCK",),
+        candidate_coin_ids=("testunlock",),
+        impact_path_type="unlock_supply_event",
+        playbook_hint="unlock_supply_pressure",
+        confidence=0.82,
+        hypothesis_score=68.0,
+        opportunity_score_final=68.0,
+        opportunity_level="validated_digest",
+        missing_requirements=("market_confirmation",),
+        validation_stage="impact_path_validated",
+        score_components={
+            "symbol": "TESTUNLOCK",
+            "coin_id": "testunlock",
+            "validated_symbol": "TESTUNLOCK",
+            "validated_coin_id": "testunlock",
+            "playbook_type": "unlock_supply_pressure",
+            "impact_path_type": "unlock_supply_event",
+            "opportunity_score_final": 68.0,
+            "opportunity_level": "validated_digest",
+            "market_confirmation_score": 72,
+        },
+    )
+    provider = event_catalyst_search.EventProviderCatalystSearchProvider(
+        lambda query: TokenomistProvider(tokenomist_path),
+        name="tokenomist",
+        filter_by_query=True,
+        max_fetches_per_search=1,
+    )
+    with TemporaryDirectory() as tmp:
+        artifact_path = Path(tmp) / "event_evidence_acquisition.jsonl"
+        result = event_evidence_acquisition.run_evidence_acquisition(
+            (unlock,),
+            provider=provider,
+            providers_by_hint={"tokenomist": provider},
+            cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(
+                enabled=True,
+                max_candidates=1,
+                max_queries=2,
+                max_results_per_query=2,
+                fixture_only=False,
+                artifact_path=artifact_path,
+            ),
+            now=now,
+            run_context={
+                "run_id": "run:testunlock",
+                "profile": "structured_source_pack",
+                "run_mode": "test",
+                "artifact_namespace": "structured_source_pack",
+            },
+        )
+    assert result.attempted == 1
+    assert result.accepted == 1
+    accepted = result.results[0].accepted_evidence[0]
+    assert accepted["source_class"] == "structured_unlock"
+    assert accepted["unlock_pct_circulating"] == 0.12
+    assert accepted["unlock_materiality"] == "large"
+    assert "structured_unlock_source" in accepted["reason_codes"]
+    assert "material_unlock" in accepted["reason_codes"]
+    assert accepted["source_pack_validated_digest_sufficient"] is True
+    assert accepted["source_pack_watchlist_requirements_met"] is True
+    card_sample = event_research_cards._accepted_evidence_sample_text(accepted)
+    audit_sample = event_opportunity_audit._accepted_evidence_sample_text(accepted)
+    assert "unlock_pct=0.12" in card_sample
+    assert "materiality=large" in audit_sample
 
 
 def test_event_evidence_acquisition_rejects_cryptopanic_tag_mismatch_and_heat_only():

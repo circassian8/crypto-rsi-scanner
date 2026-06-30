@@ -139,6 +139,8 @@ from . import event_watchlist_monitor
 from .event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEvent
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
 from .event_providers.bybit_announcements import BybitAnnouncementProvider
+from .event_providers.coinmarketcal import CoinMarketCalProvider
+from .event_providers.tokenomist import TokenomistProvider
 from .llm_providers.fixture import (
     FixtureLLMCatalystFrameProvider,
     FixtureLLMExtractionProvider,
@@ -7586,10 +7588,27 @@ def _event_catalyst_search_provider(
                 limit=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_LIMIT,
                 timeout=config.EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_TIMEOUT,
             ))
+        elif provider_name == "coinmarketcal":
+            providers.append(event_catalyst_search.EventProviderCatalystSearchProvider(
+                lambda query: CoinMarketCalProvider(config.EVENT_DISCOVERY_COINMARKETCAL_PATH),
+                name="coinmarketcal",
+                filter_by_query=True,
+                max_fetches_per_search=1,
+            ))
+        elif provider_name == "tokenomist":
+            providers.append(event_catalyst_search.EventProviderCatalystSearchProvider(
+                lambda query: TokenomistProvider(config.EVENT_DISCOVERY_TOKENOMIST_PATH),
+                name="tokenomist",
+                filter_by_query=True,
+                max_fetches_per_search=1,
+            ))
         else:
             warnings.append(provider_name)
     if warnings:
-        print(f"Unknown event catalyst-search provider(s): {', '.join(warnings)}. Known: fixture, gdelt, rss, cryptopanic, polymarket.")
+        print(
+            "Unknown event catalyst-search provider(s): "
+            f"{', '.join(warnings)}. Known: fixture, gdelt, rss, cryptopanic, polymarket, coinmarketcal, tokenomist."
+        )
     if not providers:
         return None
     health_cfg = _event_provider_health_config_from_runtime()
@@ -7623,6 +7642,7 @@ def _event_evidence_acquisition_providers_from_runtime(
             "official_exchange",
             "binance_announcements",
             "bybit_announcements",
+            "coinmarketcal",
             "tokenomist",
             "coinalyze",
             "sports_fixtures",
@@ -7693,7 +7713,18 @@ def _event_evidence_acquisition_providers_from_runtime(
     providers["official_exchange"] = official_exchange
     providers["binance_announcements"] = official_exchange
     providers["bybit_announcements"] = official_exchange
-    providers["tokenomist"] = fixture_provider
+    providers["coinmarketcal"] = event_catalyst_search.EventProviderCatalystSearchProvider(
+        lambda query: CoinMarketCalProvider(config.EVENT_DISCOVERY_COINMARKETCAL_PATH),
+        name="coinmarketcal",
+        filter_by_query=True,
+        max_fetches_per_search=1,
+    )
+    providers["tokenomist"] = event_catalyst_search.EventProviderCatalystSearchProvider(
+        lambda query: TokenomistProvider(config.EVENT_DISCOVERY_TOKENOMIST_PATH),
+        name="tokenomist",
+        filter_by_query=True,
+        max_fetches_per_search=1,
+    )
     providers["coinalyze"] = fixture_provider
     providers["sports_fixtures"] = fixture_provider
     return providers

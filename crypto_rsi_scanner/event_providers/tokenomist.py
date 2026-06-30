@@ -61,6 +61,7 @@ def _load_rows(path: Path) -> list[Mapping[str, Any]]:
 def _raw_event(row: Mapping[str, Any], provider: str) -> RawDiscoveredEvent | None:
     symbol = str(row.get("symbol") or row.get("token_symbol") or "").upper()
     name = str(row.get("name") or row.get("token_name") or symbol or "").strip()
+    coin_id = str(row.get("coin_id") or row.get("token_id") or "").strip()
     unlock_time = _first_dt(row, ("unlock_time", "unlock_date", "date", "event_time"))
     if not symbol or unlock_time is None:
         return None
@@ -68,22 +69,42 @@ def _raw_event(row: Mapping[str, Any], provider: str) -> RawDiscoveredEvent | No
     fetched_at = _first_dt(row, ("fetched_at", "updated_at", "updatedAt")) or published_at or datetime.now(timezone.utc)
     pct = _float_or_none(row.get("unlock_pct_circulating") or row.get("percent_of_circulating_supply"))
     amount = _float_or_none(row.get("unlock_amount") or row.get("amount"))
+    unlock_kind = _unlock_kind(row)
+    vesting_category = str(row.get("vesting_category") or row.get("category") or row.get("allocation") or "").strip()
+    materiality = _unlock_materiality(pct)
     title = str(row.get("title") or f"{name} ({symbol}) token unlock")
     description = str(row.get("description") or row.get("notes") or title)
+    source_confidence = _source_confidence(row, materiality=materiality)
     payload = dict(row)
     payload["event"] = {
         "event_name": title,
         "event_type": "token_unlock",
         "event_time": unlock_time.isoformat(),
         "event_time_confidence": 1.0,
-        "confidence": float(row.get("source_confidence") or 0.90),
+        "event_time_source": "structured_unlock",
+        "confidence": source_confidence,
         "description": f"{description} {name} {symbol}".strip(),
+        "source_class": "structured_unlock",
+        "source_mission": "supply_confirmation",
+        "token_id": coin_id or None,
+        "token_symbol": symbol,
+        "token_name": name,
+        "unlock_type": unlock_kind,
+        "vesting_category": vesting_category or None,
+        "unlock_materiality": materiality,
     }
     payload["supply"] = {
+        "coin_id": coin_id or None,
         "symbol": symbol,
         "timestamp": unlock_time.isoformat(),
         "unlock_amount": amount,
         "unlock_pct_circulating": pct,
+        "unlock_type": unlock_kind,
+        "vesting_category": vesting_category or None,
+        "unlock_materiality": materiality,
+        "source_class": "structured_unlock",
+        "source_mission": "supply_confirmation",
+        "supply_event": "token_unlock",
         "notes": description,
     }
     raw_id = str(row.get("raw_id") or row.get("id") or f"{provider}:{content_hash(payload)[:16]}")
@@ -97,9 +118,51 @@ def _raw_event(row: Mapping[str, Any], provider: str) -> RawDiscoveredEvent | No
         title=title,
         body=payload["event"]["description"],
         raw_json=payload,
-        source_confidence=float(row.get("source_confidence") or 0.90),
+        source_confidence=source_confidence,
         content_hash=content_hash(payload),
     )
+
+
+def _unlock_kind(row: Mapping[str, Any]) -> str:
+    text = " ".join(str(row.get(key) or "") for key in ("unlock_type", "type", "description", "notes", "title")).casefold()
+    if "linear" in text or "stream" in text:
+        return "linear"
+    if "cliff" in text:
+        return "cliff"
+    return str(row.get("unlock_type") or row.get("type") or "scheduled").strip() or "scheduled"
+
+
+def _unlock_materiality(pct: float | None) -> str:
+    normalized = _normalize_pct(pct)
+    if normalized is None:
+        return "unknown"
+    if normalized >= 0.10:
+        return "large"
+    if normalized >= 0.05:
+        return "material"
+    if normalized > 0:
+        return "small"
+    return "none"
+
+
+def _normalize_pct(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return value / 100.0 if value > 1.0 else value
+
+
+def _source_confidence(row: Mapping[str, Any], *, materiality: str) -> float:
+    try:
+        value = float(row.get("source_confidence")) if row.get("source_confidence") not in (None, "") else None
+    except (TypeError, ValueError):
+        value = None
+    if value is None:
+        value = 0.90
+    if value > 1.0:
+        value = value / 100.0
+    if materiality == "unknown":
+        value = min(value, 0.78)
+    return max(0.0, min(1.0, value))
 
 
 def _first_dt(row: Mapping[str, Any], keys: tuple[str, ...]) -> datetime | None:

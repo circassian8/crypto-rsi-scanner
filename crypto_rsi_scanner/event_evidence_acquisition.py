@@ -832,6 +832,15 @@ def _validate_raw_result(
         reject_reasons.append("cryptopanic_currency_tag_mismatch")
     if plan_query.must_validate_asset and not bool(pack_eval.get("source_pack_impact_path_validating_source")):
         reject_reasons.append("source_pack_missing_impact_path_validator")
+    if pack.name == "unlock_supply_pack":
+        missing = set(str(item) for item in pack_eval.get("source_pack_missing_evidence") or ())
+        for reason in ("needs_supply_materiality", "unlock_not_material", "stale_unlock_data"):
+            if reason in missing:
+                reject_reasons.append(reason)
+    if pack.name == "project_event_pack":
+        missing = set(str(item) for item in pack_eval.get("source_pack_missing_evidence") or ())
+        if "low_authority_calendar_event" in missing:
+            reject_reasons.append("low_authority_calendar_event")
     if quality.evidence_specificity in {
         event_evidence_quality.EvidenceSpecificity.GENERIC_CONTEXT.value,
         event_evidence_quality.EvidenceSpecificity.CATALYST_ONLY.value,
@@ -857,6 +866,19 @@ def _validate_raw_result(
         reason_codes.append("official_exchange_listing")
     if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_PROJECT.value:
         reason_codes.append("official_project_confirmation")
+    if assessment.source_class == event_source_registry.SourceClass.STRUCTURED_CALENDAR.value:
+        reason_codes.append("structured_calendar_source")
+        if assessment.can_validate_event_time:
+            reason_codes.append("event_time_confirmation")
+    if assessment.source_class == event_source_registry.SourceClass.STRUCTURED_UNLOCK.value:
+        reason_codes.append("structured_unlock_source")
+        if assessment.can_validate_event_time:
+            reason_codes.append("event_time_confirmation")
+        unlock_materiality = _structured_metadata_from_raw_map(raw_map).get("unlock_materiality")
+        if unlock_materiality in {"material", "large"}:
+            reason_codes.append("material_unlock")
+        if unlock_materiality == "large":
+            reason_codes.append("large_unlock")
     if assessment.cryptopanic_currency_tag_match:
         reason_codes.append("cryptopanic_currency_tag_match")
     if quality.evidence_specificity == event_evidence_quality.EvidenceSpecificity.DIRECT_TOKEN_MECHANISM.value:
@@ -870,6 +892,7 @@ def _validate_raw_result(
 
     accepted = not reject_reasons
     exchange_metadata = _exchange_metadata_from_raw_map(raw_map)
+    structured_metadata = _structured_metadata_from_raw_map(raw_map)
     sample = {
         "accepted": accepted,
         "raw_id": raw.raw_id,
@@ -898,6 +921,7 @@ def _validate_raw_result(
         "cryptopanic_currency_tag_match": assessment.cryptopanic_currency_tag_match,
         "narrative_heat": assessment.narrative_heat,
         **exchange_metadata,
+        **structured_metadata,
         "query": plan_query.query,
         "provider_hint": plan_query.provider_hint,
         "purpose": plan_query.purpose,
@@ -1389,6 +1413,59 @@ def _exchange_metadata_from_raw_map(raw_map: Mapping[str, Any]) -> dict[str, Any
     }
 
 
+def _structured_metadata_from_raw_map(raw_map: Mapping[str, Any]) -> dict[str, Any]:
+    event = raw_map.get("event") if isinstance(raw_map.get("event"), Mapping) else {}
+    calendar = raw_map.get("calendar") if isinstance(raw_map.get("calendar"), Mapping) else {}
+    supply = raw_map.get("supply") if isinstance(raw_map.get("supply"), Mapping) else {}
+    event_time = (
+        raw_map.get("event_time")
+        or event.get("event_time")
+        or calendar.get("event_time")
+        or supply.get("timestamp")
+    )
+    unlock_pct = supply.get("unlock_pct_circulating", raw_map.get("unlock_pct_circulating"))
+    unlock_materiality = (
+        supply.get("unlock_materiality")
+        or event.get("unlock_materiality")
+        or _unlock_materiality(unlock_pct)
+    )
+    return {
+        "structured_event_time": _text_or_none(event_time),
+        "structured_event_time_source": _text_or_none(event.get("event_time_source") or calendar.get("event_time_source")),
+        "calendar_event_category": _text_or_none(event.get("event_category") or calendar.get("event_category")),
+        "calendar_confirmed": _bool_or_none(event.get("calendar_confirmed", calendar.get("confirmed"))),
+        "calendar_original_source_url": _text_or_none(event.get("calendar_original_source_url") or calendar.get("original_source_url")),
+        "unlock_amount": supply.get("unlock_amount", raw_map.get("unlock_amount")),
+        "unlock_pct_circulating": unlock_pct,
+        "unlock_type": _text_or_none(supply.get("unlock_type") or event.get("unlock_type") or raw_map.get("unlock_type")),
+        "vesting_category": _text_or_none(supply.get("vesting_category") or event.get("vesting_category") or raw_map.get("vesting_category")),
+        "unlock_materiality": _text_or_none(unlock_materiality),
+    }
+
+
+def _unlock_materiality(value: object) -> str | None:
+    try:
+        pct = float(value)
+    except (TypeError, ValueError):
+        return None
+    pct = pct / 100.0 if pct > 1.0 else pct
+    if pct >= 0.10:
+        return "large"
+    if pct >= 0.05:
+        return "material"
+    if pct > 0:
+        return "small"
+    return "none"
+
+
+def _bool_or_none(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if value in (None, ""):
+        return None
+    return str(value).strip().casefold() in {"1", "true", "yes", "confirmed", "verified"}
+
+
 def _text_or_none(value: object) -> str | None:
     if value in (None, ""):
         return None
@@ -1488,7 +1565,15 @@ def _absence_meaningful_for_hint(provider_hint: str, coverage_status: str) -> bo
     if status != event_source_registry.ProviderCoverageStatus.COMPLETE.value:
         return False
     hint = str(provider_hint or "").casefold()
-    return hint in {"official_exchange", "project_blog_rss", "tokenomist", "coinalyze", "binance_announcements", "bybit_announcements"}
+    return hint in {
+        "official_exchange",
+        "project_blog_rss",
+        "coinmarketcal",
+        "tokenomist",
+        "coinalyze",
+        "binance_announcements",
+        "bybit_announcements",
+    }
 
 
 def _request_dedupe_key(request: EvidenceAcquisitionRequest | None) -> str | None:

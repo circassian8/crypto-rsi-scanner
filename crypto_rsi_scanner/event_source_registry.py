@@ -286,6 +286,17 @@ def source_descriptor_for(
             can_validate_catalyst=True,
             can_validate_impact_path=True,
             can_validate_event_time=True,
+            can_prove=(
+                SourceMission.TOKEN_IDENTITY_VALIDATION.value,
+                SourceMission.CATALYST_VALIDATION.value,
+                SourceMission.EVENT_TIME_CONFIRMATION.value,
+                SourceMission.SUPPLY_CONFIRMATION.value,
+            ),
+            cannot_prove=(
+                SourceMission.MARKET_CONFIRMATION.value,
+                SourceMission.DERIVATIVE_CONFIRMATION.value,
+            ),
+            useful_playbooks=_PLAYBOOKS_BY_SOURCE_CLASS[SourceClass.STRUCTURED_UNLOCK.value],
             reason_codes=tuple(reasons),
         )
     if any(hint in joined for hint in _STRUCTURED_CALENDAR_HINTS):
@@ -302,6 +313,17 @@ def source_descriptor_for(
             can_validate_catalyst=True,
             can_validate_impact_path=False,
             can_validate_event_time=True,
+            can_prove=(
+                SourceMission.TOKEN_IDENTITY_VALIDATION.value,
+                SourceMission.CATALYST_VALIDATION.value,
+                SourceMission.EVENT_TIME_CONFIRMATION.value,
+            ),
+            cannot_prove=(
+                SourceMission.MARKET_CONFIRMATION.value,
+                SourceMission.DERIVATIVE_CONFIRMATION.value,
+                SourceMission.SUPPLY_CONFIRMATION.value,
+            ),
+            useful_playbooks=_PLAYBOOKS_BY_SOURCE_CLASS[SourceClass.STRUCTURED_CALENDAR.value],
             reason_codes=tuple(reasons),
         )
     if any(hint in joined for hint in _DERIVATIVES_HINTS):
