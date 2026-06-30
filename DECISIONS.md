@@ -16,6 +16,29 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - CryptoPanic tags and exchange announcements are first-class evidence
+**Status:** accepted
+**Decision:** Event Alpha may treat matching CryptoPanic currency-tag evidence
+and official exchange announcements as first-class source-pack evidence when
+they pass deterministic identity, catalyst-link, impact-path, and source-quality
+checks. CryptoPanic evidence must preserve currency tags and only gets the
+`cryptopanic_currency_tag_match` reason when the tag matches the validated
+symbol or coin; sentiment, hot, rising, important, or bullish context alone is
+not confirmation. Official exchange announcements should preserve exchange,
+normalized event kind, product type, symbol, pair/contract, announcement time,
+and URL metadata for cards, audits, and daily briefs. These sources can support
+validated digest/watchlist decisions only through existing source-pack and live
+confirmation gates; they cannot create `TRIGGERED_FADE`, bypass resolver or
+impact-path gates, send Telegram by themselves, write normal RSI rows, paper
+trade, or imply execution.
+**Why:** CryptoPanic token-tagged news and official Binance/Bybit-style listing
+announcements are high-signal confirmation sources, but treating them as generic
+news made cards and audits less useful and made tag-mismatched/hot-only rows too
+ambiguous for operator review.
+**Revisit when:** The source registry moves to typed provider events or a
+reviewed burn-in sample proves that tag-matched CryptoPanic or official
+exchange evidence needs playbook-specific weighting changes.
+
 ## 2026-06-29 - Source coverage reports diagnose gaps, not eligibility
 **Status:** accepted
 **Decision:** Event Alpha source coverage reports may combine provider

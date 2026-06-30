@@ -1523,8 +1523,20 @@ def test_event_discovery_exchange_announcement_providers_parse_fixtures():
     assert binance_events[0].provider == "binance_announcements"
     assert binance_events[0].raw_json["event"]["event_type"] == "exchange_listing"
     assert binance_events[0].raw_json["event"]["event_time"] == "2026-06-15T12:00:00+00:00"
+    assert binance_events[0].raw_json["source_class"] == "official_exchange"
+    assert binance_events[0].raw_json["exchange"] == "binance"
+    assert binance_events[0].raw_json["announcement_symbols"] == ("TESTLIST",)
+    assert binance_events[0].raw_json["announcement_pairs"] == ("TESTLIST/USDT",)
+    assert binance_events[0].raw_json["announcement_time"] == "2026-06-15T12:00:00+00:00"
+    assert binance_events[0].raw_json["source_url"] == "https://www.binance.com/en/support/announcement/binance-testlist"
     assert bybit_events[0].provider == "bybit_announcements"
     assert bybit_events[0].raw_json["event"]["event_type"] == "perp_listing"
+    assert bybit_events[0].raw_json["source_class"] == "official_exchange"
+    assert bybit_events[0].raw_json["exchange"] == "bybit"
+    assert bybit_events[0].raw_json["announcement_symbols"] == ("TESTPERP",)
+    assert bybit_events[0].raw_json["announcement_pairs"] == ("TESTPERP/USDT",)
+    assert bybit_events[0].raw_json["announcement_contracts"] == ("TESTPERPUSDT",)
+    assert bybit_events[0].raw_json["exchange_product_type"] == "perp_listing"
 
     with tempfile.TemporaryDirectory() as tmp:
         bad_path = Path(tmp) / "bad_announcements.json"
@@ -1536,6 +1548,39 @@ def test_event_discovery_exchange_announcement_providers_parse_fixtures():
             pass
         else:
             raise AssertionError("required malformed announcement fixture should fail")
+        normalized_path = Path(tmp) / "normalized_announcements.json"
+        normalized_path.write_text(json.dumps({
+            "announcements": [
+                {
+                    "id": "binance-old-delist",
+                    "title": "Binance Will Delist OLDUSDT",
+                    "body": "Binance will delist OLD/USDT spot trading pairs.",
+                    "publishDate": "2026-06-15T08:00:00Z",
+                    "url": "https://www.binance.com/en/support/announcement/old-delist",
+                },
+                {
+                    "id": "binance-new-launchpool",
+                    "title": "Binance Launchpool Adds New Token (NEW)",
+                    "body": "Binance Launchpool opens NEW subscriptions.",
+                    "publishDate": "2026-06-15T08:30:00Z",
+                    "url": "https://www.binance.com/en/support/announcement/new-launchpool",
+                },
+                {
+                    "id": "binance-maintenance",
+                    "title": "Binance Updates API Rate Limits",
+                    "body": "General operational update.",
+                    "publishDate": "2026-06-15T09:00:00Z",
+                },
+            ]
+        }), encoding="utf-8")
+        normalized = BinanceAnnouncementProvider(normalized_path, required=True).fetch_events(start, end)
+        assert [event.raw_json["event"]["event_type"] for event in normalized] == [
+            "exchange_delisting",
+            "exchange_product_event",
+        ]
+        assert normalized[0].raw_json["exchange_product_type"] == "delisting"
+        assert normalized[0].raw_json["announcement_pairs"] == ("OLD/USDT",)
+        assert normalized[1].raw_json["exchange_product_type"] == "launchpool"
 
 
 def test_event_discovery_binance_cms_websocket_payload_fixture():
@@ -2726,6 +2771,63 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
         api_token="token123",
         opener=failing_opener,
     ).fetch_events(start, end) == []
+
+
+def test_event_catalyst_search_cryptopanic_uses_symbol_and_coin_currency_filters():
+    import json
+    from datetime import datetime, timezone
+    from urllib.parse import parse_qs, urlparse
+    from crypto_rsi_scanner import event_catalyst_search
+
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    seen = {}
+
+    def fake_opener(request, timeout):
+        seen["url"] = request.full_url
+        seen["timeout"] = timeout
+        return FakeResponse({"results": []})
+
+    provider = event_catalyst_search.CryptoPanicCatalystSearchProvider(
+        live_enabled=True,
+        api_token="token123",
+        base_url="https://cryptopanic.test/api/v1/posts/",
+        opener=fake_opener,
+    )
+    result = provider.search(
+        (
+            event_catalyst_search.SearchQuery(
+                anomaly_raw_id="hyp:rune",
+                query="RUNE exploit official update",
+                symbol="RUNE",
+                coin_id="thorchain",
+                aliases=("RUNE", "thorchain"),
+                rank=1,
+            ),
+        ),
+        max_results_per_query=1,
+        now=datetime(2026, 6, 15, 12, tzinfo=timezone.utc),
+    )
+
+    params = parse_qs(urlparse(seen["url"]).query)
+    assert params["currencies"] == ["RUNE,thorchain"]
+    assert params["search"] == ["RUNE exploit official update"]
+    assert seen["timeout"] == 10.0
+    assert result.query_count == 1
+    assert result.result_count == 0
 
 
 def test_event_discovery_gdelt_live_provider_parses_article_list_offline():
@@ -30271,6 +30373,9 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         assert any("cryptopanic_currency_tag_match" in item["reason_codes"] for item in result.results[0].accepted_evidence)
         accepted_sample = result.results[0].accepted_evidence[0]
         assert accepted_sample["source_class"] == "cryptopanic_tagged"
+        assert "RUNE" in accepted_sample["currency_tags"]
+        assert "THORCHAIN" in accepted_sample["currency_tags"]
+        assert accepted_sample["cryptopanic_currency_tag_match"] is True
         assert accepted_sample["source_pack_impact_path_validating_source"] is True
         assert accepted_sample["source_pack_validated_digest_sufficient"] is True
         assert "impact_path_validation" in accepted_sample["source_can_prove"]
@@ -30287,6 +30392,77 @@ def test_event_evidence_acquisition_executes_fixture_searches():
         assert "token_identity_validation" in rows[0]["source_can_prove"]
         assert "security_or_regulatory_shock" in rows[0]["source_useful_playbooks"]
         assert "official_confirmation" in rows[0]["source_cannot_prove"]
+
+
+def test_event_evidence_acquisition_rejects_cryptopanic_tag_mismatch_and_heat_only():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_catalyst_search, event_evidence_acquisition, event_impact_hypotheses
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    rune = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:rune-hot-rejected",
+        event_cluster_id="cluster:rune-hot",
+        event_type="security_incident",
+        external_asset="THORChain",
+        impact_category="security_or_regulatory_shock",
+        candidate_sectors=("defi_tokens",),
+        candidate_symbols=("RUNE",),
+        candidate_coin_ids=("thorchain",),
+        impact_path_type="exploit_security_event",
+        playbook_hint="security_or_regulatory_shock",
+        confidence=0.78,
+        hypothesis_score=64.0,
+        opportunity_score_final=64.0,
+        opportunity_level="exploratory",
+        missing_requirements=("source evidence", "impact_path_validation"),
+        validation_stage="catalyst_link_validated",
+        score_components={
+            "symbol": "RUNE",
+            "coin_id": "thorchain",
+            "validated_symbol": "RUNE",
+            "validated_coin_id": "thorchain",
+            "playbook_type": "security_or_regulatory_shock",
+            "impact_path_type": "exploit_security_event",
+            "opportunity_score_final": 64.0,
+            "opportunity_level": "exploratory",
+        },
+    )
+    fetched = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+    hot_but_unrelated = RawDiscoveredEvent(
+        raw_id="raw:rune-hot-unrelated",
+        provider="cryptopanic",
+        fetched_at=fetched,
+        published_at=fetched,
+        source_url="https://cryptopanic.com/news/btc-hot",
+        title="Bullish crypto market heat lifts majors",
+        body="CryptoPanic marks this as hot and bullish. RUNE is only mentioned in a broad market recap without incident details.",
+        raw_json={"currency_tags": ("BTC",), "kind": "hot", "source_origin": "CryptoPanic"},
+        source_confidence=0.88,
+        content_hash="rune-hot-unrelated",
+    )
+    provider = event_catalyst_search.FixtureCatalystSearchProvider(rows_by_query={
+        "RUNE hack incident security market reaction": (hot_but_unrelated,),
+        "RUNE exploit official update": (),
+    })
+    result = event_evidence_acquisition.run_evidence_acquisition(
+        (rune,),
+        provider=provider,
+        providers_by_hint={"cryptopanic": provider, "project_blog_rss": provider},
+        cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(
+            enabled=True,
+            max_candidates=1,
+            max_queries=2,
+            max_results_per_query=2,
+            fixture_only=True,
+        ),
+        now=fetched,
+    )
+
+    assert result.accepted == 0
+    assert result.results[0].status == "rejected_results_only"
+    rejected_reasons = set(result.results[0].rejected_evidence[0]["reason_codes"])
+    assert "cryptopanic_currency_tag_mismatch" in rejected_reasons
+    assert "cryptopanic_narrative_heat_only" in rejected_reasons
 
 
 def test_event_evidence_acquisition_provider_unavailable_and_operator_surfaces():

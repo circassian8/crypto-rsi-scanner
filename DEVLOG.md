@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Make CryptoPanic and exchange evidence first-class · Codex
+**Why:** CryptoPanic token-tagged news and official exchange announcements are
+the highest-value confirmation sources for several Event Alpha source packs, but
+their accepted evidence samples did not preserve enough provider-specific proof
+for cards, audits, and daily briefs.
+**Changes:**
+- CryptoPanic catalyst searches now query by validated symbol plus coin slug by
+  default, accepted/rejected evidence preserves currency tags, tag-match status,
+  and narrative-heat metadata, and tag mismatches or hot/bullish-only posts get
+  explicit rejection reasons.
+- Binance/Bybit announcement normalization now records official exchange source
+  metadata, event kind, product type, symbols, pairs/contracts, announcement
+  timestamps, and source URLs; it also recognizes delisting and
+  launchpool/earn/product announcements while rejecting unrelated operational
+  updates.
+- Research cards, opportunity audits, and daily briefs now surface accepted
+  evidence source classes plus compact CryptoPanic tag and official-exchange
+  pair/contract details without changing alert gates.
+- Expanded tests for CryptoPanic currency filtering/tag validation, heat-only
+  rejection, official exchange listing/perp metadata, delisting/product
+  normalization, and source-class reporting.
+**Verify:** `python3 tests/test_indicators.py` (565/565 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=evidence_acquisition_smoke
+PYTHON=python3`; `make verify PYTHON=python3`.
+**Notes/risks:** Research-only. This adds stronger evidence acquisition and
+display semantics only; it does not weaken strict alert gates, send Telegram,
+write normal RSI rows, paper trade, live trade, or create `TRIGGERED_FADE`.
+
 ## 2026-06-30 — Harden Event Alpha source-system coverage semantics · Codex
 **Why:** Source coverage reports needed to distinguish missing providers,
 role-specific degradation, and non-confirming evidence more explicitly so

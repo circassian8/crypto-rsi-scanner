@@ -495,7 +495,7 @@ class CryptoPanicCatalystSearchProvider(EventProviderCatalystSearchProvider):
                 base_url=str(kwargs.get("base_url") or "https://cryptopanic.com/api/v1/posts/"),
                 public=bool(kwargs.get("public", True)),
                 filter_name=str(kwargs.get("filter_name") or ""),
-                currencies=str(kwargs.get("currencies") or query.symbol),
+                currencies=_cryptopanic_currencies_for_query(query, kwargs.get("currencies")),
                 regions=str(kwargs.get("regions") or ""),
                 kind=str(kwargs.get("kind") or ""),
                 search=query.query,
@@ -508,6 +508,27 @@ class CryptoPanicCatalystSearchProvider(EventProviderCatalystSearchProvider):
 
     def cache_key_for_query(self, query: SearchQuery) -> tuple[str, ...]:
         return (self.name, query.symbol, query.query)
+
+
+def _cryptopanic_currencies_for_query(query: SearchQuery, configured: object = None) -> str:
+    if configured not in (None, ""):
+        return str(configured)
+    values: list[str] = []
+    symbol = str(query.symbol or "").strip()
+    if symbol:
+        values.append(symbol.upper())
+    coin_id = str(query.coin_id or "").strip()
+    if coin_id:
+        values.append(coin_id)
+    for alias in query.aliases:
+        value = str(alias or "").strip()
+        if not value:
+            continue
+        if value.casefold() == coin_id.casefold():
+            values.append(coin_id)
+        elif value.upper() == symbol.upper():
+            values.append(symbol.upper())
+    return ",".join(dict.fromkeys(values))
 
 
 class PolymarketCatalystSearchProvider(EventProviderCatalystSearchProvider):

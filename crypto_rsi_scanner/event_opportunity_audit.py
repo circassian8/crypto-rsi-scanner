@@ -448,7 +448,7 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
             f"reason={merged.get('final_verdict_reason') or 'none'}"
         ),
         f"- accepted reason codes: {'; '.join(str(item) for item in list(accepted_reasons or ())[:5]) if accepted_reasons else 'none'}",
-        f"- accepted evidence samples: {'; '.join(str((item or {}).get('title') or (item or {}).get('source_url') or 'evidence')[:120] for item in list(accepted_evidence or ())[:2]) if accepted_evidence else 'none'}",
+        f"- accepted evidence samples: {'; '.join(_accepted_evidence_sample_text(item) for item in list(accepted_evidence or ())[:2]) if accepted_evidence else 'none'}",
         f"- provider gaps/failures: {'; '.join(str(item) for item in list(failures or ())[:5]) if failures else 'none'}",
         f"- validation criteria: {'; '.join(pack.validation_requirements[:5])}",
     ]
@@ -471,6 +471,39 @@ def _source_contract_text(values: object, *, limit: int = 5) -> str:
     shown = [_human_contract_value(item) for item in items[:limit]]
     suffix = f"; +{len(items) - limit} more" if len(items) > limit else ""
     return "; ".join(shown) + suffix
+
+
+def _accepted_evidence_sample_text(item: object) -> str:
+    if not isinstance(item, Mapping):
+        return str(item)[:160]
+    title = str(item.get("title") or item.get("source_url") or "evidence")[:120]
+    details: list[str] = []
+    tags = item.get("currency_tags")
+    if tags:
+        if isinstance(tags, str):
+            tag_text = tags
+        elif isinstance(tags, Iterable) and not isinstance(tags, (bytes, bytearray, Mapping)):
+            tag_text = ",".join(str(tag) for tag in list(tags)[:4] if str(tag))
+        else:
+            tag_text = str(tags)
+        if tag_text:
+            details.append(f"tags={tag_text}")
+    if item.get("cryptopanic_currency_tag_match"):
+        details.append("tag_match=true")
+    exchange = item.get("exchange")
+    if exchange:
+        details.append(f"exchange={exchange}")
+    pairs = item.get("announcement_pairs")
+    if pairs:
+        pair_text = pairs if isinstance(pairs, str) else ",".join(str(pair) for pair in list(pairs)[:4] if str(pair))
+        if pair_text:
+            details.append(f"pairs={pair_text}")
+    contracts = item.get("announcement_contracts")
+    if contracts:
+        contract_text = contracts if isinstance(contracts, str) else ",".join(str(contract) for contract in list(contracts)[:4] if str(contract))
+        if contract_text:
+            details.append(f"contracts={contract_text}")
+    return title + (f" ({'; '.join(details)})" if details else "")
 
 
 def _human_contract_value(value: object) -> str:

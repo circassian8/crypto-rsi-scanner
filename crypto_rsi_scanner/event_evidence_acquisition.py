@@ -822,6 +822,14 @@ def _validate_raw_result(
         reject_reasons.append("catalyst_missing")
     if assessment.source_class in pack.context_only_sources:
         reject_reasons.append("source_context_only")
+    currency_tags = _currency_tags_from_raw_map(raw_map)
+    if (
+        assessment.source_class == event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value
+        and plan_query.must_validate_asset
+        and currency_tags
+        and not assessment.cryptopanic_currency_tag_match
+    ):
+        reject_reasons.append("cryptopanic_currency_tag_mismatch")
     if plan_query.must_validate_asset and not bool(pack_eval.get("source_pack_impact_path_validating_source")):
         reject_reasons.append("source_pack_missing_impact_path_validator")
     if quality.evidence_specificity in {
@@ -834,6 +842,12 @@ def _validate_raw_result(
         reject_reasons.append("source_quality_too_low")
     if quality.evidence_specificity == event_evidence_quality.EvidenceSpecificity.SOURCE_NOISE.value:
         reject_reasons.append("source_noise")
+    if (
+        assessment.narrative_heat
+        and not assessment.cryptopanic_currency_tag_match
+        and quality.evidence_specificity != event_evidence_quality.EvidenceSpecificity.DIRECT_TOKEN_MECHANISM.value
+    ):
+        reject_reasons.append("cryptopanic_narrative_heat_only")
     if query.symbol.upper() in event_catalyst_search.COMMON_WORD_SYMBOLS and not _case_sensitive_symbol(raw, query.symbol):
         reject_reasons.append("ticker_collision")
     if _generic_cooccurrence(text, request):
@@ -855,6 +869,7 @@ def _validate_raw_result(
         reason_codes.append("second_source_confirmation")
 
     accepted = not reject_reasons
+    exchange_metadata = _exchange_metadata_from_raw_map(raw_map)
     sample = {
         "accepted": accepted,
         "raw_id": raw.raw_id,
@@ -879,6 +894,10 @@ def _validate_raw_result(
         "source_pack_watchlist_requirements_met": bool(pack_eval.get("source_pack_watchlist_requirements_met")),
         "source_pack_high_priority_requirements_met": bool(pack_eval.get("source_pack_high_priority_requirements_met")),
         "source_pack_missing_evidence": tuple(pack_eval.get("source_pack_missing_evidence") or ()),
+        "currency_tags": currency_tags,
+        "cryptopanic_currency_tag_match": assessment.cryptopanic_currency_tag_match,
+        "narrative_heat": assessment.narrative_heat,
+        **exchange_metadata,
         "query": plan_query.query,
         "provider_hint": plan_query.provider_hint,
         "purpose": plan_query.purpose,
@@ -1324,6 +1343,68 @@ def _raw_mapping(raw: RawDiscoveredEvent) -> dict[str, Any]:
         "raw_json": payload,
         "source_confidence": raw.source_confidence,
     }
+
+
+def _currency_tags_from_raw_map(raw_map: Mapping[str, Any]) -> tuple[str, ...]:
+    tags: list[str] = []
+
+    def collect(value: object) -> None:
+        if value in (None, ""):
+            return
+        if isinstance(value, str):
+            for part in value.replace(";", ",").split(","):
+                cleaned = part.strip()
+                if cleaned:
+                    tags.append(cleaned.upper())
+            return
+        if isinstance(value, Mapping):
+            for key in ("code", "symbol", "slug", "title", "name"):
+                item = value.get(key)
+                if item not in (None, ""):
+                    tags.append(str(item).strip().upper())
+            return
+        if isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray)):
+            for item in value:
+                collect(item)
+
+    for key in ("currency_tags", "currencyTags", "currencies", "tags"):
+        collect(raw_map.get(key))
+    nested = raw_map.get("raw_json")
+    if isinstance(nested, Mapping):
+        for key in ("currency_tags", "currencyTags", "currencies", "tags"):
+            collect(nested.get(key))
+    return tuple(dict.fromkeys(value for value in tags if value))
+
+
+def _exchange_metadata_from_raw_map(raw_map: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "exchange": _text_or_none(raw_map.get("exchange")),
+        "announcement_kind": _text_or_none(raw_map.get("announcement_kind")),
+        "exchange_product_type": _text_or_none(raw_map.get("exchange_product_type")),
+        "announcement_symbols": _tuple_text(raw_map.get("announcement_symbols")),
+        "announcement_pairs": _tuple_text(raw_map.get("announcement_pairs")),
+        "announcement_contracts": _tuple_text(raw_map.get("announcement_contracts")),
+        "announcement_time": _text_or_none(raw_map.get("announcement_time")),
+        "announcement_published_at": _text_or_none(raw_map.get("announcement_published_at")),
+    }
+
+
+def _text_or_none(value: object) -> str | None:
+    if value in (None, ""):
+        return None
+    return str(value)
+
+
+def _tuple_text(value: object) -> tuple[str, ...]:
+    if value in (None, ""):
+        return ()
+    if isinstance(value, str):
+        return tuple(part.strip() for part in value.replace(";", ",").split(",") if part.strip())
+    if isinstance(value, Mapping):
+        return tuple(str(item).strip() for item in value.values() if str(item).strip())
+    if isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray)):
+        return tuple(str(item).strip() for item in value if str(item).strip())
+    return (str(value),)
 
 
 def _row_from_object(item: object | Mapping[str, Any] | None) -> dict[str, Any]:

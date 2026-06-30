@@ -41,6 +41,16 @@ stronger source classes when the text also names the token and explains the
 impact path. The planner can suggest official searches, denial searches,
 market/derivatives/supply refreshes, and validation criteria; deterministic
 resolver, quality, router, and `event_fade.py` gates remain authoritative.
+CryptoPanic validation is tag-aware: a matching `currency_tags`/`currencies`
+entry should be preserved on evidence rows and may add
+`cryptopanic_currency_tag_match` only when it matches the validated symbol or
+coin id. A CryptoPanic post that is merely hot, bullish, important, or rising is
+context only until the source text also supports the catalyst and token impact
+path. Official exchange rows should preserve the exchange, normalized event kind
+(`exchange_listing`, `perp_listing`, `exchange_delisting`, or
+`exchange_product_event`), product type, symbols, pairs/contracts,
+announcement time, and source URL so cards and audits can show exactly what the
+official source proves.
 Source-pack acquisition rows now persist the attempted plan, execution results,
 query execution statuses, provider coverage statuses, accepted/rejected samples,
 and source-pack sufficiency booleans. Treat these rows as audit evidence; they
@@ -120,6 +130,12 @@ for, and whether absence is meaningful under current provider coverage.
 CryptoPanic-tagged evidence can strengthen token/catalyst/impact evidence, but
 it still cannot prove official confirmation; official project/exchange or
 structured sources remain the right evidence for official confirmation.
+When reviewing cards or audits, look for compact provider-specific sample
+details: CryptoPanic accepted samples should show the matching tag and
+`tag_match=true`; official exchange accepted samples should show the exchange,
+pair, or contract where available. If those details are missing from a fresh
+artifact, rerun the evidence-acquisition smoke before trusting the source-pack
+summary.
 The same canonical-core rule applies to secondary operator copy. Cards and
 audits should derive latest source, source count, impact-path
 reason/strength, digest eligibility, market confirmation/freshness, upgrade

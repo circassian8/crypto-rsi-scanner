@@ -947,6 +947,20 @@ def _source_coverage_summary_lines(
         1 for row in executed_rows
         if str(row.get("status") or "") == event_evidence_acquisition.EvidenceAcquisitionStatus.REJECTED_RESULTS_ONLY.value
     )
+    accepted_by_source_class: dict[str, int] = {}
+    for row in executed_rows:
+        evidence_items = row.get("accepted_evidence") or ()
+        if isinstance(evidence_items, Mapping):
+            evidence_items = (evidence_items,)
+        for evidence in evidence_items:
+            if not isinstance(evidence, Mapping):
+                continue
+            source_class = str(evidence.get("source_class") or "unknown")
+            accepted_by_source_class[source_class] = accepted_by_source_class.get(source_class, 0) + 1
+    accepted_source_text = ", ".join(
+        f"{source_class}={count}"
+        for source_class, count in sorted(accepted_by_source_class.items(), key=lambda item: (-item[1], item[0]))
+    ) or "none"
     next_source = _source_coverage_next_source(gaps, executed_rows)
     return [
         f"- Source registry: {summary}",
@@ -961,6 +975,7 @@ def _source_coverage_summary_lines(
             f"no_results={no_results}, "
             f"rejected_only={rejected_only}"
         ),
+        f"- Accepted evidence by source class: {accepted_source_text}",
         f"- Source coverage gaps: {len(gaps)} candidate(s) need healthier or more specific source coverage.",
         f"- What data source would most improve next run: {next_source}",
         "- Evidence absence rule: broad/degraded RSS/GDELT/Polymarket gaps are not treated as strong negative proof.",

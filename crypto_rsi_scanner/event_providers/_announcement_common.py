@@ -158,10 +158,23 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         or item.get("articleUrl")
         or item.get("link")
     )
+    exchange = _exchange_name(provider)
+    symbols = _announcement_symbols(title, body)
+    pairs = _announcement_pairs(title, body)
+    contracts = _announcement_contracts(title, body)
+    product_type = _exchange_product_type(event_type, title, body)
     payload = dict(item)
     payload["source_class"] = "official_exchange"
     payload["announcement_kind"] = event_type
-    payload["announcement_symbols"] = _announcement_symbols(title, body)
+    payload["exchange"] = exchange
+    payload["announcement_symbols"] = symbols
+    payload["announcement_pairs"] = pairs
+    payload["announcement_contracts"] = contracts
+    payload["announcement_time"] = event_time.isoformat() if event_time else None
+    payload["announcement_published_at"] = published_at.isoformat() if published_at else None
+    payload["exchange_product_type"] = product_type
+    if source_url:
+        payload["source_url"] = str(source_url)
     payload["event"] = {
         "event_name": title,
         "event_type": event_type,
@@ -169,6 +182,12 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
         "event_time_confidence": 1.0 if _has_explicit_event_time(item) else 0.60,
         "confidence": float(item.get("source_confidence") or 0.85),
         "description": body or title,
+        "exchange": exchange,
+        "symbols": symbols,
+        "pairs": pairs,
+        "contracts": contracts,
+        "announcement_kind": event_type,
+        "exchange_product_type": product_type,
     }
     return RawDiscoveredEvent(
         raw_id=f"{provider}:{raw_id}",
@@ -186,9 +205,28 @@ def _raw_event_from_item(item: Mapping[str, Any], provider: str) -> RawDiscovere
 
 def _event_type(title: str, body: str) -> str | None:
     text = clean_text(f"{title} {body}")
+    if any(token in text for token in (
+        "delist",
+        "delisting",
+        "remove trading pair",
+        "remove spot trading pair",
+        "cease trading",
+    )):
+        return "exchange_delisting"
     if any(token in text for token in ("perpetual", "perp", "futures", "contract")):
         if any(token in text for token in ("list", "launch", "add", "new")):
             return "perp_listing"
+    if any(token in text for token in (
+        "launchpool",
+        "launchpad",
+        "simple earn",
+        "earn product",
+        "earn campaign",
+        "staking",
+        "savings",
+    )):
+        if any(token in text for token in ("launch", "add", "introduce", "open", "new", "subscribe")):
+            return "exchange_product_event"
     if any(token in text for token in (
         "will list",
         "new listing",
@@ -201,6 +239,38 @@ def _event_type(title: str, body: str) -> str | None:
     return None
 
 
+def _exchange_name(provider: str) -> str:
+    value = str(provider or "").casefold()
+    if "binance" in value:
+        return "binance"
+    if "bybit" in value:
+        return "bybit"
+    if "okx" in value:
+        return "okx"
+    if "kucoin" in value:
+        return "kucoin"
+    if "coinbase" in value:
+        return "coinbase"
+    return value.replace("_announcements", "").replace("_", "-") or "exchange"
+
+
+def _exchange_product_type(event_type: str, title: str, body: str) -> str:
+    text = clean_text(f"{title} {body}")
+    if event_type == "exchange_listing":
+        return "spot_listing"
+    if event_type == "perp_listing":
+        return "perp_listing"
+    if event_type == "exchange_delisting":
+        return "delisting"
+    if "launchpool" in text:
+        return "launchpool"
+    if "launchpad" in text:
+        return "launchpad"
+    if "earn" in text or "staking" in text or "savings" in text:
+        return "earn_product"
+    return event_type or "exchange_product"
+
+
 def _announcement_symbols(title: str, body: str) -> tuple[str, ...]:
     text = f"{title} {body}"
     out: list[str] = []
@@ -209,8 +279,43 @@ def _announcement_symbols(title: str, body: str) -> tuple[str, ...]:
     for match in re.finditer(r"\(([A-Z0-9]{2,12})\)", text):
         out.append(match.group(1))
     for match in re.finditer(r"\b([A-Z0-9]{2,12})\s+(?:spot|perp|perpetual|futures|trading)\b", text, re.IGNORECASE):
-        out.append(match.group(1).upper())
-    return tuple(dict.fromkeys(value for value in out if value not in {"USD", "USDT", "USDC", "BTC", "ETH"}))
+        candidate = match.group(1)
+        if candidate != candidate.upper():
+            continue
+        if any(candidate.endswith(quote) for quote in ("USDT", "USDC", "FDUSD", "BTC", "ETH")):
+            continue
+        out.append(candidate.upper())
+    excluded = {"USD", "USDT", "USDC", "BTC", "ETH", "OPEN", "WILL", "LIST", "NEW", "ADD"}
+    return tuple(dict.fromkeys(value for value in out if value not in excluded))
+
+
+def _announcement_pairs(title: str, body: str) -> tuple[str, ...]:
+    text = f"{title} {body}"
+    out: list[str] = []
+    quotes = "USDT|USDC|FDUSD|BTC|ETH|USD|EUR|TRY|BRL"
+    for match in re.finditer(rf"\b([A-Z0-9]{{2,12}})[/-]({quotes})\b", text):
+        base = match.group(1).upper()
+        quote = match.group(2).upper()
+        if base not in {"USD", "USDT", "USDC", "BTC", "ETH"}:
+            out.append(f"{base}/{quote}")
+    for match in re.finditer(rf"\b([A-Z0-9]{{2,12}})({quotes})\b", text):
+        base = match.group(1).upper()
+        quote = match.group(2).upper()
+        if base not in {"USD", "USDT", "USDC", "BTC", "ETH"}:
+            out.append(f"{base}/{quote}")
+    return tuple(dict.fromkeys(out))
+
+
+def _announcement_contracts(title: str, body: str) -> tuple[str, ...]:
+    text = f"{title} {body}"
+    out: list[str] = []
+    for pair in _announcement_pairs(title, body):
+        base, quote = pair.split("/", 1)
+        if quote in {"USDT", "USDC", "USD"}:
+            out.append(f"{base}{quote}")
+    for match in re.finditer(r"\b([A-Z0-9]{2,20})(?:USDT|USDC|USD)-?(?:PERP|PERPETUAL)\b", text):
+        out.append(match.group(0).upper().replace("-", ""))
+    return tuple(dict.fromkeys(out))
 
 
 def _parse_time(value: object) -> datetime | None:
