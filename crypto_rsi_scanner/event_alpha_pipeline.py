@@ -60,6 +60,11 @@ class EventAlphaSendResult:
     deliveries_skipped_duplicate: int = 0
     deliveries_skipped_in_flight: int = 0
     deliveries_blocked: int = 0
+    research_review_digest_enabled: bool = False
+    research_review_digest_candidates: int = 0
+    research_review_digest_would_send: int = 0
+    research_review_digest_sent: int = 0
+    research_review_digest_block_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -106,6 +111,11 @@ class EventAlphaPipelineResult:
     notification_deliveries_skipped_duplicate: int = 0
     notification_deliveries_skipped_in_flight: int = 0
     notification_deliveries_blocked: int = 0
+    research_review_digest_enabled: bool = False
+    research_review_digest_candidates: int = 0
+    research_review_digest_would_send: int = 0
+    research_review_digest_sent: int = 0
+    research_review_digest_block_reason: str | None = None
     notification_burn_in: bool = False
     research_card_paths: tuple[Path, ...] = ()
     run_id: str | None = None
@@ -906,6 +916,11 @@ def _with_send_result(
         send_cooldown_blocks=dict(send_result.cooldown_blocks),
         notification_scope=send_result.notification_scope,
         notification_scope_value=send_result.notification_scope_value,
+        research_review_digest_enabled=send_result.research_review_digest_enabled,
+        research_review_digest_candidates=send_result.research_review_digest_candidates,
+        research_review_digest_would_send=send_result.research_review_digest_would_send,
+        research_review_digest_sent=send_result.research_review_digest_sent,
+        research_review_digest_block_reason=send_result.research_review_digest_block_reason,
     )
 
 

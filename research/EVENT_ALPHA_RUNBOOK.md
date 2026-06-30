@@ -60,7 +60,10 @@ make event-alpha-source-coverage-report PROFILE=notify_llm_deep PYTHON=python3
 The dashboard is read-only. It reports configured, missing, healthy, and
 degraded providers by source pack; accepted/rejected/skipped acquisition
 outcomes; whether evidence absence is meaningful; and the provider/source pack
-most likely to improve the next run. Treat CoinGecko and DefiLlama-style rows as
+most likely to improve the next run. Each pack also prints recommended actions,
+such as configuring CryptoPanic token/news coverage, restoring official exchange
+announcement feeds, raising evidence-acquisition query budgets, or fixing
+feed-level RSS quarantine/backoff. Treat CoinGecko and DefiLlama-style rows as
 market/protocol metric evidence only: they can support market confirmation or
 source coverage, but they do not prove official confirmation or catalyst
 impact-path validation by themselves.
@@ -402,7 +405,16 @@ operator explicitly wants review leads alongside strict alerts. Smoke it with:
 
 ```
 make event-alpha-research-review-digest-smoke PYTHON=python3
+make event-alpha-notify-llm-deep-research-review-no-send-smoke PYTHON=python3
 ```
+
+The `notify_llm_deep` smoke uses the real notification profile with fixture
+candidates and no-send guard enabled. It should write a blocked
+`research_review_digest` delivery row, populate run-ledger fields
+`research_review_digest_enabled`, `research_review_digest_candidates`,
+`research_review_digest_would_send`, and pass strict artifact doctor. If those
+fields show candidates but the delivery ledger has no research-review row, treat
+the rehearsal as not ready.
 
 Event Alpha can also write `HYPOTHESIS` watchlist rows. A hypothesis means the
 radar inferred that an external catalyst may affect a crypto sector or seed

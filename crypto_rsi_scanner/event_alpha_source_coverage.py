@@ -107,6 +107,7 @@ class EventAlphaSourceCoveragePack:
     rejected_only_count: int = 0
     skipped_budget_count: int = 0
     provider_unavailable_count: int = 0
+    recommended_actions: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -121,6 +122,7 @@ class EventAlphaSourceCoveragePack:
             "rejected_only_count": self.rejected_only_count,
             "skipped_budget_count": self.skipped_budget_count,
             "provider_unavailable_count": self.provider_unavailable_count,
+            "recommended_actions": list(self.recommended_actions),
         }
 
 
@@ -182,6 +184,15 @@ def build_source_coverage_report(
         unavailable = sum(1 for row in pack_rows if _status(row) in {"provider_unavailable", "provider_backoff", "failed_soft", "skipped_config"})
         blocked = _coverage_blocked_count(pack_name, pack_rows=pack_rows, core_rows=core_rows)
         absence_meaningful = _evidence_absence_meaningful(pack_name, healthy, degraded)
+        recommended_actions = _pack_recommended_actions(
+            pack_name,
+            missing=missing,
+            degraded=degraded,
+            blocked=blocked,
+            skipped_budget=skipped_budget,
+            rejected_only=rejected_only,
+            provider_unavailable=unavailable,
+        )
         packs.append(
             EventAlphaSourceCoveragePack(
                 source_pack=pack_name,
@@ -195,6 +206,7 @@ def build_source_coverage_report(
                 rejected_only_count=rejected_only,
                 skipped_budget_count=skipped_budget,
                 provider_unavailable_count=unavailable,
+                recommended_actions=recommended_actions,
             )
         )
     return EventAlphaSourceCoverageReport(
@@ -237,6 +249,7 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
                     f"provider_unavailable={pack.provider_unavailable_count}"
                 ),
                 f"  candidates blocked by coverage gap: {pack.candidates_blocked_by_coverage_gap}",
+                f"  recommended actions: {_join(pack.recommended_actions)}",
             ]
         )
     recs = _recommendation_lines(report)
@@ -378,6 +391,60 @@ def _recommendation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
             reason.append(f"degraded_or_backoff_in_packs={provider_gap_counts[provider]}")
         lines.append(f"- {provider}: " + ", ".join(reason))
     return lines
+
+
+def _pack_recommended_actions(
+    pack_name: str,
+    *,
+    missing: Iterable[str],
+    degraded: Iterable[str],
+    blocked: int,
+    skipped_budget: int,
+    rejected_only: int,
+    provider_unavailable: int,
+) -> tuple[str, ...]:
+    actions: list[str] = []
+    missing_set = set(missing)
+    degraded_set = set(degraded)
+    if blocked or missing_set or degraded_set:
+        for provider in sorted(missing_set):
+            actions.append(_provider_setup_action(provider, status="missing"))
+        for provider in sorted(degraded_set):
+            actions.append(_provider_setup_action(provider, status="degraded"))
+    if skipped_budget:
+        actions.append("raise evidence-acquisition query/candidate budget for this source pack")
+    if rejected_only:
+        actions.append("inspect rejected evidence samples and add stricter query terms before trusting absence")
+    if provider_unavailable:
+        actions.append("run provider health report/reset before treating missing evidence as meaningful")
+    if pack_name == "market_anomaly_pack" and "defillama" in missing_set:
+        actions.append("add or enable DefiLlama-style protocol metrics before relying on market-anomaly confirmation")
+    return tuple(dict.fromkeys(action for action in actions if action))
+
+
+def _provider_setup_action(provider: str, *, status: str) -> str:
+    prefix = "configure" if status == "missing" else "restore"
+    guidance = {
+        "cryptopanic": "CryptoPanic token/news coverage with CRYPTOPANIC_API_KEY",
+        "gdelt": "GDELT broad-news coverage and provider backoff health",
+        "project_blog_rss": "project/blog RSS feeds; quarantine feed-level 403s instead of the whole RSS provider",
+        "binance_announcements": "official Binance announcement coverage for listing/perp events",
+        "bybit_announcements": "official Bybit announcement coverage for listing/perp events",
+        "coinmarketcal": "structured event calendar coverage",
+        "tokenomist": "Tokenomist unlock/supply coverage",
+        "sports_fixtures": "sports fixture coverage for fan-token packs",
+        "polymarket": "Polymarket context coverage for external catalysts",
+        "coinalyze": "Coinalyze derivatives/OI/funding coverage",
+        "coingecko": "CoinGecko market/universe coverage",
+        "defillama": "DefiLlama protocol TVL/revenue/context coverage",
+        "etherscan": "Etherscan token-flow/supply coverage",
+        "arkham": "Arkham labeled-wallet coverage",
+        "dune": "Dune curated on-chain query coverage",
+        "okx_announcements": "OKX official announcement coverage",
+        "coinbase": "Coinbase official listing coverage",
+    }
+    detail = guidance.get(provider, f"{provider} coverage")
+    return f"{prefix} {detail}"
 
 
 def _sorted_tuple(values: Iterable[str]) -> tuple[str, ...]:

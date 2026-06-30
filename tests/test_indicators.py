@@ -217,6 +217,16 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "--event-alpha-notify-fixture-smoke" in deep_no_send_smoke_dry
     assert "RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND=1" in deep_no_send_smoke_dry
     assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_no_send_smoke" in deep_no_send_smoke_dry
+    deep_research_review_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-notify-llm-deep-research-review-no-send-smoke", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "RSI_EVENT_ALPHA_NOTIFY_FIXTURE_PROFILE=notify_llm_deep" in deep_research_review_dry
+    assert "RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED=1" in deep_research_review_dry
+    assert "research_review_digest_candidates" in deep_research_review_dry
+    assert "notify_llm_deep_research_review_smoke" in deep_research_review_dry
+    assert "--event-alpha-artifact-doctor-delivery-scope latest_run" in deep_research_review_dry
     deep_rehearsal_dry = subprocess.check_output(
         ["make", "-n", "event-alpha-notify-llm-deep-real-no-send-rehearsal", "PYTHON=python3"],
         cwd=root,
@@ -643,12 +653,18 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert proxy.evidence_absence_meaningful is False
     assert proxy.skipped_budget_count == 1
     assert proxy.candidates_blocked_by_coverage_gap == 2
+    assert any("CryptoPanic" in item for item in proxy.recommended_actions)
+    assert any("RSS" in item or "project/blog RSS" in item for item in proxy.recommended_actions)
+    assert any("evidence-acquisition query/candidate budget" in item for item in proxy.recommended_actions)
     assert security.accepted_evidence_count == 1
     assert "cryptopanic" in security.missing_providers
     assert listing.rejected_only_count == 1
+    assert any("rejected evidence samples" in item for item in listing.recommended_actions)
     assert perp.provider_unavailable_count == 1
+    assert any("provider health report/reset" in item for item in perp.recommended_actions)
     assert "coingecko" in market.healthy_providers
     assert "defillama" in market.missing_providers
+    assert any("DefiLlama" in item for item in market.recommended_actions)
     assert market.evidence_absence_meaningful is True
 
     text = event_alpha_source_coverage.format_source_coverage_report(report)
@@ -658,6 +674,8 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "evidence absence meaningful: false" in text
     assert "accepted=1" in text
     assert "Most useful next data source:" in text
+    assert "recommended actions:" in text
+    assert "configure CryptoPanic token/news coverage" in text
     assert "No alerts, sends, trades" in text
 
 
@@ -23905,6 +23923,10 @@ def test_event_alpha_research_review_digest_surfaces_near_misses_without_alertin
         assert not result.attempted
         assert result.deliveries_blocked == 1
         assert result.lane_items_attempted[notif.LANE_RESEARCH_REVIEW_DIGEST] == 1
+        assert result.research_review_digest_enabled is True
+        assert result.research_review_digest_candidates == 1
+        assert result.research_review_digest_would_send == 1
+        assert result.research_review_digest_sent == 0
         rows = delivery.load_delivery_records(dcfg.path)
         assert rows[-1]["lane"] == notif.LANE_RESEARCH_REVIEW_DIGEST
         assert rows[-1]["state"] == delivery.STATE_BLOCKED
@@ -24031,6 +24053,30 @@ def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
         )
         assert clean.research_review_digest_contains_hard_gated_candidate == 0
         assert clean.research_review_digest_contains_strict_alertable == 0
+        assert clean.research_review_digest_enabled_but_lane_missing == 0
+        assert clean.research_review_digest_candidates_without_delivery == 0
+
+        missing_lane = doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-missing-review-lane",
+                "profile": "fixture",
+                "artifact_namespace": namespace,
+                "run_mode": "test",
+                "research_review_digest_enabled": True,
+                "research_review_digest_candidates": 1,
+                "research_review_digest_would_send": 1,
+            }],
+            delivery_rows=[],
+            core_opportunity_rows=[core_row],
+            profile="fixture",
+            artifact_namespace=namespace,
+            include_test_artifacts=True,
+            strict=True,
+            delivery_strict_scope="latest_run",
+        )
+        assert missing_lane.research_review_digest_enabled_but_lane_missing == 1
+        assert missing_lane.research_review_digest_candidates_without_delivery == 1
+        assert missing_lane.status == "BLOCKED"
 
         bad_preview = Path(tmp) / "bad_preview.md"
         bad_preview.write_text(

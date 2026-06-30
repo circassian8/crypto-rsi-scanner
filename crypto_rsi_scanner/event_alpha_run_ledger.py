@@ -217,6 +217,15 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
                     for lane in sorted(set(lane_attempted) | set(lane_delivered))
                 )
             )
+        if row.get("research_review_digest_enabled") or row.get("research_review_digest_candidates"):
+            rows.append(
+                "  research_review_digest: "
+                f"enabled={str(bool(row.get('research_review_digest_enabled'))).lower()} "
+                f"candidates={int(row.get('research_review_digest_candidates') or 0)} "
+                f"would_send={int(row.get('research_review_digest_would_send') or 0)} "
+                f"sent={int(row.get('research_review_digest_sent') or 0)} "
+                f"block={row.get('research_review_digest_block_reason') or 'none'}"
+            )
         rows.append(
             "  "
             f"snapshots={int(row.get('snapshot_rows_written') or 0)} "
@@ -379,6 +388,11 @@ def _run_record(
         "send_heartbeat_due": bool(getattr(result, "send_heartbeat_due", False)),
         "send_heartbeat_sent": bool(getattr(result, "send_heartbeat_sent", False)),
         "send_cooldown_blocks": dict(getattr(result, "send_cooldown_blocks", {}) or {}),
+        "research_review_digest_enabled": bool(getattr(result, "research_review_digest_enabled", False)),
+        "research_review_digest_candidates": _int(getattr(result, "research_review_digest_candidates", 0)),
+        "research_review_digest_would_send": _int(getattr(result, "research_review_digest_would_send", 0)),
+        "research_review_digest_sent": _int(getattr(result, "research_review_digest_sent", 0)),
+        "research_review_digest_block_reason": getattr(result, "research_review_digest_block_reason", None),
         "notification_summary": _notification_summary(result, profile=profile, notify_burn=notify_burn),
         "send_block_reason": getattr(result, "send_block_reason", None),
         "sent": bool(getattr(result, "send_success", False)),
@@ -448,6 +462,11 @@ def _notification_summary(result: Any, *, profile: str | None, notify_burn: bool
         "would_send_count": _int(getattr(result, "send_would_send_items", 0)),
         "block_reason": getattr(result, "send_block_reason", None),
         "cooldown_blocks": dict(getattr(result, "send_cooldown_blocks", {}) or {}),
+        "research_review_digest_enabled": bool(getattr(result, "research_review_digest_enabled", False)),
+        "research_review_digest_candidates": _int(getattr(result, "research_review_digest_candidates", 0)),
+        "research_review_digest_would_send": _int(getattr(result, "research_review_digest_would_send", 0)),
+        "research_review_digest_sent": _int(getattr(result, "research_review_digest_sent", 0)),
+        "research_review_digest_block_reason": getattr(result, "research_review_digest_block_reason", None),
         "provider_fail_fast_blocks": provider_blocks,
         "runtime_budget_exhausted": any("notification_runtime_budget_exhausted" in warning for warning in warnings),
     }

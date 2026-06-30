@@ -2977,6 +2977,16 @@ def _event_alpha_notify_cycle_body(
         notification_scope=notification_plan.notification_scope,
         notification_scope_value=notification_plan.scope_value,
         block_reason="send not requested",
+        research_review_digest_enabled=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED,
+        research_review_digest_candidates=len(notification_plan.research_review_items),
+        research_review_digest_would_send=notification_plan.lane_counts.get(
+            event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST,
+            0,
+        ),
+        research_review_digest_sent=0,
+        research_review_digest_block_reason=notification_plan.blocked_by_lane.get(
+            event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST
+        ),
     )
     clock_send_blocker = _event_alpha_notify_fixed_clock_blocker(clock_status)
     if send and clock_send_blocker:
@@ -2993,6 +3003,16 @@ def _event_alpha_notify_cycle_body(
             cooldown_blocks=dict(notification_plan.blocked_by_lane),
             notification_scope=notification_plan.notification_scope,
             notification_scope_value=notification_plan.scope_value,
+            research_review_digest_enabled=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED,
+            research_review_digest_candidates=len(notification_plan.research_review_items),
+            research_review_digest_would_send=notification_plan.lane_counts.get(
+                event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST,
+                0,
+            ),
+            research_review_digest_sent=0,
+            research_review_digest_block_reason=notification_plan.blocked_by_lane.get(
+                event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST
+            ),
         )
         pipeline_result = replace(
             pipeline_result,
@@ -3038,6 +3058,11 @@ def _event_alpha_notify_cycle_body(
         send_cooldown_blocks=dict(send_result.cooldown_blocks),
         notification_scope=send_result.notification_scope,
         notification_scope_value=send_result.notification_scope_value,
+        research_review_digest_enabled=send_result.research_review_digest_enabled,
+        research_review_digest_candidates=send_result.research_review_digest_candidates,
+        research_review_digest_would_send=send_result.research_review_digest_would_send,
+        research_review_digest_sent=send_result.research_review_digest_sent,
+        research_review_digest_block_reason=send_result.research_review_digest_block_reason,
         notification_lock_acquired=run_lock.acquired,
         notification_stale_lock_recovered=run_lock.stale_recovered,
         notification_delivery_records_written=send_result.delivery_records_written,
@@ -6019,6 +6044,11 @@ def event_alpha_notify_fixture_smoke(
         send_cooldown_blocks=send_result.cooldown_blocks,
         notification_scope=send_result.notification_scope,
         notification_scope_value=send_result.notification_scope_value,
+        research_review_digest_enabled=send_result.research_review_digest_enabled,
+        research_review_digest_candidates=send_result.research_review_digest_candidates,
+        research_review_digest_would_send=send_result.research_review_digest_would_send,
+        research_review_digest_sent=send_result.research_review_digest_sent,
+        research_review_digest_block_reason=send_result.research_review_digest_block_reason,
         notification_burn_in=True,
         research_card_paths=card_write.card_paths,
         core_opportunity_store_path=str(context.core_opportunity_store_path),
@@ -7760,6 +7790,16 @@ def _send_event_alpha_routed_digest(
                 cooldown_blocks=dict(plan.blocked_by_lane),
                 notification_scope=plan.notification_scope,
                 notification_scope_value=plan.scope_value,
+                research_review_digest_enabled=notif_cfg.research_review_digest_enabled,
+                research_review_digest_candidates=len(plan.research_review_items),
+                research_review_digest_would_send=plan.lane_counts.get(
+                    event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST,
+                    0,
+                ),
+                research_review_digest_sent=0,
+                research_review_digest_block_reason=plan.blocked_by_lane.get(
+                    event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST
+                ),
             )
             print(f"Event Alpha routed notifications would send {result.would_send_items} item(s); blocked: {clock_blocker}.")
             return result

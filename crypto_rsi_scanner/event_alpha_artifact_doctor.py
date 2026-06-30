@@ -97,6 +97,8 @@ class EventAlphaArtifactDoctorResult:
     research_review_digest_too_many_items: int = 0
     research_review_digest_missing_feedback_target: int = 0
     research_review_digest_absolute_path: int = 0
+    research_review_digest_enabled_but_lane_missing: int = 0
+    research_review_digest_candidates_without_delivery: int = 0
     digest_item_without_live_confirmation: int = 0
     digest_item_rejected_results_only: int = 0
     strategic_broad_asset_digest_without_confirmation: int = 0
@@ -685,6 +687,29 @@ def diagnose_artifacts(
         )
     if alerts and not card_count and any(str(row.get("tier") or "") in {"HIGH_PRIORITY_WATCH", "TRIGGERED_FADE"} for row in alerts):
         warnings.append("high-priority/triggered snapshots exist but no research cards were found")
+    research_review_enabled_but_lane_missing = 0
+    research_review_candidates_without_delivery = 0
+    if latest_run:
+        rr_enabled = bool(latest_run.get("research_review_digest_enabled"))
+        rr_candidates = _as_int(latest_run.get("research_review_digest_candidates"))
+        rr_would_send = _as_int(latest_run.get("research_review_digest_would_send"))
+        latest_lanes = {
+            str(row.get("lane") or "")
+            for row in delivery_rows
+            if isinstance(row, Mapping)
+            and latest_run_id
+            and str(row.get("run_id") or "") == str(latest_run_id)
+        }
+        if rr_enabled and (rr_candidates or rr_would_send) and "research_review_digest" not in latest_lanes:
+            research_review_enabled_but_lane_missing = 1
+            if rr_candidates:
+                research_review_candidates_without_delivery = 1
+    if research_review_enabled_but_lane_missing:
+        message = "research_review_digest_enabled_but_lane_missing=1"
+        (blockers if strict else warnings).append(message)
+    if research_review_candidates_without_delivery:
+        message = "research_review_digest_candidates_without_delivery=1"
+        (blockers if strict else warnings).append(message)
     delivery_summary = _delivery.summarize_delivery_rows([row for row in delivery_rows if isinstance(row, Mapping)])
     if delivery_summary.failed:
         warnings.append(
@@ -1112,6 +1137,8 @@ def diagnose_artifacts(
         research_review_digest_too_many_items=delivery_conflicts["research_review_digest_too_many_items"],
         research_review_digest_missing_feedback_target=delivery_conflicts["research_review_digest_missing_feedback_target"],
         research_review_digest_absolute_path=delivery_conflicts["research_review_digest_absolute_path"],
+        research_review_digest_enabled_but_lane_missing=research_review_enabled_but_lane_missing,
+        research_review_digest_candidates_without_delivery=research_review_candidates_without_delivery,
         digest_item_without_live_confirmation=delivery_conflicts["digest_item_without_live_confirmation"],
         digest_item_rejected_results_only=delivery_conflicts["digest_item_rejected_results_only"],
         strategic_broad_asset_digest_without_confirmation=delivery_conflicts["strategic_broad_asset_digest_without_confirmation"],
@@ -2854,7 +2881,9 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"research_review_hard_gated={result.research_review_digest_contains_hard_gated_candidate} "
             f"research_review_too_many={result.research_review_digest_too_many_items} "
             f"research_review_feedback_missing={result.research_review_digest_missing_feedback_target} "
-            f"research_review_absolute_path={result.research_review_digest_absolute_path}"
+            f"research_review_absolute_path={result.research_review_digest_absolute_path} "
+            f"research_review_lane_missing={result.research_review_digest_enabled_but_lane_missing} "
+            f"research_review_no_delivery={result.research_review_digest_candidates_without_delivery}"
         ),
         (
             "quality fields: "

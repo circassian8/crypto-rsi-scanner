@@ -49,7 +49,10 @@ non-alertable exploratory/local rows only after identity, score, and hard-gate
 filters pass; source-noise, ticker collisions, generic co-occurrence,
 sector-only rows by default, diagnostics/support rows, and already alertable
 rows must stay out. It cannot create `TRIGGERED_FADE`, loosen quality gates,
-route normal RSI alerts, write paper/live rows, or imply execution.
+route normal RSI alerts, write paper/live rows, or imply execution. Real-profile
+rehearsals must write run-ledger counters and delivery rows for the
+`research_review_digest` lane when candidates are due; missing lane rows are an
+artifact-health failure, not a reason to relax alert gates.
 **Why:** Burn-in needs useful operator feedback even when strict routes have no
 alertable decisions. Mixing near-misses into daily digest/high-priority lanes
 would blur the meaning of alertable Event Alpha decisions.

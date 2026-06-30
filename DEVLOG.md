@@ -17,6 +17,36 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Operationalize notify-deep research-review digest · Codex
+**Why:** The fixture research-review digest worked, but real-profile
+`notify_llm_deep` rehearsals did not expose research-review lane accounting, so
+near-miss candidates could disappear behind heartbeat-only previews. Source
+coverage also needed clearer next-provider guidance without weakening strict
+alert gates.
+**Changes:**
+- Threaded `research_review_digest` enabled/candidate/would-send/sent/block
+  counters through notification send results, pipeline results, run ledgers, and
+  run-ledger reports.
+- Added a strict artifact-doctor check for latest runs that have
+  research-review candidates but no `research_review_digest` delivery row.
+- Added `make event-alpha-notify-llm-deep-research-review-no-send-smoke` to
+  prove the real `notify_llm_deep` profile writes blocked no-send
+  research-review delivery rows for fixture near-misses.
+- Expanded source coverage reports with actionable per-pack provider, setup,
+  budget, rejected-only, and provider-health recommendations.
+- Updated runbook, roadmap, and decision notes for the operational
+  research-review lane.
+**Verify:** `python3 tests/test_indicators.py` (563/563 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-notify-llm-deep-research-review-no-send-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep_rehearsal
+PYTHON=python3`; `make event-alpha-live-burn-in-no-send PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Research-only. This does not change strict alert eligibility,
+normal RSI alerts, paper/live writes, or `TRIGGERED_FADE`. The live burn-in
+still reports expected external-provider/LLM instability as warnings
+(GDELT 429, RSS 403/timeouts, OpenAI timeouts/resets), not blockers.
+
 ## 2026-06-29 — Add Event Alpha source coverage dashboard · Codex
 **Why:** Live/rehearsal runs can stay quiet because source-pack evidence is
 missing, degraded, skipped by budget, or rejected. Operators needed one

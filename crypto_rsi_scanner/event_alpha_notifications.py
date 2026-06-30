@@ -852,6 +852,10 @@ def send_notifications(
 
     def _result(**kwargs: Any) -> event_alpha_pipeline.EventAlphaSendResult:
         counts = writer.counts if writer else {}
+        research_review_sent = kwargs.pop(
+            "research_review_digest_sent",
+            int((kwargs.get("lane_items_delivered") or {}).get(LANE_RESEARCH_REVIEW_DIGEST, 0)),
+        )
         return event_alpha_pipeline.EventAlphaSendResult(
             heartbeat_due=plan.heartbeat_due,
             cooldown_blocks=dict(plan.blocked_by_lane),
@@ -864,6 +868,11 @@ def send_notifications(
             deliveries_skipped_duplicate=int(counts.get(delivery.STATE_SKIPPED_DUPLICATE, 0)),
             deliveries_skipped_in_flight=int(counts.get(delivery.STATE_SKIPPED_IN_FLIGHT, 0)),
             deliveries_blocked=int(counts.get(delivery.STATE_BLOCKED, 0)),
+            research_review_digest_enabled=bool(cfg.research_review_digest_enabled),
+            research_review_digest_candidates=len(plan.research_review_items),
+            research_review_digest_would_send=int(lane_attempts.get(LANE_RESEARCH_REVIEW_DIGEST, 0)),
+            research_review_digest_sent=int(research_review_sent or 0),
+            research_review_digest_block_reason=plan.blocked_by_lane.get(LANE_RESEARCH_REVIEW_DIGEST),
             **kwargs,
         )
 
