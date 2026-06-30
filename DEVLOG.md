@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Harden Event Alpha asset-role identity · Codex
+**Why:** Candidate assets can be over-promoted when taxonomy suggestions,
+common-word tickers, broad macro assets, or venue tokens are treated as directly
+affected assets without source evidence explaining the actual role.
+**Changes:**
+- Added deterministic asset knowledge and role capabilities for core assets
+  such as BTC/ETH/SOL, RUNE/THORChain, AAVE, VELVET, HYPE, CHZ, TRUMP, LINK,
+  KCS, stablecoins, and wrapped assets.
+- Resolver and impact-path validation now persist identity confidence,
+  identity evidence, matched field/alias, role source, collision risk, asset
+  kind, role capabilities, and role-validation failures/warnings.
+- Taxonomy/LLM suggestions stay diagnostic unless source text directly ties the
+  asset identity to the mechanism; broad macro assets are capped to contextual
+  roles when the article is not really about the coin.
+- Event classification now distinguishes proxy instruments from proxy venues
+  using asset capabilities plus text context, preserving historical TEST*
+  event-fade fixture behavior and keeping `TRIGGERED_FADE` controlled by
+  `event_fade.py`.
+- Cards, opportunity audits, daily briefs, watchlist rows, and canonical core
+  rows surface compact identity metadata for operator review.
+**Verify:** `python3 tests/test_indicators.py` (572/572 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=evidence_acquisition_smoke
+PYTHON=python3`; `python3 -m compileall -q crypto_rsi_scanner tests`.
+**Notes/risks:** Research-only. Asset knowledge can reject or cap weak roles,
+but it cannot send Telegram, trade, paper trade, write normal RSI rows, or
+create `TRIGGERED_FADE`.
+
 ## 2026-06-30 — Rebuild source enrichment quality gates · Codex
 **Why:** Google News placeholders, ticker-sidebar pages, blocked pages, and
 affiliate/SEO article text can poison Event Alpha LLM extraction, catalyst

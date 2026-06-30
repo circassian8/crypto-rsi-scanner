@@ -994,6 +994,20 @@ def _list_value(value: object) -> list[str]:
     return [str(value)]
 
 
+def _display_list_value(value: object, *, limit: int = 6) -> str:
+    items = _list_value(value)
+    if not items:
+        return "none"
+    return "; ".join(items[:limit])
+
+
+def _role_capabilities_line(value: object) -> str:
+    if not isinstance(value, Mapping):
+        return "unknown"
+    enabled = [str(key) for key, child in sorted(value.items()) if bool(child)]
+    return ", ".join(enabled) if enabled else "none"
+
+
 def _bool_value(value: object) -> bool:
     if isinstance(value, bool):
         return value
@@ -1860,6 +1874,13 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
     impact_path_reason = components.get("impact_path_reason") or _canonical_reason_from_components(components) or "not available"
     impact_path_type = components.get("impact_path_type") or components.get("primary_impact_path") or "not available"
     candidate_role = components.get("candidate_role") or "not available"
+    asset_kind = components.get("asset_kind") or "unknown"
+    role_source = components.get("role_source") or components.get("asset_role_source") or "unknown"
+    identity_confidence = components.get("identity_confidence")
+    identity_evidence = components.get("identity_evidence") or []
+    collision_risk = components.get("collision_risk") or "none"
+    role_capabilities = components.get("role_capabilities") or {}
+    role_validation_failures = components.get("role_validation_failures") or []
     incident_id = components.get("incident_id") or "unknown"
     canonical_incident_name = components.get("canonical_incident_name") or "unknown"
     event_archetype = components.get("event_archetype") or "unknown"
@@ -1982,6 +2003,13 @@ def _impact_hypothesis_lines(entry: event_watchlist.EventWatchlistEntry | None) 
         f"- Playbook: {entry.latest_playbook_type or 'impact_hypothesis'}",
         f"- Impact path type: {impact_path_type}",
         f"- Candidate role: {candidate_role}",
+        f"- Asset kind: {asset_kind}",
+        f"- Role source: {role_source}",
+        f"- Identity confidence: {identity_confidence if identity_confidence is not None else 'n/a'}",
+        f"- Identity evidence: {_display_list_value(identity_evidence)}",
+        f"- Collision risk: {collision_risk}",
+        f"- Role capabilities: {_role_capabilities_line(role_capabilities)}",
+        f"- Role validation failures: {_display_list_value(role_validation_failures)}",
         f"- Candidate role confidence: {role_confidence if role_confidence is not None else 'n/a'}",
         f"- Candidate role evidence: {'; '.join(str(item) for item in role_evidence[:4]) if role_evidence else 'none'}",
         f"- Impact path strength: {impact_path_strength}",

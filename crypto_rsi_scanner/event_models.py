@@ -68,6 +68,15 @@ class EventAssetLink:
     link_confidence: float
     match_reason: str
     evidence: tuple[str, ...]
+    identity_confidence: float | None = None
+    identity_evidence: tuple[str, ...] = ()
+    matched_alias: str | None = None
+    matched_field: str | None = None
+    rejected_aliases: tuple[str, ...] = ()
+    collision_terms: tuple[str, ...] = ()
+    collision_risk: str = "none"
+    role_source: str = "resolver_exact"
+    source_noise_reason: str | None = None
 
 
 @dataclass(frozen=True)

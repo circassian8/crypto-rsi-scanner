@@ -16,6 +16,28 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - Asset role validation is deterministic before promotion
+**Status:** accepted
+**Decision:** Event Alpha candidate promotion must validate the asset role
+against deterministic asset knowledge before treating a token as the affected
+asset, proxy instrument, proxy venue, infrastructure provider, ecosystem asset,
+or broad macro context. Rows should persist asset kind, role capabilities,
+identity confidence, identity evidence, role source, matched identity field,
+collision risk, and role-validation failures/warnings where available.
+Taxonomy candidates, LLM suggestions, source-context mentions, and common-word
+tickers are proposals only until source text directly ties the asset identity
+to the relevant mechanism. Broad macro assets such as BTC/ETH/SOL can remain
+market context unless the source directly explains the asset-specific impact.
+This validation may cap or demote candidates, but it cannot send Telegram,
+paper trade, live trade, write normal RSI rows, bypass source-pack gates, or
+create `TRIGGERED_FADE`.
+**Why:** Source expansion makes false positives more likely: LINK can be a
+taxonomy candidate in a THORChain exploit, HYPE can be a common word or a venue
+token depending on context, and BTC can appear as broad market context without
+being the actual affected asset.
+**Revisit when:** The asset knowledge graph is replaced by a reviewed external
+asset registry with audited entity/role mappings and false-positive metrics.
+
 ## 2026-06-30 - Article enrichment quality gates LLM source text
 **Status:** accepted
 **Decision:** Event Alpha source enrichment must persist auditable article

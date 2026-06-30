@@ -236,6 +236,14 @@ class EventImpactHypothesis:
     supporting_evidence_quotes: tuple[str, ...] = ()
     supporting_hypothesis_count: int = 1
     asset_role_source: str | None = None
+    asset_kind: str | None = None
+    role_source: str | None = None
+    identity_confidence: float | None = None
+    identity_evidence: tuple[str, ...] = ()
+    collision_risk: str | None = None
+    role_validation_failures: tuple[str, ...] = ()
+    role_validation_warnings: tuple[str, ...] = ()
+    role_capabilities: Mapping[str, bool] = field(default_factory=dict)
     independent_source_domains: tuple[str, ...] = ()
     conflicting_claims: tuple[str, ...] = ()
     opportunity_score_final: float | None = None
@@ -616,20 +624,26 @@ def validate_hypotheses_with_raw_events(
                     "coin_id": coin_id,
                     "reason": reason,
                     "validated": True,
+                    "role_source": event_identity.ROLE_SOURCE_RESOLVER_EXACT,
+                    "identity_confidence": 95.0,
+                    "identity_evidence": (reason,),
                 }
                 for reason, symbol, coin_id in zip(reasons, matched_symbols, matched_coin_ids)
             )
             crypto_assets = _merge_asset_rows(hypothesis.crypto_candidate_assets, hypothesis.validated_candidate_assets, merged_assets)
             symbols, coin_ids = _assets_from_asset_rows(crypto_assets)
             components = dict(hypothesis.score_components or {})
+            components.update(_asset_knowledge_components(merged_assets[0] if merged_assets else (crypto_assets[0] if crypto_assets else None)))
             components["validation_strength"] = 95.0
             if impact_path_reason:
                 components["impact_path_strength"] = 85.0 if _impact_path_reason_is_strong(impact_path_reason) else 35.0
             quality_kwargs = {}
             if impact_validation is not None:
                 components.update(_impact_validation_score_components(impact_validation))
+                components.update(_impact_validation_metadata_components(impact_validation))
                 impact_validation = _refresh_impact_validation_score(impact_validation, components)
                 components.update(_impact_validation_score_components(impact_validation))
+                components.update(_impact_validation_metadata_components(impact_validation))
                 quality_kwargs = _quality_verdict_replace_kwargs(
                     impact_validation,
                     impact_context=impact_context,
@@ -987,6 +1001,9 @@ def _asset_row_from_mapping(
         "confidence": round(max(0.0, min(1.0, confidence)), 4),
         "evidence": str(asset.get("evidence") or asset.get("evidence_quote") or ""),
         "source_title": str(asset.get("source_title") or asset.get("title") or ""),
+        "role_source": str(asset.get("role_source") or event_identity.ROLE_SOURCE_LLM_SUGGESTION),
+        "identity_confidence": round(max(0.0, min(100.0, confidence * 100.0)), 2),
+        "identity_evidence": tuple(str(value) for value in (asset.get("evidence") or asset.get("evidence_quote") or "", asset.get("title") or "") if str(value)),
         "validated": False,
     }
 
@@ -1315,6 +1332,13 @@ def _hypothesis_from_rule(
         validated_assets=validated_assets,
         suggested_assets=accepted_suggested,
     )
+    score_components.update(
+        _asset_knowledge_components(
+            validated_assets[0]
+            if validated_assets
+            else (crypto_candidate_assets[0] if crypto_candidate_assets else None)
+        )
+    )
     claim_rows = event_claim_semantics.extract_event_claims(raws)
     incident = incident or _incident_for_single_event(event, raws)
     if incident is not None:
@@ -1434,8 +1458,10 @@ def _hypothesis_from_rule(
         )
         updated_components = dict(score_components)
         updated_components.update(_impact_validation_score_components(validation))
+        updated_components.update(_impact_validation_metadata_components(validation))
         validation = _refresh_impact_validation_score(validation, updated_components)
         updated_components.update(_impact_validation_score_components(validation))
+        updated_components.update(_impact_validation_metadata_components(validation))
         quality_kwargs = _quality_verdict_replace_kwargs(
             validation,
             impact_context=(raws[0], str(asset.get("symbol") or (symbols[0] if symbols else "")), str(asset.get("coin_id") or (coin_ids[0] if coin_ids else ""))),
@@ -1951,6 +1977,9 @@ def _asset_rows_from_taxonomy(
                 "name": name,
                 "symbol": symbol,
                 "coin_id": coin_id,
+                "role_source": event_identity.ROLE_SOURCE_TAXONOMY_CANDIDATE,
+                "identity_confidence": 35.0,
+                "identity_evidence": ("taxonomy candidate",),
                 "validated": False,
             })
     return _merge_asset_rows(tuple(rows))
@@ -2074,6 +2103,33 @@ def _candidate_rejection_reason(
     if str(row.get("mention_type") or "") in {"publisher_or_source", "ordinary_word"}:
         return "source_noise_not_candidate_asset"
     return None
+
+
+def _asset_knowledge_components(asset: Mapping[str, Any] | None) -> dict[str, Any]:
+    row = dict(asset or {})
+    knowledge = event_identity.asset_knowledge_for(
+        symbol=str(row.get("symbol") or ""),
+        coin_id=str(row.get("coin_id") or ""),
+        name=str(row.get("name") or ""),
+        categories=row.get("categories") or (),
+        aliases=row.get("aliases") or (),
+        metadata=row,
+    )
+    identity_evidence = row.get("identity_evidence") or row.get("evidence") or row.get("source_title") or ()
+    if isinstance(identity_evidence, str):
+        identity_evidence = (identity_evidence,)
+    return {
+        "asset_name": knowledge.official_name,
+        "asset_kind": knowledge.asset_kind,
+        "asset_categories": list(knowledge.categories),
+        "asset_aliases": list(knowledge.aliases[:8]),
+        "role_capabilities": knowledge.role_capabilities.as_dict(),
+        "role_source": str(row.get("role_source") or event_identity.ROLE_SOURCE_RESOLVER_EXACT),
+        "asset_role_source": str(row.get("role_source") or event_identity.ROLE_SOURCE_RESOLVER_EXACT),
+        "identity_confidence": float(row.get("identity_confidence") or 0.0),
+        "identity_evidence": tuple(str(value) for value in identity_evidence if str(value)),
+        "collision_risk": "high" if knowledge.common_word_collision_risk else "none",
+    }
 
 
 def _suggested_assets_by_event(
@@ -2608,6 +2664,22 @@ def _impact_validation_score_components(
     return components
 
 
+def _impact_validation_metadata_components(
+    validation: event_impact_path_validator.ImpactPathValidation,
+) -> dict[str, Any]:
+    return {
+        "asset_kind": validation.asset_kind,
+        "role_source": validation.role_source,
+        "asset_role_source": validation.role_source,
+        "identity_confidence": validation.identity_confidence,
+        "identity_evidence": list(validation.identity_evidence or ()),
+        "collision_risk": validation.collision_risk,
+        "role_validation_failures": list(validation.role_validation_failures or ()),
+        "role_validation_warnings": list(validation.role_validation_warnings or ()),
+        "role_capabilities": dict(validation.role_capabilities or {}),
+    }
+
+
 def _refresh_impact_validation_score(
     validation: event_impact_path_validator.ImpactPathValidation,
     components: Mapping[str, float],
@@ -2672,6 +2744,14 @@ def _impact_validation_replace_kwargs(
         "role_evidence": validation.role_evidence,
         "cause_status": validation.cause_status,
         "claim_polarities": validation.claim_polarities,
+        "asset_kind": validation.asset_kind,
+        "role_source": validation.role_source,
+        "identity_confidence": validation.identity_confidence,
+        "identity_evidence": validation.identity_evidence,
+        "collision_risk": validation.collision_risk,
+        "role_validation_failures": validation.role_validation_failures,
+        "role_validation_warnings": validation.role_validation_warnings,
+        "role_capabilities": dict(validation.role_capabilities or {}),
     }
 
 

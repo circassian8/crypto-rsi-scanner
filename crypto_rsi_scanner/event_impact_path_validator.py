@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Iterable, Mapping
 
-from . import event_catalyst_frames, event_claim_semantics, event_incident_graph
+from . import event_catalyst_frames, event_claim_semantics, event_identity, event_incident_graph
 from .event_models import RawDiscoveredEvent
 from .event_resolver import clean_text
 
@@ -75,6 +75,14 @@ class ImpactPathValidation:
     role_evidence: tuple[str, ...] = ()
     cause_status: str | None = None
     claim_polarities: tuple[str, ...] = ()
+    asset_kind: str | None = None
+    role_source: str | None = None
+    identity_confidence: float | None = None
+    identity_evidence: tuple[str, ...] = ()
+    collision_risk: str | None = None
+    role_validation_failures: tuple[str, ...] = ()
+    role_validation_warnings: tuple[str, ...] = ()
+    role_capabilities: Mapping[str, bool] = field(default_factory=dict)
 
 
 _DIRECT_EVENT_CATEGORIES = {
@@ -170,6 +178,54 @@ def validate_impact_path(
         primary_subject=primary_subject,
         affected_ecosystem=affected_ecosystem,
     )
+    role_source = str(
+        components.get("role_source")
+        or components.get("asset_role_source")
+        or components.get("resolver_role_source")
+        or event_identity.ROLE_SOURCE_RESOLVER_EXACT
+    )
+    knowledge = event_identity.asset_knowledge_for(
+        symbol=symbol,
+        coin_id=coin_id,
+        name=components.get("asset_name") if isinstance(components, Mapping) else None,
+        categories=components.get("asset_categories") or (),
+        aliases=components.get("asset_aliases") or (),
+    )
+    identity_confidence = max(
+        llm_resolver,
+        _component_score(components, "identity_confidence"),
+        _component_score(components, "resolver_identity_confidence"),
+    )
+    role_validation = event_identity.validate_asset_role(
+        knowledge,
+        role,
+        impact_category=category,
+        impact_path_type=path_type,
+        role_source=role_source,
+        source_text=text,
+        market_confirmation=market_confirmation,
+        identity_confidence=identity_confidence if identity_confidence > 0 else None,
+        identity_evidence=(*role_evidence, symbol or "", coin_id or ""),
+    )
+    if not role_validation.accepted:
+        role = role_validation.final_role
+        role_confidence = min(float(role_confidence or 0.0), 0.45)
+        role_evidence = tuple(dict.fromkeys((*role_evidence, *role_validation.failures)))
+        if "broad_macro_asset_context_only" in role_validation.failures:
+            path_type = ImpactPathType.MACRO_ATTENTION_ONLY.value
+            strength = ImpactPathStrength.WEAK.value
+            reason = "broad_macro_asset_context_only"
+        elif "taxonomy_candidate_not_affected_asset" in role_validation.failures:
+            path_type = ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value
+            strength = ImpactPathStrength.NONE.value
+            reason = "taxonomy_candidate_not_affected_asset"
+        elif "stable_or_wrapped_asset_not_market_anomaly_candidate" in role_validation.failures:
+            path_type = ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value
+            strength = ImpactPathStrength.NONE.value
+            reason = "stable_or_wrapped_asset_not_market_anomaly_candidate"
+        else:
+            strength = ImpactPathStrength.WEAK.value if strength != ImpactPathStrength.NONE.value else strength
+            reason = role_validation.failures[0]
     required_evidence_met = strength in {ImpactPathStrength.STRONG.value, ImpactPathStrength.MEDIUM.value}
     market_confirmation_required = strength == ImpactPathStrength.MEDIUM.value
     digest_eligible = strength == ImpactPathStrength.STRONG.value or (
@@ -179,6 +235,9 @@ def validate_impact_path(
     if path_type == ImpactPathType.GENERIC_COOCCURRENCE_ONLY.value:
         digest_eligible = False
         why_digest_ineligible = "generic_cooccurrence_only"
+    elif not role_validation.accepted:
+        digest_eligible = False
+        why_digest_ineligible = role_validation.failures[0] if role_validation.failures else "asset_role_validation_failed"
     elif strength in {ImpactPathStrength.WEAK.value, ImpactPathStrength.NONE.value}:
         why_digest_ineligible = reason or "weak_impact_path"
     elif market_confirmation_required and market_confirmation < 40.0:
@@ -193,6 +252,7 @@ def validate_impact_path(
         "timing_event_window": event_window,
         "liquidity_tradability": liquidity,
         "llm_resolver_confidence": llm_resolver,
+        "identity_confidence": role_validation.identity_confidence,
     }
     opportunity_score = calculate_opportunity_score_v2(opportunity_components)
     return ImpactPathValidation(
@@ -214,6 +274,14 @@ def validate_impact_path(
         role_evidence=role_evidence,
         cause_status=cause_status,
         claim_polarities=tuple(dict.fromkeys(claim.polarity for claim in claims)),
+        asset_kind=role_validation.asset_kind,
+        role_source=role_validation.role_source,
+        identity_confidence=role_validation.identity_confidence,
+        identity_evidence=role_validation.identity_evidence,
+        collision_risk=role_validation.collision_risk,
+        role_validation_failures=role_validation.failures,
+        role_validation_warnings=role_validation.warnings,
+        role_capabilities=role_validation.role_capabilities.as_dict(),
     )
 
 

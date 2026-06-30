@@ -145,6 +145,13 @@ def format_opportunity_audit(
         f"- validated symbol: {components.get('validated_symbol') or row.get('validated_symbol') or row.get('symbol') or 'unknown'}",
         f"- validated coin_id: {components.get('validated_coin_id') or row.get('validated_coin_id') or row.get('coin_id') or 'unknown'}",
         f"- candidate role: {components.get('candidate_role') or row.get('candidate_role') or 'unknown'}",
+        f"- asset kind: {components.get('asset_kind') or row.get('asset_kind') or 'unknown'}",
+        f"- role source: {components.get('role_source') or components.get('asset_role_source') or row.get('role_source') or row.get('asset_role_source') or 'unknown'}",
+        f"- identity confidence: {components.get('identity_confidence') if components.get('identity_confidence') is not None else row.get('identity_confidence', 'n/a')}",
+        f"- identity evidence: {_list_value(components.get('identity_evidence') or row.get('identity_evidence'))}",
+        f"- collision risk: {components.get('collision_risk') or row.get('collision_risk') or 'none'}",
+        f"- role capabilities: {_role_capabilities_value(components.get('role_capabilities') or row.get('role_capabilities'))}",
+        f"- role validation failures: {_list_value(components.get('role_validation_failures') or row.get('role_validation_failures'))}",
         f"- identity warnings: {_list_value(row.get('warnings') or components.get('warnings'))}",
         "",
         "## Incident",
@@ -1065,6 +1072,13 @@ def _asset_list(value: Any) -> str:
         else:
             rows.append(str(item))
     return "; ".join(rows)
+
+
+def _role_capabilities_value(value: Any) -> str:
+    if not isinstance(value, Mapping):
+        return "unknown"
+    enabled = [str(key) for key, child in sorted(value.items()) if bool(child)]
+    return ", ".join(enabled) if enabled else "none"
 
 
 def _collect_core_row_values(rows: Iterable[Mapping[str, Any]], *keys: str) -> tuple[str, ...]:

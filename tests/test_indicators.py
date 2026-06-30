@@ -34203,6 +34203,246 @@ def test_event_alpha_rehearsal_make_targets_include_fixture_and_fast_caps():
     assert "RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES=5" in fast
 
 
+def test_event_asset_knowledge_and_role_validation_caps_taxonomy_and_broad_assets():
+    from crypto_rsi_scanner import event_identity
+
+    btc = event_identity.asset_knowledge_for(symbol="BTC", coin_id="bitcoin")
+    rune = event_identity.asset_knowledge_for(symbol="RUNE", coin_id="thorchain")
+    velvet = event_identity.asset_knowledge_for(symbol="VELVET", coin_id="velvet")
+    link = event_identity.asset_knowledge_for(symbol="LINK", coin_id="chainlink")
+    tether = event_identity.asset_knowledge_for(symbol="USDT", coin_id="tether")
+    assert btc.broad_macro_asset is True
+    assert rune.project_entities == ("THORChain",)
+    assert velvet.role_capabilities.can_be_proxy_venue is True
+    assert link.role_capabilities.can_be_infrastructure is True
+
+    taxonomy = event_identity.validate_asset_role(
+        link,
+        event_identity.ROLE_DIRECT_SUBJECT,
+        impact_category="security_or_regulatory_shock",
+        role_source=event_identity.ROLE_SOURCE_TAXONOMY_CANDIDATE,
+        source_text="THORChain confirms a RUNE exploit; Chainlink is an oracle taxonomy candidate.",
+    )
+    assert taxonomy.accepted is False
+    assert taxonomy.final_role == event_identity.ROLE_GENERIC_MENTION
+    assert "taxonomy_candidate_not_affected_asset" in taxonomy.failures
+
+    broad = event_identity.validate_asset_role(
+        btc,
+        event_identity.ROLE_DIRECT_SUBJECT,
+        impact_category="strategic_investment_or_valuation",
+        source_text="Kraken buys a stake in Aave while Bitcoin markets are mentioned as context.",
+        market_confirmation=20,
+    )
+    assert broad.accepted is False
+    assert broad.final_role == event_identity.ROLE_MACRO_AFFECTED_ASSET
+    assert "broad_macro_asset_context_only" in broad.failures
+
+    stable = event_identity.validate_asset_role(
+        tether,
+        event_identity.ROLE_DIRECT_SUBJECT,
+        impact_category="market_anomaly_unknown",
+        source_text="USDT market anomaly without catalyst evidence.",
+    )
+    assert stable.accepted is False
+    assert "stable_or_wrapped_asset_not_market_anomaly_candidate" in stable.failures
+
+
+def test_event_impact_path_uses_asset_knowledge_for_roles_and_broad_context():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from crypto_rsi_scanner import event_impact_path_validator
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+
+    now = datetime(2026, 6, 20, tzinfo=timezone.utc)
+
+    def raw(raw_id: str, title: str, body: str) -> RawDiscoveredEvent:
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider="fixture_news",
+            fetched_at=now,
+            published_at=now,
+            source_url=f"https://example.com/{raw_id}",
+            title=title,
+            body=body,
+            raw_json={},
+            source_confidence=0.90,
+            content_hash=raw_id,
+        )
+
+    aave_raw = raw(
+        "aave_kraken",
+        "Kraken buys strategic stake in Aave",
+        "Kraken acquired a strategic stake in Aave; Bitcoin is mentioned only as broad market context.",
+    )
+    aave_hypothesis = SimpleNamespace(
+        impact_category="strategic_investment_or_valuation",
+        external_asset="Kraken",
+        score_components={"validation_strength": 95, "market_confirmation": 45},
+    )
+    aave = event_impact_path_validator.validate_impact_path(
+        aave_raw,
+        aave_hypothesis,
+        symbol="AAVE",
+        coin_id="aave",
+        score_components=aave_hypothesis.score_components,
+    )
+    assert aave.candidate_role == "direct_subject"
+    assert aave.asset_kind == "protocol_token"
+    assert aave.role_validation_failures == ()
+
+    btc = event_impact_path_validator.validate_impact_path(
+        aave_raw,
+        aave_hypothesis,
+        symbol="BTC",
+        coin_id="bitcoin",
+        score_components=aave_hypothesis.score_components,
+    )
+    assert btc.candidate_role == "macro_affected_asset"
+    assert btc.impact_path_strength == "weak"
+    assert btc.digest_eligible_by_impact_path is False
+    assert "broad_macro_asset_context_only" in btc.role_validation_failures
+
+    link = event_impact_path_validator.validate_impact_path(
+        raw(
+            "thor_link",
+            "THORChain confirms RUNE exploit",
+            "THORChain confirms a RUNE exploit; Chainlink appears only as an oracle taxonomy candidate.",
+        ),
+        SimpleNamespace(impact_category="security_or_regulatory_shock", external_asset="THORChain", score_components={"role_source": "taxonomy_candidate"}),
+        symbol="LINK",
+        coin_id="chainlink",
+        score_components={"role_source": "taxonomy_candidate", "validation_strength": 40},
+    )
+    assert link.candidate_role == "generic_mention"
+    assert link.role_source == "taxonomy_candidate"
+    assert "taxonomy_candidate_not_affected_asset" in link.role_validation_failures
+
+    velvet = event_impact_path_validator.validate_impact_path(
+        raw(
+            "velvet_spacex",
+            "VELVET offers SpaceX pre-IPO exposure",
+            "Velvet lets users trade tokenized stock exposure to SpaceX pre-IPO markets.",
+        ),
+        SimpleNamespace(impact_category="tokenized_stock_venue", external_asset="SpaceX", score_components={"validation_strength": 95}),
+        symbol="VELVET",
+        coin_id="velvet",
+        score_components={"validation_strength": 95, "market_confirmation": 50},
+    )
+    assert velvet.candidate_role == "proxy_venue"
+    assert velvet.asset_kind == "tokenized_equity_venue"
+    assert velvet.digest_eligible_by_impact_path is True
+
+
+def test_event_resolver_outputs_identity_metadata_and_rejects_generic_hype():
+    from datetime import datetime, timezone
+
+    from crypto_rsi_scanner.event_models import DiscoveredAsset, NormalizedEvent
+    from crypto_rsi_scanner.event_resolver import resolve_event_assets
+
+    now = datetime(2026, 6, 20, tzinfo=timezone.utc)
+    assets = [
+        DiscoveredAsset("hyperliquid", "HYPE", "Hyperliquid", aliases=("hyperliquid", "hype")),
+        DiscoveredAsset("bitcoin", "BTC", "Bitcoin", aliases=("bitcoin", "btc")),
+    ]
+    generic = NormalizedEvent(
+        event_id="evt_hype_generic",
+        raw_ids=("raw",),
+        event_name="IPO hype builds before SpaceX listing",
+        event_type="news",
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=now,
+        source="fixture",
+        source_urls=(),
+        external_asset="SpaceX",
+        description="Market hype rises, but no crypto project is named.",
+        confidence=0.85,
+    )
+    assert resolve_event_assets(generic, assets) == []
+
+    direct = NormalizedEvent(
+        event_id="evt_hyperliquid",
+        raw_ids=("raw",),
+        event_name="Hyperliquid launches HYPEUSDT perp",
+        event_type="perp_listing",
+        event_time=None,
+        event_time_confidence=0.0,
+        first_seen_time=now,
+        source="fixture",
+        source_urls=(),
+        external_asset="Hyperliquid",
+        description="Hyperliquid lists HYPEUSDT and references the HYPE token.",
+        confidence=0.90,
+    )
+    link = resolve_event_assets(direct, assets)[0]
+    assert link.symbol == "HYPE"
+    assert link.matched_field in {"coin_id", "alias", "symbol", "name_and_symbol"}
+    assert link.identity_confidence and link.identity_confidence >= 80
+    assert link.collision_risk == "high"
+    assert link.role_source in {"resolver_exact", "market_symbol_only"}
+
+
+def test_event_operator_surfaces_show_asset_identity_metadata():
+    from dataclasses import replace
+
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_opportunity_audit, event_research_cards, event_watchlist
+
+    components = {
+        "validated_symbol": "VELVET",
+        "validated_coin_id": "velvet",
+        "impact_path_type": "venue_value_capture",
+        "impact_path_strength": "strong",
+        "candidate_role": "proxy_venue",
+        "asset_kind": "tokenized_equity_venue",
+        "role_source": "resolver_exact",
+        "identity_confidence": 95.0,
+        "identity_evidence": ["VELVET offers SpaceX pre-IPO tokenized stock exposure"],
+        "collision_risk": "none",
+        "role_capabilities": {"can_be_proxy_venue": True, "can_be_market_anomaly": True},
+        "role_validation_failures": [],
+        "evidence_quality_score": 85,
+        "source_class": "cryptopanic_tagged",
+        "evidence_specificity": "direct_token_mechanism",
+        "market_confirmation_score": 75,
+        "market_confirmation_level": "confirmed",
+        "market_context_freshness_status": "fresh",
+        "market_context_age_hours": 0.2,
+        "market_context_stale": False,
+        "market_context_freshness_cap_applied": False,
+        "opportunity_score_final": 92,
+        "opportunity_level": "high_priority",
+        "opportunity_verdict_reasons": ["proxy_impact_path_explained"],
+        "why_local_only": "not_local_only",
+        "why_not_watchlist": "not_watchlist",
+        "manual_verification_items": ["verify source and liquidity"],
+        "upgrade_requirements": [],
+        "downgrade_warnings": [],
+    }
+    entry = replace(
+        _test_watchlist_entry(state=event_watchlist.EventWatchlistState.HIGH_PRIORITY.value, symbol="VELVET", coin_id="velvet"),
+        key="incident-spacex|velvet|proxy_venue",
+        relationship_type="impact_hypothesis",
+        latest_score_components=components,
+        latest_event_name="SpaceX proxy exposure",
+    )
+    card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    assert "Asset kind: tokenized_equity_venue" in card.markdown
+    assert "Role source: resolver_exact" in card.markdown
+    assert "Identity evidence: VELVET offers SpaceX pre-IPO tokenized stock exposure" in card.markdown
+    brief = event_alpha_daily_brief.build_daily_brief(watchlist_entries=[entry], requested_profile="fixture")
+    assert "asset_kind=tokenized_equity_venue" in brief
+    assert "role_source=resolver_exact" in brief
+    audit = event_opportunity_audit.format_opportunity_audit(
+        entry.key,
+        watchlist_entries=[entry],
+        profile="fixture",
+    )
+    assert "asset kind: tokenized_equity_venue" in audit
+    assert "role capabilities: can_be_market_anomaly, can_be_proxy_venue" in audit
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

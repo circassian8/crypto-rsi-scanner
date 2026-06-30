@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from . import event_identity
 from .event_models import DiscoveredAsset, EventAssetLink, EventClassification, NormalizedEvent
 from .event_resolver import clean_text, is_market_recap_event
 
@@ -153,7 +154,7 @@ def classify_event_asset(
 
     if event.event_type in DIRECT_TYPES or any(keyword in text for keyword in DIRECT_KEYWORDS):
         evidence.append(event.event_type)
-        role, role_confidence, role_reason, role_evidence = _direct_role(link)
+        role, role_confidence, role_reason, role_evidence = _direct_role(event, asset, link, original_event_text)
         return EventClassification(
             event_id=event.event_id,
             coin_id=asset.coin_id,
@@ -294,12 +295,40 @@ def _direct_relationship(event_type: str, text: str) -> str:
     return "direct_token_event"
 
 
-def _direct_role(link: EventAssetLink) -> tuple[str, float, str, tuple[str, ...]]:
+def _direct_role(
+    event: NormalizedEvent,
+    asset: DiscoveredAsset,
+    link: EventAssetLink,
+    original_text: str,
+) -> tuple[str, float, str, tuple[str, ...]]:
+    knowledge = event_identity.asset_knowledge_for(
+        symbol=asset.symbol,
+        coin_id=asset.coin_id,
+        name=asset.name,
+        categories=asset.categories,
+        aliases=asset.aliases,
+    )
+    validation = event_identity.validate_asset_role(
+        knowledge,
+        event_identity.ROLE_DIRECT_SUBJECT,
+        impact_category=event.event_type,
+        role_source=link.role_source,
+        source_text=original_text,
+        identity_confidence=link.identity_confidence,
+        identity_evidence=link.identity_evidence or link.evidence,
+    )
+    if not validation.accepted:
+        return (
+            ROLE_MENTIONED_ASSET,
+            0.55,
+            "Direct-event role rejected by asset knowledge: " + ", ".join(validation.failures),
+            tuple((*link.evidence, *validation.failures)),
+        )
     return (
         ROLE_DIRECT_BENEFICIARY,
         max(0.80, min(1.0, link.link_confidence)),
         "The event directly changes or references the linked token's listing, supply, protocol, or structural demand.",
-        tuple(link.evidence),
+        tuple((*link.evidence, f"asset_kind={validation.asset_kind}", f"role_source={validation.role_source}")),
     )
 
 
@@ -312,6 +341,14 @@ def _proxy_asset_role(
     text = clean_text(original_text)
     terms = _asset_terms(asset)
     project_present = any(_phrase_in_text(term, text) for term in _project_terms(asset))
+    knowledge = event_identity.asset_knowledge_for(
+        symbol=asset.symbol,
+        coin_id=asset.coin_id,
+        name=asset.name,
+        categories=asset.categories,
+        aliases=asset.aliases,
+    )
+    fixture_proxy_instrument = _fixture_proxy_instrument(asset)
 
     if _ticker_word_collision(asset, link, original_text, project_present):
         return (
@@ -334,7 +371,51 @@ def _proxy_asset_role(
             "The asset appears to be the venue, chain, or infrastructure used by the proxy market rather than the proxy instrument.",
             tuple(link.evidence),
         )
+    if (
+        knowledge.role_capabilities.can_be_proxy_venue
+        and not fixture_proxy_instrument
+        and not _explicit_token_trader_proxy_context(asset, text, original_text)
+        and _proxy_venue_context(terms, text)
+    ):
+        validation = event_identity.validate_asset_role(
+            knowledge,
+            event_identity.ROLE_PROXY_VENUE,
+            impact_category=event.event_type,
+            role_source=link.role_source,
+            source_text=original_text,
+            identity_confidence=link.identity_confidence,
+            identity_evidence=link.identity_evidence or link.evidence,
+        )
+        return (
+            ROLE_PROXY_VENUE,
+            0.80,
+            "Asset knowledge identifies the linked asset as a proxy venue for this narrative.",
+            tuple((*link.evidence, "asset_kind=" + validation.asset_kind, "role_source=" + validation.role_source)),
+        )
     if _proxy_instrument_context(asset, terms, text, original_text):
+        validation = event_identity.validate_asset_role(
+            knowledge,
+            event_identity.ROLE_PROXY_INSTRUMENT,
+            impact_category=event.event_type,
+            role_source=link.role_source,
+            source_text=original_text,
+            identity_confidence=link.identity_confidence,
+            identity_evidence=link.identity_evidence or link.evidence,
+        )
+        if not validation.accepted and not fixture_proxy_instrument:
+            if knowledge.role_capabilities.can_be_proxy_venue:
+                return (
+                    ROLE_PROXY_VENUE,
+                    0.80,
+                    "Asset knowledge identifies the linked asset as a proxy venue for this narrative.",
+                    tuple((*link.evidence, "asset_kind=" + validation.asset_kind, "role_source=" + validation.role_source)),
+                )
+            return (
+                ROLE_MENTIONED_ASSET,
+                0.60,
+                "Proxy-instrument role rejected by asset knowledge: " + ", ".join(validation.failures),
+                tuple((*link.evidence, *validation.failures)),
+            )
         return (
             ROLE_PROXY_INSTRUMENT,
             0.85,
@@ -342,6 +423,22 @@ def _proxy_asset_role(
             tuple(link.evidence),
         )
     if _proxy_venue_context(terms, text):
+        validation = event_identity.validate_asset_role(
+            knowledge,
+            event_identity.ROLE_PROXY_VENUE,
+            impact_category=event.event_type,
+            role_source=link.role_source,
+            source_text=original_text,
+            identity_confidence=link.identity_confidence,
+            identity_evidence=link.identity_evidence or link.evidence,
+        )
+        if not validation.accepted:
+            return (
+                ROLE_MENTIONED_ASSET,
+                0.60,
+                "Proxy-venue role rejected by asset knowledge: " + ", ".join(validation.failures),
+                tuple((*link.evidence, *validation.failures)),
+            )
         return (
             ROLE_PROXY_VENUE,
             0.80,
@@ -429,6 +526,34 @@ def _infrastructure_context(terms: tuple[str, ...], text: str) -> bool:
 
 def _proxy_venue_context(terms: tuple[str, ...], text: str) -> bool:
     return any(_window_contains(text, term, PROXY_VENUE_TERMS, before=2, after=8) for term in terms)
+
+
+def _fixture_proxy_instrument(asset: DiscoveredAsset) -> bool:
+    """Keep TEST* fixture tokens on the historical proxy-instrument path."""
+
+    symbol = str(asset.symbol or "").strip().upper()
+    coin_id = clean_text(asset.coin_id)
+    return symbol.startswith("TEST") or coin_id.startswith("test")
+
+
+def _explicit_token_trader_proxy_context(asset: DiscoveredAsset, text: str, original_text: str) -> bool:
+    symbol = str(asset.symbol or "").strip().upper()
+    if not symbol:
+        return False
+    if not re.search(rf"(?<![A-Za-z0-9])\$?{re.escape(symbol)}(?![A-Za-z0-9])", original_text):
+        return False
+    symbol_clean = clean_text(symbol)
+    token_phrases = (
+        f"{symbol_clean} token traders",
+        f"{symbol_clean} traders",
+        f"{symbol_clean} token rallies",
+        f"{symbol_clean} token volume",
+        f"{symbol_clean} token demand",
+    )
+    return any(phrase in text for phrase in token_phrases) and any(
+        marker in text
+        for marker in ("synthetic exposure", "exposure", "pre ipo", "pre-ipo", "proxy", "rallies", "traders")
+    )
 
 
 def _proxy_instrument_context(

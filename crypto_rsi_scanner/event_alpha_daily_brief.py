@@ -666,7 +666,11 @@ def build_daily_brief(
     ]
     if active:
         for entry in sorted(active, key=lambda item: item.latest_score, reverse=True)[:5]:
-            lines.append(f"- {event_watchlist.final_state_value(entry)}: {entry.symbol}/{entry.coin_id} score={entry.latest_score} playbook={entry.latest_playbook_type or 'unknown'}")
+            lines.append(
+                f"- {event_watchlist.final_state_value(entry)}: {entry.symbol}/{entry.coin_id} "
+                f"score={entry.latest_score} playbook={entry.latest_playbook_type or 'unknown'}"
+                f"{_watchlist_identity_suffix(entry)}"
+            )
     else:
         lines.append("- No active watchlist entries.")
     lines.extend(["", "### Quality-Capped Watchlist Rows"])
@@ -1244,6 +1248,21 @@ def _watchlist_hotter_lines(entries: list[event_watchlist.EventWatchlistEntry]) 
     return lines
 
 
+def _watchlist_identity_suffix(entry: event_watchlist.EventWatchlistEntry) -> str:
+    components = entry.latest_score_components or {}
+    parts: list[str] = []
+    asset_kind = components.get("asset_kind")
+    role_source = components.get("role_source")
+    collision = components.get("collision_risk")
+    if asset_kind:
+        parts.append(f"asset_kind={asset_kind}")
+    if role_source:
+        parts.append(f"role_source={role_source}")
+    if collision:
+        parts.append(f"collision={collision}")
+    return " " + " ".join(parts) if parts else ""
+
+
 def _suppression_lines(
     decisions: list[event_alpha_router.EventAlphaRouteDecision],
     entries: list[event_watchlist.EventWatchlistEntry],
@@ -1356,6 +1375,9 @@ def _core_opportunity_lines(
             f"state={item.final_state_after_quality_gate or 'unknown'} "
             f"score={item.opportunity_score_final:.0f} "
             f"path={item.primary_impact_path} role={item.candidate_role} "
+            f"asset_kind={item.asset_kind or 'unknown'} "
+            f"role_source={item.role_source or 'unknown'} "
+            f"collision={item.collision_risk or 'none'} "
             f"categories={categories} paths={paths}{diagnostics}"
         )
         lines.append(
@@ -1364,6 +1386,13 @@ def _core_opportunity_lines(
             f"hidden_diagnostics={item.diagnostic_row_count} "
             f"quality_capped_support={item.quality_capped_supporting_rows}"
         )
+        if item.role_capabilities:
+            caps = ", ".join(key for key, value in sorted(item.role_capabilities.items()) if value) or "none"
+            lines.append(f"  role capabilities: {caps}")
+        if item.identity_evidence:
+            lines.append(f"  identity: confidence={item.identity_confidence if item.identity_confidence is not None else 'n/a'} evidence={item.identity_evidence[0]}")
+        if item.role_validation_failures:
+            lines.append(f"  role validation failures: {', '.join(item.role_validation_failures[:4])}")
         if item.supporting_evidence_quotes:
             lines.append(f"  evidence: {item.supporting_evidence_quotes[0]}")
         if item.why_other_rows_hidden != "no hidden supporting rows":

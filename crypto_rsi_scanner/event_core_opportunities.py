@@ -40,6 +40,13 @@ class CoreOpportunity:
     primary_row: dict[str, Any]
     supporting_rows: tuple[dict[str, Any], ...] = ()
     diagnostic_rows: tuple[dict[str, Any], ...] = ()
+    asset_kind: str | None = None
+    role_source: str | None = None
+    identity_confidence: float | None = None
+    identity_evidence: tuple[str, ...] = ()
+    collision_risk: str | None = None
+    role_capabilities: Mapping[str, bool] | None = None
+    role_validation_failures: tuple[str, ...] = ()
 
     @property
     def alertable(self) -> bool:
@@ -454,6 +461,8 @@ def _build_core_opportunity(
     capped_count = sum(1 for row in supporting if _bool(row.get("state_quality_capped")))
     visible_reason = _visible_reason(primary, route, state, level)
     hidden_reason = _hidden_reason(len(supporting), len(diagnostics), capped_count)
+    identity_evidence = _collect_values(supporting, ("identity_evidence", "resolver_identity_evidence"))
+    role_failures = _collect_values(supporting, ("role_validation_failures", "role_validation_failure"))
     return CoreOpportunity(
         core_opportunity_id=_explicit_core_id(supporting) or _core_id(key),
         incident_id=_optional(_value(primary, components, "incident_id", "event_cluster_id", "cluster_id")),
@@ -478,6 +487,13 @@ def _build_core_opportunity(
         primary_row=primary,
         supporting_rows=supporting,
         diagnostic_rows=diagnostics,
+        asset_kind=_optional(_value(primary, components, "asset_kind")),
+        role_source=_optional(_value(primary, components, "role_source", "asset_role_source")),
+        identity_confidence=_float(_value(primary, components, "identity_confidence")),
+        identity_evidence=identity_evidence,
+        collision_risk=_optional(_value(primary, components, "collision_risk")),
+        role_capabilities=_mapping_value(primary, components, "role_capabilities"),
+        role_validation_failures=role_failures,
     )
 
 
@@ -531,6 +547,15 @@ def _normalize_row(item: Any) -> dict[str, Any]:
     row.setdefault("opportunity_score_final", components.get("opportunity_score_final"))
     row.setdefault("final_state_after_quality_gate", row.get("state"))
     return row
+
+
+def _mapping_value(row: Mapping[str, Any], components: Mapping[str, Any], key: str) -> Mapping[str, bool] | None:
+    value = row.get(key)
+    if not isinstance(value, Mapping):
+        value = components.get(key)
+    if not isinstance(value, Mapping):
+        return None
+    return {str(k): bool(v) for k, v in value.items()}
 
 
 def _entry_as_row(entry: event_watchlist.EventWatchlistEntry) -> dict[str, Any]:
