@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Fix research-review daily brief namespace selection · Codex
+**Why:** `notify_llm_deep` research-review smoke artifacts were valid under the
+`notify_llm_deep_research_review_smoke` namespace, but the daily brief could
+filter out the test-mode run/core rows when invoked with runtime
+`PROFILE=notify_llm_deep`, leaving a misleading `Selected run profile: none`
+and `Core opportunities: 0` report.
+**Changes:**
+- Makefile report targets now include test artifacts when either `PROFILE` or
+  `ARTIFACT_NAMESPACE` names a known fixture/smoke namespace, so
+  `PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke`
+  inspects the intended smoke artifacts.
+- The deep research-review no-send smoke now writes source coverage, writes the
+  daily brief, checks both artifacts exist, prints preview lane status, and then
+  runs strict artifact doctor in latest-run scope.
+- Daily briefs include the research-review run-ledger counters, and artifact
+  doctor now blocks broken briefs that omit the selected run, mismatch
+  profile/namespace, show a wrong canonical core count, omit the
+  research-review lane, or fail to link the source coverage report.
+- Source coverage reports now explicitly warn that configured providers without
+  health observations are unknown/not observed and should not be inferred
+  healthy.
+**Verify:** `python3 tests/test_indicators.py` (579/579 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-notify-llm-deep-research-review-no-send-smoke PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke STRICT=1 PYTHON=python3`
+(no blockers; expected unknown-provider warning for unobserved fixture health);
+`make event-alpha-notification-inbox PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke BURN_IN_REVIEW=1 PYTHON=python3`;
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Reporting/diagnostics only. It does not change alert scoring,
+send guards, paper/live rows, normal RSI rows, or `TRIGGERED_FADE`.
+
 ## 2026-06-30 — Operationalize research-review source coverage · Codex
 **Why:** `notify_llm_deep` research-review rehearsals need source-coverage
 artifacts and profile/namespace-safe report commands so operators and Pro-model

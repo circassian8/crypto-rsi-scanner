@@ -228,7 +228,22 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "notify_llm_deep_research_review_smoke" in deep_research_review_dry
     assert "--event-alpha-source-coverage-report --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke" in deep_research_review_dry
     assert "event_alpha_source_coverage.md" in deep_research_review_dry
+    assert "--event-alpha-daily-brief --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-include-test-artifacts" in deep_research_review_dry
+    assert "event_alpha_daily_brief.md" in deep_research_review_dry
     assert "--event-alpha-artifact-doctor-delivery-scope latest_run" in deep_research_review_dry
+    daily_brief_namespace_dry = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "event-alpha-daily-brief",
+            "PROFILE=notify_llm_deep",
+            "ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke",
+            "PYTHON=python3",
+        ],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-include-test-artifacts" in daily_brief_namespace_dry
     source_coverage_dry = subprocess.check_output(
         [
             "make",
@@ -763,6 +778,7 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert unobserved_proxy.provider_coverage_status == "unknown"
     assert "gdelt:not_observed=unknown" in unobserved_proxy.provider_role_statuses
     unobserved_text = event_alpha_source_coverage.format_source_coverage_report(unobserved)
+    assert "configured providers with no health row are unknown/not observed" in unobserved_text
     assert "unknown/not observed providers: gdelt, project_blog_rss" in unobserved_text
     assert "provider coverage status: unknown" in unobserved_text
 
@@ -14615,6 +14631,158 @@ def test_event_alpha_inbox_and_daily_brief_show_exploratory_digest_separately():
     assert "Lane count sent/due: 0/1" in brief
     assert "PUMP/pump" in brief
     assert "## Alertable Decisions\n- None." in brief
+
+
+def test_daily_brief_custom_namespace_selects_test_run_and_core_rows():
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_alpha_notifications as notif
+
+    namespace = "notify_llm_deep_research_review_smoke"
+    run_id = "2026-06-15T16:00:00+00:00|notify_llm_deep"
+    core_rows = []
+    for idx, row in enumerate(_canonical_core_fixture_rows(), start=1):
+        item = {
+            **row,
+            "row_type": "event_core_opportunity",
+            "schema_version": "event_core_opportunity_store_v1",
+            "run_id": run_id,
+            "profile": "notify_llm_deep",
+            "run_mode": "test",
+            "artifact_namespace": namespace,
+            "core_opportunity_id": f"core-{idx}",
+        }
+        if idx == 2:
+            item.update({
+                "hypothesis_id": "hyp-hype-distinct",
+                "incident_id": "incident-hype-distinct",
+                "symbol": "HYPE",
+                "coin_id": "hyperliquid",
+                "validated_symbol": "HYPE",
+                "validated_coin_id": "hyperliquid",
+            })
+        core_rows.append(item)
+    brief = event_alpha_daily_brief.build_daily_brief(
+        run_rows=[{
+            "row_type": "event_alpha_run",
+            "run_id": run_id,
+            "profile": "notify_llm_deep",
+            "run_mode": "test",
+            "artifact_namespace": namespace,
+            "success": True,
+            "core_opportunity_rows_written": 5,
+            "research_review_digest_enabled": True,
+            "research_review_digest_candidates": 1,
+            "research_review_digest_would_send": 1,
+        }],
+        core_opportunity_rows=core_rows,
+        notification_runs=[{
+            "row_type": "event_alpha_notification_run",
+            "run_id": run_id,
+            "profile": "notify_llm_deep",
+            "run_mode": "test",
+            "artifact_namespace": namespace,
+            "lane_counts_due": {notif.LANE_RESEARCH_REVIEW_DIGEST: 1},
+            "lane_counts_sent": {notif.LANE_RESEARCH_REVIEW_DIGEST: 0},
+        }],
+        requested_profile="notify_llm_deep",
+        artifact_namespace=namespace,
+        run_mode="notification_burn_in",
+        run_ledger_path=f"event_fade_cache/{namespace}/event_alpha_runs.jsonl",
+        include_test_artifacts=True,
+    )
+
+    assert "Selected run profile: notify_llm_deep" in brief
+    assert f"Selected run namespace: {namespace}" in brief
+    assert "No run ledger rows found" not in brief
+    assert "Core opportunities: 5 (canonical_store_rows=5" in brief
+    assert "research_review_digest_enabled=true" in brief
+    assert "research_review_digest_candidates=1" in brief
+    assert "research_review_digest_would_send=1" in brief
+    assert "Lane count sent/due: 0/1" in brief
+    assert "VELVET" in brief
+    assert "AAVE" in brief
+
+
+def test_artifact_doctor_blocks_broken_daily_brief_selection():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_notifications as notif
+
+    namespace = "notify_llm_deep_research_review_smoke"
+    run_id = "2026-06-15T16:00:00+00:00|notify_llm_deep"
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        brief_path = root / "event_alpha_daily_brief.md"
+        source_coverage = root / "event_alpha_source_coverage.md"
+        source_coverage.write_text("EVENT ALPHA SOURCE COVERAGE\n", encoding="utf-8")
+        brief_path.write_text(
+            "\n".join([
+                "# Event Alpha Daily Brief",
+                "Requested profile: notify_llm_deep",
+                f"Artifact namespace: {namespace}",
+                "Selected run profile: none",
+                "Selected run namespace: none",
+                "",
+                "## Executive Summary",
+                "- Core opportunities: 0 (canonical_store_rows=0, high_priority=0)",
+                "",
+                "### Research Review Digest",
+                "- Lane count sent/due: 0/0",
+                "",
+                "### System Health / Providers / Budget",
+                "- No run ledger rows found.",
+            ]),
+            encoding="utf-8",
+        )
+        doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "row_type": "event_alpha_run",
+                "run_id": run_id,
+                "profile": "notify_llm_deep",
+                "run_mode": "test",
+                "artifact_namespace": namespace,
+                "success": True,
+                "research_review_digest_enabled": True,
+                "research_review_digest_candidates": 1,
+                "research_review_digest_would_send": 1,
+            }],
+            core_opportunity_rows=[
+                {
+                    "row_type": "event_core_opportunity",
+                    "schema_version": "event_core_opportunity_store_v1",
+                    "run_id": run_id,
+                    "profile": "notify_llm_deep",
+                    "run_mode": "test",
+                    "artifact_namespace": namespace,
+                    "core_opportunity_id": f"core-{idx}",
+                    "symbol": f"COIN{idx}",
+                    "coin_id": f"coin-{idx}",
+                    "opportunity_level": "validated_digest",
+                    "final_route_after_quality_gate": "RESEARCH_DIGEST",
+                }
+                for idx in range(5)
+            ],
+            delivery_rows=[{
+                "row_type": "event_alpha_notification_delivery",
+                "run_id": run_id,
+                "profile": "notify_llm_deep",
+                "artifact_namespace": namespace,
+                "lane": notif.LANE_RESEARCH_REVIEW_DIGEST,
+                "state": "blocked",
+                "would_send": True,
+            }],
+            daily_brief_path=brief_path,
+            source_coverage_report_path=source_coverage,
+            profile="notify_llm_deep",
+            artifact_namespace=namespace,
+            include_test_artifacts=True,
+            strict=True,
+        )
+
+    assert doctor.daily_brief_missing_selected_run == 1
+    assert doctor.daily_brief_selected_run_mismatch == 1
+    assert doctor.daily_brief_core_count_mismatch_store == 1
+    assert doctor.daily_brief_research_review_lane_missing == 1
+    assert doctor.daily_brief_source_coverage_path_missing == 1
+    assert doctor.status == "BLOCKED"
+    assert any("daily_brief_missing_selected_run=1" in item for item in doctor.blockers)
 
 
 def test_event_alpha_telegram_recipient_check_is_guarded_and_redacted():

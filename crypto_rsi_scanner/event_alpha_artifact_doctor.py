@@ -59,6 +59,11 @@ class EventAlphaArtifactDoctorResult:
     quality_review_market_freshness_contradiction: int = 0
     upgrade_candidates_include_high_priority: int = 0
     daily_brief_card_group_mismatch_with_index: int = 0
+    daily_brief_missing_selected_run: int = 0
+    daily_brief_selected_run_mismatch: int = 0
+    daily_brief_core_count_mismatch_store: int = 0
+    daily_brief_research_review_lane_missing: int = 0
+    daily_brief_source_coverage_path_missing: int = 0
     core_route_conflicts_with_opportunity_level: int = 0
     live_validated_without_confirmation: int = 0
     live_sector_digest_without_asset: int = 0
@@ -194,6 +199,7 @@ def diagnose_artifacts(
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     source_coverage_report_path: str | Path | None = None,
+    daily_brief_path: str | Path | None = None,
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
     delivery_rows: Iterable[Mapping[str, Any]] = (),
     profile: str | None = None,
@@ -515,6 +521,15 @@ def diagnose_artifacts(
     live_confirmation_conflicts = _live_confirmation_conflicts(core_rows, profile=profile, artifact_namespace=artifact_namespace)
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
+    daily_brief_conflicts = _daily_brief_consistency_conflicts(
+        daily_brief_path,
+        runs=runs,
+        core_rows=core_rows,
+        delivery_rows=[row for row in delivery_rows if isinstance(row, Mapping)],
+        source_coverage_report_path=source_coverage_report_path,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+    )
     upgrade_high_priority = 0
     fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
     fresh_visible_missing_targets = sum(
@@ -639,6 +654,18 @@ def diagnose_artifacts(
     if card_group_mismatches:
         message = f"daily_brief_card_group_mismatch_with_index={card_group_mismatches}"
         (blockers if strict and core_store_available else warnings).append(message)
+    for key in (
+        "daily_brief_missing_selected_run",
+        "daily_brief_selected_run_mismatch",
+        "daily_brief_core_count_mismatch_store",
+        "daily_brief_research_review_lane_missing",
+        "daily_brief_source_coverage_path_missing",
+    ):
+        count = daily_brief_conflicts.get(key, 0)
+        if not count:
+            continue
+        message = f"{key}={count}"
+        (blockers if strict else warnings).append(message)
     if core_route_conflicts:
         message = f"core_route_conflicts_with_opportunity_level={core_route_conflicts}"
         (blockers if strict and core_store_available else warnings).append(message)
@@ -1137,6 +1164,11 @@ def diagnose_artifacts(
         quality_review_market_freshness_contradiction=market_freshness_contradictions,
         upgrade_candidates_include_high_priority=upgrade_high_priority,
         daily_brief_card_group_mismatch_with_index=card_group_mismatches,
+        daily_brief_missing_selected_run=daily_brief_conflicts["daily_brief_missing_selected_run"],
+        daily_brief_selected_run_mismatch=daily_brief_conflicts["daily_brief_selected_run_mismatch"],
+        daily_brief_core_count_mismatch_store=daily_brief_conflicts["daily_brief_core_count_mismatch_store"],
+        daily_brief_research_review_lane_missing=daily_brief_conflicts["daily_brief_research_review_lane_missing"],
+        daily_brief_source_coverage_path_missing=daily_brief_conflicts["daily_brief_source_coverage_path_missing"],
         core_route_conflicts_with_opportunity_level=core_route_conflicts,
         live_validated_without_confirmation=live_confirmation_conflicts["live_validated_without_confirmation"],
         live_sector_digest_without_asset=live_confirmation_conflicts["live_sector_digest_without_asset"],
@@ -1957,6 +1989,104 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         if healthy & unknown:
             out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & unknown)
     return out
+
+
+def _daily_brief_consistency_conflicts(
+    path: str | Path | None,
+    *,
+    runs: Iterable[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]],
+    delivery_rows: Iterable[Mapping[str, Any]],
+    source_coverage_report_path: str | Path | None = None,
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
+) -> dict[str, int]:
+    out = {
+        "daily_brief_missing_selected_run": 0,
+        "daily_brief_selected_run_mismatch": 0,
+        "daily_brief_core_count_mismatch_store": 0,
+        "daily_brief_research_review_lane_missing": 0,
+        "daily_brief_source_coverage_path_missing": 0,
+    }
+    if path is None:
+        return out
+    brief_path = Path(path)
+    if not brief_path.exists():
+        return out
+    try:
+        text = brief_path.read_text(encoding="utf-8")
+    except OSError:
+        return out
+    run_list = [dict(row) for row in runs if isinstance(row, Mapping)]
+    core_list = [dict(row) for row in core_rows if isinstance(row, Mapping)]
+    latest_id = _latest_run_id(run_list)
+    latest_run = next((row for row in run_list if str(row.get("run_id") or "") == str(latest_id or "")), None)
+    if run_list and "No run ledger rows found" in text:
+        out["daily_brief_missing_selected_run"] = 1
+    selected_profile = _daily_brief_line_value(text, "Selected run profile")
+    selected_namespace = _daily_brief_line_value(text, "Selected run namespace")
+    expected_profile = str((latest_run or {}).get("profile") or profile or "default").strip()
+    expected_namespace = str((latest_run or {}).get("artifact_namespace") or artifact_namespace or "legacy").strip()
+    if latest_run:
+        if selected_profile in {"", "none"} or selected_namespace in {"", "none"}:
+            out["daily_brief_selected_run_mismatch"] = 1
+        elif selected_profile != expected_profile or selected_namespace != expected_namespace:
+            out["daily_brief_selected_run_mismatch"] = 1
+    rendered_expected_core_count = len(event_core_opportunity_store.core_opportunities_from_rows(core_list)) if core_list else 0
+    rendered_core_count = _daily_brief_core_count(text)
+    if core_list and rendered_core_count is not None and rendered_core_count != rendered_expected_core_count:
+        out["daily_brief_core_count_mismatch_store"] = 1
+    elif core_list and "Core opportunities: 0" in text:
+        out["daily_brief_core_count_mismatch_store"] = 1
+    research_review_expected = False
+    if latest_run and (
+        _as_int(latest_run.get("research_review_digest_candidates"))
+        or _as_int(latest_run.get("research_review_digest_would_send"))
+    ):
+        research_review_expected = True
+    if latest_id:
+        research_review_expected = research_review_expected or any(
+            str(row.get("run_id") or "") == str(latest_id)
+            and str(row.get("lane") or "") == "research_review_digest"
+            for row in delivery_rows
+            if isinstance(row, Mapping)
+        )
+    review_section = _daily_brief_section(text, "### Research Review Digest")
+    if research_review_expected and (
+        not review_section
+        or "Lane count sent/due: 0/0" in review_section
+    ):
+        out["daily_brief_research_review_lane_missing"] = 1
+    if source_coverage_report_path is not None and Path(source_coverage_report_path).exists():
+        source_text = str(source_coverage_report_path)
+        if source_text not in text and Path(source_coverage_report_path).name not in text:
+            out["daily_brief_source_coverage_path_missing"] = 1
+    return out
+
+
+def _daily_brief_line_value(text: str, label: str) -> str:
+    prefix = f"{label}:"
+    for line in text.splitlines():
+        if line.startswith(prefix):
+            return line.split(":", 1)[-1].strip()
+    return ""
+
+
+def _daily_brief_core_count(text: str) -> int | None:
+    match = re.search(r"^- Core opportunities:\s+(\d+)\b", text, flags=re.MULTILINE)
+    if not match:
+        return None
+    return _as_int(match.group(1))
+
+
+def _daily_brief_section(text: str, heading: str) -> str:
+    start = text.find(heading)
+    if start < 0:
+        return ""
+    next_heading = text.find("\n### ", start + len(heading))
+    if next_heading < 0:
+        return text[start:]
+    return text[start:next_heading]
 
 
 def _split_provider_line(line: str) -> tuple[str, ...]:
@@ -2954,6 +3084,11 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"quality_review_market_freshness_contradiction={result.quality_review_market_freshness_contradiction} "
             f"upgrade_candidates_include_high_priority={result.upgrade_candidates_include_high_priority} "
             f"daily_brief_card_group_mismatch_with_index={result.daily_brief_card_group_mismatch_with_index} "
+            f"daily_brief_missing_selected_run={result.daily_brief_missing_selected_run} "
+            f"daily_brief_selected_run_mismatch={result.daily_brief_selected_run_mismatch} "
+            f"daily_brief_core_count_mismatch_store={result.daily_brief_core_count_mismatch_store} "
+            f"daily_brief_research_review_lane_missing={result.daily_brief_research_review_lane_missing} "
+            f"daily_brief_source_coverage_path_missing={result.daily_brief_source_coverage_path_missing} "
             f"core_route_conflicts_with_opportunity_level={result.core_route_conflicts_with_opportunity_level} "
             f"alert_snapshot_route_mismatch_core_store={result.alert_snapshot_route_mismatch_core_store} "
             f"alert_snapshot_level_mismatch_core_store={result.alert_snapshot_level_mismatch_core_store} "

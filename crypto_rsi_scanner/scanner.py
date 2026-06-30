@@ -6548,6 +6548,7 @@ def event_alpha_artifact_doctor_report(
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
+        daily_brief_path=context.daily_brief_path,
         llm_budget_rows=artifacts["budget_rows"],
         delivery_rows=delivery_rows,
         profile=profile_name,

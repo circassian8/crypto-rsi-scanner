@@ -102,7 +102,7 @@ EVENT_ALPHA_NOTIFY_EVERY_RUN_PROFILES = notify_no_key notify_llm notify_llm_deep
 EVENT_ALPHA_NOTIFY_DEDUPE_BY_CONTENT = $(if $(filter $(EVENT_ALPHA_NOTIFY_EVERY_RUN_PROFILES),$(PROFILE)),0,1)
 EVENT_ALPHA_NOTIFY_DEDUPE_WINDOW_HOURS = $(if $(filter $(EVENT_ALPHA_NOTIFY_EVERY_RUN_PROFILES),$(PROFILE)),0,24)
 EVENT_ALPHA_TEST_ARTIFACT_PROFILES = quality_validation catalyst_frame_validation catalyst_frame_e2e notify_llm_quality_frame evidence_acquisition_smoke fixture_notify_smoke notification_format_smoke research_review_digest_smoke notify_llm_deep_research_review_smoke notify_llm_deep_no_send_smoke notify_llm_deep_fixture_rehearsal
-EVENT_ALPHA_INCLUDE_TEST_ARG = $(if $(filter $(EVENT_ALPHA_TEST_ARTIFACT_PROFILES),$(PROFILE)),--event-alpha-include-test-artifacts,)
+EVENT_ALPHA_INCLUDE_TEST_ARG = $(if $(filter $(EVENT_ALPHA_TEST_ARTIFACT_PROFILES),$(PROFILE) $(ARTIFACT_NAMESPACE)),--event-alpha-include-test-artifacts,)
 EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_NAMESPACE ?= $(if $(filter notify_llm_deep,$(PROFILE)),notify_llm_deep_rehearsal,$(PROFILE))
 EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_MARKER ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVENT_ALPHA_ONE_CYCLE_PREFLIGHT_NAMESPACE)/event_alpha_one_cycle_send_preflight_passed.marker
 
@@ -976,9 +976,13 @@ event-alpha-notify-llm-deep-research-review-no-send-smoke:
 	grep -q '"research_review_digest_enabled":true' "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_research_review_smoke/event_alpha_runs.jsonl"
 	grep -q '"research_review_digest_candidates":1' "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_research_review_smoke/event_alpha_runs.jsonl"
 	$(PYTHON) main.py --event-alpha-notification-deliveries-report --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-include-test-artifacts
-	$(PYTHON) main.py --event-alpha-notification-inbox --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-burn-in-review --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-source-coverage-report --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke
 	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_research_review_smoke/event_alpha_source_coverage.md"
+	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-include-test-artifacts
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_research_review_smoke/event_alpha_daily_brief.md"
+	$(PYTHON) main.py --event-alpha-notification-inbox --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-burn-in-review --event-alpha-include-test-artifacts
+	@echo "preview_path=$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_research_review_smoke/event_alpha_notification_preview.md"
+	@grep -E "^(## Lane|lane:|status:|would_send:)" "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_research_review_smoke/event_alpha_notification_preview.md" || true
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict --event-alpha-artifact-doctor-delivery-scope latest_run
 
 event-alpha-notify-llm-deep-no-send-smoke:

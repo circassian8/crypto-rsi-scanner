@@ -281,6 +281,7 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         f"provider_health_rows: {report.provider_health_rows}",
         f"evidence_acquisition_rows: {report.acquisition_rows}",
         f"core_opportunity_rows: {report.core_rows}",
+        "note: configured providers with no health row are unknown/not observed; do not infer they are healthy.",
         "",
         "Source-pack coverage:",
     ]

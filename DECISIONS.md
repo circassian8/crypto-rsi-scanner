@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - Daily brief selection is artifact-namespace authoritative
+**Status:** accepted
+**Decision:** Event Alpha operator reports must treat an explicit
+`ARTIFACT_NAMESPACE` as the artifact scope even when the runtime `PROFILE`
+differs. Smoke/test namespaces must pass `--event-alpha-include-test-artifacts`
+based on either profile or namespace, and strict artifact doctor must block
+fresh daily briefs that miss the selected run, mismatch selected
+profile/namespace, show a canonical core count inconsistent with the current
+core store, omit an expected research-review lane, or fail to link an existing
+source coverage report.
+**Why:** Research-review rehearsals commonly use a production-like runtime
+profile such as `notify_llm_deep` with a smoke namespace. Filtering only by
+profile can silently hide valid test-mode run/core rows and produce a brief
+that says there are zero opportunities while cards and delivery artifacts
+exist.
+**Revisit when:** Event Alpha artifact selection moves to a typed run-index
+store that records an explicit immutable selected run id for every generated
+operator report.
+
 ## 2026-06-30 - Unobserved providers are not healthy source coverage
 **Status:** accepted
 **Decision:** Event Alpha source coverage must distinguish runtime profile from

@@ -613,6 +613,14 @@ def build_daily_brief(
     lines.extend(["", "### Research Review Digest"])
     review_due = _lane_count(latest_notification, "lane_counts_due", event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST)
     review_sent = _lane_count(latest_notification, "lane_counts_sent", event_alpha_notifications.LANE_RESEARCH_REVIEW_DIGEST)
+    if latest:
+        lines.append(
+            "- Run ledger: "
+            f"research_review_digest_enabled={str(bool(latest.get('research_review_digest_enabled'))).lower()} "
+            f"research_review_digest_candidates={int(latest.get('research_review_digest_candidates') or 0)} "
+            f"research_review_digest_would_send={int(latest.get('research_review_digest_would_send') or 0)} "
+            f"research_review_digest_block={latest.get('research_review_digest_block_reason') or 'none'}"
+        )
     lines.append(f"- Lane count sent/due: {review_sent}/{review_due}")
     lines.append("- Near-miss research review only; not alertable, missing confirmation, and not a trade signal.")
     if research_review:

@@ -94,6 +94,7 @@ backoff, budget skipping, or rejected-only acquisition results:
 make event-alpha-source-coverage-report PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-source-coverage-report PROFILE=notify_llm_deep PYTHON=python3
 make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke PYTHON=python3
+make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke PYTHON=python3
 ```
 
 The dashboard is read-only and writes
@@ -110,6 +111,16 @@ quarantine/backoff. Treat CoinGecko and DefiLlama-style rows as
 market/protocol metric evidence only: they can support market confirmation or
 source coverage, but they do not prove official confirmation or catalyst
 impact-path validation by themselves.
+
+For smoke namespaces such as `notify_llm_deep_research_review_smoke`, the
+runtime profile can intentionally remain `notify_llm_deep` while
+`ARTIFACT_NAMESPACE` points at the smoke artifact directory. The Make report
+targets include test artifacts when the namespace is a known smoke namespace,
+so the daily brief should show the selected run profile/namespace, canonical
+core count, source coverage path, and research-review lane from that namespace.
+Strict artifact doctor blocks a fresh brief that claims no selected run, renders
+zero core opportunities while the core store has rows, omits an expected
+research-review lane, or loses the source-coverage link.
 
 Advanced market confirmation is split by evidence family. Coinalyze-style
 derivatives rows should preserve open-interest change, funding, liquidation
