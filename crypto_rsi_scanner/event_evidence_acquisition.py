@@ -816,7 +816,11 @@ def _validate_raw_result(
     )
     reason_codes: list[str] = []
     reject_reasons: list[str] = []
-    identity_ok = event_catalyst_search.result_mentions_anomaly_identity(raw, query, None)
+    official_exchange_identity_ok = _official_exchange_identity_match(raw_map, request)
+    if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value:
+        identity_ok = official_exchange_identity_ok
+    else:
+        identity_ok = event_catalyst_search.result_mentions_anomaly_identity(raw, query, None)
     if not identity_ok and plan_query.must_validate_asset:
         reject_reasons.append("token_identity_rejected")
     if not _catalyst_link_ok(text, request, plan_query):
@@ -846,7 +850,11 @@ def _validate_raw_result(
         event_evidence_quality.EvidenceSpecificity.GENERIC_CONTEXT.value,
         event_evidence_quality.EvidenceSpecificity.CATALYST_ONLY.value,
         event_evidence_quality.EvidenceSpecificity.TOKEN_ONLY.value,
-    }:
+    } and not (
+        official_exchange_identity_ok
+        and assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value
+        and bool(pack_eval.get("source_pack_impact_path_validating_source"))
+    ):
         reject_reasons.append("impact_path_missing")
     if assessment.confidence_cap < 45 or quality.evidence_quality_score < 45:
         reject_reasons.append("source_quality_too_low")
@@ -865,6 +873,8 @@ def _validate_raw_result(
 
     if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value:
         reason_codes.append("official_exchange_listing")
+        if official_exchange_identity_ok:
+            reason_codes.append("official_exchange_identity_match")
     if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_PROJECT.value:
         reason_codes.append("official_project_confirmation")
     if assessment.source_class == event_source_registry.SourceClass.STRUCTURED_CALENDAR.value:
@@ -1413,6 +1423,69 @@ def _exchange_metadata_from_raw_map(raw_map: Mapping[str, Any]) -> dict[str, Any
         "announcement_time": _text_or_none(raw_map.get("announcement_time")),
         "announcement_published_at": _text_or_none(raw_map.get("announcement_published_at")),
     }
+
+
+def _official_exchange_identity_match(
+    raw_map: Mapping[str, Any],
+    request: EvidenceAcquisitionRequest,
+) -> bool:
+    if str(raw_map.get("source_class") or "").strip() != event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value:
+        return False
+    expected = {_compact_exchange_identity(request.symbol)}
+    if request.coin_id:
+        expected.add(_compact_exchange_identity(request.coin_id))
+    expected.discard("")
+    if not expected:
+        return False
+    values: list[str] = []
+    event = raw_map.get("event") if isinstance(raw_map.get("event"), Mapping) else {}
+    for source in (raw_map, event):
+        for key in (
+            "announcement_symbols",
+            "announcement_pairs",
+            "announcement_contracts",
+            "symbols",
+            "pairs",
+            "contracts",
+        ):
+            values.extend(str(item) for item in _tuple_text(source.get(key)))
+    return any(_exchange_metadata_value_matches(value, expected) for value in values)
+
+
+_QUOTE_ASSET_SUFFIXES = (
+    "USDT",
+    "USDC",
+    "FDUSD",
+    "TUSD",
+    "BUSD",
+    "USD",
+    "BTC",
+    "ETH",
+    "BNB",
+    "TRY",
+    "EUR",
+)
+
+
+def _compact_exchange_identity(value: object) -> str:
+    return str(value or "").upper().replace("-", "").replace("_", "").replace("/", "").replace(" ", "").strip()
+
+
+def _exchange_metadata_value_matches(value: object, expected: set[str]) -> bool:
+    raw = str(value or "").upper().strip()
+    clean = _compact_exchange_identity(raw)
+    if not clean:
+        return False
+    candidates = {clean}
+    for sep in ("/", "-", "_", " "):
+        if sep in raw:
+            base = raw.split(sep, 1)[0]
+            if _compact_exchange_identity(base):
+                candidates.add(_compact_exchange_identity(base))
+    for suffix in _QUOTE_ASSET_SUFFIXES:
+        if clean.endswith(suffix) and len(clean) > len(suffix):
+            candidates.add(clean[: -len(suffix)])
+    return bool(candidates & expected)
 
 
 def _structured_metadata_from_raw_map(raw_map: Mapping[str, Any]) -> dict[str, Any]:

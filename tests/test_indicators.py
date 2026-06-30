@@ -2790,6 +2790,27 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
     ).fetch_events(start, end) == []
 
 
+def test_cryptopanic_catalyst_search_currency_filter_uses_validated_identity_or_empty():
+    from crypto_rsi_scanner import event_catalyst_search
+
+    with_identity = event_catalyst_search.SearchQuery(
+        anomaly_raw_id="raw:test",
+        query="RUNE exploit update",
+        symbol="RUNE",
+        rank=1,
+        coin_id="thorchain",
+        aliases=("RUNE", "THORChain"),
+    )
+    missing_identity = event_catalyst_search.SearchQuery(
+        anomaly_raw_id="raw:sector",
+        query="SpaceX crypto exposure",
+        symbol="",
+        rank=1,
+    )
+    assert event_catalyst_search._cryptopanic_currencies_for_query(with_identity) == "RUNE,thorchain"
+    assert event_catalyst_search._cryptopanic_currencies_for_query(missing_identity) == ""
+
+
 def test_event_catalyst_search_cryptopanic_uses_symbol_and_coin_currency_filters():
     import json
     from datetime import datetime, timezone
@@ -30373,6 +30394,21 @@ def test_event_source_registry_v2_provider_semantics():
     assert cryptopanic.cryptopanic_currency_tag_match is True
     assert cryptopanic.narrative_heat is True
     assert "cryptopanic_currency_tag_match" in cryptopanic.reason_codes
+    cryptopanic_mismatch = event_source_registry.assess_source(
+        {
+            "provider": "cryptopanic",
+            "title": "Bullish market heat mentions RUNE",
+            "currency_tags": ("BTC",),
+            "kind": "hot",
+        },
+        symbol="RUNE",
+        coin_id="thorchain",
+    )
+    assert cryptopanic_mismatch.source_class == "cryptopanic_tagged"
+    assert cryptopanic_mismatch.cryptopanic_currency_tag_match is False
+    assert cryptopanic_mismatch.can_validate_token_identity is False
+    assert cryptopanic_mismatch.can_validate_impact_path is False
+    assert "cryptopanic_narrative_heat_without_matching_tag" in cryptopanic_mismatch.warnings
     cryptopanic_contract = event_source_registry.source_contract_metadata(
         {"provider": "cryptopanic", "raw_json": {"currency_tags": ("RUNE",)}},
         evidence_rows=(
@@ -30484,6 +30520,12 @@ def test_event_source_packs_and_feed_coverage_semantics():
     assert protocol_business.name == "protocol_business_event_pack"
     project_event = event_source_packs.source_pack_for_playbook("direct_event", impact_path_type="direct_protocol_event")
     assert project_event.name == "project_event_pack"
+    security = event_source_packs.source_pack_for_playbook("security_or_regulatory_shock")
+    fan = event_source_packs.source_pack_for_playbook("fan_sports_proxy")
+    political = event_source_packs.source_pack_for_playbook("political_meme_proxy")
+    assert "cryptopanic_tagged" in security.preferred_source_classes
+    assert "cryptopanic_tagged" in fan.preferred_source_classes
+    assert "cryptopanic_tagged" in political.preferred_source_classes
 
     pack_eval = event_source_packs.evaluate_pack_evidence(
         {
@@ -30505,6 +30547,8 @@ def test_event_source_packs_and_feed_coverage_semantics():
         {
             "provider": "bybit_announcements",
             "title": "Bybit Will List TESTUSDT",
+            "announcement_symbols": ("TEST",),
+            "announcement_pairs": ("TEST/USDT",),
             "playbook_type": "listing_volatility",
             "symbol": "TEST",
             "coin_id": "test-token",
@@ -30515,6 +30559,36 @@ def test_event_source_packs_and_feed_coverage_semantics():
     assert listing_eval["source_pack_validated_digest_sufficient"] is True
     assert listing_eval["source_pack_watchlist_requirements_met"] is True
     assert listing_eval["source_pack_impact_path_validating_source"] is True
+    listing_mismatch = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "binance_announcements",
+            "title": "Binance Will List OTHERUSDT",
+            "announcement_symbols": ("OTHER",),
+            "announcement_pairs": ("OTHER/USDT",),
+            "playbook_type": "listing_volatility",
+            "symbol": "TEST",
+            "coin_id": "test-token",
+            "market_confirmation_score": 75,
+        },
+        pack=listing,
+    )
+    assert listing_mismatch["source_pack_validated_digest_sufficient"] is False
+    assert "symbol_or_pair_match" not in listing_mismatch["source_pack_met_requirements"]
+    listing_substring_mismatch = event_source_packs.evaluate_pack_evidence(
+        {
+            "provider": "binance_announcements",
+            "title": "Binance Will List TESTLISTUSDT",
+            "announcement_symbols": ("TESTLIST",),
+            "announcement_pairs": ("TESTLIST/USDT",),
+            "playbook_type": "listing_volatility",
+            "symbol": "TEST",
+            "coin_id": "test",
+            "market_confirmation_score": 75,
+        },
+        pack=listing,
+    )
+    assert listing_substring_mismatch["source_pack_validated_digest_sufficient"] is False
+    assert "symbol_or_pair_match" not in listing_substring_mismatch["source_pack_met_requirements"]
 
     unlock = event_source_packs.source_pack_for_playbook("unlock_supply_pressure")
     large_unlock_eval = event_source_packs.evaluate_pack_evidence(
@@ -31299,6 +31373,179 @@ def test_event_evidence_acquisition_accepts_structured_tokenomist_unlocks():
     audit_sample = event_opportunity_audit._accepted_evidence_sample_text(accepted)
     assert "unlock_pct=0.12" in card_sample
     assert "materiality=large" in audit_sample
+
+
+def test_event_evidence_acquisition_accepts_official_exchange_announcements_only_on_identity_match():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_catalyst_search,
+        event_evidence_acquisition,
+        event_impact_hypotheses,
+    )
+    from crypto_rsi_scanner.event_providers.binance_announcements import BinanceAnnouncementProvider
+    from crypto_rsi_scanner.event_providers.bybit_announcements import BybitAnnouncementProvider
+
+    now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 6, 12, tzinfo=timezone.utc)
+    end = datetime(2026, 6, 17, tzinfo=timezone.utc)
+    binance_path, bybit_path = _exchange_announcement_fixture_paths()
+    listing_raw = BinanceAnnouncementProvider(binance_path, required=True).fetch_events(start, end)[0]
+    perp_raw = BybitAnnouncementProvider(bybit_path, required=True).fetch_events(start, end)[0]
+
+    listing = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:testlist-listing",
+        event_cluster_id="cluster:testlist",
+        event_type="exchange_listing",
+        external_asset="Binance",
+        impact_category="listing_liquidity_event",
+        candidate_sectors=("direct_token_events",),
+        candidate_symbols=("TESTLIST",),
+        candidate_coin_ids=("testlist",),
+        impact_path_type="listing_liquidity_event",
+        playbook_hint="listing_volatility",
+        confidence=0.82,
+        hypothesis_score=66.0,
+        opportunity_score_final=66.0,
+        opportunity_level="validated_digest",
+        validation_stage="impact_path_validated",
+        score_components={
+            "symbol": "TESTLIST",
+            "coin_id": "testlist",
+            "validated_symbol": "TESTLIST",
+            "validated_coin_id": "testlist",
+            "playbook_type": "listing_volatility",
+            "impact_path_type": "listing_liquidity_event",
+            "opportunity_score_final": 66.0,
+            "opportunity_level": "validated_digest",
+        },
+    )
+    perp = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:testperp-listing",
+        event_cluster_id="cluster:testperp",
+        event_type="perp_listing",
+        external_asset="Bybit",
+        impact_category="perp_listing",
+        candidate_sectors=("direct_token_events",),
+        candidate_symbols=("TESTPERP",),
+        candidate_coin_ids=("testperp",),
+        impact_path_type="perp_listing",
+        playbook_hint="perp_listing_squeeze",
+        confidence=0.82,
+        hypothesis_score=67.0,
+        opportunity_score_final=67.0,
+        opportunity_level="validated_digest",
+        validation_stage="impact_path_validated",
+        score_components={
+            "symbol": "TESTPERP",
+            "coin_id": "testperp",
+            "validated_symbol": "TESTPERP",
+            "validated_coin_id": "testperp",
+            "playbook_type": "perp_listing_squeeze",
+            "impact_path_type": "perp_listing",
+            "opportunity_score_final": 67.0,
+            "opportunity_level": "validated_digest",
+        },
+    )
+    mismatch = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:other-listing",
+        event_cluster_id="cluster:other",
+        event_type="exchange_listing",
+        external_asset="Binance",
+        impact_category="listing_liquidity_event",
+        candidate_sectors=("direct_token_events",),
+        candidate_symbols=("OTHER",),
+        candidate_coin_ids=("other"),
+        impact_path_type="listing_liquidity_event",
+        playbook_hint="listing_volatility",
+        confidence=0.82,
+        hypothesis_score=66.0,
+        opportunity_score_final=66.0,
+        opportunity_level="validated_digest",
+        validation_stage="impact_path_validated",
+        score_components={
+            "symbol": "OTHER",
+            "coin_id": "other",
+            "validated_symbol": "OTHER",
+            "validated_coin_id": "other",
+            "playbook_type": "listing_volatility",
+            "impact_path_type": "listing_liquidity_event",
+            "opportunity_score_final": 66.0,
+            "opportunity_level": "validated_digest",
+        },
+    )
+    substring_mismatch = event_impact_hypotheses.EventImpactHypothesis(
+        hypothesis_id="hyp:test-substring-listing",
+        event_cluster_id="cluster:test-substring",
+        event_type="exchange_listing",
+        external_asset="Binance",
+        impact_category="listing_liquidity_event",
+        candidate_sectors=("direct_token_events",),
+        candidate_symbols=("TEST",),
+        candidate_coin_ids=("test"),
+        impact_path_type="listing_liquidity_event",
+        playbook_hint="listing_volatility",
+        confidence=0.82,
+        hypothesis_score=66.0,
+        opportunity_score_final=66.0,
+        opportunity_level="validated_digest",
+        validation_stage="impact_path_validated",
+        score_components={
+            "symbol": "TEST",
+            "coin_id": "test",
+            "validated_symbol": "TEST",
+            "validated_coin_id": "test",
+            "playbook_type": "listing_volatility",
+            "impact_path_type": "listing_liquidity_event",
+            "opportunity_score_final": 66.0,
+            "opportunity_level": "validated_digest",
+        },
+    )
+
+    provider = event_catalyst_search.FixtureCatalystSearchProvider(rows_by_query={
+        "TESTLIST listing announcement": (listing_raw,),
+        "TESTPERP perpetual futures listing announcement": (perp_raw,),
+        "OTHER listing announcement": (listing_raw,),
+        "TEST listing announcement": (listing_raw,),
+    })
+    result = event_evidence_acquisition.run_evidence_acquisition(
+        (listing, perp, mismatch, substring_mismatch),
+        provider=provider,
+        providers_by_hint={"official_exchange": provider},
+        cfg=event_evidence_acquisition.EvidenceAcquisitionConfig(
+            enabled=True,
+            max_candidates=4,
+            max_queries=8,
+            max_results_per_query=2,
+            fixture_only=True,
+        ),
+        now=now,
+    )
+
+    by_hypothesis = {item.hypothesis_id: item for item in result.results}
+    listing_result = by_hypothesis["hyp:testlist-listing"]
+    perp_result = by_hypothesis["hyp:testperp-listing"]
+    mismatch_result = by_hypothesis["hyp:other-listing"]
+    substring_mismatch_result = by_hypothesis["hyp:test-substring-listing"]
+    assert listing_result.status == "accepted_evidence_found"
+    assert perp_result.status == "accepted_evidence_found"
+    listing_evidence = listing_result.accepted_evidence[0]
+    perp_evidence = perp_result.accepted_evidence[0]
+    assert listing_evidence["source_class"] == "official_exchange"
+    assert listing_evidence["exchange"] == "binance"
+    assert listing_evidence["announcement_kind"] == "exchange_listing"
+    assert listing_evidence["announcement_pairs"] == ("TESTLIST/USDT",)
+    assert "official_exchange_listing" in listing_evidence["reason_codes"]
+    assert listing_evidence["source_pack_validated_digest_sufficient"] is True
+    assert listing_evidence["source_pack_watchlist_requirements_met"] is False
+    assert perp_evidence["exchange"] == "bybit"
+    assert perp_evidence["announcement_kind"] == "perp_listing"
+    assert perp_evidence["announcement_contracts"] == ("TESTPERPUSDT",)
+    assert perp_evidence["source_pack_validated_digest_sufficient"] is True
+    assert perp_evidence["source_pack_watchlist_requirements_met"] is False
+    assert mismatch_result.status == "rejected_results_only"
+    assert "token_identity_rejected" in mismatch_result.rejected_evidence[0]["reason_codes"]
+    assert substring_mismatch_result.status == "rejected_results_only"
+    assert "token_identity_rejected" in substring_mismatch_result.rejected_evidence[0]["reason_codes"]
 
 
 def test_event_evidence_acquisition_rejects_cryptopanic_tag_mismatch_and_heat_only():

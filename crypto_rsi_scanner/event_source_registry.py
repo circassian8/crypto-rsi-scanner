@@ -392,9 +392,9 @@ def source_descriptor_for(
             default_mission=SourceMission.CATALYST_VALIDATION.value,
             source_quality_prior=74.0 if tags else 62.0,
             confidence_cap=88.0 if tags else 78.0,
-            can_validate_token_identity=bool(tags),
+            can_validate_token_identity=False,
             can_validate_catalyst=True,
-            can_validate_impact_path=bool(tags),
+            can_validate_impact_path=False,
             can_validate_event_time=False,
             reason_codes=tuple(reasons),
         )
@@ -485,7 +485,26 @@ def assess_source(
 ) -> SourceRegistryAssessment:
     """Assess one evidence row under the source registry."""
     mapping = dict(row or {})
-    payload = dict(raw_json or mapping.get("raw_json") or mapping.get("score_components") or {})
+    payload = {
+        key: mapping.get(key)
+        for key in (
+            "currencies",
+            "currency_tags",
+            "currencyTags",
+            "tags",
+            "source_origin",
+            "source_class",
+            "kind",
+            "filter",
+            "status",
+            "vote",
+            "votes",
+        )
+        if mapping.get(key) not in (None, "", [], {}, ())
+    }
+    nested_payload = raw_json or mapping.get("raw_json") or mapping.get("score_components") or {}
+    if isinstance(nested_payload, Mapping):
+        payload.update(dict(nested_payload))
     provider_value = provider or mapping.get("provider") or mapping.get("source_provider") or mapping.get("source")
     source_url_value = source_url or mapping.get("source_url") or mapping.get("url")
     text_value = " ".join(
@@ -527,10 +546,17 @@ def assess_source(
             can_impact = True
             reasons.append("cryptopanic_currency_tag_match")
         else:
+            prior = min(prior, 68.0)
+            cap = min(cap, 72.0)
+            can_identity = False
+            can_impact = False
             warnings.append("cryptopanic_missing_matching_currency_tag")
         if _narrative_heat(payload, text_value):
-            prior = max(prior, 82.0)
             reasons.append("narrative_heat")
+            if tag_match:
+                prior = max(prior, 82.0)
+            else:
+                warnings.append("cryptopanic_narrative_heat_without_matching_tag")
 
     asset_named = _asset_mentioned(text_value, symbol=symbol or mapping.get("symbol") or mapping.get("validated_symbol"), coin_id=coin_id or mapping.get("coin_id") or mapping.get("validated_coin_id"))
     if descriptor.source_class == SourceClass.PREDICTION_MARKET.value:

@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - CryptoPanic and exchange evidence require asset-specific proof
+**Status:** accepted
+**Decision:** CryptoPanic rows may serve as stronger Event Alpha source-pack
+evidence only when their currency tags match the validated symbol or coin id
+and the article text supports the catalyst/impact path. Narrative heat,
+sentiment, hot/bullish flags, or unrelated tags are not confirmation. Official
+exchange announcements may validate listing/perp/direct exchange-event
+evidence only when parsed symbol, pair, or contract metadata matches the
+candidate identity; an official exchange domain alone is not enough. Both
+families remain research-only evidence sources and cannot bypass market,
+derivatives, quality, or event-fade gates.
+**Why:** These sources are high-value but easy to misuse. Token tags and
+exchange metadata provide auditable identity proof; generic source authority or
+sentiment does not.
+**Revisit when:** Reviewed live burn-in data shows a separate deterministic
+rule is needed for untagged CryptoPanic posts or exchange product events that
+do not expose normalized symbol/pair metadata.
+
 ## 2026-06-30 - Feedback rows expose top-level calibration dimensions
 **Status:** accepted
 **Decision:** Event Alpha feedback rows are calibration artifacts and must carry

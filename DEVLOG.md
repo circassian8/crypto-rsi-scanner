@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Promote CryptoPanic and exchange evidence contracts · Codex
+**Why:** CryptoPanic token-tagged news and official exchange announcements are
+the highest-value source families for Event Alpha validation, but they need
+strict identity semantics so hot/bullish news or unrelated listings cannot
+confirm weak candidates.
+**Changes:**
+- CryptoPanic source assessment now only treats tagged rows as token-identity
+  and impact-path proof when the currency tag matches the validated symbol or
+  coin id; tag mismatches and narrative-heat-only rows remain capped/rejected.
+- Source packs now treat tagged CryptoPanic as preferred evidence for security,
+  fan/sports, political meme, and strategic/business paths where it was already
+  allowed as impact-validating evidence.
+- Official Binance/Bybit announcement evidence now validates acquisition rows
+  through parsed exchange symbol/pair/contract metadata, while unrelated
+  official listings are rejected as token-identity mismatches.
+- Added regressions for CryptoPanic currency query filters, matched/mismatched
+  tags, official listing/perp metadata, source-pack validation, and the
+  watchlist/high-priority need for later market/derivatives confirmation.
+**Verify:** `python3 tests/test_indicators.py` (576/576 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=evidence_acquisition_smoke PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Research-only evidence contract change. This does not weaken
+strict alert gates, send Telegram, paper/live trade, write normal RSI rows, or
+create `TRIGGERED_FADE`.
+
 ## 2026-06-30 — Harden Event Alpha feedback calibration fields · Codex
 **Why:** Feedback labels should be useful calibration rows even when the matched
 core/card/watchlist context carries source-pack and quality fields outside the

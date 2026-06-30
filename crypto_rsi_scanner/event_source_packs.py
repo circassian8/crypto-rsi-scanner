@@ -185,6 +185,7 @@ SOURCE_PACKS: dict[str, SourcePack] = {
         playbooks=("security_or_regulatory_shock", "direct_event"),
         preferred_source_classes=(
             event_source_registry.SourceClass.OFFICIAL_PROJECT.value,
+            event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value,
             event_source_registry.SourceClass.CRYPTO_NEWS.value,
             event_source_registry.SourceClass.BROAD_NEWS.value,
         ),
@@ -209,6 +210,7 @@ SOURCE_PACKS: dict[str, SourcePack] = {
         preferred_source_classes=(
             event_source_registry.SourceClass.OFFICIAL_PROJECT.value,
             event_source_registry.SourceClass.STRUCTURED_CALENDAR.value,
+            event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value,
             event_source_registry.SourceClass.CRYPTO_NEWS.value,
         ),
         preferred_providers=("sports_fixtures", "project_blog_rss", "cryptopanic", "gdelt"),
@@ -232,6 +234,7 @@ SOURCE_PACKS: dict[str, SourcePack] = {
         preferred_source_classes=(
             event_source_registry.SourceClass.BROAD_NEWS.value,
             event_source_registry.SourceClass.PREDICTION_MARKET.value,
+            event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value,
             event_source_registry.SourceClass.CRYPTO_NEWS.value,
         ),
         preferred_providers=("gdelt", "polymarket", "cryptopanic"),
@@ -250,6 +253,7 @@ SOURCE_PACKS: dict[str, SourcePack] = {
         playbooks=("strategic_investment", "protocol_business_event", "direct_event"),
         preferred_source_classes=(
             event_source_registry.SourceClass.OFFICIAL_PROJECT.value,
+            event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value,
             event_source_registry.SourceClass.CRYPTO_NEWS.value,
             event_source_registry.SourceClass.BROAD_NEWS.value,
         ),
@@ -459,7 +463,14 @@ def _met_requirement_tokens(
     tokens.update(str(item) for item in _iter_values(row.get("reason_codes")))
     tokens.update(str(item) for item in _iter_values(row.get("validation_reasons")))
     tokens.update(str(item) for item in _iter_values(row.get("accepted_evidence_reason_codes")))
-    if assessment.can_validate_token_identity:
+    identity_confirmed = _row_confirms_asset_identity(row, assessment=assessment)
+    identity_can_count = assessment.can_validate_token_identity
+    if assessment.source_class in {
+        event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value,
+        event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value,
+    }:
+        identity_can_count = identity_can_count and identity_confirmed
+    if identity_can_count:
         tokens.update({"token_identity", "asset_identity", "symbol_or_pair_match", "affected_protocol_or_token"})
     if assessment.can_validate_catalyst:
         tokens.update({"catalyst_validation", "independent_catalyst_source"})
@@ -500,6 +511,110 @@ def _met_requirement_tokens(
     if "denial" in text or "correction" in text:
         tokens.add("denial_or_correction_search")
     return {token for token in tokens if token}
+
+
+def _row_confirms_asset_identity(
+    row: Mapping[str, Any],
+    *,
+    assessment: event_source_registry.SourceRegistryAssessment,
+) -> bool:
+    symbol = str(
+        row.get("validated_symbol")
+        or row.get("symbol")
+        or _nested_value(row, "score_components", "validated_symbol")
+        or _nested_value(row, "score_components", "symbol")
+        or ""
+    ).strip()
+    coin_id = str(
+        row.get("validated_coin_id")
+        or row.get("coin_id")
+        or _nested_value(row, "score_components", "validated_coin_id")
+        or _nested_value(row, "score_components", "coin_id")
+        or ""
+    ).strip()
+    if not symbol and not coin_id:
+        return False
+    if assessment.source_class == event_source_registry.SourceClass.CRYPTOPANIC_TAGGED.value:
+        tags = event_source_registry.assess_source(row, symbol=symbol, coin_id=coin_id).cryptopanic_currency_tag_match
+        return bool(tags)
+    if assessment.source_class == event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value:
+        metadata = _announcement_identity_terms(row)
+        expected = {_compact_exchange_identity(symbol)} if symbol else set()
+        if coin_id:
+            expected.add(_compact_exchange_identity(coin_id))
+        expected.discard("")
+        return any(_exchange_metadata_value_matches(term, expected) for term in metadata)
+    text = " ".join(str(row.get(key) or "") for key in ("title", "body", "event_name", "description"))
+    if symbol and _term_in_text(text, symbol):
+        return True
+    if coin_id and _term_in_text(text, coin_id.replace("-", " ")):
+        return True
+    return False
+
+
+def _nested_value(row: Mapping[str, Any], parent: str, key: str) -> object:
+    nested = row.get(parent)
+    return nested.get(key) if isinstance(nested, Mapping) else None
+
+
+def _announcement_identity_terms(row: Mapping[str, Any]) -> tuple[str, ...]:
+    values: list[str] = []
+    event = row.get("event") if isinstance(row.get("event"), Mapping) else {}
+    raw_json = row.get("raw_json") if isinstance(row.get("raw_json"), Mapping) else {}
+    for source in (row, event, raw_json):
+        for key in (
+            "announcement_symbols",
+            "announcement_pairs",
+            "announcement_contracts",
+            "symbols",
+            "pairs",
+            "contracts",
+        ):
+            values.extend(str(item) for item in _iter_values(source.get(key)))
+    return tuple(dict.fromkeys(value for value in values if value))
+
+
+_QUOTE_ASSET_SUFFIXES = (
+    "USDT",
+    "USDC",
+    "FDUSD",
+    "TUSD",
+    "BUSD",
+    "USD",
+    "BTC",
+    "ETH",
+    "BNB",
+    "TRY",
+    "EUR",
+)
+
+
+def _compact_exchange_identity(value: object) -> str:
+    return str(value or "").upper().replace("-", "").replace("_", "").replace("/", "").replace(" ", "").strip()
+
+
+def _exchange_metadata_value_matches(value: object, expected: set[str]) -> bool:
+    raw = str(value or "").upper().strip()
+    clean = _compact_exchange_identity(raw)
+    if not clean:
+        return False
+    candidates = {clean}
+    for sep in ("/", "-", "_", " "):
+        if sep in raw:
+            base = raw.split(sep, 1)[0]
+            if _compact_exchange_identity(base):
+                candidates.add(_compact_exchange_identity(base))
+    for suffix in _QUOTE_ASSET_SUFFIXES:
+        if clean.endswith(suffix) and len(clean) > len(suffix):
+            candidates.add(clean[: -len(suffix)])
+    return bool(candidates & expected)
+
+
+def _term_in_text(text: str, term: str) -> bool:
+    normalized = str(term or "").strip()
+    if not normalized:
+        return False
+    return normalized.casefold() in str(text or "").casefold()
 
 
 def _requirements_met(requirements: Iterable[str], tokens: set[str]) -> bool:
