@@ -3749,6 +3749,7 @@ def event_alpha_notification_checklist_report(
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
+        source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
         llm_budget_rows=artifacts["budget_rows"],
         profile=profile.name,
         artifact_namespace=context.artifact_namespace,
@@ -4494,8 +4495,22 @@ def event_alpha_source_coverage_report(
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
     )
+    report_text = event_alpha_source_coverage.format_source_coverage_report(report)
+    source_coverage_path = context.namespace_dir / "event_alpha_source_coverage.md"
+    source_coverage_json_path = context.namespace_dir / "event_alpha_source_coverage.json"
+    try:
+        context.namespace_dir.mkdir(parents=True, exist_ok=True)
+        source_coverage_path.write_text(report_text + "\n", encoding="utf-8")
+        source_coverage_json_path.write_text(
+            json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        print(f"warning: source coverage artifact write failed: {exc}")
     print(_event_alpha_context_block(context))
-    print(event_alpha_source_coverage.format_source_coverage_report(report))
+    print(f"source_coverage_report_path: {source_coverage_path}")
+    print(f"source_coverage_json_path: {source_coverage_json_path}")
+    print(report_text)
 
 
 def event_alpha_provider_health_reset(
@@ -6532,6 +6547,7 @@ def event_alpha_artifact_doctor_report(
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
+        source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
         llm_budget_rows=artifacts["budget_rows"],
         delivery_rows=delivery_rows,
         profile=profile_name,

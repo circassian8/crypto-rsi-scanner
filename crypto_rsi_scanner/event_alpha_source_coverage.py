@@ -100,6 +100,7 @@ class EventAlphaSourceCoveragePack:
     configured_providers: tuple[str, ...]
     missing_providers: tuple[str, ...]
     healthy_providers: tuple[str, ...]
+    unknown_or_unobserved_providers: tuple[str, ...]
     degraded_or_backoff_providers: tuple[str, ...]
     provider_coverage_status: str
     provider_role_statuses: tuple[str, ...]
@@ -121,6 +122,7 @@ class EventAlphaSourceCoveragePack:
             "configured_providers": list(self.configured_providers),
             "missing_providers": list(self.missing_providers),
             "healthy_providers": list(self.healthy_providers),
+            "unknown_or_unobserved_providers": list(self.unknown_or_unobserved_providers),
             "degraded_or_backoff_providers": list(self.degraded_or_backoff_providers),
             "provider_coverage_status": self.provider_coverage_status,
             "source_pack_coverage_status": self.provider_coverage_status,
@@ -187,6 +189,10 @@ def build_source_coverage_report(
             provider for provider in configured_for_pack
             if _provider_effective_status(provider, health_by_provider) == "healthy"
         )
+        unknown = tuple(
+            provider for provider in configured_for_pack
+            if _provider_effective_status(provider, health_by_provider) in {"unknown", "not_observed"}
+        )
         degraded = tuple(
             provider for provider in configured_for_pack
             if _provider_effective_status(provider, health_by_provider) in {"degraded", "backoff", "unavailable"}
@@ -203,12 +209,14 @@ def build_source_coverage_report(
             configured_for_pack=configured_for_pack,
             missing=missing,
             healthy=healthy,
+            unknown=unknown,
             degraded=degraded,
             provider_unavailable_count=unavailable,
         )
         coverage_gap_reason = _coverage_gap_reason(
             coverage_status=coverage_status,
             missing=missing,
+            unknown=unknown,
             degraded=degraded,
             blocked=blocked,
             skipped_budget=skipped_budget,
@@ -218,6 +226,7 @@ def build_source_coverage_report(
         role_statuses = _provider_role_statuses_for_pack(
             provider_health_rows or {},
             preferred=preferred,
+            unknown=unknown,
             now=observed,
         )
         recommended_actions = _pack_recommended_actions(
@@ -235,6 +244,7 @@ def build_source_coverage_report(
                 configured_providers=_sorted_tuple(configured_for_pack),
                 missing_providers=_sorted_tuple(missing),
                 healthy_providers=_sorted_tuple(healthy),
+                unknown_or_unobserved_providers=_sorted_tuple(unknown),
                 degraded_or_backoff_providers=_sorted_tuple(degraded),
                 provider_coverage_status=coverage_status,
                 provider_role_statuses=role_statuses,
@@ -281,6 +291,7 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
                 f"  configured providers: {_join(pack.configured_providers)}",
                 f"  missing providers: {_join(pack.missing_providers)}",
                 f"  healthy providers: {_join(pack.healthy_providers)}",
+                f"  unknown/not observed providers: {_join(pack.unknown_or_unobserved_providers)}",
                 f"  degraded/backoff providers: {_join(pack.degraded_or_backoff_providers)}",
                 f"  provider coverage status: {pack.provider_coverage_status}",
                 f"  provider role health: {_join(pack.provider_role_statuses)}",
@@ -351,13 +362,14 @@ def _provider_alias(row: Mapping[str, Any], *, fallback_key: str) -> str:
 
 
 def _provider_effective_status(provider: str, health_by_provider: Mapping[str, str]) -> str:
-    return str(health_by_provider.get(provider) or "healthy")
+    return str(health_by_provider.get(provider) or "unknown")
 
 
 def _provider_role_statuses_for_pack(
     rows: Mapping[str, Mapping[str, Any]],
     *,
     preferred: Iterable[str],
+    unknown: Iterable[str] = (),
     now: datetime,
 ) -> tuple[str, ...]:
     preferred_set = set(preferred)
@@ -369,6 +381,8 @@ def _provider_role_statuses_for_pack(
         role = str(row.get("provider_role") or row.get("provider_kind") or "unclassified").strip() or "unclassified"
         status = event_provider_health.provider_health_status(row, now=now)
         out.append(f"{alias}:{role}={status}")
+    for alias in sorted(set(unknown) & preferred_set):
+        out.append(f"{alias}:not_observed=unknown")
     return tuple(dict.fromkeys(out))
 
 
@@ -456,30 +470,35 @@ def _pack_coverage_status(
     configured_for_pack: Iterable[str],
     missing: Iterable[str],
     healthy: Iterable[str],
+    unknown: Iterable[str],
     degraded: Iterable[str],
     provider_unavailable_count: int,
 ) -> str:
     configured_set = set(configured_for_pack)
     missing_set = set(missing)
     healthy_set = set(healthy)
+    unknown_set = set(unknown)
     degraded_set = set(degraded)
     if provider_unavailable_count and not healthy_set:
         return "unavailable"
     if not configured_set:
         return "not_configured"
+    if unknown_set and not healthy_set and not degraded_set:
+        return "unknown"
     if degraded_set and not healthy_set:
         return "degraded"
     if healthy_set and not missing_set and not degraded_set and not provider_unavailable_count:
-        return "complete"
+        return "partial" if unknown_set else "complete"
     if healthy_set:
         return "partial"
-    return "unavailable"
+    return "unknown" if unknown_set else "unavailable"
 
 
 def _coverage_gap_reason(
     *,
     coverage_status: str,
     missing: Iterable[str],
+    unknown: Iterable[str],
     degraded: Iterable[str],
     blocked: int,
     skipped_budget: int,
@@ -487,12 +506,15 @@ def _coverage_gap_reason(
     provider_unavailable: int,
 ) -> str | None:
     reasons: list[str] = []
-    if coverage_status in {"not_configured", "degraded", "unavailable", "partial"}:
+    if coverage_status in {"not_configured", "degraded", "unavailable", "partial", "unknown"}:
         reasons.append(f"source_pack_coverage_{coverage_status}")
     missing_values = _sorted_tuple(missing)
+    unknown_values = _sorted_tuple(unknown)
     degraded_values = _sorted_tuple(degraded)
     if missing_values:
         reasons.append("missing:" + ",".join(missing_values))
+    if unknown_values:
+        reasons.append("not_observed:" + ",".join(unknown_values))
     if degraded_values:
         reasons.append("degraded:" + ",".join(degraded_values))
     if skipped_budget:

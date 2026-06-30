@@ -272,6 +272,11 @@ def build_daily_brief(
             near_miss_candidates,
             upgrade_candidates,
             acquisition_rows=acquisition_rows,
+            source_coverage_report_path=(
+                Path(run_ledger_path).parent / "event_alpha_source_coverage.md"
+                if run_ledger_path
+                else None
+            ),
         ),
         "",
         "### Provider Health by Source Pack",
@@ -924,6 +929,7 @@ def _source_coverage_summary_lines(
     upgrade_candidates: Iterable[event_near_miss.EventNearMissCandidate],
     *,
     acquisition_rows: Iterable[Mapping[str, Any]] = (),
+    source_coverage_report_path: str | Path | None = None,
 ) -> list[str]:
     row_maps = [_row_mapping(row) for row in rows]
     row_maps = [row for row in row_maps if row]
@@ -973,7 +979,12 @@ def _source_coverage_summary_lines(
         for status, count in sorted(article_quality_counts.items(), key=lambda item: (-item[1], item[0]))
     ) or "none"
     next_source = _source_coverage_next_source(gaps, executed_rows)
+    report_path = Path(source_coverage_report_path) if source_coverage_report_path else None
+    report_status = "not written yet"
+    if report_path is not None:
+        report_status = str(report_path) if report_path.exists() else f"{report_path} (not written yet)"
     return [
+        f"- Detailed source coverage report: {report_status}",
         f"- Source registry: {summary}",
         (
             "- Evidence acquisition funnel: "

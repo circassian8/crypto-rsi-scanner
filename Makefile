@@ -50,7 +50,8 @@ EVENT_ALPHA_ANOMALY_MIN_RETURN_24H ?= 0.03
 EVENT_ALPHA_ANOMALY_MIN_VOLUME_MCAP ?= 0.05
 EVENT_CATALYST_SEARCH_FIXTURE_PATH ?=
 EVENT_ALPHA_ARTIFACT_BASE_DIR ?= $(EVENT_DISCOVERY_CACHE_DIR)
-EVENT_ALPHA_ARTIFACT_NAMESPACE ?= $(PROFILE)
+ARTIFACT_NAMESPACE ?= $(PROFILE)
+EVENT_ALPHA_ARTIFACT_NAMESPACE ?= $(ARTIFACT_NAMESPACE)
 EVENT_ALPHA_PROFILE_DIR ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/$(EVENT_ALPHA_ARTIFACT_NAMESPACE)
 EVENT_ALPHA_FIXTURE_DIR ?= $(EVENT_ALPHA_ARTIFACT_BASE_DIR)/fixture
 EVENT_WATCHLIST_STATE_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_watchlist_state.jsonl
@@ -67,7 +68,7 @@ EVENT_RESEARCH_CARDS_DIR ?= $(EVENT_ALPHA_PROFILE_DIR)/research_cards
 EVENT_ALPHA_ALERT_OUTCOMES ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_alerts_with_outcomes.jsonl
 EVENT_ALPHA_ALERT_PRICES ?= fixtures/event_discovery/outcome_prices.json
 PROFILE ?= no_key_live
-EVENT_ALPHA_RUNTIME_PROFILE = $(if $(filter notify_llm_deep_rehearsal notify_llm_deep_fixture_rehearsal,$(PROFILE)),notify_llm_deep,$(if $(filter fixture_notify_smoke notification_format_smoke notify_llm_deep_no_send_smoke,$(PROFILE)),fixture,$(PROFILE)))
+EVENT_ALPHA_RUNTIME_PROFILE ?= $(if $(filter notify_llm_deep_rehearsal notify_llm_deep_fixture_rehearsal notify_llm_deep_research_review_smoke,$(PROFILE)),notify_llm_deep,$(if $(filter fixture_notify_smoke notification_format_smoke notify_llm_deep_no_send_smoke,$(PROFILE)),fixture,$(PROFILE)))
 ALERT_KEY ?=
 FEEDBACK_TARGET ?=
 FEEDBACK_NOTES ?=
@@ -192,7 +193,7 @@ help:
 	@echo "  make event-alpha-notify-llm-deep-scheduled  Scheduled deeper bounded LLM notify run; sends only with RSI_EVENT_ALERTS_ENABLED=1"
 	@echo "  make event-alpha-notify-llm-quality-scheduled  Fresh LLM quality artifact run under notify_llm_quality; no send flag"
 	@echo "  make event-alpha-provider-health-report PROFILE=notify_no_key  Print profile provider health/backoff rows"
-	@echo "  make event-alpha-source-coverage-report PROFILE=notify_llm_deep  Print source-pack provider/evidence coverage"
+	@echo "  make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke  Print source-pack provider/evidence coverage"
 	@echo "  make event-alpha-provider-health-reset PROFILE=notify_no_key PROVIDER_KEY=gdelt:event_source CONFIRM=1  Clear selected provider backoff"
 	@echo "  make event-alpha-notify-fixture-smoke  Run local fake-sender notification smoke"
 	@echo "  make event-alpha-notification-format-smoke  Run fake-sender notification formatting + doctor smoke"
@@ -858,14 +859,14 @@ event-alpha-notification-runs-report:
 event-alpha-notification-inbox: PROFILE = notify_no_key
 event-alpha-notification-inbox:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
-	$(PYTHON) main.py --event-alpha-notification-inbox --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_BURN_IN_REVIEW_ARG)
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
+	$(PYTHON) main.py --event-alpha-notification-inbox --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_BURN_IN_REVIEW_ARG)
 
 event-alpha-notification-deliveries-report: PROFILE = notify_no_key
 event-alpha-notification-deliveries-report:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
-	$(PYTHON) main.py --event-alpha-notification-deliveries-report --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE)
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
+	$(PYTHON) main.py --event-alpha-notification-deliveries-report --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE)
 
 event-alpha-notification-retry-failed: PROFILE = notify_no_key
 event-alpha-notification-retry-failed:
@@ -915,8 +916,8 @@ event-alpha-provider-health-report:
 event-alpha-source-coverage-report: PROFILE = notify_no_key
 event-alpha-source-coverage-report:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
-	$(PYTHON) main.py --event-alpha-source-coverage-report --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE)
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
+	$(PYTHON) main.py --event-alpha-source-coverage-report --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE)
 
 event-alpha-provider-health-reset: PROFILE = notify_no_key
 event-alpha-provider-health-reset:
@@ -976,6 +977,8 @@ event-alpha-notify-llm-deep-research-review-no-send-smoke:
 	grep -q '"research_review_digest_candidates":1' "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_research_review_smoke/event_alpha_runs.jsonl"
 	$(PYTHON) main.py --event-alpha-notification-deliveries-report --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-include-test-artifacts
 	$(PYTHON) main.py --event-alpha-notification-inbox --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-burn-in-review --event-alpha-include-test-artifacts
+	$(PYTHON) main.py --event-alpha-source-coverage-report --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke
+	test -s "$(EVENT_ALPHA_ARTIFACT_BASE_DIR)/notify_llm_deep_research_review_smoke/event_alpha_source_coverage.md"
 	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke --event-alpha-include-test-artifacts --event-alpha-artifact-doctor-strict --event-alpha-artifact-doctor-delivery-scope latest_run
 
 event-alpha-notify-llm-deep-no-send-smoke:
@@ -1418,7 +1421,7 @@ event-alpha-daily-brief:
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
 	RSI_EVENT_ALPHA_DAILY_BRIEF_PATH=$(EVENT_ALPHA_DAILY_BRIEF_PATH) \
-	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
+	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG)
 
 event-alpha-replay:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
@@ -1494,7 +1497,7 @@ event-alpha-artifact-doctor:
 	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
 	RSI_EVENT_ALPHA_FEEDBACK_PATH=$(EVENT_ALPHA_PROFILE_DIR)/event_alpha_feedback.jsonl \
 	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
-	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE_ARG)
+	$(PYTHON) main.py --event-alpha-artifact-doctor --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG) $(EVENT_ALPHA_INCLUDE_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_STRICT_LEGACY_ARG) $(EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE_ARG)
 
 event-alpha-tuning-worksheet:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \

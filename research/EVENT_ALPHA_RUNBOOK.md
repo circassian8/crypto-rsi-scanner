@@ -93,15 +93,20 @@ backoff, budget skipping, or rejected-only acquisition results:
 ```bash
 make event-alpha-source-coverage-report PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-source-coverage-report PROFILE=notify_llm_deep PYTHON=python3
+make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke PYTHON=python3
 ```
 
-The dashboard is read-only. It reports configured, missing, healthy, and
-degraded providers by source pack; accepted/rejected/skipped acquisition
-outcomes; whether evidence absence is meaningful; and the provider/source pack
-most likely to improve the next run. Each pack also prints recommended actions,
-such as configuring CryptoPanic token/news coverage, restoring official exchange
-announcement feeds, raising evidence-acquisition query budgets, or fixing
-feed-level RSS quarantine/backoff. Treat CoinGecko and DefiLlama-style rows as
+The dashboard is read-only and writes
+`event_fade_cache/<artifact_namespace>/event_alpha_source_coverage.md` plus a
+JSON sidecar for review bundles. `PROFILE` controls the runtime profile;
+`ARTIFACT_NAMESPACE` controls which artifact namespace is inspected. The report
+shows configured, missing, healthy, unknown/not-observed, and degraded providers
+by source pack; accepted/rejected/skipped acquisition outcomes; whether evidence
+absence is meaningful; and the provider/source pack most likely to improve the
+next run. Each pack also prints recommended actions, such as configuring
+CryptoPanic token/news coverage, restoring official exchange announcement
+feeds, raising evidence-acquisition query budgets, or fixing feed-level RSS
+quarantine/backoff. Treat CoinGecko and DefiLlama-style rows as
 market/protocol metric evidence only: they can support market confirmation or
 source coverage, but they do not prove official confirmation or catalyst
 impact-path validation by themselves.
@@ -126,10 +131,12 @@ Each source-pack row now also prints pack-level `provider_coverage_status`,
 role-specific provider health, explicit coverage-gap reasons, and the providers
 missing or degraded for confirmation. A provider may be healthy for one role and
 degraded for another, for example RSS event intake versus RSS catalyst search.
-Interpret `degraded`, `unavailable`, and `not_configured` as unknown coverage,
-not as proof that no confirming evidence exists. Artifact doctor flags missing
-coverage metadata, missing provider recommendations, and contradictions where a
-degraded/unavailable/not-configured pack is treated as meaningful absence.
+Interpret `unknown`, `degraded`, `unavailable`, and `not_configured` as unknown
+coverage, not as proof that no confirming evidence exists. A configured provider
+with no provider-health row is `unknown/not observed`, not healthy. Artifact
+doctor flags missing coverage artifacts/metadata, missing provider
+recommendations, unobserved-provider coverage warnings, and contradictions where
+a degraded/unavailable/not-configured pack is treated as meaningful absence.
 
 The operator-facing opportunity spine is the canonical CoreOpportunity view.
 When `event_core_opportunities.jsonl` exists, cards and audits should read the

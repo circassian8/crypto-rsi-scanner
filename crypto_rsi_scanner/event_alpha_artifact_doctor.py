@@ -64,6 +64,9 @@ class EventAlphaArtifactDoctorResult:
     live_sector_digest_without_asset: int = 0
     live_rejected_results_promoted: int = 0
     live_skipped_budget_promoted: int = 0
+    source_coverage_report_missing: int = 0
+    source_coverage_provider_status_unknown: int = 0
+    source_coverage_provider_marked_healthy_without_observation: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
@@ -190,6 +193,7 @@ def diagnose_artifacts(
     evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
+    source_coverage_report_path: str | Path | None = None,
     llm_budget_rows: Iterable[Mapping[str, Any]] = (),
     delivery_rows: Iterable[Mapping[str, Any]] = (),
     profile: str | None = None,
@@ -510,6 +514,7 @@ def diagnose_artifacts(
     core_route_conflicts = _core_route_conflicts_with_opportunity_level(core_rows)
     live_confirmation_conflicts = _live_confirmation_conflicts(core_rows, profile=profile, artifact_namespace=artifact_namespace)
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
+    source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     upgrade_high_priority = 0
     fresh_visible_missing_cards = sum(1 for item in visible_core if item.core_opportunity_id not in card_core_ids and _core_has_fresh_rows(item))
     fresh_visible_missing_targets = sum(
@@ -661,6 +666,22 @@ def diagnose_artifacts(
             f"{live_confirmation_conflicts['live_skipped_budget_promoted']}"
         )
         (blockers if strict and core_store_available else warnings).append(message)
+    if source_coverage_report_conflicts["source_coverage_report_missing"]:
+        warnings.append(
+            "source_coverage_report_missing="
+            f"{source_coverage_report_conflicts['source_coverage_report_missing']}"
+        )
+    if source_coverage_report_conflicts["source_coverage_provider_status_unknown"]:
+        warnings.append(
+            "source_coverage_provider_status_unknown="
+            f"{source_coverage_report_conflicts['source_coverage_provider_status_unknown']}"
+        )
+    if source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"]:
+        message = (
+            "source_coverage_provider_marked_healthy_without_observation="
+            f"{source_coverage_report_conflicts['source_coverage_provider_marked_healthy_without_observation']}"
+        )
+        (blockers if strict else warnings).append(message)
     if source_coverage_conflicts["source_pack_provider_status_missing"]:
         warnings.append(
             "source_pack_provider_status_missing="
@@ -1121,6 +1142,9 @@ def diagnose_artifacts(
         live_sector_digest_without_asset=live_confirmation_conflicts["live_sector_digest_without_asset"],
         live_rejected_results_promoted=live_confirmation_conflicts["live_rejected_results_promoted"],
         live_skipped_budget_promoted=live_confirmation_conflicts["live_skipped_budget_promoted"],
+        source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
+        source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
+        source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
         degraded_provider_absence_marked_meaningful=source_coverage_conflicts["degraded_provider_absence_marked_meaningful"],
@@ -1892,6 +1916,56 @@ def _source_coverage_metadata_conflicts(rows: Iterable[Mapping[str, Any]]) -> di
         if status in {"degraded", "unavailable", "not_configured"} and absence:
             out["degraded_provider_absence_marked_meaningful"] += 1
     return out
+
+
+def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]:
+    out = {
+        "source_coverage_report_missing": 0,
+        "source_coverage_provider_status_unknown": 0,
+        "source_coverage_provider_marked_healthy_without_observation": 0,
+    }
+    if path is None:
+        return out
+    report_path = Path(path)
+    if not report_path.exists():
+        out["source_coverage_report_missing"] = 1
+        return out
+    try:
+        text = report_path.read_text(encoding="utf-8")
+    except OSError:
+        out["source_coverage_report_missing"] = 1
+        return out
+    out["source_coverage_provider_status_unknown"] = text.count("provider coverage status: unknown")
+    unknown_provider_lines = [
+        line for line in text.splitlines()
+        if line.strip().startswith("unknown/not observed providers:")
+        and line.rsplit(":", 1)[-1].strip() not in {"", "none"}
+    ]
+    out["source_coverage_provider_status_unknown"] += len(unknown_provider_lines)
+    blocks = text.split("\n- ")
+    for block in blocks:
+        healthy_line = next(
+            (line for line in block.splitlines() if line.strip().startswith("healthy providers:")),
+            "",
+        )
+        unknown_line = next(
+            (line for line in block.splitlines() if line.strip().startswith("unknown/not observed providers:")),
+            "",
+        )
+        healthy = set(_split_provider_line(healthy_line))
+        unknown = set(_split_provider_line(unknown_line))
+        if healthy & unknown:
+            out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & unknown)
+    return out
+
+
+def _split_provider_line(line: str) -> tuple[str, ...]:
+    if ":" not in line:
+        return ()
+    value = line.rsplit(":", 1)[-1].strip()
+    if not value or value == "none":
+        return ()
+    return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
 def _tuple_value(value: Any) -> tuple[str, ...]:
@@ -2899,6 +2973,9 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"live_sector_digest_without_asset={result.live_sector_digest_without_asset} "
             f"live_rejected_results_promoted={result.live_rejected_results_promoted} "
             f"live_skipped_budget_promoted={result.live_skipped_budget_promoted} "
+            f"source_coverage_report_missing={result.source_coverage_report_missing} "
+            f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
+            f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
             f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful}"

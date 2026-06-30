@@ -226,7 +226,36 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED=1" in deep_research_review_dry
     assert "research_review_digest_candidates" in deep_research_review_dry
     assert "notify_llm_deep_research_review_smoke" in deep_research_review_dry
+    assert "--event-alpha-source-coverage-report --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke" in deep_research_review_dry
+    assert "event_alpha_source_coverage.md" in deep_research_review_dry
     assert "--event-alpha-artifact-doctor-delivery-scope latest_run" in deep_research_review_dry
+    source_coverage_dry = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "event-alpha-source-coverage-report",
+            "PROFILE=notify_llm_deep",
+            "ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke",
+            "PYTHON=python3",
+        ],
+        cwd=root,
+        text=True,
+    )
+    assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke" in source_coverage_dry
+    assert "--event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke" in source_coverage_dry
+    doctor_namespace_dry = subprocess.check_output(
+        [
+            "make",
+            "-n",
+            "event-alpha-artifact-doctor",
+            "PROFILE=notify_llm_deep_research_review_smoke",
+            "STRICT=1",
+            "PYTHON=python3",
+        ],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_research_review_smoke" in doctor_namespace_dry
     deep_rehearsal_dry = subprocess.check_output(
         ["make", "-n", "event-alpha-notify-llm-deep-real-no-send-rehearsal", "PYTHON=python3"],
         cwd=root,
@@ -718,6 +747,61 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     )
     assert doctor.degraded_provider_absence_marked_meaningful == 1
     assert doctor.missing_provider_recommendations_missing == 1
+
+    unobserved = event_alpha_source_coverage.build_source_coverage_report(
+        provider_status_report=provider_report,
+        provider_health_rows={},
+        evidence_acquisition_rows=[],
+        core_opportunity_rows=[],
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep",
+    )
+    unobserved_proxy = {pack.source_pack: pack for pack in unobserved.packs}["proxy_preipo_rwa_pack"]
+    assert "gdelt" in unobserved_proxy.unknown_or_unobserved_providers
+    assert "project_blog_rss" in unobserved_proxy.unknown_or_unobserved_providers
+    assert "gdelt" not in unobserved_proxy.healthy_providers
+    assert unobserved_proxy.provider_coverage_status == "unknown"
+    assert "gdelt:not_observed=unknown" in unobserved_proxy.provider_role_statuses
+    unobserved_text = event_alpha_source_coverage.format_source_coverage_report(unobserved)
+    assert "unknown/not observed providers: gdelt, project_blog_rss" in unobserved_text
+    assert "provider coverage status: unknown" in unobserved_text
+
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        report_path = Path(tmp) / "event_alpha_source_coverage.md"
+        report_path.write_text(unobserved_text, encoding="utf-8")
+        source_report_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "source-coverage-test",
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "notify_llm_deep",
+                "run_mode": "test",
+            }],
+            source_coverage_report_path=report_path,
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert source_report_doctor.source_coverage_report_missing == 0
+        assert source_report_doctor.source_coverage_provider_status_unknown > 0
+        assert source_report_doctor.source_coverage_provider_marked_healthy_without_observation == 0
+
+        missing_report_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "source-coverage-missing-test",
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "notify_llm_deep",
+                "run_mode": "test",
+            }],
+            source_coverage_report_path=Path(tmp) / "missing.md",
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            include_test_artifacts=True,
+        )
+        assert missing_report_doctor.source_coverage_report_missing == 1
     assert any("degraded_provider_absence_marked_meaningful=1" in item for item in doctor.blockers)
 
 

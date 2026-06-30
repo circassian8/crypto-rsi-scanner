@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Operationalize research-review source coverage · Codex
+**Why:** `notify_llm_deep` research-review rehearsals need source-coverage
+artifacts and profile/namespace-safe report commands so operators and Pro-model
+reviews inspect the intended run rather than a similarly named profile.
+Configured providers with no health observation also must not be reported as
+healthy.
+**Changes:**
+- `make event-alpha-source-coverage-report` and common Event Alpha report
+  targets now separate runtime `PROFILE` from `ARTIFACT_NAMESPACE`, while
+  preserving the shorthand namespace mapping for the
+  `notify_llm_deep_research_review_smoke` target.
+- Source coverage reports now persist Markdown and JSON artifacts under the
+  inspected namespace, and daily briefs point to the detailed report when
+  available.
+- Source coverage provider status now treats configured-but-unobserved
+  providers as `unknown/not observed` instead of healthy, with artifact-doctor
+  counters for missing reports, unknown provider coverage, and impossible
+  healthy/unobserved contradictions.
+- Added regressions for the Make target profile/namespace split, source
+  coverage unknown-provider semantics, and doctor source-coverage counters.
+**Verify:** `python3 tests/test_indicators.py` (577/577 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-research-review-no-send-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep_research_review_smoke STRICT=1 PYTHON=python3`
+(no blockers; expected unknown-provider warning for unobserved fixture health);
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Reporting/diagnostics only. It does not change route scoring,
+Telegram send guards, paper/live rows, normal RSI rows, or `TRIGGERED_FADE`.
+
 ## 2026-06-30 — Reconcile deep rehearsal core-card coverage · Codex
 **Why:** The full Prompt 10 artifact audit found that the `notify_llm_deep`
 no-send rehearsal could write visible canonical CoreOpportunity rows that were

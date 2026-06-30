@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - Unobserved providers are not healthy source coverage
+**Status:** accepted
+**Decision:** Event Alpha source coverage must distinguish runtime profile from
+artifact namespace and must persist source-coverage reports under the inspected
+namespace. A configured source provider with no provider-health observation is
+`unknown/not observed`, not healthy, and evidence absence from that pack is not
+meaningful unless a high-specificity healthy provider actually observed the
+source path. Artifact doctor may warn on missing source-coverage reports or
+unknown provider coverage and must block impossible contradictions where the
+same provider is both healthy and unobserved.
+**Why:** Live and no-send research-review runs can otherwise overstate source
+coverage and make missing evidence look like a reliable negative signal.
+Separating profile and namespace also prevents operator reports from inspecting
+the wrong artifact directory.
+**Revisit when:** Provider-health storage moves to a typed schema with explicit
+per-role observation records and source-pack coverage SLAs.
+
 ## 2026-06-30 - CryptoPanic and exchange evidence require asset-specific proof
 **Status:** accepted
 **Decision:** CryptoPanic rows may serve as stronger Event Alpha source-pack
