@@ -11,6 +11,8 @@ from .event_alpha_notification_sender import NotificationSendAttemptResult, safe
 
 log = logging.getLogger(__name__)
 
+TELEGRAM_SEND_TIMEOUT_SECONDS = 45
+
 
 def _truncate(text: str, limit: int) -> str:
     """Truncate on a line boundary so we never cut an HTML tag in half."""
@@ -103,7 +105,7 @@ def send_telegram_structured(
                 r = requests.post(
                     f"https://api.telegram.org/bot{token}/sendMessage",
                     json=payload,
-                    timeout=20,
+                    timeout=TELEGRAM_SEND_TIMEOUT_SECONDS,
                 )
                 r.raise_for_status()
                 delivered_chunks += 1

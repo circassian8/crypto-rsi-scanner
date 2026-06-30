@@ -22206,6 +22206,7 @@ def test_telegram_structured_send_tracks_recipients_chunks_and_bool_compat():
         assert "SECRET123" not in str(result.channel_summary)
         assert notifications.send_telegram("legacy bool", parse_mode="HTML") is True
         assert len(calls) >= 4
+        assert {call[2] for call in calls} == {notifications.TELEGRAM_SEND_TIMEOUT_SECONDS}
     finally:
         notifications.requests.post = orig_post
         config.TELEGRAM_BOT_TOKEN = orig_token

@@ -27,8 +27,11 @@ Telegram sender's chunking instead of truncating the digest body.
   digests and stopped emitting the local-inbox overflow footer.
 - Removed formatter-side truncation from exploratory and research-review
   Telegram digests so all selected lane items render in the outgoing message.
+- Raised the structured Telegram send timeout to 45 seconds so longer chunked
+  digest sends have more room to complete.
 - Added regressions proving core and exploratory digest bodies include all
-  selected items and do not hide candidates behind local-inbox overflow text.
+  selected items and do not hide candidates behind local-inbox overflow text,
+  plus a timeout assertion for the structured sender.
 **Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
 `python3 tests/test_indicators.py` (581/581 passed);
 `make verify PYTHON=python3`.
