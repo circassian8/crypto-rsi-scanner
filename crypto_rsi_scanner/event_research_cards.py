@@ -679,6 +679,15 @@ def _selected_entries(
                 continue
             ordered.append(_entry_from_core_opportunity(opportunity))
             seen_core.add(opportunity.core_opportunity_id)
+        for row in stored_core_rows:
+            core_id = str(row.get("core_opportunity_id") or "").strip()
+            if not core_id or core_id in seen_core:
+                continue
+            fallback = event_core_opportunities.aggregate_core_opportunities([row])
+            if not fallback:
+                continue
+            ordered.append(_entry_from_core_opportunity(fallback[0]))
+            seen_core.add(core_id)
         if ordered:
             return ordered
     states = set(selected_tiers or {

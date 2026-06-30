@@ -17,6 +17,28 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Reconcile deep rehearsal core-card coverage · Codex
+**Why:** The full Prompt 10 artifact audit found that the `notify_llm_deep`
+no-send rehearsal could write visible canonical CoreOpportunity rows that were
+hidden by aggregation and therefore never received research-card paths or
+feedback targets. Strict artifact doctor correctly blocked send-readiness.
+**Changes:**
+- Research-card selection now keeps the aggregation-first operator ordering, but
+  appends any store-backed core rows that aggregation omitted so the canonical
+  core store, card index, feedback targets, and artifact doctor stay
+  reconciled.
+- Added a regression proving an aggregated generic-support core row still gets a
+  card and can be linked back into `event_core_opportunities.jsonl`.
+**Verify:** `python3 tests/test_indicators.py` (577/577 passed);
+`make event-alpha-notify-llm-deep-real-no-send-rehearsal-fast PYTHON=python3`
+now writes 245 core rows/cards and strict doctor has no blockers;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3`
+reports `READY_FOR_NO_SEND_REHEARSAL_REVIEW: yes`.
+**Notes/risks:** Artifact/card consistency only. It does not change scoring,
+routes, notification sends, paper/live rows, normal RSI rows, or
+`TRIGGERED_FADE`.
+
 ## 2026-06-30 — Promote CryptoPanic and exchange evidence contracts · Codex
 **Why:** CryptoPanic token-tagged news and official exchange announcements are
 the highest-value source families for Event Alpha validation, but they need

@@ -32683,6 +32683,58 @@ def test_research_cards_use_canonical_core_store_groups():
         assert all(row.get("card_path") for row in linked_rows)
 
 
+def test_research_cards_backfill_aggregated_support_core_rows():
+    from crypto_rsi_scanner import event_alpha_router, event_core_opportunity_store, event_research_cards, event_watchlist
+
+    rows = _canonical_core_fixture_rows()
+    hidden_support = {
+        **rows[-1],
+        "hypothesis_id": "hyp-meme-generic-support",
+        "core_opportunity_id": "core_memecore_generic_support",
+        "impact_path_type": "generic_cooccurrence_only",
+        "primary_impact_path": "generic_cooccurrence_only",
+        "candidate_role": "generic_mention",
+        "opportunity_level": "local_only",
+        "opportunity_score_final": 0,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
+        "final_state_after_quality_gate": event_watchlist.EventWatchlistState.HYPOTHESIS.value,
+        "evidence_specificity": "insufficient_data",
+        "evidence_quality_score": 0,
+    }
+    rows.append(hidden_support)
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        store_path = root / "event_core_opportunities.jsonl"
+        event_core_opportunity_store.write_core_opportunities(
+            rows,
+            cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=store_path),
+            run_id="run-core-cards-hidden-support",
+            profile="market_refresh_smoke",
+            run_mode="burn_in",
+            artifact_namespace="market_refresh_smoke",
+        )
+        store_rows = event_core_opportunity_store.load_core_opportunities(store_path, latest_run=True).rows
+        result = event_research_cards.write_research_cards(
+            root / "cards",
+            watchlist_entries=[],
+            alert_rows=store_rows,
+            limit=50,
+        )
+        link_update = event_core_opportunity_store.update_core_opportunity_card_links(
+            store_path,
+            result.card_paths,
+            run_id="run-core-cards-hidden-support",
+        )
+        linked_rows = event_core_opportunity_store.load_core_opportunities(store_path, latest_run=True).rows
+        by_id = {row["core_opportunity_id"]: row for row in linked_rows}
+        assert link_update.success
+        assert by_id["core_memecore_generic_support"]["card_path"]
+        assert any(
+            event_research_cards.card_core_opportunity_id(path) == "core_memecore_generic_support"
+            for path in result.card_paths
+        )
+
+
 def test_research_card_primary_fields_use_canonical_core_row():
     from crypto_rsi_scanner import event_core_opportunity_store, event_research_cards
 
