@@ -1593,6 +1593,7 @@ def _event_alpha_notification_config_from_runtime(
         research_review_digest_include_local_only=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_INCLUDE_LOCAL_ONLY,
         research_review_digest_include_sector=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_INCLUDE_SECTOR,
         research_review_digest_send_with_alerts=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_SEND_WITH_ALERTS,
+        allow_source_only_narrative_digest=config.EVENT_ALPHA_ALLOW_SOURCE_ONLY_NARRATIVE_DIGEST,
         quality_mode=config.EVENT_ALPHA_NOTIFICATION_QUALITY_MODE,
     )
 
@@ -6294,6 +6295,7 @@ def event_alpha_notify_fixture_smoke(
         research_review_digest_include_local_only=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_INCLUDE_LOCAL_ONLY,
         research_review_digest_include_sector=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_INCLUDE_SECTOR,
         research_review_digest_send_with_alerts=config.EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_SEND_WITH_ALERTS,
+        allow_source_only_narrative_digest=config.EVENT_ALPHA_ALLOW_SOURCE_ONLY_NARRATIVE_DIGEST,
     )
     delivery_cfg = _event_alpha_notification_delivery_config_from_runtime(context)
 

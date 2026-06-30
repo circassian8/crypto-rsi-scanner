@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - CryptoPanic success reconciles stale backoff and narrative digest stays strict
+**Status:** accepted
+**Decision:** A successful same-day CryptoPanic Growth request is operational
+evidence that the provider is usable for the inspected namespace, even if an
+older profile-scoped provider-health row still says `provider_backoff`. Source
+coverage should report `observed_healthy` or `observed_partial_success`, keep a
+backoff-reconciled flag for audit, and avoid telling the operator to configure,
+restore, or verify the token after successful requests were observed. Live-style
+narrative source packs such as fan/sports, proxy/pre-IPO RWA, and political meme
+packs still need stronger daily-digest confirmation than a single source-only
+row: official/structured evidence, multiple accepted evidence rows, matching
+CryptoPanic tag evidence plus market confirmation, or an explicit operator opt-in
+via `RSI_EVENT_ALPHA_ALLOW_SOURCE_ONLY_NARRATIVE_DIGEST=1`.
+**Why:** The first successful Growth Weekly rehearsal proved CryptoPanic was
+working, but stale backoff diagnostics and source-only narrative digest rows made
+operator-facing artifacts look both broken and too permissive.
+**Revisit when:** Burn-in labels show that a specific single-source narrative
+class is useful enough to promote without market, official, structured, or
+multi-source confirmation.
+
 ## 2026-06-30 - CryptoPanic live diagnostics must be body-aware and redacted
 **Status:** accepted
 **Decision:** CryptoPanic live fetches must read response bodies while the HTTP

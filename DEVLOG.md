@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Finish CryptoPanic source-coverage consistency · Codex
+**Why:** The first successful Growth Weekly rehearsal proved CryptoPanic could
+return usable evidence, but the operator surfaces still mixed that success with
+stale provider-backoff language and source-only narrative rows could be promoted
+too loosely.
+**Changes:**
+- Reconciled successful CryptoPanic request-ledger rows with stale provider
+  health so both the top-level source-coverage summary and each source pack show
+  CryptoPanic as healthy/partial-success instead of degraded after a successful
+  request.
+- Preserved full accepted/rejected evidence arrays plus explicit provider and
+  reason-code counts in evidence-acquisition artifacts, with count-mismatch
+  doctor coverage.
+- Tightened notification digest gating for source-only narrative packs
+  (`fan_sports_pack`, `proxy_preipo_rwa_pack`, `political_meme_pack`) so single
+  token-tagged narrative evidence without market confirmation is kept in
+  research-review/local output unless explicitly enabled.
+- Deduped research-review candidates by canonical core opportunity, excluded
+  strict-lane cores, allowed live-confirmation-blocked daily candidates to show
+  as research-review, and hid sector-only core rows from the default core view.
+- Added artifact-doctor checks for unconfirmed narrative digest rows,
+  single-source/no-market fan-token digest rows, visible sector cores, duplicate
+  proxy cores, CryptoPanic stale-backoff recommendation drift, and
+  evidence-count mismatches.
+- Documented `RSI_EVENT_ALPHA_ALLOW_SOURCE_ONLY_NARRATIVE_DIGEST` and updated
+  `ROADMAP.md`, `DECISIONS.md`, and the Event Alpha runbook.
+**Verify:** `python3 tests/test_indicators.py` (589/589 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-signal-quality-eval PYTHON=python3` (36/36 passed);
+`make event-alpha-cryptopanic-preflight PYTHON=python3` (READY, token redacted);
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
+(WARN only, blockers none);
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The latest rehearsal stayed no-send guarded. GDELT timeouts and
+some RSS 403s remain expected fail-soft provider warnings; CryptoPanic itself is
+now shown as observed healthy when successful requests are present. No Telegram
+sends, trades, paper rows, normal RSI rows, or `TRIGGERED_FADE` creation were
+performed.
+
 ## 2026-06-30 — Harden CryptoPanic live diagnostics and research-review rendering · Codex
 **Why:** The live CryptoPanic path still needed body-aware failure diagnostics,
 clear source-coverage states, and artifact checks that could prove research-review

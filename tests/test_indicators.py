@@ -662,7 +662,9 @@ def test_event_provider_status_formats_burn_in_readiness_summary_and_pack_gaps()
 
 def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_gaps():
     import json
+    import tempfile
     from datetime import datetime, timezone
+    from pathlib import Path
     from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_cryptopanic, event_alpha_source_coverage
 
     cfg = _event_provider_status_cfg(
@@ -887,6 +889,94 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "unknown/not observed providers: gdelt, project_blog_rss" in unobserved_text
     assert "provider coverage status: unknown" in unobserved_text
 
+    with tempfile.TemporaryDirectory() as tmp:
+        ledger_path = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+        ledger_path.write_text(
+            json.dumps(
+                {
+                    "timestamp": "2026-06-15T12:00:00+00:00",
+                    "status_code": 200,
+                    "result_count": 1,
+                    "quota_counted": True,
+                    "currencies": "RUNE",
+                    "normalized_request_key": "cryptopanic:RUNE",
+                    "request_url_redacted": "https://cryptopanic.com/api/growth_weekly/v2/posts/?auth_token=<redacted>&currencies=RUNE",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        configured_report = event_provider_status.build_event_discovery_provider_status(
+            _event_provider_status_cfg(
+                EVENT_DISCOVERY_CRYPTOPANIC_LIVE=True,
+                EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN="SECRET_TOKEN_SHOULD_NOT_RENDER",
+            )
+        )
+        success_report = event_alpha_source_coverage.build_source_coverage_report(
+            provider_status_report=configured_report,
+            provider_health_rows={
+                "cryptopanic:catalyst_search": {
+                    "provider_key": "cryptopanic:catalyst_search",
+                    "provider_service": "cryptopanic",
+                    "provider_role": "catalyst_search",
+                    "disabled_until": "2999-01-01T00:00:00+00:00",
+                    "last_error_class": "HTTPError",
+                }
+            },
+            evidence_acquisition_rows=[
+                {
+                    "source_pack": "security_shock_pack",
+                    "status": "accepted_evidence_found",
+                    "accepted_evidence": [{
+                        "provider": "cryptopanic",
+                        "reason_codes": ("cryptopanic_currency_tag_match",),
+                    }],
+                }
+            ],
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep_cryptopanic_rehearsal",
+            cryptopanic_request_ledger_path=ledger_path,
+            now=datetime(2026, 6, 15, 13, tzinfo=timezone.utc),
+        )
+        success_text = event_alpha_source_coverage.format_source_coverage_report(success_report)
+        assert success_report.cryptopanic_health_status == "healthy"
+        assert success_report.cryptopanic_coverage_status == "observed_healthy"
+        assert success_report.cryptopanic_successful_requests == 1
+        assert success_report.cryptopanic_backoff_reconciled_after_success is True
+        assert success_report.cryptopanic_recommendation == "no action; accepted CryptoPanic evidence is available"
+        success_packs = {pack.source_pack: pack for pack in success_report.packs}
+        success_security = success_packs["security_shock_pack"]
+        assert "cryptopanic" in success_security.healthy_providers
+        assert "cryptopanic" not in success_security.degraded_or_backoff_providers
+        assert "cryptopanic:catalyst_search=healthy" in success_security.provider_role_statuses
+        assert "configure CryptoPanic token" not in success_text
+        assert "restore CryptoPanic token/news coverage" not in success_text
+        source_report_path = Path(tmp) / "event_alpha_source_coverage.md"
+        source_report_path.write_text(success_text, encoding="utf-8")
+        doctor_success = event_alpha_artifact_doctor.diagnose_artifacts(
+            evidence_acquisition_rows=[
+                {
+                    "source_pack": "security_shock_pack",
+                    "status": "accepted_evidence_found",
+                    "core_opportunity_id": "core:rune",
+                    "accepted_evidence_count": 1,
+                    "accepted_evidence": [{"provider": "cryptopanic"}],
+                    "rejected_evidence_count": 0,
+                    "rejected_evidence": [],
+                }
+            ],
+            core_opportunity_rows=[],
+            card_paths=[],
+            source_coverage_report_path=source_report_path,
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep_cryptopanic_rehearsal",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert doctor_success.cryptopanic_success_with_backoff_status == 0
+        assert doctor_success.cryptopanic_restore_token_recommendation_when_configured == 0
+        assert doctor_success.evidence_count_mismatch == 0
+
     configured_cfg = _event_provider_status_cfg(
         EVENT_DISCOVERY_CRYPTOPANIC_LIVE=True,
         EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN="SECRET_TOKEN_SHOULD_NOT_RENDER",
@@ -925,8 +1015,8 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
         parse_text = event_alpha_source_coverage.format_source_coverage_report(parse_report)
         assert parse_report.cryptopanic_configured is True
         assert parse_report.cryptopanic_observed is True
-        assert parse_report.cryptopanic_coverage_status == "configured_but_parse_error"
-        assert "coverage status: configured_but_parse_error" in parse_text
+        assert parse_report.cryptopanic_coverage_status == "observed_parse_error"
+        assert "coverage status: observed_parse_error" in parse_text
         assert "inspect cryptopanic_request_ledger.jsonl body excerpt" in parse_text
         assert "configure CryptoPanic token/news coverage" not in parse_text
 
@@ -954,7 +1044,7 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
 
         parse_report_path = Path(tmp) / "event_alpha_source_coverage.md"
         parse_report_path.write_text(
-            "CryptoPanic:\n- configured: true\n- observed this run: true\n- coverage status: configured_but_parse_error\n",
+            "CryptoPanic:\n- configured: true\n- observed this run: true\n- coverage status: observed_parse_error\n",
             encoding="utf-8",
         )
         (Path(tmp) / "cryptopanic_request_ledger.jsonl").write_text(
@@ -13712,6 +13802,11 @@ def test_event_alpha_live_daily_digest_requires_confirmation_and_dedupes_family(
         event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
         event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
     )
+    single_source_fan = _notify_route_decision(
+        "FAN",
+        event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+        event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+    )
     core_rows = [
         {
             "core_opportunity_id": "core-chz",
@@ -13720,12 +13815,36 @@ def test_event_alpha_live_daily_digest_requires_confirmation_and_dedupes_family(
             "coin_id": "chiliz",
             "incident_id": "world-cup",
             "impact_path_type": "fan_sports",
+            "source_pack": "fan_sports_pack",
             "final_route_after_quality_gate": "RESEARCH_DIGEST",
             "final_opportunity_level": "validated_digest",
             "evidence_acquisition_status": "accepted_evidence_found",
             "accepted_evidence_count": 1,
+            "accepted_provider_counts": {"cryptopanic": 1},
             "accepted_reason_codes": ["cryptopanic_currency_tag_match"],
             "source_class": "cryptopanic_tagged",
+            "market_confirmation_level": "moderate",
+            "market_context_freshness_status": "fresh",
+        },
+        {
+            "core_opportunity_id": "core-fan",
+            "source_alert_ids": [single_source_fan.alert_id],
+            "symbol": "FAN",
+            "coin_id": "fan-token",
+            "incident_id": "world-cup-single-source",
+            "impact_path_type": "fan_sports",
+            "source_pack": "fan_sports_pack",
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "final_opportunity_level": "validated_digest",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 82,
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "accepted_evidence_count": 1,
+            "accepted_provider_counts": {"cryptopanic": 1},
+            "accepted_reason_codes": ["cryptopanic_currency_tag_match"],
+            "source_class": "cryptopanic_tagged",
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
         },
         {
             "core_opportunity_id": "core-syn",
@@ -13754,7 +13873,7 @@ def test_event_alpha_live_daily_digest_requires_confirmation_and_dedupes_family(
     )
 
     plan = notif.build_notification_plan(
-        [confirmed, duplicate, weak],
+        [confirmed, duplicate, weak, single_source_fan],
         storage=FakeStorage(),
         cfg=cfg,
         now=datetime(2026, 6, 20, 12, tzinfo=timezone.utc),
@@ -13765,6 +13884,141 @@ def test_event_alpha_live_daily_digest_requires_confirmation_and_dedupes_family(
     assert len(daily) == 1
     assert daily[0].entry.symbol == "CHZ"
     assert all(item.entry.symbol != "SYN" for item in daily)
+    assert any(getattr(item, "decision", item).entry.symbol == "FAN" for item in plan.research_review_items)
+    assert all(item.entry.symbol != "FAN" for item in daily)
+
+
+def test_event_alpha_doctor_flags_unconfirmed_narrative_digest_and_core_visibility():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor,
+        event_alpha_notification_delivery as delivery,
+        event_core_opportunities,
+    )
+
+    fan_core = {
+        "row_type": "event_core_opportunity",
+        "core_opportunity_id": "core-fan",
+        "profile": "notify_llm_deep",
+        "artifact_namespace": "notify_llm_deep",
+        "run_mode": "notification_burn_in",
+        "symbol": "FAN",
+        "coin_id": "fan-token",
+        "incident_id": "world-cup-single-source",
+        "candidate_role": "proxy_instrument",
+        "impact_path_type": "fan_sports",
+        "source_pack": "fan_sports_pack",
+        "final_route_after_quality_gate": "RESEARCH_DIGEST",
+        "opportunity_level": "validated_digest",
+        "accepted_evidence_count": 1,
+        "accepted_provider_counts": {"cryptopanic": 1},
+        "accepted_reason_codes": ("cryptopanic_currency_tag_match",),
+        "market_confirmation_level": "none",
+        "market_context_freshness_status": "missing",
+    }
+    row = delivery.build_record(
+        run_id="run-fan",
+        alert_id="core-fan",
+        profile="notify_llm_deep",
+        namespace="notify_llm_deep",
+        lane="daily_digest",
+        route="RESEARCH_DIGEST",
+        content_hash="hash-fan",
+        core_opportunity_id="core-fan",
+        core_opportunity_ids=("core-fan",),
+        canonical_symbol="FAN",
+        canonical_coin_id="fan-token",
+        feedback_target="core-fan",
+        canonical_card_path="cards/fan.md",
+        state=delivery.STATE_BLOCKED,
+        delivery_state=delivery.STATE_BLOCKED,
+        delivery_mode="no_send_preview",
+        status_detail="would_send_but_guard_disabled",
+        now=datetime(2026, 6, 20, 12, tzinfo=timezone.utc),
+    ).to_row()
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        core_opportunity_rows=[fan_core],
+        evidence_acquisition_rows=[
+            {
+                "core_opportunity_id": "core-fan",
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "accepted_evidence_count": 2,
+                "accepted_evidence": [{"provider": "cryptopanic"}],
+                "rejected_evidence_count": 0,
+                "rejected_evidence": [],
+            }
+        ],
+        delivery_rows=[row],
+        run_rows=[{
+            "run_id": "run-fan",
+            "profile": "notify_llm_deep",
+            "artifact_namespace": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+        }],
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep",
+        strict=False,
+    )
+    assert doctor.unconfirmed_narrative_daily_digest == 1
+    assert doctor.single_source_no_market_fan_token_digest == 1
+    assert doctor.evidence_count_mismatch == 1
+
+    velvet_base = {
+        "incident_id": "incident:spacex",
+        "profile": "notify_llm_deep",
+        "artifact_namespace": "notify_llm_deep",
+        "run_mode": "notification_burn_in",
+        "external_asset": "SpaceX",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "candidate_role": "proxy_venue",
+        "impact_path_type": "venue_value_capture",
+        "source_pack": "proxy_preipo_rwa_pack",
+        "final_route_after_quality_gate": "HIGH_PRIORITY_RESEARCH",
+        "opportunity_level": "high_priority",
+        "opportunity_score_final": 92,
+    }
+    cores = event_core_opportunities.visible_core_opportunities([
+        {**velvet_base, "main_frame_type": "tokenized_stock_venue", "hypothesis_id": "hyp:velvet:venue"},
+        {**velvet_base, "main_frame_type": "rwa_preipo_proxy", "hypothesis_id": "hyp:velvet:rwa"},
+        {
+            "incident_id": "incident:sports-sector",
+            "symbol": "SECTOR",
+            "coin_id": "sector:sports_fan_proxy",
+            "candidate_role": "sector_context",
+            "impact_path_type": "fan_sports",
+            "source_pack": "fan_sports_pack",
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "opportunity_level": "validated_digest",
+            "opportunity_score_final": 77,
+        },
+    ])
+    assert [item.symbol for item in cores] == ["VELVET"]
+    assert len(cores[0].supporting_rows) == 2
+
+    sector_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        core_opportunity_rows=[
+            {
+                "core_opportunity_id": "sector-core",
+                "profile": "notify_llm_deep",
+                "artifact_namespace": "notify_llm_deep",
+                "run_mode": "notification_burn_in",
+                "symbol": "SECTOR",
+                "coin_id": "sector:sports_fan_proxy",
+                "final_route_after_quality_gate": "RESEARCH_DIGEST",
+                "opportunity_level": "validated_digest",
+            },
+            {**velvet_base, "core_opportunity_id": "velvet-a"},
+            {**velvet_base, "core_opportunity_id": "velvet-b"},
+        ],
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep",
+        strict=False,
+    )
+    assert sector_doctor.visible_sector_core_without_config == 1
+    assert sector_doctor.duplicate_proxy_core_rows == 1
 
 
 def test_event_alpha_notification_blocks_rejected_only_core_digest():

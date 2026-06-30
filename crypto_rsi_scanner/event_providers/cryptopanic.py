@@ -79,6 +79,9 @@ class CryptoPanicUsageSummary:
     today_requests: int
     remaining_weekly: int | None
     remaining_daily_soft: int | None
+    successful_requests: int = 0
+    failed_requests: int = 0
+    partial_success: bool = False
     last_request_at: datetime | None = None
     last_status_code: int | None = None
     last_error_class: str | None = None
@@ -566,6 +569,8 @@ def cryptopanic_usage_summary(
     day_key = observed.date()
     rolling = 0
     today = 0
+    successful = 0
+    failed = 0
     last_request_at: datetime | None = None
     last_status_code: int | None = None
     last_error_class: str | None = None
@@ -579,6 +584,12 @@ def cryptopanic_usage_summary(
             rolling += 1
         if ts.date() == day_key:
             today += 1
+            error_class = str(row.get("error_class") or "").strip()
+            status_code = _int_or_none(row.get("status_code"))
+            if not error_class and status_code is not None and 200 <= status_code < 400:
+                successful += 1
+            elif error_class or (status_code is not None and status_code >= 400):
+                failed += 1
         if last_request_at is None or ts > last_request_at:
             last_request_at = ts
             try:
@@ -592,6 +603,9 @@ def cryptopanic_usage_summary(
         daily_soft_limit=int(daily_soft_limit),
         rolling_7d_requests=rolling,
         today_requests=today,
+        successful_requests=successful,
+        failed_requests=failed,
+        partial_success=bool(successful and failed),
         remaining_weekly=max(0, int(weekly_limit) - rolling) if weekly_limit > 0 else None,
         remaining_daily_soft=max(0, int(daily_soft_limit) - today) if daily_soft_limit > 0 else None,
         last_request_at=last_request_at,
@@ -818,6 +832,13 @@ def _read_ledger_rows(path: Path | None) -> tuple[Mapping[str, Any], ...]:
     except (OSError, json.JSONDecodeError):
         return tuple(rows)
     return tuple(rows)
+
+
+def _int_or_none(value: object) -> int | None:
+    try:
+        return int(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_datetime(value: object) -> datetime | None:

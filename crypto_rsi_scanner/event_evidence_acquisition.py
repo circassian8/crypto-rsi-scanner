@@ -501,10 +501,15 @@ def format_acquisition_report(rows: Iterable[Mapping[str, Any]]) -> str:
     lines.append("statuses: " + _counts_line(status_counts))
     lines.append("source_packs: " + _counts_line(pack_counts))
     for row in data[:12]:
+        rejected_display = (
+            row.get("rejected_evidence_count")
+            if row.get("rejected_evidence_count") is not None
+            else len(row.get("rejected_evidence") or row.get("rejected_evidence_samples") or ())
+        )
         lines.append(
             f"- {row.get('symbol') or row.get('coin_id') or 'UNKNOWN'} "
             f"pack={row.get('source_pack') or 'unknown'} status={row.get('status') or 'unknown'} "
-            f"accepted={len(row.get('accepted_evidence') or ())} rejected={len(row.get('rejected_evidence_samples') or ())} "
+            f"accepted={len(row.get('accepted_evidence') or ())} rejected={rejected_display} "
             f"score={row.get('opportunity_score_before')}->{row.get('opportunity_score_after')} "
             f"evidence={row.get('acquisition_evidence_status') or 'unknown'} "
             f"final={row.get('final_upgrade_status') or row.get('acquisition_upgrade_status') or 'unchanged'} "
@@ -1091,6 +1096,11 @@ def _artifact_row(
     observed_at: str,
 ) -> dict[str, Any]:
     query_metadata = tuple(query.to_metadata() for query in result.query_results)
+    accepted_evidence = tuple(dict(item) for item in result.accepted_evidence)
+    rejected_evidence = tuple(dict(item) for item in result.rejected_evidence)
+    accepted_provider_counts = _provider_counts(result.accepted_evidence)
+    rejected_provider_counts = _provider_counts(result.rejected_evidence)
+    accepted_reason_code_counts = _reason_code_counts(result.accepted_evidence)
     query_execution_statuses = tuple(dict.fromkeys(
         str(query.get("status") or "")
         for query in query_metadata
@@ -1161,8 +1171,16 @@ def _artifact_row(
         "queries_executed": result.queries_executed,
         "providers_used": result.providers_used,
         "provider_failures": result.provider_failures,
-        "accepted_evidence": tuple(dict(item) for item in result.accepted_evidence[:5]),
-        "rejected_evidence_samples": tuple(dict(item) for item in result.rejected_evidence[:5]),
+        "accepted_evidence": accepted_evidence,
+        "rejected_evidence": rejected_evidence,
+        "rejected_evidence_samples": rejected_evidence[:5],
+        "accepted_evidence_count": len(result.accepted_evidence),
+        "rejected_evidence_count": len(result.rejected_evidence),
+        "accepted_provider_counts": accepted_provider_counts,
+        "rejected_provider_counts": rejected_provider_counts,
+        "accepted_reason_code_counts": accepted_reason_code_counts,
+        "evidence_acquisition_accepted_count": len(result.accepted_evidence),
+        "evidence_acquisition_rejected_count": len(result.rejected_evidence),
         "acquisition_evidence_status": result.acquisition_evidence_status,
         "evidence_quality_before": result.evidence_quality_before,
         "evidence_quality_after": result.evidence_quality_after,
@@ -1197,6 +1215,30 @@ def _artifact_row(
         "no_upgrade_reason": result.no_upgrade_reason,
         "warnings": result.warnings,
     }
+
+
+def _provider_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        provider = str(
+            row.get("provider")
+            or row.get("provider_used")
+            or row.get("provider_hint")
+            or row.get("source_provider")
+            or "unknown"
+        ).strip() or "unknown"
+        counts[provider] = counts.get(provider, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _reason_code_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        for code in row.get("reason_codes") or ():
+            text = str(code or "").strip()
+            if text:
+                counts[text] = counts.get(text, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _apply_final_verdict_metadata(components: dict[str, Any], result: EvidenceAcquisitionResult) -> None:

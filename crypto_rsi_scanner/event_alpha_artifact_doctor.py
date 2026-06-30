@@ -93,6 +93,13 @@ class EventAlphaArtifactDoctorResult:
     cryptopanic_body_excerpt_unredacted_token: int = 0
     cryptopanic_quota_exceeded: int = 0
     cryptopanic_request_ledger_missing_when_used: int = 0
+    cryptopanic_success_with_backoff_status: int = 0
+    cryptopanic_restore_token_recommendation_when_configured: int = 0
+    evidence_count_mismatch: int = 0
+    unconfirmed_narrative_daily_digest: int = 0
+    single_source_no_market_fan_token_digest: int = 0
+    visible_sector_core_without_config: int = 0
+    duplicate_proxy_core_rows: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -427,6 +434,7 @@ def diagnose_artifacts(
         warnings.append("LLM budget rows missing for LLM profile")
     card_file_paths = [Path(path) for path in card_paths]
     research_card_paths = [path for path in card_file_paths if path.name != "index.md"]
+    daily_brief_card_names = _daily_brief_card_names(daily_brief_path)
     card_count = len(research_card_paths)
     index_present = any(path.name == "index.md" for path in card_file_paths)
     cards_missing_lineage = sum(1 for path in research_card_paths if not event_research_cards.card_has_current_lineage(path))
@@ -487,7 +495,8 @@ def diagnose_artifacts(
     card_group_mismatches = sum(
         1
         for path in research_card_paths
-        if path in card_group_map
+        if (not daily_brief_card_names or path.name in daily_brief_card_names)
+        and path in card_group_map
         and _expected_card_group_for_store_core(
             visible_core_by_id.get(str(event_research_cards.card_core_opportunity_id(path) or ""))
         ) not in {None, card_group_map[path]}
@@ -549,6 +558,9 @@ def diagnose_artifacts(
         research_card_paths=research_card_paths,
         source_coverage_report_path=source_coverage_report_path,
     )
+    evidence_count_mismatches = _evidence_count_mismatches(acquisition_rows)
+    visible_sector_cores = _visible_sector_core_without_config(core_rows)
+    duplicate_proxy_cores = _duplicate_proxy_core_rows(core_rows)
     daily_brief_conflicts = _daily_brief_consistency_conflicts(
         daily_brief_path,
         runs=runs,
@@ -816,6 +828,22 @@ def diagnose_artifacts(
             f"{cryptopanic_conflicts['cryptopanic_request_ledger_missing_when_used']}"
         )
         (blockers if strict else warnings).append(message)
+    for key in (
+        "cryptopanic_success_with_backoff_status",
+        "cryptopanic_restore_token_recommendation_when_configured",
+    ):
+        if cryptopanic_conflicts[key]:
+            message = f"{key}={cryptopanic_conflicts[key]}"
+            (blockers if strict else warnings).append(message)
+    if evidence_count_mismatches:
+        message = f"evidence_count_mismatch={evidence_count_mismatches}"
+        (blockers if strict else warnings).append(message)
+    if visible_sector_cores:
+        message = f"visible_sector_core_without_config={visible_sector_cores}"
+        (blockers if strict else warnings).append(message)
+    if duplicate_proxy_cores:
+        message = f"duplicate_proxy_core_rows={duplicate_proxy_cores}"
+        (blockers if strict else warnings).append(message)
     if visible_missing_targets:
         message = f"visible_core_opportunities_missing_feedback_targets={visible_missing_targets}"
         (blockers if strict and fresh_visible_missing_targets else warnings).append(message)
@@ -946,6 +974,13 @@ def diagnose_artifacts(
             f"{delivery_conflicts['strategic_broad_asset_digest_without_confirmation']}"
         )
         (blockers if strict else warnings).append(message)
+    for key in (
+        "unconfirmed_narrative_daily_digest",
+        "single_source_no_market_fan_token_digest",
+    ):
+        if delivery_conflicts[key]:
+            message = f"{key}={delivery_conflicts[key]}"
+            (blockers if strict else warnings).append(message)
     if delivery_conflicts["telegram_message_contains_absolute_path"]:
         message = (
             "telegram_message_contains_absolute_path="
@@ -1299,6 +1334,15 @@ def diagnose_artifacts(
         cryptopanic_body_excerpt_unredacted_token=cryptopanic_conflicts["cryptopanic_body_excerpt_unredacted_token"],
         cryptopanic_quota_exceeded=cryptopanic_conflicts["cryptopanic_quota_exceeded"],
         cryptopanic_request_ledger_missing_when_used=cryptopanic_conflicts["cryptopanic_request_ledger_missing_when_used"],
+        cryptopanic_success_with_backoff_status=cryptopanic_conflicts["cryptopanic_success_with_backoff_status"],
+        cryptopanic_restore_token_recommendation_when_configured=cryptopanic_conflicts[
+            "cryptopanic_restore_token_recommendation_when_configured"
+        ],
+        evidence_count_mismatch=evidence_count_mismatches,
+        unconfirmed_narrative_daily_digest=delivery_conflicts["unconfirmed_narrative_daily_digest"],
+        single_source_no_market_fan_token_digest=delivery_conflicts["single_source_no_market_fan_token_digest"],
+        visible_sector_core_without_config=visible_sector_cores,
+        duplicate_proxy_core_rows=duplicate_proxy_cores,
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -1519,8 +1563,6 @@ def _expected_card_group_for_store_core(
 ) -> str | None:
     if opportunity is None:
         return None
-    if event_core_opportunities.core_opportunity_visibility_group(opportunity) is None:
-        return "Diagnostic / Source-Noise / Control Cards"
     if opportunity.is_high_priority or opportunity.is_watchlist or opportunity.is_validated_digest or opportunity.alertable:
         return "Core Opportunity Cards"
     if (
@@ -1531,8 +1573,12 @@ def _expected_card_group_for_store_core(
         or opportunity.quality_capped_supporting_rows > 0
     ):
         return "Local-Only / Quality-Capped Cards"
+    if str(opportunity.opportunity_level or "").casefold() == "local_only":
+        return "Local-Only / Quality-Capped Cards"
     if str(opportunity.opportunity_level or "").casefold() == "exploratory" or opportunity.opportunity_score_final >= 50:
         return "Near-Miss Cards"
+    if event_core_opportunities.core_opportunity_visibility_group(opportunity) is None:
+        return "Diagnostic / Source-Noise / Control Cards"
     return "Local-Only / Quality-Capped Cards"
 
 
@@ -2138,6 +2184,8 @@ def _cryptopanic_artifact_conflicts(
         "cryptopanic_body_excerpt_unredacted_token": 0,
         "cryptopanic_quota_exceeded": 0,
         "cryptopanic_request_ledger_missing_when_used": 0,
+        "cryptopanic_success_with_backoff_status": 0,
+        "cryptopanic_restore_token_recommendation_when_configured": 0,
     }
     source_text = ""
     if source_coverage_report_path is not None and Path(source_coverage_report_path).exists():
@@ -2223,26 +2271,147 @@ def _cryptopanic_artifact_conflicts(
     ]
     out["cryptopanic_duplicate_request_key"] = max(0, len(request_keys) - len(set(request_keys)))
     attempted_rows = [row for row in ledger_rows if row.get("quota_counted") is not False]
+    successful_rows = [
+        row
+        for row in attempted_rows
+        if not str(row.get("error_class") or "").strip()
+        and ((_int_or_none(row.get("status_code"), 0) or 0) in range(200, 400))
+    ]
     if attempted_rows:
         successes = sum(1 for row in attempted_rows if int(row.get("result_count") or 0) > 0 and not str(row.get("error_class") or ""))
         failures = sum(1 for row in attempted_rows if str(row.get("error_class") or "") or _int_or_none(row.get("status_code"), 0) >= 400)
         if failures and successes == 0 and failures == len(attempted_rows):
             out["cryptopanic_all_requests_failed"] = 1
     unusable_markers = (
-        "coverage status: configured_but_parse_error",
-        "coverage status: configured_but_rate_limited",
-        "coverage status: configured_but_auth_failed",
-        "coverage status: configured_but_backoff",
+        "coverage status: observed_parse_error",
+        "coverage status: observed_rate_limited",
+        "coverage status: observed_backoff_without_success",
         "coverage status: quota_exhausted",
     )
     if any(marker in source_text for marker in unusable_markers):
         out["cryptopanic_configured_but_unusable"] = 1
+    if successful_rows and (
+        "health status: backoff" in source_text
+        or "coverage status: observed_backoff_without_success" in source_text
+        or "coverage status: configured_but_backoff" in source_text
+    ):
+        out["cryptopanic_success_with_backoff_status"] = 1
+    if successful_rows and (
+        "configure CryptoPanic token" in source_text
+        or "restore CryptoPanic token" in source_text
+        or "verify the CryptoPanic token" in source_text
+    ):
+        out["cryptopanic_restore_token_recommendation_when_configured"] = 1
     if sum(1 for _ in ledger_rows) > 600:
         out["cryptopanic_quota_exceeded"] = 1
     combined_text = source_text + "\n" + "\n".join(_read_card_text(path) for path in research_card_paths)
     if _contains_unredacted_cryptopanic_secret(combined_text):
         out["cryptopanic_token_printed_or_unredacted"] = 1
     return out
+
+
+def _evidence_count_mismatches(rows: Iterable[Mapping[str, Any]]) -> int:
+    mismatches = 0
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        for count_key, list_key in (
+            ("accepted_evidence_count", "accepted_evidence"),
+            ("rejected_evidence_count", "rejected_evidence"),
+        ):
+            if count_key not in row:
+                continue
+            declared = _int_or_none(row.get(count_key))
+            if declared is None:
+                mismatches += 1
+                continue
+            if list_key not in row:
+                # Legacy acquisition rows persisted only sample arrays; those are
+                # intentionally incomplete and should remain readable.
+                continue
+            observed = len(_mapping_items(row.get(list_key)))
+            if declared != observed:
+                mismatches += 1
+        legacy_accepted = _int_or_none(row.get("evidence_acquisition_accepted_count"))
+        accepted = _int_or_none(row.get("accepted_evidence_count"))
+        if legacy_accepted is not None and accepted is not None and legacy_accepted != accepted:
+            mismatches += 1
+        legacy_rejected = _int_or_none(row.get("evidence_acquisition_rejected_count"))
+        rejected = _int_or_none(row.get("rejected_evidence_count"))
+        if legacy_rejected is not None and rejected is not None and legacy_rejected != rejected:
+            mismatches += 1
+    return mismatches
+
+
+def _daily_brief_card_names(path: str | Path | None) -> set[str]:
+    if path is None:
+        return set()
+    brief_path = Path(path)
+    if not brief_path.exists():
+        return set()
+    try:
+        text = brief_path.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    return {
+        match.group(1)
+        for match in re.finditer(r"\[(card_[^\]\s]+?\.md)\]", text)
+    }
+
+
+def _visible_sector_core_without_config(rows: Iterable[Mapping[str, Any]]) -> int:
+    count = 0
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        symbol = str(row.get("symbol") or row.get("validated_symbol") or "").strip().upper()
+        coin_id = str(row.get("coin_id") or row.get("validated_coin_id") or "").strip().casefold()
+        if symbol != "SECTOR" and not coin_id.startswith("sector"):
+            continue
+        route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").strip()
+        level = str(row.get("opportunity_level") or row.get("final_opportunity_level") or "").strip()
+        visible = event_alpha_router.route_value_is_alertable(route) or level in {
+            "validated_digest",
+            "watchlist",
+            "high_priority",
+        }
+        allowed = str(row.get("sector_review_enabled") or row.get("allow_sector_digest") or "").strip().casefold() in {
+            "1",
+            "true",
+            "yes",
+        }
+        if visible and not allowed:
+            count += 1
+    return count
+
+
+def _duplicate_proxy_core_rows(rows: Iterable[Mapping[str, Any]]) -> int:
+    groups: dict[tuple[str, str, str, str], int] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        if event_core_opportunities.row_is_diagnostic(row):
+            continue
+        impact = str(row.get("impact_path_type") or row.get("primary_impact_path") or row.get("impact_path_reason") or "").casefold()
+        source_pack = str(row.get("source_pack") or "").casefold()
+        if not any(token in f"{impact} {source_pack}" for token in ("proxy", "preipo", "pre_ipo", "rwa", "venue")):
+            continue
+        symbol = str(row.get("symbol") or row.get("validated_symbol") or "").strip().upper()
+        coin_id = str(row.get("coin_id") or row.get("validated_coin_id") or "").strip().casefold() or symbol
+        if symbol == "SECTOR" or coin_id.startswith("sector"):
+            continue
+        incident = str(
+            row.get("incident_id")
+            or row.get("canonical_incident_name")
+            or row.get("external_asset")
+            or row.get("event_cluster_id")
+            or ""
+        ).strip().casefold()
+        role = str(row.get("candidate_role") or row.get("relationship_type") or "").strip().casefold()
+        family = "proxy_value_capture"
+        key = (incident, coin_id, role or "proxy", family)
+        groups[key] = groups.get(key, 0) + 1
+    return sum(max(0, count - 1) for count in groups.values())
 
 
 def _row_mentions_cryptopanic(row: Mapping[str, Any]) -> bool:
@@ -2488,6 +2657,8 @@ def _notification_delivery_conflicts(
         "digest_item_without_live_confirmation": 0,
         "digest_item_rejected_results_only": 0,
         "strategic_broad_asset_digest_without_confirmation": 0,
+        "unconfirmed_narrative_daily_digest": 0,
+        "single_source_no_market_fan_token_digest": 0,
         "multi_item_delivery_missing_arrays": 0,
         "notification_preview_missing": 0,
         "notification_preview_relpath_missing": 0,
@@ -2601,6 +2772,10 @@ def _notification_delivery_conflicts(
             for delivery_core in cores:
                 if _delivery_core_lacks_live_confirmation(delivery_core):
                     out["digest_item_without_live_confirmation"] += 1
+                if lane == "daily_digest" and _delivery_core_is_unconfirmed_narrative(delivery_core):
+                    out["unconfirmed_narrative_daily_digest"] += 1
+                    if _delivery_core_is_single_source_no_market_fan_token(delivery_core):
+                        out["single_source_no_market_fan_token_digest"] += 1
                 if str(delivery_core.get("evidence_acquisition_status") or "") == "rejected_results_only":
                     out["digest_item_rejected_results_only"] += 1
                 if _delivery_core_is_strategic_broad_asset_context(delivery_core):
@@ -2912,6 +3087,72 @@ def _delivery_core_lacks_live_confirmation(core: Mapping[str, Any]) -> bool:
         "skipped_config",
         "not_configured",
     } or confirmation in {"", "does_not_confirm", "unresolved", "coverage_gap"}
+
+
+def _delivery_core_is_unconfirmed_narrative(core: Mapping[str, Any]) -> bool:
+    source_pack = str(core.get("source_pack") or "").strip().casefold()
+    if source_pack not in {"fan_sports_pack", "proxy_preipo_rwa_pack", "political_meme_pack"}:
+        return False
+    if not event_alpha_router.route_value_is_alertable(core.get("final_route_after_quality_gate") or core.get("route")):
+        return False
+    return _delivery_core_lacks_narrative_digest_confirmation(core)
+
+
+def _delivery_core_is_single_source_no_market_fan_token(core: Mapping[str, Any]) -> bool:
+    source_pack = str(core.get("source_pack") or "").strip().casefold()
+    if source_pack != "fan_sports_pack":
+        return False
+    accepted = max(
+        _as_int(core.get("accepted_evidence_count")),
+        _as_int(core.get("evidence_acquisition_accepted_count")),
+        _as_int(core.get("accepted_count")),
+    )
+    provider_counts = _mapping_counts(core.get("accepted_provider_counts"))
+    market = str(core.get("market_confirmation_level") or "").strip().casefold()
+    freshness = str(core.get("market_context_freshness_status") or "").strip().casefold()
+    no_market = market in {"", "none", "missing", "unknown", "insufficient_data"} or freshness in {"missing", "stale", "unknown"}
+    return accepted <= 1 and provider_counts.get("cryptopanic", 0) >= 1 and no_market
+
+
+def _delivery_core_lacks_narrative_digest_confirmation(core: Mapping[str, Any]) -> bool:
+    accepted = max(
+        _as_int(core.get("accepted_evidence_count")),
+        _as_int(core.get("evidence_acquisition_accepted_count")),
+        _as_int(core.get("accepted_count")),
+    )
+    source_class = str(core.get("source_class") or "").strip().casefold()
+    official_or_structured = source_class in {
+        "official_project",
+        "official_exchange",
+        "structured_calendar",
+        "structured_unlock",
+        "exchange_announcement",
+    }
+    market = str(core.get("market_confirmation_level") or "").strip().casefold()
+    freshness = str(core.get("market_context_freshness_status") or "").strip().casefold()
+    market_ok = market in {"moderate", "strong", "confirmed", "fresh"} and freshness not in {"missing", "stale", "unknown"}
+    provider_counts = _mapping_counts(core.get("accepted_provider_counts"))
+    reason_codes = " ".join(str(value) for value in _tuple_value(core.get("accepted_reason_codes")))
+    reason_codes += " " + " ".join(str(value) for value in _mapping_counts(core.get("accepted_reason_code_counts")))
+    cryptopanic_confirmed = provider_counts.get("cryptopanic", 0) > 0 and "cryptopanic_currency_tag_match" in reason_codes.casefold()
+    if official_or_structured or accepted >= 2:
+        return False
+    if cryptopanic_confirmed and market_ok:
+        return False
+    return True
+
+
+def _mapping_counts(value: object) -> dict[str, int]:
+    if not isinstance(value, Mapping):
+        return {}
+    out: dict[str, int] = {}
+    for key, raw in value.items():
+        try:
+            count = int(raw or 0)
+        except (TypeError, ValueError):
+            continue
+        out[str(key).strip().casefold()] = max(0, count)
+    return out
 
 
 def _delivery_core_is_strategic_broad_asset_context(core: Mapping[str, Any]) -> bool:
@@ -3504,7 +3745,13 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"cryptopanic_status_code_missing_on_http_failure={result.cryptopanic_status_code_missing_on_http_failure} "
             f"cryptopanic_body_excerpt_unredacted_token={result.cryptopanic_body_excerpt_unredacted_token} "
             f"cryptopanic_quota_exceeded={result.cryptopanic_quota_exceeded} "
-            f"cryptopanic_request_ledger_missing_when_used={result.cryptopanic_request_ledger_missing_when_used}"
+            f"cryptopanic_request_ledger_missing_when_used={result.cryptopanic_request_ledger_missing_when_used} "
+            f"cryptopanic_success_with_backoff_status={result.cryptopanic_success_with_backoff_status} "
+            "cryptopanic_restore_token_recommendation_when_configured="
+            f"{result.cryptopanic_restore_token_recommendation_when_configured} "
+            f"evidence_count_mismatch={result.evidence_count_mismatch} "
+            f"visible_sector_core_without_config={result.visible_sector_core_without_config} "
+            f"duplicate_proxy_core_rows={result.duplicate_proxy_core_rows}"
         ),
         (
             "snapshot lineage: "
@@ -3539,6 +3786,9 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"digest_without_confirmation={result.digest_item_without_live_confirmation} "
             f"digest_rejected_only={result.digest_item_rejected_results_only} "
             f"strategic_broad_digest={result.strategic_broad_asset_digest_without_confirmation} "
+            f"unconfirmed_narrative_daily_digest={result.unconfirmed_narrative_daily_digest} "
+            "single_source_no_market_fan_token_digest="
+            f"{result.single_source_no_market_fan_token_digest} "
             f"preview_missing={result.notification_preview_missing} "
             f"preview_relpath_missing={result.notification_preview_relpath_missing} "
             f"preview_unresolvable={result.notification_preview_path_unresolvable} "

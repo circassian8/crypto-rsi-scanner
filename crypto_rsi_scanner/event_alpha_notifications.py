@@ -82,6 +82,7 @@ class EventAlphaNotificationConfig:
     research_review_digest_include_local_only: bool = False
     research_review_digest_include_sector: bool = False
     research_review_digest_send_with_alerts: bool = False
+    allow_source_only_narrative_digest: bool = False
     quality_mode: str = "validated_digest"
 
 
@@ -252,9 +253,22 @@ def build_notification_plan(
         len(by_lane.get(lane, ()))
         for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST)
     )
+    strict_core_ids = _strict_lane_core_ids(by_lane, core_index)
     if cfg.research_review_digest_enabled:
-        selected = select_research_review_candidates(all_decisions, cfg=cfg, now=observed)
-        selected = _with_unconfirmed_daily_review_items(selected, daily_unconfirmed, cfg=cfg)
+        selected = select_research_review_candidates(
+            all_decisions,
+            cfg=cfg,
+            now=observed,
+            excluded_core_ids=strict_core_ids,
+            core_row_by_alert_id=core_index,
+        )
+        selected = _with_unconfirmed_daily_review_items(
+            selected,
+            daily_unconfirmed,
+            cfg=cfg,
+            excluded_core_ids=strict_core_ids,
+            core_row_by_alert_id=core_index,
+        )
         if selected:
             if strict_due_count and not cfg.research_review_digest_send_with_alerts:
                 blocked[LANE_RESEARCH_REVIEW_DIGEST] = "strict alert lane has due candidates"
@@ -310,7 +324,7 @@ def _confirmed_daily_digest_decisions(
     live_strict = _daily_digest_requires_live_confirmation(cfg)
     for decision in decisions:
         core = _core_row_for_decision(decision, core_row_by_alert_id) or {}
-        if not live_strict or _daily_digest_has_confirmation(decision, core):
+        if not live_strict or _daily_digest_has_confirmation(decision, core, cfg=cfg):
             confirmed.append(decision)
         else:
             unconfirmed.append(decision)
@@ -332,7 +346,10 @@ def _daily_digest_requires_live_confirmation(cfg: EventAlphaNotificationConfig) 
 def _daily_digest_has_confirmation(
     decision: event_alpha_router.EventAlphaRouteDecision,
     core: Mapping[str, Any],
+    *,
+    cfg: EventAlphaNotificationConfig | None = None,
 ) -> bool:
+    cfg = cfg or EventAlphaNotificationConfig()
     entry = _decision_entry(decision)
     components = dict(getattr(entry, "latest_score_components", {}) or {})
     merged: dict[str, Any] = {**components, **dict(core)}
@@ -344,7 +361,11 @@ def _daily_digest_has_confirmation(
     acquisition_status = str(merged.get("evidence_acquisition_status") or "").strip()
     acquisition_confirmation = str(merged.get("acquisition_confirmation_status") or "").strip()
     source_class = str(merged.get("source_class") or merged.get("source_origin_class") or "").casefold()
-    reason_codes = " ".join(str(item) for item in _iter_values(merged.get("accepted_reason_codes") or merged.get("reason_codes")))
+    reason_values = (
+        *_iter_values(merged.get("accepted_reason_codes") or merged.get("reason_codes")),
+        *_iter_values(merged.get("accepted_reason_code_counts")),
+    )
+    reason_codes = " ".join(str(item) for item in reason_values)
     source_pack = str(merged.get("source_pack") or "").casefold()
     market_confirmation = str(
         merged.get("market_confirmation_level")
@@ -359,11 +380,37 @@ def _daily_digest_has_confirmation(
         or ""
     ).casefold()
     impact = str(merged.get("impact_path_type") or merged.get("effective_playbook_type") or "").casefold()
+    official_or_structured = source_class in {
+        "official_project",
+        "official_exchange",
+        "structured_calendar",
+        "structured_unlock",
+        "exchange_announcement",
+    }
+    provider_counts = _mapping_counts(merged.get("accepted_provider_counts"))
+    cryptopanic_accepted = provider_counts.get("cryptopanic", 0)
+    cryptopanic_tagged = "cryptopanic_currency_tag_match" in reason_codes.casefold()
+    fresh_market = _has_digest_market_confirmation(merged)
+    narrative_source_pack = source_pack in {
+        "fan_sports_pack",
+        "proxy_preipo_rwa_pack",
+        "political_meme_pack",
+    }
+    if narrative_source_pack:
+        if bool(getattr(cfg, "allow_source_only_narrative_digest", False)):
+            return (accepted > 0 and acquisition_status == "accepted_evidence_found") or acquisition_confirmation == "confirms"
+        if official_or_structured:
+            return True
+        if accepted >= 2:
+            return True
+        if cryptopanic_tagged and cryptopanic_accepted > 0 and fresh_market:
+            return True
+        return False
     if accepted > 0 and acquisition_status == "accepted_evidence_found":
         return True
     if acquisition_confirmation == "confirms":
         return True
-    if source_class in {"official_project", "official_exchange", "structured_calendar", "structured_unlock"}:
+    if official_or_structured:
         return True
     if "cryptopanic_currency_tag_match" in reason_codes.casefold() and source_class in {"cryptopanic_tagged", "crypto_news"}:
         return True
@@ -373,6 +420,38 @@ def _daily_digest_has_confirmation(
     fresh_context = market_freshness not in {"", "missing", "stale", "unknown"}
     generic = impact in {"", "insufficient_data", "generic_cooccurrence", "source_noise_control", "ambiguous_control"}
     return fresh_market and fresh_context and not generic
+
+
+def _has_digest_market_confirmation(row: Mapping[str, Any]) -> bool:
+    market = str(
+        row.get("market_confirmation_level")
+        or row.get("market_confirmation")
+        or row.get("market_reaction_confirmation")
+        or ""
+    ).casefold()
+    freshness = str(
+        row.get("market_context_freshness_status")
+        or row.get("core_market_freshness_status")
+        or row.get("market_freshness_status")
+        or ""
+    ).casefold()
+    if market in {"moderate", "strong", "confirmed", "fresh"} and freshness not in {"missing", "stale", "unknown"}:
+        return True
+    score = _float_or_none(row.get("market_confirmation_score") or row.get("market_move_volume") or row.get("market_score"))
+    return score is not None and score >= 40 and freshness not in {"missing", "stale", "unknown"}
+
+
+def _mapping_counts(value: object) -> dict[str, int]:
+    if not isinstance(value, Mapping):
+        return {}
+    out: dict[str, int] = {}
+    for key, raw in value.items():
+        try:
+            count = int(raw or 0)
+        except (TypeError, ValueError):
+            continue
+        out[str(key).strip().casefold()] = max(0, count)
+    return out
 
 
 def _dedupe_daily_digest_decisions(
@@ -392,6 +471,42 @@ def _dedupe_daily_digest_decisions(
         grouped.append(decision)
     limit = max(0, int(max_items or 0))
     return grouped[:limit] if limit else []
+
+
+def _strict_lane_core_ids(
+    by_lane: Mapping[str, Iterable[event_alpha_router.EventAlphaRouteDecision]],
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]],
+) -> set[str]:
+    out: set[str] = set()
+    for lane in (LANE_TRIGGERED_FADE, LANE_INSTANT_ESCALATION, LANE_DAILY_DIGEST):
+        for decision in by_lane.get(lane, ()):
+            core_id = _core_id_for_decision(decision, core_row_by_alert_id)
+            if core_id:
+                out.add(core_id)
+    return out
+
+
+def _core_id_for_decision(
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]],
+) -> str:
+    core = _core_row_for_decision(decision, core_row_by_alert_id) or {}
+    entry = _decision_entry(decision)
+    return str(
+        core.get("core_opportunity_id")
+        or getattr(entry, "core_opportunity_id", None)
+        or ""
+    ).strip()
+
+
+def _core_row_is_research_alertable(core: Mapping[str, Any]) -> bool:
+    if not core:
+        return False
+    route = str(core.get("final_route_after_quality_gate") or core.get("route") or "").strip()
+    if event_alpha_router.route_value_is_alertable(route):
+        return True
+    level = str(core.get("final_opportunity_level") or core.get("opportunity_level") or "").strip()
+    return level in {"validated_digest", "watchlist", "high_priority"}
 
 
 def _daily_digest_group_key(
@@ -437,13 +552,27 @@ def _with_unconfirmed_daily_review_items(
     unconfirmed: Iterable[event_alpha_router.EventAlphaRouteDecision],
     *,
     cfg: EventAlphaNotificationConfig,
+    excluded_core_ids: Iterable[str] = (),
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[EventAlphaResearchReviewDigestItem, ...]:
     if not unconfirmed:
         return selected
     items = list(selected)
+    core_index = core_row_by_alert_id or {}
     seen = {item.decision.alert_id for item in items}
+    seen_core_ids = {
+        core_id
+        for item in items
+        for core_id in (_core_id_for_decision(item.decision, core_index),)
+        if core_id
+    }
+    excluded = {str(item).strip() for item in excluded_core_ids if str(item).strip()}
     for decision in unconfirmed:
         if decision.alert_id in seen:
+            continue
+        core_id = _core_id_for_decision(decision, core_index)
+        core = _core_row_for_decision(decision, core_index) or {}
+        if core_id and (core_id in excluded or core_id in seen_core_ids):
             continue
         entry = _decision_entry(decision)
         components = dict(getattr(entry, "latest_score_components", {}) or {})
@@ -460,6 +589,8 @@ def _with_unconfirmed_daily_review_items(
             what_would_upgrade=("accepted source-pack evidence or fresh market confirmation",),
         ))
         seen.add(decision.alert_id)
+        if core_id:
+            seen_core_ids.add(core_id)
     items.sort(
         key=lambda item: (
             item.rank_score,
@@ -544,6 +675,8 @@ def select_research_review_candidates(
     *,
     cfg: EventAlphaNotificationConfig,
     now: datetime | None = None,
+    excluded_core_ids: Iterable[str] = (),
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[EventAlphaResearchReviewDigestItem, ...]:
     """Pick near-miss/local research candidates without making them alertable."""
     _ = now
@@ -551,8 +684,17 @@ def select_research_review_candidates(
         return ()
     min_score = float(cfg.research_review_digest_min_score or 0.0)
     items: list[EventAlphaResearchReviewDigestItem] = []
+    excluded = {str(item).strip() for item in excluded_core_ids if str(item).strip()}
+    core_index = core_row_by_alert_id or {}
+    seen_core_ids: set[str] = set()
     for decision in decisions:
         if bool(getattr(decision, "alertable", False)) or event_alpha_router.alertable_after_quality_gate(decision):
+            continue
+        core_id = _core_id_for_decision(decision, core_index)
+        core = _core_row_for_decision(decision, core_index) or {}
+        if core_id and (core_id in excluded or core_id in seen_core_ids):
+            continue
+        if _core_row_is_research_alertable(core):
             continue
         entry = decision.entry
         components = dict(getattr(entry, "latest_score_components", {}) or {})
@@ -585,6 +727,8 @@ def select_research_review_candidates(
                 what_would_upgrade=tuple(upgrade),
             )
         )
+        if core_id:
+            seen_core_ids.add(core_id)
     items.sort(
         key=lambda item: (
             item.rank_score,

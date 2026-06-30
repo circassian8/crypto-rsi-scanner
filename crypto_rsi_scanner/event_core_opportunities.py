@@ -173,7 +173,7 @@ def core_opportunity_visibility_group(
 
     This is presentation-only: it does not route, score, send, or mutate rows.
     """
-    if not include_diagnostics and _core_is_diagnostic_only(opportunity):
+    if not include_diagnostics and (_core_is_diagnostic_only(opportunity) or _core_is_sector_only(opportunity)):
         return None
     if opportunity.is_high_priority:
         return "High-Priority Core Opportunities"
@@ -637,12 +637,9 @@ def _catalyst_group_key(row: Mapping[str, Any]) -> str:
         return ""
     date = _clean(_value(row, components, "event_date", "event_time", "catalyst_event_time"))
     date_bucket = date[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", date) else ""
-    frame = _clean(_value(row, components, "main_frame_type", "catalyst_frame_type"))
     pieces = [subject.casefold()]
     if date_bucket:
         pieces.append(date_bucket)
-    if frame:
-        pieces.append(frame.casefold())
     return "catalyst:" + "|".join(_slug(piece) for piece in pieces if piece)
 
 
@@ -734,6 +731,12 @@ def _core_is_diagnostic_only(opportunity: CoreOpportunity) -> bool:
         "word_collision",
         "generic_cooccurrence_only",
     ))
+
+
+def _core_is_sector_only(opportunity: CoreOpportunity) -> bool:
+    symbol = str(opportunity.symbol or "").strip().upper()
+    coin_id = str(opportunity.coin_id or "").strip().casefold()
+    return symbol == "SECTOR" or coin_id.startswith("sector")
 
 
 def _core_is_near_miss_like(opportunity: CoreOpportunity) -> bool:

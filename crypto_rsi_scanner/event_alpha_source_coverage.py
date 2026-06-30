@@ -160,6 +160,11 @@ class EventAlphaSourceCoverageReport:
     cryptopanic_remaining_weekly: int | None = None
     cryptopanic_accepted_evidence: int = 0
     cryptopanic_rejected_evidence: int = 0
+    cryptopanic_successful_requests: int = 0
+    cryptopanic_failed_requests: int = 0
+    cryptopanic_partial_success: bool = False
+    cryptopanic_backoff_reconciled_after_success: bool = False
+    cryptopanic_health_reason: str | None = None
     cryptopanic_source_packs: tuple[str, ...] = ()
     cryptopanic_not_used_reason: str | None = None
     cryptopanic_coverage_status: str = "not_configured"
@@ -180,6 +185,11 @@ class EventAlphaSourceCoverageReport:
             "cryptopanic_remaining_weekly": self.cryptopanic_remaining_weekly,
             "cryptopanic_accepted_evidence": self.cryptopanic_accepted_evidence,
             "cryptopanic_rejected_evidence": self.cryptopanic_rejected_evidence,
+            "cryptopanic_successful_requests": self.cryptopanic_successful_requests,
+            "cryptopanic_failed_requests": self.cryptopanic_failed_requests,
+            "cryptopanic_partial_success": self.cryptopanic_partial_success,
+            "cryptopanic_backoff_reconciled_after_success": self.cryptopanic_backoff_reconciled_after_success,
+            "cryptopanic_health_reason": self.cryptopanic_health_reason,
             "cryptopanic_source_packs": list(self.cryptopanic_source_packs),
             "cryptopanic_not_used_reason": self.cryptopanic_not_used_reason,
             "cryptopanic_coverage_status": self.cryptopanic_coverage_status,
@@ -203,19 +213,26 @@ def build_source_coverage_report(
 ) -> EventAlphaSourceCoverageReport:
     """Build source-pack coverage from readiness, health, and artifact rows."""
     observed = now or datetime.now(timezone.utc)
-    health_by_provider = _health_by_provider(provider_health_rows or {}, now=observed)
+    raw_health_by_provider = _health_by_provider(provider_health_rows or {}, now=observed)
+    health_by_provider = dict(raw_health_by_provider)
     configured = _configured_providers(provider_status_report, health_by_provider)
     acquisition = [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)]
     core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
     cryptopanic_stats = _cryptopanic_stats(
         configured=configured,
-        health_by_provider=health_by_provider,
+        health_by_provider=raw_health_by_provider,
         acquisition_rows=acquisition,
         request_ledger_path=cryptopanic_request_ledger_path,
         weekly_limit=cryptopanic_weekly_limit,
         daily_soft_limit=cryptopanic_daily_soft_limit,
         now=observed,
     )
+    provider_status_overrides: dict[str, str] = {}
+    if cryptopanic_stats["successful_requests"]:
+        provider_status_overrides["cryptopanic"] = (
+            "degraded" if cryptopanic_stats["failed_requests"] else "healthy"
+        )
+        health_by_provider["cryptopanic"] = provider_status_overrides["cryptopanic"]
 
     packs: list[EventAlphaSourceCoveragePack] = []
     for pack_name in SOURCE_COVERAGE_PACK_ORDER:
@@ -266,6 +283,7 @@ def build_source_coverage_report(
             preferred=preferred,
             unknown=unknown,
             now=observed,
+            effective_status_overrides=provider_status_overrides,
         )
         recommended_actions = _pack_recommended_actions(
             pack_name,
@@ -275,6 +293,7 @@ def build_source_coverage_report(
             skipped_budget=skipped_budget,
             rejected_only=rejected_only,
             provider_unavailable=unavailable,
+            satisfied_providers={"cryptopanic"} if cryptopanic_stats["successful_requests"] else (),
         )
         packs.append(
             EventAlphaSourceCoveragePack(
@@ -314,6 +333,11 @@ def build_source_coverage_report(
         cryptopanic_remaining_weekly=cryptopanic_stats["remaining_weekly"],
         cryptopanic_accepted_evidence=cryptopanic_stats["accepted"],
         cryptopanic_rejected_evidence=cryptopanic_stats["rejected"],
+        cryptopanic_successful_requests=cryptopanic_stats["successful_requests"],
+        cryptopanic_failed_requests=cryptopanic_stats["failed_requests"],
+        cryptopanic_partial_success=cryptopanic_stats["partial_success"],
+        cryptopanic_backoff_reconciled_after_success=cryptopanic_stats["backoff_reconciled_after_success"],
+        cryptopanic_health_reason=cryptopanic_stats["health_reason"],
         cryptopanic_source_packs=tuple(cryptopanic_stats["source_packs"]),
         cryptopanic_not_used_reason=cryptopanic_stats["not_used_reason"],
         cryptopanic_coverage_status=cryptopanic_stats["coverage_status"],
@@ -342,6 +366,11 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         f"- remaining weekly quota: {report.cryptopanic_remaining_weekly if report.cryptopanic_remaining_weekly is not None else 'unknown'}",
         f"- accepted evidence: {report.cryptopanic_accepted_evidence}",
         f"- rejected evidence: {report.cryptopanic_rejected_evidence}",
+        f"- successful requests: {report.cryptopanic_successful_requests}",
+        f"- failed requests: {report.cryptopanic_failed_requests}",
+        f"- partial success: {str(report.cryptopanic_partial_success).lower()}",
+        f"- stale backoff reconciled after success: {str(report.cryptopanic_backoff_reconciled_after_success).lower()}",
+        f"- health reason: {report.cryptopanic_health_reason or 'none'}",
         f"- source packs contributed: {_join(report.cryptopanic_source_packs)}",
         f"- not-used reason: {report.cryptopanic_not_used_reason or 'none'}",
         f"- coverage status: {report.cryptopanic_coverage_status}",
@@ -436,15 +465,17 @@ def _provider_role_statuses_for_pack(
     preferred: Iterable[str],
     unknown: Iterable[str] = (),
     now: datetime,
+    effective_status_overrides: Mapping[str, str] | None = None,
 ) -> tuple[str, ...]:
     preferred_set = set(preferred)
+    overrides = dict(effective_status_overrides or {})
     out: list[str] = []
     for key, row in sorted(rows.items()):
         alias = _provider_alias(row, fallback_key=str(key))
         if alias not in preferred_set:
             continue
         role = str(row.get("provider_role") or row.get("provider_kind") or "unclassified").strip() or "unclassified"
-        status = event_provider_health.provider_health_status(row, now=now)
+        status = overrides.get(alias) or event_provider_health.provider_health_status(row, now=now)
         out.append(f"{alias}:{role}={status}")
     for alias in sorted(set(unknown) & preferred_set):
         out.append(f"{alias}:not_observed=unknown")
@@ -527,12 +558,18 @@ def _cryptopanic_stats(
         weekly_limit=weekly_limit,
         daily_soft_limit=daily_soft_limit,
     )
+    successful_requests = int(getattr(usage, "successful_requests", 0) or 0)
+    failed_requests = int(getattr(usage, "failed_requests", 0) or 0)
+    backoff_reconciled_after_success = bool(successful_requests and health_status == "backoff")
+    effective_health_status = health_status
+    if successful_requests:
+        effective_health_status = "partial_success" if failed_requests else "healthy"
     if usage.today_requests > 0:
         observed = True
     coverage_status = _cryptopanic_coverage_status(
         configured=configured_flag,
         observed=observed,
-        health_status=health_status,
+        health_status=effective_health_status,
         accepted=accepted,
         rejected=rejected,
         usage=usage,
@@ -551,15 +588,29 @@ def _cryptopanic_stats(
             reason = "query_planner_skipped"
     elif not configured_flag:
         reason = "not_configured"
+    health_reason = _cryptopanic_health_reason(
+        coverage_status=coverage_status,
+        raw_health_status=health_status,
+        successful_requests=successful_requests,
+        failed_requests=failed_requests,
+        accepted=accepted,
+        rejected=rejected,
+        backoff_reconciled_after_success=backoff_reconciled_after_success,
+    )
     return {
         "configured": configured_flag,
-        "health_status": health_status,
+        "health_status": effective_health_status,
         "observed": observed,
         "requests_used": int(usage.today_requests),
         "rolling_7d_requests": int(usage.rolling_7d_requests),
         "remaining_weekly": usage.remaining_weekly,
         "accepted": accepted,
         "rejected": rejected,
+        "successful_requests": successful_requests,
+        "failed_requests": failed_requests,
+        "partial_success": bool(successful_requests and failed_requests),
+        "backoff_reconciled_after_success": backoff_reconciled_after_success,
+        "health_reason": health_reason,
         "source_packs": _sorted_tuple(source_packs),
         "not_used_reason": reason,
         "coverage_status": coverage_status,
@@ -581,18 +632,26 @@ def _cryptopanic_coverage_status(
     last_error = str(usage.last_error_class or "").strip()
     if usage.remaining_weekly == 0:
         return "quota_exhausted"
+    successful_requests = int(getattr(usage, "successful_requests", 0) or 0)
+    failed_requests = int(getattr(usage, "failed_requests", 0) or 0)
+    if successful_requests:
+        if failed_requests:
+            return "observed_partial_success"
+        if accepted > 0:
+            return "observed_healthy"
+        return "observed_no_results"
     if last_error == "json_parse_error" or last_error == "empty_response":
-        return "configured_but_parse_error"
+        return "observed_parse_error"
     if last_error in {"rate_limited_or_forbidden", "auth_failed"}:
-        return "configured_but_rate_limited" if last_error == "rate_limited_or_forbidden" else "configured_but_auth_failed"
+        return "observed_rate_limited"
     if health_status == "backoff":
-        return "configured_but_backoff"
+        return "observed_backoff_without_success"
     if not observed:
         return "configured_not_observed"
     if accepted > 0:
-        return "configured_observed_healthy"
+        return "observed_healthy"
     if rejected > 0 or usage.today_requests > 0:
-        return "configured_observed_no_results"
+        return "observed_no_results"
     return "configured_not_observed"
 
 
@@ -600,14 +659,39 @@ def _cryptopanic_recommendation(status: str) -> str:
     return {
         "not_configured": "configure CryptoPanic token with RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN",
         "configured_not_observed": "run a CryptoPanic-enabled rehearsal or inspect provider selection",
-        "configured_observed_healthy": "no action; accepted CryptoPanic evidence is available",
-        "configured_observed_no_results": "no matching token news found; inspect query/candidate terms, not provider credentials",
-        "configured_but_parse_error": "inspect cryptopanic_request_ledger.jsonl body excerpt, content type, and endpoint shape",
-        "configured_but_rate_limited": "wait for cooldown or reduce CryptoPanic request rate/quota usage",
-        "configured_but_auth_failed": "verify the CryptoPanic token/plan without printing the token",
-        "configured_but_backoff": "reset provider backoff only after configuration changed or cooldown elapsed",
+        "observed_healthy": "no action; accepted CryptoPanic evidence is available",
+        "observed_partial_success": "use accepted evidence; inspect failed CryptoPanic roles in the request ledger",
+        "observed_no_results": "no matching token news found; inspect query/candidate terms, not provider credentials",
+        "observed_parse_error": "inspect cryptopanic_request_ledger.jsonl body excerpt, content type, and endpoint shape",
+        "observed_rate_limited": "wait for cooldown or reduce CryptoPanic request rate/quota usage",
+        "observed_backoff_without_success": "wait for cooldown or reset provider backoff only after configuration changed",
         "quota_exhausted": "wait for quota reset or lower per-run request limits",
     }.get(status, "inspect CryptoPanic request ledger and provider health")
+
+
+def _cryptopanic_health_reason(
+    *,
+    coverage_status: str,
+    raw_health_status: str,
+    successful_requests: int,
+    failed_requests: int,
+    accepted: int,
+    rejected: int,
+    backoff_reconciled_after_success: bool,
+) -> str:
+    if backoff_reconciled_after_success:
+        return "stale_backoff_ignored_due_success"
+    if successful_requests and failed_requests:
+        return "successful_requests_with_failures"
+    if successful_requests and accepted:
+        return "successful_requests_with_accepted_evidence"
+    if successful_requests:
+        return "successful_requests_no_matching_evidence"
+    if coverage_status == "observed_backoff_without_success" or raw_health_status == "backoff":
+        return "provider_backoff_without_success"
+    if rejected:
+        return "observed_rejected_evidence_only"
+    return coverage_status
 
 
 def _row_mentions_cryptopanic(row: Mapping[str, Any]) -> bool:
@@ -778,14 +862,20 @@ def _pack_recommended_actions(
     skipped_budget: int,
     rejected_only: int,
     provider_unavailable: int,
+    satisfied_providers: Iterable[str] = (),
 ) -> tuple[str, ...]:
     actions: list[str] = []
     missing_set = set(missing)
     degraded_set = set(degraded)
+    satisfied = set(satisfied_providers)
     if blocked or missing_set or degraded_set:
         for provider in sorted(missing_set):
+            if provider in satisfied:
+                continue
             actions.append(_provider_setup_action(provider, status="missing"))
         for provider in sorted(degraded_set):
+            if provider in satisfied:
+                continue
             actions.append(_provider_setup_action(provider, status="degraded"))
     if skipped_budget:
         actions.append("raise evidence-acquisition query/candidate budget for this source pack")

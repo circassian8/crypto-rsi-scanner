@@ -110,7 +110,11 @@ absence is meaningful; and the provider/source pack most likely to improve the
 next run. Each pack also prints recommended actions, such as configuring
 CryptoPanic token/news coverage, restoring official exchange announcement
 feeds, raising evidence-acquisition query budgets, or fixing feed-level RSS
-quarantine/backoff. Treat CoinGecko and DefiLlama-style rows as
+quarantine/backoff. If same-day CryptoPanic Growth requests succeeded, source
+coverage should treat stale CryptoPanic provider-health backoff as reconciled and
+should not recommend configuring, restoring, or verifying the token for that
+namespace; use the request ledger and the `backoff_reconciled_after_success`
+flag for audit. Treat CoinGecko and DefiLlama-style rows as
 market/protocol metric evidence only: they can support market confirmation or
 source coverage, but they do not prove official confirmation or catalyst
 impact-path validation by themselves.
@@ -150,11 +154,14 @@ guessing whether the token is missing. Live fetches record `content_type`,
 `provider_health_effect`, `quota_counted`, status code, and a classified
 `error_class` such as `json_parse_error`, `empty_response`,
 `rate_limited_or_forbidden`, `auth_failed`, `server_error`, `network_error`,
-`provider_backoff`, or `quota_exhausted`. Source coverage reports distinguish
-`configured_but_parse_error`, `configured_but_rate_limited`,
-`configured_but_backoff`, `configured_observed_no_results`, and
-`not_configured`; artifact doctor strict mode blocks unredacted token excerpts
-or HTTP-failure rows missing status codes.
+`provider_backoff`, or `quota_exhausted`. Source coverage reports use
+`observed_healthy`, `observed_partial_success`, `observed_no_results`,
+`observed_parse_error`, `observed_rate_limited`,
+`observed_backoff_without_success`, `quota_exhausted`,
+`configured_not_observed`, and `not_configured` so missing configuration,
+successful observation, partial success, and unusable responses are not
+collapsed into one status. Artifact doctor strict mode blocks unredacted token
+excerpts or HTTP-failure rows missing status codes.
 
 The CryptoPanic preflight prints only redacted key/config state, endpoint,
 plan, quota usage, source packs, provider health/backoff, and the targeted reset
@@ -386,8 +393,14 @@ Daily digest lanes are confirmed and grouped before formatting. Live-style
 profiles require accepted source-pack evidence, official/structured evidence,
 matching CryptoPanic token/catalyst proof, strong direct source evidence, or
 fresh non-generic market confirmation before an item can stay in daily digest.
-Unconfirmed support rows are moved to research-review/local diagnostics. The
-Telegram digest renders the top
+Narrative packs with higher false-positive risk (`fan_sports_pack`,
+`proxy_preipo_rwa_pack`, and `political_meme_pack`) are stricter by default:
+a single accepted source-only item without market confirmation, official or
+structured confirmation, or a second accepted evidence row is moved to the
+research-review/local path. Operators can explicitly allow this class with
+`RSI_EVENT_ALPHA_ALLOW_SOURCE_ONLY_NARRATIVE_DIGEST=1`, but the default burn-in
+posture is conservative. Unconfirmed support rows are moved to
+research-review/local diagnostics. The Telegram digest renders the top
 `RSI_EVENT_ALPHA_DAILY_DIGEST_MAX_ITEMS` grouped items and points to the local
 brief for overflow.
 
