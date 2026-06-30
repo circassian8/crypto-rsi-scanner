@@ -220,6 +220,7 @@ class CryptoPanicProvider:
         self.last_skip_reason: str | None = None
         self.last_request_url_redacted: str | None = None
         self.last_status_code: int | None = None
+        self.last_error_class: str | None = None
         self.last_result_count: int = 0
         self.requests_attempted: int = 0
         self.request_cache_hits: int = 0
@@ -245,6 +246,7 @@ class CryptoPanicProvider:
         observed = self.fetched_at or datetime.now(timezone.utc)
         self.last_skip_reason = None
         self.last_status_code = None
+        self.last_error_class = None
         self.last_result_count = 0
         self.requests_attempted = 0
         self.request_cache_hits = 0
@@ -307,6 +309,12 @@ class CryptoPanicProvider:
                 redacted_url = redact_cryptopanic_url(url)
                 self.last_request_url_redacted = redacted_url
                 status_code: int | None = None
+                content_type: str | None = None
+                body_excerpt: str | None = None
+                parse_error_message: str | None = None
+                response_bytes: int | None = None
+                provider_health_effect: str | None = None
+                quota_counted = False
                 result_count = 0
                 error_class: str | None = None
                 try:
@@ -314,9 +322,15 @@ class CryptoPanicProvider:
                     request = Request(url, headers={"Accept": "application/json", "User-Agent": "crypto-rsi-scanner/1.0"})
                     with self.opener(request, self.timeout) as response:
                         status_code = int(getattr(response, "status", getattr(response, "code", 200)))
-                        if status_code >= 400:
-                            raise RuntimeError(f"HTTP {status_code}")
-                    raw = json.loads(response.read().decode("utf-8"))
+                        content_type = _response_content_type(response)
+                        body_bytes = response.read()
+                    quota_counted = True
+                    response_bytes = len(body_bytes or b"")
+                    body_text = _decode_response_body(body_bytes)
+                    body_excerpt = _safe_body_excerpt(body_text)
+                    if status_code >= 400:
+                        raise CryptoPanicHTTPStatusError(status_code)
+                    raw = _parse_json_body(body_text)
                     fetched = [_normalize_cryptopanic_item(item) for item in _news_items(raw, allow_empty=True)]
                     self._request_cache[cache_key] = tuple(fetched)
                     if process_cache_key is not None:
@@ -331,8 +345,17 @@ class CryptoPanicProvider:
                             seen_ids.add(key)
                         rows.append(item)
                 except Exception as exc:  # noqa: BLE001
-                    status_code = _status_code_from_exception(exc)
+                    if status_code is None:
+                        status_code = _status_code_from_exception(exc)
+                    if status_code is not None or isinstance(exc, HTTPError):
+                        quota_counted = True
+                    exc_content_type, exc_body_excerpt, exc_response_bytes = _exception_response_diagnostics(exc)
+                    content_type = content_type or exc_content_type
+                    body_excerpt = body_excerpt or exc_body_excerpt
+                    response_bytes = response_bytes if response_bytes is not None else exc_response_bytes
+                    parse_error_message = _parse_error_message(exc)
                     error_class = _error_class_from_exception(exc)
+                    provider_health_effect = _provider_health_effect(error_class, status_code)
                     warning = _safe_fetch_warning(exc)
                     warnings.append(warning)
                     self._request_cache[cache_key] = ()
@@ -344,6 +367,7 @@ class CryptoPanicProvider:
                     if redacted_url:
                         self.requests_attempted += 1
                         self.last_status_code = status_code
+                        self.last_error_class = error_class
                         self._record_request(
                             observed_at=observed,
                             endpoint="posts",
@@ -353,6 +377,12 @@ class CryptoPanicProvider:
                             status_code=status_code,
                             result_count=result_count,
                             error_class=error_class,
+                            content_type=content_type,
+                            body_excerpt_redacted=body_excerpt,
+                            parse_error_message=parse_error_message,
+                            response_bytes=response_bytes,
+                            provider_health_effect=provider_health_effect,
+                            quota_counted=quota_counted,
                         )
 
         if warnings:
@@ -458,6 +488,12 @@ class CryptoPanicProvider:
         status_code: int | None,
         result_count: int,
         error_class: str | None,
+        content_type: str | None = None,
+        body_excerpt_redacted: str | None = None,
+        parse_error_message: str | None = None,
+        response_bytes: int | None = None,
+        provider_health_effect: str | None = None,
+        quota_counted: bool = True,
     ) -> None:
         if self.request_ledger_path is None:
             return
@@ -480,6 +516,12 @@ class CryptoPanicProvider:
             "status_code": status_code,
             "result_count": result_count,
             "error_class": error_class,
+            "content_type": content_type,
+            "body_excerpt_redacted": body_excerpt_redacted,
+            "parse_error_message": parse_error_message,
+            "response_bytes": response_bytes,
+            "provider_health_effect": provider_health_effect or _provider_health_effect(error_class, status_code),
+            "quota_counted": bool(quota_counted),
         }
         try:
             self.request_ledger_path.parent.mkdir(parents=True, exist_ok=True)
@@ -489,14 +531,26 @@ class CryptoPanicProvider:
             log.warning("CryptoPanic request ledger write failed: %s", type(exc).__name__)
 
 
+class CryptoPanicHTTPStatusError(RuntimeError):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"HTTP {status_code}")
+        self.status = int(status_code)
+        self.code = int(status_code)
+
+
+class CryptoPanicEmptyResponseError(ValueError):
+    pass
+
+
 def _safe_fetch_warning(exc: BaseException) -> str:
     """Return a warning that cannot echo the request URL or auth token."""
+    classified = _error_class_from_exception(exc)
     if isinstance(exc, HTTPError):
-        return f"CryptoPanic live news fetch failed: HTTPError status={exc.code}"
+        return f"CryptoPanic live news fetch failed: {classified} status={exc.code}"
     status = getattr(exc, "status", None) or getattr(exc, "code", None)
     if status:
-        return f"CryptoPanic live news fetch failed: {type(exc).__name__} status={status}"
-    return f"CryptoPanic live news fetch failed: {type(exc).__name__}"
+        return f"CryptoPanic live news fetch failed: {classified} status={status}"
+    return f"CryptoPanic live news fetch failed: {classified}"
 
 
 def cryptopanic_usage_summary(
@@ -516,6 +570,8 @@ def cryptopanic_usage_summary(
     last_status_code: int | None = None
     last_error_class: str | None = None
     for row in _read_ledger_rows(path):
+        if row.get("quota_counted") is False:
+            continue
         ts = _parse_datetime(row.get("timestamp"))
         if ts is None:
             continue
@@ -553,6 +609,84 @@ def redact_cryptopanic_url(url: str) -> str:
         else:
             query.append((key, value))
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def redact_cryptopanic_text(text: object) -> str:
+    clean = str(text or "")
+    clean = re.sub(r"(?i)(auth_token=)[^&\\s<>]+", r"\1<redacted>", clean)
+    clean = re.sub(r"(?i)((?:api[_-]?token|token|auth)[\"'\\s:=]+)[A-Za-z0-9._-]{16,}", r"\1<redacted>", clean)
+    clean = re.sub(r"\b[A-Fa-f0-9]{32,}\b", "<redacted>", clean)
+    return clean
+
+
+def _response_content_type(response: Any) -> str | None:
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return None
+    getter = getattr(headers, "get", None)
+    if callable(getter):
+        value = getter("Content-Type") or getter("content-type")
+        return str(value or "").strip() or None
+    return None
+
+
+def _decode_response_body(body: bytes | bytearray | object) -> str:
+    if body is None:
+        return ""
+    if isinstance(body, str):
+        return body.lstrip("\ufeff")
+    if not isinstance(body, (bytes, bytearray)):
+        body = bytes(body)
+    return bytes(body).decode("utf-8", errors="replace").lstrip("\ufeff")
+
+
+def _parse_json_body(body_text: str) -> Any:
+    if not str(body_text or "").strip():
+        raise CryptoPanicEmptyResponseError("empty response body")
+    return json.loads(body_text)
+
+
+def _safe_body_excerpt(body_text: object, *, limit: int = 300) -> str | None:
+    clean = redact_cryptopanic_text(body_text)
+    if not clean:
+        return None
+    clean = " ".join(clean.split())
+    return clean[: max(1, int(limit or 300))]
+
+
+def _exception_response_diagnostics(exc: BaseException) -> tuple[str | None, str | None, int | None]:
+    content_type = None
+    body_excerpt = None
+    response_bytes = None
+    if isinstance(exc, HTTPError):
+        headers = getattr(exc, "headers", None)
+        if headers is not None and callable(getattr(headers, "get", None)):
+            content_type = str(headers.get("Content-Type") or headers.get("content-type") or "").strip() or None
+        try:
+            body = exc.read()
+        except Exception:  # noqa: BLE001
+            body = b""
+        response_bytes = len(body or b"")
+        body_excerpt = _safe_body_excerpt(_decode_response_body(body))
+    return content_type, body_excerpt, response_bytes
+
+
+def _parse_error_message(exc: BaseException) -> str | None:
+    if isinstance(exc, (json.JSONDecodeError, CryptoPanicEmptyResponseError)):
+        return redact_cryptopanic_text(str(exc))[:300]
+    return None
+
+
+def _provider_health_effect(error_class: str | None, status_code: int | None) -> str | None:
+    if not error_class:
+        return None
+    if error_class in {"auth_failed", "rate_limited_or_forbidden", "server_error", "json_parse_error", "empty_response"}:
+        return "degraded_backoff"
+    if error_class == "network_error":
+        return "degraded_backoff"
+    if status_code and status_code >= 400:
+        return "degraded_backoff"
+    return "warning"
 
 
 def _posts_endpoint(base_url: str) -> str:
@@ -718,6 +852,16 @@ def _status_code_from_exception(exc: BaseException) -> int | None:
 
 def _error_class_from_exception(exc: BaseException) -> str:
     status = _status_code_from_exception(exc)
+    if status == 401:
+        return "auth_failed"
     if status in {403, 429}:
-        return "rate_limit_or_forbidden"
+        return "rate_limited_or_forbidden"
+    if status and status >= 500:
+        return "server_error"
+    if isinstance(exc, CryptoPanicEmptyResponseError):
+        return "empty_response"
+    if isinstance(exc, json.JSONDecodeError):
+        return "json_parse_error"
+    if isinstance(exc, (OSError, TimeoutError)):
+        return "network_error"
     return type(exc).__name__

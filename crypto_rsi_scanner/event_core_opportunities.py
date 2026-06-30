@@ -8,6 +8,7 @@ as diagnostics. It does not score, route, send, trade, or mutate artifacts.
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Mapping
@@ -148,7 +149,8 @@ def aggregate_core_opportunities(rows: Iterable[Any]) -> tuple[CoreOpportunity, 
         promoted_key = promoted_by_incident_asset.get(incident_asset) or promoted_by_asset.get(_asset_key(members[0]))
         if not promoted_key or promoted_key == key:
             continue
-        if all(_should_attach_to_promoted_core(row) for row in members):
+        promoted_primary = sorted(groups.get(promoted_key, []), key=_row_rank, reverse=True)[0]
+        if all(_should_attach_to_promoted_core(row) or _compatible_support_for_promoted(row, promoted_primary) for row in members):
             diagnostics_by_key.setdefault(promoted_key, []).extend(members)
             groups.pop(key, None)
 
@@ -589,7 +591,8 @@ def _core_key(row: Mapping[str, Any]) -> str | None:
     components = _components(row)
     role = _normalized_role(_value(row, components, "candidate_role", "relationship_type", "latest_effective_playbook_type", "playbook_type"))
     family = _impact_path_family(_primary_impact_path(row) or _value(row, components, "impact_category"))
-    return "|".join((incident or "unknown_incident", asset, role or "unknown_role", family or "unknown_family"))
+    catalyst = _catalyst_group_key(row) or incident or "unknown_incident"
+    return "|".join((catalyst, asset, role or "unknown_role", family or "unknown_family"))
 
 
 def _incident_asset_key(row: Mapping[str, Any]) -> tuple[str, str]:
@@ -615,6 +618,38 @@ def _coin_id(row: Mapping[str, Any]) -> str:
 def _primary_impact_path(row: Mapping[str, Any]) -> str:
     components = _components(row)
     return _clean(_value(row, components, "primary_impact_path", "impact_path_type", "impact_path_reason", "impact_category"))
+
+
+def _catalyst_group_key(row: Mapping[str, Any]) -> str:
+    components = _components(row)
+    subject = _clean(
+        _value(
+            row,
+            components,
+            "main_catalyst_subject",
+            "external_asset",
+            "canonical_incident_name",
+            "incident_canonical_name",
+            "canonical_name",
+        )
+    )
+    if not subject:
+        return ""
+    date = _clean(_value(row, components, "event_date", "event_time", "catalyst_event_time"))
+    date_bucket = date[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", date) else ""
+    frame = _clean(_value(row, components, "main_frame_type", "catalyst_frame_type"))
+    pieces = [subject.casefold()]
+    if date_bucket:
+        pieces.append(date_bucket)
+    if frame:
+        pieces.append(frame.casefold())
+    return "catalyst:" + "|".join(_slug(piece) for piece in pieces if piece)
+
+
+def _slug(value: object) -> str:
+    text = str(value or "").casefold()
+    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    return text or "unknown"
 
 
 def _normalized_role(value: object) -> str:
@@ -762,6 +797,20 @@ def _should_attach_to_promoted_core(row: Mapping[str, Any]) -> bool:
     }:
         return True
     return role in {"unknown_with_reason", "generic_mention"} or path in {"insufficient_data", "generic_cooccurrence_only"}
+
+
+def _compatible_support_for_promoted(row: Mapping[str, Any], promoted: Mapping[str, Any]) -> bool:
+    row_components = _components(row)
+    promoted_components = _components(promoted)
+    row_family = _impact_path_family(_primary_impact_path(row) or _value(row, row_components, "impact_category"))
+    promoted_family = _impact_path_family(_primary_impact_path(promoted) or _value(promoted, promoted_components, "impact_category"))
+    if not row_family or row_family == "unknown" or row_family != promoted_family:
+        return False
+    row_role = _normalized_role(_value(row, row_components, "candidate_role", "relationship_type", "latest_effective_playbook_type", "playbook_type"))
+    promoted_role = _normalized_role(_value(promoted, promoted_components, "candidate_role", "relationship_type", "latest_effective_playbook_type", "playbook_type"))
+    if row_role and promoted_role and row_role != promoted_role:
+        return False
+    return True
 
 
 def _row_rank(row: Mapping[str, Any]) -> tuple[int, int, int, float, int]:

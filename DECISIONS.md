@@ -16,6 +16,38 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - CryptoPanic live diagnostics must be body-aware and redacted
+**Status:** accepted
+**Decision:** CryptoPanic live fetches must read response bodies while the HTTP
+response is open, decode them safely, and classify empty, malformed JSON, auth,
+rate-limit/forbidden, server, network, provider-backoff, and quota-exhausted
+failures without leaking `auth_token` values. Request ledger rows should keep
+redacted URLs plus content type, redacted body excerpt, parse error, response
+byte count, quota-counted flag, and provider-health effect. Source coverage and
+artifact doctor must distinguish missing configuration from configured-but-
+unusable parse/rate-limit/backoff states.
+**Why:** A configured provider that returns HTML, an empty body, or a 403 is a
+different operator problem from a missing token. Without body-aware diagnostics
+the system can look silently unconfigured or unusable while hiding the actual
+repair path.
+**Revisit when:** CryptoPanic moves to a typed SDK/client layer that exposes
+the same diagnostics without direct urllib response handling.
+
+## 2026-06-30 - Research-review Telegram copy uses canonical core identity
+**Status:** accepted
+**Decision:** When a research-review digest item resolves to a canonical
+CoreOpportunity, Telegram copy must show the canonical card basename and
+`agg:...` feedback target, while lower-level hypothesis/watchlist ids remain
+artifact metadata only. Artifact doctor strict mode must block fresh
+research-review delivery rows whose preview body points at stale hypothesis
+cards/feedback targets when canonical core identity is available.
+**Why:** Research-review digests are the operator feedback loop. Showing
+support-row or hypothesis targets for a canonical opportunity makes feedback
+hard to apply and can make duplicated support rows look like separate review
+items.
+**Revisit when:** Notification bodies are generated directly from typed
+CoreOpportunity card objects and no longer accept lower-level route decisions.
+
 ## 2026-06-30 - Event Alpha daily digest requires confirmation and grouping
 **Status:** accepted
 **Decision:** Live-style Event Alpha daily digest lanes must contain grouped,

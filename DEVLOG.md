@@ -17,6 +17,47 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Harden CryptoPanic live diagnostics and research-review rendering · Codex
+**Why:** The live CryptoPanic path still needed body-aware failure diagnostics,
+clear source-coverage states, and artifact checks that could prove research-review
+Telegram copy uses canonical core card/feedback targets instead of lower-level
+hypothesis rows.
+**Changes:**
+- Made the live CryptoPanic provider read response bodies inside the HTTP context,
+  decode safely, classify empty/non-JSON/HTTP/network failures, and write redacted
+  response diagnostics to `cryptopanic_request_ledger.jsonl` without exposing tokens.
+- Added CryptoPanic source-coverage states/recommendations and provider-health
+  preservation for safe error classes such as `json_parse_error`,
+  `empty_response`, `rate_limited_or_forbidden`, `provider_backoff`, and
+  `quota_exhausted`.
+- Extended artifact doctor checks for CryptoPanic parse/status/body-redaction
+  failures and for research-review Telegram bodies that disagree with canonical
+  core card or feedback metadata.
+- Updated research-review digest rendering to prefer canonical core card paths and
+  feedback targets, and tightened CoreOpportunity/support aggregation plus alert
+  snapshot dedupe so canonical routed cores do not produce duplicate alertable
+  rows.
+- Updated `ROADMAP.md`, `DECISIONS.md`, the Event Alpha runbook, and regression
+  coverage for CryptoPanic diagnostics, source coverage, canonical digest body
+  checks, and core aggregation.
+**Verify:** `python3 tests/test_indicators.py` (588/588 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3` (36/36 passed);
+`make event-alpha-cryptopanic-preflight PYTHON=python3` (READY, token redacted);
+`make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal PYTHON=python3`
+(no sends; strict doctor blockers cleared after canonical snapshot dedupe);
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
+(WARN only, blockers none);
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The CryptoPanic rehearsal currently reports
+`configured_but_backoff`, so source coverage warns `cryptopanic_configured_but_unusable=1`
+but does not block strict doctor. The ledger now includes status/content/body
+diagnostics and redacted excerpts for Pro-model review. No Telegram sends, trades,
+paper rows, normal RSI rows, or `TRIGGERED_FADE` creation were performed.
+
 ## 2026-06-30 — Harden CryptoPanic request planning and digest eligibility · Codex
 **Why:** The Growth Weekly no-send rehearsal exposed two live-path risks:
 duplicate/invalid CryptoPanic currency requests could burn quota, and daily

@@ -830,6 +830,7 @@ def format_research_review_telegram_digest(
     *,
     profile: str | None = None,
     card_path_by_alert_id: Mapping[str, str | Path] | None = None,
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]] | None = None,
     cfg: EventAlphaNotificationConfig | None = None,
 ) -> str:
     """Render near-miss research-review candidates for Telegram burn-in."""
@@ -849,13 +850,16 @@ def format_research_review_telegram_digest(
     for item in keep:
         decision = item.decision
         entry = decision.entry
+        core = _core_row_for_decision(decision, core_row_by_alert_id or {}) or {}
         level = _human_level(_research_review_level(decision))
         score = _research_review_score(decision)
-        card_label = _telegram_card_basename(decision, card_path_by_alert_id)
-        feedback_target = _telegram_feedback_target(decision)
+        card_label = _telegram_card_basename(decision, card_path_by_alert_id, core=core)
+        feedback_target = _telegram_feedback_target(decision, core=core)
+        symbol = str(core.get("symbol") or core.get("validated_symbol") or entry.symbol or "UNKNOWN")
+        coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or entry.coin_id or "unknown")
         block = [
             "",
-            f"{displayed + 1}. <b>{_esc(entry.symbol or 'UNKNOWN')} / {_esc(entry.coin_id or 'unknown')}</b>",
+            f"{displayed + 1}. <b>{_esc(symbol)} / {_esc(coin_id)}</b>",
             f"   Level: {_esc(level)} · Score: {_esc(f'{score:g}')}",
             f"   Catalyst: {_esc(_candidate_catalyst_text(entry))}",
             f"   Impact path: {_esc(_human_playbook(entry.impact_path_type or entry.latest_effective_playbook_type or entry.latest_playbook_type or entry.relationship_type))}",
@@ -1155,6 +1159,7 @@ def send_notifications(
                 items,
                 profile=profile,
                 card_path_by_alert_id=card_map,
+                core_row_by_alert_id=plan.core_row_by_alert_id,
                 cfg=cfg,
             )
             identity = _delivery_identity_for_decisions(
@@ -2354,6 +2359,7 @@ class _DeliveryWriter:
                     items,
                     profile=profile,
                     card_path_by_alert_id=card_map,
+                    core_row_by_alert_id=plan.core_row_by_alert_id,
                     cfg=EventAlphaNotificationConfig(),
                 )
                 identity = _delivery_identity_for_decisions(
@@ -2847,7 +2853,18 @@ def _human_why_not_alertable(reasons: Iterable[str]) -> str:
 def _telegram_card_basename(
     decision: event_alpha_router.EventAlphaRouteDecision,
     card_path_by_alert_id: Mapping[str, str | Path] | None,
+    *,
+    core: Mapping[str, Any] | None = None,
 ) -> str:
+    core = core or {}
+    for value in (
+        core.get("card_path"),
+        core.get("research_card_path"),
+        core.get("canonical_card_path"),
+    ):
+        text = str(value or "").strip()
+        if text:
+            return Path(text).name or "local card"
     card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
     for key in _decision_identity_keys(decision):
         path = card_paths.get(key)
@@ -2857,7 +2874,20 @@ def _telegram_card_basename(
     return "local artifacts"
 
 
-def _telegram_feedback_target(decision: event_alpha_router.EventAlphaRouteDecision) -> str:
+def _telegram_feedback_target(
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    *,
+    core: Mapping[str, Any] | None = None,
+) -> str:
+    core = core or {}
+    for value in (
+        core.get("feedback_target"),
+        core.get("core_opportunity_id"),
+        core.get("canonical_core_opportunity_id"),
+    ):
+        text = str(value or "").strip()
+        if text:
+            return text
     components = dict(getattr(decision.entry, "latest_score_components", {}) or {})
     for value in (
         components.get("core_opportunity_id"),

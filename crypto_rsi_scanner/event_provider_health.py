@@ -721,6 +721,19 @@ def _error_class(error: object) -> str:
     if isinstance(error, BaseException):
         return type(error).__name__
     text = str(error or "").strip()
+    lowered = text.casefold()
+    for known in (
+        "auth_failed",
+        "rate_limited_or_forbidden",
+        "server_error",
+        "json_parse_error",
+        "empty_response",
+        "network_error",
+        "provider_backoff",
+        "quota_exhausted",
+    ):
+        if known in lowered:
+            return known
     return text.split(":", 1)[0] if text else "UnknownError"
 
 

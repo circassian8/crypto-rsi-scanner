@@ -144,6 +144,18 @@ construction. Repeated normalized request keys within one run are deduped from
 the in-memory request cache and surfaced through run-ledger and artifact-doctor
 request-planning counters.
 
+If CryptoPanic is configured but unusable, inspect the same ledger rather than
+guessing whether the token is missing. Live fetches record `content_type`,
+`response_bytes`, `body_excerpt_redacted`, `parse_error_message`,
+`provider_health_effect`, `quota_counted`, status code, and a classified
+`error_class` such as `json_parse_error`, `empty_response`,
+`rate_limited_or_forbidden`, `auth_failed`, `server_error`, `network_error`,
+`provider_backoff`, or `quota_exhausted`. Source coverage reports distinguish
+`configured_but_parse_error`, `configured_but_rate_limited`,
+`configured_but_backoff`, `configured_observed_no_results`, and
+`not_configured`; artifact doctor strict mode blocks unredacted token excerpts
+or HTTP-failure rows missing status codes.
+
 The CryptoPanic preflight prints only redacted key/config state, endpoint,
 plan, quota usage, source packs, provider health/backoff, and the targeted reset
 command. The rehearsal target uses the real `notify_llm_deep` path with
@@ -565,6 +577,14 @@ candidates and no-send guard enabled. It should write a blocked
 `research_review_digest_would_send`, and pass strict artifact doctor. If those
 fields show candidates but the delivery ledger has no research-review row, treat
 the rehearsal as not ready.
+When a research-review row has a canonical CoreOpportunity, the Telegram body
+should display the canonical core card basename and `agg:...` feedback target.
+Hypothesis/watchlist ids remain in the local artifacts for audit, but they
+should not be the visible feedback target for a canonical opportunity. Strict
+artifact doctor checks `notification_body_card_mismatch_canonical`,
+`notification_body_feedback_mismatch_canonical`, and
+`research_review_body_uses_hypothesis_target_when_core_exists` before send
+readiness can pass.
 
 The burn-in inbox starts with a compact ranked review queue. It ranks strict
 would-send rows, digest rows, research-review near-misses, upgrade candidates,

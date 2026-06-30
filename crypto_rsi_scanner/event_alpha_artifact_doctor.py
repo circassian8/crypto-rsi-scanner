@@ -86,6 +86,11 @@ class EventAlphaArtifactDoctorResult:
     cryptopanic_invalid_currency_code: int = 0
     cryptopanic_empty_currency_request: int = 0
     cryptopanic_coin_id_sent_as_currency: int = 0
+    cryptopanic_all_requests_failed: int = 0
+    cryptopanic_json_parse_errors: int = 0
+    cryptopanic_configured_but_unusable: int = 0
+    cryptopanic_status_code_missing_on_http_failure: int = 0
+    cryptopanic_body_excerpt_unredacted_token: int = 0
     cryptopanic_quota_exceeded: int = 0
     cryptopanic_request_ledger_missing_when_used: int = 0
     runs_with_matching_snapshots: int = 0
@@ -122,6 +127,9 @@ class EventAlphaArtifactDoctorResult:
     research_review_digest_too_many_items: int = 0
     research_review_digest_missing_feedback_target: int = 0
     research_review_digest_absolute_path: int = 0
+    notification_body_card_mismatch_canonical: int = 0
+    notification_body_feedback_mismatch_canonical: int = 0
+    research_review_body_uses_hypothesis_target_when_core_exists: int = 0
     research_review_digest_enabled_but_lane_missing: int = 0
     research_review_digest_candidates_without_delivery: int = 0
     digest_item_without_live_confirmation: int = 0
@@ -785,10 +793,20 @@ def diagnose_artifacts(
         "cryptopanic_invalid_currency_code",
         "cryptopanic_empty_currency_request",
         "cryptopanic_coin_id_sent_as_currency",
+        "cryptopanic_status_code_missing_on_http_failure",
+        "cryptopanic_body_excerpt_unredacted_token",
     ):
         if cryptopanic_conflicts[key]:
             message = f"{key}={cryptopanic_conflicts[key]}"
             (blockers if strict else warnings).append(message)
+    for key in (
+        "cryptopanic_all_requests_failed",
+        "cryptopanic_json_parse_errors",
+        "cryptopanic_configured_but_unusable",
+    ):
+        if cryptopanic_conflicts[key]:
+            message = f"{key}={cryptopanic_conflicts[key]}"
+            warnings.append(message)
     if cryptopanic_conflicts["cryptopanic_quota_exceeded"]:
         message = f"cryptopanic_quota_exceeded={cryptopanic_conflicts['cryptopanic_quota_exceeded']}"
         (blockers if strict else warnings).append(message)
@@ -943,6 +961,14 @@ def diagnose_artifacts(
     if delivery_conflicts["multi_item_delivery_missing_arrays"]:
         message = f"multi_item_delivery_missing_arrays={delivery_conflicts['multi_item_delivery_missing_arrays']}"
         (blockers if strict else warnings).append(message)
+    for key in (
+        "notification_body_card_mismatch_canonical",
+        "notification_body_feedback_mismatch_canonical",
+        "research_review_body_uses_hypothesis_target_when_core_exists",
+    ):
+        if delivery_conflicts[key]:
+            message = f"{key}={delivery_conflicts[key]}"
+            (blockers if strict else warnings).append(message)
     for key in (
         "research_review_digest_missing_confirmation_label",
         "research_review_digest_contains_strict_alertable",
@@ -1262,6 +1288,15 @@ def diagnose_artifacts(
         cryptopanic_rejected_only_promoted=cryptopanic_conflicts["cryptopanic_rejected_only_promoted"],
         cryptopanic_token_printed_or_unredacted=cryptopanic_conflicts["cryptopanic_token_printed_or_unredacted"],
         cryptopanic_growth_unsupported_param_used=cryptopanic_conflicts["cryptopanic_growth_unsupported_param_used"],
+        cryptopanic_duplicate_request_key=cryptopanic_conflicts["cryptopanic_duplicate_request_key"],
+        cryptopanic_invalid_currency_code=cryptopanic_conflicts["cryptopanic_invalid_currency_code"],
+        cryptopanic_empty_currency_request=cryptopanic_conflicts["cryptopanic_empty_currency_request"],
+        cryptopanic_coin_id_sent_as_currency=cryptopanic_conflicts["cryptopanic_coin_id_sent_as_currency"],
+        cryptopanic_all_requests_failed=cryptopanic_conflicts["cryptopanic_all_requests_failed"],
+        cryptopanic_json_parse_errors=cryptopanic_conflicts["cryptopanic_json_parse_errors"],
+        cryptopanic_configured_but_unusable=cryptopanic_conflicts["cryptopanic_configured_but_unusable"],
+        cryptopanic_status_code_missing_on_http_failure=cryptopanic_conflicts["cryptopanic_status_code_missing_on_http_failure"],
+        cryptopanic_body_excerpt_unredacted_token=cryptopanic_conflicts["cryptopanic_body_excerpt_unredacted_token"],
         cryptopanic_quota_exceeded=cryptopanic_conflicts["cryptopanic_quota_exceeded"],
         cryptopanic_request_ledger_missing_when_used=cryptopanic_conflicts["cryptopanic_request_ledger_missing_when_used"],
         runs_with_matching_snapshots=matching_snapshot_runs,
@@ -1300,6 +1335,9 @@ def diagnose_artifacts(
         research_review_digest_too_many_items=delivery_conflicts["research_review_digest_too_many_items"],
         research_review_digest_missing_feedback_target=delivery_conflicts["research_review_digest_missing_feedback_target"],
         research_review_digest_absolute_path=delivery_conflicts["research_review_digest_absolute_path"],
+        notification_body_card_mismatch_canonical=delivery_conflicts["notification_body_card_mismatch_canonical"],
+        notification_body_feedback_mismatch_canonical=delivery_conflicts["notification_body_feedback_mismatch_canonical"],
+        research_review_body_uses_hypothesis_target_when_core_exists=delivery_conflicts["research_review_body_uses_hypothesis_target_when_core_exists"],
         research_review_digest_enabled_but_lane_missing=research_review_enabled_but_lane_missing,
         research_review_digest_candidates_without_delivery=research_review_candidates_without_delivery,
         digest_item_without_live_confirmation=delivery_conflicts["digest_item_without_live_confirmation"],
@@ -2093,6 +2131,11 @@ def _cryptopanic_artifact_conflicts(
         "cryptopanic_invalid_currency_code": 0,
         "cryptopanic_empty_currency_request": 0,
         "cryptopanic_coin_id_sent_as_currency": 0,
+        "cryptopanic_all_requests_failed": 0,
+        "cryptopanic_json_parse_errors": 0,
+        "cryptopanic_configured_but_unusable": 0,
+        "cryptopanic_status_code_missing_on_http_failure": 0,
+        "cryptopanic_body_excerpt_unredacted_token": 0,
         "cryptopanic_quota_exceeded": 0,
         "cryptopanic_request_ledger_missing_when_used": 0,
     }
@@ -2161,12 +2204,39 @@ def _cryptopanic_artifact_conflicts(
                 out["cryptopanic_coin_id_sent_as_currency"] += 1
         if "auth_token=" in redacted_url and "auth_token=%3Credacted%3E" not in redacted_url and "auth_token=<redacted>" not in redacted_url:
             out["cryptopanic_token_printed_or_unredacted"] = 1
+        error_class = str(row.get("error_class") or "").strip()
+        status_code = row.get("status_code")
+        try:
+            status_int = int(status_code) if status_code not in (None, "") else None
+        except (TypeError, ValueError):
+            status_int = None
+        if error_class in {"json_parse_error", "empty_response"}:
+            out["cryptopanic_json_parse_errors"] += 1
+        if error_class in {"auth_failed", "rate_limited_or_forbidden", "server_error"} and status_int is None:
+            out["cryptopanic_status_code_missing_on_http_failure"] += 1
+        if _contains_unredacted_cryptopanic_secret(str(row.get("body_excerpt_redacted") or "")):
+            out["cryptopanic_body_excerpt_unredacted_token"] += 1
     request_keys = [
         str(row.get("normalized_request_key") or row.get("request_url_redacted") or "").strip()
         for row in ledger_rows
         if str(row.get("normalized_request_key") or row.get("request_url_redacted") or "").strip()
     ]
     out["cryptopanic_duplicate_request_key"] = max(0, len(request_keys) - len(set(request_keys)))
+    attempted_rows = [row for row in ledger_rows if row.get("quota_counted") is not False]
+    if attempted_rows:
+        successes = sum(1 for row in attempted_rows if int(row.get("result_count") or 0) > 0 and not str(row.get("error_class") or ""))
+        failures = sum(1 for row in attempted_rows if str(row.get("error_class") or "") or _int_or_none(row.get("status_code"), 0) >= 400)
+        if failures and successes == 0 and failures == len(attempted_rows):
+            out["cryptopanic_all_requests_failed"] = 1
+    unusable_markers = (
+        "coverage status: configured_but_parse_error",
+        "coverage status: configured_but_rate_limited",
+        "coverage status: configured_but_auth_failed",
+        "coverage status: configured_but_backoff",
+        "coverage status: quota_exhausted",
+    )
+    if any(marker in source_text for marker in unusable_markers):
+        out["cryptopanic_configured_but_unusable"] = 1
     if sum(1 for _ in ledger_rows) > 600:
         out["cryptopanic_quota_exceeded"] = 1
     combined_text = source_text + "\n" + "\n".join(_read_card_text(path) for path in research_card_paths)
@@ -2228,7 +2298,16 @@ def _contains_unredacted_cryptopanic_secret(text: str) -> bool:
         value = match.group(1)
         if value not in {"<redacted>", "%3Credacted%3E", "[redacted]"}:
             return True
+    if re.search(r"\b[A-Fa-f0-9]{32,}\b", text):
+        return True
     return False
+
+
+def _int_or_none(value: object, default: int | None = None) -> int | None:
+    try:
+        return int(value) if value not in (None, "") else default
+    except (TypeError, ValueError):
+        return default
 
 
 def _accepted_cryptopanic_count(row: Mapping[str, Any]) -> int:
@@ -2403,6 +2482,9 @@ def _notification_delivery_conflicts(
         "research_review_digest_too_many_items": 0,
         "research_review_digest_missing_feedback_target": 0,
         "research_review_digest_absolute_path": 0,
+        "notification_body_card_mismatch_canonical": 0,
+        "notification_body_feedback_mismatch_canonical": 0,
+        "research_review_body_uses_hypothesis_target_when_core_exists": 0,
         "digest_item_without_live_confirmation": 0,
         "digest_item_rejected_results_only": 0,
         "strategic_broad_asset_digest_without_confirmation": 0,
@@ -2476,6 +2558,19 @@ def _notification_delivery_conflicts(
                 out["research_review_digest_too_many_items"] += 1
             if not str(row.get("feedback_target") or "").strip():
                 out["research_review_digest_missing_feedback_target"] += 1
+            if core_ids:
+                body_lower = telegram_body.casefold()
+                card_paths = _tuple_value(row.get("canonical_card_paths")) or _tuple_value(row.get("canonical_card_path"))
+                feedback_targets = _tuple_value(row.get("feedback_targets")) or _tuple_value(row.get("feedback_target"))
+                for card_path in card_paths:
+                    basename = Path(str(card_path)).name
+                    if basename and basename.casefold() not in body_lower:
+                        out["notification_body_card_mismatch_canonical"] += 1
+                for target in feedback_targets:
+                    if target and str(target).casefold() not in body_lower:
+                        out["notification_body_feedback_mismatch_canonical"] += 1
+                if re.search(r"(?im)^\s*feedback target:\s*hyp:", telegram_body):
+                    out["research_review_body_uses_hypothesis_target_when_core_exists"] += 1
             for digest_core in cores:
                 if _research_review_core_is_alertable(digest_core):
                     out["research_review_digest_contains_strict_alertable"] += 1
@@ -3399,6 +3494,15 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"cryptopanic_rejected_only_promoted={result.cryptopanic_rejected_only_promoted} "
             f"cryptopanic_token_printed_or_unredacted={result.cryptopanic_token_printed_or_unredacted} "
             f"cryptopanic_growth_unsupported_param_used={result.cryptopanic_growth_unsupported_param_used} "
+            f"cryptopanic_duplicate_request_key={result.cryptopanic_duplicate_request_key} "
+            f"cryptopanic_invalid_currency_code={result.cryptopanic_invalid_currency_code} "
+            f"cryptopanic_empty_currency_request={result.cryptopanic_empty_currency_request} "
+            f"cryptopanic_coin_id_sent_as_currency={result.cryptopanic_coin_id_sent_as_currency} "
+            f"cryptopanic_all_requests_failed={result.cryptopanic_all_requests_failed} "
+            f"cryptopanic_json_parse_errors={result.cryptopanic_json_parse_errors} "
+            f"cryptopanic_configured_but_unusable={result.cryptopanic_configured_but_unusable} "
+            f"cryptopanic_status_code_missing_on_http_failure={result.cryptopanic_status_code_missing_on_http_failure} "
+            f"cryptopanic_body_excerpt_unredacted_token={result.cryptopanic_body_excerpt_unredacted_token} "
             f"cryptopanic_quota_exceeded={result.cryptopanic_quota_exceeded} "
             f"cryptopanic_request_ledger_missing_when_used={result.cryptopanic_request_ledger_missing_when_used}"
         ),
@@ -3454,6 +3558,9 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"research_review_too_many={result.research_review_digest_too_many_items} "
             f"research_review_feedback_missing={result.research_review_digest_missing_feedback_target} "
             f"research_review_absolute_path={result.research_review_digest_absolute_path} "
+            f"body_card_mismatch={result.notification_body_card_mismatch_canonical} "
+            f"body_feedback_mismatch={result.notification_body_feedback_mismatch_canonical} "
+            f"body_hypothesis_target={result.research_review_body_uses_hypothesis_target_when_core_exists} "
             f"research_review_lane_missing={result.research_review_digest_enabled_but_lane_missing} "
             f"research_review_no_delivery={result.research_review_digest_candidates_without_delivery}"
         ),

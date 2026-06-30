@@ -126,6 +126,7 @@ def write_alert_snapshots(
     rows = [_with_card_context(row, card_context) for row in rows]
     if core_rows:
         rows = [_with_core_resolution(row, core_rows) for row in rows]
+    rows = _dedupe_canonical_alertable_snapshot_rows(rows)
     rows = _filter_snapshot_rows(
         rows,
         policy=cfg.snapshot_policy,
@@ -1324,6 +1325,50 @@ def _filter_snapshot_rows(
                 controls += 1
         return kept
     return rows
+
+
+def _dedupe_canonical_alertable_snapshot_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep one alertable canonical snapshot per core opportunity and route.
+
+    Support rows are still available through the CoreOpportunity store/cards.
+    Writing many alertable snapshots for one canonical core makes inbox and
+    doctor output look like duplicate alerts.
+    """
+    records: list[tuple[int, tuple[str, str] | None, tuple[float, float, str], dict[str, Any]]] = []
+    best: dict[tuple[str, str], tuple[float, float, str, int]] = {}
+    for idx, row in enumerate(rows):
+        key = _canonical_alertable_snapshot_key(row)
+        rank = _canonical_alertable_snapshot_rank(row)
+        records.append((idx, key, rank, row))
+        if key is None:
+            continue
+        current = best.get(key)
+        candidate = (*rank, -idx)
+        if current is None or candidate > current:
+            best[key] = candidate
+    kept: list[dict[str, Any]] = []
+    for idx, key, _rank, row in records:
+        if key is not None and best.get(key, (None, None, None, None))[3] != -idx:
+            continue
+        kept.append(row)
+    return kept
+
+
+def _canonical_alertable_snapshot_key(row: Mapping[str, Any]) -> tuple[str, str] | None:
+    if _is_diagnostic_support_snapshot(row):
+        return None
+    core_id = str(row.get("core_opportunity_id") or "").strip()
+    route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").strip()
+    if not core_id or not event_alpha_router.route_value_is_alertable(route):
+        return None
+    return core_id, route
+
+
+def _canonical_alertable_snapshot_rank(row: Mapping[str, Any]) -> tuple[float, float, str]:
+    score = _num(row.get("opportunity_score_final") or row.get("final_opportunity_score") or row.get("score")) or 0.0
+    source_quality = _num(row.get("source_quality") or row.get("evidence_quality_score")) or 0.0
+    identifier = str(row.get("snapshot_id") or row.get("alert_key") or row.get("alert_id") or "")
+    return score, source_quality, identifier
 
 
 def _outcome_for_row(row: Mapping[str, Any], price_rows: tuple[dict[str, Any], ...]) -> dict[str, Any] | None:

@@ -162,6 +162,8 @@ class EventAlphaSourceCoverageReport:
     cryptopanic_rejected_evidence: int = 0
     cryptopanic_source_packs: tuple[str, ...] = ()
     cryptopanic_not_used_reason: str | None = None
+    cryptopanic_coverage_status: str = "not_configured"
+    cryptopanic_recommendation: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -180,6 +182,8 @@ class EventAlphaSourceCoverageReport:
             "cryptopanic_rejected_evidence": self.cryptopanic_rejected_evidence,
             "cryptopanic_source_packs": list(self.cryptopanic_source_packs),
             "cryptopanic_not_used_reason": self.cryptopanic_not_used_reason,
+            "cryptopanic_coverage_status": self.cryptopanic_coverage_status,
+            "cryptopanic_recommendation": self.cryptopanic_recommendation,
             "packs": [pack.to_dict() for pack in self.packs],
         }
 
@@ -312,6 +316,8 @@ def build_source_coverage_report(
         cryptopanic_rejected_evidence=cryptopanic_stats["rejected"],
         cryptopanic_source_packs=tuple(cryptopanic_stats["source_packs"]),
         cryptopanic_not_used_reason=cryptopanic_stats["not_used_reason"],
+        cryptopanic_coverage_status=cryptopanic_stats["coverage_status"],
+        cryptopanic_recommendation=cryptopanic_stats["recommendation"],
     )
 
 
@@ -338,6 +344,8 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         f"- rejected evidence: {report.cryptopanic_rejected_evidence}",
         f"- source packs contributed: {_join(report.cryptopanic_source_packs)}",
         f"- not-used reason: {report.cryptopanic_not_used_reason or 'none'}",
+        f"- coverage status: {report.cryptopanic_coverage_status}",
+        f"- recommendation: {report.cryptopanic_recommendation or 'none'}",
         "",
         "Source-pack coverage:",
     ]
@@ -521,6 +529,14 @@ def _cryptopanic_stats(
     )
     if usage.today_requests > 0:
         observed = True
+    coverage_status = _cryptopanic_coverage_status(
+        configured=configured_flag,
+        observed=observed,
+        health_status=health_status,
+        accepted=accepted,
+        rejected=rejected,
+        usage=usage,
+    )
     reason = None
     if configured_flag and not observed:
         if health_status == "backoff":
@@ -546,7 +562,52 @@ def _cryptopanic_stats(
         "rejected": rejected,
         "source_packs": _sorted_tuple(source_packs),
         "not_used_reason": reason,
+        "coverage_status": coverage_status,
+        "recommendation": _cryptopanic_recommendation(coverage_status),
     }
+
+
+def _cryptopanic_coverage_status(
+    *,
+    configured: bool,
+    observed: bool,
+    health_status: str,
+    accepted: int,
+    rejected: int,
+    usage: cryptopanic_provider.CryptoPanicUsageSummary,
+) -> str:
+    if not configured:
+        return "not_configured"
+    last_error = str(usage.last_error_class or "").strip()
+    if usage.remaining_weekly == 0:
+        return "quota_exhausted"
+    if last_error == "json_parse_error" or last_error == "empty_response":
+        return "configured_but_parse_error"
+    if last_error in {"rate_limited_or_forbidden", "auth_failed"}:
+        return "configured_but_rate_limited" if last_error == "rate_limited_or_forbidden" else "configured_but_auth_failed"
+    if health_status == "backoff":
+        return "configured_but_backoff"
+    if not observed:
+        return "configured_not_observed"
+    if accepted > 0:
+        return "configured_observed_healthy"
+    if rejected > 0 or usage.today_requests > 0:
+        return "configured_observed_no_results"
+    return "configured_not_observed"
+
+
+def _cryptopanic_recommendation(status: str) -> str:
+    return {
+        "not_configured": "configure CryptoPanic token with RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN",
+        "configured_not_observed": "run a CryptoPanic-enabled rehearsal or inspect provider selection",
+        "configured_observed_healthy": "no action; accepted CryptoPanic evidence is available",
+        "configured_observed_no_results": "no matching token news found; inspect query/candidate terms, not provider credentials",
+        "configured_but_parse_error": "inspect cryptopanic_request_ledger.jsonl body excerpt, content type, and endpoint shape",
+        "configured_but_rate_limited": "wait for cooldown or reduce CryptoPanic request rate/quota usage",
+        "configured_but_auth_failed": "verify the CryptoPanic token/plan without printing the token",
+        "configured_but_backoff": "reset provider backoff only after configuration changed or cooldown elapsed",
+        "quota_exhausted": "wait for quota reset or lower per-run request limits",
+    }.get(status, "inspect CryptoPanic request ledger and provider health")
 
 
 def _row_mentions_cryptopanic(row: Mapping[str, Any]) -> bool:

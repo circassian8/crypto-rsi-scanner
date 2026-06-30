@@ -587,6 +587,26 @@ def test_event_provider_status_ready_with_live_source_and_redacted_credentials()
     assert "CryptoPanic live mode is enabled but the API token is missing" in text
 
 
+def test_event_provider_health_preserves_cryptopanic_safe_error_class():
+    import tempfile
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_provider_health
+
+    with tempfile.TemporaryDirectory() as tmp:
+        cfg = event_provider_health.EventProviderHealthConfig(path=Path(tmp) / "provider_health.jsonl")
+        event_provider_health.record_provider_failure(
+            "cryptopanic_live_news",
+            "CryptoPanic live news fetch failed: json_parse_error",
+            cfg=cfg,
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+            provider_service="cryptopanic",
+            provider_role="event_source",
+        )
+        rows = event_provider_health.load_provider_health(cfg.path)
+        row = rows["cryptopanic:event_source"]
+        assert row["last_error_class"] == "json_parse_error"
+
+
 def test_event_provider_status_ready_with_rss_url_file():
     cfg = _event_provider_status_cfg(
         EVENT_DISCOVERY_PROJECT_BLOG_RSS_LIVE=True,
@@ -867,8 +887,50 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "unknown/not observed providers: gdelt, project_blog_rss" in unobserved_text
     assert "provider coverage status: unknown" in unobserved_text
 
+    configured_cfg = _event_provider_status_cfg(
+        EVENT_DISCOVERY_CRYPTOPANIC_LIVE=True,
+        EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN="SECRET_TOKEN_SHOULD_NOT_RENDER",
+    )
+    configured_report = event_provider_status.build_event_discovery_provider_status(configured_cfg)
+    with TemporaryDirectory() as tmp_ledger:
+        ledger = Path(tmp_ledger) / "cryptopanic_request_ledger.jsonl"
+        ledger.write_text(json.dumps({
+            "timestamp": "2026-06-15T00:00:00+00:00",
+            "plan": "growth_weekly",
+            "request_url_redacted": "https://cryptopanic.test/api/growth_weekly/v2/posts/?auth_token=%3Credacted%3E&currencies=RUNE",
+            "currencies": "RUNE",
+            "status_code": 200,
+            "result_count": 0,
+            "error_class": "json_parse_error",
+            "content_type": "text/html",
+            "body_excerpt_redacted": "<html>Cloudflare</html>",
+            "parse_error_message": "Expecting value",
+            "quota_counted": True,
+        }) + "\n", encoding="utf-8")
+        parse_report = event_alpha_source_coverage.build_source_coverage_report(
+            provider_status_report=configured_report,
+            provider_health_rows={"cryptopanic:catalyst_search": {
+                "provider_service": "cryptopanic",
+                "provider_role": "catalyst_search",
+                "last_error_class": "json_parse_error",
+                "consecutive_failures": 1,
+            }},
+            evidence_acquisition_rows=[],
+            core_opportunity_rows=[],
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            cryptopanic_request_ledger_path=ledger,
+            now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+        )
+        parse_text = event_alpha_source_coverage.format_source_coverage_report(parse_report)
+        assert parse_report.cryptopanic_configured is True
+        assert parse_report.cryptopanic_observed is True
+        assert parse_report.cryptopanic_coverage_status == "configured_but_parse_error"
+        assert "coverage status: configured_but_parse_error" in parse_text
+        assert "inspect cryptopanic_request_ledger.jsonl body excerpt" in parse_text
+        assert "configure CryptoPanic token/news coverage" not in parse_text
+
     import tempfile
-    from pathlib import Path
 
     with tempfile.TemporaryDirectory() as tmp:
         report_path = Path(tmp) / "event_alpha_source_coverage.md"
@@ -890,28 +952,38 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
         assert source_report_doctor.source_coverage_provider_status_unknown > 0
         assert source_report_doctor.source_coverage_provider_marked_healthy_without_observation == 0
 
+        parse_report_path = Path(tmp) / "event_alpha_source_coverage.md"
+        parse_report_path.write_text(
+            "CryptoPanic:\n- configured: true\n- observed this run: true\n- coverage status: configured_but_parse_error\n",
+            encoding="utf-8",
+        )
         (Path(tmp) / "cryptopanic_request_ledger.jsonl").write_text(
             "\n".join([
                 json.dumps({
                     "timestamp": "2026-06-15T00:00:00+00:00",
                     "plan": "growth_weekly",
                     "request_url_redacted": "https://cryptopanic.test/api/growth_weekly/v2/posts/?auth_token=%3Credacted%3E&search=RUNE",
+                    "currencies": "RUNE",
                 }),
                 json.dumps({
                     "timestamp": "2026-06-15T00:01:00+00:00",
                     "plan": "enterprise",
                     "request_url_redacted": "https://cryptopanic.test/api/enterprise/v2/posts/?auth_token=%3Credacted%3E&search=RUNE",
+                    "currencies": "RUNE",
                 }),
                 json.dumps({
                     "timestamp": "2026-06-15T00:02:00+00:00",
                     "plan": "growth_weekly",
                     "request_url_redacted": "https://cryptopanic.test/api/growth_weekly/v2/posts/?auth_token=plain_test_token",
+                    "currencies": "BAD",
+                    "error_class": "json_parse_error",
+                    "body_excerpt_redacted": "<html>bad</html>",
                 }),
             ]) + "\n",
             encoding="utf-8",
         )
         cryptopanic_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
-            source_coverage_report_path=report_path,
+            source_coverage_report_path=parse_report_path,
             profile="notify_llm_deep",
             artifact_namespace="notify_llm_deep",
             include_test_artifacts=True,
@@ -919,6 +991,8 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
         )
         assert cryptopanic_doctor.cryptopanic_growth_unsupported_param_used == 1
         assert cryptopanic_doctor.cryptopanic_token_printed_or_unredacted == 1
+        assert cryptopanic_doctor.cryptopanic_json_parse_errors == 1
+        assert cryptopanic_doctor.cryptopanic_configured_but_unusable == 1
 
         missing_report_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{
@@ -2918,14 +2992,17 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
 
         def __init__(self, payload):
             self.payload = payload
+            self.closed = False
 
         def __enter__(self):
             return self
 
         def __exit__(self, exc_type, exc, tb):
+            self.closed = True
             return False
 
         def read(self):
+            assert self.closed is False, "CryptoPanic response body must be read inside context manager"
             return json.dumps(self.payload).encode("utf-8")
 
     seen = {}
@@ -3274,9 +3351,97 @@ def test_cryptopanic_live_provider_dedupes_failed_same_run_requests():
 
     assert calls == 1
     assert len(ledger_rows) == 1
-    assert ledger_rows[0]["error_class"] == "JSONDecodeError"
+    assert ledger_rows[0]["error_class"] == "json_parse_error"
+    assert ledger_rows[0]["content_type"] is None
+    assert ledger_rows[0]["body_excerpt_redacted"] == "not json"
+    assert ledger_rows[0]["parse_error_message"]
+    assert ledger_rows[0]["response_bytes"] == 8
+    assert ledger_rows[0]["quota_counted"] is True
     assert providers[1].request_cache_hits == 1
-    assert providers[1].requests_deduped == 1
+
+
+def test_cryptopanic_live_provider_records_safe_parse_and_http_diagnostics():
+    import io
+    import json
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    from urllib.error import HTTPError
+
+    from crypto_rsi_scanner.event_providers.cryptopanic import CryptoPanicProvider
+
+    class FakeHeaders(dict):
+        def get(self, key, default=None):
+            return super().get(key, default) or super().get(key.lower(), default)
+
+    class TextResponse:
+        status = 200
+
+        def __init__(self, body: bytes, content_type: str):
+            self._body = body
+            self.headers = FakeHeaders({"Content-Type": content_type})
+            self.closed = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            self.closed = True
+            return False
+
+        def read(self):
+            assert self.closed is False
+            return self._body
+
+    observed = datetime(2026, 6, 15, 12, tzinfo=timezone.utc)
+
+    def run_once(opener):
+        with TemporaryDirectory() as tmp:
+            ledger = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+            provider = CryptoPanicProvider(
+                None,
+                live_enabled=True,
+                api_token="02391c483204eb24f783dd55d61b2e76f727c67c",
+                base_url="https://cryptopanic.test/api/growth_weekly/v2",
+                currencies="CHZ",
+                opener=opener,
+                fetched_at=observed,
+                request_ledger_path=ledger,
+                min_seconds_between_requests=0,
+            )
+            assert provider.fetch_events(observed, observed) == []
+            return provider, [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+
+    empty_provider, empty_rows = run_once(lambda request, timeout: TextResponse(b"", "application/json"))
+    assert empty_provider.last_error_class == "empty_response"
+    assert empty_rows[0]["error_class"] == "empty_response"
+    assert empty_rows[0]["parse_error_message"] == "empty response body"
+    assert empty_rows[0]["response_bytes"] == 0
+
+    html_provider, html_rows = run_once(lambda request, timeout: TextResponse(b"<html>bad token 02391c483204eb24f783dd55d61b2e76f727c67c</html>", "text/html"))
+    assert html_provider.last_error_class == "json_parse_error"
+    assert html_rows[0]["content_type"] == "text/html"
+    assert html_rows[0]["error_class"] == "json_parse_error"
+    assert "02391c483204eb24f783dd55d61b2e76f727c67c" not in html_rows[0]["body_excerpt_redacted"]
+    assert "<redacted>" in html_rows[0]["body_excerpt_redacted"]
+
+    def http_error(request, timeout):
+        raise HTTPError(
+            request.full_url,
+            403,
+            "Forbidden",
+            FakeHeaders({"Content-Type": "text/html"}),
+            io.BytesIO(b"<html>forbidden auth_token=02391c483204eb24f783dd55d61b2e76f727c67c</html>"),
+        )
+
+    http_provider, http_rows = run_once(http_error)
+    assert http_provider.last_error_class == "rate_limited_or_forbidden"
+    assert http_rows[0]["status_code"] == 403
+    assert http_rows[0]["error_class"] == "rate_limited_or_forbidden"
+    assert http_rows[0]["content_type"] == "text/html"
+    assert http_rows[0]["provider_health_effect"] == "degraded_backoff"
+    assert http_rows[0]["quota_counted"] is True
+    assert "02391c483204eb24f783dd55d61b2e76f727c67c" not in http_rows[0]["body_excerpt_redacted"]
 
 
 def test_cryptopanic_catalyst_search_currency_filter_uses_validated_identity_or_empty():
@@ -25670,10 +25835,36 @@ def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
             "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.STORE_ONLY.value,
             "impact_path_type": "meme_attention",
             "candidate_role": "candidate_asset",
+            "card_path": str(Path(tmp) / "cards" / "core_doge_research_review.md"),
+            "feedback_target": "agg:doge-research-review",
             "profile": "fixture",
             "artifact_namespace": namespace,
             "run_mode": "test",
         }
+        preview_plan = notif.build_notification_plan(
+            [decision],
+            storage=_NotifyFakeStorage(),
+            cfg=notif.EventAlphaNotificationConfig(
+                enabled=False,
+                research_review_digest_enabled=True,
+                research_review_digest_min_score=60,
+            ),
+            now=datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc),
+            core_opportunity_rows=[core_row],
+        )
+        preview_body = notif.format_research_review_telegram_digest(
+            preview_plan.research_review_items,
+            profile="fixture",
+            cfg=notif.EventAlphaNotificationConfig(
+                enabled=False,
+                research_review_digest_enabled=True,
+                research_review_digest_min_score=60,
+            ),
+            core_row_by_alert_id=preview_plan.core_row_by_alert_id,
+        )
+        assert "DOGE / dogecoin" in preview_body
+        assert "Card: core_doge_research_review.md" in preview_body
+        assert "Feedback target: agg:doge-research-review" in preview_body
         sent_result = notif.send_notifications(
             [decision],
             storage=_NotifyFakeStorage(),
@@ -25791,6 +25982,116 @@ def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
         assert bad.research_review_digest_missing_feedback_target == 1
         assert bad.research_review_digest_absolute_path == 1
         assert bad.status == "BLOCKED"
+
+
+def test_event_alpha_artifact_doctor_blocks_research_review_body_not_using_canonical_core():
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from crypto_rsi_scanner import (
+        event_alpha_artifact_doctor as doctor,
+        event_alpha_notification_delivery as delivery,
+    )
+
+    namespace = "research_review_canonical_body_unit"
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        preview = base / namespace / "event_alpha_notification_preview.md"
+        preview.parent.mkdir(parents=True, exist_ok=True)
+        preview.write_text(
+            "# Event Alpha Notification Preview\n\n"
+            "## Lane: research_review_digest\n\n"
+            "```html\n"
+            "<b>Event Alpha Research Review</b>\n"
+            "<i>Not alertable. Missing confirmation. Not a trade signal.</i>\n"
+            "1. <b>VELVET / velvet</b>\n"
+            "   Card: hyp_velvet_card.md\n"
+            "   Feedback target: hyp:velvet-stale-support\n"
+            "```\n",
+            encoding="utf-8",
+        )
+        core_row = {
+            "core_opportunity_id": "agg:velvet-spacex-core",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "final_opportunity_level": "exploratory",
+            "final_route_after_quality_gate": "STORE_ONLY",
+            "profile": "fixture",
+            "artifact_namespace": namespace,
+            "run_mode": "test",
+        }
+        delivery_row = {
+            "row_type": "event_alpha_notification_delivery",
+            "run_id": "run-review-body",
+            "profile": "fixture",
+            "artifact_namespace": namespace,
+            "namespace": namespace,
+            "run_mode": "test",
+            "lane": "research_review_digest",
+            "state": delivery.STATE_BLOCKED,
+            "delivery_state": delivery.STATE_BLOCKED,
+            "status_detail": "would_send_but_guard_disabled",
+            "delivery_mode": "no_send_rehearsal",
+            "content_hash": "review-body-canonical",
+            "attempted_at": datetime(2026, 6, 20, 12, 0, tzinfo=timezone.utc).isoformat(),
+            "notification_preview_path": str(preview),
+            "notification_preview_relpath": delivery.notification_preview_relpath_for_path(preview),
+            "core_opportunity_id": "agg:velvet-spacex-core",
+            "core_opportunity_ids": ["agg:velvet-spacex-core"],
+            "canonical_card_path": "event_fade_cache/cards/core_velvet_spacex.md",
+            "canonical_card_paths": ["event_fade_cache/cards/core_velvet_spacex.md"],
+            "feedback_target": "agg:velvet-spacex-core",
+            "feedback_targets": ["agg:velvet-spacex-core"],
+        }
+        result = doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-review-body",
+                "profile": "fixture",
+                "artifact_namespace": namespace,
+                "run_mode": "test",
+            }],
+            delivery_rows=[delivery_row],
+            core_opportunity_rows=[core_row],
+            profile="fixture",
+            artifact_namespace=namespace,
+            include_test_artifacts=True,
+            strict=True,
+            delivery_strict_scope="latest_run",
+        )
+        assert result.notification_body_card_mismatch_canonical == 1
+        assert result.notification_body_feedback_mismatch_canonical == 1
+        assert result.research_review_body_uses_hypothesis_target_when_core_exists == 1
+        assert result.status == "BLOCKED"
+
+        preview.write_text(
+            "# Event Alpha Notification Preview\n\n"
+            "```html\n"
+            "<b>Event Alpha Research Review</b>\n"
+            "<i>Not alertable. Missing confirmation. Not a trade signal.</i>\n"
+            "1. <b>VELVET / velvet</b>\n"
+            "   Card: core_velvet_spacex.md\n"
+            "   Feedback target: agg:velvet-spacex-core\n"
+            "```\n",
+            encoding="utf-8",
+        )
+        clean = doctor.diagnose_artifacts(
+            run_rows=[{
+                "run_id": "run-review-body",
+                "profile": "fixture",
+                "artifact_namespace": namespace,
+                "run_mode": "test",
+            }],
+            delivery_rows=[delivery_row],
+            core_opportunity_rows=[core_row],
+            profile="fixture",
+            artifact_namespace=namespace,
+            include_test_artifacts=True,
+            strict=True,
+            delivery_strict_scope="latest_run",
+        )
+        assert clean.notification_body_card_mismatch_canonical == 0
+        assert clean.notification_body_feedback_mismatch_canonical == 0
+        assert clean.research_review_body_uses_hypothesis_target_when_core_exists == 0
 
 
 def test_event_alpha_notification_quality_modes_filter_lanes():
@@ -26962,7 +27263,11 @@ def test_event_core_opportunities_aggregate_duplicates_and_hide_controls():
             level="high_priority",
             score=94,
         ),
-        row("VELVET", category="rwa_preipo_proxy", path="proxy_exposure", score=67),
+        {
+            **row("VELVET", category="rwa_preipo_proxy", path="proxy_exposure", score=67),
+            "incident_id": "incident:spacex-alt-headline",
+            "hypothesis_id": "hyp:VELVET:rwa_preipo_proxy_alt_headline",
+        },
         {
             **row("VELVET", category="unknown", path="insufficient_data", role="unknown_with_reason", score=0),
             "opportunity_level": "local_only",
@@ -26989,6 +27294,7 @@ def test_event_core_opportunities_aggregate_duplicates_and_hide_controls():
     assert len(velvet) == 1
     assert velvet[0].final_route_after_quality_gate == event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value
     assert {"tokenized_stock_venue", "rwa_preipo_proxy"} <= set(velvet[0].supporting_categories)
+    assert "hyp:VELVET:rwa_preipo_proxy_alt_headline" in velvet[0].supporting_hypothesis_ids
     assert velvet[0].source_noise_control_count == 1
     assert velvet[0].diagnostic_row_count == 2
     assert velvet[0].quality_capped_supporting_rows == 1
