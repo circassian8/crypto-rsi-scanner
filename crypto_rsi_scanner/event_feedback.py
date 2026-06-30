@@ -516,14 +516,18 @@ def _record_from_entry(
         playbook_type=entry.latest_playbook_type,
         latest_score=entry.latest_score,
         watchlist_last_seen_at=entry.last_seen_at,
-        source_class=_optional_str(components.get("source_class")),
-        source_domain=_optional_str(components.get("source_domain")),
-        evidence_specificity=_optional_str(components.get("evidence_specificity")),
-        impact_path_type=_optional_str(components.get("impact_path_type")),
-        candidate_role=_optional_str(components.get("candidate_role")),
-        opportunity_level=_optional_str(components.get("opportunity_level")),
-        market_confirmation_level=_optional_str(components.get("market_confirmation_level")),
-        source_pack=_optional_str(components.get("evidence_acquisition_source_pack") or components.get("source_pack")),
+        source_class=_optional_str(components.get("source_class") or _row_value(row, "source_class", components=row_components)),
+        source_domain=_optional_str(components.get("source_domain") or _row_value(row, "source_domain", components=row_components)),
+        evidence_specificity=_optional_str(components.get("evidence_specificity") or _row_value(row, "evidence_specificity", components=row_components)),
+        impact_path_type=_optional_str(components.get("impact_path_type") or _row_value(row, "impact_path_type", "primary_impact_path", components=row_components)),
+        candidate_role=_optional_str(components.get("candidate_role") or _row_value(row, "candidate_role", components=row_components)),
+        opportunity_level=_optional_str(components.get("opportunity_level") or _row_value(row, "opportunity_level", "final_opportunity_level", components=row_components)),
+        market_confirmation_level=_optional_str(components.get("market_confirmation_level") or _row_value(row, "market_confirmation_level", components=row_components)),
+        source_pack=_optional_str(
+            components.get("evidence_acquisition_source_pack")
+            or components.get("source_pack")
+            or _row_value(row, "source_pack", "evidence_acquisition_source_pack", components=row_components)
+        ),
         source_provider=_optional_str(
             components.get("source_provider")
             or _first_text(components.get("evidence_acquisition_providers_used"))

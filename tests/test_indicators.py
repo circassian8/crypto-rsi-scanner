@@ -29007,7 +29007,6 @@ def test_feedback_and_calibration_include_signal_quality_fields():
         "opportunity_level": "watchlist",
         "source_class": "crypto_native",
         "source_domain": "cryptopanic.com",
-        "evidence_acquisition_source_pack": "proxy_preipo_rwa_pack",
         "evidence_acquisition_providers_used": ("cryptopanic",),
         "catalyst_frame_status": "validated",
         "main_frame_type": "proxy_exposure",

@@ -1107,10 +1107,14 @@ review proposed cases before promoting them into the canonical eval.
 
 Feedback rows are calibration artifacts, not controls. They preserve
 `incident_id`, impact path, candidate role, opportunity level, evidence
-specificity, market confirmation, source class, and playbook metadata from the
-matched watchlist row. Calibration reports group feedback-only rows by those
-fields even when no alert snapshot exists, but they only print recommendations;
-they do not alter thresholds or routing.
+specificity, market confirmation, source class, source domain, source pack,
+market freshness, catalyst-frame status, final route, and playbook metadata
+from the matched canonical core/card/watchlist row. Those calibration
+dimensions should be present as top-level feedback fields; nested source
+metadata remains audit context and should not be the only place a report has to
+look. Calibration reports group feedback-only rows by those fields even when no
+alert snapshot exists, but they only print recommendations; they do not alter
+thresholds or routing.
 
 `event-alpha-quality-loop` runs only local reports:
 

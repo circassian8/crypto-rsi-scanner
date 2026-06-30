@@ -17,6 +17,33 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Harden Event Alpha feedback calibration fields · Codex
+**Why:** Feedback labels should be useful calibration rows even when the matched
+core/card/watchlist context carries source-pack and quality fields outside the
+latest score components.
+**Changes:**
+- Feedback recording now falls back to the matched canonical row/context for
+  top-level calibration fields including source class/domain, evidence
+  specificity, impact path, candidate role, opportunity level, market
+  confirmation, and source pack.
+- Strengthened the feedback/calibration regression so `source_pack` is proven
+  from the canonical context row rather than only from nested score components.
+- Documented that top-level feedback dimensions are the calibration contract;
+  nested metadata remains audit context only.
+**Verify:** `python3 tests/test_indicators.py` (574/574 passed);
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make event-alpha-feedback-readiness PROFILE=catalyst_frame_e2e PYTHON=python3`;
+`make event-feedback-useful PROFILE=catalyst_frame_e2e FEEDBACK_TARGET=agg:3381ebd96566 PYTHON=python3`;
+`make event-alpha-calibration-report PROFILE=catalyst_frame_e2e PYTHON=python3`;
+`make event-alpha-export-signal-quality-cases PROFILE=catalyst_frame_e2e PYTHON=python3`;
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-quality-validation-cycle PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Research-only calibration artifact change. This does not alter
+routes, alertability, notification sends, paper/live rows, normal RSI rows, or
+`TRIGGERED_FADE`.
+
 ## 2026-06-30 — Polish Event Alpha burn-in review queue · Codex
 **Why:** Research-review burn-in needs a small operator-facing queue instead of
 row dumps, while source-noise/control diagnostics stay out of the default

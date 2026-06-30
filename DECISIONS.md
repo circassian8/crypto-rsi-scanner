@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - Feedback rows expose top-level calibration dimensions
+**Status:** accepted
+**Decision:** Event Alpha feedback rows are calibration artifacts and must carry
+the dimensions needed for grouping and eval-case export as top-level fields:
+core opportunity id, card path, run/profile/namespace, incident/hypothesis
+identity, symbol/coin id, impact path, candidate role, opportunity level, final
+route, evidence specificity, source class/domain/pack, market confirmation,
+market freshness, and catalyst-frame status where available. Nested source or
+score metadata remains useful audit context, but calibration reports and
+feedback-to-eval exports should not depend on nested-only fields.
+**Why:** Useful/junk/watch labels only become learnable if they preserve the
+operator-facing source, quality, market, and route dimensions in a stable shape
+across alert, card, watchlist, and core-opportunity targets.
+**Revisit when:** Feedback storage moves to a typed database schema with an
+explicit migration path for historical JSONL artifacts.
+
 ## 2026-06-30 - LLM analyst tools are advisory planning surfaces
 **Status:** accepted
 **Decision:** Event Alpha may use LLM-backed or fixture-backed analyst tools
