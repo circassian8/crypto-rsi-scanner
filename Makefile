@@ -173,7 +173,7 @@ help:
 	@echo "  make event-alpha-resume-notifications PROFILE=notify_no_key CONFIRM=1  Clear the namespace pause file"
 	@echo "  make event-alpha-notification-checklist PROFILE=notify_no_key  Check preview/send readiness without sending"
 	@echo "  make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal  Final artifact gate before enabling Event Alpha Telegram sends"
-	@echo "  make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal  Final artifact-backed send go/no-go report"
+	@echo "  make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal ARTIFACT_NAMESPACE=notify_llm_deep_rehearsal  Final artifact-backed send go/no-go report"
 	@echo "  make event-alpha-telegram-no-send-final-check-fast  Fast deterministic fixture final check with compact output; no live providers or Telegram sends"
 	@echo "  make event-alpha-telegram-one-cycle-send-preflight PROFILE=notify_llm_deep_rehearsal  No-send preflight and marker for one-cycle Telegram re-enable"
 	@echo "  RSI_EVENT_ALERTS_ENABLED=1 CONFIRM=1 make event-alpha-telegram-send-one-cycle PROFILE=notify_llm_deep  Explicit guarded one-cycle Telegram send"
@@ -1145,18 +1145,32 @@ event-alpha-notify-llm-deep-real-no-send-rehearsal-fast:
 	$(PYTHON) main.py --event-alpha-send-readiness --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_rehearsal
 
 event-alpha-send-readiness: PROFILE = notify_llm_deep_rehearsal
+event-alpha-send-readiness: ARTIFACT_NAMESPACE ?= $(PROFILE)
 event-alpha-send-readiness:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
-	$(if $(filter notify_llm_deep_rehearsal notify_llm_deep_no_send_smoke notify_llm_deep_fixture_rehearsal,$(PROFILE)),RSI_EVENT_ALERTS_ENABLED=0,) \
-	$(PYTHON) main.py --event-alpha-send-readiness --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
+	RSI_EVENT_ALPHA_FEEDBACK_PATH=$(EVENT_ALPHA_PROFILE_DIR)/event_alpha_feedback.jsonl \
+	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
+	$(if $(or $(findstring fixture,$(ARTIFACT_NAMESPACE)),$(findstring smoke,$(ARTIFACT_NAMESPACE)),$(findstring rehearsal,$(ARTIFACT_NAMESPACE)),$(findstring no_send,$(ARTIFACT_NAMESPACE))),RSI_EVENT_ALERTS_ENABLED=0,) \
+	$(PYTHON) main.py --event-alpha-send-readiness --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
 
 event-alpha-send-go-no-go: PROFILE = notify_llm_deep_rehearsal
+event-alpha-send-go-no-go: ARTIFACT_NAMESPACE ?= $(PROFILE)
 event-alpha-send-go-no-go:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \
-	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(PROFILE) \
-	$(if $(filter notify_llm_deep_rehearsal notify_llm_deep_no_send_smoke notify_llm_deep_fixture_rehearsal,$(PROFILE)),RSI_EVENT_ALERTS_ENABLED=0,) \
-	$(PYTHON) main.py --event-alpha-notify-go-no-go --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(PROFILE) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
+	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=$(ARTIFACT_NAMESPACE) \
+	RSI_EVENT_ALPHA_RUN_LEDGER_PATH=$(EVENT_ALPHA_RUN_LEDGER_PATH) \
+	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
+	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
+	RSI_EVENT_PROVIDER_HEALTH_PATH=$(EVENT_PROVIDER_HEALTH_PATH) \
+	RSI_EVENT_ALPHA_FEEDBACK_PATH=$(EVENT_ALPHA_PROFILE_DIR)/event_alpha_feedback.jsonl \
+	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
+	$(if $(or $(findstring fixture,$(ARTIFACT_NAMESPACE)),$(findstring smoke,$(ARTIFACT_NAMESPACE)),$(findstring rehearsal,$(ARTIFACT_NAMESPACE)),$(findstring no_send,$(ARTIFACT_NAMESPACE))),RSI_EVENT_ALERTS_ENABLED=0,) \
+	$(PYTHON) main.py --event-alpha-notify-go-no-go --event-alpha-profile $(EVENT_ALPHA_RUNTIME_PROFILE) --event-alpha-artifact-namespace $(ARTIFACT_NAMESPACE) $(EVENT_ALPHA_INCLUDE_TEST_ARG)
 
 event-alpha-telegram-send-readiness-final: PROFILE = notify_llm_deep_fixture_rehearsal
 event-alpha-telegram-send-readiness-final:

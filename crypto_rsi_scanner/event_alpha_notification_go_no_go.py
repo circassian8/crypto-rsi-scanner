@@ -366,12 +366,24 @@ def _delivery_rows_have_canonical_identity(rows: Iterable[Mapping[str, Any]]) ->
     if not scoped:
         return True
     return all(
-        bool(str(row.get("core_opportunity_id") or "").strip())
-        and bool(str(row.get("canonical_symbol") or "").strip())
-        and bool(str(row.get("canonical_coin_id") or "").strip())
-        and bool(str(row.get("feedback_target") or "").strip())
+        bool(_identity_values(row, "core_opportunity_ids", "core_opportunity_id"))
+        and bool(_identity_values(row, "canonical_symbols", "canonical_symbol"))
+        and bool(_identity_values(row, "canonical_coin_ids", "canonical_coin_id"))
+        and bool(_identity_values(row, "feedback_targets", "feedback_target"))
         for row in scoped
     )
+
+
+def _identity_values(row: Mapping[str, Any], array_key: str, scalar_key: str) -> tuple[str, ...]:
+    value = row.get(array_key)
+    if isinstance(value, (list, tuple)):
+        items = tuple(str(item).strip() for item in value if str(item).strip())
+        if items:
+            return items
+    scalar = str(row.get(scalar_key) or "").strip()
+    if not scalar:
+        return ()
+    return tuple(part.strip() for part in scalar.split(",") if part.strip())
 
 
 def _has_alert_delivery_rows(rows: Iterable[Mapping[str, Any]]) -> bool:

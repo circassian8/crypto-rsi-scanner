@@ -1574,6 +1574,7 @@ def _event_alpha_notification_config_from_runtime(
         profile_name=profile_name,
         artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
         daily_digest_cooldown_hours=config.EVENT_ALPHA_NOTIFY_DAILY_DIGEST_COOLDOWN_HOURS,
+        daily_digest_max_items=config.EVENT_ALPHA_DAILY_DIGEST_MAX_ITEMS,
         instant_escalation_cooldown_hours=config.EVENT_ALPHA_NOTIFY_INSTANT_COOLDOWN_HOURS,
         max_instant_per_day=config.EVENT_ALPHA_NOTIFY_MAX_INSTANT_PER_DAY,
         health_heartbeat_enabled=config.EVENT_ALPHA_NOTIFY_HEALTH_HEARTBEAT_ENABLED,
@@ -2360,6 +2361,14 @@ def _cryptopanic_stats_for_pipeline_result(
         weekly_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
         daily_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
     )
+    ledger_rows = _recent_cryptopanic_request_rows(_cryptopanic_request_ledger_path(), since=usage.last_request_at)
+    normalized_keys = [
+        str(row.get("normalized_request_key") or "").strip()
+        for row in ledger_rows
+        if str(row.get("normalized_request_key") or "").strip()
+    ]
+    duplicate_requests = max(0, len(normalized_keys) - len(set(normalized_keys)))
+    invalid_currency_requests = sum(1 for row in ledger_rows if _cryptopanic_row_has_invalid_currencies(row))
     requests_used = int(usage.today_requests or 0)
     if requests_used > 0:
         attempted = True
@@ -2384,12 +2393,64 @@ def _cryptopanic_stats_for_pipeline_result(
         "cryptopanic_configured": configured,
         "cryptopanic_attempted": attempted,
         "cryptopanic_requests_used": requests_used,
+        "cryptopanic_request_cache_hits": 0,
+        "cryptopanic_request_cache_misses": max(0, len(normalized_keys)),
+        "cryptopanic_requests_deduped": duplicate_requests,
+        "cryptopanic_invalid_currency_requests_skipped": invalid_currency_requests,
         "cryptopanic_results": max(results_seen, accepted + rejected),
         "cryptopanic_accepted_evidence": accepted,
         "cryptopanic_rejected_evidence": rejected,
         "cryptopanic_provider_status": provider_status,
         "cryptopanic_skip_reason": skip_reason,
     }
+
+
+def _recent_cryptopanic_request_rows(path: str | Path | None, *, since: datetime | None = None) -> list[Mapping[str, Any]]:
+    request_path = Path(path).expanduser() if path else None
+    if request_path is None or not request_path.exists():
+        return []
+    rows: list[Mapping[str, Any]] = []
+    try:
+        for line in request_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if not isinstance(row, Mapping):
+                continue
+            if since is not None:
+                ts = _parse_datetime_utc(row.get("timestamp"))
+                if ts is not None and ts < since:
+                    continue
+            rows.append(row)
+    except (OSError, json.JSONDecodeError):
+        return rows
+    return rows
+
+
+def _cryptopanic_row_has_invalid_currencies(row: Mapping[str, Any]) -> bool:
+    currencies = str(row.get("currencies") or "").strip()
+    if not currencies:
+        return True
+    for part in currencies.split(","):
+        value = part.strip()
+        if not value or value == "SECTOR" or value != value.upper() or "-" in value or "_" in value:
+            return True
+    return False
+
+
+def _parse_datetime_utc(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _mapping_mentions_cryptopanic(item: object) -> bool:
@@ -3508,6 +3569,8 @@ def event_alpha_notify_go_no_go(
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         card_paths=card_paths,
         provider_health_rows=artifacts["provider_rows"],
+        source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
+        daily_brief_path=context.daily_brief_path,
         llm_budget_rows=artifacts["budget_rows"],
         delivery_rows=delivery_rows,
         profile=profile_name,
@@ -6840,6 +6903,8 @@ def event_alpha_send_readiness_report(
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         card_paths=card_paths,
         provider_health_rows=artifacts["provider_rows"],
+        source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
+        daily_brief_path=context.daily_brief_path,
         llm_budget_rows=artifacts["budget_rows"],
         delivery_rows=delivery_rows,
         profile=profile_name,

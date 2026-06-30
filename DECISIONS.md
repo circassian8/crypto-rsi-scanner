@@ -16,6 +16,24 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - Event Alpha daily digest requires confirmation and grouping
+**Status:** accepted
+**Decision:** Live-style Event Alpha daily digest lanes must contain grouped,
+confirmed core opportunities only. A daily digest item needs accepted
+source-pack evidence, official/structured evidence, matching CryptoPanic
+token+catalyst proof, or fresh market confirmation with a non-generic impact
+path. Unconfirmed/not-executed/no-market candidates, sector-only rows, generic
+cooccurrence, broad strategic/macro context without token proof, and duplicate
+support rows must stay in research-review, near-miss, local-only, or diagnostic
+artifacts. Multi-item delivery rows must use structured identity arrays while
+retaining scalar compatibility fields.
+**Why:** The first Growth Weekly rehearsal proved CryptoPanic evidence works,
+but it also showed that unconfirmed support rows can make daily digest output
+too noisy and artifact identities fragile.
+**Revisit when:** Reviewed burn-in labels show that a specific lower-confidence
+class should be promoted into daily digest with a deterministic source/market
+proof rule.
+
 ## 2026-06-30 - CryptoPanic Growth Weekly uses a conservative request contract
 **Status:** accepted
 **Decision:** CryptoPanic live Event Alpha access defaults to the Growth Weekly
@@ -27,8 +45,12 @@ aliases are accepted for operator convenience. Growth profiles must not send
 `search`, `size`, `last_pull`, `with_content`, `panic_period`, or
 `panic_sort`. Requests are quota-ledgered with redacted URLs and bounded by
 weekly, per-run, daily-soft, page, currency-batch, and minimum-interval limits.
-Artifact doctor blocks unredacted tokens, Growth-unsupported params, quota
-overruns, and rejected-only promoted CryptoPanic evidence.
+CryptoPanic currency planning is ticker-only: CoinGecko slugs, `SECTOR`, empty
+currency requests, lowercase/raw terms, and unvalidated common-word collisions
+must be rejected before live request construction. Repeated normalized request
+keys within a run must be deduped/cached. Artifact doctor blocks unredacted
+tokens, Growth-unsupported params, invalid or duplicate currency requests,
+quota overruns, and rejected-only promoted CryptoPanic evidence.
 **Why:** The user’s current subscription is a 600-request/week Growth Weekly
 plan. The previous integration could hit the wrong endpoint or unsupported
 params, causing 403s and stale backoff while burning operator trust.

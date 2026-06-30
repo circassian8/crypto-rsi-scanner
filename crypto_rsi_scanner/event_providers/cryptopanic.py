@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -35,6 +36,38 @@ GROWTH_WEEKLY_UNSUPPORTED_PARAMS = {
     "size",
     "with_content",
 }
+_CURRENCY_CODE_RE = re.compile(r"^[A-Z][A-Z0-9]{0,9}$")
+_COMMON_WORD_TICKER_COLLISIONS = {
+    "A",
+    "AI",
+    "ALL",
+    "AND",
+    "ARE",
+    "AS",
+    "AT",
+    "BE",
+    "BY",
+    "FOR",
+    "GO",
+    "H",
+    "IN",
+    "IS",
+    "IT",
+    "JUST",
+    "NO",
+    "NOT",
+    "OF",
+    "ON",
+    "OR",
+    "REAL",
+    "SO",
+    "THE",
+    "TO",
+    "UP",
+    "US",
+    "WE",
+}
+_PROCESS_REQUEST_CACHE: dict[tuple[str, tuple[Any, ...]], tuple[Mapping[str, Any], ...]] = {}
 
 
 @dataclass(frozen=True)
@@ -49,6 +82,75 @@ class CryptoPanicUsageSummary:
     last_request_at: datetime | None = None
     last_status_code: int | None = None
     last_error_class: str | None = None
+
+
+@dataclass(frozen=True)
+class CryptoPanicCurrencyPlan:
+    accepted: tuple[str, ...]
+    rejected: tuple[dict[str, str], ...]
+    duplicate_count: int = 0
+
+
+def normalize_cryptopanic_currency_code(
+    symbol: object,
+    coin_id: object = None,
+    aliases: Iterable[object] = (),
+    *,
+    identity_validated: bool = True,
+) -> str | None:
+    """Return a Growth-API currency ticker or ``None`` for unsafe candidates.
+
+    CryptoPanic's ``currencies`` parameter expects token tickers, not CoinGecko
+    slugs. Callers with unvalidated raw terms should pass
+    ``identity_validated=False`` so common-word collisions such as ``H`` stay out
+    of live request planning.
+    """
+    code, _reason = _normalize_currency_candidate(
+        symbol,
+        coin_id=coin_id,
+        aliases=aliases,
+        identity_validated=identity_validated,
+    )
+    return code
+
+
+def plan_cryptopanic_currency_codes(
+    candidates: Iterable[Mapping[str, Any] | object],
+    *,
+    identity_validated: bool = True,
+) -> CryptoPanicCurrencyPlan:
+    accepted: list[str] = []
+    rejected: list[dict[str, str]] = []
+    seen: set[str] = set()
+    duplicates = 0
+    for candidate in candidates:
+        if isinstance(candidate, Mapping):
+            symbol = candidate.get("symbol") or candidate.get("code") or candidate.get("currency")
+            coin_id = candidate.get("coin_id") or candidate.get("slug")
+            aliases = candidate.get("aliases") or ()
+            validated = bool(candidate.get("identity_validated", identity_validated))
+        else:
+            symbol = candidate
+            coin_id = None
+            aliases = ()
+            validated = identity_validated
+        code, reason = _normalize_currency_candidate(
+            symbol,
+            coin_id=coin_id,
+            aliases=aliases,
+            identity_validated=validated,
+        )
+        raw = str(symbol or "").strip()
+        if not code:
+            rejected.append({"candidate": raw, "reason": reason or "invalid_currency"})
+            continue
+        if code in seen:
+            duplicates += 1
+            rejected.append({"candidate": raw or code, "normalized": code, "reason": "duplicate_request"})
+            continue
+        seen.add(code)
+        accepted.append(code)
+    return CryptoPanicCurrencyPlan(tuple(accepted), tuple(rejected), duplicates)
 
 
 def _urlopen_with_timeout(request: Request, timeout: float) -> Any:
@@ -120,6 +222,12 @@ class CryptoPanicProvider:
         self.last_status_code: int | None = None
         self.last_result_count: int = 0
         self.requests_attempted: int = 0
+        self.request_cache_hits: int = 0
+        self.request_cache_misses: int = 0
+        self.requests_deduped: int = 0
+        self.invalid_currency_requests_skipped: int = 0
+        self.rejected_currency_candidates: tuple[dict[str, str], ...] = ()
+        self._request_cache: dict[tuple[Any, ...], tuple[Mapping[str, Any], ...]] = {}
 
     def fetch_events(self, start: datetime, end: datetime) -> list[RawDiscoveredEvent]:
         self.last_warnings = ()
@@ -139,6 +247,12 @@ class CryptoPanicProvider:
         self.last_status_code = None
         self.last_result_count = 0
         self.requests_attempted = 0
+        self.request_cache_hits = 0
+        self.request_cache_misses = 0
+        self.requests_deduped = 0
+        self.invalid_currency_requests_skipped = 0
+        self.rejected_currency_candidates = ()
+        self._request_cache = {}
         token = self.api_token.strip()
         if not token:
             warning = "CryptoPanic live news fetch skipped: missing API token"
@@ -152,7 +266,18 @@ class CryptoPanicProvider:
         rows: list[Mapping[str, Any]] = []
         warnings: list[str] = []
         seen_ids: set[str] = set()
-        for currencies in _currency_batches(self.currencies, max_size=self.max_currencies_per_request):
+        batches, plan = _currency_batches_with_plan(self.currencies, max_size=self.max_currencies_per_request)
+        self.requests_deduped = plan.duplicate_count
+        self.invalid_currency_requests_skipped = len(plan.rejected)
+        self.rejected_currency_candidates = plan.rejected
+        if not batches:
+            self.last_skip_reason = "no_valid_currencies"
+            self.last_warnings = ("CryptoPanic live news fetch skipped: no valid currency tickers",)
+            for warning in self.last_warnings:
+                log.warning(warning)
+            return []
+
+        for currencies in batches:
             for page in range(self.page, self.page + self.max_pages_per_query):
                 decision = self._quota_skip_reason(now=observed)
                 if decision:
@@ -160,6 +285,24 @@ class CryptoPanicProvider:
                     if decision in {"quota_exhausted", "run_budget_exhausted", "daily_soft_limit_exceeded"}:
                         warnings.append(f"CryptoPanic live news fetch skipped: {decision}")
                     continue
+                cache_key = self._request_cache_key(currencies=currencies, page=page)
+                process_cache_key = self._process_request_cache_key(cache_key)
+                cached = self._request_cache.get(cache_key)
+                if cached is None and process_cache_key is not None:
+                    cached = _PROCESS_REQUEST_CACHE.get(process_cache_key)
+                if cached is not None:
+                    self.request_cache_hits += 1
+                    self.requests_deduped += 1
+                    self._request_cache[cache_key] = cached
+                    for item in cached:
+                        key = str(item.get("cryptopanic_id") or item.get("id") or item.get("url") or "")
+                        if key and key in seen_ids:
+                            continue
+                        if key:
+                            seen_ids.add(key)
+                        rows.append(item)
+                    continue
+                self.request_cache_misses += 1
                 url = self._request_url(token, currencies=currencies, page=page)
                 redacted_url = redact_cryptopanic_url(url)
                 self.last_request_url_redacted = redacted_url
@@ -173,8 +316,11 @@ class CryptoPanicProvider:
                         status_code = int(getattr(response, "status", getattr(response, "code", 200)))
                         if status_code >= 400:
                             raise RuntimeError(f"HTTP {status_code}")
-                        raw = json.loads(response.read().decode("utf-8"))
+                    raw = json.loads(response.read().decode("utf-8"))
                     fetched = [_normalize_cryptopanic_item(item) for item in _news_items(raw, allow_empty=True)]
+                    self._request_cache[cache_key] = tuple(fetched)
+                    if process_cache_key is not None:
+                        _PROCESS_REQUEST_CACHE[process_cache_key] = tuple(fetched)
                     result_count = len(fetched)
                     self.last_result_count += result_count
                     for item in fetched:
@@ -189,6 +335,9 @@ class CryptoPanicProvider:
                     error_class = _error_class_from_exception(exc)
                     warning = _safe_fetch_warning(exc)
                     warnings.append(warning)
+                    self._request_cache[cache_key] = ()
+                    if process_cache_key is not None:
+                        _PROCESS_REQUEST_CACHE[process_cache_key] = ()
                     if self.required:
                         raise
                 finally:
@@ -244,6 +393,26 @@ class CryptoPanicProvider:
         if plan == "enterprise" and self.search:
             query["search"] = self.search
         return _append_query(_posts_endpoint(self.base_url), query)
+
+    def _request_cache_key(self, *, currencies: str, page: int) -> tuple[Any, ...]:
+        normalized = tuple(part.strip().upper() for part in str(currencies or "").split(",") if part.strip())
+        return (
+            normalized,
+            str(self.filter_name or "").strip().lower(),
+            str(self.kind or "").strip().lower(),
+            bool(self.public),
+            bool(self.following),
+            int(page or 1),
+        )
+
+    def _process_request_cache_key(self, request_key: tuple[Any, ...]) -> tuple[str, tuple[Any, ...]] | None:
+        if self.request_ledger_path is None:
+            return None
+        try:
+            scope = str(self.request_ledger_path.resolve())
+        except OSError:
+            scope = str(self.request_ledger_path)
+        return (scope, request_key)
 
     def _quota_skip_reason(self, *, now: datetime) -> str | None:
         if self.request_ledger_path is None:
@@ -302,6 +471,9 @@ class CryptoPanicProvider:
             "request_url_redacted": request_url_redacted,
             "plan": self.plan or GROWTH_WEEKLY_PLAN,
             "currencies": currencies,
+            "normalized_request_key": "|".join(
+                str(part) for part in self._request_cache_key(currencies=currencies, page=page)
+            ),
             "filter": self.filter_name if self.filter_name in GROWTH_WEEKLY_ALLOWED_FILTERS else "",
             "kind": self.kind if self.kind in GROWTH_WEEKLY_ALLOWED_KINDS else "",
             "page": page,
@@ -396,19 +568,59 @@ def _append_query(url: str, query: Mapping[str, str]) -> str:
 
 
 def _currency_batches(raw: str, *, max_size: int) -> tuple[str, ...]:
-    values = [part.strip() for part in str(raw or "").replace(";", ",").split(",") if part.strip()]
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        key = value.casefold()
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(value)
+    batches, _plan = _currency_batches_with_plan(raw, max_size=max_size)
+    return batches
+
+
+def _currency_batches_with_plan(raw: str, *, max_size: int) -> tuple[tuple[str, ...], CryptoPanicCurrencyPlan]:
+    candidates = []
+    for part in str(raw or "").replace(";", ",").split(","):
+        value = part.strip()
+        candidates.append({"symbol": value, "identity_validated": False})
+    plan = plan_cryptopanic_currency_codes(candidates, identity_validated=False)
+    deduped = list(plan.accepted)
     if not deduped:
-        return ("",)
+        return (), plan
     size = max(1, int(max_size or 1))
-    return tuple(",".join(deduped[index:index + size]) for index in range(0, len(deduped), size))
+    return tuple(",".join(deduped[index:index + size]) for index in range(0, len(deduped), size)), plan
+
+
+def _normalize_currency_candidate(
+    symbol: object,
+    *,
+    coin_id: object = None,
+    aliases: Iterable[object] = (),
+    identity_validated: bool = True,
+) -> tuple[str | None, str]:
+    raw = str(symbol or "").strip()
+    if not raw:
+        return None, "empty_currency"
+    upper = raw.upper()
+    if upper == "SECTOR":
+        return None, "sector_not_currency"
+    if _looks_like_coin_slug(raw):
+        return None, "coin_id_not_currency"
+    if not _CURRENCY_CODE_RE.match(upper):
+        return None, "symbol_unvalidated"
+    if not identity_validated and upper in _COMMON_WORD_TICKER_COLLISIONS:
+        return None, "ticker_collision"
+    _ = coin_id, tuple(aliases or ())
+    return upper, ""
+
+
+def _looks_like_coin_slug(value: str) -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    if text != text.upper():
+        return True
+    if text != text.upper() and ("-" in text or "_" in text):
+        return True
+    if text != text.upper() and any(ch.isdigit() for ch in text):
+        return True
+    if " " in text:
+        return True
+    return False
 
 
 def _normalize_cryptopanic_item(item: Mapping[str, Any]) -> Mapping[str, Any]:

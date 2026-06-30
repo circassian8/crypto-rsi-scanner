@@ -17,6 +17,56 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Harden CryptoPanic request planning and digest eligibility · Codex
+**Why:** The Growth Weekly no-send rehearsal exposed two live-path risks:
+duplicate/invalid CryptoPanic currency requests could burn quota, and daily
+digest rows could still include unconfirmed support candidates.
+**Changes:**
+- Added ticker-only CryptoPanic request planning that rejects empty/global,
+  `SECTOR`, slug/coin-id, lowercase, malformed, duplicate, and unvalidated
+  common-word currency requests before live fetch construction.
+- Added per-run request-key dedupe/cache across provider instances, including
+  failed/malformed responses, plus request-planning counters in pipeline/run
+  ledgers and strict artifact-doctor checks for duplicate or invalid
+  CryptoPanic requests.
+- Normalized catalyst-search CryptoPanic currency filters to validated ticker
+  symbols only, avoiding coin-id strings such as `RUNE,thorchain`.
+- Tightened live-style daily digest eligibility so only confirmed, grouped core
+  opportunities can remain in digest lanes; unconfirmed rows are moved to
+  research-review/local diagnostics, and digest rendering is capped by
+  `RSI_EVENT_ALPHA_DAILY_DIGEST_MAX_ITEMS`.
+- Added structured multi-item delivery identity arrays for core IDs, symbols,
+  coin IDs, card paths, and feedback targets while preserving scalar
+  compatibility fields.
+- Made send-readiness/go-no-go Make targets namespace-aware and wired embedded
+  artifact-doctor checks to the correct source-coverage and daily-brief
+  artifacts.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, the Event Alpha runbook,
+  and regressions for CryptoPanic request planning, daily digest gating, and
+  delivery identity arrays.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (585/585 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3` (36/36 passed);
+`make event-alpha-cryptopanic-preflight PYTHON=python3` (READY, token redacted,
+Growth endpoint, per-run cap 10);
+`make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal PYTHON=python3`
+(no sends, strict doctor had no blockers);
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-send-readiness PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`
+(READY_FOR_NO_SEND_REHEARSAL_REVIEW);
+`make event-alpha-send-go-no-go PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`
+(READY_FOR_NO_SEND_REVIEW);
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE=latest_run PYTHON=python3`
+(WARN only, blockers none);
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The live CryptoPanic rehearsal returned provider JSON decode
+warnings and entered provider backoff; the duplicate failed request was still
+deduped/cached and handled fail-soft. No Telegram sends, trades, paper rows,
+normal RSI rows, or `TRIGGERED_FADE` creation were performed.
+
 ## 2026-06-30 — Send all Event Alpha digest items to Telegram · Codex
 **Why:** The live Event Alpha digest was hiding routed candidates behind a
 `+N more in the local notification inbox` footer. The operator wants every

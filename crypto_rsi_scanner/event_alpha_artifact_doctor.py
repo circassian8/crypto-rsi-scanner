@@ -82,6 +82,10 @@ class EventAlphaArtifactDoctorResult:
     cryptopanic_rejected_only_promoted: int = 0
     cryptopanic_token_printed_or_unredacted: int = 0
     cryptopanic_growth_unsupported_param_used: int = 0
+    cryptopanic_duplicate_request_key: int = 0
+    cryptopanic_invalid_currency_code: int = 0
+    cryptopanic_empty_currency_request: int = 0
+    cryptopanic_coin_id_sent_as_currency: int = 0
     cryptopanic_quota_exceeded: int = 0
     cryptopanic_request_ledger_missing_when_used: int = 0
     runs_with_matching_snapshots: int = 0
@@ -109,6 +113,7 @@ class EventAlphaArtifactDoctorResult:
     delivery_feedback_target_missing: int = 0
     delivery_card_path_missing: int = 0
     delivery_alert_id_not_canonical: int = 0
+    multi_item_delivery_missing_arrays: int = 0
     telegram_message_contains_absolute_path: int = 0
     telegram_message_contains_raw_debug_dump: int = 0
     research_review_digest_missing_confirmation_label: int = 0
@@ -775,6 +780,15 @@ def diagnose_artifacts(
             f"{cryptopanic_conflicts['cryptopanic_growth_unsupported_param_used']}"
         )
         (blockers if strict else warnings).append(message)
+    for key in (
+        "cryptopanic_duplicate_request_key",
+        "cryptopanic_invalid_currency_code",
+        "cryptopanic_empty_currency_request",
+        "cryptopanic_coin_id_sent_as_currency",
+    ):
+        if cryptopanic_conflicts[key]:
+            message = f"{key}={cryptopanic_conflicts[key]}"
+            (blockers if strict else warnings).append(message)
     if cryptopanic_conflicts["cryptopanic_quota_exceeded"]:
         message = f"cryptopanic_quota_exceeded={cryptopanic_conflicts['cryptopanic_quota_exceeded']}"
         (blockers if strict else warnings).append(message)
@@ -925,6 +939,9 @@ def diagnose_artifacts(
             "telegram_message_contains_raw_debug_dump="
             f"{delivery_conflicts['telegram_message_contains_raw_debug_dump']}"
         )
+        (blockers if strict else warnings).append(message)
+    if delivery_conflicts["multi_item_delivery_missing_arrays"]:
+        message = f"multi_item_delivery_missing_arrays={delivery_conflicts['multi_item_delivery_missing_arrays']}"
         (blockers if strict else warnings).append(message)
     for key in (
         "research_review_digest_missing_confirmation_label",
@@ -2072,6 +2089,10 @@ def _cryptopanic_artifact_conflicts(
         "cryptopanic_rejected_only_promoted": 0,
         "cryptopanic_token_printed_or_unredacted": 0,
         "cryptopanic_growth_unsupported_param_used": 0,
+        "cryptopanic_duplicate_request_key": 0,
+        "cryptopanic_invalid_currency_code": 0,
+        "cryptopanic_empty_currency_request": 0,
+        "cryptopanic_coin_id_sent_as_currency": 0,
         "cryptopanic_quota_exceeded": 0,
         "cryptopanic_request_ledger_missing_when_used": 0,
     }
@@ -2130,8 +2151,22 @@ def _cryptopanic_artifact_conflicts(
         plan = str(row.get("plan") or "growth_weekly").strip().lower()
         if plan != "enterprise" and _growth_unsupported_params(redacted_url):
             out["cryptopanic_growth_unsupported_param_used"] += 1
+        currencies = str(row.get("currencies") or "").strip()
+        if not currencies:
+            out["cryptopanic_empty_currency_request"] += 1
+        for currency in [part.strip() for part in currencies.split(",") if part.strip()]:
+            if currency != currency.upper() or not re.match(r"^[A-Z][A-Z0-9]{1,9}$", currency):
+                out["cryptopanic_invalid_currency_code"] += 1
+            if "-" in currency or "_" in currency or currency.casefold() in {"fetch-ai", "synapse-2", "chiliz"}:
+                out["cryptopanic_coin_id_sent_as_currency"] += 1
         if "auth_token=" in redacted_url and "auth_token=%3Credacted%3E" not in redacted_url and "auth_token=<redacted>" not in redacted_url:
             out["cryptopanic_token_printed_or_unredacted"] = 1
+    request_keys = [
+        str(row.get("normalized_request_key") or row.get("request_url_redacted") or "").strip()
+        for row in ledger_rows
+        if str(row.get("normalized_request_key") or row.get("request_url_redacted") or "").strip()
+    ]
+    out["cryptopanic_duplicate_request_key"] = max(0, len(request_keys) - len(set(request_keys)))
     if sum(1 for _ in ledger_rows) > 600:
         out["cryptopanic_quota_exceeded"] = 1
     combined_text = source_text + "\n" + "\n".join(_read_card_text(path) for path in research_card_paths)
@@ -2371,6 +2406,7 @@ def _notification_delivery_conflicts(
         "digest_item_without_live_confirmation": 0,
         "digest_item_rejected_results_only": 0,
         "strategic_broad_asset_digest_without_confirmation": 0,
+        "multi_item_delivery_missing_arrays": 0,
         "notification_preview_missing": 0,
         "notification_preview_relpath_missing": 0,
         "notification_preview_path_unresolvable": 0,
@@ -2425,7 +2461,8 @@ def _notification_delivery_conflicts(
                 if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
                     out["telegram_message_contains_raw_debug_dump"] += 1
         lane = str(row.get("lane") or "")
-        core_ids = _tuple_value(row.get("core_opportunity_id"))
+        scalar_core_ids = _tuple_value(row.get("core_opportunity_id"))
+        core_ids = _tuple_value(row.get("core_opportunity_ids")) or scalar_core_ids
         alert_ids = _tuple_value(row.get("alert_id"))
         cores = tuple(core_rows_by_id[core_id] for core_id in core_ids if core_id in core_rows_by_id)
         missing_core_ids = tuple(core_id for core_id in core_ids if core_id not in core_rows_by_id)
@@ -2446,6 +2483,8 @@ def _notification_delivery_conflicts(
                     out["research_review_digest_contains_hard_gated_candidate"] += 1
         if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
             continue
+        if lane == "daily_digest" and len(scalar_core_ids) > 1 and not _tuple_value(row.get("core_opportunity_ids")):
+            out["multi_item_delivery_missing_arrays"] += 1
         requires_core = _delivery_requires_core_identity(row)
         if requires_core:
             if not core_ids:
@@ -2701,7 +2740,7 @@ def _delivery_lacks_core_identity(row: Mapping[str, Any]) -> bool:
     lane = str(row.get("lane") or "").strip()
     if lane not in {"daily_digest", "instant_escalation"}:
         return False
-    return not str(row.get("core_opportunity_id") or "").strip()
+    return not (_tuple_value(row.get("core_opportunity_ids")) or _tuple_value(row.get("core_opportunity_id")))
 
 
 def _delivery_is_legacy_pre_core_identity(row: Mapping[str, Any]) -> bool:

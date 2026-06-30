@@ -62,6 +62,7 @@ class EventAlphaNotificationConfig:
     profile_name: str | None = None
     artifact_namespace: str | None = None
     daily_digest_cooldown_hours: float = 12.0
+    daily_digest_max_items: int = 5
     instant_escalation_cooldown_hours: float = 1.0
     max_instant_per_day: int = 3
     health_heartbeat_enabled: bool = True
@@ -143,6 +144,11 @@ class EventAlphaNotificationPlan:
 class DeliveryIdentity:
     notification_item_ids: tuple[str, ...]
     source_alert_ids: tuple[str, ...]
+    core_opportunity_ids: tuple[str, ...] = ()
+    canonical_symbols: tuple[str, ...] = ()
+    canonical_coin_ids: tuple[str, ...] = ()
+    canonical_card_paths: tuple[str, ...] = ()
+    feedback_targets: tuple[str, ...] = ()
     requested_alert_id: str | None = None
     alert_id: str | None = None
     core_opportunity_id: str | None = None
@@ -181,13 +187,29 @@ def build_notification_plan(
     by_lane: dict[str, list[event_alpha_router.EventAlphaRouteDecision]] = {lane: [] for lane in LANES}
     blocked: dict[str, str] = {}
 
-    daily = [decision for decision in alertable if _lane_for_decision(decision) == LANE_DAILY_DIGEST]
+    daily_candidates = [decision for decision in alertable if _lane_for_decision(decision) == LANE_DAILY_DIGEST]
+    daily_unconfirmed: list[event_alpha_router.EventAlphaRouteDecision] = []
+    daily = _confirmed_daily_digest_decisions(
+        daily_candidates,
+        core_row_by_alert_id=core_index,
+        cfg=cfg,
+        unconfirmed=daily_unconfirmed,
+    )
+    daily = _dedupe_daily_digest_decisions(
+        daily,
+        core_row_by_alert_id=core_index,
+        max_items=cfg.daily_digest_max_items,
+    )
     if daily:
         due, reason = lane_due(storage, LANE_DAILY_DIGEST, cfg=cfg, now=observed)
         if due:
             by_lane[LANE_DAILY_DIGEST] = daily
         else:
             blocked[LANE_DAILY_DIGEST] = reason
+    if daily_unconfirmed:
+        blocked[LANE_DAILY_DIGEST] = (
+            f"{len(daily_unconfirmed)} candidate(s) excluded from daily_digest: live confirmation missing"
+        )
 
     instant = [decision for decision in alertable if _lane_for_decision(decision) == LANE_INSTANT_ESCALATION]
     if instant:
@@ -232,6 +254,7 @@ def build_notification_plan(
     )
     if cfg.research_review_digest_enabled:
         selected = select_research_review_candidates(all_decisions, cfg=cfg, now=observed)
+        selected = _with_unconfirmed_daily_review_items(selected, daily_unconfirmed, cfg=cfg)
         if selected:
             if strict_due_count and not cfg.research_review_digest_send_with_alerts:
                 blocked[LANE_RESEARCH_REVIEW_DIGEST] = "strict alert lane has due candidates"
@@ -274,6 +297,192 @@ def build_notification_plan(
         core_row_by_alert_id=core_index,
         canonicalization_warnings=canonical_warnings,
     )
+
+
+def _confirmed_daily_digest_decisions(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]],
+    cfg: EventAlphaNotificationConfig,
+    unconfirmed: list[event_alpha_router.EventAlphaRouteDecision],
+) -> list[event_alpha_router.EventAlphaRouteDecision]:
+    confirmed: list[event_alpha_router.EventAlphaRouteDecision] = []
+    live_strict = _daily_digest_requires_live_confirmation(cfg)
+    for decision in decisions:
+        core = _core_row_for_decision(decision, core_row_by_alert_id) or {}
+        if not live_strict or _daily_digest_has_confirmation(decision, core):
+            confirmed.append(decision)
+        else:
+            unconfirmed.append(decision)
+    return confirmed
+
+
+def _daily_digest_requires_live_confirmation(cfg: EventAlphaNotificationConfig) -> bool:
+    scope = " ".join(
+        str(value or "").casefold()
+        for value in (cfg.profile_name, cfg.artifact_namespace, cfg.notification_scope)
+    )
+    if any(token in scope for token in ("fixture", "smoke", "e2e", "test")):
+        return False
+    if not str(cfg.artifact_namespace or "").strip() and "deep" not in scope and "rehearsal" not in scope:
+        return False
+    return any(token in scope for token in ("notify_llm_deep", "cryptopanic", "live", "burn_in", "rehearsal", "send"))
+
+
+def _daily_digest_has_confirmation(
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    core: Mapping[str, Any],
+) -> bool:
+    entry = _decision_entry(decision)
+    components = dict(getattr(entry, "latest_score_components", {}) or {})
+    merged: dict[str, Any] = {**components, **dict(core)}
+    symbol = str(merged.get("symbol") or merged.get("validated_symbol") or getattr(entry, "symbol", "") or "").strip().upper()
+    coin_id = str(merged.get("coin_id") or merged.get("validated_coin_id") or getattr(entry, "coin_id", "") or "").strip()
+    if _research_review_is_sector(symbol, coin_id):
+        return False
+    accepted = _accepted_evidence_count(merged)
+    acquisition_status = str(merged.get("evidence_acquisition_status") or "").strip()
+    acquisition_confirmation = str(merged.get("acquisition_confirmation_status") or "").strip()
+    source_class = str(merged.get("source_class") or merged.get("source_origin_class") or "").casefold()
+    reason_codes = " ".join(str(item) for item in _iter_values(merged.get("accepted_reason_codes") or merged.get("reason_codes")))
+    source_pack = str(merged.get("source_pack") or "").casefold()
+    market_confirmation = str(
+        merged.get("market_confirmation_level")
+        or merged.get("market_confirmation")
+        or merged.get("market_reaction_confirmation")
+        or ""
+    ).casefold()
+    market_freshness = str(
+        merged.get("market_context_freshness_status")
+        or merged.get("core_market_freshness_status")
+        or merged.get("market_freshness_status")
+        or ""
+    ).casefold()
+    impact = str(merged.get("impact_path_type") or merged.get("effective_playbook_type") or "").casefold()
+    if accepted > 0 and acquisition_status == "accepted_evidence_found":
+        return True
+    if acquisition_confirmation == "confirms":
+        return True
+    if source_class in {"official_project", "official_exchange", "structured_calendar", "structured_unlock"}:
+        return True
+    if "cryptopanic_currency_tag_match" in reason_codes.casefold() and source_class in {"cryptopanic_tagged", "crypto_news"}:
+        return True
+    if source_pack in {"listing_liquidity_pack", "perp_listing_squeeze_pack", "unlock_supply_pack"} and source_class.startswith("official"):
+        return True
+    fresh_market = market_confirmation not in {"", "none", "missing", "unknown", "insufficient_data"}
+    fresh_context = market_freshness not in {"", "missing", "stale", "unknown"}
+    generic = impact in {"", "insufficient_data", "generic_cooccurrence", "source_noise_control", "ambiguous_control"}
+    return fresh_market and fresh_context and not generic
+
+
+def _dedupe_daily_digest_decisions(
+    decisions: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    core_row_by_alert_id: Mapping[str, Mapping[str, Any]],
+    max_items: int,
+) -> list[event_alpha_router.EventAlphaRouteDecision]:
+    grouped: list[event_alpha_router.EventAlphaRouteDecision] = []
+    seen: set[tuple[str, str, str]] = set()
+    for decision in decisions:
+        core = _core_row_for_decision(decision, core_row_by_alert_id) or {}
+        key = _daily_digest_group_key(decision, core)
+        if key in seen:
+            continue
+        seen.add(key)
+        grouped.append(decision)
+    limit = max(0, int(max_items or 0))
+    return grouped[:limit] if limit else []
+
+
+def _daily_digest_group_key(
+    decision: event_alpha_router.EventAlphaRouteDecision,
+    core: Mapping[str, Any],
+) -> tuple[str, str, str]:
+    entry = _decision_entry(decision)
+    coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or getattr(entry, "coin_id", "") or "").strip().casefold()
+    if not coin_id:
+        coin_id = str(core.get("symbol") or core.get("validated_symbol") or getattr(entry, "symbol", "") or "").strip().casefold()
+    incident = str(
+        core.get("incident_id")
+        or core.get("canonical_incident_name")
+        or core.get("event_family")
+        or getattr(entry, "latest_event_name", "")
+        or ""
+    ).strip().casefold()
+    impact = str(core.get("impact_path_type") or getattr(entry, "impact_path_type", "") or getattr(entry, "latest_effective_playbook_type", "") or "").strip().casefold()
+    return (coin_id, incident, _impact_family(impact))
+
+
+def _decision_entry(decision: object) -> object:
+    return getattr(decision, "entry", decision)
+
+
+def _impact_family(value: str) -> str:
+    text = str(value or "").casefold()
+    if "fan" in text or "sports" in text:
+        return "fan_sports"
+    if "proxy" in text or "rwa" in text or "preipo" in text or "pre_ipo" in text:
+        return "proxy"
+    if "listing" in text or "perp" in text:
+        return "listing"
+    if "unlock" in text or "supply" in text:
+        return "supply"
+    if "security" in text or "exploit" in text:
+        return "security"
+    return text or "unknown"
+
+
+def _with_unconfirmed_daily_review_items(
+    selected: tuple[EventAlphaResearchReviewDigestItem, ...],
+    unconfirmed: Iterable[event_alpha_router.EventAlphaRouteDecision],
+    *,
+    cfg: EventAlphaNotificationConfig,
+) -> tuple[EventAlphaResearchReviewDigestItem, ...]:
+    if not unconfirmed:
+        return selected
+    items = list(selected)
+    seen = {item.decision.alert_id for item in items}
+    for decision in unconfirmed:
+        if decision.alert_id in seen:
+            continue
+        entry = _decision_entry(decision)
+        components = dict(getattr(entry, "latest_score_components", {}) or {})
+        score = _research_review_score(decision)
+        if score < float(cfg.research_review_digest_min_score or 0.0):
+            continue
+        items.append(EventAlphaResearchReviewDigestItem(
+            decision=decision,
+            rank_score=score,
+            why_included=("would be daily digest except live confirmation is missing",),
+            why_not_alertable=tuple(_research_review_not_alertable_reasons(decision, components)) or (
+                "live_confirmation_missing",
+            ),
+            what_would_upgrade=("accepted source-pack evidence or fresh market confirmation",),
+        ))
+        seen.add(decision.alert_id)
+    items.sort(
+        key=lambda item: (
+            item.rank_score,
+            _research_review_score(item.decision),
+            getattr(_decision_entry(item.decision), "last_seen_at", ""),
+            getattr(_decision_entry(item.decision), "symbol", ""),
+        ),
+        reverse=True,
+    )
+    return tuple(items[: max(0, int(cfg.research_review_digest_max_items or 0))])
+
+
+def _iter_values(value: object) -> tuple[object, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, (str, bytes)):
+        return (value,)
+    if isinstance(value, Mapping):
+        return tuple(value.values())
+    try:
+        return tuple(value)  # type: ignore[arg-type]
+    except TypeError:
+        return (value,)
 
 
 def select_exploratory_candidates(
@@ -980,6 +1189,7 @@ def send_notifications(
                 card_path_by_alert_id=card_map,
                 core_row_by_alert_id=plan.core_row_by_alert_id,
                 pipeline_result=pipeline_result,
+                max_items=cfg.daily_digest_max_items if lane == LANE_DAILY_DIGEST else None,
             )
             identity = _delivery_identity_for_decisions(
                 items,
@@ -1226,23 +1436,45 @@ def _delivery_identity_for_decisions(
         or first_core.get("canonical_card_path")
         or _first_card_path(card_path_by_alert_id, (*core_ids, *source_ids))
     )
-    alert_id = ",".join(notification_ids)
-    requested = ",".join(source_ids)
+    card_paths = tuple(dict.fromkeys(
+        str(
+            row.get("card_path")
+            or row.get("research_card_path")
+            or row.get("canonical_card_path")
+            or ""
+        ).strip()
+        for row in core_rows
+        if str(row.get("card_path") or row.get("research_card_path") or row.get("canonical_card_path") or "").strip()
+    ))
+    symbols = tuple(dict.fromkeys(
+        str(row.get("symbol") or row.get("validated_symbol") or "").strip()
+        for row in core_rows
+        if str(row.get("symbol") or row.get("validated_symbol") or "").strip()
+    ))
+    coin_ids = tuple(dict.fromkeys(
+        str(row.get("coin_id") or row.get("validated_coin_id") or "").strip()
+        for row in core_rows
+        if str(row.get("coin_id") or row.get("validated_coin_id") or "").strip()
+    ))
+    feedback_targets = core_ids or source_ids or notification_ids
+    alert_id = notification_ids[0] if notification_ids else None
+    requested = source_ids[0] if source_ids else alert_id
     reconciled = bool(core_ids)
     return DeliveryIdentity(
         notification_item_ids=notification_ids,
         source_alert_ids=source_ids,
+        core_opportunity_ids=core_ids,
+        canonical_symbols=symbols,
+        canonical_coin_ids=coin_ids,
+        canonical_card_paths=card_paths,
+        feedback_targets=feedback_targets,
         requested_alert_id=requested or alert_id,
         alert_id=alert_id,
-        core_opportunity_id=",".join(core_ids) if core_ids else None,
-        canonical_symbol=_joined_unique(
-            row.get("symbol") or row.get("validated_symbol") for row in core_rows
-        ),
-        canonical_coin_id=_joined_unique(
-            row.get("coin_id") or row.get("validated_coin_id") for row in core_rows
-        ),
+        core_opportunity_id=core_ids[0] if core_ids else None,
+        canonical_symbol=symbols[0] if symbols else None,
+        canonical_coin_id=coin_ids[0] if coin_ids else None,
         canonical_card_path=str(card_path) if card_path else None,
-        feedback_target=",".join(core_ids) if core_ids else (requested or alert_id),
+        feedback_target=feedback_targets[0] if feedback_targets else (requested or alert_id),
         identity_reconciled=reconciled,
         identity_reconciliation_reason="canonical_core_opportunity" if reconciled else "source_alert_identity",
         notification_preview_path=str(preview_path) if preview_path else None,
@@ -1256,10 +1488,15 @@ def _identity_record_fields(identity: DeliveryIdentity | None) -> dict[str, Any]
     return {
         "requested_alert_id": identity.requested_alert_id,
         "core_opportunity_id": identity.core_opportunity_id,
+        "core_opportunity_ids": identity.core_opportunity_ids,
         "canonical_symbol": identity.canonical_symbol,
+        "canonical_symbols": identity.canonical_symbols,
         "canonical_coin_id": identity.canonical_coin_id,
+        "canonical_coin_ids": identity.canonical_coin_ids,
         "canonical_card_path": identity.canonical_card_path,
+        "canonical_card_paths": identity.canonical_card_paths,
         "feedback_target": identity.feedback_target,
+        "feedback_targets": identity.feedback_targets,
         "source_alert_ids": identity.source_alert_ids,
         "notification_item_ids": identity.notification_item_ids,
         "identity_reconciled": identity.identity_reconciled,
@@ -1279,7 +1516,19 @@ def format_core_opportunity_telegram_digest(
     max_items: int | None = None,
 ) -> str:
     """Render a compact human-facing digest keyed by canonical core opportunities."""
-    keep = [decision for decision in decisions if event_alpha_router.alertable_after_quality_gate(decision)]
+    unique_keep: list[event_alpha_router.EventAlphaRouteDecision] = []
+    seen_for_count: set[str] = set()
+    for decision in decisions:
+        if not event_alpha_router.alertable_after_quality_gate(decision):
+            continue
+        key = decision.alert_id
+        if key in seen_for_count:
+            continue
+        seen_for_count.add(key)
+        unique_keep.append(decision)
+    total_items = len(unique_keep)
+    limit = max(1, int(max_items or 0)) if max_items is not None else None
+    keep = unique_keep[:limit] if limit is not None else unique_keep
     card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
     core_map = core_row_by_alert_id or {}
     title = "Event Alpha Research Digest"
@@ -1354,6 +1603,8 @@ def format_core_opportunity_telegram_digest(
         if core_id:
             lines.append(f"Feedback target: {_esc(core_id)}")
     lines.append("")
+    if total_items > len(keep):
+        lines.append(f"+{total_items - len(keep)} more in local brief.")
     lines.append("Research cards and feedback commands are available in local artifacts/inbox.")
     return "\n".join(lines)
 
@@ -1772,10 +2023,13 @@ def _preview_summary_lines(sections: Iterable[Mapping[str, Any]]) -> list[str]:
     ]
     not_due = [row for row in rows if not bool(row.get("would_send")) and not bool(row.get("sent"))]
     core_ids = {
-        str(getattr(row.get("identity"), "core_opportunity_id", "") or "").strip()
+        str(item).strip()
         for row in rows
-        if str(getattr(row.get("identity"), "core_opportunity_id", "") or "").strip()
+        for item in (getattr(row.get("identity"), "core_opportunity_ids", ()) or ())
+        if str(item).strip()
     }
+    rendered_items = sum(len(getattr(row.get("identity"), "notification_item_ids", ()) or ()) for row in rows)
+    source_alert_count = sum(len(getattr(row.get("identity"), "source_alert_ids", ()) or ()) for row in rows)
     blocked_confirmation = [
         row for row in rows
         if any(
@@ -1807,7 +2061,9 @@ def _preview_summary_lines(sections: Iterable[Mapping[str, Any]]) -> list[str]:
         f"- Would send: {'yes' if would_send else 'no'}",
         f"- Lanes: {', '.join(lane_parts) if lane_parts else 'none'}",
         f"- Lane counts: due={len(would_send)} · sent={len(sent)} · would_send_but_guard_disabled={len(guard_blocked)} · blocked_by_quality={len(quality_blocked)} · blocked_by_cooldown={len(cooldown_blocked)} · not_due={len(not_due)}",
-        f"- Candidates included: {len(core_ids)}",
+        f"- Rendered candidate items: {rendered_items}",
+        f"- Core opportunity items: {len(core_ids)}",
+        f"- Source alert IDs: {source_alert_count}",
         f"- Candidates blocked by confirmation: {len(blocked_confirmation)}",
         "- Provider issues: see Telegram body/run ledger",
         f"- Send guard: {send_guard}",
@@ -2126,6 +2382,7 @@ class _DeliveryWriter:
                     profile=profile,
                     card_path_by_alert_id=card_map,
                     core_row_by_alert_id=plan.core_row_by_alert_id,
+                    max_items=getattr(self.cfg, "daily_digest_max_items", None) if lane == LANE_DAILY_DIGEST else None,
                 )
                 identity = _delivery_identity_for_decisions(
                     items,
@@ -2247,10 +2504,15 @@ class _DeliveryWriter:
                     f"sent: {str(bool(section['sent'])).lower()}",
                     f"alert_id: {item_identity.alert_id or self._joined(item_identity.notification_item_ids)}",
                     f"core_opportunity_id: {item_identity.core_opportunity_id or 'none'}",
+                    "core_opportunity_ids: " + ", ".join(item_identity.core_opportunity_ids or ("none",)),
                     f"canonical_symbol: {item_identity.canonical_symbol or 'unknown'}",
+                    "canonical_symbols: " + ", ".join(item_identity.canonical_symbols or ("none",)),
                     f"canonical_coin_id: {item_identity.canonical_coin_id or 'unknown'}",
+                    "canonical_coin_ids: " + ", ".join(item_identity.canonical_coin_ids or ("none",)),
                     f"canonical_card_path: {_preview_path_label(item_identity.canonical_card_path)}",
+                    "canonical_card_paths: " + ", ".join(_preview_path_label(path) for path in (item_identity.canonical_card_paths or ("none",))),
                     f"feedback_target: {item_identity.feedback_target or item_identity.core_opportunity_id or item_identity.alert_id or 'none'}",
+                    "feedback_targets: " + ", ".join(item_identity.feedback_targets or ("none",)),
                     "source_alert_ids: " + ", ".join(item_identity.source_alert_ids or ("none",)),
                     "notification_item_ids: " + ", ".join(item_identity.notification_item_ids or ("none",)),
                     f"identity_reconciled: {str(item_identity.identity_reconciled).lower()}",

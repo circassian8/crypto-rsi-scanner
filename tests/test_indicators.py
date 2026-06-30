@@ -3051,6 +3051,7 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
             None,
             live_enabled=True,
             api_token="token123",
+            currencies="BTC",
             opener=fake_opener,
             fetched_at=fetched_at,
             request_ledger_path=ledger,
@@ -3093,6 +3094,7 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
             None,
             live_enabled=True,
             api_token="token123",
+            currencies="BTC",
             opener=should_not_call_opener,
             fetched_at=fetched_at,
             request_ledger_path=ledger,
@@ -3104,8 +3106,209 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
         assert len(ledger.read_text(encoding="utf-8").splitlines()) == 1
 
 
+def test_cryptopanic_live_provider_sanitizes_and_dedupes_currency_requests():
+    import json
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+    from urllib.parse import parse_qs, urlparse
+    from crypto_rsi_scanner.event_providers.cryptopanic import CryptoPanicProvider
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"results": []}).encode("utf-8")
+
+    seen_urls = []
+
+    def fake_opener(request, timeout):
+        seen_urls.append(request.full_url)
+        return FakeResponse()
+
+    with TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+        provider = CryptoPanicProvider(
+            None,
+            live_enabled=True,
+            api_token="token123",
+            base_url="https://cryptopanic.test/api/growth_weekly/v2",
+            currencies="FET,fetch-ai,VELVET,VELVET,SECTOR,H,humanity,,SYN,synapse-2,CHZ,chiliz",
+            opener=fake_opener,
+            fetched_at=datetime(2026, 6, 15, 12, tzinfo=timezone.utc),
+            request_ledger_path=ledger,
+            min_seconds_between_requests=0,
+        )
+        provider.fetch_events(
+            datetime(2026, 6, 15, tzinfo=timezone.utc),
+            datetime(2026, 6, 16, tzinfo=timezone.utc),
+        )
+        ledger_rows = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+
+    assert len(seen_urls) == 1
+    params = parse_qs(urlparse(seen_urls[0]).query)
+    assert params["currencies"] == ["FET,VELVET,SYN,CHZ"]
+    assert provider.requests_deduped == 1
+    assert provider.invalid_currency_requests_skipped >= 5
+    assert {item["reason"] for item in provider.rejected_currency_candidates} >= {
+        "coin_id_not_currency",
+        "sector_not_currency",
+        "ticker_collision",
+        "empty_currency",
+        "duplicate_request",
+    }
+    assert len(ledger_rows) == 1
+    assert ledger_rows[0]["currencies"] == "FET,VELVET,SYN,CHZ"
+    assert "fetch-ai" not in ledger_rows[0]["request_url_redacted"]
+    assert ledger_rows[0]["normalized_request_key"]
+
+
+def test_cryptopanic_live_provider_dedupes_same_run_across_instances():
+    import json
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner.event_providers.cryptopanic import CryptoPanicProvider
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return json.dumps({"results": [{"id": "cp-chz-1", "title": "CHZ World Cup fan token"}]}).encode("utf-8")
+
+    calls = 0
+
+    def fake_opener(request, timeout):
+        nonlocal calls
+        calls += 1
+        return FakeResponse()
+
+    observed = datetime(2026, 6, 15, 12, tzinfo=timezone.utc)
+    with TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+        providers = [
+            CryptoPanicProvider(
+                None,
+                live_enabled=True,
+                api_token="token123",
+                base_url="https://cryptopanic.test/api/growth_weekly/v2",
+                currencies="CHZ",
+                opener=fake_opener,
+                fetched_at=observed,
+                request_ledger_path=ledger,
+                min_seconds_between_requests=0,
+            )
+            for _ in range(2)
+        ]
+        for provider in providers:
+            events = provider.fetch_events(observed, observed)
+            assert len(events) == 1
+        ledger_rows = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+
+    assert calls == 1
+    assert len(ledger_rows) == 1
+    assert providers[1].request_cache_hits == 1
+    assert providers[1].requests_deduped == 1
+
+
+def test_cryptopanic_live_provider_dedupes_failed_same_run_requests():
+    import json
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from crypto_rsi_scanner.event_providers.cryptopanic import CryptoPanicProvider
+
+    class BadResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b"not json"
+
+    calls = 0
+
+    def bad_opener(request, timeout):
+        nonlocal calls
+        calls += 1
+        return BadResponse()
+
+    observed = datetime(2026, 6, 15, 12, tzinfo=timezone.utc)
+    with TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+        providers = [
+            CryptoPanicProvider(
+                None,
+                live_enabled=True,
+                api_token="token123",
+                base_url="https://cryptopanic.test/api/growth_weekly/v2",
+                currencies="CHZ",
+                opener=bad_opener,
+                fetched_at=observed,
+                request_ledger_path=ledger,
+                min_seconds_between_requests=0,
+            )
+            for _ in range(2)
+        ]
+        for provider in providers:
+            assert provider.fetch_events(observed, observed) == []
+        ledger_rows = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+
+    assert calls == 1
+    assert len(ledger_rows) == 1
+    assert ledger_rows[0]["error_class"] == "JSONDecodeError"
+    assert providers[1].request_cache_hits == 1
+    assert providers[1].requests_deduped == 1
+
+
 def test_cryptopanic_catalyst_search_currency_filter_uses_validated_identity_or_empty():
     from crypto_rsi_scanner import event_catalyst_search
+    from crypto_rsi_scanner.event_providers.cryptopanic import (
+        normalize_cryptopanic_currency_code,
+        plan_cryptopanic_currency_codes,
+    )
+
+    assert normalize_cryptopanic_currency_code("FET", "fetch-ai") == "FET"
+    assert normalize_cryptopanic_currency_code("SYN", "synapse-2") == "SYN"
+    assert normalize_cryptopanic_currency_code("CHZ", "chiliz") == "CHZ"
+    assert normalize_cryptopanic_currency_code("SECTOR") is None
+    assert normalize_cryptopanic_currency_code("") is None
+    assert normalize_cryptopanic_currency_code("H", "humanity", identity_validated=False) is None
+    assert normalize_cryptopanic_currency_code("H", "humanity", identity_validated=True) == "H"
+
+    plan = plan_cryptopanic_currency_codes(
+        (
+            {"symbol": "VELVET", "identity_validated": True},
+            {"symbol": "VELVET", "identity_validated": True},
+            {"symbol": "fetch-ai", "identity_validated": False},
+            {"symbol": "SECTOR", "identity_validated": False},
+            {"symbol": "", "identity_validated": False},
+            {"symbol": "H", "coin_id": "humanity", "identity_validated": False},
+        ),
+        identity_validated=False,
+    )
+    assert plan.accepted == ("VELVET",)
+    reasons = {item["reason"] for item in plan.rejected}
+    assert {"duplicate_request", "coin_id_not_currency", "sector_not_currency", "empty_currency", "ticker_collision"} <= reasons
+    assert plan.duplicate_count == 1
 
     with_identity = event_catalyst_search.SearchQuery(
         anomaly_raw_id="raw:test",
@@ -3121,7 +3324,7 @@ def test_cryptopanic_catalyst_search_currency_filter_uses_validated_identity_or_
         symbol="",
         rank=1,
     )
-    assert event_catalyst_search._cryptopanic_currencies_for_query(with_identity) == "RUNE,thorchain"
+    assert event_catalyst_search._cryptopanic_currencies_for_query(with_identity) == "RUNE"
     assert event_catalyst_search._cryptopanic_currencies_for_query(missing_identity) == ""
 
 
@@ -3177,7 +3380,7 @@ def test_event_catalyst_search_cryptopanic_uses_symbol_and_coin_currency_filters
 
     params = parse_qs(urlparse(seen["url"]).query)
     assert urlparse(seen["url"]).path == "/api/growth_weekly/v2/posts/"
-    assert params["currencies"] == ["RUNE,thorchain"]
+    assert params["currencies"] == ["RUNE"]
     assert params["kind"] == ["news"]
     assert params["public"] == ["true"]
     assert "search" not in params
@@ -13265,10 +13468,15 @@ def test_event_alpha_notification_uses_canonical_core_identity_and_compact_messa
     assert result.success is True
     assert rows[0]["alert_id"] == "agg:ffdcb488dbed"
     assert rows[0]["core_opportunity_id"] == "agg:ffdcb488dbed"
+    assert rows[0]["core_opportunity_ids"] == ["agg:ffdcb488dbed"]
     assert rows[0]["canonical_symbol"] == "BTC"
+    assert rows[0]["canonical_symbols"] == ["BTC"]
     assert rows[0]["canonical_coin_id"] == "bitcoin"
+    assert rows[0]["canonical_coin_ids"] == ["bitcoin"]
     assert rows[0]["canonical_card_path"] == "/tmp/local/cards/agg-ffdcb488dbed.md"
+    assert rows[0]["canonical_card_paths"] == ["/tmp/local/cards/agg-ffdcb488dbed.md"]
     assert rows[0]["feedback_target"] == "agg:ffdcb488dbed"
+    assert rows[0]["feedback_targets"] == ["agg:ffdcb488dbed"]
     assert rows[0]["identity_reconciled"] is True
     assert rows[0]["source_alert_ids"] == [decision.alert_id]
     assert rows[0]["notification_item_ids"] == ["agg:ffdcb488dbed"]
@@ -13283,12 +13491,13 @@ def test_event_alpha_notification_uses_canonical_core_identity_and_compact_messa
     assert "source_alert_ids:" in preview
     assert "agg:ffdcb488dbed" in preview
     assert "## Preview Summary" in preview
-    assert "Candidates included: 1" in preview
+    assert "Rendered candidate items: 1" in preview
+    assert "Core opportunity items: 1" in preview
     assert "Recommendation: inspect this preview" in preview
     assert "/tmp/local/cards" not in preview
 
 
-def test_event_alpha_core_digest_includes_all_alertable_items_without_inbox_overflow():
+def test_event_alpha_core_digest_caps_daily_items_with_local_brief_overflow():
     from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router
 
     decisions = [
@@ -13300,13 +13509,97 @@ def test_event_alpha_core_digest_includes_all_alertable_items_without_inbox_over
         for i in range(18)
     ]
 
-    message = notif.format_core_opportunity_telegram_digest(decisions, profile="notify_llm_deep")
+    message = notif.format_core_opportunity_telegram_digest(decisions, profile="notify_llm_deep", max_items=5)
 
-    assert "Items: 18" in message
+    assert "Items: 5" in message
     assert "1. CORE0 / core0" in message
-    assert "18. CORE17 / core17" in message
-    assert "more in the local notification inbox" not in message
-    assert "more in local notification inbox" not in message
+    assert "5. CORE4 / core4" in message
+    assert "6. CORE5 / core5" not in message
+    assert "+13 more in local brief." in message
+
+
+def test_event_alpha_live_daily_digest_requires_confirmation_and_dedupes_family():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_notifications as notif, event_alpha_router
+
+    class FakeStorage:
+        def __init__(self):
+            self.meta = {}
+
+        def get_meta(self, key):
+            return self.meta.get(key)
+
+        def set_meta(self, key, value):
+            self.meta[key] = value
+
+    confirmed = _notify_route_decision(
+        "CHZ",
+        event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+        event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+    )
+    duplicate = _notify_route_decision(
+        "CHZ",
+        event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+        event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+    )
+    weak = _notify_route_decision(
+        "SYN",
+        event_alpha_router.EventAlphaRouteLane.DAILY_DIGEST,
+        event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST,
+    )
+    core_rows = [
+        {
+            "core_opportunity_id": "core-chz",
+            "source_alert_ids": [confirmed.alert_id, duplicate.alert_id],
+            "symbol": "CHZ",
+            "coin_id": "chiliz",
+            "incident_id": "world-cup",
+            "impact_path_type": "fan_sports",
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "final_opportunity_level": "validated_digest",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "accepted_evidence_count": 1,
+            "accepted_reason_codes": ["cryptopanic_currency_tag_match"],
+            "source_class": "cryptopanic_tagged",
+        },
+        {
+            "core_opportunity_id": "core-syn",
+            "source_alert_ids": [weak.alert_id],
+            "symbol": "SYN",
+            "coin_id": "synapse",
+            "incident_id": "strategic",
+            "impact_path_type": "strategic_investment",
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "final_opportunity_level": "validated_digest",
+            "evidence_acquisition_status": "not_executed",
+            "accepted_evidence_count": 0,
+            "market_confirmation_level": "none",
+            "market_context_freshness_status": "missing",
+        },
+    ]
+    cfg = notif.EventAlphaNotificationConfig(
+        enabled=True,
+        profile_name="notify_llm_deep",
+        artifact_namespace="notify_llm_deep_cryptopanic_rehearsal",
+        daily_digest_cooldown_hours=0,
+        daily_digest_max_items=5,
+        research_review_digest_enabled=True,
+        research_review_digest_min_score=0,
+        research_review_digest_send_with_alerts=True,
+    )
+
+    plan = notif.build_notification_plan(
+        [confirmed, duplicate, weak],
+        storage=FakeStorage(),
+        cfg=cfg,
+        now=datetime(2026, 6, 20, 12, tzinfo=timezone.utc),
+        core_opportunity_rows=core_rows,
+    )
+
+    daily = plan.decisions_by_lane[notif.LANE_DAILY_DIGEST]
+    assert len(daily) == 1
+    assert daily[0].entry.symbol == "CHZ"
+    assert all(item.entry.symbol != "SYN" for item in daily)
 
 
 def test_event_alpha_notification_blocks_rejected_only_core_digest():
@@ -25465,7 +25758,11 @@ def test_event_alpha_research_review_digest_inbox_and_doctor_checks():
             "notification_preview_path": str(bad_preview),
             "notification_preview_relpath": delivery.notification_preview_relpath_for_path(bad_preview),
             "feedback_target": "",
+            "feedback_targets": [],
             "core_opportunity_id": "agg:bad-alertable",
+            "core_opportunity_ids": ["agg:bad-alertable"],
+            "canonical_symbols": ["BAD"],
+            "canonical_coin_ids": ["bad"],
         }
         bad_core = {
             "core_opportunity_id": "agg:bad-alertable",
@@ -30122,7 +30419,14 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "--event-alert-send" not in readiness
 
     go_no_go = subprocess.run(
-        ["make", "-n", "event-alpha-send-go-no-go", "PROFILE=notify_llm_deep_fixture_rehearsal", "PYTHON=python3"],
+        [
+            "make",
+            "-n",
+            "event-alpha-send-go-no-go",
+            "PROFILE=notify_llm_deep",
+            "ARTIFACT_NAMESPACE=notify_llm_deep_fixture_rehearsal",
+            "PYTHON=python3",
+        ],
         cwd=root,
         capture_output=True,
         text=True,

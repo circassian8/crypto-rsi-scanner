@@ -148,6 +148,10 @@ class EventAlphaPipelineResult:
     cryptopanic_configured: bool = False
     cryptopanic_attempted: bool = False
     cryptopanic_requests_used: int = 0
+    cryptopanic_request_cache_hits: int = 0
+    cryptopanic_request_cache_misses: int = 0
+    cryptopanic_requests_deduped: int = 0
+    cryptopanic_invalid_currency_requests_skipped: int = 0
     cryptopanic_results: int = 0
     cryptopanic_accepted_evidence: int = 0
     cryptopanic_rejected_evidence: int = 0

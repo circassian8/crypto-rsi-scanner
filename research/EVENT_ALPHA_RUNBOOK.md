@@ -131,12 +131,18 @@ actual attempted CryptoPanic requests in
 `event_fade_cache/<artifact_namespace>/cryptopanic_request_ledger.jsonl` with
 redacted URLs, status code, result count, currency batch, page, profile, and
 namespace. The default guardrails are conservative:
-`RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT=20`,
+`RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT=10`,
 `RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT=80`,
 `RSI_EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY=1`,
 `RSI_EVENT_DISCOVERY_CRYPTOPANIC_MAX_CURRENCIES_PER_REQUEST=10`, and
 `RSI_EVENT_DISCOVERY_CRYPTOPANIC_MIN_SECONDS_BETWEEN_REQUESTS=1`. Skipped
 quota/budget calls do not consume ledger rows.
+CryptoPanic currency requests are planned as validated uppercase tickers only.
+CoinGecko slugs, lowercase raw terms, `SECTOR`, empty/global currency batches,
+and unvalidated common-word collisions are rejected before request
+construction. Repeated normalized request keys within one run are deduped from
+the in-memory request cache and surfaced through run-ledger and artifact-doctor
+request-planning counters.
 
 The CryptoPanic preflight prints only redacted key/config state, endpoint,
 plan, quota usage, source packs, provider health/backoff, and the targeted reset
@@ -315,9 +321,11 @@ decisions to the canonical `core_opportunity_id` before formatting, dedupe, and
 delivery-ledger writes. Lower-level watchlist/hypothesis ids are retained as
 `source_alert_ids` for audit, but the delivered item, feedback target, and card
 reference should point at the `agg:...` core opportunity. Fresh daily digest and
-instant-escalation delivery rows must carry `core_opportunity_id`,
-`canonical_symbol`, `canonical_coin_id`, `canonical_card_path`,
-`feedback_target`, requested/source ids, and identity reconciliation metadata.
+instant-escalation delivery rows must carry array-backed
+`core_opportunity_ids`, `canonical_symbols`, `canonical_coin_ids`,
+`canonical_card_paths`, `feedback_targets`, requested/source ids, and identity
+reconciliation metadata. Scalar identity fields remain for compatibility and
+should point at the first item only, never comma-joined multi-item values.
 Rows that cannot satisfy that contract must remain explicit diagnostics/legacy
 rows, not delivered core-opportunity notifications. The rendered Telegram
 body is intentionally compact: it shows candidate, catalyst, route/level,
@@ -354,6 +362,22 @@ make event-alpha-notify-llm-deep-real-no-send-rehearsal-fast PYTHON=python3
 make event-alpha-send-readiness PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-send-go-no-go PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 ```
+
+When inspecting a smoke/rehearsal namespace with a runtime profile such as
+`notify_llm_deep`, pass the namespace explicitly:
+
+```bash
+make event-alpha-send-go-no-go PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3
+```
+
+Daily digest lanes are confirmed and grouped before formatting. Live-style
+profiles require accepted source-pack evidence, official/structured evidence,
+matching CryptoPanic token/catalyst proof, strong direct source evidence, or
+fresh non-generic market confirmation before an item can stay in daily digest.
+Unconfirmed support rows are moved to research-review/local diagnostics. The
+Telegram digest renders the top
+`RSI_EVENT_ALPHA_DAILY_DIGEST_MAX_ITEMS` grouped items and points to the local
+brief for overflow.
 
 For a deterministic delivery-plan rehearsal that injects fixture VELVET/AAVE/BTC
 core opportunities through the same `notify_llm_deep` notification planning

@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 
 from . import event_identity
 from .event_models import RawDiscoveredEvent
-from .event_providers.cryptopanic import CryptoPanicProvider
+from .event_providers.cryptopanic import CryptoPanicProvider, normalize_cryptopanic_currency_code
 from .event_providers.gdelt import GdeltProvider
 from .event_providers.prediction_market_events import PredictionMarketEventsProvider
 from .event_providers.project_blog_rss import ProjectBlogRssProvider
@@ -486,6 +486,12 @@ class CryptoPanicCatalystSearchProvider(EventProviderCatalystSearchProvider):
     name = "cryptopanic"
 
     def __init__(self, **kwargs: Any) -> None:
+        self._configured_currencies = kwargs.get("currencies")
+        self._filter_name = str(kwargs.get("filter_name") or "")
+        self._kind = str(kwargs.get("kind") or "news")
+        self._public = bool(kwargs.get("public", True))
+        self._following = bool(kwargs.get("following", False))
+
         def factory(query: SearchQuery) -> CryptoPanicProvider:
             return CryptoPanicProvider(
                 kwargs.get("path"),
@@ -518,28 +524,26 @@ class CryptoPanicCatalystSearchProvider(EventProviderCatalystSearchProvider):
         super().__init__(factory, name=self.name)
 
     def cache_key_for_query(self, query: SearchQuery) -> tuple[str, ...]:
-        return (self.name, query.symbol, query.query)
+        currencies = _cryptopanic_currencies_for_query(query, self._configured_currencies)
+        return (
+            self.name,
+            currencies,
+            self._filter_name.strip().lower(),
+            self._kind.strip().lower(),
+            "following" if self._following else ("public" if self._public else "private"),
+        )
 
 
 def _cryptopanic_currencies_for_query(query: SearchQuery, configured: object = None) -> str:
     if configured not in (None, ""):
         return str(configured)
-    values: list[str] = []
-    symbol = str(query.symbol or "").strip()
-    if symbol:
-        values.append(symbol.upper())
-    coin_id = str(query.coin_id or "").strip()
-    if coin_id:
-        values.append(coin_id)
-    for alias in query.aliases:
-        value = str(alias or "").strip()
-        if not value:
-            continue
-        if value.casefold() == coin_id.casefold():
-            values.append(coin_id)
-        elif value.upper() == symbol.upper():
-            values.append(symbol.upper())
-    return ",".join(dict.fromkeys(values))
+    code = normalize_cryptopanic_currency_code(
+        query.symbol,
+        query.coin_id,
+        query.aliases,
+        identity_validated=bool(query.symbol and query.coin_id),
+    )
+    return code or ""
 
 
 class PolymarketCatalystSearchProvider(EventProviderCatalystSearchProvider):

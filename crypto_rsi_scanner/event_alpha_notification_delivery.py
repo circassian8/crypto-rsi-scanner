@@ -115,10 +115,15 @@ class NotificationDeliveryRecord:
     dedupe_bucket: str | None = None
     requested_alert_id: str | None = None
     core_opportunity_id: str | None = None
+    core_opportunity_ids: tuple[str, ...] = ()
     canonical_symbol: str | None = None
+    canonical_symbols: tuple[str, ...] = ()
     canonical_coin_id: str | None = None
+    canonical_coin_ids: tuple[str, ...] = ()
     canonical_card_path: str | None = None
+    canonical_card_paths: tuple[str, ...] = ()
     feedback_target: str | None = None
+    feedback_targets: tuple[str, ...] = ()
     source_alert_ids: tuple[str, ...] = ()
     notification_item_ids: tuple[str, ...] = ()
     identity_reconciled: bool = False
@@ -161,10 +166,15 @@ class NotificationDeliveryRecord:
             "dedupe_bucket": self.dedupe_bucket,
             "requested_alert_id": self.requested_alert_id,
             "core_opportunity_id": self.core_opportunity_id,
+            "core_opportunity_ids": list(self.core_opportunity_ids),
             "canonical_symbol": self.canonical_symbol,
+            "canonical_symbols": list(self.canonical_symbols),
             "canonical_coin_id": self.canonical_coin_id,
+            "canonical_coin_ids": list(self.canonical_coin_ids),
             "canonical_card_path": self.canonical_card_path,
+            "canonical_card_paths": list(self.canonical_card_paths),
             "feedback_target": self.feedback_target,
+            "feedback_targets": list(self.feedback_targets),
             "source_alert_ids": list(self.source_alert_ids),
             "notification_item_ids": list(self.notification_item_ids),
             "identity_reconciled": bool(self.identity_reconciled),
@@ -285,10 +295,15 @@ def build_record(
     dedupe_bucket: str | None = None,
     requested_alert_id: str | None = None,
     core_opportunity_id: str | None = None,
+    core_opportunity_ids: Iterable[str] = (),
     canonical_symbol: str | None = None,
+    canonical_symbols: Iterable[str] = (),
     canonical_coin_id: str | None = None,
+    canonical_coin_ids: Iterable[str] = (),
     canonical_card_path: str | None = None,
+    canonical_card_paths: Iterable[str] = (),
     feedback_target: str | None = None,
+    feedback_targets: Iterable[str] = (),
     source_alert_ids: Iterable[str] = (),
     notification_item_ids: Iterable[str] = (),
     identity_reconciled: bool = False,
@@ -342,10 +357,15 @@ def build_record(
         dedupe_bucket=str(dedupe_bucket)[:200] if dedupe_bucket else None,
         requested_alert_id=str(requested_alert_id) if requested_alert_id else None,
         core_opportunity_id=str(core_opportunity_id) if core_opportunity_id else None,
+        core_opportunity_ids=tuple(str(item) for item in core_opportunity_ids if str(item)),
         canonical_symbol=str(canonical_symbol) if canonical_symbol else None,
+        canonical_symbols=tuple(str(item) for item in canonical_symbols if str(item)),
         canonical_coin_id=str(canonical_coin_id) if canonical_coin_id else None,
+        canonical_coin_ids=tuple(str(item) for item in canonical_coin_ids if str(item)),
         canonical_card_path=str(canonical_card_path) if canonical_card_path else None,
+        canonical_card_paths=tuple(str(item) for item in canonical_card_paths if str(item)),
         feedback_target=str(feedback_target) if feedback_target else None,
+        feedback_targets=tuple(str(item) for item in feedback_targets if str(item)),
         source_alert_ids=tuple(str(item) for item in source_alert_ids if str(item)),
         notification_item_ids=tuple(str(item) for item in notification_item_ids if str(item)),
         identity_reconciled=bool(identity_reconciled),
@@ -780,8 +800,11 @@ def _section(title: str, rows: list[dict[str, Any]], limit: int) -> list[str]:
     rows = sorted(rows, key=lambda row: str(row.get("attempted_at") or ""), reverse=True)[: max(0, limit)]
     for row in rows:
         stamp = row.get("delivered_at") or row.get("attempted_at") or "unknown"
-        identity = str(row.get("core_opportunity_id") or row.get("alert_id") or "n/a")
-        symbol = str(row.get("canonical_symbol") or row.get("canonical_coin_id") or "").strip()
+        core_ids = _row_list(row, "core_opportunity_ids") or _split_legacy_csv(row.get("core_opportunity_id"))
+        symbols = _row_list(row, "canonical_symbols") or _split_legacy_csv(row.get("canonical_symbol"))
+        coin_ids = _row_list(row, "canonical_coin_ids") or _split_legacy_csv(row.get("canonical_coin_id"))
+        identity = str((core_ids[0] if core_ids else row.get("alert_id")) or "n/a")
+        symbol = str((symbols[0] if symbols else (coin_ids[0] if coin_ids else "")) or "").strip()
         if symbol:
             identity = f"{identity} ({symbol})"
         detail = (
@@ -793,6 +816,8 @@ def _section(title: str, rows: list[dict[str, Any]], limit: int) -> list[str]:
             detail += f" status_detail={status_detail}"
         if row.get("source_alert_ids") and row.get("identity_reconciled"):
             detail += " source_alerts=" + ",".join(str(item) for item in row.get("source_alert_ids") or [])
+        if len(core_ids) > 1:
+            detail += f" core_items={len(core_ids)}"
         if row.get("error_class"):
             detail += f" error_class={row.get('error_class')}"
         if row.get("error_message_safe"):
@@ -825,6 +850,20 @@ def _delivery_status_detail(row: Mapping[str, Any]) -> str:
     if state == STATE_SKIPPED_IN_FLIGHT:
         return "skipped_in_flight"
     return ""
+
+
+def _row_list(row: Mapping[str, Any], key: str) -> list[str]:
+    value = row.get(key)
+    if isinstance(value, list | tuple):
+        return [str(item) for item in value if str(item)]
+    return []
+
+
+def _split_legacy_csv(value: object) -> list[str]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    return [part.strip() for part in text.split(",") if part.strip()]
 
 
 def _row_rank(row: Mapping[str, Any]) -> tuple[int, str]:
