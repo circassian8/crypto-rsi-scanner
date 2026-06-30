@@ -282,6 +282,26 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_rehearsal" in deep_rehearsal_dry
     assert "RSI_EVENT_RESEARCH_CARDS_WRITE_LIMIT=250" in deep_rehearsal_dry
     assert "--event-alpha-artifact-doctor-delivery-scope latest_run" in deep_rehearsal_dry
+    cryptopanic_preflight_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-cryptopanic-preflight", "PROFILE=notify_llm_deep", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "--event-alpha-cryptopanic-preflight --event-alpha-profile notify_llm_deep" in cryptopanic_preflight_dry
+    cryptopanic_rehearsal_dry = subprocess.check_output(
+        ["make", "-n", "event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal", "PYTHON=python3"],
+        cwd=root,
+        text=True,
+    )
+    assert "notify_llm_deep_cryptopanic_rehearsal" in cryptopanic_rehearsal_dry
+    assert "--event-alpha-cryptopanic-preflight --event-alpha-profile notify_llm_deep" in cryptopanic_rehearsal_dry
+    assert "--event-alpha-notify-cycle --event-alpha-profile notify_llm_deep --event-alert-send" in cryptopanic_rehearsal_dry
+    assert "RSI_EVENT_ALERTS_ENABLED=0" in cryptopanic_rehearsal_dry
+    assert "RSI_EVENT_CATALYST_SEARCH_MAX_ANOMALIES=2" in cryptopanic_rehearsal_dry
+    assert "RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES=2" in cryptopanic_rehearsal_dry
+    assert "RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES=4" in cryptopanic_rehearsal_dry
+    assert "RSI_EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT=3" in cryptopanic_rehearsal_dry
+    assert "event-alpha-telegram-send-one-cycle" not in cryptopanic_rehearsal_dry
     assert "check-python:" in makefile
     assert "bootstrap:" in makefile
     assert "python3 -m venv .venv" in makefile
@@ -619,7 +639,8 @@ def test_event_provider_status_formats_burn_in_readiness_summary_and_pack_gaps()
 
 
 def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_gaps():
-    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_source_coverage
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_cryptopanic, event_alpha_source_coverage
 
     cfg = _event_provider_status_cfg(
         EVENT_DISCOVERY_GDELT_LIVE=True,
@@ -655,8 +676,13 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
             "source_pack": "security_shock_pack",
             "status": "accepted_evidence_found",
             "symbol": "RUNE",
+            "providers_used": ("cryptopanic",),
             "accepted_evidence": [{
+                "provider": "cryptopanic",
+                "source_class": "cryptopanic_tagged",
                 "title": "RUNE exploit update",
+                "reason_codes": ("cryptopanic_currency_tag_match", "direct_token_mechanism"),
+                "currency_tags": ("RUNE",),
                 "source_enrichment": {
                     "article_quality_status": "good",
                     "cleaner_version": "source_enrichment_cleaner_test",
@@ -691,6 +717,11 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
         profile="notify_llm_deep",
         artifact_namespace="notify_llm_deep",
     )
+    assert report.cryptopanic_configured is False
+    assert report.cryptopanic_observed is True
+    assert report.cryptopanic_accepted_evidence == 1
+    assert report.cryptopanic_rejected_evidence == 0
+    assert report.cryptopanic_source_packs == ("security_shock_pack",)
     by_pack = {pack.source_pack: pack for pack in report.packs}
     proxy = by_pack["proxy_preipo_rwa_pack"]
     security = by_pack["security_shock_pack"]
@@ -729,6 +760,11 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
 
     text = event_alpha_source_coverage.format_source_coverage_report(report)
     assert "EVENT ALPHA SOURCE COVERAGE" in text
+    assert "CryptoPanic:" in text
+    assert "- configured: false" in text
+    assert "- observed this run: true" in text
+    assert "- accepted evidence: 1" in text
+    assert "- source packs contributed: security_shock_pack" in text
     assert "proxy_preipo_rwa_pack" in text
     assert "missing providers: cryptopanic" in text
     assert "provider coverage status: degraded" in text
@@ -741,6 +777,41 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "recommended actions:" in text
     assert "configure CryptoPanic token/news coverage" in text
     assert "No alerts, sends, trades" in text
+
+    configured_cfg = _event_provider_status_cfg(
+        EVENT_DISCOVERY_CRYPTOPANIC_LIVE=True,
+        EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN="SECRET_TOKEN_SHOULD_NOT_RENDER",
+    )
+    configured_report = event_provider_status.build_event_discovery_provider_status(configured_cfg)
+    preflight = event_alpha_cryptopanic.build_cryptopanic_preflight(
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep",
+        provider_status_report=configured_report,
+        provider_health_rows={
+            "cryptopanic:catalyst_search": {
+                "provider_key": "cryptopanic:catalyst_search",
+                "provider_service": "cryptopanic",
+                "provider_role": "catalyst_search",
+                "disabled_until": "2999-01-01T00:00:00+00:00",
+                "last_error_class": "HTTPError",
+            }
+        },
+        provider_health_path="event_fade_cache/notify_llm_deep/event_provider_health.json",
+        token_configured=True,
+        live_enabled=True,
+        catalyst_search_providers=("cryptopanic", "gdelt"),
+        no_send=True,
+        now=datetime(2026, 6, 15, tzinfo=timezone.utc),
+    )
+    preflight_text = event_alpha_cryptopanic.format_cryptopanic_preflight(preflight)
+    assert preflight.token_configured is True
+    assert preflight.provider_in_backoff is True
+    assert preflight.skip_reason == "provider_backoff"
+    assert "CryptoPanic token configured: yes (redacted)" in preflight_text
+    assert "SECRET_TOKEN_SHOULD_NOT_RENDER" not in preflight_text
+    assert "security_shock_pack" in preflight.source_packs
+    assert "proxy_preipo_rwa_pack" in preflight.source_packs
+    assert "make event-alpha-provider-health-reset PROFILE=notify_llm_deep SERVICE=cryptopanic CONFIRM=1" in preflight_text
 
     doctor = event_alpha_artifact_doctor.diagnose_artifacts(
         core_opportunity_rows=[
@@ -2880,14 +2951,18 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
         raise AssertionError("required missing CryptoPanic token should fail")
 
     def failing_opener(request, timeout):
-        raise TimeoutError("offline timeout")
+        raise TimeoutError(f"offline timeout url={request.full_url}")
 
-    assert CryptoPanicProvider(
+    failed_provider = CryptoPanicProvider(
         None,
         live_enabled=True,
         api_token="token123",
         opener=failing_opener,
-    ).fetch_events(start, end) == []
+    )
+    assert failed_provider.fetch_events(start, end) == []
+    assert failed_provider.last_warnings
+    assert "token123" not in failed_provider.last_warnings[0]
+    assert "auth_token" not in failed_provider.last_warnings[0]
 
 
 def test_cryptopanic_catalyst_search_currency_filter_uses_validated_identity_or_empty():
@@ -5989,6 +6064,7 @@ def test_event_alpha_cycle_search_loop_uses_fixture_evidence_and_respects_limits
 
 def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
     import tempfile
+    from dataclasses import replace
     from datetime import datetime, timezone
     from pathlib import Path
     from crypto_rsi_scanner import (
@@ -6072,7 +6148,15 @@ def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
 
     with tempfile.TemporaryDirectory() as tmp:
         row = event_alpha_run_ledger.append_run_record(
-            no_provider,
+            replace(
+                no_provider,
+                cryptopanic_configured=True,
+                cryptopanic_attempted=True,
+                cryptopanic_results=3,
+                cryptopanic_accepted_evidence=1,
+                cryptopanic_rejected_evidence=2,
+                cryptopanic_provider_status="healthy",
+            ),
             cfg=event_alpha_run_ledger.EventAlphaRunLedgerConfig(Path(tmp) / "runs.jsonl"),
             profile="fixture",
             started_at=now,
@@ -6081,6 +6165,12 @@ def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
             send_requested=False,
         )
         assert row["catalyst_search_skip_reasons"]["provider_unavailable"] == 1
+        assert row["cryptopanic_configured"] is True
+        assert row["cryptopanic_attempted"] is True
+        assert row["cryptopanic_results"] == 3
+        assert row["cryptopanic_accepted_evidence"] == 1
+        assert row["cryptopanic_rejected_evidence"] == 2
+        assert row["cryptopanic_provider_status"] == "healthy"
         runs_report = event_alpha_run_ledger.format_run_ledger_report(
             event_alpha_run_ledger.EventAlphaRunLedgerReadResult(
                 path=Path(tmp) / "runs.jsonl",
@@ -6089,6 +6179,7 @@ def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
             )
         )
         assert "catalyst_search_skip_reasons: provider_unavailable=1" in runs_report
+        assert "cryptopanic configured=true attempted=true results=3 accepted=1 rejected=2 status=healthy skip=none" in runs_report
         brief = event_alpha_daily_brief.build_daily_brief(
             run_rows=[row],
             include_test_artifacts=True,

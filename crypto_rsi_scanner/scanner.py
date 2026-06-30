@@ -80,6 +80,7 @@ from . import event_alpha_eval_export
 from . import event_alpha_explain
 from . import event_alpha_feedback_readiness
 from . import event_alpha_health_guard
+from . import event_alpha_cryptopanic
 from . import event_impact_hypothesis_store
 from . import event_incident_store
 from . import event_alpha_missed
@@ -1741,6 +1742,21 @@ def _apply_event_alpha_profile(profile_name: str | None) -> event_alpha_profiles
 
 
 _PROFILE_LOCAL_BUDGET_OVERRIDES: dict[str, type] = {
+    "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES": int,
+    "EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES": int,
+    "EVENT_ALPHA_EVIDENCE_ACQUISITION_TIMEOUT_SECONDS": float,
+    "EVENT_CATALYST_SEARCH_MAX_ANOMALIES": int,
+    "EVENT_CATALYST_SEARCH_MAX_QUERIES_PER_ANOMALY": int,
+    "EVENT_CATALYST_SEARCH_MAX_RESULTS_PER_QUERY": int,
+    "EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT": float,
+    "EVENT_DISCOVERY_GDELT_TIMEOUT": float,
+    "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_TIMEOUT": float,
+    "EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT": float,
+    "EVENT_IMPACT_HYPOTHESIS_MAX_DISCOVERY_QUERIES": int,
+    "EVENT_IMPACT_HYPOTHESIS_MAX_DISCOVERY_RESULTS": int,
+    "EVENT_IMPACT_HYPOTHESIS_MAX_HYPOTHESES": int,
+    "EVENT_IMPACT_HYPOTHESIS_MAX_QUERIES_PER_HYPOTHESIS": int,
+    "EVENT_LLM_CATALYST_FRAMES_MAX_ROWS_PER_RUN": int,
     "EVENT_LLM_MAX_CANDIDATES_PER_RUN": int,
     "EVENT_LLM_EXTRACTOR_MAX_EVENTS_PER_RUN": int,
     "EVENT_LLM_MAX_CALLS_PER_RUN": int,
@@ -1751,12 +1767,14 @@ _PROFILE_LOCAL_BUDGET_OVERRIDES: dict[str, type] = {
     "EVENT_LLM_CACHE_TTL_HOURS": float,
     "EVENT_LLM_OPENAI_TIMEOUT": float,
     "EVENT_LLM_EXTRACTOR_OPENAI_TIMEOUT": float,
+    "EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN": int,
+    "EVENT_SOURCE_ENRICHMENT_TIMEOUT_SECONDS": float,
     "EVENT_ALPHA_NOTIFY_MAX_RUNTIME_SECONDS": float,
 }
 
 
 def _profile_override_value(attr: str, profile_value: Any) -> Any:
-    """Let local LLM budget env vars intentionally widen profile defaults."""
+    """Let explicit runtime env vars intentionally tune profile caps."""
     caster = _PROFILE_LOCAL_BUDGET_OVERRIDES.get(attr)
     if caster is None:
         return profile_value
@@ -2232,6 +2250,126 @@ def _write_event_core_opportunities_for_run(
     return updated, write_result
 
 
+def _cryptopanic_stats_for_pipeline_result(
+    pipeline_result: event_alpha_pipeline.EventAlphaPipelineResult,
+    *,
+    provider_health_path: str | Path,
+) -> dict[str, Any]:
+    """Summarize CryptoPanic usage without exposing the API token."""
+    acquisition = pipeline_result.evidence_acquisition_result
+    accepted = 0
+    rejected = 0
+    results_seen = 0
+    attempted = False
+    provider_failures = 0
+    if acquisition is not None:
+        for result in acquisition.results:
+            providers = {str(item).casefold() for item in getattr(result, "providers_used", ()) or ()}
+            if "cryptopanic" in providers:
+                attempted = True
+            for query in getattr(result, "query_results", ()) or ():
+                query_values = (
+                    getattr(query, "provider_hint", ""),
+                    getattr(query, "provider_used", ""),
+                    getattr(query, "query", ""),
+                )
+                query_is_cryptopanic = any("cryptopanic" in str(value).casefold() for value in query_values)
+                if query_is_cryptopanic:
+                    attempted = True
+                    results_seen += int(getattr(query, "results_seen", 0) or 0)
+                    provider_failures += len(tuple(getattr(query, "provider_failures", ()) or ()))
+                accepted += sum(
+                    1
+                    for item in getattr(query, "accepted_evidence", ()) or ()
+                    if _mapping_mentions_cryptopanic(item)
+                )
+                rejected += sum(
+                    1
+                    for item in getattr(query, "rejected_evidence", ()) or ()
+                    if _mapping_mentions_cryptopanic(item)
+                )
+            accepted += sum(
+                1
+                for item in getattr(result, "accepted_evidence", ()) or ()
+                if _mapping_mentions_cryptopanic(item)
+            )
+            rejected += sum(
+                1
+                for item in getattr(result, "rejected_evidence", ()) or ()
+                if _mapping_mentions_cryptopanic(item)
+            )
+            provider_failures += sum(
+                1
+                for item in getattr(result, "provider_failures", ()) or ()
+                if "cryptopanic" in str(item).casefold()
+            )
+    rows = event_provider_health.load_provider_health(provider_health_path)
+    statuses = [
+        event_provider_health.provider_health_status(row)
+        for key, row in rows.items()
+        if "cryptopanic" in " ".join(
+            str(value or "").casefold()
+            for value in (
+                key,
+                row.get("provider"),
+                row.get("provider_key"),
+                row.get("provider_service"),
+            )
+        )
+    ]
+    provider_status = "not_observed"
+    if "backoff" in statuses:
+        provider_status = "backoff"
+    elif "degraded" in statuses:
+        provider_status = "degraded"
+    elif statuses:
+        provider_status = "healthy"
+    configured = bool(config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN)
+    skip_reason = None
+    if not configured:
+        skip_reason = "missing_api_key"
+    elif not config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE and not config.EVENT_DISCOVERY_CRYPTOPANIC_PATH:
+        skip_reason = "profile_disabled"
+    elif not attempted:
+        if provider_status == "backoff":
+            skip_reason = "provider_backoff"
+        elif provider_failures:
+            skip_reason = "provider_error"
+        elif acquisition is None or not acquisition.results:
+            skip_reason = "no_eligible_candidates"
+        else:
+            skip_reason = "query_planner_skipped"
+    return {
+        "cryptopanic_configured": configured,
+        "cryptopanic_attempted": attempted,
+        "cryptopanic_results": max(results_seen, accepted + rejected),
+        "cryptopanic_accepted_evidence": accepted,
+        "cryptopanic_rejected_evidence": rejected,
+        "cryptopanic_provider_status": provider_status,
+        "cryptopanic_skip_reason": skip_reason,
+    }
+
+
+def _mapping_mentions_cryptopanic(item: object) -> bool:
+    if not isinstance(item, Mapping):
+        return "cryptopanic" in str(item).casefold()
+    values = (
+        item.get("provider"),
+        item.get("provider_hint"),
+        item.get("provider_used"),
+        item.get("source_class"),
+        item.get("source_url"),
+        item.get("reason_codes"),
+        item.get("currency_tags"),
+        item.get("query"),
+    )
+    return any(
+        "cryptopanic" in str(value).casefold()
+        or str(value).casefold() == "cryptopanic_tagged"
+        for value in values
+    )
+
+
 def event_alpha_cycle(
     verbose: bool = False,
     with_llm: bool = False,
@@ -2459,6 +2597,13 @@ def event_alpha_cycle(
         + (f" block={incident_store_result.block_reason}" if incident_store_result.block_reason else "")
     )
     print(event_core_opportunity_store.format_core_opportunity_store_write_result(core_store_result))
+    pipeline_result = replace(
+        pipeline_result,
+        **_cryptopanic_stats_for_pipeline_result(
+            pipeline_result,
+            provider_health_path=_event_provider_health_config_from_runtime().path,
+        ),
+    )
     run_row = event_alpha_run_ledger.append_run_record(
         pipeline_result,
         cfg=_event_alpha_run_ledger_config_from_runtime(),
@@ -3124,6 +3269,13 @@ def _event_alpha_notify_cycle_body(
         + (f" block={incident_store_result.block_reason}" if incident_store_result.block_reason else "")
     )
     print(event_core_opportunity_store.format_core_opportunity_store_write_result(core_store_result))
+    pipeline_result = replace(
+        pipeline_result,
+        **_cryptopanic_stats_for_pipeline_result(
+            pipeline_result,
+            provider_health_path=_event_provider_health_config_from_runtime().path,
+        ),
+    )
     run_row = event_alpha_run_ledger.append_run_record(
         pipeline_result,
         cfg=_event_alpha_run_ledger_config_from_runtime(),
@@ -4464,6 +4616,36 @@ def event_alpha_provider_health_report(
     print(_event_alpha_context_block(context))
     print(f"provider_health_path: {context.provider_health_path}")
     print(event_provider_health.format_provider_health_report(rows))
+
+
+def event_alpha_cryptopanic_preflight(
+    verbose: bool = False,
+    *,
+    profile_name: str | None = None,
+    artifact_namespace: str | None = None,
+) -> None:
+    """Print a redacted CryptoPanic readiness report for Event Alpha runs."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = _event_alpha_report_context(profile_name or "notify_llm_deep", artifact_namespace)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    provider_report = event_provider_status.build_event_discovery_provider_status(config)
+    provider_rows = event_provider_health.load_provider_health(context.provider_health_path)
+    report = event_alpha_cryptopanic.build_cryptopanic_preflight(
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        provider_status_report=provider_report,
+        provider_health_rows=provider_rows,
+        provider_health_path=context.provider_health_path,
+        token_configured=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN),
+        live_enabled=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE or config.EVENT_DISCOVERY_CRYPTOPANIC_PATH),
+        catalyst_search_providers=tuple(str(item) for item in config.EVENT_CATALYST_SEARCH_PROVIDERS),
+        no_send=not bool(config.EVENT_ALERTS_ENABLED),
+    )
+    print(_event_alpha_context_block(context))
+    print(event_alpha_cryptopanic.format_cryptopanic_preflight(report))
 
 
 def event_alpha_source_coverage_report(
@@ -9498,6 +9680,11 @@ def cli() -> None:
         help="Print profile-scoped Event Alpha provider health/backoff rows.",
     )
     parser.add_argument(
+        "--event-alpha-cryptopanic-preflight",
+        action="store_true",
+        help="Print redacted CryptoPanic readiness/backoff/source-pack preflight for Event Alpha.",
+    )
+    parser.add_argument(
         "--event-alpha-source-coverage-report",
         action="store_true",
         help="Print source-pack provider/evidence coverage for Event Alpha research artifacts.",
@@ -10423,6 +10610,13 @@ def cli() -> None:
         return
     if args.event_alpha_provider_health_report:
         event_alpha_provider_health_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or None,
+        )
+        return
+    if args.event_alpha_cryptopanic_preflight:
+        event_alpha_cryptopanic_preflight(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or None,

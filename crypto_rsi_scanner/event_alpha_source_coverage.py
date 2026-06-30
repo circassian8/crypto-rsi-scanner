@@ -150,6 +150,13 @@ class EventAlphaSourceCoverageReport:
     provider_health_rows: int = 0
     acquisition_rows: int = 0
     core_rows: int = 0
+    cryptopanic_configured: bool = False
+    cryptopanic_health_status: str = "not_observed"
+    cryptopanic_observed: bool = False
+    cryptopanic_accepted_evidence: int = 0
+    cryptopanic_rejected_evidence: int = 0
+    cryptopanic_source_packs: tuple[str, ...] = ()
+    cryptopanic_not_used_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -158,6 +165,13 @@ class EventAlphaSourceCoverageReport:
             "provider_health_rows": self.provider_health_rows,
             "acquisition_rows": self.acquisition_rows,
             "core_rows": self.core_rows,
+            "cryptopanic_configured": self.cryptopanic_configured,
+            "cryptopanic_health_status": self.cryptopanic_health_status,
+            "cryptopanic_observed": self.cryptopanic_observed,
+            "cryptopanic_accepted_evidence": self.cryptopanic_accepted_evidence,
+            "cryptopanic_rejected_evidence": self.cryptopanic_rejected_evidence,
+            "cryptopanic_source_packs": list(self.cryptopanic_source_packs),
+            "cryptopanic_not_used_reason": self.cryptopanic_not_used_reason,
             "packs": [pack.to_dict() for pack in self.packs],
         }
 
@@ -178,6 +192,11 @@ def build_source_coverage_report(
     configured = _configured_providers(provider_status_report, health_by_provider)
     acquisition = [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)]
     core_rows = [dict(row) for row in core_opportunity_rows if isinstance(row, Mapping)]
+    cryptopanic_stats = _cryptopanic_stats(
+        configured=configured,
+        health_by_provider=health_by_provider,
+        acquisition_rows=acquisition,
+    )
 
     packs: list[EventAlphaSourceCoveragePack] = []
     for pack_name in SOURCE_COVERAGE_PACK_ORDER:
@@ -268,6 +287,13 @@ def build_source_coverage_report(
         provider_health_rows=len(provider_health_rows or {}),
         acquisition_rows=len(acquisition),
         core_rows=len(core_rows),
+        cryptopanic_configured=cryptopanic_stats["configured"],
+        cryptopanic_health_status=cryptopanic_stats["health_status"],
+        cryptopanic_observed=cryptopanic_stats["observed"],
+        cryptopanic_accepted_evidence=cryptopanic_stats["accepted"],
+        cryptopanic_rejected_evidence=cryptopanic_stats["rejected"],
+        cryptopanic_source_packs=tuple(cryptopanic_stats["source_packs"]),
+        cryptopanic_not_used_reason=cryptopanic_stats["not_used_reason"],
     )
 
 
@@ -282,6 +308,15 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         f"evidence_acquisition_rows: {report.acquisition_rows}",
         f"core_opportunity_rows: {report.core_rows}",
         "note: configured providers with no health row are unknown/not observed; do not infer they are healthy.",
+        "",
+        "CryptoPanic:",
+        f"- configured: {str(report.cryptopanic_configured).lower()}",
+        f"- health status: {report.cryptopanic_health_status}",
+        f"- observed this run: {str(report.cryptopanic_observed).lower()}",
+        f"- accepted evidence: {report.cryptopanic_accepted_evidence}",
+        f"- rejected evidence: {report.cryptopanic_rejected_evidence}",
+        f"- source packs contributed: {_join(report.cryptopanic_source_packs)}",
+        f"- not-used reason: {report.cryptopanic_not_used_reason or 'none'}",
         "",
         "Source-pack coverage:",
     ]
@@ -423,6 +458,87 @@ def _evidence_items(value: object) -> tuple[Mapping[str, Any], ...]:
     if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
         return tuple(item for item in value if isinstance(item, Mapping))
     return ()
+
+
+def _cryptopanic_stats(
+    *,
+    configured: set[str],
+    health_by_provider: Mapping[str, str],
+    acquisition_rows: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    accepted = 0
+    rejected = 0
+    observed = "cryptopanic" in health_by_provider
+    source_packs: set[str] = set()
+    provider_failures: set[str] = set()
+    for row in acquisition_rows:
+        row_has_cryptopanic = _row_mentions_cryptopanic(row)
+        accepted_items = tuple(item for item in _evidence_items(row.get("accepted_evidence")) if _evidence_mentions_cryptopanic(item))
+        rejected_items = tuple(item for item in _evidence_items(row.get("rejected_evidence_samples") or row.get("rejected_evidence")) if _evidence_mentions_cryptopanic(item))
+        query_items = tuple(item for item in _evidence_items(row.get("queries")) if _evidence_mentions_cryptopanic(item))
+        if row_has_cryptopanic or accepted_items or rejected_items or query_items:
+            observed = True
+            pack = str(row.get("source_pack") or "")
+            if pack:
+                source_packs.add(pack)
+        accepted += len(accepted_items)
+        rejected += len(rejected_items)
+        for failure in row.get("provider_failures") or ():
+            if "cryptopanic" in str(failure).casefold():
+                provider_failures.add(str(failure))
+    configured_flag = "cryptopanic" in configured
+    health_status = _provider_effective_status("cryptopanic", health_by_provider)
+    reason = None
+    if configured_flag and not observed:
+        if health_status == "backoff":
+            reason = "provider_backoff"
+        elif health_status in {"degraded", "unavailable"}:
+            reason = "provider_error"
+        elif provider_failures:
+            reason = "provider_error"
+        elif not acquisition_rows:
+            reason = "no_acquisition_rows"
+        else:
+            reason = "query_planner_skipped"
+    elif not configured_flag:
+        reason = "not_configured"
+    return {
+        "configured": configured_flag,
+        "health_status": health_status,
+        "observed": observed,
+        "accepted": accepted,
+        "rejected": rejected,
+        "source_packs": _sorted_tuple(source_packs),
+        "not_used_reason": reason,
+    }
+
+
+def _row_mentions_cryptopanic(row: Mapping[str, Any]) -> bool:
+    values: list[object] = [
+        row.get("providers_used"),
+        row.get("evidence_acquisition_providers_used"),
+        row.get("provider_failures"),
+        row.get("provider_coverage_gaps"),
+    ]
+    return any("cryptopanic" in str(value).casefold() for value in values)
+
+
+def _evidence_mentions_cryptopanic(item: Mapping[str, Any]) -> bool:
+    values = (
+        item.get("provider"),
+        item.get("provider_hint"),
+        item.get("provider_used"),
+        item.get("source_class"),
+        item.get("source_url"),
+        item.get("reason_codes"),
+        item.get("currency_tags"),
+        item.get("query"),
+    )
+    return any(
+        "cryptopanic" in str(value).casefold()
+        or str(value).casefold() == "cryptopanic_tagged"
+        for value in values
+    )
 
 
 def _coverage_blocked_count(

@@ -145,6 +145,13 @@ class EventAlphaPipelineResult:
     core_opportunity_write_success: bool = False
     core_opportunity_rows_written: int = 0
     core_opportunity_write_block_reason: str | None = None
+    cryptopanic_configured: bool = False
+    cryptopanic_attempted: bool = False
+    cryptopanic_results: int = 0
+    cryptopanic_accepted_evidence: int = 0
+    cryptopanic_rejected_evidence: int = 0
+    cryptopanic_provider_status: str = "not_observed"
+    cryptopanic_skip_reason: str | None = None
 
     @property
     def raw_events(self) -> int:

@@ -75,6 +75,11 @@ class EventAlphaArtifactDoctorResult:
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
     degraded_provider_absence_marked_meaningful: int = 0
+    cryptopanic_configured_but_not_observed: int = 0
+    cryptopanic_used_but_no_source_coverage_entry: int = 0
+    cryptopanic_accepted_evidence_missing_from_card: int = 0
+    cryptopanic_rejected_only_promoted: int = 0
+    cryptopanic_token_printed_or_unredacted: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -521,6 +526,12 @@ def diagnose_artifacts(
     live_confirmation_conflicts = _live_confirmation_conflicts(core_rows, profile=profile, artifact_namespace=artifact_namespace)
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
+    cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
+        acquisition_rows=acquisition_rows,
+        core_rows=core_rows,
+        research_card_paths=research_card_paths,
+        source_coverage_report_path=source_coverage_report_path,
+    )
     daily_brief_conflicts = _daily_brief_consistency_conflicts(
         daily_brief_path,
         runs=runs,
@@ -723,6 +734,35 @@ def diagnose_artifacts(
         message = (
             "degraded_provider_absence_marked_meaningful="
             f"{source_coverage_conflicts['degraded_provider_absence_marked_meaningful']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if cryptopanic_conflicts["cryptopanic_configured_but_not_observed"]:
+        warnings.append(
+            "cryptopanic_configured_but_not_observed="
+            f"{cryptopanic_conflicts['cryptopanic_configured_but_not_observed']}"
+        )
+    if cryptopanic_conflicts["cryptopanic_used_but_no_source_coverage_entry"]:
+        message = (
+            "cryptopanic_used_but_no_source_coverage_entry="
+            f"{cryptopanic_conflicts['cryptopanic_used_but_no_source_coverage_entry']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if cryptopanic_conflicts["cryptopanic_accepted_evidence_missing_from_card"]:
+        message = (
+            "cryptopanic_accepted_evidence_missing_from_card="
+            f"{cryptopanic_conflicts['cryptopanic_accepted_evidence_missing_from_card']}"
+        )
+        (blockers if strict and core_store_available else warnings).append(message)
+    if cryptopanic_conflicts["cryptopanic_rejected_only_promoted"]:
+        message = (
+            "cryptopanic_rejected_only_promoted="
+            f"{cryptopanic_conflicts['cryptopanic_rejected_only_promoted']}"
+        )
+        (blockers if strict and core_store_available else warnings).append(message)
+    if cryptopanic_conflicts["cryptopanic_token_printed_or_unredacted"]:
+        message = (
+            "cryptopanic_token_printed_or_unredacted="
+            f"{cryptopanic_conflicts['cryptopanic_token_printed_or_unredacted']}"
         )
         (blockers if strict else warnings).append(message)
     if visible_missing_targets:
@@ -1180,6 +1220,11 @@ def diagnose_artifacts(
         source_pack_provider_status_missing=source_coverage_conflicts["source_pack_provider_status_missing"],
         missing_provider_recommendations_missing=source_coverage_conflicts["missing_provider_recommendations_missing"],
         degraded_provider_absence_marked_meaningful=source_coverage_conflicts["degraded_provider_absence_marked_meaningful"],
+        cryptopanic_configured_but_not_observed=cryptopanic_conflicts["cryptopanic_configured_but_not_observed"],
+        cryptopanic_used_but_no_source_coverage_entry=cryptopanic_conflicts["cryptopanic_used_but_no_source_coverage_entry"],
+        cryptopanic_accepted_evidence_missing_from_card=cryptopanic_conflicts["cryptopanic_accepted_evidence_missing_from_card"],
+        cryptopanic_rejected_only_promoted=cryptopanic_conflicts["cryptopanic_rejected_only_promoted"],
+        cryptopanic_token_printed_or_unredacted=cryptopanic_conflicts["cryptopanic_token_printed_or_unredacted"],
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -1988,6 +2033,117 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         unknown = set(_split_provider_line(unknown_line))
         if healthy & unknown:
             out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & unknown)
+    return out
+
+
+def _cryptopanic_artifact_conflicts(
+    *,
+    acquisition_rows: Iterable[Mapping[str, Any]],
+    core_rows: Iterable[Mapping[str, Any]],
+    research_card_paths: Iterable[Path],
+    source_coverage_report_path: str | Path | None,
+) -> dict[str, int]:
+    out = {
+        "cryptopanic_configured_but_not_observed": 0,
+        "cryptopanic_used_but_no_source_coverage_entry": 0,
+        "cryptopanic_accepted_evidence_missing_from_card": 0,
+        "cryptopanic_rejected_only_promoted": 0,
+        "cryptopanic_token_printed_or_unredacted": 0,
+    }
+    source_text = ""
+    if source_coverage_report_path is not None and Path(source_coverage_report_path).exists():
+        try:
+            source_text = Path(source_coverage_report_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            source_text = ""
+    if "CryptoPanic:" in source_text:
+        if "- configured: true" in source_text and "- observed this run: false" in source_text:
+            out["cryptopanic_configured_but_not_observed"] = 1
+    acquisition = [dict(row) for row in acquisition_rows if isinstance(row, Mapping)]
+    cryptopanic_used = any(_row_mentions_cryptopanic(row) for row in acquisition)
+    if cryptopanic_used and "CryptoPanic:" not in source_text:
+        out["cryptopanic_used_but_no_source_coverage_entry"] = 1
+    accepted_core_ids = {
+        str(row.get("core_opportunity_id") or "")
+        for row in acquisition
+        if _accepted_cryptopanic_count(row) > 0
+    }
+    if accepted_core_ids:
+        card_text_by_core = _card_text_by_core(research_card_paths)
+        for core_id in accepted_core_ids:
+            if not core_id:
+                continue
+            text = card_text_by_core.get(core_id, "")
+            if text and "cryptopanic" not in text.casefold():
+                out["cryptopanic_accepted_evidence_missing_from_card"] += 1
+    rejected_only_core_ids = {
+        str(row.get("core_opportunity_id") or "")
+        for row in acquisition
+        if _row_mentions_cryptopanic(row)
+        and _accepted_cryptopanic_count(row) <= 0
+        and (
+            str(row.get("status") or row.get("evidence_acquisition_status") or "") == "rejected_results_only"
+            or _rejected_cryptopanic_count(row) > 0
+        )
+    }
+    for row in core_rows:
+        core_id = str(row.get("core_opportunity_id") or "")
+        if core_id not in rejected_only_core_ids:
+            continue
+        route = str(row.get("final_route_after_quality_gate") or row.get("route") or "")
+        level = str(row.get("opportunity_level") or row.get("final_opportunity_level") or "")
+        alertable = bool(row.get("alertable_after_quality_gate") or row.get("route_alertable"))
+        if alertable or route in {"RESEARCH_DIGEST", "WATCHLIST", "HIGH_PRIORITY_RESEARCH"} or level in {"validated_digest", "watchlist", "high_priority"}:
+            out["cryptopanic_rejected_only_promoted"] += 1
+    combined_text = source_text + "\n" + "\n".join(_read_card_text(path) for path in research_card_paths)
+    if "auth_token=" in combined_text or "RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN=" in combined_text:
+        out["cryptopanic_token_printed_or_unredacted"] = 1
+    return out
+
+
+def _row_mentions_cryptopanic(row: Mapping[str, Any]) -> bool:
+    values = (
+        row.get("provider"),
+        row.get("provider_hint"),
+        row.get("provider_used"),
+        row.get("source_class"),
+        row.get("source_url"),
+        row.get("providers_used"),
+        row.get("evidence_acquisition_providers_used"),
+        row.get("provider_failures"),
+        row.get("reason_codes"),
+        row.get("accepted_evidence"),
+        row.get("rejected_evidence"),
+        row.get("rejected_evidence_samples"),
+        row.get("queries"),
+    )
+    return any("cryptopanic" in str(value).casefold() for value in values)
+
+
+def _accepted_cryptopanic_count(row: Mapping[str, Any]) -> int:
+    accepted = row.get("accepted_evidence") or row.get("evidence_acquisition_accepted_evidence")
+    return sum(1 for item in _mapping_items(accepted) if _row_mentions_cryptopanic(item))
+
+
+def _rejected_cryptopanic_count(row: Mapping[str, Any]) -> int:
+    rejected = row.get("rejected_evidence_samples") or row.get("rejected_evidence") or row.get("evidence_acquisition_rejected_samples")
+    return sum(1 for item in _mapping_items(rejected) if _row_mentions_cryptopanic(item))
+
+
+def _mapping_items(value: Any) -> tuple[Mapping[str, Any], ...]:
+    if isinstance(value, Mapping):
+        return (value,)
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+        return tuple(item for item in value if isinstance(item, Mapping))
+    return ()
+
+
+def _card_text_by_core(paths: Iterable[Path]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for path in paths:
+        text = _read_card_text(path)
+        for match in re.finditer(r"core_opportunity_id:\s*([^\s]+)", text):
+            out[str(match.group(1)).strip()] = text
     return out
 
 
@@ -3113,7 +3269,12 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
-            f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful}"
+            f"degraded_provider_absence_marked_meaningful={result.degraded_provider_absence_marked_meaningful} "
+            f"cryptopanic_configured_but_not_observed={result.cryptopanic_configured_but_not_observed} "
+            f"cryptopanic_used_but_no_source_coverage_entry={result.cryptopanic_used_but_no_source_coverage_entry} "
+            f"cryptopanic_accepted_evidence_missing_from_card={result.cryptopanic_accepted_evidence_missing_from_card} "
+            f"cryptopanic_rejected_only_promoted={result.cryptopanic_rejected_only_promoted} "
+            f"cryptopanic_token_printed_or_unredacted={result.cryptopanic_token_printed_or_unredacted}"
         ),
         (
             "snapshot lineage: "

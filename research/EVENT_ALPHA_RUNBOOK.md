@@ -91,8 +91,11 @@ CryptoPanic/exchange/calendar/unlock/derivatives/market evidence, provider
 backoff, budget skipping, or rejected-only acquisition results:
 
 ```bash
+make event-alpha-cryptopanic-preflight PROFILE=notify_llm_deep PYTHON=python3
+make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal PYTHON=python3
 make event-alpha-source-coverage-report PROFILE=notify_llm_deep_rehearsal PYTHON=python3
 make event-alpha-source-coverage-report PROFILE=notify_llm_deep PYTHON=python3
+make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3
 make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke PYTHON=python3
 make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke PYTHON=python3
 ```
@@ -111,6 +114,13 @@ quarantine/backoff. Treat CoinGecko and DefiLlama-style rows as
 market/protocol metric evidence only: they can support market confirmation or
 source coverage, but they do not prove official confirmation or catalyst
 impact-path validation by themselves.
+
+The CryptoPanic preflight prints only redacted key/config state, source packs,
+provider health/backoff, and the targeted reset command. The rehearsal target
+uses the real `notify_llm_deep` path with `RSI_EVENT_ALERTS_ENABLED=0` and the
+`notify_llm_deep_cryptopanic_rehearsal` namespace, so it can prove whether
+CryptoPanic was attempted and accepted/rejected evidence without sending
+Telegram or mutating trading/live RSI state.
 
 For smoke namespaces such as `notify_llm_deep_research_review_smoke`, the
 runtime profile can intentionally remain `notify_llm_deep` while
@@ -1451,6 +1461,8 @@ Provider health has profile-scoped operator commands:
 
 ```bash
 make event-alpha-provider-health-report PROFILE=notify_no_key
+make event-alpha-cryptopanic-preflight PROFILE=notify_llm_deep
+make event-alpha-provider-health-reset PROFILE=notify_llm_deep SERVICE=cryptopanic CONFIRM=1
 make event-alpha-provider-health-reset PROFILE=notify_no_key PROVIDER_KEY=gdelt:event_source CONFIRM=1
 make event-alpha-provider-health-reset PROFILE=notify_no_key PROVIDER_ALL=1 CONFIRM=1
 ```

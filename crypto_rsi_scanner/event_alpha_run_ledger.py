@@ -179,6 +179,17 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
             f"upgraded={int(row.get('evidence_acquisition_upgraded') or 0)} "
             f"rows={int(row.get('evidence_acquisition_rows_written') or 0)}"
         )
+        if row.get("cryptopanic_configured") or row.get("cryptopanic_attempted") or row.get("cryptopanic_skip_reason"):
+            rows.append(
+                "  "
+                f"cryptopanic configured={str(bool(row.get('cryptopanic_configured'))).lower()} "
+                f"attempted={str(bool(row.get('cryptopanic_attempted'))).lower()} "
+                f"results={int(row.get('cryptopanic_results') or 0)} "
+                f"accepted={int(row.get('cryptopanic_accepted_evidence') or 0)} "
+                f"rejected={int(row.get('cryptopanic_rejected_evidence') or 0)} "
+                f"status={row.get('cryptopanic_provider_status') or 'not_observed'} "
+                f"skip={row.get('cryptopanic_skip_reason') or 'none'}"
+            )
         rows.append(
             "  "
             f"catalyst_frames analyzed={int(row.get('catalyst_frames_analyzed') or 0)} "
@@ -368,6 +379,13 @@ def _run_record(
         "evidence_acquisition_path": str(getattr(acquisition, "path", "") or ""),
         "evidence_acquisition_run_status": str(getattr(acquisition, "status", "") or ""),
         "evidence_acquisition_status_counts": _evidence_acquisition_status_counts(acquisition),
+        "cryptopanic_configured": bool(getattr(result, "cryptopanic_configured", False)),
+        "cryptopanic_attempted": bool(getattr(result, "cryptopanic_attempted", False)),
+        "cryptopanic_results": _int(getattr(result, "cryptopanic_results", 0)),
+        "cryptopanic_accepted_evidence": _int(getattr(result, "cryptopanic_accepted_evidence", 0)),
+        "cryptopanic_rejected_evidence": _int(getattr(result, "cryptopanic_rejected_evidence", 0)),
+        "cryptopanic_provider_status": str(getattr(result, "cryptopanic_provider_status", "") or "not_observed"),
+        "cryptopanic_skip_reason": getattr(result, "cryptopanic_skip_reason", None),
         "candidates": _int(getattr(result, "candidates", 0)),
         "clusters": _int(getattr(result, "clusters", 0)),
         "alerts": len(list(getattr(result, "alerts", ()) or ())),

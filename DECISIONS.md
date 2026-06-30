@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - CryptoPanic live proof remains no-send and redacted
+**Status:** accepted
+**Decision:** CryptoPanic operational checks must use a redacted preflight and
+no-send rehearsal path before any notification promotion. The preflight may
+report whether the token is configured, provider health/backoff status, source
+packs that depend on CryptoPanic, and a targeted `SERVICE=cryptopanic`
+provider-health reset command, but it must not print the token. The
+`notify_llm_deep_cryptopanic_rehearsal` target runs with Telegram sends
+guarded off and records CryptoPanic configured/attempted/result/accepted/
+rejected/status/skip counters in the run ledger.
+**Why:** CryptoPanic is useful high-specificity evidence only when token-tagged
+and catalyst-specific, but it uses a secret token and can fail/backoff like any
+live provider. Operators and Pro-model reviews need proof that it was exercised
+without risking a secret leak or accidental send.
+**Revisit when:** CryptoPanic evidence is promoted into a scheduled live-send
+profile with reviewed burn-in metrics and a separate human-approved send plan.
+
 ## 2026-06-30 - Daily brief selection is artifact-namespace authoritative
 **Status:** accepted
 **Decision:** Event Alpha operator reports must treat an explicit

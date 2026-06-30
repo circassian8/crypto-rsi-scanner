@@ -17,6 +17,46 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Prove CryptoPanic no-send evidence path · Codex
+**Why:** With a local CryptoPanic key configured, `notify_llm_deep` needed a
+safe no-send proof path that shows whether CryptoPanic is configured, attempted,
+observed in source coverage, and redacted in all operator artifacts.
+**Changes:**
+- Added a redacted CryptoPanic preflight helper/report that shows token
+  configured status, live/profile readiness, provider-health/backoff state,
+  dependent source packs, and a targeted reset command without printing secrets.
+- Added CryptoPanic counters to Event Alpha pipeline/run-ledger artifacts and
+  wired both regular and notification-cycle ledger writes to summarize
+  configured/attempted/results/accepted/rejected/provider status.
+- Extended source-coverage reports and artifact doctor checks for CryptoPanic
+  configured-but-unobserved, source-coverage mismatches, card evidence
+  mismatches, rejected-only promotions, and token leak patterns.
+- Hardened CryptoPanic provider failures so live fetch errors are logged by
+  class/status only, not full auth-token URLs.
+- Added `make event-alpha-cryptopanic-preflight` and a bounded
+  `make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal` that runs the
+  real `notify_llm_deep` no-send path with CryptoPanic enabled, strict caps,
+  source coverage, daily brief, inbox, and strict artifact doctor.
+- Let explicit runtime env caps override profile defaults for source search,
+  source enrichment, evidence acquisition, catalyst frames, and notification
+  runtime so proof/rehearsal targets remain bounded.
+**Verify:** `python3 tests/test_indicators.py` (579/579 passed);
+`make event-alpha-cryptopanic-preflight PYTHON=python3`;
+`make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal PYTHON=python3`
+(CryptoPanic configured/attempted, provider returned redacted HTTP 403 and was
+recorded as backoff; no sends; strict artifact doctor had no blockers);
+`rg -n "auth_token=|RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN|02391c" event_fade_cache/notify_llm_deep_cryptopanic_rehearsal || true`
+(no matches); `make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The local key is present but CryptoPanic returned HTTP 403 in
+the live no-send proof, so accepted CryptoPanic evidence stayed at zero. This
+change proves configuration/attempt/coverage/backoff visibility and redaction;
+it does not send Telegram, trade, paper trade, write normal RSI rows, or create
+`TRIGGERED_FADE`.
+
 ## 2026-06-30 — Fix research-review daily brief namespace selection · Codex
 **Why:** `notify_llm_deep` research-review smoke artifacts were valid under the
 `notify_llm_deep_research_review_smoke` namespace, but the daily brief could

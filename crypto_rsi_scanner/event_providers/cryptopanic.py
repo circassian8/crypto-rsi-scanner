@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -94,7 +95,7 @@ class CryptoPanicProvider:
                 raw = json.loads(response.read().decode("utf-8"))
             rows = _news_items(raw, allow_empty=True)
         except Exception as exc:  # noqa: BLE001
-            warning = f"CryptoPanic live news fetch failed: {exc}"
+            warning = _safe_fetch_warning(exc)
             self.last_warnings = (warning,)
             if self.required:
                 raise
@@ -125,3 +126,13 @@ class CryptoPanicProvider:
         query.update({key: value for key, value in optional.items() if value})
         separator = "&" if "?" in self.base_url else "?"
         return self.base_url + separator + urlencode(query)
+
+
+def _safe_fetch_warning(exc: BaseException) -> str:
+    """Return a warning that cannot echo the request URL or auth token."""
+    if isinstance(exc, HTTPError):
+        return f"CryptoPanic live news fetch failed: HTTPError status={exc.code}"
+    status = getattr(exc, "status", None) or getattr(exc, "code", None)
+    if status:
+        return f"CryptoPanic live news fetch failed: {type(exc).__name__} status={status}"
+    return f"CryptoPanic live news fetch failed: {type(exc).__name__}"
