@@ -225,6 +225,12 @@ def render_research_card(
         "",
         "## Derivatives / Supply / Liquidity",
         f"- Derivatives crowding: {_score(entry, alert, 'derivatives_crowding')}",
+        f"- Derivatives confirmation: {_score(entry, alert, 'derivatives_confirmation_level')} / {_score(entry, alert, 'derivatives_confirmation_score')} "
+        f"(freshness={_score(entry, alert, 'derivatives_freshness_status')})",
+        f"- DEX liquidity confirmation: {_score(entry, alert, 'dex_liquidity_level')} / {_score(entry, alert, 'dex_liquidity_score')} "
+        f"(freshness={_score(entry, alert, 'dex_freshness_status')})",
+        f"- Protocol metrics confirmation: {_score(entry, alert, 'protocol_metrics_level')} / {_score(entry, alert, 'protocol_metrics_score')} "
+        f"(freshness={_score(entry, alert, 'protocol_metrics_freshness_status')})",
         f"- Supply pressure: {_score(entry, alert, 'supply_pressure')}",
         f"- Cluster confidence: {_score(entry, alert, 'cluster_confidence')}",
         "",

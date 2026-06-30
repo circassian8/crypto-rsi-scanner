@@ -170,6 +170,15 @@ def format_opportunity_audit(
         f"cap_applied={components.get('market_context_freshness_cap_applied') if components.get('market_context_freshness_cap_applied') is not None else row.get('market_context_freshness_cap_applied')}",
         f"- market reasons: {_list_value(components.get('market_confirmation_reasons') or row.get('market_confirmation_reasons'))}",
         f"- market missing: {_list_value(components.get('market_confirmation_missing_fields') or row.get('market_confirmation_missing_fields'))}",
+        f"- derivatives confirmation: {components.get('derivatives_confirmation_level') or row.get('derivatives_confirmation_level') or 'unknown'} / "
+        f"{components.get('derivatives_confirmation_score') or row.get('derivatives_confirmation_score') or 'n/a'} "
+        f"freshness={components.get('derivatives_freshness_status') or row.get('derivatives_freshness_status') or 'unknown'}",
+        f"- DEX liquidity confirmation: {components.get('dex_liquidity_level') or row.get('dex_liquidity_level') or 'unknown'} / "
+        f"{components.get('dex_liquidity_score') or row.get('dex_liquidity_score') or 'n/a'} "
+        f"freshness={components.get('dex_freshness_status') or row.get('dex_freshness_status') or 'unknown'}",
+        f"- protocol metrics confirmation: {components.get('protocol_metrics_level') or row.get('protocol_metrics_level') or 'unknown'} / "
+        f"{components.get('protocol_metrics_score') or row.get('protocol_metrics_score') or 'n/a'} "
+        f"freshness={components.get('protocol_metrics_freshness_status') or row.get('protocol_metrics_freshness_status') or 'unknown'}",
         "",
         "## Final opportunity verdict",
         f"- level/score: {components.get('final_opportunity_level') or row.get('final_opportunity_level') or components.get('opportunity_level') or row.get('opportunity_level') or 'unknown'} / {components.get('final_opportunity_score') or row.get('final_opportunity_score') or components.get('opportunity_score_final') or row.get('opportunity_score_final') or 'n/a'}",

@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - Derivatives, DEX liquidity, and protocol metrics are market evidence only
+**Status:** accepted
+**Decision:** Event Alpha may use Coinalyze-style derivatives snapshots,
+GeckoTerminal-style DEX liquidity/pool-volume snapshots, and DefiLlama-style
+protocol TVL/fees/volume snapshots as first-class market-confirmation evidence
+with explicit freshness status. These signals may support playbook-specific
+confirmation: listings/perps can use open-interest, funding, futures volume,
+and liquidations; proxy-attention rows can use DEX liquidity sanity and DEX
+volume; strategic/protocol/security rows can use TVL, fees, protocol volume, or
+TVL outflow. Stale, missing, unknown, or provider-unavailable rows remain
+coverage gaps and cannot validate the catalyst. These sources cannot prove
+asset identity, official confirmation, impact-path validation, `TRIGGERED_FADE`,
+Telegram sends, paper trades, normal RSI signal rows, or execution by
+themselves.
+**Why:** Price-only confirmation is too thin for Event Alpha. Derivatives,
+liquidity, and protocol metrics make operator review more useful, but treating
+them as catalyst proof would weaken strict source/identity/impact gates.
+**Revisit when:** Reviewed live burn-in outcomes show reliable playbook-specific
+thresholds for OI/funding, DEX liquidity, TVL/fees, or protocol-volume changes.
+
 ## 2026-06-30 - Structured calendar and unlock evidence has pack-specific proof obligations
 **Status:** accepted
 **Decision:** Event Alpha may treat CoinMarketCal-style structured calendar

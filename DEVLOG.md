@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Add advanced Event Alpha market confirmation · Codex
+**Why:** Event Alpha source and impact-path validation was stronger, but
+operator-facing market confirmation was still too spot-price-centric. Derivative
+crowding, DEX liquidity, and protocol metrics should inform playbook-specific
+confirmation without proving the catalyst by themselves.
+**Changes:**
+- Market confirmation now scores fresh derivatives evidence from OI, funding,
+  liquidations, long/short crowding, and futures volume, with separate
+  derivatives freshness, level, score, and reason fields.
+- Added fixture-ready DEX liquidity and protocol-metric confirmation paths for
+  liquidity sanity, DEX volume/new-pool context, TVL outflows/growth, fees, and
+  protocol volume.
+- Watchlist enrichment can now carry DEX liquidity and protocol metrics through
+  fixture/provider abstractions, while core opportunity rows, cards, audits,
+  daily briefs, quality review, and verdict explanations expose the new
+  confirmation layers.
+- Source packs and source registry now request Coinalyze/GeckoTerminal/
+  DefiLlama-style evidence where relevant while keeping identity, catalyst-link,
+  impact-path, source-quality, live-confirmation, and event-fade gates strict.
+- Expanded tests for perp/listing derivatives, stale/missing derivatives,
+  DEX liquidity caps/support, protocol TVL/fee confirmation, playbook-specific
+  interpretation, source-pack gaps, and watchlist enrichment fixtures.
+**Verify:** `python3 tests/test_indicators.py` (566/566 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make verify PYTHON=python3`; `python3 -m compileall -q crypto_rsi_scanner
+tests`.
+**Notes/risks:** Research-only. Advanced market data can support, cap, or
+explain opportunity quality, but it cannot prove identity/catalyst/impact path,
+send Telegram, write normal RSI rows, trade, paper trade, or create
+`TRIGGERED_FADE`.
+
 ## 2026-06-30 — Promote structured calendar and unlock source packs · Codex
 **Why:** CoinMarketCal-style dated catalysts and Tokenomist-style unlock rows
 were parsed, but Event Alpha did not preserve enough structured proof or enforce

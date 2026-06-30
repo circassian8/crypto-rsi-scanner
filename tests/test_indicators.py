@@ -681,7 +681,7 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "missing providers: cryptopanic" in text
     assert "provider coverage status: degraded" in text
     assert "provider role health: gdelt:event_source=degraded, project_blog_rss:catalyst_search=degraded" in text
-    assert "providers missing for confirmation: cryptopanic, polymarket" in text
+    assert "providers missing for confirmation: coinalyze, cryptopanic, geckoterminal, polymarket" in text
     assert "evidence absence meaningful: false" in text
     assert "accepted=1" in text
     assert "Most useful next data source:" in text
@@ -7800,6 +7800,151 @@ def test_event_market_evidence_and_opportunity_verdict_quality_layers():
     assert stale_fixture_market.market_context_freshness_status == "fixture_allowed_stale"
     assert stale_fixture_market.level == "strong"
     assert stale_fixture_market.freshness_cap_applied is False
+
+    perp_listing = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot={
+                "return_24h": 0.18,
+                "volume_zscore_24h": 3.1,
+                "volume_to_market_cap": 0.24,
+                "timestamp": now.isoformat(),
+                "source": "unit_test_market",
+            },
+            derivatives_snapshot={
+                "open_interest_24h_change_pct": 0.72,
+                "funding_rate_8h": 0.0008,
+                "liquidations_24h": 2_500_000,
+                "long_short_ratio": 2.1,
+                "futures_volume_24h": 12_000_000,
+                "timestamp": now.isoformat(),
+                "source": "coinalyze_fixture",
+            },
+            playbook_type="perp_listing_squeeze",
+            now=now,
+            market_context_observed_at=now,
+            market_context_source="unit_test_market",
+            allow_stale_fixture_market_context=False,
+        )
+    )
+    assert perp_listing.derivatives_confirmation_level in {"moderate", "strong"}
+    assert perp_listing.derivatives_freshness_status == "fresh"
+    assert "oi_expansion" in perp_listing.derivatives_confirmation_reasons
+    assert "funding_heated" in perp_listing.derivatives_confirmation_reasons
+
+    stale_derivatives = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot={
+                "return_24h": 0.18,
+                "volume_zscore_24h": 3.1,
+                "timestamp": now.isoformat(),
+            },
+            derivatives_snapshot={
+                "open_interest_24h_change_pct": 0.72,
+                "funding_rate_8h": 0.0008,
+                "timestamp": "2026-06-24T00:00:00Z",
+                "source": "coinalyze_live",
+            },
+            playbook_type="perp_listing_squeeze",
+            now=now,
+            market_context_observed_at=now,
+            market_context_source="unit_test_market",
+            allow_stale_fixture_market_context=False,
+        )
+    )
+    assert stale_derivatives.derivatives_freshness_status == "stale"
+    assert "needs_fresh_derivatives_confirmation" in stale_derivatives.missing_fields
+    assert "oi_expansion" not in stale_derivatives.reasons
+
+    proxy_with_liquidity = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot={
+                "return_24h": 0.42,
+                "volume_zscore_24h": 4.0,
+                "volume_to_market_cap": 0.34,
+                "timestamp": now.isoformat(),
+            },
+            dex_liquidity_snapshot={
+                "pool_liquidity_usd": 850_000,
+                "dex_volume_24h": 1_600_000,
+                "pool_age_hours": 28,
+                "timestamp": now.isoformat(),
+                "source": "geckoterminal_fixture",
+            },
+            playbook_type="rwa_preipo_proxy",
+            now=now,
+            market_context_observed_at=now,
+            market_context_source="unit_test_market",
+            allow_stale_fixture_market_context=False,
+        )
+    )
+    assert proxy_with_liquidity.dex_liquidity_level in {"moderate", "strong"}
+    assert proxy_with_liquidity.dex_freshness_status == "fresh"
+    assert "dex_volume_spike" in proxy_with_liquidity.dex_liquidity_reasons
+
+    illiquid_proxy = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot={
+                "return_24h": 0.60,
+                "volume_zscore_24h": 6.0,
+                "volume_to_market_cap": 0.45,
+                "timestamp": now.isoformat(),
+            },
+            dex_liquidity_snapshot={
+                "pool_liquidity_usd": 45_000,
+                "dex_volume_24h": 500_000,
+                "price_impact_2pct": 0.08,
+                "timestamp": now.isoformat(),
+                "source": "geckoterminal_fixture",
+            },
+            playbook_type="rwa_preipo_proxy",
+            now=now,
+            market_context_observed_at=now,
+            market_context_source="unit_test_market",
+            allow_stale_fixture_market_context=False,
+        )
+    )
+    assert illiquid_proxy.market_confirmation_score <= 74
+    assert "liquidity_sanity" in illiquid_proxy.missing_fields
+    assert "dex_liquidity_sanity_cap" in illiquid_proxy.warnings
+
+    strategic_protocol = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot={"return_24h": 0.10, "volume_zscore_24h": 2.8, "timestamp": now.isoformat()},
+            protocol_metrics_snapshot={
+                "tvl": 1_200_000_000,
+                "tvl_change_24h_pct": 0.11,
+                "fees_change_24h_pct": 0.22,
+                "protocol_dex_volume_24h": 18_000_000,
+                "timestamp": now.isoformat(),
+                "source": "defillama_fixture",
+            },
+            playbook_type="strategic_investment_or_valuation",
+            now=now,
+            market_context_observed_at=now,
+            market_context_source="unit_test_market",
+            allow_stale_fixture_market_context=False,
+        )
+    )
+    assert strategic_protocol.protocol_metrics_level in {"moderate", "strong"}
+    assert "protocol_tvl_growth" in strategic_protocol.protocol_metrics_reasons
+
+    security_outflow = event_market_confirmation.evaluate_market_confirmation(
+        event_market_confirmation.EventMarketConfirmationInput(
+            market_snapshot={"return_24h": -0.22, "volume_zscore_24h": 3.2, "timestamp": now.isoformat()},
+            protocol_metrics_snapshot={
+                "tvl_change_24h_pct": -0.18,
+                "timestamp": now.isoformat(),
+                "source": "defillama_fixture",
+            },
+            playbook_type="security_or_regulatory_shock",
+            now=now,
+            market_context_observed_at=now,
+            market_context_source="unit_test_market",
+            allow_stale_fixture_market_context=False,
+        )
+    )
+    assert "downside_reaction" in security_outflow.reasons
+    assert "protocol_tvl_outflow" in security_outflow.protocol_metrics_reasons
 
     weak_market = event_market_confirmation.evaluate_market_confirmation(
         event_market_confirmation.EventMarketConfirmationInput(playbook_type="market_anomaly_unknown")
@@ -22306,12 +22451,18 @@ def test_watchlist_monitor_uses_derivatives_and_supply_enrichment_without_trigge
         read,
         derivatives_source="fixture",
         supply_source="fixture",
+        dex_liquidity_source="fixture",
+        protocol_metrics_source="fixture",
         derivatives_rows=[{"coin_id": "velvet", "derivatives_crowding": 68}],
         supply_rows=[{"coin_id": "velvet", "supply_pressure": 72}],
+        dex_liquidity_rows=[{"coin_id": "velvet", "pool_liquidity_usd": 500_000, "dex_volume_24h": 900_000}],
+        protocol_metrics_rows=[{"coin_id": "velvet", "tvl_change_24h_pct": 0.12}],
     )
     assert enrichment.assets_requested == 1
     assert enrichment.derivatives["velvet"]["derivatives_crowding"] == 68
     assert enrichment.supply["velvet"]["supply_pressure"] == 72
+    assert enrichment.dex_liquidity["velvet"]["pool_liquidity_usd"] == 500_000
+    assert enrichment.protocol_metrics["velvet"]["tvl_change_24h_pct"] == 0.12
     monitored = event_watchlist_monitor.monitor_watchlist(
         read,
         derivatives_by_asset=enrichment.derivatives,
@@ -29831,6 +29982,14 @@ def test_event_source_registry_v2_provider_semantics():
     assert defillama.source_class == "market_data"
     assert "market_confirmation" in defillama.can_prove
     assert "impact_path_validation" in defillama.cannot_prove
+    geckoterminal = event_source_registry.assess_source(
+        {"provider": "geckoterminal", "title": "VELVET DEX liquidity and pool volume snapshot"},
+        symbol="VELVET",
+        coin_id="velvet",
+    )
+    assert geckoterminal.source_class == "market_data"
+    assert geckoterminal.source_mission == "market_confirmation"
+    assert "market_confirmation" in geckoterminal.can_prove
 
     seo = event_source_registry.assess_source(
         {"provider": "rss", "title": "Best crypto to buy price prediction market recap"},
@@ -29866,11 +30025,14 @@ def test_event_source_packs_and_feed_coverage_semantics():
     assert "official_exchange" in listing.preferred_source_classes
     assert "cryptopanic_tagged" in listing.preferred_source_classes
     assert "official_exchange_source" in listing.sufficient_for_validated_digest
+    assert "coinalyze" in listing.preferred_providers
 
     proxy = event_source_packs.source_pack_for_playbook("proxy_attention", impact_path_type="venue_value_capture")
     assert proxy.name == "proxy_preipo_rwa_pack"
     assert "prediction_market" in proxy.context_only_sources
     assert "official_project" in proxy.impact_path_validating_sources
+    assert "geckoterminal" in proxy.preferred_providers
+    assert "liquidity_sanity" in proxy.required_for_high_priority
 
     strategic = event_source_packs.source_pack_for_playbook(
         "strategic_investment",
@@ -29879,6 +30041,7 @@ def test_event_source_packs_and_feed_coverage_semantics():
     assert strategic.name == "strategic_investment_pack"
     assert "denial_or_correction_search" in strategic.validation_requirements
     assert "second_source_confirmation" in strategic.sufficient_for_validated_digest
+    assert "defillama" in strategic.preferred_providers
     protocol_business = event_source_packs.source_pack_for_playbook(
         "protocol_business_event",
         impact_path_type="protocol_business_event",

@@ -171,7 +171,7 @@ class FeedHealth:
 _OFFICIAL_EXCHANGE_HINTS = ("binance", "bybit", "coinbase", "okx", "kucoin", "bitget", "kraken")
 _STRUCTURED_CALENDAR_HINTS = ("coinmarketcal", "coindar", "messari")
 _UNLOCK_HINTS = ("tokenomist", "unlock", "vesting")
-_DERIVATIVES_HINTS = ("coinalyze", "futures", "funding", "open-interest", "open_interest")
+_DERIVATIVES_HINTS = ("coinalyze", "futures", "funding", "open-interest", "open_interest", "liquidations")
 _SUPPLY_HINTS = ("etherscan", "arkham", "dune", "tokenomist")
 _CRYPTO_NEWS_HINTS = ("coindesk", "cointelegraph", "decrypt", "theblock", "blockworks", "cryptoslate")
 _SEO_HINTS = ("price prediction", "coupon", "invite code", "best crypto to buy", "sponsored")
@@ -180,10 +180,14 @@ _MARKET_DATA_HINTS = (
     "coingecko",
     "coinmarketcap",
     "defillama",
+    "geckoterminal",
     "tvl",
     "protocol fees",
     "protocol revenue",
     "dex volume",
+    "dex liquidity",
+    "pool liquidity",
+    "price impact",
     "ohlcv",
     "klines",
     "price snapshot",

@@ -93,6 +93,22 @@ market/protocol metric evidence only: they can support market confirmation or
 source coverage, but they do not prove official confirmation or catalyst
 impact-path validation by themselves.
 
+Advanced market confirmation is split by evidence family. Coinalyze-style
+derivatives rows should preserve open-interest change, funding, liquidation
+volume, long/short ratio, futures volume, and a freshness status. They are most
+useful for perp/listing squeeze and proxy-fade/attention playbooks, but stale
+or missing derivatives are a coverage gap, not catalyst proof. GeckoTerminal-
+style DEX rows should preserve pool liquidity, DEX volume, pool age, price
+impact/spread proxy, new-pool status, and freshness; proxy-attention and
+microcap rows need liquidity sanity before high-priority treatment. DefiLlama-
+style protocol rows should preserve TVL, TVL change, fees/revenue,
+protocol/DEX volume, and freshness; strategic/protocol/security rows can use
+these metrics to explain market reaction or TVL outflow. Cards, audits, daily
+briefs, and quality review show derivatives, DEX liquidity, and protocol
+metric confirmation separately from spot market confirmation. These fields are
+research evidence only and cannot bypass source-pack, identity, impact-path,
+quality, live-confirmation, router, or `event_fade.py` gates.
+
 Each source-pack row now also prints pack-level `provider_coverage_status`,
 role-specific provider health, explicit coverage-gap reasons, and the providers
 missing or degraded for confirmation. A provider may be healthy for one role and

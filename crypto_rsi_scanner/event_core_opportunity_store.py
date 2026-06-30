@@ -615,6 +615,27 @@ def _row_from_core_opportunity(
     post_level = _first_text(all_rows, ("post_refresh_opportunity_level", "refreshed_opportunity_level", "opportunity_level_after_market_refresh")) or item.opportunity_level
     post_score = _first_float(all_rows, ("post_refresh_opportunity_score", "refreshed_opportunity_score", "opportunity_score_after_market_refresh"))
     market_context = _best_market_context(all_rows)
+    derivatives_confirmation = _best_confirmation_context(
+        all_rows,
+        score_keys=("derivatives_confirmation_score",),
+        level_keys=("derivatives_confirmation_level",),
+        reasons_keys=("derivatives_confirmation_reasons",),
+        freshness_keys=("derivatives_freshness_status",),
+    )
+    dex_liquidity_confirmation = _best_confirmation_context(
+        all_rows,
+        score_keys=("dex_liquidity_score",),
+        level_keys=("dex_liquidity_level",),
+        reasons_keys=("dex_liquidity_reasons",),
+        freshness_keys=("dex_freshness_status",),
+    )
+    protocol_metrics_confirmation = _best_confirmation_context(
+        all_rows,
+        score_keys=("protocol_metrics_score",),
+        level_keys=("protocol_metrics_level",),
+        reasons_keys=("protocol_metrics_reasons",),
+        freshness_keys=("protocol_metrics_freshness_status",),
+    )
     acquisition = _build_core_evidence_acquisition_view(item.core_opportunity_id, all_rows)
     source_pack = acquisition.source_pack or source_pack
     evidence_before = acquisition.evidence_quality_before if acquisition.evidence_quality_before is not None else evidence_before
@@ -754,6 +775,18 @@ def _row_from_core_opportunity(
         "market_confirmation_score": market_after,
         "market_confirmation_level": market_level,
         "market_confirmation_summary": market_summary,
+        "derivatives_confirmation_score": derivatives_confirmation.get("score"),
+        "derivatives_confirmation_level": derivatives_confirmation.get("level"),
+        "derivatives_confirmation_reasons": list(derivatives_confirmation.get("reasons") or ()),
+        "derivatives_freshness_status": derivatives_confirmation.get("freshness_status"),
+        "dex_liquidity_score": dex_liquidity_confirmation.get("score"),
+        "dex_liquidity_level": dex_liquidity_confirmation.get("level"),
+        "dex_liquidity_reasons": list(dex_liquidity_confirmation.get("reasons") or ()),
+        "dex_freshness_status": dex_liquidity_confirmation.get("freshness_status"),
+        "protocol_metrics_score": protocol_metrics_confirmation.get("score"),
+        "protocol_metrics_level": protocol_metrics_confirmation.get("level"),
+        "protocol_metrics_reasons": list(protocol_metrics_confirmation.get("reasons") or ()),
+        "protocol_metrics_freshness_status": protocol_metrics_confirmation.get("freshness_status"),
         "market_data_freshness": market_context.get("market_context_freshness_status"),
         "market_reaction_confirmation": market_level,
         "market_confirmation_before": market_before,
@@ -1878,6 +1911,23 @@ def _best_market_context(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         return {}
     candidates.sort(key=_market_context_rank, reverse=True)
     return candidates[0]
+
+
+def _best_confirmation_context(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    score_keys: tuple[str, ...],
+    level_keys: tuple[str, ...],
+    reasons_keys: tuple[str, ...],
+    freshness_keys: tuple[str, ...],
+) -> dict[str, Any]:
+    score = _best_float(rows, score_keys)
+    return {
+        "score": score,
+        "level": _first_text(rows, level_keys) or (_market_level_from_score(score) if score is not None else None),
+        "reasons": _first_list(rows, reasons_keys),
+        "freshness_status": _first_text(rows, freshness_keys),
+    }
 
 
 def _market_context_from_flat(source: Mapping[str, Any]) -> dict[str, Any]:

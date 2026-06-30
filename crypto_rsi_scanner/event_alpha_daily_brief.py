@@ -1523,16 +1523,55 @@ def _core_market_freshness_line(item: event_core_opportunities.CoreOpportunity) 
     core_refresh_needed = core_status in {"", "stale", "unknown", "missing"}
     support_refresh_needed = 0 if core_status in {"fresh", "fixture_allowed_stale"} else support_gaps
     refresh_attempted = any(info[4] for info in row_infos)
+    derivatives_line = _confirmation_status_line(
+        item.primary_row,
+        core_components,
+        level_key="derivatives_confirmation_level",
+        score_key="derivatives_confirmation_score",
+        freshness_key="derivatives_freshness_status",
+    )
+    dex_line = _confirmation_status_line(
+        item.primary_row,
+        core_components,
+        level_key="dex_liquidity_level",
+        score_key="dex_liquidity_score",
+        freshness_key="dex_freshness_status",
+    )
+    protocol_line = _confirmation_status_line(
+        item.primary_row,
+        core_components,
+        level_key="protocol_metrics_level",
+        score_key="protocol_metrics_score",
+        freshness_key="protocol_metrics_freshness_status",
+    )
     return (
         f"  - {item.core_opportunity_id} {item.symbol}/{item.coin_id}: "
         f"core_market_freshness_status={core_status or 'missing'} "
         f"core_market_context_source={core_source or 'unknown'} "
         f"core_market_context_age={core_age} "
         f"refresh_attempted={str(refresh_attempted).lower()} "
+        f"derivatives={derivatives_line} "
+        f"dex_liquidity={dex_line} "
+        f"protocol_metrics={protocol_line} "
         f"core_market_refresh_needed={str(core_refresh_needed).lower()} "
         f"support_rows_stale_or_missing_count={support_gaps} "
         f"support_rows_needing_refresh_count={support_refresh_needed}"
     )
+
+
+def _confirmation_status_line(
+    row: Mapping[str, Any],
+    components: Mapping[str, Any],
+    *,
+    level_key: str,
+    score_key: str,
+    freshness_key: str,
+) -> str:
+    level = row.get(level_key) or components.get(level_key) or "none"
+    score = row.get(score_key) if row.get(score_key) is not None else components.get(score_key)
+    freshness = row.get(freshness_key) or components.get(freshness_key) or "missing"
+    score_text = "n/a" if score in (None, "") else str(score)
+    return f"{level}/{score_text}/{freshness}"
 
 
 def _row_mapping(row: Any) -> Mapping[str, Any]:

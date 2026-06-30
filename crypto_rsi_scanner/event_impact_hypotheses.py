@@ -154,6 +154,18 @@ class EventImpactHypothesis:
     market_confirmation_warnings: tuple[str, ...] = ()
     market_confirmation_missing_fields: tuple[str, ...] = ()
     market_confirmation_summary: str | None = None
+    derivatives_confirmation_score: float | None = None
+    derivatives_confirmation_level: str | None = None
+    derivatives_confirmation_reasons: tuple[str, ...] = ()
+    derivatives_freshness_status: str | None = None
+    dex_liquidity_score: float | None = None
+    dex_liquidity_level: str | None = None
+    dex_liquidity_reasons: tuple[str, ...] = ()
+    dex_freshness_status: str | None = None
+    protocol_metrics_score: float | None = None
+    protocol_metrics_level: str | None = None
+    protocol_metrics_reasons: tuple[str, ...] = ()
+    protocol_metrics_freshness_status: str | None = None
     market_context_source: str | None = None
     market_context_timestamp: str | None = None
     market_context_observed_at: str | None = None
@@ -2686,6 +2698,14 @@ def _quality_verdict_replace_kwargs(
             market_snapshot=market_context.get("market_snapshot") or _payload_mapping(payload, "market", "market_snapshot"),
             market_anomaly_row=_payload_mapping(payload, "anomaly", "market_anomaly"),
             derivatives_snapshot=_payload_mapping(payload, "derivatives", "derivatives_snapshot"),
+            dex_liquidity_snapshot=_payload_mapping(payload, "dex_liquidity", "dex_liquidity_snapshot", "dex"),
+            protocol_metrics_snapshot=_payload_mapping(
+                payload,
+                "protocol_metrics",
+                "protocol_metrics_snapshot",
+                "defillama",
+                "protocol",
+            ),
             supply_snapshot=_payload_mapping(payload, "supply", "supply_snapshot"),
             btc_context=_payload_mapping(payload, "btc_context"),
             sector_benchmark=_payload_mapping(payload, "sector_benchmark"),
@@ -2758,6 +2778,18 @@ def _quality_verdict_replace_kwargs(
         "market_confirmation_warnings": market_result.warnings,
         "market_confirmation_missing_fields": market_result.missing_fields,
         "market_confirmation_summary": market_result.confirmation_summary,
+        "derivatives_confirmation_score": market_result.derivatives_confirmation_score,
+        "derivatives_confirmation_level": market_result.derivatives_confirmation_level,
+        "derivatives_confirmation_reasons": market_result.derivatives_confirmation_reasons,
+        "derivatives_freshness_status": market_result.derivatives_freshness_status,
+        "dex_liquidity_score": market_result.dex_liquidity_score,
+        "dex_liquidity_level": market_result.dex_liquidity_level,
+        "dex_liquidity_reasons": market_result.dex_liquidity_reasons,
+        "dex_freshness_status": market_result.dex_freshness_status,
+        "protocol_metrics_score": market_result.protocol_metrics_score,
+        "protocol_metrics_level": market_result.protocol_metrics_level,
+        "protocol_metrics_reasons": market_result.protocol_metrics_reasons,
+        "protocol_metrics_freshness_status": market_result.protocol_metrics_freshness_status,
         "market_context_source": market_context.get("source"),
         "market_context_timestamp": market_context.get("timestamp"),
         "market_context_observed_at": market_result.market_context_observed_at or market_context.get("timestamp"),
