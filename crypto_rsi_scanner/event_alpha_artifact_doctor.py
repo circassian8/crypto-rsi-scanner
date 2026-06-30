@@ -6,6 +6,7 @@ import re
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+from urllib.parse import parse_qs, urlsplit
 
 from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_opportunity_verdict, event_research_cards, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
@@ -80,6 +81,9 @@ class EventAlphaArtifactDoctorResult:
     cryptopanic_accepted_evidence_missing_from_card: int = 0
     cryptopanic_rejected_only_promoted: int = 0
     cryptopanic_token_printed_or_unredacted: int = 0
+    cryptopanic_growth_unsupported_param_used: int = 0
+    cryptopanic_quota_exceeded: int = 0
+    cryptopanic_request_ledger_missing_when_used: int = 0
     runs_with_matching_snapshots: int = 0
     runs_with_missing_snapshots: int = 0
     runs_with_external_snapshot_paths: int = 0
@@ -765,6 +769,21 @@ def diagnose_artifacts(
             f"{cryptopanic_conflicts['cryptopanic_token_printed_or_unredacted']}"
         )
         (blockers if strict else warnings).append(message)
+    if cryptopanic_conflicts["cryptopanic_growth_unsupported_param_used"]:
+        message = (
+            "cryptopanic_growth_unsupported_param_used="
+            f"{cryptopanic_conflicts['cryptopanic_growth_unsupported_param_used']}"
+        )
+        (blockers if strict else warnings).append(message)
+    if cryptopanic_conflicts["cryptopanic_quota_exceeded"]:
+        message = f"cryptopanic_quota_exceeded={cryptopanic_conflicts['cryptopanic_quota_exceeded']}"
+        (blockers if strict else warnings).append(message)
+    if cryptopanic_conflicts["cryptopanic_request_ledger_missing_when_used"]:
+        message = (
+            "cryptopanic_request_ledger_missing_when_used="
+            f"{cryptopanic_conflicts['cryptopanic_request_ledger_missing_when_used']}"
+        )
+        (blockers if strict else warnings).append(message)
     if visible_missing_targets:
         message = f"visible_core_opportunities_missing_feedback_targets={visible_missing_targets}"
         (blockers if strict and fresh_visible_missing_targets else warnings).append(message)
@@ -1225,6 +1244,9 @@ def diagnose_artifacts(
         cryptopanic_accepted_evidence_missing_from_card=cryptopanic_conflicts["cryptopanic_accepted_evidence_missing_from_card"],
         cryptopanic_rejected_only_promoted=cryptopanic_conflicts["cryptopanic_rejected_only_promoted"],
         cryptopanic_token_printed_or_unredacted=cryptopanic_conflicts["cryptopanic_token_printed_or_unredacted"],
+        cryptopanic_growth_unsupported_param_used=cryptopanic_conflicts["cryptopanic_growth_unsupported_param_used"],
+        cryptopanic_quota_exceeded=cryptopanic_conflicts["cryptopanic_quota_exceeded"],
+        cryptopanic_request_ledger_missing_when_used=cryptopanic_conflicts["cryptopanic_request_ledger_missing_when_used"],
         runs_with_matching_snapshots=matching_snapshot_runs,
         runs_with_missing_snapshots=missing_snapshot_runs,
         runs_with_external_snapshot_paths=external_snapshot_runs,
@@ -2049,6 +2071,9 @@ def _cryptopanic_artifact_conflicts(
         "cryptopanic_accepted_evidence_missing_from_card": 0,
         "cryptopanic_rejected_only_promoted": 0,
         "cryptopanic_token_printed_or_unredacted": 0,
+        "cryptopanic_growth_unsupported_param_used": 0,
+        "cryptopanic_quota_exceeded": 0,
+        "cryptopanic_request_ledger_missing_when_used": 0,
     }
     source_text = ""
     if source_coverage_report_path is not None and Path(source_coverage_report_path).exists():
@@ -2095,8 +2120,22 @@ def _cryptopanic_artifact_conflicts(
         alertable = bool(row.get("alertable_after_quality_gate") or row.get("route_alertable"))
         if alertable or route in {"RESEARCH_DIGEST", "WATCHLIST", "HIGH_PRIORITY_RESEARCH"} or level in {"validated_digest", "watchlist", "high_priority"}:
             out["cryptopanic_rejected_only_promoted"] += 1
+    source_path = Path(source_coverage_report_path) if source_coverage_report_path is not None else None
+    ledger_path = source_path.with_name("cryptopanic_request_ledger.jsonl") if source_path is not None else None
+    ledger_rows = _load_jsonl_rows(ledger_path) if ledger_path is not None else ()
+    if cryptopanic_used and ledger_path is not None and not ledger_path.exists():
+        out["cryptopanic_request_ledger_missing_when_used"] = 1
+    for row in ledger_rows:
+        redacted_url = str(row.get("request_url_redacted") or "")
+        plan = str(row.get("plan") or "growth_weekly").strip().lower()
+        if plan != "enterprise" and _growth_unsupported_params(redacted_url):
+            out["cryptopanic_growth_unsupported_param_used"] += 1
+        if "auth_token=" in redacted_url and "auth_token=%3Credacted%3E" not in redacted_url and "auth_token=<redacted>" not in redacted_url:
+            out["cryptopanic_token_printed_or_unredacted"] = 1
+    if sum(1 for _ in ledger_rows) > 600:
+        out["cryptopanic_quota_exceeded"] = 1
     combined_text = source_text + "\n" + "\n".join(_read_card_text(path) for path in research_card_paths)
-    if "auth_token=" in combined_text or "RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN=" in combined_text:
+    if _contains_unredacted_cryptopanic_secret(combined_text):
         out["cryptopanic_token_printed_or_unredacted"] = 1
     return out
 
@@ -2118,6 +2157,43 @@ def _row_mentions_cryptopanic(row: Mapping[str, Any]) -> bool:
         row.get("queries"),
     )
     return any("cryptopanic" in str(value).casefold() for value in values)
+
+
+def _load_jsonl_rows(path: Path | None) -> tuple[Mapping[str, Any], ...]:
+    if path is None or not path.exists():
+        return ()
+    rows: list[Mapping[str, Any]] = []
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.strip():
+                continue
+            import json
+
+            value = json.loads(line)
+            if isinstance(value, Mapping):
+                rows.append(value)
+    except Exception:  # noqa: BLE001 - doctor must fail soft
+        return tuple(rows)
+    return tuple(rows)
+
+
+def _growth_unsupported_params(redacted_url: str) -> tuple[str, ...]:
+    unsupported = {"last_pull", "panic_period", "panic_sort", "search", "size", "with_content"}
+    try:
+        query = parse_qs(urlsplit(redacted_url).query)
+    except Exception:  # noqa: BLE001
+        return ()
+    return tuple(sorted(key for key in query if key in unsupported))
+
+
+def _contains_unredacted_cryptopanic_secret(text: str) -> bool:
+    if "RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN=" in text:
+        return True
+    for match in re.finditer(r"auth_token=([^&\s]+)", text):
+        value = match.group(1)
+        if value not in {"<redacted>", "%3Credacted%3E", "[redacted]"}:
+            return True
+    return False
 
 
 def _accepted_cryptopanic_count(row: Mapping[str, Any]) -> int:
@@ -2349,8 +2425,11 @@ def _notification_delivery_conflicts(
                 if re.search(r"\b(alert_id|card_id|research_card|route|lane)=", telegram_body):
                     out["telegram_message_contains_raw_debug_dump"] += 1
         lane = str(row.get("lane") or "")
-        core_id = str(row.get("core_opportunity_id") or "").strip()
-        core = core_rows_by_id.get(core_id) if core_id else None
+        core_ids = _tuple_value(row.get("core_opportunity_id"))
+        alert_ids = _tuple_value(row.get("alert_id"))
+        cores = tuple(core_rows_by_id[core_id] for core_id in core_ids if core_id in core_rows_by_id)
+        missing_core_ids = tuple(core_id for core_id in core_ids if core_id not in core_rows_by_id)
+        core = cores[0] if len(cores) == 1 else None
         if lane == "research_review_digest":
             if "Not alertable" not in telegram_body or "Missing confirmation" not in telegram_body:
                 out["research_review_digest_missing_confirmation_label"] += 1
@@ -2360,33 +2439,38 @@ def _notification_delivery_conflicts(
                 out["research_review_digest_too_many_items"] += 1
             if not str(row.get("feedback_target") or "").strip():
                 out["research_review_digest_missing_feedback_target"] += 1
-            if core:
-                if _research_review_core_is_alertable(core):
+            for digest_core in cores:
+                if _research_review_core_is_alertable(digest_core):
                     out["research_review_digest_contains_strict_alertable"] += 1
-                if _research_review_core_is_hard_gated(core):
+                if _research_review_core_is_hard_gated(digest_core):
                     out["research_review_digest_contains_hard_gated_candidate"] += 1
         if lane not in {"daily_digest", "instant_escalation", "triggered_fade"}:
             continue
-        alert_id = str(row.get("alert_id") or "").strip()
         requires_core = _delivery_requires_core_identity(row)
         if requires_core:
-            if not core_id:
+            if not core_ids:
                 out["delivery_core_id_missing"] += 1
             if not str(row.get("feedback_target") or "").strip():
                 out["delivery_feedback_target_missing"] += 1
             if not str(row.get("canonical_card_path") or "").strip():
                 out["delivery_card_path_missing"] += 1
-        if core_id and not core:
+        if missing_core_ids:
             out["delivery_identity_mismatch_core_store"] += 1
-        if requires_core and alert_id and (not core_id or alert_id != core_id) and lane != "triggered_fade":
+        if (
+            requires_core
+            and alert_ids
+            and lane != "triggered_fade"
+            and (not core_ids or set(alert_ids) != set(core_ids))
+        ):
             out["delivery_alert_id_not_canonical"] += 1
-        if core and lane in {"daily_digest", "instant_escalation"}:
-            if _delivery_core_lacks_live_confirmation(core):
-                out["digest_item_without_live_confirmation"] += 1
-            if str(core.get("evidence_acquisition_status") or "") == "rejected_results_only":
-                out["digest_item_rejected_results_only"] += 1
-            if _delivery_core_is_strategic_broad_asset_context(core):
-                out["strategic_broad_asset_digest_without_confirmation"] += 1
+        if cores and lane in {"daily_digest", "instant_escalation"}:
+            for delivery_core in cores:
+                if _delivery_core_lacks_live_confirmation(delivery_core):
+                    out["digest_item_without_live_confirmation"] += 1
+                if str(delivery_core.get("evidence_acquisition_status") or "") == "rejected_results_only":
+                    out["digest_item_rejected_results_only"] += 1
+                if _delivery_core_is_strategic_broad_asset_context(delivery_core):
+                    out["strategic_broad_asset_digest_without_confirmation"] += 1
     return out
 
 
@@ -3274,7 +3358,10 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"cryptopanic_used_but_no_source_coverage_entry={result.cryptopanic_used_but_no_source_coverage_entry} "
             f"cryptopanic_accepted_evidence_missing_from_card={result.cryptopanic_accepted_evidence_missing_from_card} "
             f"cryptopanic_rejected_only_promoted={result.cryptopanic_rejected_only_promoted} "
-            f"cryptopanic_token_printed_or_unredacted={result.cryptopanic_token_printed_or_unredacted}"
+            f"cryptopanic_token_printed_or_unredacted={result.cryptopanic_token_printed_or_unredacted} "
+            f"cryptopanic_growth_unsupported_param_used={result.cryptopanic_growth_unsupported_param_used} "
+            f"cryptopanic_quota_exceeded={result.cryptopanic_quota_exceeded} "
+            f"cryptopanic_request_ledger_missing_when_used={result.cryptopanic_request_ledger_missing_when_used}"
         ),
         (
             "snapshot lineage: "

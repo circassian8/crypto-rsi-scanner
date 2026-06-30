@@ -115,12 +115,41 @@ market/protocol metric evidence only: they can support market confirmation or
 source coverage, but they do not prove official confirmation or catalyst
 impact-path validation by themselves.
 
-The CryptoPanic preflight prints only redacted key/config state, source packs,
-provider health/backoff, and the targeted reset command. The rehearsal target
-uses the real `notify_llm_deep` path with `RSI_EVENT_ALERTS_ENABLED=0` and the
+CryptoPanic runs against the Growth Weekly API by default:
+`https://cryptopanic.com/api/growth_weekly/v2/posts/`. Configure
+`RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN` in `.env`; the code also accepts the
+legacy aliases `RSI_EVENT_DISCOVERY_CRYPTOPANIC_AUTH_TOKEN`,
+`CRYPTOPANIC_AUTH_TOKEN`, `CRYPTOPANIC_API_KEY`, and `CRYPTOPANIC_TOKEN`.
+Growth Weekly requests send `auth_token` plus only `public`/`following`,
+`currencies`, `regions`, `filter`, `kind`, and `page`. Do not expect
+Growth Weekly to use `search`, `size`, `last_pull`, `with_content`,
+`panic_period`, or `panic_sort`; those remain Enterprise-only and are omitted
+unless the configured plan is explicitly `enterprise`.
+
+The Growth Weekly plan is capped at 600 requests per week. Event Alpha records
+actual attempted CryptoPanic requests in
+`event_fade_cache/<artifact_namespace>/cryptopanic_request_ledger.jsonl` with
+redacted URLs, status code, result count, currency batch, page, profile, and
+namespace. The default guardrails are conservative:
+`RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT=20`,
+`RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT=80`,
+`RSI_EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY=1`,
+`RSI_EVENT_DISCOVERY_CRYPTOPANIC_MAX_CURRENCIES_PER_REQUEST=10`, and
+`RSI_EVENT_DISCOVERY_CRYPTOPANIC_MIN_SECONDS_BETWEEN_REQUESTS=1`. Skipped
+quota/budget calls do not consume ledger rows.
+
+The CryptoPanic preflight prints only redacted key/config state, endpoint,
+plan, quota usage, source packs, provider health/backoff, and the targeted reset
+command. The rehearsal target uses the real `notify_llm_deep` path with
+`RSI_EVENT_ALERTS_ENABLED=0` and the
 `notify_llm_deep_cryptopanic_rehearsal` namespace, so it can prove whether
 CryptoPanic was attempted and accepted/rejected evidence without sending
-Telegram or mutating trading/live RSI state.
+Telegram or mutating trading/live RSI state. If stale missing-key/backoff state
+survives after adding the token, run:
+
+```bash
+make event-alpha-provider-health-reset PROFILE=notify_llm_deep SERVICE=cryptopanic CONFIRM=1 PYTHON=python3
+```
 
 For smoke namespaces such as `notify_llm_deep_research_review_smoke`, the
 runtime profile can intentionally remain `notify_llm_deep` while

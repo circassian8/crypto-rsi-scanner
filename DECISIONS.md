@@ -16,6 +16,26 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - CryptoPanic Growth Weekly uses a conservative request contract
+**Status:** accepted
+**Decision:** CryptoPanic live Event Alpha access defaults to the Growth Weekly
+API contract: `https://cryptopanic.com/api/growth_weekly/v2/posts/` with
+`auth_token` plus only Growth-supported query parameters (`public` or
+`following`, `currencies`, `regions`, `filter`, `kind`, and `page`). The
+canonical token env var is `RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN`; legacy
+aliases are accepted for operator convenience. Growth profiles must not send
+`search`, `size`, `last_pull`, `with_content`, `panic_period`, or
+`panic_sort`. Requests are quota-ledgered with redacted URLs and bounded by
+weekly, per-run, daily-soft, page, currency-batch, and minimum-interval limits.
+Artifact doctor blocks unredacted tokens, Growth-unsupported params, quota
+overruns, and rejected-only promoted CryptoPanic evidence.
+**Why:** The user’s current subscription is a 600-request/week Growth Weekly
+plan. The previous integration could hit the wrong endpoint or unsupported
+params, causing 403s and stale backoff while burning operator trust.
+**Revisit when:** The user explicitly upgrades to an Enterprise plan and wants
+Enterprise-only fields such as search to participate in research evidence
+collection.
+
 ## 2026-06-30 - CryptoPanic live proof remains no-send and redacted
 **Status:** accepted
 **Decision:** CryptoPanic operational checks must use a redacted preflight and

@@ -147,6 +147,7 @@ class EventAlphaPipelineResult:
     core_opportunity_write_block_reason: str | None = None
     cryptopanic_configured: bool = False
     cryptopanic_attempted: bool = False
+    cryptopanic_requests_used: int = 0
     cryptopanic_results: int = 0
     cryptopanic_accepted_evidence: int = 0
     cryptopanic_rejected_evidence: int = 0

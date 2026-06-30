@@ -301,6 +301,8 @@ def test_makefile_has_clean_export_and_bootstrap_targets():
     assert "RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_CANDIDATES=2" in cryptopanic_rehearsal_dry
     assert "RSI_EVENT_ALPHA_EVIDENCE_ACQUISITION_MAX_QUERIES=4" in cryptopanic_rehearsal_dry
     assert "RSI_EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT=3" in cryptopanic_rehearsal_dry
+    assert "RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT=8" in cryptopanic_rehearsal_dry
+    assert "RSI_EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY=1" in cryptopanic_rehearsal_dry
     assert "event-alpha-telegram-send-one-cycle" not in cryptopanic_rehearsal_dry
     assert "check-python:" in makefile
     assert "bootstrap:" in makefile
@@ -639,6 +641,7 @@ def test_event_provider_status_formats_burn_in_readiness_summary_and_pack_gaps()
 
 
 def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_gaps():
+    import json
     from datetime import datetime, timezone
     from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_cryptopanic, event_alpha_source_coverage
 
@@ -776,6 +779,7 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "Most useful next data source:" in text
     assert "recommended actions:" in text
     assert "configure CryptoPanic token/news coverage" in text
+    assert "RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN" in text
     assert "No alerts, sends, trades" in text
 
     configured_cfg = _event_provider_status_cfg(
@@ -797,8 +801,14 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
             }
         },
         provider_health_path="event_fade_cache/notify_llm_deep/event_provider_health.json",
+        request_ledger_path=None,
         token_configured=True,
         live_enabled=True,
+        endpoint_url="https://cryptopanic.com/api/growth_weekly/v2",
+        plan="growth_weekly",
+        weekly_limit=600,
+        daily_soft_limit=80,
+        per_run_limit=20,
         catalyst_search_providers=("cryptopanic", "gdelt"),
         no_send=True,
         now=datetime(2026, 6, 15, tzinfo=timezone.utc),
@@ -807,7 +817,11 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert preflight.token_configured is True
     assert preflight.provider_in_backoff is True
     assert preflight.skip_reason == "provider_backoff"
+    assert preflight.status == "IN_BACKOFF"
     assert "CryptoPanic token configured: yes (redacted)" in preflight_text
+    assert "endpoint: https://cryptopanic.com/api/growth_weekly/v2/posts/" in preflight_text
+    assert "plan: growth_weekly" in preflight_text
+    assert "weekly usage: 0/600" in preflight_text
     assert "SECRET_TOKEN_SHOULD_NOT_RENDER" not in preflight_text
     assert "security_shock_pack" in preflight.source_packs
     assert "proxy_preipo_rwa_pack" in preflight.source_packs
@@ -875,6 +889,36 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
         assert source_report_doctor.source_coverage_report_missing == 0
         assert source_report_doctor.source_coverage_provider_status_unknown > 0
         assert source_report_doctor.source_coverage_provider_marked_healthy_without_observation == 0
+
+        (Path(tmp) / "cryptopanic_request_ledger.jsonl").write_text(
+            "\n".join([
+                json.dumps({
+                    "timestamp": "2026-06-15T00:00:00+00:00",
+                    "plan": "growth_weekly",
+                    "request_url_redacted": "https://cryptopanic.test/api/growth_weekly/v2/posts/?auth_token=%3Credacted%3E&search=RUNE",
+                }),
+                json.dumps({
+                    "timestamp": "2026-06-15T00:01:00+00:00",
+                    "plan": "enterprise",
+                    "request_url_redacted": "https://cryptopanic.test/api/enterprise/v2/posts/?auth_token=%3Credacted%3E&search=RUNE",
+                }),
+                json.dumps({
+                    "timestamp": "2026-06-15T00:02:00+00:00",
+                    "plan": "growth_weekly",
+                    "request_url_redacted": "https://cryptopanic.test/api/growth_weekly/v2/posts/?auth_token=plain_test_token",
+                }),
+            ]) + "\n",
+            encoding="utf-8",
+        )
+        cryptopanic_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+            source_coverage_report_path=report_path,
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep",
+            include_test_artifacts=True,
+            strict=True,
+        )
+        assert cryptopanic_doctor.cryptopanic_growth_unsupported_param_used == 1
+        assert cryptopanic_doctor.cryptopanic_token_printed_or_unredacted == 1
 
         missing_report_doctor = event_alpha_artifact_doctor.diagnose_artifacts(
             run_rows=[{
@@ -2864,8 +2908,10 @@ def test_event_discovery_news_providers_parse_fixtures():
 def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
     import json
     from datetime import datetime, timezone
+    from tempfile import TemporaryDirectory
     from urllib.parse import parse_qs, urlparse
-    from crypto_rsi_scanner.event_providers.cryptopanic import CryptoPanicProvider
+    from pathlib import Path
+    from crypto_rsi_scanner.event_providers.cryptopanic import CryptoPanicProvider, cryptopanic_usage_summary
 
     class FakeResponse:
         status = 200
@@ -2891,12 +2937,20 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
         return FakeResponse({
             "results": [
                 {
-                    "id": "cp-testai-openai-preipo",
+                    "id": 42,
+                    "slug": "testai-openai-preipo",
                     "title": "TESTAI offers synthetic exposure to OpenAI pre IPO event",
+                    "description": "TESTAI users can trade tokenized OpenAI pre-IPO exposure.",
                     "published_at": "2026-06-15T10:15:00Z",
-                    "url": "https://example.test/cryptopanic/testai-openai",
-                    "source": {"domain": "example.test"},
-                    "currencies": [{"code": "TESTAI", "title": "Test AI"}],
+                    "created_at": "2026-06-15T10:14:00Z",
+                    "original_url": "https://example.test/news/testai-openai",
+                    "url": "https://cryptopanic.test/news/testai-openai",
+                    "kind": "news",
+                    "source": {"title": "Example Crypto", "domain": "example.test", "type": "news"},
+                    "instruments": [{"code": "TESTAI", "title": "Test AI", "slug": "test-ai"}],
+                    "votes": {"important": 2, "positive": 1},
+                    "panic_score": 77,
+                    "content": {"clean": "TESTAI expands OpenAI exposure.", "original": "<p>ignored</p>"},
                 },
             ],
         })
@@ -2904,43 +2958,65 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
     start = datetime(2026, 6, 15, tzinfo=timezone.utc)
     end = datetime(2026, 6, 16, tzinfo=timezone.utc)
     fetched_at = datetime(2026, 6, 15, 10, 20, tzinfo=timezone.utc)
-    provider = CryptoPanicProvider(
-        None,
-        live_enabled=True,
-        api_token="token123",
-        base_url="https://cryptopanic.test/api/v1/posts/",
-        public=True,
-        filter_name="hot",
-        currencies="BTC,ETH",
-        regions="en",
-        kind="news",
-        search="pre-ipo",
-        timeout=2.5,
-        opener=fake_opener,
-        fetched_at=fetched_at,
-    )
-    events = provider.fetch_events(start, end)
+    with TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+        provider = CryptoPanicProvider(
+            None,
+            live_enabled=True,
+            api_token="token123",
+            base_url="https://cryptopanic.test/api/growth_weekly/v2",
+            public=True,
+            filter_name="hot",
+            currencies="BTC,ETH",
+            regions="en",
+            kind="news",
+            search="pre-ipo",
+            timeout=2.5,
+            opener=fake_opener,
+            fetched_at=fetched_at,
+            request_ledger_path=ledger,
+            profile="fixture",
+            artifact_namespace="cryptopanic_growth_fixture",
+            min_seconds_between_requests=0,
+        )
+        events = provider.fetch_events(start, end)
+        ledger_rows = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+        assert len(ledger_rows) == 1
+        assert ledger_rows[0]["request_url_redacted"].endswith("auth_token=%3Credacted%3E&public=true&currencies=BTC%2CETH&regions=en&kind=news&filter=hot&page=1")
+        assert ledger_rows[0]["profile"] == "fixture"
+        assert ledger_rows[0]["artifact_namespace"] == "cryptopanic_growth_fixture"
+        assert ledger_rows[0]["status_code"] == 200
+        assert ledger_rows[0]["result_count"] == 1
+        usage = cryptopanic_usage_summary(ledger, now=fetched_at, weekly_limit=600, daily_soft_limit=80)
+        assert usage.rolling_7d_requests == 1
+        assert usage.remaining_weekly == 599
     assert len(events) == 1
     parsed = urlparse(seen["url"])
     params = parse_qs(parsed.query)
     assert parsed.scheme == "https"
     assert parsed.netloc == "cryptopanic.test"
+    assert parsed.path == "/api/growth_weekly/v2/posts/"
     assert params["auth_token"] == ["token123"]
     assert params["public"] == ["true"]
     assert params["filter"] == ["hot"]
     assert params["currencies"] == ["BTC,ETH"]
     assert params["regions"] == ["en"]
     assert params["kind"] == ["news"]
-    assert params["search"] == ["pre-ipo"]
+    assert params["page"] == ["1"]
+    for unsupported in ("search", "size", "last_pull", "with_content", "panic_period", "panic_sort"):
+        assert unsupported not in params
     assert seen["timeout"] == 2.5
     assert seen["accept"] == "application/json"
     event = events[0]
     assert event.provider == "cryptopanic"
-    assert event.source_url == "https://example.test/cryptopanic/testai-openai"
+    assert event.source_url == "https://example.test/news/testai-openai"
     assert event.published_at.isoformat() == "2026-06-15T10:15:00+00:00"
     assert event.fetched_at == fetched_at
     assert event.raw_json["event"]["event_type"] == "ipo_proxy"
-    assert event.raw_json["currencies"][0]["code"] == "TESTAI"
+    assert event.raw_json["instrument_codes"] == ("TESTAI",)
+    assert event.raw_json["source_domain"] == "example.test"
+    assert event.raw_json["source_class"] == "cryptopanic_tagged"
+    assert event.raw_json["content_original_present"] is True
 
     assert CryptoPanicProvider(None, live_enabled=True, api_token="").fetch_events(start, end) == []
     try:
@@ -2963,6 +3039,69 @@ def test_event_discovery_cryptopanic_live_provider_parses_posts_offline():
     assert failed_provider.last_warnings
     assert "token123" not in failed_provider.last_warnings[0]
     assert "auth_token" not in failed_provider.last_warnings[0]
+
+    with TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+        ledger.write_text(json.dumps({
+            "timestamp": fetched_at.isoformat(),
+            "request_url_redacted": "https://cryptopanic.test/api/growth_weekly/v2/posts/?auth_token=%3Credacted%3E",
+            "status_code": 200,
+        }) + "\n", encoding="utf-8")
+        quota_provider = CryptoPanicProvider(
+            None,
+            live_enabled=True,
+            api_token="token123",
+            opener=fake_opener,
+            fetched_at=fetched_at,
+            request_ledger_path=ledger,
+            weekly_request_limit=1,
+            min_seconds_between_requests=0,
+        )
+        assert quota_provider.fetch_events(start, end) == []
+        assert quota_provider.last_skip_reason == "quota_exhausted"
+        assert len(ledger.read_text(encoding="utf-8").splitlines()) == 1
+
+    with TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+        run_cap_provider = CryptoPanicProvider(
+            None,
+            live_enabled=True,
+            api_token="token123",
+            currencies="BTC,ETH",
+            opener=fake_opener,
+            fetched_at=fetched_at,
+            request_ledger_path=ledger,
+            requests_per_run_limit=1,
+            max_currencies_per_request=1,
+            min_seconds_between_requests=0,
+        )
+        assert len(run_cap_provider.fetch_events(start, end)) == 1
+        assert run_cap_provider.last_skip_reason == "run_budget_exhausted"
+        assert len(ledger.read_text(encoding="utf-8").splitlines()) == 1
+
+    def should_not_call_opener(request, timeout):
+        raise AssertionError(f"unexpected CryptoPanic call: {request.full_url}")
+
+    with TemporaryDirectory() as tmp:
+        ledger = Path(tmp) / "cryptopanic_request_ledger.jsonl"
+        ledger.write_text(json.dumps({
+            "timestamp": fetched_at.isoformat(),
+            "request_url_redacted": "https://cryptopanic.test/api/growth_weekly/v2/posts/?auth_token=%3Credacted%3E",
+            "status_code": 200,
+        }) + "\n", encoding="utf-8")
+        daily_cap_provider = CryptoPanicProvider(
+            None,
+            live_enabled=True,
+            api_token="token123",
+            opener=should_not_call_opener,
+            fetched_at=fetched_at,
+            request_ledger_path=ledger,
+            requests_per_day_soft_limit=1,
+            min_seconds_between_requests=0,
+        )
+        assert daily_cap_provider.fetch_events(start, end) == []
+        assert daily_cap_provider.last_skip_reason == "daily_soft_limit_exceeded"
+        assert len(ledger.read_text(encoding="utf-8").splitlines()) == 1
 
 
 def test_cryptopanic_catalyst_search_currency_filter_uses_validated_identity_or_empty():
@@ -3017,8 +3156,9 @@ def test_event_catalyst_search_cryptopanic_uses_symbol_and_coin_currency_filters
     provider = event_catalyst_search.CryptoPanicCatalystSearchProvider(
         live_enabled=True,
         api_token="token123",
-        base_url="https://cryptopanic.test/api/v1/posts/",
+        base_url="https://cryptopanic.test/api/growth_weekly/v2",
         opener=fake_opener,
+        min_seconds_between_requests=0,
     )
     result = provider.search(
         (
@@ -3036,8 +3176,14 @@ def test_event_catalyst_search_cryptopanic_uses_symbol_and_coin_currency_filters
     )
 
     params = parse_qs(urlparse(seen["url"]).query)
+    assert urlparse(seen["url"]).path == "/api/growth_weekly/v2/posts/"
     assert params["currencies"] == ["RUNE,thorchain"]
-    assert params["search"] == ["RUNE exploit official update"]
+    assert params["kind"] == ["news"]
+    assert params["public"] == ["true"]
+    assert "search" not in params
+    assert "size" not in params
+    assert "last_pull" not in params
+    assert "with_content" not in params
     assert seen["timeout"] == 10.0
     assert result.query_count == 1
     assert result.result_count == 0
@@ -6152,6 +6298,7 @@ def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
                 no_provider,
                 cryptopanic_configured=True,
                 cryptopanic_attempted=True,
+                cryptopanic_requests_used=2,
                 cryptopanic_results=3,
                 cryptopanic_accepted_evidence=1,
                 cryptopanic_rejected_evidence=2,
@@ -6167,6 +6314,7 @@ def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
         assert row["catalyst_search_skip_reasons"]["provider_unavailable"] == 1
         assert row["cryptopanic_configured"] is True
         assert row["cryptopanic_attempted"] is True
+        assert row["cryptopanic_requests_used"] == 2
         assert row["cryptopanic_results"] == 3
         assert row["cryptopanic_accepted_evidence"] == 1
         assert row["cryptopanic_rejected_evidence"] == 2
@@ -6179,7 +6327,7 @@ def test_event_catalyst_search_skip_reasons_flow_to_ledger_and_brief():
             )
         )
         assert "catalyst_search_skip_reasons: provider_unavailable=1" in runs_report
-        assert "cryptopanic configured=true attempted=true results=3 accepted=1 rejected=2 status=healthy skip=none" in runs_report
+        assert "cryptopanic configured=true attempted=true requests=2 results=3 accepted=1 rejected=2 status=healthy skip=none" in runs_report
         brief = event_alpha_daily_brief.build_daily_brief(
             run_rows=[row],
             include_test_artifacts=True,
@@ -13746,6 +13894,118 @@ def test_event_alpha_artifact_doctor_blocks_digest_delivery_without_core_identit
     assert result.delivery_alert_id_not_canonical == 1
     assert result.notification_preview_missing == 0
     assert result.status == "BLOCKED"
+
+
+def test_event_alpha_artifact_doctor_accepts_multi_core_digest_and_core_route_derivation():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    with TemporaryDirectory() as tmp:
+        preview = Path(tmp) / "event_alpha_notification_preview.md"
+        preview.write_text(
+            "# Event Alpha Notification Preview\n\n"
+            "## Lane 1: daily_digest\n\n"
+            "### Telegram Body\n\n"
+            "```html\n"
+            "<b>Event Alpha Research Digest</b>\n"
+            "VELVET / velvet\n"
+            "AAVE / aave\n"
+            "```",
+            encoding="utf-8",
+        )
+        run = {
+            "run_id": "run-1",
+            "row_type": "event_alpha_run",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep",
+            "cycle_completed": True,
+            "success": True,
+            "alertable": 2,
+            "snapshot_write_success": True,
+            "snapshot_rows_written": 1,
+        }
+        core_a = {
+            "row_type": "event_core_opportunity",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep",
+            "core_opportunity_id": "core_a",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "final_opportunity_level": "validated_digest",
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "evidence_acquisition_status": "accepted_evidence_found",
+            "acquisition_confirmation_status": "confirms",
+            "accepted_evidence_count": 1,
+            "market_confirmation_level": "fresh",
+            "market_context_freshness_status": "fresh",
+        }
+        core_b = dict(
+            core_a,
+            core_opportunity_id="core_b",
+            symbol="AAVE",
+            coin_id="aave",
+        )
+        delivery_row = {
+            "row_type": "event_alpha_notification_delivery",
+            "delivery_id": "delivery-multi-core",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep",
+            "alert_id": "core_b,core_a",
+            "requested_alert_id": "core_a,core_b",
+            "core_opportunity_id": "core_a,core_b",
+            "feedback_target": "core_a,core_b",
+            "canonical_card_path": "cards/core_a.md,cards/core_b.md",
+            "lane": "daily_digest",
+            "route": "RESEARCH_DIGEST",
+            "state": "blocked",
+            "delivery_mode": "no_send",
+            "status_detail": "would_send_but_guard_disabled",
+            "attempted_at": "2026-06-28T12:00:00+00:00",
+            "notification_preview_path": str(preview),
+            "notification_preview_relpath": str(preview),
+        }
+        alert_row = {
+            "row_type": "event_alpha_alert_snapshot",
+            "run_id": "run-1",
+            "profile": "notify_llm_deep",
+            "run_mode": "notification_burn_in",
+            "artifact_namespace": "notify_llm_deep",
+            "alert_id": "ea:test|core_a",
+            "core_opportunity_id": "core_a",
+            "feedback_target": "core_a",
+            "symbol": "VELVET",
+            "coin_id": "velvet",
+            "opportunity_level": "validated_digest",
+            "final_opportunity_level": "validated_digest",
+            "opportunity_score_final": 72.0,
+            "impact_path_type": "tokenized_stock_venue",
+            "candidate_role": "proxy_venue",
+            "source_class": "cryptopanic_tagged",
+            "evidence_specificity": "token_and_catalyst",
+            "requested_route_before_quality_gate": "STORE_ONLY",
+            "route": "RESEARCH_DIGEST",
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+            "route_alertable": True,
+            "alertable_after_quality_gate": True,
+            "quality_gate_block_reason": "core_route_derived_from_opportunity_level:validated_digest",
+            "final_state_after_quality_gate": "RADAR",
+        }
+        result = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[run],
+            alert_rows=[alert_row],
+            core_opportunity_rows=[core_a, core_b],
+            delivery_rows=[delivery_row],
+            strict=True,
+        )
+
+    assert result.delivery_identity_mismatch_core_store == 0
+    assert result.delivery_alert_id_not_canonical == 0
+    assert result.fresh_quality_route_conflict_rows == 0
+    assert result.alert_snapshot_route_mismatch_core_store == 0
 
 
 def test_event_alpha_send_readiness_accepts_clean_no_send_rehearsal():

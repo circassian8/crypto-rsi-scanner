@@ -170,8 +170,16 @@ def quality_gate_route_for_row(
             or EventAlphaRoute.STORE_ONLY.value
         )
         return final, _optional_str(data.get("quality_gate_block_reason"))
+    stored_reason = _optional_str(data.get("quality_gate_block_reason"))
+    stored_final_route = str(data.get("final_route_after_quality_gate") or "").strip()
+    use_reconciled_final_route = (
+        not requested_route
+        and stored_final_route
+        and _is_core_route_derivation_reason(stored_reason)
+    )
     requested = str(
-        requested_route
+        (stored_final_route if use_reconciled_final_route else None)
+        or requested_route
         or data.get("requested_route_before_quality_gate")
         or data.get("route")
         or data.get("final_route_after_quality_gate")
@@ -197,7 +205,7 @@ def quality_gate_route_for_row(
             EventAlphaRoute.RESEARCH_DIGEST.value,
             f"opportunity_level_caps_high_priority:{level}",
         )
-    return requested, _optional_str(data.get("quality_gate_block_reason"))
+    return requested, stored_reason
 
 
 def alertable_after_quality_gate_for_row(
@@ -208,6 +216,10 @@ def alertable_after_quality_gate_for_row(
 ) -> bool:
     final, _ = quality_gate_route_for_row(row, components=components, require_quality=require_quality)
     return route_value_is_alertable(final)
+
+
+def _is_core_route_derivation_reason(reason: str | None) -> bool:
+    return str(reason or "").startswith("core_route_derived_from_opportunity_level:")
 
 
 def route_watchlist(

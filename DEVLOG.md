@@ -17,6 +17,54 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Harden CryptoPanic Growth Weekly integration · Codex
+**Why:** The configured CryptoPanic key is on the Growth Weekly plan, which uses
+`/api/growth_weekly/v2/posts/` with `auth_token` and a smaller parameter
+surface. The prior integration could hit the wrong endpoint or send unsupported
+query parameters, making live evidence acquisition fail or consume quota
+unclearly.
+**Changes:**
+- Switched live CryptoPanic defaults to the Growth Weekly endpoint and canonical
+  `RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN`, while preserving legacy token
+  aliases for local operator convenience.
+- Added Growth-plan request construction that only sends supported parameters
+  (`auth_token`, `public`/`following`, `currencies`, `regions`, `filter`,
+  `kind`, `page`) and omits unsupported Growth params such as `search`,
+  `last_pull`, `panic_period`, `panic_sort`, `size`, and `with_content`.
+- Added request-ledger quota accounting for weekly, daily-soft, and per-run
+  CryptoPanic caps, plus redacted ledger/report URLs and source-coverage
+  request-usage reporting.
+- Wired Growth-plan settings through event discovery, catalyst search, evidence
+  acquisition, preflight, source coverage, run ledger, and the bounded
+  `notify_llm_deep` no-send rehearsal.
+- Hardened artifact doctor checks for Growth unsupported params, unredacted
+  token leakage, quota exhaustion, missing ledgers, multi-core digest delivery
+  identity, and canonical core-derived alert routes.
+- Updated `.env.example`, `ROADMAP.md`, `DECISIONS.md`, the Event Alpha runbook,
+  Makefile help/targets, and offline regressions for Growth request semantics.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (580/580 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3` (36/36 passed);
+`make event-alpha-cryptopanic-preflight PYTHON=python3` (READY, token redacted,
+Growth endpoint, quota ledger path shown);
+`make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal PYTHON=python3`
+(CryptoPanic returned live results, no Telegram send, strict artifact doctor had
+no blockers);
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`
+(CryptoPanic healthy, 18 requests used today, 582 weekly remaining);
+`make event-alpha-notification-inbox PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal BURN_IN_REVIEW=1 PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`
+(WARN only, blockers none);
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Live CryptoPanic is now functional in the bounded no-send
+rehearsal, but GDELT/RSS still showed expected fail-soft provider degradation.
+All new paths remain research-only: no Telegram sends in tests, no trades, no
+paper trades, no normal RSI writes, and no LLM/provider-created
+`TRIGGERED_FADE`.
+
 ## 2026-06-30 — Prove CryptoPanic no-send evidence path · Codex
 **Why:** With a local CryptoPanic key configured, `notify_llm_deep` needed a
 safe no-send proof path that shows whether CryptoPanic is configured, attempted,
@@ -45,8 +93,8 @@ observed in source coverage, and redacted in all operator artifacts.
 `make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal PYTHON=python3`
 (CryptoPanic configured/attempted, provider returned redacted HTTP 403 and was
 recorded as backoff; no sends; strict artifact doctor had no blockers);
-`rg -n "auth_token=|RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN|02391c" event_fade_cache/notify_llm_deep_cryptopanic_rehearsal || true`
-(no matches); `make event-alpha-signal-quality-eval PYTHON=python3`;
+redaction scan over `event_fade_cache/notify_llm_deep_cryptopanic_rehearsal`
+(no unredacted CryptoPanic token matches); `make event-alpha-signal-quality-eval PYTHON=python3`;
 `make event-alpha-research-review-digest-smoke PYTHON=python3`;
 `make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
 `make event-alpha-catalyst-frame-e2e-cycle PYTHON=python3`;

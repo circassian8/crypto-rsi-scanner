@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from . import event_provider_health, event_provider_status, event_source_packs
+from .event_providers import cryptopanic as cryptopanic_provider
 
 
 SOURCE_COVERAGE_PACK_ORDER = (
@@ -153,6 +155,9 @@ class EventAlphaSourceCoverageReport:
     cryptopanic_configured: bool = False
     cryptopanic_health_status: str = "not_observed"
     cryptopanic_observed: bool = False
+    cryptopanic_requests_used: int = 0
+    cryptopanic_rolling_7d_requests: int = 0
+    cryptopanic_remaining_weekly: int | None = None
     cryptopanic_accepted_evidence: int = 0
     cryptopanic_rejected_evidence: int = 0
     cryptopanic_source_packs: tuple[str, ...] = ()
@@ -168,6 +173,9 @@ class EventAlphaSourceCoverageReport:
             "cryptopanic_configured": self.cryptopanic_configured,
             "cryptopanic_health_status": self.cryptopanic_health_status,
             "cryptopanic_observed": self.cryptopanic_observed,
+            "cryptopanic_requests_used": self.cryptopanic_requests_used,
+            "cryptopanic_rolling_7d_requests": self.cryptopanic_rolling_7d_requests,
+            "cryptopanic_remaining_weekly": self.cryptopanic_remaining_weekly,
             "cryptopanic_accepted_evidence": self.cryptopanic_accepted_evidence,
             "cryptopanic_rejected_evidence": self.cryptopanic_rejected_evidence,
             "cryptopanic_source_packs": list(self.cryptopanic_source_packs),
@@ -184,6 +192,9 @@ def build_source_coverage_report(
     core_opportunity_rows: Iterable[Mapping[str, Any]] = (),
     profile: str = "default",
     artifact_namespace: str = "default",
+    cryptopanic_request_ledger_path: str | Path | None = None,
+    cryptopanic_weekly_limit: int = 600,
+    cryptopanic_daily_soft_limit: int = 80,
     now: datetime | None = None,
 ) -> EventAlphaSourceCoverageReport:
     """Build source-pack coverage from readiness, health, and artifact rows."""
@@ -196,6 +207,10 @@ def build_source_coverage_report(
         configured=configured,
         health_by_provider=health_by_provider,
         acquisition_rows=acquisition,
+        request_ledger_path=cryptopanic_request_ledger_path,
+        weekly_limit=cryptopanic_weekly_limit,
+        daily_soft_limit=cryptopanic_daily_soft_limit,
+        now=observed,
     )
 
     packs: list[EventAlphaSourceCoveragePack] = []
@@ -290,6 +305,9 @@ def build_source_coverage_report(
         cryptopanic_configured=cryptopanic_stats["configured"],
         cryptopanic_health_status=cryptopanic_stats["health_status"],
         cryptopanic_observed=cryptopanic_stats["observed"],
+        cryptopanic_requests_used=cryptopanic_stats["requests_used"],
+        cryptopanic_rolling_7d_requests=cryptopanic_stats["rolling_7d_requests"],
+        cryptopanic_remaining_weekly=cryptopanic_stats["remaining_weekly"],
         cryptopanic_accepted_evidence=cryptopanic_stats["accepted"],
         cryptopanic_rejected_evidence=cryptopanic_stats["rejected"],
         cryptopanic_source_packs=tuple(cryptopanic_stats["source_packs"]),
@@ -313,6 +331,9 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
         f"- configured: {str(report.cryptopanic_configured).lower()}",
         f"- health status: {report.cryptopanic_health_status}",
         f"- observed this run: {str(report.cryptopanic_observed).lower()}",
+        f"- requests used today: {report.cryptopanic_requests_used}",
+        f"- rolling 7-day requests: {report.cryptopanic_rolling_7d_requests}",
+        f"- remaining weekly quota: {report.cryptopanic_remaining_weekly if report.cryptopanic_remaining_weekly is not None else 'unknown'}",
         f"- accepted evidence: {report.cryptopanic_accepted_evidence}",
         f"- rejected evidence: {report.cryptopanic_rejected_evidence}",
         f"- source packs contributed: {_join(report.cryptopanic_source_packs)}",
@@ -465,6 +486,10 @@ def _cryptopanic_stats(
     configured: set[str],
     health_by_provider: Mapping[str, str],
     acquisition_rows: Iterable[Mapping[str, Any]],
+    request_ledger_path: str | Path | None = None,
+    weekly_limit: int = 600,
+    daily_soft_limit: int = 80,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     accepted = 0
     rejected = 0
@@ -488,6 +513,14 @@ def _cryptopanic_stats(
                 provider_failures.add(str(failure))
     configured_flag = "cryptopanic" in configured
     health_status = _provider_effective_status("cryptopanic", health_by_provider)
+    usage = cryptopanic_provider.cryptopanic_usage_summary(
+        request_ledger_path,
+        now=now or datetime.now(timezone.utc),
+        weekly_limit=weekly_limit,
+        daily_soft_limit=daily_soft_limit,
+    )
+    if usage.today_requests > 0:
+        observed = True
     reason = None
     if configured_flag and not observed:
         if health_status == "backoff":
@@ -506,6 +539,9 @@ def _cryptopanic_stats(
         "configured": configured_flag,
         "health_status": health_status,
         "observed": observed,
+        "requests_used": int(usage.today_requests),
+        "rolling_7d_requests": int(usage.rolling_7d_requests),
+        "remaining_weekly": usage.remaining_weekly,
         "accepted": accepted,
         "rejected": rejected,
         "source_packs": _sorted_tuple(source_packs),
@@ -704,7 +740,7 @@ def _pack_recommended_actions(
 def _provider_setup_action(provider: str, *, status: str) -> str:
     prefix = "configure" if status == "missing" else "restore"
     guidance = {
-        "cryptopanic": "CryptoPanic token/news coverage with CRYPTOPANIC_API_KEY",
+        "cryptopanic": "CryptoPanic token/news coverage with RSI_EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN",
         "gdelt": "GDELT broad-news coverage and provider backoff health",
         "project_blog_rss": "project/blog RSS feeds; quarantine feed-level 403s instead of the whole RSS provider",
         "binance_announcements": "official Binance announcement coverage for listing/perp events",

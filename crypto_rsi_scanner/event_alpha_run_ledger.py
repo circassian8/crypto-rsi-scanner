@@ -184,6 +184,7 @@ def format_run_ledger_report(result: EventAlphaRunLedgerReadResult) -> str:
                 "  "
                 f"cryptopanic configured={str(bool(row.get('cryptopanic_configured'))).lower()} "
                 f"attempted={str(bool(row.get('cryptopanic_attempted'))).lower()} "
+                f"requests={int(row.get('cryptopanic_requests_used') or 0)} "
                 f"results={int(row.get('cryptopanic_results') or 0)} "
                 f"accepted={int(row.get('cryptopanic_accepted_evidence') or 0)} "
                 f"rejected={int(row.get('cryptopanic_rejected_evidence') or 0)} "
@@ -381,6 +382,7 @@ def _run_record(
         "evidence_acquisition_status_counts": _evidence_acquisition_status_counts(acquisition),
         "cryptopanic_configured": bool(getattr(result, "cryptopanic_configured", False)),
         "cryptopanic_attempted": bool(getattr(result, "cryptopanic_attempted", False)),
+        "cryptopanic_requests_used": _int(getattr(result, "cryptopanic_requests_used", 0)),
         "cryptopanic_results": _int(getattr(result, "cryptopanic_results", 0)),
         "cryptopanic_accepted_evidence": _int(getattr(result, "cryptopanic_accepted_evidence", 0)),
         "cryptopanic_rejected_evidence": _int(getattr(result, "cryptopanic_rejected_evidence", 0)),

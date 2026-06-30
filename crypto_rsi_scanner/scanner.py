@@ -141,6 +141,7 @@ from .event_models import EventDiscoveryResult, NormalizedEvent, RawDiscoveredEv
 from .event_providers.binance_announcements import BinanceAnnouncementProvider
 from .event_providers.bybit_announcements import BybitAnnouncementProvider
 from .event_providers.coinmarketcal import CoinMarketCalProvider
+from .event_providers import cryptopanic as cryptopanic_provider
 from .event_providers.tokenomist import TokenomistProvider
 from .llm_providers.fixture import (
     FixtureLLMCatalystFrameProvider,
@@ -1237,13 +1238,24 @@ def _event_discovery_result_from_config(
         cryptopanic_live=config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
         cryptopanic_api_token=config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN,
         cryptopanic_base_url=config.EVENT_DISCOVERY_CRYPTOPANIC_BASE_URL,
+        cryptopanic_plan=config.EVENT_DISCOVERY_CRYPTOPANIC_PLAN,
         cryptopanic_public=config.EVENT_DISCOVERY_CRYPTOPANIC_PUBLIC,
+        cryptopanic_following=config.EVENT_DISCOVERY_CRYPTOPANIC_FOLLOWING,
         cryptopanic_filter=config.EVENT_DISCOVERY_CRYPTOPANIC_FILTER,
         cryptopanic_currencies=config.EVENT_DISCOVERY_CRYPTOPANIC_CURRENCIES,
         cryptopanic_regions=config.EVENT_DISCOVERY_CRYPTOPANIC_REGIONS,
         cryptopanic_kind=config.EVENT_DISCOVERY_CRYPTOPANIC_KIND,
         cryptopanic_search=config.EVENT_DISCOVERY_CRYPTOPANIC_SEARCH,
         cryptopanic_timeout=config.EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT,
+        cryptopanic_request_ledger_path=_cryptopanic_request_ledger_path(),
+        cryptopanic_profile=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "",
+        cryptopanic_artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "",
+        cryptopanic_weekly_request_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
+        cryptopanic_requests_per_run_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT,
+        cryptopanic_requests_per_day_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
+        cryptopanic_min_seconds_between_requests=config.EVENT_DISCOVERY_CRYPTOPANIC_MIN_SECONDS_BETWEEN_REQUESTS,
+        cryptopanic_max_pages_per_query=config.EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY,
+        cryptopanic_max_currencies_per_request=config.EVENT_DISCOVERY_CRYPTOPANIC_MAX_CURRENCIES_PER_REQUEST,
         gdelt_path=config.EVENT_DISCOVERY_GDELT_PATH,
         gdelt_live=config.EVENT_DISCOVERY_GDELT_LIVE,
         gdelt_base_url=config.EVENT_DISCOVERY_GDELT_BASE_URL,
@@ -1695,6 +1707,18 @@ def _event_alpha_run_lock_config_from_runtime() -> event_alpha_run_lock.EventAlp
     )
 
 
+def _cryptopanic_request_ledger_path() -> Path:
+    explicit = getattr(config, "EVENT_DISCOVERY_CRYPTOPANIC_REQUEST_LEDGER_PATH", None)
+    if explicit:
+        explicit_path = Path(explicit).expanduser()
+        if explicit_path.name != "cryptopanic_request_ledger.jsonl" or explicit_path.exists():
+            return explicit_path
+    health_path = Path(config.EVENT_PROVIDER_HEALTH_PATH).expanduser()
+    if not health_path.is_absolute():
+        health_path = config.DATA_DIR / health_path
+    return health_path.with_name("cryptopanic_request_ledger.jsonl")
+
+
 def _event_alpha_notify_context_from_runtime(
     profile_name: str | None,
 ) -> event_alpha_artifacts.EventAlphaArtifactContext:
@@ -1749,6 +1773,12 @@ _PROFILE_LOCAL_BUDGET_OVERRIDES: dict[str, type] = {
     "EVENT_CATALYST_SEARCH_MAX_QUERIES_PER_ANOMALY": int,
     "EVENT_CATALYST_SEARCH_MAX_RESULTS_PER_QUERY": int,
     "EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT": float,
+    "EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT": int,
+    "EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT": int,
+    "EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT": int,
+    "EVENT_DISCOVERY_CRYPTOPANIC_MIN_SECONDS_BETWEEN_REQUESTS": float,
+    "EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY": int,
+    "EVENT_DISCOVERY_CRYPTOPANIC_MAX_CURRENCIES_PER_REQUEST": int,
     "EVENT_DISCOVERY_GDELT_TIMEOUT": float,
     "EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_TIMEOUT": float,
     "EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT": float,
@@ -2324,6 +2354,17 @@ def _cryptopanic_stats_for_pipeline_result(
         provider_status = "degraded"
     elif statuses:
         provider_status = "healthy"
+    usage = cryptopanic_provider.cryptopanic_usage_summary(
+        _cryptopanic_request_ledger_path(),
+        now=datetime.now(timezone.utc),
+        weekly_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
+        daily_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
+    )
+    requests_used = int(usage.today_requests or 0)
+    if requests_used > 0:
+        attempted = True
+        if provider_status == "not_observed" and usage.last_status_code:
+            provider_status = "healthy" if int(usage.last_status_code) < 400 else "degraded"
     configured = bool(config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN)
     skip_reason = None
     if not configured:
@@ -2342,6 +2383,7 @@ def _cryptopanic_stats_for_pipeline_result(
     return {
         "cryptopanic_configured": configured,
         "cryptopanic_attempted": attempted,
+        "cryptopanic_requests_used": requests_used,
         "cryptopanic_results": max(results_seen, accepted + rejected),
         "cryptopanic_accepted_evidence": accepted,
         "cryptopanic_rejected_evidence": rejected,
@@ -4639,8 +4681,14 @@ def event_alpha_cryptopanic_preflight(
         provider_status_report=provider_report,
         provider_health_rows=provider_rows,
         provider_health_path=context.provider_health_path,
+        request_ledger_path=context.provider_health_path.with_name("cryptopanic_request_ledger.jsonl"),
         token_configured=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN),
         live_enabled=bool(config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE or config.EVENT_DISCOVERY_CRYPTOPANIC_PATH),
+        endpoint_url=config.EVENT_DISCOVERY_CRYPTOPANIC_BASE_URL,
+        plan=config.EVENT_DISCOVERY_CRYPTOPANIC_PLAN,
+        weekly_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
+        daily_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
+        per_run_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT,
         catalyst_search_providers=tuple(str(item) for item in config.EVENT_CATALYST_SEARCH_PROVIDERS),
         no_send=not bool(config.EVENT_ALERTS_ENABLED),
     )
@@ -4676,6 +4724,9 @@ def event_alpha_source_coverage_report(
         core_opportunity_rows=core_rows,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
+        cryptopanic_request_ledger_path=context.provider_health_path.with_name("cryptopanic_request_ledger.jsonl"),
+        cryptopanic_weekly_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
+        cryptopanic_daily_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
     )
     report_text = event_alpha_source_coverage.format_source_coverage_report(report)
     source_coverage_path = context.namespace_dir / "event_alpha_source_coverage.md"
@@ -7772,12 +7823,23 @@ def _event_catalyst_search_provider(
                 live_enabled=config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
                 api_token=config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN,
                 base_url=config.EVENT_DISCOVERY_CRYPTOPANIC_BASE_URL,
+                plan=config.EVENT_DISCOVERY_CRYPTOPANIC_PLAN,
                 public=config.EVENT_DISCOVERY_CRYPTOPANIC_PUBLIC,
+                following=config.EVENT_DISCOVERY_CRYPTOPANIC_FOLLOWING,
                 filter_name=config.EVENT_DISCOVERY_CRYPTOPANIC_FILTER,
                 currencies=config.EVENT_DISCOVERY_CRYPTOPANIC_CURRENCIES,
                 regions=config.EVENT_DISCOVERY_CRYPTOPANIC_REGIONS,
                 kind=config.EVENT_DISCOVERY_CRYPTOPANIC_KIND,
                 timeout=config.EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT,
+                request_ledger_path=_cryptopanic_request_ledger_path(),
+                profile=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "",
+                artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "",
+                weekly_request_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
+                requests_per_run_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT,
+                requests_per_day_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
+                min_seconds_between_requests=config.EVENT_DISCOVERY_CRYPTOPANIC_MIN_SECONDS_BETWEEN_REQUESTS,
+                max_pages_per_query=config.EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY,
+                max_currencies_per_request=config.EVENT_DISCOVERY_CRYPTOPANIC_MAX_CURRENCIES_PER_REQUEST,
             ))
         elif provider_name == "polymarket":
             providers.append(event_catalyst_search.PolymarketCatalystSearchProvider(
@@ -7856,12 +7918,23 @@ def _event_evidence_acquisition_providers_from_runtime(
         live_enabled=config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE,
         api_token=config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN,
         base_url=config.EVENT_DISCOVERY_CRYPTOPANIC_BASE_URL,
+        plan=config.EVENT_DISCOVERY_CRYPTOPANIC_PLAN,
         public=config.EVENT_DISCOVERY_CRYPTOPANIC_PUBLIC,
+        following=config.EVENT_DISCOVERY_CRYPTOPANIC_FOLLOWING,
         filter_name=config.EVENT_DISCOVERY_CRYPTOPANIC_FILTER,
         currencies=config.EVENT_DISCOVERY_CRYPTOPANIC_CURRENCIES,
         regions=config.EVENT_DISCOVERY_CRYPTOPANIC_REGIONS,
         kind=config.EVENT_DISCOVERY_CRYPTOPANIC_KIND,
         timeout=min(config.EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT, cfg.timeout_seconds),
+        request_ledger_path=_cryptopanic_request_ledger_path(),
+        profile=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "",
+        artifact_namespace=config.EVENT_ALPHA_ARTIFACT_NAMESPACE or "",
+        weekly_request_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
+        requests_per_run_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT,
+        requests_per_day_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
+        min_seconds_between_requests=config.EVENT_DISCOVERY_CRYPTOPANIC_MIN_SECONDS_BETWEEN_REQUESTS,
+        max_pages_per_query=config.EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY,
+        max_currencies_per_request=config.EVENT_DISCOVERY_CRYPTOPANIC_MAX_CURRENCIES_PER_REQUEST,
     )
     providers["project_blog_rss"] = event_catalyst_search.ProjectRssCatalystSearchProvider(
         path=config.EVENT_DISCOVERY_PROJECT_BLOG_RSS_PATH,

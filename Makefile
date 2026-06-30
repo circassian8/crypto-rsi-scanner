@@ -97,7 +97,7 @@ EVENT_ALPHA_ARTIFACT_DOCTOR_DELIVERY_SCOPE_ARG = $(if $(strip $(EVENT_ALPHA_ARTI
 EVENT_ALPHA_IGNORE_BACKOFF_ARG = $(if $(filter 1 true yes,$(IGNORE_BACKOFF)),--ignore-provider-backoff,)
 EVENT_ALPHA_INCLUDE_DIAGNOSTICS_ARG = $(if $(filter 1 true yes,$(INCLUDE_DIAGNOSTICS)),--event-opportunity-audit-include-diagnostics,)
 EVENT_ALPHA_BURN_IN_REVIEW_ARG = $(if $(filter 1 true yes,$(BURN_IN_REVIEW)),--event-alpha-burn-in-review,)
-EVENT_ALPHA_PROVIDER_SELECTOR_ARGS = $(if $(strip $(PROVIDER_KEY)),--provider-key $(PROVIDER_KEY),) $(if $(strip $(PROVIDER_SERVICE)),--service $(PROVIDER_SERVICE),) $(if $(strip $(PROVIDER_ROLE)),--role $(PROVIDER_ROLE),) $(if $(filter 1 true yes,$(PROVIDER_ALL)),--all,)
+EVENT_ALPHA_PROVIDER_SELECTOR_ARGS = $(if $(strip $(PROVIDER_KEY)),--provider-key $(PROVIDER_KEY),) $(if $(strip $(PROVIDER_SERVICE)),--service $(PROVIDER_SERVICE),) $(if $(strip $(SERVICE)),--service $(SERVICE),) $(if $(strip $(PROVIDER)),--service $(PROVIDER),) $(if $(strip $(PROVIDER_ROLE)),--role $(PROVIDER_ROLE),) $(if $(filter 1 true yes,$(PROVIDER_ALL)),--all,)
 EVENT_ALPHA_NOTIFY_EVERY_RUN_PROFILES = notify_no_key notify_llm notify_llm_deep notify_llm_quality
 EVENT_ALPHA_NOTIFY_DEDUPE_BY_CONTENT = $(if $(filter $(EVENT_ALPHA_NOTIFY_EVERY_RUN_PROFILES),$(PROFILE)),0,1)
 EVENT_ALPHA_NOTIFY_DEDUPE_WINDOW_HOURS = $(if $(filter $(EVENT_ALPHA_NOTIFY_EVERY_RUN_PROFILES),$(PROFILE)),0,24)
@@ -196,6 +196,7 @@ help:
 	@echo "  make event-alpha-cryptopanic-preflight PROFILE=notify_llm_deep  Redacted CryptoPanic config/health/source-pack preflight"
 	@echo "  make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_research_review_smoke  Print source-pack provider/evidence coverage"
 	@echo "  make event-alpha-provider-health-reset PROFILE=notify_no_key PROVIDER_KEY=gdelt:event_source CONFIRM=1  Clear selected provider backoff"
+	@echo "  make event-alpha-provider-health-reset PROFILE=notify_llm_deep SERVICE=cryptopanic CONFIRM=1  Clear CryptoPanic-only backoff"
 	@echo "  make event-alpha-notify-fixture-smoke  Run local fake-sender notification smoke"
 	@echo "  make event-alpha-notification-format-smoke  Run fake-sender notification formatting + doctor smoke"
 	@echo "  make event-alpha-notify-llm-deep-research-review-no-send-smoke  Verify research-review lane in notify_llm_deep no-send rehearsal"
@@ -1021,6 +1022,11 @@ event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal:
 	RSI_EVENT_SOURCE_ENRICHMENT_MAX_ROWS_PER_RUN=5 \
 	RSI_EVENT_SOURCE_ENRICHMENT_TIMEOUT_SECONDS=3 \
 	RSI_EVENT_DISCOVERY_CRYPTOPANIC_TIMEOUT=3 \
+	RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_RUN_LIMIT=8 \
+	RSI_EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT=80 \
+	RSI_EVENT_DISCOVERY_CRYPTOPANIC_MAX_PAGES_PER_QUERY=1 \
+	RSI_EVENT_DISCOVERY_CRYPTOPANIC_MAX_CURRENCIES_PER_REQUEST=10 \
+	RSI_EVENT_DISCOVERY_CRYPTOPANIC_MIN_SECONDS_BETWEEN_REQUESTS=1 \
 	RSI_EVENT_DISCOVERY_GDELT_TIMEOUT=3 \
 	RSI_EVENT_DISCOVERY_PROJECT_BLOG_RSS_TIMEOUT=3 \
 	RSI_EVENT_DISCOVERY_PREDICTION_MARKET_EVENTS_TIMEOUT=3 \
