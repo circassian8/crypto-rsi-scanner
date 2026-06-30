@@ -14,6 +14,7 @@ from . import (
     event_core_opportunities,
     event_core_opportunity_store,
     event_graph,
+    event_llm_evidence_planner,
     event_opportunity_verdict,
     event_alpha_reason_text,
     event_source_packs,
@@ -136,6 +137,10 @@ def render_research_card(
         f"- State / alert tier: {state} / {tier}",
         f"- Playbook: {playbook}",
     ]
+    analyst_lines = _analyst_summary_lines(entry, alert)
+    if analyst_lines:
+        lines.extend(["", "## Analyst Summary"])
+        lines.extend(analyst_lines)
     if decision is not None:
         lines.append(f"- Route: {event_alpha_router.final_route_value(decision)} ({decision.reason})")
         if decision.quality_gate_block_reason or decision.requested_route_before_quality_gate:
@@ -1705,6 +1710,27 @@ def _source_acquisition_lines(
         ),
         "- What source would downgrade this: " + verdict_copy.downgrade_text,
     ]
+    return lines
+
+
+def _analyst_summary_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> list[str]:
+    components = _card_components(entry, alert)
+    if not components:
+        return []
+    plan = components.get("evidence_acquisition_plan") if isinstance(components.get("evidence_acquisition_plan"), Mapping) else None
+    summary = event_llm_evidence_planner.generate_analyst_summary(components, plan=plan)
+    lines = [
+        f"- Why surfaced: {summary.why_surfaced}",
+        f"- Alertability: {summary.why_not_alertable}",
+        f"- What would upgrade: {summary.what_would_upgrade}",
+        f"- What would invalidate: {summary.what_would_invalidate}",
+        "- Check next: " + "; ".join(summary.what_to_check_next[:4]),
+    ]
+    if summary.warnings:
+        lines.append("- Analyst warnings: " + "; ".join(summary.warnings[:4]))
     return lines
 
 

@@ -17,6 +17,35 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-06-30 — Add Event Alpha LLM analyst tools · Codex
+**Why:** Catalyst-frame analysis is not the only useful LLM layer. Operators
+also need constrained source triage, evidence planning, contradiction checks,
+manual verification prompts, and concise summaries without letting LLMs decide
+routes, trades, or `TRIGGERED_FADE`.
+**Changes:**
+- Added a quote-checked LLM source-triage schema on top of deterministic source
+  enrichment, including page type, real-article status, official/recap/SEO
+  flags, mechanism evidence quote, confidence, and deterministic override caps.
+- Extended the evidence planner with v2 metadata: query intents, official
+  confirmation queries, denial/correction queries, expected proof criteria,
+  manual checklist, contradiction/denial status, analyst summaries, and
+  explicit LLM analyst-tool budget counters.
+- Research cards now show a deterministic Analyst Summary block with why the
+  candidate surfaced, why it is or is not alertable, what would upgrade it,
+  what would invalidate it, and what to check next.
+- Added regression tests for source triage validation, SEO/official/good
+  source handling, unsupported LLM output rejection, contradiction/denial
+  detection, analyst-summary copy, and budget caps/missing-key behavior.
+**Verify:** `python3 tests/test_indicators.py` (574/574 passed);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Research-only. These tools can improve operator context and
+planning, but deterministic source/identity/quality validators remain
+authoritative and LLM output cannot send notifications, trade, paper trade,
+write normal RSI rows, or create `TRIGGERED_FADE`.
+
 ## 2026-06-30 — Harden Event Alpha asset-role identity · Codex
 **Why:** Candidate assets can be over-promoted when taxonomy suggestions,
 common-word tickers, broad macro assets, or venue tokens are treated as directly

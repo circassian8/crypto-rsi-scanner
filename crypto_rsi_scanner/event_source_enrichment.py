@@ -36,6 +36,17 @@ USABLE_ARTICLE_QUALITY_STATUSES = frozenset({
     ARTICLE_QUALITY_GOOD,
     ARTICLE_QUALITY_FIXTURE_TEXT_USED,
 })
+LLM_SOURCE_PAGE_TYPES = frozenset({
+    "article",
+    "official_announcement",
+    "market_recap",
+    "seo_affiliate",
+    "prediction_market_context",
+    "redirect_placeholder",
+    "blocked_or_paywalled",
+    "source_noise",
+    "unknown",
+})
 
 SOURCE_TRIAGE_SEND_TO_LLM = "send_to_llm_frame_analyzer"
 SOURCE_TRIAGE_RAW_OBSERVATION = "keep_raw_observation"
@@ -139,6 +150,38 @@ class EventSourceQualityJudgment:
     source_quality_score: float
     reason: str
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class EventLLMSourceTriage:
+    page_type: str
+    is_real_article: bool
+    article_quality: str
+    boilerplate_ratio_estimate: float
+    is_official_source: bool
+    is_recap: bool
+    is_affiliate_or_seo: bool
+    candidate_catalyst_mechanism_present: bool
+    evidence_quote: str
+    confidence: float
+    reason: str = ""
+    warnings: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "page_type": self.page_type,
+            "is_real_article": self.is_real_article,
+            "article_quality": self.article_quality,
+            "boilerplate_ratio_estimate": self.boilerplate_ratio_estimate,
+            "is_official_source": self.is_official_source,
+            "is_recap": self.is_recap,
+            "is_affiliate_or_seo": self.is_affiliate_or_seo,
+            "candidate_catalyst_mechanism_present": self.candidate_catalyst_mechanism_present,
+            "evidence_quote": self.evidence_quote,
+            "confidence": self.confidence,
+            "reason": self.reason,
+            "warnings": list(self.warnings),
+        }
 
 
 @dataclass(frozen=True)
@@ -547,6 +590,105 @@ def build_source_quality_judge_packet(
             "alert tiers, catalysts, or assets."
         ),
     }
+
+
+def build_llm_source_triage_packet(
+    raw_event: RawDiscoveredEvent,
+    *,
+    article: EventArticleExtraction | None = None,
+    triage: EventSourceTriageResult | None = None,
+    prompt_version: str = "llm_source_triage_v1",
+) -> dict[str, Any]:
+    article = article or _article_from_payload(raw_event) or _fixture_article(
+        raw_event,
+        cfg=EventSourceEnrichmentConfig(),
+        text=_summary_text(raw_event),
+    )
+    triage = triage or triage_source(raw_event, article=article)
+    return {
+        "schema_version": "event_source_triage_v1",
+        "prompt_version": prompt_version,
+        "raw_id": raw_event.raw_id,
+        "provider": raw_event.provider,
+        "source_url": raw_event.source_url,
+        "title": raw_event.title,
+        "body_excerpt": article.body_text[:4000],
+        "article": article.to_dict(),
+        "deterministic_triage": triage.to_dict(),
+        "allowed_page_types": sorted(LLM_SOURCE_PAGE_TYPES),
+        "allowed_article_quality": sorted({
+            ARTICLE_QUALITY_GOOD,
+            ARTICLE_QUALITY_THIN,
+            ARTICLE_QUALITY_BOILERPLATE_HEAVY,
+            ARTICLE_QUALITY_REDIRECT_PLACEHOLDER,
+            ARTICLE_QUALITY_PAYWALL_OR_BLOCKED,
+            ARTICLE_QUALITY_FETCH_FAILED,
+            ARTICLE_QUALITY_FIXTURE_TEXT_USED,
+        }),
+        "instructions": (
+            "Classify source quality and whether the page contains a candidate/catalyst "
+            "mechanism. Do not recommend trades, alerts, or routes."
+        ),
+    }
+
+
+def run_llm_source_triage(
+    raw_event: RawDiscoveredEvent,
+    *,
+    provider: LLMSourceQualityJudgeProvider | None,
+    cfg: EventSourceQualityJudgeConfig | None = None,
+) -> EventLLMSourceTriage | None:
+    """Run optional LLM source triage, constrained by deterministic source triage."""
+    cfg = cfg or EventSourceQualityJudgeConfig()
+    if not cfg.enabled or provider is None:
+        return None
+    article = _article_from_payload(raw_event)
+    deterministic = triage_source(raw_event, article=article) if article else None
+    if deterministic and deterministic.source_quality_score < cfg.min_importance_score and deterministic.decision != SOURCE_TRIAGE_DIAGNOSTIC_ONLY:
+        return None
+    packet = build_llm_source_triage_packet(
+        raw_event,
+        article=article,
+        triage=deterministic,
+        prompt_version=cfg.prompt_version,
+    )
+    try:
+        result = provider.judge_source_quality(packet)
+    except Exception as exc:  # noqa: BLE001 - optional LLM triage must fail soft.
+        return EventLLMSourceTriage(
+            page_type="unknown",
+            is_real_article=False,
+            article_quality=ARTICLE_QUALITY_FETCH_FAILED,
+            boilerplate_ratio_estimate=1.0,
+            is_official_source=False,
+            is_recap=False,
+            is_affiliate_or_seo=False,
+            candidate_catalyst_mechanism_present=False,
+            evidence_quote="",
+            confidence=0.0,
+            reason=f"llm_source_triage_failed:{type(exc).__name__}",
+            warnings=("llm_source_triage_failed",),
+        )
+    if result.warning or not result.raw:
+        return EventLLMSourceTriage(
+            page_type="unknown",
+            is_real_article=False,
+            article_quality=ARTICLE_QUALITY_FETCH_FAILED,
+            boilerplate_ratio_estimate=1.0,
+            is_official_source=False,
+            is_recap=False,
+            is_affiliate_or_seo=False,
+            candidate_catalyst_mechanism_present=False,
+            evidence_quote="",
+            confidence=0.0,
+            reason=result.warning or "llm_source_triage_missing_output",
+            warnings=tuple(item for item in (result.warning,) if item),
+        )
+    return validate_llm_source_triage(
+        result.raw,
+        source_text=" ".join(str(part or "") for part in (raw_event.title, raw_event.body, article.body_text if article else "")),
+        deterministic=deterministic,
+    )
 
 
 def run_source_quality_judge(
@@ -1044,6 +1186,72 @@ def _validate_source_quality_judgment(
         article_quality_status=status,
         source_quality_score=round(score, 2),
         reason=str(raw.get("reason") or "source_quality_judged"),
+        warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def validate_llm_source_triage(
+    raw: Mapping[str, Any],
+    *,
+    source_text: str,
+    deterministic: EventSourceTriageResult | None = None,
+) -> EventLLMSourceTriage:
+    page_type = str(raw.get("page_type") or "").strip()
+    if page_type not in LLM_SOURCE_PAGE_TYPES:
+        raise ValueError(f"invalid LLM source page_type: {page_type}")
+    quality = str(raw.get("article_quality") or raw.get("article_quality_status") or "").strip()
+    if quality not in {
+        ARTICLE_QUALITY_GOOD,
+        ARTICLE_QUALITY_THIN,
+        ARTICLE_QUALITY_BOILERPLATE_HEAVY,
+        ARTICLE_QUALITY_REDIRECT_PLACEHOLDER,
+        ARTICLE_QUALITY_PAYWALL_OR_BLOCKED,
+        ARTICLE_QUALITY_FETCH_FAILED,
+        ARTICLE_QUALITY_FIXTURE_TEXT_USED,
+    }:
+        raise ValueError(f"invalid LLM source article_quality: {quality}")
+    quote = str(raw.get("evidence_quote") or "").strip()
+    warnings = [str(item) for item in (raw.get("warnings") or ()) if item]
+    confidence = max(0.0, min(1.0, _float_or_zero(raw.get("confidence"))))
+    clean_quote = clean_text(quote)
+    clean_source = clean_text(source_text)
+    if quote and clean_quote not in clean_source:
+        warnings.append("evidence_quote_missing_from_source")
+        confidence = min(confidence, 0.50)
+    if bool(raw.get("candidate_catalyst_mechanism_present")) and not quote:
+        warnings.append("mechanism_without_quote")
+        confidence = min(confidence, 0.50)
+    is_affiliate = bool(raw.get("is_affiliate_or_seo")) or page_type == "seo_affiliate"
+    is_real = bool(raw.get("is_real_article")) and quality in USABLE_ARTICLE_QUALITY_STATUSES
+    is_official = bool(raw.get("is_official_source")) or page_type == "official_announcement"
+    if deterministic is not None and deterministic.decision in {SOURCE_TRIAGE_DIAGNOSTIC_ONLY, SOURCE_TRIAGE_REJECT}:
+        is_real = False
+        confidence = min(confidence, 0.45)
+        warnings.append("deterministic_triage_override")
+    if deterministic is not None and deterministic.source_is_affiliate_or_seo:
+        is_real = False
+        is_affiliate = True
+        quality = ARTICLE_QUALITY_BOILERPLATE_HEAVY
+        confidence = min(confidence, 0.35)
+        warnings.append("affiliate_or_seo_override")
+    if is_affiliate:
+        is_real = False
+        confidence = min(confidence, 0.45)
+    if page_type in {"redirect_placeholder", "blocked_or_paywalled", "source_noise"}:
+        is_real = False
+        confidence = min(confidence, 0.50)
+    return EventLLMSourceTriage(
+        page_type=page_type,
+        is_real_article=is_real,
+        article_quality=quality,
+        boilerplate_ratio_estimate=max(0.0, min(1.0, _float_or_zero(raw.get("boilerplate_ratio_estimate")))),
+        is_official_source=is_official,
+        is_recap=bool(raw.get("is_recap")) or page_type == "market_recap",
+        is_affiliate_or_seo=is_affiliate,
+        candidate_catalyst_mechanism_present=bool(raw.get("candidate_catalyst_mechanism_present")) and bool(quote),
+        evidence_quote=quote if not quote or clean_quote in clean_source else "",
+        confidence=round(confidence, 3),
+        reason=str(raw.get("reason") or "llm_source_triage_validated"),
         warnings=tuple(dict.fromkeys(warnings)),
     )
 

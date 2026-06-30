@@ -64,6 +64,11 @@ class EvidencePlannerResult:
     supply_refresh_requests: tuple[str, ...] = ()
     validation_criteria: tuple[str, ...] = ()
     checklist: tuple[str, ...] = ()
+    query_intents: tuple[str, ...] = ()
+    official_confirmation_queries: tuple[EvidencePlanQuery, ...] = ()
+    denial_correction_queries: tuple[EvidencePlanQuery, ...] = ()
+    expected_proof_criteria: tuple[str, ...] = ()
+    manual_checklist: tuple[str, ...] = ()
     provider_gaps: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
@@ -81,8 +86,81 @@ class EvidencePlannerResult:
             "evidence_supply_refresh_requests": self.supply_refresh_requests,
             "evidence_validation_criteria": self.validation_criteria,
             "evidence_acquisition_checklist": self.checklist,
+            "evidence_query_intents": self.query_intents,
+            "evidence_official_confirmation_queries": tuple(item.to_metadata() for item in self.official_confirmation_queries),
+            "evidence_denial_correction_queries": tuple(item.to_metadata() for item in self.denial_correction_queries),
+            "evidence_expected_proof_criteria": self.expected_proof_criteria,
+            "evidence_manual_checklist": self.manual_checklist,
             "evidence_provider_gaps": self.provider_gaps,
             "evidence_acquisition_warnings": self.warnings,
+        }
+
+
+@dataclass(frozen=True)
+class EvidenceContradictionStatus:
+    status: str
+    blocks_validation: bool
+    reason: str
+    denial_queries: tuple[EvidencePlanQuery, ...] = ()
+    warnings: tuple[str, ...] = ()
+
+    def to_metadata(self) -> dict[str, Any]:
+        return {
+            "contradiction_status": self.status,
+            "contradiction_blocks_validation": self.blocks_validation,
+            "contradiction_reason": self.reason,
+            "contradiction_denial_queries": tuple(item.to_metadata() for item in self.denial_queries),
+            "contradiction_warnings": self.warnings,
+        }
+
+
+@dataclass(frozen=True)
+class EventAnalystSummary:
+    why_surfaced: str
+    why_not_alertable: str
+    what_would_upgrade: str
+    what_would_invalidate: str
+    what_to_check_next: tuple[str, ...]
+    warnings: tuple[str, ...] = ()
+
+    def to_metadata(self) -> dict[str, Any]:
+        return {
+            "analyst_summary_why_surfaced": self.why_surfaced,
+            "analyst_summary_why_not_alertable": self.why_not_alertable,
+            "analyst_summary_what_would_upgrade": self.what_would_upgrade,
+            "analyst_summary_what_would_invalidate": self.what_would_invalidate,
+            "analyst_summary_check_next": self.what_to_check_next,
+            "analyst_summary_warnings": self.warnings,
+        }
+
+
+@dataclass(frozen=True)
+class LLMAnalystToolBudgetConfig:
+    enabled: bool = True
+    provider: str = "fixture"
+    api_key_present: bool = False
+    max_calls_per_run: int = 20
+
+
+@dataclass(frozen=True)
+class LLMAnalystToolBudgetResult:
+    triage_llm_calls: int = 0
+    query_planner_llm_calls: int = 0
+    summary_llm_calls: int = 0
+    skipped_by_budget: int = 0
+    skipped_missing_api_key: int = 0
+    selected_row_ids: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+
+    def to_metadata(self) -> dict[str, Any]:
+        return {
+            "triage_llm_calls": self.triage_llm_calls,
+            "query_planner_llm_calls": self.query_planner_llm_calls,
+            "summary_llm_calls": self.summary_llm_calls,
+            "skipped_by_budget": self.skipped_by_budget,
+            "skipped_missing_api_key": self.skipped_missing_api_key,
+            "selected_row_ids": self.selected_row_ids,
+            "warnings": self.warnings,
         }
 
 
@@ -163,11 +241,16 @@ def plan_evidence(request: EvidencePlannerRequest | Mapping[str, Any]) -> Eviden
     market = (request.coin_id or request.symbol,) if pack.market_refresh_required and (request.coin_id or request.symbol) else ()
     derivatives = (request.coin_id or request.symbol,) if pack.derivatives_refresh_required and (request.coin_id or request.symbol) else ()
     supply = (request.coin_id or request.symbol,) if pack.supply_refresh_required and (request.coin_id or request.symbol) else ()
+    query_intents = tuple(dict.fromkeys(query.purpose for query in (*queries, *denial) if query.purpose))
+    checklist = _checklist(request, pack)
     warnings: list[str] = []
     if pack.name in {"political_meme_pack", "proxy_preipo_rwa_pack"} and "polymarket" in " ".join(pack.preferred_providers):
         warnings.append("prediction_market_context_only_until_token_identity_validated")
     if not selected:
         warnings.append("planner_not_selected_below_prefilter")
+    contradiction = detect_contradiction_or_denial(request)
+    if contradiction.blocks_validation:
+        warnings.extend(contradiction.warnings or (contradiction.reason,))
     return EvidencePlannerResult(
         plan_id=_plan_id(request, pack.name),
         opportunity_id=request.opportunity_id,
@@ -181,9 +264,201 @@ def plan_evidence(request: EvidencePlannerRequest | Mapping[str, Any]) -> Eviden
         derivatives_refresh_requests=derivatives,
         supply_refresh_requests=supply,
         validation_criteria=pack.validation_requirements,
-        checklist=_checklist(request, pack),
+        checklist=checklist,
+        query_intents=query_intents,
+        official_confirmation_queries=official,
+        denial_correction_queries=denial,
+        expected_proof_criteria=_expected_proof_criteria(request, pack),
+        manual_checklist=checklist,
         provider_gaps=provider_gaps,
         warnings=tuple(dict.fromkeys(warnings)),
+    )
+
+
+def detect_contradiction_or_denial(row_or_request: EvidencePlannerRequest | Mapping[str, Any]) -> EvidenceContradictionStatus:
+    request = row_or_request if isinstance(row_or_request, EvidencePlannerRequest) else request_from_row(row_or_request)
+    text = " ".join(str(part or "") for part in (
+        request.event_name,
+        request.external_asset,
+        request.playbook_type,
+        request.impact_path_type,
+        " ".join(request.missing_evidence),
+    )).casefold()
+    if not text and isinstance(row_or_request, Mapping):
+        text = " ".join(str(row_or_request.get(key) or "") for key in (
+            "title", "body", "description", "reason", "llm_reason", "impact_path_reason", "event_name",
+        )).casefold()
+    pack = event_source_packs.source_pack_for_playbook(
+        request.playbook_type,
+        impact_path_type=request.impact_path_type,
+    )
+    queries = _denial_queries(request, pack)
+    exploit_denial = any(term in text for term in (
+        "not hacked", "no hack", "no exploit", "false exploit", "exploit denied", "hack denied",
+    ))
+    listing_denial = any(term in text for term in (
+        "denies listing", "listing denied", "not listing", "fake listing", "false listing",
+    ))
+    partnership_denial = any(term in text for term in (
+        "denies partnership", "partnership denied", "not affiliated", "no affiliation", "rumor denied",
+    ))
+    correction = any(term in text for term in ("correction", "corrected", "clarifies", "clarification"))
+    rumor = any(term in text for term in ("rumor", "rumoured", "unconfirmed", "unofficial source"))
+    if exploit_denial and pack.name == "security_shock_pack":
+        return EvidenceContradictionStatus(
+            status="denial_found",
+            blocks_validation=True,
+            reason="exploit_or_hack_denied",
+            denial_queries=queries,
+            warnings=("exploit_denial_blocks_security_path",),
+        )
+    if listing_denial and pack.name in {"listing_liquidity_pack", "perp_listing_squeeze_pack"}:
+        return EvidenceContradictionStatus(
+            status="denial_found",
+            blocks_validation=True,
+            reason="listing_denied_or_fake",
+            denial_queries=queries,
+            warnings=("listing_denial_blocks_listing_path",),
+        )
+    if partnership_denial:
+        return EvidenceContradictionStatus(
+            status="denial_found",
+            blocks_validation=True,
+            reason="partnership_or_affiliation_denied",
+            denial_queries=queries,
+            warnings=("relationship_denial_blocks_candidate",),
+        )
+    if correction:
+        return EvidenceContradictionStatus(
+            status="correction_risk",
+            blocks_validation=True,
+            reason="source_correction_requires_review",
+            denial_queries=queries,
+            warnings=("correction_requires_manual_review",),
+        )
+    if rumor:
+        return EvidenceContradictionStatus(
+            status="rumor_or_unofficial",
+            blocks_validation=False,
+            reason="rumor_needs_denial_and_official_confirmation_search",
+            denial_queries=queries,
+            warnings=("unofficial_or_rumor_source",),
+        )
+    return EvidenceContradictionStatus(
+        status="none_detected",
+        blocks_validation=False,
+        reason="no_denial_or_correction_terms_detected",
+        denial_queries=queries,
+        warnings=(),
+    )
+
+
+def generate_analyst_summary(row: Mapping[str, Any], *, plan: EvidencePlannerResult | Mapping[str, Any] | None = None) -> EventAnalystSummary:
+    request = request_from_row(row)
+    plan_meta = plan.to_metadata() if isinstance(plan, EvidencePlannerResult) else dict(plan or {})
+    level = request.opportunity_level or str(row.get("final_opportunity_level") or "local_only")
+    final_route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").strip()
+    impact = request.impact_path_type or str(row.get("impact_category") or "unknown")
+    source_pack = str(plan_meta.get("evidence_acquisition_source_pack") or row.get("source_pack") or request.source_pack or "unknown")
+    symbol = request.symbol or request.coin_id or "candidate"
+    score = request.score
+    why_surfaced = (
+        f"{symbol} surfaced as {level} under {impact} with score {score:.1f}"
+        if score
+        else f"{symbol} surfaced as {level} under {impact}"
+    )
+    block_reason = str(
+        row.get("quality_gate_block_reason")
+        or row.get("why_not_promoted")
+        or row.get("why_not_watchlist")
+        or row.get("why_local_only")
+        or ""
+    )
+    if final_route and final_route not in {"RESEARCH_DIGEST", "WATCHLIST", "HIGH_PRIORITY_RESEARCH", "TRIGGERED_FADE_RESEARCH"}:
+        why_not_alertable = f"Not alertable on final route {final_route}"
+        if block_reason:
+            why_not_alertable += f": {_first_text(block_reason)}"
+    elif level in {"local_only", "exploratory"}:
+        why_not_alertable = f"Not alertable because opportunity level is {level}"
+        if block_reason:
+            why_not_alertable += f": {_first_text(block_reason)}"
+    else:
+        why_not_alertable = "Alertability is governed by deterministic route, source-pack, and quality gates."
+    needed = _iter_texts(plan_meta.get("evidence_needed") or row.get("missing_requirements") or row.get("upgrade_requirements"))
+    criteria = _iter_texts(plan_meta.get("evidence_expected_proof_criteria") or plan_meta.get("evidence_validation_criteria"))
+    upgrade_parts = tuple(dict.fromkeys((*needed[:3], *criteria[:2])))
+    what_would_upgrade = (
+        "source/evidence proof: " + "; ".join(upgrade_parts)
+        if upgrade_parts
+        else "accepted source-pack evidence plus fresh market confirmation"
+    )
+    contradiction = detect_contradiction_or_denial(row)
+    if contradiction.blocks_validation:
+        what_would_invalidate = contradiction.reason
+    elif source_pack in {"proxy_preipo_rwa_pack", "ai_ipo_proxy_pack"}:
+        what_would_invalidate = "proxy/exposure denied, source corrected, or market confirmation fails"
+    elif source_pack == "security_shock_pack":
+        what_would_invalidate = "exploit/security claim denied or unrelated to the asset"
+    elif source_pack in {"listing_liquidity_pack", "perp_listing_squeeze_pack"}:
+        what_would_invalidate = "official listing denied, stale, or not tied to the token identity"
+    else:
+        what_would_invalidate = "source correction, missing token identity, or unsupported impact path"
+    checklist = _iter_texts(plan_meta.get("evidence_manual_checklist") or plan_meta.get("evidence_acquisition_checklist"))
+    check_next = tuple(dict.fromkeys(checklist[:4] or ("confirm source evidence", "verify asset identity", "refresh market context")))
+    warnings = tuple(dict.fromkeys((
+        *_iter_texts(row.get("warnings")),
+        *_iter_texts(plan_meta.get("evidence_acquisition_warnings")),
+        *contradiction.warnings,
+    )))
+    return EventAnalystSummary(
+        why_surfaced=why_surfaced,
+        why_not_alertable=why_not_alertable,
+        what_would_upgrade=what_would_upgrade,
+        what_would_invalidate=what_would_invalidate,
+        what_to_check_next=check_next,
+        warnings=warnings,
+    )
+
+
+def select_llm_analyst_tools(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    cfg: LLMAnalystToolBudgetConfig | None = None,
+) -> LLMAnalystToolBudgetResult:
+    cfg = cfg or LLMAnalystToolBudgetConfig()
+    if not cfg.enabled:
+        return LLMAnalystToolBudgetResult(warnings=("llm_analyst_tools_disabled",))
+    if cfg.provider != "fixture" and not cfg.api_key_present:
+        rows_tuple = tuple(rows)
+        return LLMAnalystToolBudgetResult(
+            skipped_missing_api_key=len(rows_tuple),
+            warnings=("missing_api_key",),
+        )
+    remaining = max(0, int(cfg.max_calls_per_run))
+    triage = planner = summary = skipped = 0
+    selected: list[str] = []
+    for row in rows:
+        needs = _analyst_tool_needs(row)
+        if not needs:
+            continue
+        needed_calls = len(needs)
+        if needed_calls > remaining:
+            skipped += 1
+            continue
+        remaining -= needed_calls
+        if "triage" in needs:
+            triage += 1
+        if "planner" in needs:
+            planner += 1
+        if "summary" in needs:
+            summary += 1
+        selected.append(_row_id(row))
+    return LLMAnalystToolBudgetResult(
+        triage_llm_calls=triage,
+        query_planner_llm_calls=planner,
+        summary_llm_calls=summary,
+        skipped_by_budget=skipped,
+        selected_row_ids=tuple(selected),
     )
 
 
@@ -249,6 +524,33 @@ def _evidence_needed(request: EvidencePlannerRequest, pack: event_source_packs.S
     return tuple(dict.fromkeys(values))
 
 
+def _expected_proof_criteria(request: EvidencePlannerRequest, pack: event_source_packs.SourcePack) -> tuple[str, ...]:
+    criteria = list(pack.validation_requirements)
+    if pack.name in {"proxy_preipo_rwa_pack", "ai_ipo_proxy_pack"}:
+        criteria.extend([
+            "source quote names the token/venue and the external exposure mechanism",
+            "prediction-market context is not used as token-impact proof by itself",
+        ])
+    elif pack.name == "security_shock_pack":
+        criteria.extend([
+            "source confirms the incident affected the candidate asset/protocol",
+            "denial/correction search does not rule out the exploit/security path",
+        ])
+    elif pack.name in {"listing_liquidity_pack", "perp_listing_squeeze_pack"}:
+        criteria.extend([
+            "official exchange announcement names the exact symbol/pair/contract",
+            "market or derivatives refresh confirms the listing mattered for trading conditions",
+        ])
+    elif pack.name == "strategic_investment_pack":
+        criteria.extend([
+            "second source or official source confirms the stake/investment",
+            "source explains why the stake or valuation is relevant to token value",
+        ])
+    if request.frame_disagreement:
+        criteria.append("manual review resolves rule-vs-LLM catalyst frame disagreement")
+    return tuple(dict.fromkeys(criteria))
+
+
 def _checklist(request: EvidencePlannerRequest, pack: event_source_packs.SourcePack) -> tuple[str, ...]:
     base = [
         "confirm token/project identity with non-URL evidence",
@@ -263,7 +565,46 @@ def _checklist(request: EvidencePlannerRequest, pack: event_source_packs.SourceP
         base.append("refresh unlock/supply pressure")
     if request.candidate_role in {"proxy_venue", "proxy_instrument"}:
         base.append("check denial/correction sources for proxy relationship")
+    if pack.name == "strategic_investment_pack":
+        base.append("check for denial, correction, or non-token equity-only interpretation")
+    if pack.name == "security_shock_pack":
+        base.append("check whether the exploit/security claim was denied or corrected")
     return tuple(dict.fromkeys(base))
+
+
+def _analyst_tool_needs(row: Mapping[str, Any]) -> tuple[str, ...]:
+    needs: list[str] = []
+    level = str(row.get("opportunity_level") or row.get("final_opportunity_level") or "").casefold()
+    route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").casefold()
+    score = _float(row.get("opportunity_score_final") or row.get("score")) or 0.0
+    text = " ".join(str(row.get(key) or "") for key in (
+        "title", "event_name", "canonical_incident_name", "body", "description", "impact_path_reason",
+    )).casefold()
+    if row.get("source_url") and (
+        row.get("source_quality_score") in (None, "")
+        or str(row.get("source_triage_decision") or "").casefold() in {"", "send_to_llm_frame_analyzer"}
+    ):
+        needs.append("triage")
+    if should_plan_evidence(row) or any(term in text for term in ("denied", "not hacked", "correction", "rumor", "unofficial")):
+        needs.append("planner")
+    if level in {"validated_digest", "watchlist", "high_priority"} or "research" in route or score >= 50:
+        needs.append("summary")
+    return tuple(dict.fromkeys(needs))
+
+
+def _row_id(row: Mapping[str, Any]) -> str:
+    for key in ("core_opportunity_id", "hypothesis_id", "alert_id", "watchlist_key", "raw_id", "symbol", "coin_id"):
+        value = row.get(key)
+        if value:
+            return str(value)
+    return "unknown"
+
+
+def _first_text(value: object) -> str:
+    texts = _iter_texts(value)
+    if not texts:
+        return ""
+    return texts[0][:180]
 
 
 def _provider_gaps(provider_health: Mapping[str, Any]) -> tuple[str, ...]:

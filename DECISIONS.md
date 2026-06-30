@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-06-30 - LLM analyst tools are advisory planning surfaces
+**Status:** accepted
+**Decision:** Event Alpha may use LLM-backed or fixture-backed analyst tools
+for source triage, evidence query planning, denial/correction planning, manual
+verification checklists, and concise analyst summaries. These outputs must be
+quote-checked where they cite evidence and constrained by deterministic source
+triage, source-pack contracts, asset identity validation, opportunity quality
+gates, and live confirmation policy. They may explain or prioritize what to
+verify next, but they cannot decide final route/state, send Telegram, paper
+trade, live trade, write normal RSI rows, bypass source-pack gates, or create
+`TRIGGERED_FADE`.
+**Why:** LLMs are useful for reducing operator workload around messy source
+quality and follow-up planning, but letting them act as final promotion logic
+would weaken the research-only safety model and make artifacts harder to audit.
+**Revisit when:** Reviewed burn-in data shows enough analyst-tool precision and
+calibration to promote a specific advisory field into a deterministic rule.
+
 ## 2026-06-30 - Asset role validation is deterministic before promotion
 **Status:** accepted
 **Decision:** Event Alpha candidate promotion must validate the asset role

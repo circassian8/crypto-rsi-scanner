@@ -8922,6 +8922,165 @@ def test_event_source_enrichment_triage_and_fixture_source_quality_judge():
     assert boilerplate.is_real_article is False
 
 
+def test_event_llm_source_triage_schema_and_quote_validation():
+    from datetime import datetime, timezone
+    from crypto_rsi_scanner import event_source_enrichment
+    from crypto_rsi_scanner.event_models import RawDiscoveredEvent
+    from crypto_rsi_scanner.llm_providers.fixture import FixtureLLMSourceQualityProvider
+
+    now = datetime(2026, 6, 18, 12, 0, tzinfo=timezone.utc)
+
+    def raw_event(raw_id: str, provider: str, url: str, title: str, body: str) -> RawDiscoveredEvent:
+        return RawDiscoveredEvent(
+            raw_id=raw_id,
+            provider=provider,
+            fetched_at=now,
+            published_at=now,
+            source_url=url,
+            title=title,
+            body=body,
+            raw_json={},
+            source_confidence=0.9,
+            content_hash=raw_id,
+        )
+
+    provider = FixtureLLMSourceQualityProvider(cases={
+        "good-triage": {
+            "page_type": "article",
+            "is_real_article": True,
+            "article_quality": "fixture_text_used",
+            "boilerplate_ratio_estimate": 0.08,
+            "is_official_source": False,
+            "is_recap": False,
+            "is_affiliate_or_seo": False,
+            "candidate_catalyst_mechanism_present": True,
+            "evidence_quote": "Velvet offers SpaceX pre-IPO tokenized stock exposure",
+            "confidence": 0.91,
+            "reason": "direct mechanism quote",
+        },
+        "official-triage": {
+            "page_type": "official_announcement",
+            "is_real_article": True,
+            "article_quality": "fixture_text_used",
+            "boilerplate_ratio_estimate": 0.05,
+            "is_official_source": True,
+            "is_recap": False,
+            "is_affiliate_or_seo": False,
+            "candidate_catalyst_mechanism_present": True,
+            "evidence_quote": "Binance will list TESTUSDT",
+            "confidence": 0.94,
+        },
+        "seo-triage": {
+            "page_type": "seo_affiliate",
+            "is_real_article": True,
+            "article_quality": "good",
+            "boilerplate_ratio_estimate": 0.2,
+            "is_official_source": False,
+            "is_recap": False,
+            "is_affiliate_or_seo": True,
+            "candidate_catalyst_mechanism_present": False,
+            "evidence_quote": "",
+            "confidence": 0.88,
+        },
+        "bad-triage": {
+            "page_type": "not_a_page_type",
+            "is_real_article": True,
+            "article_quality": "good",
+            "boilerplate_ratio_estimate": 0.1,
+            "is_official_source": False,
+            "is_recap": False,
+            "is_affiliate_or_seo": False,
+            "candidate_catalyst_mechanism_present": True,
+            "evidence_quote": "unsupported",
+            "confidence": 0.8,
+        },
+        "missing-quote": {
+            "page_type": "article",
+            "is_real_article": True,
+            "article_quality": "fixture_text_used",
+            "boilerplate_ratio_estimate": 0.1,
+            "is_official_source": False,
+            "is_recap": False,
+            "is_affiliate_or_seo": False,
+            "candidate_catalyst_mechanism_present": True,
+            "evidence_quote": "quote not in source",
+            "confidence": 0.92,
+        },
+    })
+    cfg = event_source_enrichment.EventSourceQualityJudgeConfig(enabled=True, min_importance_score=0)
+
+    good = event_source_enrichment.run_llm_source_triage(
+        raw_event(
+            "good-triage",
+            "cryptopanic_news",
+            "https://fixture.test/velvet",
+            "Velvet offers SpaceX exposure",
+            "Velvet offers SpaceX pre-IPO tokenized stock exposure for crypto users.",
+        ),
+        provider=provider,
+        cfg=cfg,
+    )
+    assert good is not None
+    assert good.page_type == "article"
+    assert good.candidate_catalyst_mechanism_present is True
+    assert good.confidence > 0.8
+
+    official = event_source_enrichment.run_llm_source_triage(
+        raw_event(
+            "official-triage",
+            "binance_announcements",
+            "https://www.binance.com/en/support/announcement/test",
+            "Binance Will List TESTUSDT",
+            "Binance will list TESTUSDT and open spot trading.",
+        ),
+        provider=provider,
+        cfg=cfg,
+    )
+    assert official is not None
+    assert official.is_official_source is True
+
+    seo = event_source_enrichment.run_llm_source_triage(
+        raw_event(
+            "seo-triage",
+            "rss",
+            "https://seo.example/referral",
+            "Register Binance now",
+            "Register Binance now with referral code USD777 and sign up now for lifetime fee bonus.",
+        ),
+        provider=provider,
+        cfg=cfg,
+    )
+    assert seo is not None
+    assert seo.is_real_article is False
+    assert seo.confidence <= 0.45
+
+    missing = event_source_enrichment.run_llm_source_triage(
+        raw_event(
+            "missing-quote",
+            "rss",
+            "https://fixture.test/missing",
+            "Velvet offers SpaceX exposure",
+            "Velvet offers SpaceX exposure.",
+        ),
+        provider=provider,
+        cfg=cfg,
+    )
+    assert missing is not None
+    assert missing.confidence <= 0.50
+    assert "evidence_quote_missing_from_source" in missing.warnings
+
+    try:
+        event_source_enrichment.run_llm_source_triage(
+            raw_event("bad-triage", "rss", "https://fixture.test/bad", "Bad", "unsupported"),
+            provider=provider,
+            cfg=cfg,
+        )
+    except ValueError as exc:
+        assert "invalid LLM source page_type" in str(exc)
+    else:
+        raise AssertionError("invalid LLM source triage enum should fail validation")
+
+
 def test_event_alpha_radar_scanner_report_with_fixture_anomalies():
     import contextlib
     import io
@@ -30495,6 +30654,9 @@ def test_event_llm_evidence_planner_fixture_cases():
     assert aave.source_pack == "strategic_investment_pack"
     assert any("AAVE" in query.query and "Kraken" in query.query for query in aave.query_plan)
     assert any("denies" in query.query.casefold() for query in aave.denial_searches)
+    assert aave.official_confirmation_queries
+    assert "official_confirmation" in aave.query_intents
+    assert any("valuation" in item or "stake" in item for item in aave.expected_proof_criteria)
     assert "confirm token/project identity with non-URL evidence" in aave.checklist
 
     velvet = event_llm_evidence_planner.plan_evidence({
@@ -30511,6 +30673,8 @@ def test_event_llm_evidence_planner_fixture_cases():
     assert velvet.source_pack == "proxy_preipo_rwa_pack"
     assert any(query.provider_hint == "polymarket" and query.must_validate_asset is False for query in velvet.query_plan)
     assert velvet.market_refresh_requests == ("velvet",)
+    assert any("external exposure mechanism" in item for item in velvet.expected_proof_criteria)
+    assert "check denial/correction sources for proxy relationship" in velvet.manual_checklist
 
     rune = event_llm_evidence_planner.plan_evidence({
         "core_opportunity_id": "core:rune",
@@ -30523,6 +30687,7 @@ def test_event_llm_evidence_planner_fixture_cases():
     })
     assert rune.source_pack == "security_shock_pack"
     assert any("exploit" in query.query.casefold() for query in rune.query_plan)
+    assert any("denial" in item.casefold() for item in rune.expected_proof_criteria)
 
     generic = event_llm_evidence_planner.plan_evidence({
         "core_opportunity_id": "core:generic",
@@ -30535,6 +30700,115 @@ def test_event_llm_evidence_planner_fixture_cases():
     })
     assert generic.selected is False
     assert "planner_not_selected_below_prefilter" in generic.warnings
+    assert generic.source_pack == "political_meme_pack"
+    assert "prediction_market_context_only_until_token_identity_validated" in generic.warnings
+
+
+def test_event_llm_evidence_planner_contradiction_summary_and_budget():
+    from crypto_rsi_scanner import event_llm_evidence_planner
+
+    exploit_denied = {
+        "core_opportunity_id": "core:aave-denial",
+        "symbol": "AAVE",
+        "coin_id": "aave",
+        "event_name": "Aave not hacked after KelpDAO exploit rumors",
+        "playbook_type": "security_or_regulatory_shock",
+        "impact_path_type": "exploit_security_event",
+        "opportunity_score_final": 70,
+        "opportunity_level": "watchlist",
+    }
+    contradiction = event_llm_evidence_planner.detect_contradiction_or_denial(exploit_denied)
+    assert contradiction.blocks_validation is True
+    assert contradiction.reason == "exploit_or_hack_denied"
+    assert any("exploit" in query.query.casefold() for query in contradiction.denial_queries)
+    planned = event_llm_evidence_planner.plan_evidence(exploit_denied)
+    assert "exploit_denial_blocks_security_path" in planned.warnings
+
+    listing_denied = event_llm_evidence_planner.detect_contradiction_or_denial({
+        "symbol": "TEST",
+        "coin_id": "test-token",
+        "event_name": "Exchange denies listing TEST after fake listing rumor",
+        "playbook_type": "listing_volatility",
+        "impact_path_type": "listing_liquidity_event",
+        "opportunity_score_final": 64,
+        "opportunity_level": "validated_digest",
+    })
+    assert listing_denied.blocks_validation is True
+    assert listing_denied.reason == "listing_denied_or_fake"
+
+    velvet_row = {
+        "core_opportunity_id": "core:velvet-summary",
+        "symbol": "VELVET",
+        "coin_id": "velvet",
+        "external_asset": "SpaceX",
+        "playbook_type": "proxy_attention",
+        "impact_path_type": "venue_value_capture",
+        "candidate_role": "proxy_venue",
+        "opportunity_score_final": 82,
+        "opportunity_level": "high_priority",
+        "final_route_after_quality_gate": "HIGH_PRIORITY_RESEARCH",
+        "evidence_acquisition_plan": planned.to_metadata(),
+    }
+    velvet_plan = event_llm_evidence_planner.plan_evidence(velvet_row)
+    summary = event_llm_evidence_planner.generate_analyst_summary(velvet_row, plan=velvet_plan)
+    assert "VELVET surfaced as high_priority" in summary.why_surfaced
+    assert "SpaceX" not in summary.why_surfaced  # summary is sourced from structured route fields, not invented copy.
+    assert "source" in summary.what_would_upgrade.casefold() or "evidence" in summary.what_would_upgrade.casefold()
+    assert any("identity" in item for item in summary.what_to_check_next)
+
+    weak_btc = {
+        "core_opportunity_id": "core:btc-weak",
+        "symbol": "BTC",
+        "coin_id": "bitcoin",
+        "event_name": "Bitcoin World writes broad policy recap",
+        "playbook_type": "political_meme_proxy",
+        "impact_path_type": "insufficient_data",
+        "opportunity_score_final": 0,
+        "opportunity_level": "local_only",
+        "final_route_after_quality_gate": "STORE_ONLY",
+        "why_local_only": ("missing_direct_impact_path",),
+    }
+    weak_summary = event_llm_evidence_planner.generate_analyst_summary(weak_btc)
+    assert "Not alertable" in weak_summary.why_not_alertable
+    assert "missing_direct_impact_path" in weak_summary.why_not_alertable
+
+    budget = event_llm_evidence_planner.select_llm_analyst_tools(
+        [
+            {
+                "core_opportunity_id": "core:triage",
+                "symbol": "RUNE",
+                "coin_id": "thorchain",
+                "source_url": "https://fixture.test/rune",
+                "source_triage_decision": "send_to_llm_frame_analyzer",
+                "playbook_type": "security_or_regulatory_shock",
+                "impact_path_type": "exploit_security_event",
+                "opportunity_score_final": 80,
+                "opportunity_level": "watchlist",
+            },
+            {
+                "core_opportunity_id": "core:budget-skip",
+                "symbol": "AAVE",
+                "coin_id": "aave",
+                "source_url": "https://fixture.test/aave",
+                "playbook_type": "strategic_investment",
+                "impact_path_type": "strategic_investment_or_valuation",
+                "opportunity_score_final": 78,
+                "opportunity_level": "validated_digest",
+            },
+        ],
+        cfg=event_llm_evidence_planner.LLMAnalystToolBudgetConfig(provider="fixture", max_calls_per_run=3),
+    )
+    assert budget.triage_llm_calls == 1
+    assert budget.query_planner_llm_calls == 1
+    assert budget.summary_llm_calls == 1
+    assert budget.skipped_by_budget == 1
+
+    missing_key = event_llm_evidence_planner.select_llm_analyst_tools(
+        [weak_btc],
+        cfg=event_llm_evidence_planner.LLMAnalystToolBudgetConfig(provider="openai", api_key_present=False),
+    )
+    assert missing_key.skipped_missing_api_key == 1
+    assert "missing_api_key" in missing_key.warnings
 
 
 def test_evidence_acquisition_final_upgrade_status_tracks_final_verdict_not_evidence_only():
@@ -30810,6 +31084,9 @@ def test_event_near_miss_source_pack_and_operator_surfaces():
         },
     )
     card = event_research_cards.render_research_card(entry.key, watchlist_entries=[entry])
+    assert "## Analyst Summary" in card.markdown
+    assert "Why surfaced: VELVET surfaced" in card.markdown
+    assert "What would upgrade: source/evidence proof:" in card.markdown
     assert "## Source Coverage / Evidence Acquisition" in card.markdown
     assert "Source pack: proxy_preipo_rwa_pack" in card.markdown
     assert "Coverage status: degraded" in card.markdown
