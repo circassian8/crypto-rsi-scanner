@@ -28497,6 +28497,14 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
             "canonical_coin_id": "velvet",
             "feedback_target": "agg:velvet",
         }
+        review_row = {
+            **row,
+            "lane": "research_review_digest",
+            "core_opportunity_id": "agg:doge-review",
+            "canonical_symbol": "DOGE",
+            "canonical_coin_id": "dogecoin",
+            "feedback_target": "agg:doge-review",
+        }
         no_send = go.build_go_no_go(
             profile="notify_llm_deep",
             artifact_namespace="notify_llm_deep_rehearsal",
@@ -28513,7 +28521,7 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
             llm_budget_status="provider=openai max_run=200",
             clock_status={"now": "2026-06-20T12:00:00Z", "warnings": ()},
             send_readiness=readiness,
-            delivery_rows=[row],
+            delivery_rows=[row, review_row],
         )
         text = go.format_go_no_go(no_send)
         assert no_send.final_recommendation == go.RECOMMEND_READY_NO_SEND_REVIEW
@@ -28521,12 +28529,12 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
         assert "final_recommendation: READY_FOR_NO_SEND_REVIEW" in text
         assert "latest_run_id: run-1" in text
         assert "notification_preview_path_source: relpath" in text
-        assert "would_send_lanes: daily_digest" in text
+        assert "would_send_lanes: daily_digest, research_review_digest" in text
         assert "canonical_delivery_identity: yes" in text
         final = final_check.build_final_check(
             go_no_go_result=no_send,
             doctor_status="OK",
-            delivery_rows=[row],
+            delivery_rows=[row, review_row],
             core_rows=[
                 {
                     "run_id": "run-1",
@@ -28539,10 +28547,10 @@ def test_event_alpha_notification_go_no_go_uses_send_readiness_for_final_recomme
         assert final.status == go.RECOMMEND_READY_NO_SEND_REVIEW
         assert final.preview_path == str(preview_path)
         assert final.sends_performed == 0
-        assert final.core_ids == ("agg:velvet",)
+        assert final.core_ids == ("agg:velvet", "agg:doge-review")
         assert "Final Telegram no-send check:" in compact
         assert "- status: READY_FOR_NO_SEND_REVIEW" in compact
-        assert "- would-send lanes: daily_digest" in compact
+        assert "- would-send lanes: daily_digest, research_review_digest" in compact
         assert "- sends performed: 0" in compact
         assert "EVENT ALPHA NOTIFICATION GO/NO-GO" not in compact
         blocked = final_check.build_final_check(
@@ -28822,6 +28830,8 @@ def test_event_alpha_rehearsal_and_send_readiness_make_targets_are_no_send():
     assert "Fast deterministic Event Alpha final check" in fast_final
     assert "main.py --event-alpha-notify-fixture-smoke" in fast_final
     assert "RSI_EVENT_ALPHA_NOTIFY_FIXTURE_PROFILE=notify_llm_deep" in fast_final
+    assert "RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED=1" in fast_final
+    assert "RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_SEND_WITH_ALERTS=1" in fast_final
     assert "event-alpha-notify-llm-deep-fixture-rehearsal-artifacts" not in fast_final
     assert "$(MAKE)" not in fast_final
     assert "main.py --event-alpha-notification-inbox" in fast_final

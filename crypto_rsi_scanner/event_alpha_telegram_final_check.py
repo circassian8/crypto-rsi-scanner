@@ -160,7 +160,12 @@ def _would_send_lanes(rows: Iterable[Mapping[str, Any]]) -> tuple[str, ...]:
 
 
 def _is_alert_lane(row: Mapping[str, Any]) -> bool:
-    return str(row.get("lane") or "") in {"daily_digest", "instant_escalation", "triggered_fade"}
+    return str(row.get("lane") or "") in {
+        "daily_digest",
+        "instant_escalation",
+        "triggered_fade",
+        "research_review_digest",
+    }
 
 
 def _real_send_command(profile: str) -> str:

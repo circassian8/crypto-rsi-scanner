@@ -1155,6 +1155,11 @@ event-alpha-telegram-no-send-final-check-fast:
 	RSI_EVENT_ALPHA_ARTIFACT_NAMESPACE=notify_llm_deep_fixture_rehearsal \
 	RSI_EVENT_ALPHA_NOTIFY_FIXTURE_PROFILE=notify_llm_deep \
 	RSI_EVENT_ALPHA_NOTIFY_FIXTURE_NO_SEND=1 \
+	RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_ENABLED=1 \
+	RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_MIN_SCORE=60 \
+	RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_MAX_ITEMS=3 \
+	RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_COOLDOWN_HOURS=0 \
+	RSI_EVENT_ALPHA_RESEARCH_REVIEW_DIGEST_SEND_WITH_ALERTS=1 \
 	$(PYTHON) main.py --event-alpha-notify-fixture-smoke > "$$tmp/rehearsal.out" 2>&1 || { echo "fixture rehearsal failed; captured output:"; cat "$$tmp/rehearsal.out"; exit 1; }; \
 	$(PYTHON) main.py --event-alpha-notification-inbox --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal --event-alpha-burn-in-review > "$$tmp/inbox.out" 2>&1 || { echo "burn-in inbox failed; captured output:"; cat "$$tmp/inbox.out"; exit 1; }; \
 	$(PYTHON) main.py --event-alpha-daily-brief --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_fixture_rehearsal --event-alpha-include-test-artifacts > "$$tmp/daily_brief.out" 2>&1 || { echo "daily brief failed; captured output:"; cat "$$tmp/daily_brief.out"; exit 1; }; \

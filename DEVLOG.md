@@ -32,6 +32,9 @@ alert gates.
 - Added `make event-alpha-notify-llm-deep-research-review-no-send-smoke` to
   prove the real `notify_llm_deep` profile writes blocked no-send
   research-review delivery rows for fixture near-misses.
+- Updated the compact Telegram no-send final check so its fixture rehearsal
+  enables and reports the separate `research_review_digest` lane alongside
+  strict lanes.
 - Expanded source coverage reports with actionable per-pack provider, setup,
   budget, rejected-only, and provider-health recommendations.
 - Updated runbook, roadmap, and decision notes for the operational
@@ -39,6 +42,9 @@ alert gates.
 **Verify:** `python3 tests/test_indicators.py` (563/563 passed);
 `make event-alpha-signal-quality-eval PYTHON=python3`;
 `make event-alpha-notify-llm-deep-research-review-no-send-smoke PYTHON=python3`;
+`make event-alpha-research-review-digest-smoke PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
 `make event-alpha-source-coverage-report PROFILE=notify_llm_deep_rehearsal
 PYTHON=python3`; `make event-alpha-live-burn-in-no-send PYTHON=python3`;
 `make verify PYTHON=python3`.
