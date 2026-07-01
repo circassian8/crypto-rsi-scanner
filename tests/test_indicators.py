@@ -38533,6 +38533,8 @@ def test_makefile_exposes_derivatives_targets():
 
 
 def test_integrated_radar_fixture_lanes_and_merge():
+    import json
+
     from crypto_rsi_scanner import event_alpha_artifacts, event_integrated_radar
 
     with TemporaryDirectory() as tmp:
@@ -38548,7 +38550,7 @@ def test_integrated_radar_fixture_lanes_and_merge():
             observed_at="2026-06-15T16:00:00Z",
         )
         rows = [
-            __import__("json").loads(line)
+            json.loads(line)
             for line in result.integrated_candidates_path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
@@ -38561,12 +38563,65 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert by_symbol["TESTRUMOR"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
         assert by_symbol["SECTOR"]["opportunity_type"] == "DIAGNOSTIC"
         assert by_symbol["BTC"]["opportunity_type"] != "EARLY_LONG_RESEARCH"
+        assert by_symbol["BTC"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+        assert by_symbol["BTC"]["source_url"]
+        assert by_symbol["BTC"]["official_exchange_event"]["event_type"] == "new_trading_pair"
 
         assert set(by_symbol["TESTPERP"]["source_origins"]) >= {"official_exchange", "market_anomaly", "derivatives"}
         assert set(by_symbol["TESTFADE"]["source_origins"]) >= {"official_exchange", "market_anomaly", "derivatives"}
         assert by_symbol["TESTFADE"]["derivatives_snapshot"]
         assert by_symbol["TESTFADE"]["triggered_fade_created"] is False
         assert by_symbol["TESTFADE"]["normal_rsi_signal_written"] is False
+
+        cores = [
+            json.loads(line)
+            for line in context.core_opportunity_store_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        core_by_symbol = {row["symbol"]: row for row in cores}
+        assert "SECTOR" not in core_by_symbol
+        assert core_by_symbol["BTC"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+        assert core_by_symbol["BTC"]["source_url"] == by_symbol["BTC"]["source_url"]
+        assert core_by_symbol["BTC"]["official_exchange_event_type"] == "new_trading_pair"
+        assert core_by_symbol["BTC"]["official_exchange_event"]["event_type"] == "new_trading_pair"
+        assert core_by_symbol["TESTLIST"]["official_exchange_event_type"] == "spot_listing"
+        assert core_by_symbol["TESTPERP"]["official_exchange_event_type"] == "perp_listing"
+        assert core_by_symbol["TESTUNLOCK"]["scheduled_catalyst_event"]["event_type"] == "token_unlock"
+        assert core_by_symbol["TESTUNLOCK"]["unlock_event"]["event_type"] == "token_unlock"
+
+        card_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in result.research_card_paths
+            if "index.md" not in str(path)
+        )
+        assert "Opportunity type: UNCONFIRMED_RESEARCH" in card_text
+        assert "## Official Exchange Evidence" in card_text
+        assert "Exchange: binance" in card_text
+        assert "Event type: new_trading_pair" in card_text
+        assert by_symbol["BTC"]["source_url"] in card_text
+
+        daily = result.daily_brief_path.read_text(encoding="utf-8")
+        before_diagnostics = daily.split("## Diagnostics Appendix", 1)[0]
+        assert "SECTOR/ai_theme" not in before_diagnostics
+        assert "## Diagnostics Appendix" in daily
+        assert "SECTOR/ai_theme DIAGNOSTIC" in daily
+
+        manifest = json.loads(result.input_manifest_path.read_text(encoding="utf-8"))
+        assert manifest["input_mode"] == "auto"
+        assert manifest["row_counts"]["official_exchange"] >= 4
+        assert result.source_coverage_json_path.exists()
+        source_coverage = json.loads(result.source_coverage_json_path.read_text(encoding="utf-8"))
+        assert source_coverage["candidate_count"] == len(rows)
+        assert "official_exchange_announcements" in source_coverage["lane_critical_priority"]
+
+        run_row = json.loads(context.run_ledger_path.read_text(encoding="utf-8").splitlines()[-1])
+        assert 0 <= float(run_row["runtime_seconds"]) < 60
+        assert run_row["research_observed_at"] == "2026-06-15T16:00:00+00:00"
+        assert run_row["wall_started_at"] != run_row["research_observed_at"]
+        assert run_row["market_anomalies"] >= 2
+        assert run_row["market_state_snapshots"] >= 2
+        assert run_row["official_exchange_events"] >= 4
+        assert run_row["derivatives_state_rows"] >= 2
 
         preview = result.notification_preview_path.read_text(encoding="utf-8")
         assert "Early Long Research" in preview
@@ -38617,8 +38672,74 @@ def test_makefile_exposes_integrated_radar_target():
     text = Path("Makefile").read_text(encoding="utf-8")
 
     assert "event-alpha-integrated-radar-smoke" in text
+    assert "event-alpha-integrated-radar-doctor" in text
     assert "--event-alpha-integrated-radar-cycle" in text
     assert "--event-alpha-integrated-radar-fixture" in text
+    assert "--event-alpha-integrated-radar-run-sidecars" in text
+    assert "--event-alpha-integrated-radar-load-existing" in text
+    assert "--event-alpha-integrated-radar-auto" in text
+
+
+def test_integrated_doctor_catches_core_and_card_mismatches():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    candidate = {
+        "row_type": "event_integrated_radar_candidate",
+        "symbol": "BTC",
+        "core_opportunity_id": "core-btc",
+        "opportunity_type": "UNCONFIRMED_RESEARCH",
+        "market_state_class": "no_reaction",
+        "source_url": "https://example.com/btc",
+        "reason_codes": ["major_pair_simple_announcement_capped"],
+        "official_exchange_event": {"event_type": "new_trading_pair", "exchange": "binance", "source_url": "https://example.com/btc"},
+    }
+    core = {
+        "core_opportunity_id": "core-btc",
+        "symbol": "BTC",
+        "opportunity_type": "EARLY_LONG_RESEARCH",
+        "market_state_class": "confirmed_breakout",
+        "reason_codes": [],
+    }
+
+    conflicts = event_alpha_artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+        [candidate],
+        core_rows=[core],
+        research_card_paths=(),
+    )
+
+    assert conflicts["integrated_candidate_core_opportunity_type_mismatch"] == 1
+    assert conflicts["integrated_candidate_core_market_state_mismatch"] == 1
+    assert conflicts["integrated_candidate_core_reason_code_loss"] == 1
+    assert conflicts["integrated_candidate_core_source_url_loss"] == 1
+    assert conflicts["integrated_candidate_core_official_event_loss"] == 1
+    assert conflicts["integrated_core_silent_upgrade"] == 1
+
+
+def test_event_alpha_heartbeat_uses_strict_alert_and_research_candidate_copy():
+    from crypto_rsi_scanner import event_alpha_notifications
+
+    message = event_alpha_notifications.format_health_heartbeat(
+        profile="fixture",
+        result={
+            "cycle_completed": True,
+            "raw_events": 12,
+            "core_opportunity_rows_written": 6,
+            "extraction_rows": 0,
+            "alertable": 0,
+            "alerts": 0,
+            "candidates": 7,
+            "send_lane_items_attempted": {"heartbeat": 1},
+            "send_lane_items_delivered": {"heartbeat": 0},
+            "send_heartbeat_due": True,
+            "send_heartbeat_sent": False,
+        },
+        send_guard_status="no-send guard enabled",
+    )
+
+    assert "Alerts:" not in message
+    assert "Strict alerts: 0" in message
+    assert "Research candidates: 7" in message
+    assert "Core opportunities: 6" in message
 
 
 def _run_all():

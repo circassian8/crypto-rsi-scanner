@@ -37,7 +37,13 @@ INTEGRATED_REPORT_FILENAME = "event_integrated_radar_report.md"
 NOTIFICATION_PREVIEW_FILENAME = "event_alpha_notification_preview.md"
 DAILY_BRIEF_FILENAME = "event_alpha_daily_brief.md"
 SOURCE_COVERAGE_FILENAME = "event_alpha_source_coverage.md"
+SOURCE_COVERAGE_JSON_FILENAME = "event_alpha_source_coverage.json"
+INPUT_MANIFEST_FILENAME = "event_integrated_radar_input_manifest.json"
 RESEARCH_DISCLAIMER = "Research-only. Not a trade signal, paper trade, live RSI signal, or execution."
+INPUT_MODE_AUTO = "auto"
+INPUT_MODE_RUN_SIDECARS = "run_sidecars"
+INPUT_MODE_LOAD_EXISTING = "load_existing"
+INPUT_MODES = {INPUT_MODE_AUTO, INPUT_MODE_RUN_SIDECARS, INPUT_MODE_LOAD_EXISTING}
 
 
 @dataclass(frozen=True)
@@ -63,7 +69,21 @@ class EventIntegratedRadarResult:
     notification_preview_path: Path
     run_ledger_path: str
     core_opportunity_store_path: str
+    input_manifest_path: Path | None = None
+    source_coverage_json_path: Path | None = None
+    research_observed_at: datetime | None = None
+    wall_started_at: datetime | None = None
+    wall_finished_at: datetime | None = None
     market_anomalies: int = 0
+    market_state_snapshots: int = 0
+    official_exchange_events: int = 0
+    official_listing_candidates: int = 0
+    scheduled_catalysts: int = 0
+    unlock_candidates: int = 0
+    derivatives_state_rows: int = 0
+    derivatives_crowding_candidates: int = 0
+    fade_review_candidates: int = 0
+    integrated_candidates: int = 0
     alerts: tuple[Mapping[str, Any], ...] = ()
     routed: int = 0
     alertable: int = 0
@@ -95,40 +115,58 @@ def run_integrated_radar_cycle(
     context: event_alpha_artifacts.EventAlphaArtifactContext,
     fixture: bool = False,
     observed_at: datetime | str | None = None,
+    input_mode: str = INPUT_MODE_AUTO,
 ) -> EventIntegratedRadarResult:
     """Run one integrated research-only radar cycle and write artifacts."""
-    started = _as_utc(_parse_time(observed_at) or datetime.now(timezone.utc))
+    wall_started = datetime.now(timezone.utc)
+    research_observed_at = _as_utc(_parse_time(observed_at) or wall_started)
+    mode = _normalize_input_mode(input_mode)
     namespace_dir = Path(context.namespace_dir)
     namespace_dir.mkdir(parents=True, exist_ok=True)
     if fixture:
         _clear_namespace(namespace_dir)
         namespace_dir.mkdir(parents=True, exist_ok=True)
-    run_id = event_alpha_run_ledger.run_id_for(started, context.profile)
-    sidecars = _run_or_load_sidecars(
+    run_id = event_alpha_run_ledger.run_id_for(research_observed_at, context.profile)
+    sidecars, input_manifest = _run_or_load_sidecars(
         namespace_dir=namespace_dir,
         fixture=fixture,
-        observed_at=started,
+        observed_at=research_observed_at,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
         run_mode=context.run_mode,
         run_id=run_id,
+        input_mode=mode,
     )
+    manifest_path = namespace_dir / INPUT_MANIFEST_FILENAME
+    _write_json(manifest_path, _input_manifest_document(
+        input_manifest,
+        run_id=run_id,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_mode=context.run_mode,
+        input_mode=mode,
+        wall_started_at=wall_started,
+        research_observed_at=research_observed_at,
+    ))
     candidates = build_integrated_candidates(
         sidecar_rows=sidecars,
         profile=context.profile,
         artifact_namespace=context.artifact_namespace,
         run_mode=context.run_mode,
         run_id=run_id,
-        observed_at=started,
+        observed_at=research_observed_at,
     )
     candidates_path = namespace_dir / INTEGRATED_CANDIDATES_FILENAME
     _write_jsonl(candidates_path, candidates)
     report_path = namespace_dir / INTEGRATED_REPORT_FILENAME
-    report_path.write_text(format_integrated_radar_report(candidates, context=context), encoding="utf-8")
+    report_path.write_text(
+        format_integrated_radar_report(candidates, context=context, input_manifest=input_manifest),
+        encoding="utf-8",
+    )
     core_result = event_core_opportunity_store.write_core_opportunities(
         candidates,
         cfg=event_core_opportunity_store.EventCoreOpportunityStoreConfig(path=context.core_opportunity_store_path),
-        now=started,
+        now=research_observed_at,
         run_id=run_id,
         profile=context.profile,
         run_mode=context.run_mode,
@@ -145,7 +183,7 @@ def run_integrated_radar_cycle(
         alert_rows=core_rows,
         include_all_alertable=True,
         limit=25,
-        now=started,
+        now=research_observed_at,
         lineage_context={
             "run_id": run_id,
             "profile": context.profile,
@@ -165,11 +203,13 @@ def run_integrated_radar_cycle(
     ).rows
     daily_brief_path = namespace_dir / DAILY_BRIEF_FILENAME
     daily_brief_path.write_text(
-        format_integrated_daily_brief(candidates, core_rows=core_rows, context=context),
+        format_integrated_daily_brief(candidates, core_rows=core_rows, context=context, input_manifest=input_manifest),
         encoding="utf-8",
     )
     source_coverage_path = namespace_dir / SOURCE_COVERAGE_FILENAME
     source_coverage_path.write_text(format_integrated_source_coverage(candidates), encoding="utf-8")
+    source_coverage_json_path = namespace_dir / SOURCE_COVERAGE_JSON_FILENAME
+    _write_json(source_coverage_json_path, format_integrated_source_coverage_json(candidates, input_manifest=input_manifest))
     preview_path = namespace_dir / NOTIFICATION_PREVIEW_FILENAME
     preview_path.write_text(
         format_integrated_notification_preview(candidates, core_rows=core_rows, context=context),
@@ -177,16 +217,29 @@ def run_integrated_radar_cycle(
     )
     finished = datetime.now(timezone.utc)
     lane_due = {"heartbeat": 1, "research_review_digest": 0}
+    sidecar_counts = _sidecar_count_summary(sidecars)
     result = EventIntegratedRadarResult(
         namespace_dir=namespace_dir,
         run_id=run_id,
         profile=context.profile,
         run_mode=context.run_mode,
         artifact_namespace=context.artifact_namespace,
-        started_at=started,
+        started_at=wall_started,
         finished_at=finished,
+        research_observed_at=research_observed_at,
+        wall_started_at=wall_started,
+        wall_finished_at=finished,
         raw_events=sum(len(rows) for rows in sidecars.values()),
-        market_anomalies=len(sidecars.get("market_anomaly", ())),
+        market_anomalies=sidecar_counts["market_anomalies"],
+        market_state_snapshots=sidecar_counts["market_state_snapshots"],
+        official_exchange_events=sidecar_counts["official_exchange_events"],
+        official_listing_candidates=sidecar_counts["official_listing_candidates"],
+        scheduled_catalysts=sidecar_counts["scheduled_catalysts"],
+        unlock_candidates=sidecar_counts["unlock_candidates"],
+        derivatives_state_rows=sidecar_counts["derivatives_state_rows"],
+        derivatives_crowding_candidates=sidecar_counts["derivatives_crowding_candidates"],
+        fade_review_candidates=sidecar_counts["fade_review_candidates"],
+        integrated_candidates=len(candidates),
         candidates=len(candidates),
         core_opportunity_rows_written=core_result.rows_written,
         core_opportunity_write_attempted=core_result.attempted,
@@ -200,6 +253,8 @@ def run_integrated_radar_cycle(
         notification_preview_path=preview_path,
         run_ledger_path=str(context.run_ledger_path),
         core_opportunity_store_path=str(context.core_opportunity_store_path),
+        input_manifest_path=manifest_path,
+        source_coverage_json_path=source_coverage_json_path,
         send_lane_items_attempted=lane_due,
         send_lane_items_delivered={"heartbeat": 0, "research_review_digest": 0},
         send_would_send_items=sum(lane_due.values()),
@@ -213,7 +268,7 @@ def run_integrated_radar_cycle(
         result,
         cfg=event_alpha_run_ledger.EventAlphaRunLedgerConfig(path=context.run_ledger_path),
         profile=context.profile,
-        started_at=started,
+        started_at=wall_started,
         finished_at=finished,
         with_llm=False,
         send_requested=False,
@@ -262,6 +317,7 @@ def format_integrated_radar_report(
     candidates: Iterable[Mapping[str, Any]],
     *,
     context: event_alpha_artifacts.EventAlphaArtifactContext | None = None,
+    input_manifest: Iterable[Mapping[str, Any]] = (),
 ) -> str:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     lane_counts = Counter(str(row.get("opportunity_type") or "unknown") for row in rows)
@@ -274,8 +330,13 @@ def format_integrated_radar_report(
         f"Integrated candidates: {len(rows)}",
         "Lanes: " + _format_counts(lane_counts),
         "",
-        "## Unified Candidate Stream",
+        "## Input Manifest",
     ]
+    lines.extend(_input_manifest_lines(input_manifest))
+    lines.extend([
+        "",
+        "## Unified Candidate Stream",
+    ])
     for row in rows:
         lines.extend(_candidate_summary_lines(row))
     lines.extend([
@@ -290,6 +351,7 @@ def format_integrated_daily_brief(
     *,
     core_rows: Iterable[Mapping[str, Any]] = (),
     context: event_alpha_artifacts.EventAlphaArtifactContext | None = None,
+    input_manifest: Iterable[Mapping[str, Any]] = (),
 ) -> str:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     core_count = len([row for row in core_rows if isinstance(row, Mapping)])
@@ -309,13 +371,18 @@ def format_integrated_daily_brief(
         "- Telegram: no-send guard enabled for this integrated smoke.",
         f"- Source coverage report: {context.namespace_dir / SOURCE_COVERAGE_FILENAME if context else SOURCE_COVERAGE_FILENAME}",
         "",
+        "### Input Manifest",
+    ]
+    lines.extend(_input_manifest_lines(input_manifest, compact=True))
+    lines.extend([
+        "",
         "### Research Review Digest",
         f"- Lane count sent/due: 0/{len(_review_candidates(rows))}",
         f"- Eligible candidates: {len(_review_candidates(rows))}",
         "- Delivery: no-send preview only; integrated smoke does not create Telegram delivery rows.",
         "",
         "## Opportunity Lanes",
-    ]
+    ])
     lane_order = (
         event_market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value,
         event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value,
@@ -444,6 +511,36 @@ def format_integrated_source_coverage(candidates: Iterable[Mapping[str, Any]]) -
     return "\n".join(lines).rstrip() + "\n"
 
 
+def format_integrated_source_coverage_json(
+    candidates: Iterable[Mapping[str, Any]],
+    *,
+    input_manifest: Iterable[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
+    rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
+    source_counts = Counter(
+        source for row in rows for source in (row.get("source_packs") or [row.get("source_pack") or "unknown"])
+    )
+    lane_counts = Counter(str(row.get("opportunity_type") or "unknown") for row in rows)
+    return {
+        "schema_version": 1,
+        "row_type": "event_alpha_source_coverage",
+        "source": "integrated_radar",
+        "candidate_count": len(rows),
+        "lane_counts": dict(sorted(lane_counts.items())),
+        "source_pack_counts": dict(source_counts.most_common()),
+        "lane_critical_priority": [
+            "official_exchange_announcements",
+            "derivatives_oi_funding",
+            "structured_unlock_calendar",
+            "dex_onchain_liquidity",
+            "protocol_fundamentals",
+            "cryptopanic_tagged_news",
+            "rss_gdelt_context",
+        ],
+        "input_manifest": [dict(item) for item in input_manifest if isinstance(item, Mapping)],
+    }
+
+
 def _run_or_load_sidecars(
     *,
     namespace_dir: Path,
@@ -453,9 +550,10 @@ def _run_or_load_sidecars(
     artifact_namespace: str,
     run_mode: str,
     run_id: str,
-) -> dict[str, tuple[dict[str, Any], ...]]:
+    input_mode: str,
+) -> tuple[dict[str, tuple[dict[str, Any], ...]], tuple[dict[str, Any], ...]]:
     if fixture:
-        return _run_fixture_sidecars(
+        rows = _run_fixture_sidecars(
             namespace_dir=namespace_dir,
             observed_at=observed_at,
             profile=profile,
@@ -463,7 +561,41 @@ def _run_or_load_sidecars(
             run_mode=run_mode,
             run_id=run_id,
         )
-    return {
+        return rows, tuple(
+            _manifest_item(
+                sidecar_name=name,
+                mode="ran_fixture",
+                namespace_dir=namespace_dir,
+                rows=value,
+                configured=True,
+                started_at=observed_at,
+                finished_at=datetime.now(timezone.utc),
+            )
+            for name, value in rows.items()
+        )
+    if input_mode == INPUT_MODE_RUN_SIDECARS:
+        rows = {
+            "market_anomaly": (),
+            "official_exchange": (),
+            "scheduled_catalyst": (),
+            "unlock": (),
+            "derivatives": (),
+        }
+        manifest = tuple(
+            _manifest_item(
+                sidecar_name=name,
+                mode="skipped_provider_unavailable",
+                namespace_dir=namespace_dir,
+                rows=value,
+                configured=False,
+                started_at=observed_at,
+                finished_at=datetime.now(timezone.utc),
+                warnings=("configured sidecar execution is not enabled in this research-only integrated path",),
+            )
+            for name, value in rows.items()
+        )
+        return rows, manifest
+    rows = {
         "market_anomaly": tuple(event_market_anomaly_scanner.load_market_anomaly_rows(namespace_dir)),
         "official_exchange": _official_exchange_integration_rows(
             event_official_exchange.load_official_exchange_events(namespace_dir),
@@ -473,6 +605,20 @@ def _run_or_load_sidecars(
         "unlock": tuple(event_scheduled_catalysts.load_unlock_candidates(namespace_dir)),
         "derivatives": tuple(event_derivatives_crowding.load_derivatives_candidates(namespace_dir)),
     }
+    manifest = tuple(
+        _manifest_item(
+            sidecar_name=name,
+            mode="loaded_existing" if value else "skipped_missing_config",
+            namespace_dir=namespace_dir,
+            rows=value,
+            configured=bool(value),
+            started_at=observed_at,
+            finished_at=datetime.now(timezone.utc),
+            warnings=() if value else (f"{name} sidecar artifact missing or empty",),
+        )
+        for name, value in rows.items()
+    )
+    return rows, manifest
 
 
 def _run_fixture_sidecars(
@@ -1186,8 +1332,21 @@ def _candidate_summary_lines(row: Mapping[str, Any], *, compact: bool = False) -
     return lines
 
 
-def _append_filtered(lines: list[str], rows: list[dict[str, Any]], predicate: Any) -> None:
-    selected = [row for row in rows if predicate(row)]
+def _append_filtered(
+    lines: list[str],
+    rows: list[dict[str, Any]],
+    predicate: Any,
+    *,
+    include_diagnostics: bool = False,
+) -> None:
+    selected = [
+        row for row in rows
+        if predicate(row)
+        and (
+            include_diagnostics
+            or row.get("opportunity_type") != event_market_reaction.EventOpportunityType.DIAGNOSTIC.value
+        )
+    ]
     if not selected:
         lines.append("- None.")
         return
@@ -1199,6 +1358,28 @@ def _source_coverage_lines(rows: list[dict[str, Any]]) -> list[str]:
     counts = Counter(pack for row in rows for pack in (row.get("source_packs") or [row.get("source_pack") or "unknown"]))
     lines = [f"- {pack}: {count}" for pack, count in counts.most_common()]
     lines.append("- Most useful next source is lane-critical: official exchange, derivatives/OI/funding, structured unlock/calendar, then broader news context.")
+    return lines
+
+
+def _input_manifest_lines(
+    manifest: Iterable[Mapping[str, Any]],
+    *,
+    compact: bool = False,
+) -> list[str]:
+    rows = [dict(item) for item in manifest if isinstance(item, Mapping)]
+    if not rows:
+        return ["- Input manifest: not available."]
+    lines: list[str] = []
+    for item in rows:
+        name = item.get("sidecar_name") or "unknown"
+        mode = item.get("mode") or "unknown"
+        count = int((item.get("row_counts") or {}).get("rows") or 0)
+        freshness = item.get("freshness_status") or "unknown"
+        warnings = item.get("warnings") or ()
+        line = f"- {name}: {mode}, rows={count}, freshness={freshness}"
+        if warnings and not compact:
+            line += " warnings=" + "; ".join(str(warning) for warning in warnings[:3])
+        lines.append(line)
     return lines
 
 
@@ -1220,6 +1401,114 @@ def _integrated_warnings(rows: Iterable[Mapping[str, Any]]) -> list[str]:
             if not (row.get("source_requirements_met") and row.get("market_requirements_met")):
                 warnings.append(f"{row.get('candidate_id')}:confirmed_long_requirements_missing")
     return warnings
+
+
+def _normalize_input_mode(value: str | None) -> str:
+    text = str(value or INPUT_MODE_AUTO).strip().casefold().replace("-", "_")
+    return text if text in INPUT_MODES else INPUT_MODE_AUTO
+
+
+def _manifest_item(
+    *,
+    sidecar_name: str,
+    mode: str,
+    namespace_dir: Path,
+    rows: Iterable[Mapping[str, Any]],
+    configured: bool,
+    started_at: datetime,
+    finished_at: datetime,
+    warnings: Iterable[str] = (),
+    errors: Iterable[str] = (),
+) -> dict[str, Any]:
+    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    artifact_paths = _sidecar_artifact_paths(namespace_dir, sidecar_name)
+    missing = [str(path) for path in artifact_paths if not path.exists()]
+    freshness = "fresh" if materialized else "missing"
+    item_warnings = [str(warning) for warning in warnings if str(warning)]
+    if missing and not materialized:
+        item_warnings.append("missing_sidecar_artifact")
+    return {
+        "sidecar_name": sidecar_name,
+        "mode": mode,
+        "artifact_paths": [str(path) for path in artifact_paths],
+        "row_counts": {"rows": len(materialized)},
+        "provider_status": "configured" if configured else "not_configured",
+        "configured": bool(configured),
+        "freshness_status": freshness,
+        "warnings": tuple(dict.fromkeys(item_warnings)),
+        "errors": tuple(str(error) for error in errors if str(error)),
+        "started_at": started_at,
+        "finished_at": finished_at,
+    }
+
+
+def _input_manifest_document(
+    manifest: Iterable[Mapping[str, Any]],
+    *,
+    run_id: str,
+    profile: str,
+    artifact_namespace: str,
+    run_mode: str,
+    input_mode: str,
+    wall_started_at: datetime,
+    research_observed_at: datetime,
+) -> dict[str, Any]:
+    rows = [dict(item) for item in manifest if isinstance(item, Mapping)]
+    return {
+        "schema_version": 1,
+        "row_type": "event_integrated_radar_input_manifest",
+        "run_id": run_id,
+        "profile": profile,
+        "artifact_namespace": artifact_namespace,
+        "run_mode": run_mode,
+        "input_mode": input_mode,
+        "sidecars": rows,
+        "row_counts": {str(item.get("sidecar_name") or "unknown"): int((item.get("row_counts") or {}).get("rows") or 0) for item in rows},
+        "warnings": [warning for item in rows for warning in item.get("warnings", ())],
+        "errors": [error for item in rows for error in item.get("errors", ())],
+        "started_at": wall_started_at,
+        "finished_at": datetime.now(timezone.utc),
+        "research_observed_at": research_observed_at,
+    }
+
+
+def _sidecar_artifact_paths(namespace_dir: Path, sidecar_name: str) -> tuple[Path, ...]:
+    mapping = {
+        "market_anomaly": ("event_market_state_snapshots.jsonl", "event_market_anomalies.jsonl"),
+        "official_exchange": ("event_official_exchange_events.jsonl", "event_official_listing_candidates.jsonl"),
+        "scheduled_catalyst": ("event_scheduled_catalysts.jsonl",),
+        "unlock": ("event_unlock_candidates.jsonl",),
+        "derivatives": ("event_derivatives_state.jsonl", "event_derivatives_crowding_candidates.jsonl", "event_fade_short_review_candidates.jsonl"),
+    }
+    return tuple(namespace_dir / name for name in mapping.get(sidecar_name, ()))
+
+
+def _sidecar_count_summary(sidecars: Mapping[str, Iterable[Mapping[str, Any]]]) -> dict[str, int]:
+    market_rows = list(sidecars.get("market_anomaly", ()))
+    official_rows = list(sidecars.get("official_exchange", ()))
+    derivatives_rows = list(sidecars.get("derivatives", ()))
+    return {
+        "market_anomalies": len(market_rows),
+        "market_state_snapshots": len(market_rows),
+        "official_exchange_events": sum(
+            1 for row in official_rows
+            if str(row.get("row_type") or "") in {"official_exchange_event", "official_exchange_event_candidate"}
+            or isinstance(row.get("official_exchange_event"), Mapping)
+            or row.get("official_exchange_event_id")
+            or row.get("source_event_id")
+            or row.get("event_id")
+        ),
+        "official_listing_candidates": sum(1 for row in official_rows if str(row.get("row_type") or "") in {"official_listing_candidate", "official_exchange_event_candidate"}),
+        "scheduled_catalysts": len(tuple(sidecars.get("scheduled_catalyst", ()))),
+        "unlock_candidates": len(tuple(sidecars.get("unlock", ()))),
+        "derivatives_state_rows": sum(
+            1 for row in derivatives_rows
+            if str(row.get("row_type") or "") == "derivatives_state_snapshot"
+            or isinstance(row.get("derivatives_state_snapshot"), Mapping)
+        ),
+        "derivatives_crowding_candidates": len(derivatives_rows),
+        "fade_review_candidates": sum(1 for row in derivatives_rows if str(row.get("opportunity_type") or "") == event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value),
+    }
 
 
 def _first_value(rows: list[Mapping[str, Any]], *keys: str) -> Any:

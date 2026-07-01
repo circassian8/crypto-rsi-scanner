@@ -895,7 +895,32 @@ def _row_from_core_opportunity(
         "market_confirmation_score": market_after,
         "market_context_freshness_status": market_context.get("market_context_freshness_status"),
     })
-    return {
+    official_event = _first_mapping(all_rows, ("official_exchange_event",))
+    scheduled_event = _first_mapping(all_rows, ("scheduled_catalyst_event",))
+    unlock_event = _first_mapping(all_rows, ("unlock_event",))
+    derivatives_state_snapshot = _first_mapping(all_rows, ("derivatives_state_snapshot", "derivatives_snapshot"))
+    latest_source_url = (
+        accepted_source.get("source_url")
+        or _first_text(all_rows, ("latest_source_url", "source_url", "official_exchange_url"))
+        or _mapping_text(official_event, ("source_url", "url"))
+        or _mapping_text(scheduled_event, ("source_url", "url"))
+        or _mapping_text(unlock_event, ("source_url", "url"))
+    )
+    latest_source_title = (
+        accepted_source.get("title")
+        or _first_text(all_rows, ("latest_source_title", "source_title", "title", "event_name"))
+        or _mapping_text(official_event, ("title", "event_name"))
+        or _mapping_text(scheduled_event, ("title", "event_name"))
+        or _mapping_text(unlock_event, ("title", "event_name"))
+    )
+    latest_source_provider = (
+        accepted_source.get("provider")
+        or latest_source
+        or _mapping_text(official_event, ("provider", "exchange"))
+        or _mapping_text(scheduled_event, ("provider", "source_class"))
+        or _mapping_text(unlock_event, ("provider", "source_class"))
+    )
+    row = {
         "schema_version": EVENT_CORE_OPPORTUNITY_STORE_SCHEMA_VERSION,
         "row_type": "event_core_opportunity",
         "run_id": run_id,
@@ -926,10 +951,22 @@ def _row_from_core_opportunity(
         "evidence_quotes": list(item.supporting_evidence_quotes),
         "source_count": source_count,
         "latest_source": latest_source,
-        "latest_source_url": accepted_source.get("source_url"),
-        "latest_source_title": accepted_source.get("title"),
-        "source_provider": accepted_source.get("provider") or latest_source,
-        "source_url": accepted_source.get("source_url"),
+        "latest_source_url": latest_source_url,
+        "latest_source_title": latest_source_title,
+        "source_provider": latest_source_provider,
+        "source_url": latest_source_url,
+        "official_exchange_event": official_event,
+        "official_exchange_provider": _mapping_text(official_event, ("provider",)),
+        "official_exchange": _mapping_text(official_event, ("exchange",)),
+        "official_exchange_event_type": _mapping_text(official_event, ("event_type",)),
+        "official_exchange_title": _mapping_text(official_event, ("title", "event_name")),
+        "official_exchange_url": _mapping_text(official_event, ("source_url", "url")),
+        "official_exchange_published_at": _mapping_text(official_event, ("published_at",)),
+        "official_exchange_effective_time": _mapping_text(official_event, ("effective_time",)),
+        "official_exchange_reason_codes": _mapping_list(official_event, ("reason_codes",)),
+        "scheduled_catalyst_event": scheduled_event,
+        "unlock_event": unlock_event,
+        "derivatives_state_snapshot": derivatives_state_snapshot,
         "supporting_row_ids": support_ids,
         "diagnostic_row_ids": diagnostic_ids,
         "diagnostic_row_count": item.diagnostic_row_count,
@@ -1075,6 +1112,7 @@ def _row_from_core_opportunity(
         "feedback_target_type": "core_opportunity_id",
         "generated_at": generated_at,
     }
+    return _apply_integrated_candidate_truth(row, primary=primary, all_rows=all_rows, reaction=reaction)
 
 
 def _canonical_core_route(
@@ -1138,6 +1176,132 @@ def _canonical_core_state(
     return event_watchlist.EventWatchlistState.RADAR.value
 
 
+def _apply_integrated_candidate_truth(
+    row: dict[str, Any],
+    *,
+    primary: Mapping[str, Any],
+    all_rows: Iterable[Mapping[str, Any]],
+    reaction: event_market_reaction.MarketReactionResult,
+) -> dict[str, Any]:
+    """Preserve already-classified integrated radar candidates at rest.
+
+    Integrated radar candidates are the post-sidecar policy surface. The core
+    store may add stricter quality/live-confirmation caps, but it must not
+    recompute a generic market-reaction lane and silently upgrade capped rows.
+    """
+    integrated = _first_integrated_candidate(primary, all_rows)
+    if integrated is None:
+        return row
+    row["source_row_type"] = "event_integrated_radar_candidate"
+    row["integrated_candidate_id"] = integrated.get("candidate_id")
+    row["integrated_candidate_family_id"] = integrated.get("candidate_family_id")
+    row["generic_recomputed_opportunity_type"] = reaction.opportunity_type
+    row["generic_recomputed_market_state_class"] = reaction.market_state
+    for key in (
+        "opportunity_type",
+        "market_state_class",
+        "market_state",
+        "final_opportunity_level",
+        "opportunity_level",
+        "route",
+        "tier",
+        "latest_tier",
+        "final_route_after_quality_gate",
+        "final_tier_after_quality_gate",
+        "state",
+        "final_state_after_quality_gate",
+        "score",
+        "opportunity_score_final",
+        "final_opportunity_score",
+        "source_strength",
+        "source_requirements_met",
+        "market_requirements_met",
+        "fade_requirements_met",
+        "risk_requirements_met",
+        "why_now",
+        "source_origin",
+        "source_origins",
+        "source_pack",
+        "source_packs",
+        "source_url",
+        "latest_source_url",
+        "latest_source_title",
+        "source_class",
+        "supporting_evidence_quotes",
+    ):
+        value = integrated.get(key)
+        if value not in (None, "", [], {}, ()):
+            row[key] = value
+    for src_key, dst_key in (
+        ("what_confirms", "what_confirms"),
+        ("what_invalidates", "what_invalidates"),
+        ("why_not_alertable", "why_not_alertable"),
+        ("reason_codes", "reason_codes"),
+        ("warnings", "warnings"),
+    ):
+        value = integrated.get(src_key)
+        if value not in (None, "", [], {}, ()):
+            row[dst_key] = list(value) if isinstance(value, (list, tuple, set)) else [value]
+    row["opportunity_type_why_now"] = integrated.get("why_now") or row.get("opportunity_type_why_now")
+    row["opportunity_type_what_confirms"] = list(integrated.get("what_confirms") or row.get("opportunity_type_what_confirms") or ())
+    row["opportunity_type_what_invalidates"] = list(integrated.get("what_invalidates") or row.get("opportunity_type_what_invalidates") or ())
+    row["opportunity_type_why_not_alertable"] = list(integrated.get("why_not_alertable") or row.get("opportunity_type_why_not_alertable") or ())
+    row["opportunity_type_reason_codes"] = list(integrated.get("reason_codes") or row.get("opportunity_type_reason_codes") or ())
+    row["opportunity_type_warnings"] = list(integrated.get("warnings") or row.get("opportunity_type_warnings") or ())
+    for key in (
+        "market_state_snapshot",
+        "latest_market_snapshot",
+        "market_snapshot",
+        "official_exchange_event",
+        "scheduled_catalyst_event",
+        "unlock_event",
+        "derivatives_state_snapshot",
+        "derivatives_snapshot",
+    ):
+        value = integrated.get(key)
+        if isinstance(value, Mapping) and value:
+            row[key] = dict(value)
+    official = row.get("official_exchange_event") if isinstance(row.get("official_exchange_event"), Mapping) else {}
+    if official:
+        row["official_exchange_provider"] = _mapping_text(official, ("provider",)) or row.get("official_exchange_provider")
+        row["official_exchange"] = _mapping_text(official, ("exchange",)) or row.get("official_exchange")
+        row["official_exchange_event_type"] = _mapping_text(official, ("event_type",)) or row.get("official_exchange_event_type")
+        row["official_exchange_title"] = _mapping_text(official, ("title", "event_name")) or row.get("official_exchange_title")
+        row["official_exchange_url"] = _mapping_text(official, ("source_url", "url")) or row.get("official_exchange_url")
+        row["official_exchange_published_at"] = _mapping_text(official, ("published_at",)) or row.get("official_exchange_published_at")
+        row["official_exchange_effective_time"] = _mapping_text(official, ("effective_time",)) or row.get("official_exchange_effective_time")
+        row["official_exchange_reason_codes"] = _mapping_list(official, ("reason_codes",)) or row.get("official_exchange_reason_codes")
+        row["latest_source_url"] = row.get("latest_source_url") or row.get("official_exchange_url")
+        row["source_url"] = row.get("source_url") or row.get("official_exchange_url")
+        row["latest_source_title"] = row.get("latest_source_title") or row.get("official_exchange_title")
+    if _opportunity_rank_value(str(row.get("opportunity_type") or "")) > _opportunity_rank_value(str(integrated.get("opportunity_type") or "")):
+        row["integrated_core_silent_upgrade"] = True
+    return row
+
+
+def _first_integrated_candidate(
+    primary: Mapping[str, Any],
+    rows: Iterable[Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    if str(primary.get("row_type") or "") == "event_integrated_radar_candidate":
+        return primary
+    for row in rows:
+        if str(row.get("row_type") or "") == "event_integrated_radar_candidate":
+            return row
+    return None
+
+
+def _opportunity_rank_value(value: str) -> int:
+    return {
+        "DIAGNOSTIC": 0,
+        "UNCONFIRMED_RESEARCH": 1,
+        "RISK_ONLY": 2,
+        "EARLY_LONG_RESEARCH": 3,
+        "CONFIRMED_LONG_RESEARCH": 4,
+        "FADE_SHORT_REVIEW": 5,
+    }.get(str(value or "").upper(), -1)
+
+
 def _core_route_quality_blocked(primary: Mapping[str, Any]) -> bool:
     route, block = event_alpha_router.quality_gate_route_for_row(primary, require_quality=True)
     if block:
@@ -1172,6 +1336,41 @@ def _accepted_evidence_source_summary(samples: Iterable[Mapping[str, Any]]) -> d
         if provider or title or source_url:
             return {"provider": provider, "title": title, "source_url": source_url}
     return {}
+
+
+def _first_mapping(rows: Iterable[Mapping[str, Any]], keys: tuple[str, ...]) -> dict[str, Any] | None:
+    for row in rows:
+        for key in keys:
+            value = row.get(key)
+            if isinstance(value, Mapping) and value:
+                return dict(value)
+    return None
+
+
+def _mapping_text(row: Mapping[str, Any] | None, keys: tuple[str, ...]) -> str | None:
+    if not isinstance(row, Mapping):
+        return None
+    for key in keys:
+        value = _text_or_none(row.get(key))
+        if value:
+            return value
+    return None
+
+
+def _mapping_list(row: Mapping[str, Any] | None, keys: tuple[str, ...]) -> list[str]:
+    if not isinstance(row, Mapping):
+        return []
+    out: list[str] = []
+    for key in keys:
+        raw = row.get(key)
+        if isinstance(raw, str):
+            if raw:
+                out.append(raw)
+        elif isinstance(raw, Mapping):
+            out.extend(str(value) for value in raw.values() if str(value or ""))
+        elif isinstance(raw, Iterable):
+            out.extend(str(item) for item in raw if str(item or ""))
+    return list(dict.fromkeys(out))
 
 
 def _canonical_source_count(

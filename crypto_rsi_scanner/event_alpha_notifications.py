@@ -2719,7 +2719,8 @@ class _DeliveryWriter:
             f"Completed: {_yes_no(bool(_value(pipeline_result, 'cycle_completed', pipeline_result is not None)))}",
             f"Raw events: {_num(pipeline_result, 'raw_events')} · Core opportunities: {_num(pipeline_result, 'core_opportunities')}",
             f"Extraction rows: {_num(pipeline_result, 'extraction_rows')}",
-            f"Alertable decisions: {_num(pipeline_result, 'alertable')}",
+            f"Alertable decisions: {_num(pipeline_result, 'alertable')} · Strict alerts: {_num(pipeline_result, 'alerts')}",
+            f"Research candidates: {_num(pipeline_result, 'candidates')}",
             f"Delivery lanes: due={lanes_due} · sent={lanes_sent} · blocked={max(0, _num(pipeline_result, 'send_would_send_items') - lanes_sent)}",
             f"Provider issues: {_provider_failure_count(warnings)}",
             f"LLM calls/skips: {_num(pipeline_result, 'llm_calls_attempted')}/{_num(pipeline_result, 'llm_skipped_due_budget')}",
@@ -3226,7 +3227,7 @@ def format_health_heartbeat(
         f"Completed: {_yes_no(bool(_value(result, 'cycle_completed', result is not None)))}",
         f"Raw events: {_num(result, 'raw_events')} · Core opportunities: {_num(result, 'core_opportunities')}",
         f"Extraction rows: {_num(result, 'extraction_rows')}",
-        f"Alertable decisions: {_num(result, 'alertable')} · Alerts: {_num(result, 'alerts')}",
+        f"Alertable decisions: {_num(result, 'alertable')} · Strict alerts: {_num(result, 'alerts')} · Research candidates: {_num(result, 'candidates')}",
         (
             "Delivery lanes: "
             f"due={lanes_due} · sent={lanes_sent} · "

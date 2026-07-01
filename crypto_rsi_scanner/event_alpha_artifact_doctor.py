@@ -131,6 +131,23 @@ class EventAlphaArtifactDoctorResult:
     integrated_market_anomaly_confirmed: int = 0
     integrated_cryptopanic_confirmed: int = 0
     integrated_major_pair_early_long: int = 0
+    integrated_input_manifest_missing: int = 0
+    integrated_source_coverage_json_missing: int = 0
+    integrated_candidate_core_missing: int = 0
+    integrated_candidate_core_opportunity_type_mismatch: int = 0
+    integrated_candidate_core_market_state_mismatch: int = 0
+    integrated_candidate_core_route_level_mismatch: int = 0
+    integrated_candidate_core_reason_code_loss: int = 0
+    integrated_candidate_core_source_url_loss: int = 0
+    integrated_candidate_core_official_event_loss: int = 0
+    integrated_candidate_core_scheduled_event_loss: int = 0
+    integrated_candidate_core_unlock_event_loss: int = 0
+    integrated_candidate_core_derivatives_loss: int = 0
+    integrated_candidate_card_opportunity_type_mismatch: int = 0
+    integrated_candidate_card_official_event_missing: int = 0
+    integrated_candidate_card_source_url_missing: int = 0
+    integrated_core_silent_upgrade: int = 0
+    integrated_diagnostic_visible_in_default_operator_section: int = 0
     integrated_preview_missing_disclaimer: int = 0
     integrated_created_normal_rsi_signal: int = 0
     integrated_created_triggered_fade: int = 0
@@ -382,6 +399,17 @@ def diagnose_artifacts(
     elif source_coverage_report_path is not None:
         default_integrated_path = Path(source_coverage_report_path).parent / "event_integrated_radar_candidates.jsonl"
     raw_integrated_candidates = _read_jsonl(default_integrated_path) if default_integrated_path is not None else []
+    default_integrated_dir = default_integrated_path.parent if default_integrated_path is not None else None
+    integrated_manifest_path = (
+        default_integrated_dir / "event_integrated_radar_input_manifest.json"
+        if default_integrated_dir is not None
+        else None
+    )
+    integrated_source_coverage_json_path = (
+        default_integrated_dir / "event_alpha_source_coverage.json"
+        if default_integrated_dir is not None
+        else None
+    )
     raw_legacy = sum(
         1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
         if event_alpha_artifacts.is_legacy_row(row)
@@ -748,6 +776,11 @@ def diagnose_artifacts(
     derivatives_conflicts = _derivatives_crowding_artifact_conflicts((*derivatives_state, *fade_review_candidates))
     integrated_conflicts = _integrated_radar_artifact_conflicts(
         integrated_candidates,
+        core_rows=core_rows,
+        research_card_paths=research_card_paths,
+        daily_brief_path=daily_brief_path,
+        manifest_path=integrated_manifest_path,
+        source_coverage_json_path=integrated_source_coverage_json_path,
         preview_path=(
             Path(inspected_alert_store_path).parent / "event_alpha_notification_preview.md"
             if inspected_alert_store_path is not None
@@ -1065,6 +1098,23 @@ def diagnose_artifacts(
         "integrated_market_anomaly_confirmed",
         "integrated_cryptopanic_confirmed",
         "integrated_major_pair_early_long",
+        "integrated_input_manifest_missing",
+        "integrated_source_coverage_json_missing",
+        "integrated_candidate_core_missing",
+        "integrated_candidate_core_opportunity_type_mismatch",
+        "integrated_candidate_core_market_state_mismatch",
+        "integrated_candidate_core_route_level_mismatch",
+        "integrated_candidate_core_reason_code_loss",
+        "integrated_candidate_core_source_url_loss",
+        "integrated_candidate_core_official_event_loss",
+        "integrated_candidate_core_scheduled_event_loss",
+        "integrated_candidate_core_unlock_event_loss",
+        "integrated_candidate_core_derivatives_loss",
+        "integrated_candidate_card_opportunity_type_mismatch",
+        "integrated_candidate_card_official_event_missing",
+        "integrated_candidate_card_source_url_missing",
+        "integrated_core_silent_upgrade",
+        "integrated_diagnostic_visible_in_default_operator_section",
         "integrated_preview_missing_disclaimer",
         "integrated_created_normal_rsi_signal",
         "integrated_created_triggered_fade",
@@ -1711,6 +1761,23 @@ def diagnose_artifacts(
         integrated_market_anomaly_confirmed=integrated_conflicts["integrated_market_anomaly_confirmed"],
         integrated_cryptopanic_confirmed=integrated_conflicts["integrated_cryptopanic_confirmed"],
         integrated_major_pair_early_long=integrated_conflicts["integrated_major_pair_early_long"],
+        integrated_input_manifest_missing=integrated_conflicts["integrated_input_manifest_missing"],
+        integrated_source_coverage_json_missing=integrated_conflicts["integrated_source_coverage_json_missing"],
+        integrated_candidate_core_missing=integrated_conflicts["integrated_candidate_core_missing"],
+        integrated_candidate_core_opportunity_type_mismatch=integrated_conflicts["integrated_candidate_core_opportunity_type_mismatch"],
+        integrated_candidate_core_market_state_mismatch=integrated_conflicts["integrated_candidate_core_market_state_mismatch"],
+        integrated_candidate_core_route_level_mismatch=integrated_conflicts["integrated_candidate_core_route_level_mismatch"],
+        integrated_candidate_core_reason_code_loss=integrated_conflicts["integrated_candidate_core_reason_code_loss"],
+        integrated_candidate_core_source_url_loss=integrated_conflicts["integrated_candidate_core_source_url_loss"],
+        integrated_candidate_core_official_event_loss=integrated_conflicts["integrated_candidate_core_official_event_loss"],
+        integrated_candidate_core_scheduled_event_loss=integrated_conflicts["integrated_candidate_core_scheduled_event_loss"],
+        integrated_candidate_core_unlock_event_loss=integrated_conflicts["integrated_candidate_core_unlock_event_loss"],
+        integrated_candidate_core_derivatives_loss=integrated_conflicts["integrated_candidate_core_derivatives_loss"],
+        integrated_candidate_card_opportunity_type_mismatch=integrated_conflicts["integrated_candidate_card_opportunity_type_mismatch"],
+        integrated_candidate_card_official_event_missing=integrated_conflicts["integrated_candidate_card_official_event_missing"],
+        integrated_candidate_card_source_url_missing=integrated_conflicts["integrated_candidate_card_source_url_missing"],
+        integrated_core_silent_upgrade=integrated_conflicts["integrated_core_silent_upgrade"],
+        integrated_diagnostic_visible_in_default_operator_section=integrated_conflicts["integrated_diagnostic_visible_in_default_operator_section"],
         integrated_preview_missing_disclaimer=integrated_conflicts["integrated_preview_missing_disclaimer"],
         integrated_created_normal_rsi_signal=integrated_conflicts["integrated_created_normal_rsi_signal"],
         integrated_created_triggered_fade=integrated_conflicts["integrated_created_triggered_fade"],
@@ -2846,6 +2913,11 @@ def _derivatives_row_has_secret_leak(value: object) -> bool:
 def _integrated_radar_artifact_conflicts(
     rows: Iterable[Mapping[str, Any]],
     *,
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    research_card_paths: Iterable[Path] = (),
+    daily_brief_path: str | Path | None = None,
+    manifest_path: str | Path | None = None,
+    source_coverage_json_path: str | Path | None = None,
     preview_path: str | Path | None = None,
 ) -> dict[str, int]:
     out = {
@@ -2858,14 +2930,32 @@ def _integrated_radar_artifact_conflicts(
         "integrated_market_anomaly_confirmed": 0,
         "integrated_cryptopanic_confirmed": 0,
         "integrated_major_pair_early_long": 0,
+        "integrated_input_manifest_missing": 0,
+        "integrated_source_coverage_json_missing": 0,
+        "integrated_candidate_core_missing": 0,
+        "integrated_candidate_core_opportunity_type_mismatch": 0,
+        "integrated_candidate_core_market_state_mismatch": 0,
+        "integrated_candidate_core_route_level_mismatch": 0,
+        "integrated_candidate_core_reason_code_loss": 0,
+        "integrated_candidate_core_source_url_loss": 0,
+        "integrated_candidate_core_official_event_loss": 0,
+        "integrated_candidate_core_scheduled_event_loss": 0,
+        "integrated_candidate_core_unlock_event_loss": 0,
+        "integrated_candidate_core_derivatives_loss": 0,
+        "integrated_candidate_card_opportunity_type_mismatch": 0,
+        "integrated_candidate_card_official_event_missing": 0,
+        "integrated_candidate_card_source_url_missing": 0,
+        "integrated_core_silent_upgrade": 0,
+        "integrated_diagnostic_visible_in_default_operator_section": 0,
         "integrated_preview_missing_disclaimer": 0,
         "integrated_created_normal_rsi_signal": 0,
         "integrated_created_triggered_fade": 0,
     }
+    materialized_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
+    core_by_id = {str(row.get("core_opportunity_id") or ""): dict(row) for row in core_rows if isinstance(row, Mapping) and row.get("core_opportunity_id")}
+    card_text_by_core = _card_text_by_core(research_card_paths)
     row_count = 0
-    for row in rows:
-        if not isinstance(row, Mapping):
-            continue
+    for row in materialized_rows:
         row_count += 1
         lane = str(row.get("opportunity_type") or "").strip().upper()
         if not lane:
@@ -2921,6 +3011,18 @@ def _integrated_radar_artifact_conflicts(
             out["integrated_created_normal_rsi_signal"] += 1
         if _truthy(row.get("triggered_fade_created")) or str(row.get("signal_type") or "").upper() == "TRIGGERED_FADE":
             out["integrated_created_triggered_fade"] += 1
+        _integrated_candidate_core_card_conflicts(row, core_by_id, card_text_by_core, out)
+    if row_count and manifest_path is not None and not Path(manifest_path).exists():
+        out["integrated_input_manifest_missing"] += 1
+    if row_count and source_coverage_json_path is not None and not Path(source_coverage_json_path).exists():
+        out["integrated_source_coverage_json_missing"] += 1
+    if row_count and daily_brief_path is not None:
+        try:
+            daily_text = Path(daily_brief_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            daily_text = ""
+        if _daily_brief_has_integrated_diagnostic_leak(daily_text, materialized_rows):
+            out["integrated_diagnostic_visible_in_default_operator_section"] += 1
     if row_count and preview_path is not None:
         try:
             preview_text = Path(preview_path).read_text(encoding="utf-8")
@@ -2929,6 +3031,98 @@ def _integrated_radar_artifact_conflicts(
         if "Research-only" not in preview_text or "Not a trade signal" not in preview_text:
             out["integrated_preview_missing_disclaimer"] += 1
     return out
+
+
+def _integrated_candidate_core_card_conflicts(
+    candidate: Mapping[str, Any],
+    core_by_id: Mapping[str, Mapping[str, Any]],
+    card_text_by_core: Mapping[str, str],
+    out: dict[str, int],
+) -> None:
+    if str(candidate.get("opportunity_type") or "").strip().upper() == "DIAGNOSTIC":
+        return
+    core_id = str(candidate.get("core_opportunity_id") or "").strip()
+    if not core_id:
+        return
+    core = core_by_id.get(core_id)
+    if core is None:
+        out["integrated_candidate_core_missing"] += 1
+        return
+    candidate_lane = str(candidate.get("opportunity_type") or "").strip()
+    core_lane = str(core.get("opportunity_type") or "").strip()
+    if candidate_lane and core_lane and candidate_lane != core_lane:
+        out["integrated_candidate_core_opportunity_type_mismatch"] += 1
+    if _integrated_opportunity_rank(core_lane) > _integrated_opportunity_rank(candidate_lane):
+        out["integrated_core_silent_upgrade"] += 1
+    candidate_market = str(candidate.get("market_state_class") or candidate.get("market_state") or "").strip()
+    core_market = str(core.get("market_state_class") or core.get("market_state") or "").strip()
+    if candidate_market and core_market and candidate_market != core_market:
+        out["integrated_candidate_core_market_state_mismatch"] += 1
+    for key in ("final_route_after_quality_gate", "final_state_after_quality_gate", "final_opportunity_level", "opportunity_level"):
+        candidate_value = str(candidate.get(key) or "").strip()
+        core_value = str(core.get(key) or "").strip()
+        if candidate_value and core_value and candidate_value != core_value:
+            out["integrated_candidate_core_route_level_mismatch"] += 1
+            break
+    candidate_reasons = set(_tuple_value(candidate.get("reason_codes")))
+    core_reasons = set(_tuple_value(core.get("reason_codes")))
+    if candidate_reasons and not candidate_reasons.issubset(core_reasons):
+        out["integrated_candidate_core_reason_code_loss"] += 1
+    candidate_url = str(candidate.get("source_url") or candidate.get("latest_source_url") or "").strip()
+    core_url = str(core.get("source_url") or core.get("latest_source_url") or core.get("official_exchange_url") or "").strip()
+    if candidate_url and not core_url:
+        out["integrated_candidate_core_source_url_loss"] += 1
+    if isinstance(candidate.get("official_exchange_event"), Mapping) and not isinstance(core.get("official_exchange_event"), Mapping):
+        out["integrated_candidate_core_official_event_loss"] += 1
+    if isinstance(candidate.get("scheduled_catalyst_event"), Mapping) and not isinstance(core.get("scheduled_catalyst_event"), Mapping):
+        out["integrated_candidate_core_scheduled_event_loss"] += 1
+    if isinstance(candidate.get("unlock_event"), Mapping) and not isinstance(core.get("unlock_event"), Mapping):
+        out["integrated_candidate_core_unlock_event_loss"] += 1
+    if isinstance(candidate.get("derivatives_state_snapshot"), Mapping) and not isinstance(core.get("derivatives_state_snapshot"), Mapping):
+        out["integrated_candidate_core_derivatives_loss"] += 1
+    card_text = card_text_by_core.get(core_id, "")
+    if not card_text:
+        return
+    if candidate_lane and candidate_lane not in card_text:
+        out["integrated_candidate_card_opportunity_type_mismatch"] += 1
+    official_event = candidate.get("official_exchange_event")
+    if isinstance(official_event, Mapping):
+        expected = [
+            str(official_event.get("exchange") or "").strip(),
+            str(official_event.get("event_type") or "").strip(),
+            str(official_event.get("source_url") or "").strip(),
+        ]
+        if "Official Exchange Evidence" not in card_text and not any(value and value in card_text for value in expected):
+            out["integrated_candidate_card_official_event_missing"] += 1
+    if candidate_url and candidate_url not in card_text:
+        out["integrated_candidate_card_source_url_missing"] += 1
+
+
+def _integrated_opportunity_rank(value: object) -> int:
+    text = str(value or "").strip().upper()
+    ranks = {
+        "DIAGNOSTIC": 0,
+        "UNCONFIRMED_RESEARCH": 1,
+        "EARLY_LONG_RESEARCH": 2,
+        "RISK_ONLY": 2,
+        "CONFIRMED_LONG_RESEARCH": 3,
+        "FADE_SHORT_REVIEW": 3,
+    }
+    return ranks.get(text, 0)
+
+
+def _daily_brief_has_integrated_diagnostic_leak(text: str, rows: Iterable[Mapping[str, Any]]) -> bool:
+    diagnostic_symbols = {
+        str(row.get("symbol") or "").strip()
+        for row in rows
+        if str(row.get("opportunity_type") or "").strip().upper() == "DIAGNOSTIC"
+        and str(row.get("symbol") or "").strip()
+    }
+    if not diagnostic_symbols:
+        return False
+    diagnostics_pos = text.find("## Diagnostics Appendix")
+    visible_text = text if diagnostics_pos < 0 else text[:diagnostics_pos]
+    return any(f"{symbol}/" in visible_text for symbol in diagnostic_symbols)
 
 
 def _safe_float(value: object) -> float | None:
@@ -4829,6 +5023,23 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"integrated_market_anomaly_confirmed={result.integrated_market_anomaly_confirmed} "
             f"integrated_cryptopanic_confirmed={result.integrated_cryptopanic_confirmed} "
             f"integrated_major_pair_early_long={result.integrated_major_pair_early_long} "
+            f"integrated_input_manifest_missing={result.integrated_input_manifest_missing} "
+            f"integrated_source_coverage_json_missing={result.integrated_source_coverage_json_missing} "
+            f"integrated_candidate_core_missing={result.integrated_candidate_core_missing} "
+            f"integrated_candidate_core_opportunity_type_mismatch={result.integrated_candidate_core_opportunity_type_mismatch} "
+            f"integrated_candidate_core_market_state_mismatch={result.integrated_candidate_core_market_state_mismatch} "
+            f"integrated_candidate_core_route_level_mismatch={result.integrated_candidate_core_route_level_mismatch} "
+            f"integrated_candidate_core_reason_code_loss={result.integrated_candidate_core_reason_code_loss} "
+            f"integrated_candidate_core_source_url_loss={result.integrated_candidate_core_source_url_loss} "
+            f"integrated_candidate_core_official_event_loss={result.integrated_candidate_core_official_event_loss} "
+            f"integrated_candidate_core_scheduled_event_loss={result.integrated_candidate_core_scheduled_event_loss} "
+            f"integrated_candidate_core_unlock_event_loss={result.integrated_candidate_core_unlock_event_loss} "
+            f"integrated_candidate_core_derivatives_loss={result.integrated_candidate_core_derivatives_loss} "
+            f"integrated_candidate_card_opportunity_type_mismatch={result.integrated_candidate_card_opportunity_type_mismatch} "
+            f"integrated_candidate_card_official_event_missing={result.integrated_candidate_card_official_event_missing} "
+            f"integrated_candidate_card_source_url_missing={result.integrated_candidate_card_source_url_missing} "
+            f"integrated_core_silent_upgrade={result.integrated_core_silent_upgrade} "
+            f"integrated_diagnostic_visible_in_default_operator_section={result.integrated_diagnostic_visible_in_default_operator_section} "
             f"integrated_preview_missing_disclaimer={result.integrated_preview_missing_disclaimer} "
             f"integrated_created_normal_rsi_signal={result.integrated_created_normal_rsi_signal} "
             f"integrated_created_triggered_fade={result.integrated_created_triggered_fade} "

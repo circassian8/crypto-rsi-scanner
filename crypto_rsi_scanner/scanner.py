@@ -7618,6 +7618,7 @@ def event_alpha_integrated_radar_cycle_report(
     *,
     artifact_namespace: str | None = None,
     fixture: bool = False,
+    input_mode: str | None = None,
 ) -> None:
     """Run the research-only integrated Event Alpha radar cycle and print a summary."""
     _setup_event_discovery_logging(verbose)
@@ -7635,6 +7636,7 @@ def event_alpha_integrated_radar_cycle_report(
         context=context,
         fixture=fixture,
         observed_at=_event_research_now(),
+        input_mode=input_mode or event_integrated_radar.INPUT_MODE_AUTO,
     )
     print(_event_alpha_context_block(context))
     print(
@@ -10856,6 +10858,21 @@ def cli() -> None:
         help="Use deterministic fixture sidecar inputs for --event-alpha-integrated-radar-cycle.",
     )
     parser.add_argument(
+        "--event-alpha-integrated-radar-auto",
+        action="store_true",
+        help="Let --event-alpha-integrated-radar-cycle choose fixture/run/load sidecar behavior automatically.",
+    )
+    parser.add_argument(
+        "--event-alpha-integrated-radar-run-sidecars",
+        action="store_true",
+        help="Run integrated radar sidecar producers when available before building integrated candidates.",
+    )
+    parser.add_argument(
+        "--event-alpha-integrated-radar-load-existing",
+        action="store_true",
+        help="Build integrated radar candidates from existing local sidecar artifacts.",
+    )
+    parser.add_argument(
         "--event-alpha-market-anomaly-rows",
         default=None,
         help="Optional JSON/JSONL market rows path for --event-alpha-market-anomaly-scan.",
@@ -11845,11 +11862,19 @@ def cli() -> None:
         )
         return
     if args.event_alpha_integrated_radar_cycle:
+        integrated_input_mode = event_integrated_radar.INPUT_MODE_AUTO
+        if args.event_alpha_integrated_radar_run_sidecars:
+            integrated_input_mode = event_integrated_radar.INPUT_MODE_RUN_SIDECARS
+        if args.event_alpha_integrated_radar_load_existing:
+            integrated_input_mode = event_integrated_radar.INPUT_MODE_LOAD_EXISTING
+        if args.event_alpha_integrated_radar_auto:
+            integrated_input_mode = event_integrated_radar.INPUT_MODE_AUTO
         event_alpha_integrated_radar_cycle_report(
             verbose=args.verbose,
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             fixture=args.event_alpha_integrated_radar_fixture,
+            input_mode=integrated_input_mode,
         )
         return
     if args.event_alpha_market_anomaly_scan:

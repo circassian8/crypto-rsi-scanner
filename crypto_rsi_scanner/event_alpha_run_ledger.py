@@ -380,6 +380,11 @@ def _run_record(
     ):
         catalyst_frame_counts["skip_reasons"] = {"profile_disabled": 1}
     run_id = getattr(result, "run_id", None) or run_id_for(started_at, profile)
+    result_market_anomalies = _int(getattr(result, "market_anomalies", 0))
+    market_anomalies = result_market_anomalies if result_market_anomalies or discovery is None else _market_anomaly_count(discovery)
+    research_observed_at = getattr(result, "research_observed_at", None)
+    wall_started_at = getattr(result, "wall_started_at", None) or started_at
+    wall_finished_at = getattr(result, "wall_finished_at", None) or finished_at
     notify_burn = (
         bool(notification_burn_in)
         if notification_burn_in is not None
@@ -399,6 +404,10 @@ def _run_record(
         "research_now": clock_status.get("research_now"),
         "wall_clock_now": clock_status.get("wall_clock_now"),
         "fixed_clock_age_hours": clock_status.get("fixed_clock_age_hours"),
+        "research_observed_at": _iso_or_value(research_observed_at),
+        "wall_started_at": _iso_or_value(wall_started_at),
+        "wall_finished_at": _iso_or_value(wall_finished_at),
+        "generated_at": finished_at.isoformat(),
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
         "runtime_seconds": round(max(0.0, (finished_at - started_at).total_seconds()), 4),
@@ -406,7 +415,20 @@ def _run_record(
         "raw_events": _int(getattr(result, "raw_events", 0)),
         "cycle_completed": bool(getattr(result, "cycle_completed", True)),
         "partial_results": bool(getattr(result, "partial_results", False)),
-        "market_anomalies": _market_anomaly_count(discovery),
+        "market_anomalies": market_anomalies,
+        "market_state_snapshots": _int(getattr(result, "market_state_snapshots", 0)),
+        "official_exchange_events": _int(getattr(result, "official_exchange_events", 0)),
+        "official_listing_candidates": _int(getattr(result, "official_listing_candidates", 0)),
+        "scheduled_catalysts": _int(getattr(result, "scheduled_catalysts", 0)),
+        "unlock_candidates": _int(getattr(result, "unlock_candidates", 0)),
+        "derivatives_state_rows": _int(getattr(result, "derivatives_state_rows", 0)),
+        "derivatives_crowding_candidates": _int(getattr(result, "derivatives_crowding_candidates", 0)),
+        "fade_review_candidates": _int(getattr(result, "fade_review_candidates", 0)),
+        "integrated_candidates": _int(getattr(result, "integrated_candidates", 0)),
+        "integrated_candidates_path": str(getattr(result, "integrated_candidates_path", "") or ""),
+        "integrated_report_path": str(getattr(result, "integrated_report_path", "") or ""),
+        "integrated_input_manifest_path": str(getattr(result, "input_manifest_path", "") or ""),
+        "integrated_source_coverage_json_path": str(getattr(result, "source_coverage_json_path", "") or ""),
         "catalyst_queries": _int(getattr(result, "catalyst_queries", 0)),
         "catalyst_results_accepted": _int(getattr(catalyst, "attached_result_count", 0)),
         "catalyst_results_rejected": _int(getattr(catalyst, "rejected_result_count", 0)),
@@ -786,6 +808,12 @@ def _json_ready(value: Any) -> Any:
         return _as_utc(value).isoformat()
     if isinstance(value, float):
         return value if math.isfinite(value) else None
+    return value
+
+
+def _iso_or_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return _as_utc(value).isoformat()
     return value
 
 

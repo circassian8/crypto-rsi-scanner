@@ -135,6 +135,32 @@ confirming evidence. Treat these rows as audit evidence; they can improve a
 local research verdict only after deterministic identity, catalyst-link,
 impact-path, source-quality, and quality-gate checks pass.
 
+The integrated radar cycle is the operator-facing artifact orchestrator for
+these sidecar packs. It writes:
+
+- `event_integrated_radar_candidates.jsonl`
+- `event_integrated_radar_input_manifest.json`
+- `event_integrated_radar_report.md`
+- `event_alpha_source_coverage.md`
+- `event_alpha_source_coverage.json`
+- canonical `event_core_opportunities.jsonl`
+- research cards, daily brief, run ledger, and no-send notification preview
+
+Use `make event-alpha-integrated-radar-smoke PYTHON=python3` for the
+fixture-backed proof cycle and `make event-alpha-integrated-radar-doctor
+PYTHON=python3` for the strict consistency check. Runtime cycles support three
+input modes: `--event-alpha-integrated-radar-auto`,
+`--event-alpha-integrated-radar-run-sidecars`, and
+`--event-alpha-integrated-radar-load-existing`. Integrated candidate fields are
+canonical when persisted: operator-facing CoreOpportunity rows and cards should
+preserve the candidate's opportunity type, market state, route/state, score,
+requirements, reason/warning codes, source URL, official exchange event,
+scheduled catalyst/unlock evidence, derivatives evidence, and market snapshot.
+Diagnostics such as sector-only rows stay in the diagnostics appendix by
+default. Strict artifact doctor blocks silent lane upgrades, source/event loss,
+missing input manifests/source-coverage JSON, card mismatches, and diagnostics
+leaking into default operator sections.
+
 Source enrichment is now quality-gated before LLM extraction or catalyst-frame
 analysis can consume fetched article bodies. Enrichment cache rows should carry
 `extractor_version`, `cleaner_version`, fetched/final/canonical URLs, redirect

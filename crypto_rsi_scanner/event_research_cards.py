@@ -978,10 +978,31 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
         "what_confirms",
         "what_invalidates",
         "why_not_alertable",
+        "reason_codes",
+        "warnings",
         "final_route_after_quality_gate",
         "final_tier_after_quality_gate",
         "final_state_after_quality_gate",
         "source_pack",
+        "source_packs",
+        "source_origin",
+        "source_origins",
+        "source_url",
+        "latest_source_url",
+        "latest_source_title",
+        "official_exchange_event",
+        "official_exchange_provider",
+        "official_exchange",
+        "official_exchange_event_type",
+        "official_exchange_title",
+        "official_exchange_url",
+        "official_exchange_published_at",
+        "official_exchange_effective_time",
+        "official_exchange_reason_codes",
+        "scheduled_catalyst_event",
+        "unlock_event",
+        "derivatives_state_snapshot",
+        "derivatives_snapshot",
         "evidence_acquisition_source_pack",
         "evidence_acquisition_attempted",
         "evidence_acquisition_status",
@@ -1775,13 +1796,25 @@ def _canonical_market_summary_from_components(components: Mapping[str, Any]) -> 
 def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
     components = _card_components(entry, alert)
     sample = _first_accepted_evidence_sample(components)
+    official_event = components.get("official_exchange_event") if isinstance(components.get("official_exchange_event"), Mapping) else {}
+    scheduled_event = components.get("scheduled_catalyst_event") if isinstance(components.get("scheduled_catalyst_event"), Mapping) else {}
+    unlock_event = components.get("unlock_event") if isinstance(components.get("unlock_event"), Mapping) else {}
+    structured_event = official_event or scheduled_event or unlock_event
     latest_source = _display_text(
         components.get("latest_source")
         or components.get("source")
         or components.get("source_provider")
+        or structured_event.get("provider")
+        or structured_event.get("exchange")
     ) or _display_text(sample.get("provider") if sample else None) or _display_text(sample.get("provider_hint") if sample else None)
-    source_url = components.get("source_url") or components.get("latest_source_url") or (sample.get("source_url") if sample else None)
-    source_title = components.get("latest_source_title") or (sample.get("title") if sample else None)
+    source_url = (
+        components.get("source_url")
+        or components.get("latest_source_url")
+        or structured_event.get("source_url")
+        or structured_event.get("url")
+        or (sample.get("source_url") if sample else None)
+    )
+    source_title = components.get("latest_source_title") or structured_event.get("title") or structured_event.get("event_name") or (sample.get("title") if sample else None)
     accepted_count = _int_value(components.get("evidence_acquisition_accepted_count")) or len(_accepted_evidence_samples(components))
     source_count = _int_value(components.get("source_count")) or (entry.source_count if entry is not None else 0) or accepted_count
     lines: list[str] = [
@@ -1805,21 +1838,34 @@ def _official_exchange_evidence_lines(
     alert: Mapping[str, Any] | None,
 ) -> list[str]:
     components = _card_components(entry, alert)
+    event = components.get("official_exchange_event") if isinstance(components.get("official_exchange_event"), Mapping) else {}
     source_pack = str(components.get("source_pack") or "")
     source_class = str(components.get("source_class") or "")
-    event_type = str(components.get("event_type") or "")
+    event_type = str(components.get("official_exchange_event_type") or event.get("event_type") or components.get("event_type") or "")
     if (
         source_class != "official_exchange"
         and not source_pack.startswith("official_exchange")
         and not source_pack.startswith("official_perp")
+        and not event
     ):
         return []
-    reason_codes = _list_strings(components.get("reason_codes") or components.get("accepted_evidence_reason_codes"))
-    pairs = _list_strings(components.get("pairs") or components.get("announcement_pairs"))
-    contracts = _list_strings(components.get("contracts") or components.get("announcement_contracts"))
+    reason_codes = _list_strings(
+        components.get("official_exchange_reason_codes")
+        or event.get("reason_codes")
+        or components.get("reason_codes")
+        or components.get("accepted_evidence_reason_codes")
+    )
+    pairs = _list_strings(components.get("pairs") or event.get("pairs") or components.get("announcement_pairs"))
+    contracts = _list_strings(components.get("contracts") or event.get("contracts") or components.get("announcement_contracts"))
+    exchange = components.get("official_exchange") or event.get("exchange") or components.get("exchange")
+    title = components.get("official_exchange_title") or event.get("title") or event.get("event_name") or components.get("latest_source_title")
+    url = components.get("official_exchange_url") or event.get("source_url") or event.get("url") or components.get("source_url")
+    published = components.get("official_exchange_published_at") or event.get("published_at") or components.get("published_at")
+    effective = components.get("official_exchange_effective_time") or event.get("effective_time") or components.get("effective_time")
     lines = [
-        f"- Exchange: {_display_text(components.get('exchange')) or 'unknown'}",
+        f"- Exchange: {_display_text(exchange) or 'unknown'}",
         f"- Event type: {event_type or 'unknown'}",
+        f"- Title: {_display_text(title) or 'unknown'}",
         f"- Source pack: {source_pack or 'unknown'}",
         f"- Token identity: {'resolved' if components.get('coin_id') or components.get('validated_coin_id') else 'unresolved'}",
         f"- Impact path: {_display_text(components.get('impact_path_type')) or 'unknown'}",
@@ -1830,14 +1876,14 @@ def _official_exchange_evidence_lines(
         lines.append("- Contracts: " + ", ".join(contracts[:6]))
     if reason_codes:
         lines.append("- Reason codes: " + ", ".join(reason_codes[:8]))
-    if components.get("published_at") or components.get("effective_time"):
+    if published or effective:
         lines.append(
             "- Timing: "
-            f"published={components.get('published_at') or 'unknown'} "
-            f"effective={components.get('effective_time') or 'unknown'}"
+            f"published={published or 'unknown'} "
+            f"effective={effective or 'unknown'}"
         )
-    if components.get("source_url"):
-        lines.append(f"- Official source: {components.get('source_url')}")
+    if url:
+        lines.append(f"- Official source: {url}")
     return lines
 
 
@@ -1846,32 +1892,36 @@ def _scheduled_catalyst_lines(
     alert: Mapping[str, Any] | None,
 ) -> list[str]:
     components = _card_components(entry, alert)
+    scheduled_event = components.get("scheduled_catalyst_event") if isinstance(components.get("scheduled_catalyst_event"), Mapping) else {}
+    unlock_event = components.get("unlock_event") if isinstance(components.get("unlock_event"), Mapping) else {}
+    event = unlock_event or scheduled_event
     row_type = str(components.get("row_type") or "")
     source_pack = str(components.get("source_pack") or "")
     impact = str(components.get("impact_path_type") or "")
     if not (
         row_type in {"scheduled_catalyst_event", "unlock_event"}
+        or event
         or "unlock" in source_pack
         or "project_event" in source_pack
         or "unlock" in impact
     ):
         return []
     lines = [
-        f"- Event type: {_display_text(components.get('event_type')) or 'unknown'}",
-        f"- Event status: {_display_text(components.get('event_status')) or 'unknown'}",
-        f"- Source class: {_display_text(components.get('source_class')) or 'unknown'}",
+        f"- Event type: {_display_text(components.get('event_type') or event.get('event_type')) or 'unknown'}",
+        f"- Event status: {_display_text(components.get('event_status') or event.get('event_status')) or 'unknown'}",
+        f"- Source class: {_display_text(components.get('source_class') or event.get('source_class')) or 'unknown'}",
         f"- Source pack: {source_pack or 'unknown'}",
-        f"- Event start: {_display_text(components.get('event_start_time') or components.get('unlock_time')) or 'unknown'}",
+        f"- Event start: {_display_text(components.get('event_start_time') or components.get('unlock_time') or event.get('event_start_time') or event.get('unlock_time')) or 'unknown'}",
         f"- Market state: {_display_text(components.get('market_state')) or 'unknown'}",
         f"- Opportunity type: {_display_text(components.get('opportunity_type')) or 'unknown'}",
     ]
-    if components.get("unlock_time") or components.get("unlock_pct_circulating_supply") is not None:
+    if components.get("unlock_time") or event.get("unlock_time") or components.get("unlock_pct_circulating_supply") is not None or event.get("unlock_pct_circulating_supply") is not None:
         lines.extend([
-            f"- Unlock time: {_display_text(components.get('unlock_time')) or 'unknown'}",
-            f"- Unlock type: {_display_text(components.get('unlock_type')) or 'unknown'}",
-            f"- Unlock pct circulating: {_display_text(components.get('unlock_pct_circulating_supply')) or 'n/a'}",
-            f"- Unlock vs 30d ADV: {_display_text(components.get('unlock_vs_30d_adv')) or 'n/a'}",
-            f"- Structured unlock proof: {str(bool(components.get('structured_unlock_evidence'))).lower()}",
+            f"- Unlock time: {_display_text(components.get('unlock_time') or event.get('unlock_time')) or 'unknown'}",
+            f"- Unlock type: {_display_text(components.get('unlock_type') or event.get('unlock_type')) or 'unknown'}",
+            f"- Unlock pct circulating: {_display_text(components.get('unlock_pct_circulating_supply') or event.get('unlock_pct_circulating_supply')) or 'n/a'}",
+            f"- Unlock vs 30d ADV: {_display_text(components.get('unlock_vs_30d_adv') or event.get('unlock_vs_30d_adv')) or 'n/a'}",
+            f"- Structured unlock proof: {str(bool(components.get('structured_unlock_evidence') or event.get('structured_unlock_evidence'))).lower()}",
         ])
     confirms = _list_strings(components.get("what_confirms"))
     invalidates = _list_strings(components.get("what_invalidates"))
@@ -1882,8 +1932,9 @@ def _scheduled_catalyst_lines(
         lines.append("- What invalidates: " + "; ".join(invalidates[:4]))
     if why_not:
         lines.append("- Why not alertable: " + "; ".join(why_not[:5]))
-    if components.get("source_url"):
-        lines.append(f"- Source: {components.get('source_url')}")
+    source_url = components.get("source_url") or event.get("source_url") or event.get("url")
+    if source_url:
+        lines.append(f"- Source: {source_url}")
     return lines
 
 

@@ -17,6 +17,38 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Harden integrated radar artifact propagation · Codex
+**Why:** The integrated Event Alpha radar could classify candidates correctly
+but then lose structured source evidence or silently upgrade lanes when rows
+were persisted as canonical CoreOpportunity/cards. Operator output also needed
+clearer sidecar provenance and heartbeat copy.
+**Changes:**
+- Preserved `event_integrated_radar_candidate` lane, market state, route/state,
+  score, requirement flags, reason/warning, source URL, official exchange,
+  scheduled catalyst, unlock, derivatives, and market snapshots when writing
+  canonical CoreOpportunity rows and research cards.
+- Added integrated input modes, an input manifest JSON artifact, source coverage
+  JSON, sidecar counts in the run ledger, wall-clock runtime fields, and a
+  strict `make event-alpha-integrated-radar-doctor` target.
+- Tightened daily brief/report defaults so diagnostic rows stay in the
+  diagnostics appendix, and changed notification heartbeat/no-digest copy to
+  distinguish strict alerts from research candidates.
+- Added artifact-doctor checks for integrated candidate/core/card mismatches,
+  silent upgrades, source/event loss, missing manifests/source coverage, and
+  diagnostics leaking into default operator sections.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (642/642 passed);
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+market anomaly, official exchange, scheduled catalyst, unlock risk,
+derivatives, and fade-review smokes; notify_llm_deep source coverage/daily
+brief/strict doctor; `make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Integrated radar remains research-only and no-send guarded. It
+does not write normal RSI signal rows, paper rows, live trades, execution
+orders, or Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-01 — Add integrated Event Alpha radar cycle · Codex
 **Why:** Event Alpha had useful sidecar scans for market anomalies, official
 exchange events, scheduled/unlock catalysts, and derivatives crowding, but no

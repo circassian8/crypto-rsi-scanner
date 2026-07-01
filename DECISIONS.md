@@ -25,7 +25,14 @@ canonical integrated candidates and CoreOpportunity rows, then writes cards,
 source coverage, daily brief, run ledger, and a no-send notification preview.
 The integrated cycle must remain artifact-only and research-only: no normal RSI
 signal rows, paper trades, live trades, execution, Telegram sends in tests, or
-Event Alpha-created `TRIGGERED_FADE`.
+Event Alpha-created `TRIGGERED_FADE`. Integrated candidate truth is
+authoritative at rest: the canonical CoreOpportunity/card/report layer must not
+silently upgrade lanes or drop source URLs, reason codes, official exchange
+events, scheduled catalyst/unlock evidence, derivatives evidence, market-state
+snapshots, route/state fields, or requirement flags. Diagnostic rows may be
+stored and shown in diagnostics appendices, but they should not create visible
+operator opportunities unless a later deterministic quality gate explicitly
+promotes them.
 **Why:** Operators need one coherent radar view instead of separate sidecar
 reports, but the sidecar evidence types are still validation inputs rather than
 trade decisions. Strict artifact-doctor checks must enforce lane/source/market
