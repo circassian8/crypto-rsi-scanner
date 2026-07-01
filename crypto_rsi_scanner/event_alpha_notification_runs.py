@@ -68,7 +68,15 @@ def notification_run_record(
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     warnings = tuple(str(warning) for warning in getattr(result, "warnings", ()) or () if str(warning))
-    provider_blocks = _provider_fail_fast_blocks(warnings, provider_health_rows or {})
+    cryptopanic_success = bool(
+        _int(getattr(result, "cryptopanic_successful_requests", 0)) > 0
+        or str(getattr(result, "cryptopanic_effective_provider_status", "") or "").casefold() == "healthy"
+    )
+    provider_blocks = _provider_fail_fast_blocks(
+        warnings,
+        provider_health_rows or {},
+        cryptopanic_success=cryptopanic_success,
+    )
     lane_due = dict(getattr(result, "send_lane_items_attempted", {}) or {})
     lane_sent = dict(getattr(result, "send_lane_items_delivered", {}) or {})
     if plan is not None:
@@ -266,15 +274,88 @@ def _format_counts(counts: Mapping[str, int]) -> str:
 def _provider_fail_fast_blocks(
     warnings: Iterable[str],
     provider_health_rows: Mapping[str, Mapping[str, Any]],
+    *,
+    cryptopanic_success: bool = False,
 ) -> tuple[str, ...]:
     blocks: list[str] = [
         warning for warning in warnings
         if any(token in warning.casefold() for token in ("backoff", "failed", "failure", "timeout", "dns", "429"))
+        and not (cryptopanic_success and "cryptopanic" in warning.casefold())
     ]
     for key, row in provider_health_rows.items():
         if row.get("disabled_until"):
+            if cryptopanic_success and _row_is_cryptopanic_health(key, row):
+                continue
             blocks.append(f"{row.get('provider_key') or key} in backoff until {row.get('disabled_until')}")
     return tuple(dict.fromkeys(blocks))
+
+
+def normalize_notification_runs_after_cryptopanic_success(
+    path: str | Path,
+    *,
+    request_ledger_path: str | Path | None = None,
+) -> int:
+    """Remove stale CryptoPanic backoff fail-fast blocks after same-run success."""
+    p = Path(path).expanduser()
+    if not p.exists() or not _cryptopanic_ledger_has_success(request_ledger_path):
+        return 0
+    rows = _read_jsonl(p)
+    updated = 0
+    for row in rows:
+        blocks = tuple(str(item) for item in row.get("provider_fail_fast_blocks") or ())
+        if not blocks:
+            continue
+        filtered = tuple(
+            item for item in blocks
+            if not ("cryptopanic" in item.casefold() and "backoff" in item.casefold())
+        )
+        if filtered == blocks:
+            continue
+        row["provider_fail_fast_blocks"] = list(filtered)
+        row["provider_failure_count"] = len(filtered)
+        reconciliations = list(row.get("provider_fail_fast_reconciliations") or [])
+        note = "cryptopanic raw_status=backoff effective_status=healthy reason=same_run_successful_cryptopanic_requests"
+        if note not in reconciliations:
+            reconciliations.append(note)
+        row["provider_fail_fast_reconciliations"] = reconciliations
+        updated += 1
+    if updated:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("w", encoding="utf-8") as fh:
+            for row in rows:
+                fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+                fh.write("\n")
+    return updated
+
+
+def _row_is_cryptopanic_health(key: str, row: Mapping[str, Any]) -> bool:
+    return "cryptopanic" in " ".join(
+        str(value or "").casefold()
+        for value in (
+            key,
+            row.get("provider"),
+            row.get("provider_key"),
+            row.get("provider_service"),
+        )
+    )
+
+
+def _cryptopanic_ledger_has_success(path: str | Path | None) -> bool:
+    if not path:
+        return False
+    for row in _read_jsonl(Path(path).expanduser()):
+        if "cryptopanic" not in json.dumps(_json_ready(row), sort_keys=True).casefold():
+            # Older ledgers may not carry provider name, but the dedicated file is enough.
+            pass
+        if str(row.get("error_class") or "").strip():
+            continue
+        try:
+            code = int(row.get("status_code") or 0)
+        except (TypeError, ValueError):
+            continue
+        if 200 <= code < 300:
+            return True
+    return False
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

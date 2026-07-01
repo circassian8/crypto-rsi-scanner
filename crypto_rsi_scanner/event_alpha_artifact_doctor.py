@@ -70,6 +70,10 @@ class EventAlphaArtifactDoctorResult:
     live_sector_digest_without_asset: int = 0
     live_rejected_results_promoted: int = 0
     live_skipped_budget_promoted: int = 0
+    raw_core_validated_without_confirmation: int = 0
+    raw_core_source_only_narrative_validated: int = 0
+    raw_core_cryptopanic_tag_only_direct_path_confirmed: int = 0
+    raw_core_suppressed_duplicate_validated_stale: int = 0
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
@@ -555,6 +559,11 @@ def diagnose_artifacts(
     promoted_core_in_weak = _promoted_core_rows_that_are_weak(core_rows)
     core_route_conflicts = _core_route_conflicts_with_opportunity_level(core_rows)
     live_confirmation_conflicts = _live_confirmation_conflicts(core_rows, profile=profile, artifact_namespace=artifact_namespace)
+    raw_core_conflicts = _raw_core_live_confirmation_conflicts(
+        core_rows,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+    )
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -737,6 +746,17 @@ def diagnose_artifacts(
             "live_skipped_budget_promoted="
             f"{live_confirmation_conflicts['live_skipped_budget_promoted']}"
         )
+        (blockers if strict and core_store_available else warnings).append(message)
+    for key in (
+        "raw_core_validated_without_confirmation",
+        "raw_core_source_only_narrative_validated",
+        "raw_core_cryptopanic_tag_only_direct_path_confirmed",
+        "raw_core_suppressed_duplicate_validated_stale",
+    ):
+        count = raw_core_conflicts.get(key, 0)
+        if not count:
+            continue
+        message = f"{key}={count}"
         (blockers if strict and core_store_available else warnings).append(message)
     if source_coverage_report_conflicts["source_coverage_report_missing"]:
         warnings.append(
@@ -1316,6 +1336,10 @@ def diagnose_artifacts(
         live_sector_digest_without_asset=live_confirmation_conflicts["live_sector_digest_without_asset"],
         live_rejected_results_promoted=live_confirmation_conflicts["live_rejected_results_promoted"],
         live_skipped_budget_promoted=live_confirmation_conflicts["live_skipped_budget_promoted"],
+        raw_core_validated_without_confirmation=raw_core_conflicts["raw_core_validated_without_confirmation"],
+        raw_core_source_only_narrative_validated=raw_core_conflicts["raw_core_source_only_narrative_validated"],
+        raw_core_cryptopanic_tag_only_direct_path_confirmed=raw_core_conflicts["raw_core_cryptopanic_tag_only_direct_path_confirmed"],
+        raw_core_suppressed_duplicate_validated_stale=raw_core_conflicts["raw_core_suppressed_duplicate_validated_stale"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
         source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
         source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
@@ -2086,6 +2110,137 @@ def _live_confirmation_conflicts(
         if status == "skipped_budget":
             out["live_skipped_budget_promoted"] += 1
     return out
+
+
+def _raw_core_live_confirmation_conflicts(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    profile: str | None,
+    artifact_namespace: str | None,
+) -> dict[str, int]:
+    out = {
+        "raw_core_validated_without_confirmation": 0,
+        "raw_core_source_only_narrative_validated": 0,
+        "raw_core_cryptopanic_tag_only_direct_path_confirmed": 0,
+        "raw_core_suppressed_duplicate_validated_stale": 0,
+    }
+    for row in rows:
+        level = str(row.get("final_opportunity_level") or row.get("opportunity_level") or "").strip()
+        if level not in {"validated_digest", "watchlist", "high_priority"}:
+            continue
+        if not event_opportunity_verdict.live_confirmation_required(
+            profile=str(row.get("profile") or profile or ""),
+            run_mode=str(row.get("run_mode") or ""),
+            artifact_namespace=str(row.get("artifact_namespace") or artifact_namespace or ""),
+        ):
+            continue
+        verdict = event_opportunity_verdict.apply_live_confirmation_policy(
+            row,
+            profile=str(row.get("profile") or profile or ""),
+            run_mode=str(row.get("run_mode") or ""),
+            artifact_namespace=str(row.get("artifact_namespace") or artifact_namespace or ""),
+        )
+        raw_stale = bool(not verdict.confirmed or verdict.capped_level)
+        if raw_stale:
+            out["raw_core_validated_without_confirmation"] += 1
+        if raw_stale and _raw_core_source_only_narrative(row):
+            out["raw_core_source_only_narrative_validated"] += 1
+        if _raw_core_cryptopanic_tag_only_direct_path(row) and str(row.get("live_confirmation_status") or "") == "confirmed":
+            out["raw_core_cryptopanic_tag_only_direct_path_confirmed"] += 1
+        route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").strip()
+        if raw_stale and route == event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value:
+            out["raw_core_suppressed_duplicate_validated_stale"] += 1
+    return out
+
+
+def _raw_core_source_only_narrative(row: Mapping[str, Any]) -> bool:
+    text = " ".join(
+        str(value or "")
+        for value in (
+            row.get("source_pack"),
+            row.get("evidence_acquisition_source_pack"),
+            row.get("impact_path_type"),
+            row.get("primary_impact_path"),
+            row.get("candidate_role"),
+            row.get("playbook_type"),
+            row.get("effective_playbook_type"),
+            row.get("canonical_incident_name"),
+            row.get("event_name"),
+            row.get("latest_source_title"),
+            " ".join(str(item) for item in row.get("supporting_categories") or ()),
+            " ".join(str(item) for item in row.get("supporting_impact_paths") or ()),
+        )
+    ).casefold()
+    narrative_tokens = (
+        "fan_token",
+        "fan token",
+        "sports_fan",
+        "sports fan",
+        "world cup",
+        "proxy",
+        "preipo",
+        "pre-ipo",
+        "tokenized",
+        "rwa",
+        "political_meme",
+        "venue_value",
+    )
+    if not any(token in text for token in narrative_tokens):
+        return False
+    if _raw_core_has_official_or_structured_evidence(row):
+        return False
+    accepted = _raw_int_value(row.get("accepted_evidence_count"), row.get("evidence_acquisition_accepted_count"))
+    market_level = str(row.get("market_confirmation_level") or row.get("market_reaction_confirmation") or "").casefold()
+    freshness = str(row.get("market_context_freshness_status") or "").casefold()
+    market_score = _raw_float_value(row.get("market_confirmation_score"))
+    has_market = market_level in {"moderate", "strong"} or (market_score is not None and market_score >= 40)
+    if freshness in {"missing", "stale", "unknown", "none", ""}:
+        has_market = False
+    return accepted <= 1 and not has_market
+
+
+def _raw_core_cryptopanic_tag_only_direct_path(row: Mapping[str, Any]) -> bool:
+    source_classes = {str(row.get("source_class") or "").casefold()}
+    reason_codes = {str(item).casefold() for item in row.get("accepted_evidence_reason_codes") or row.get("reason_codes") or ()}
+    cryptopanic_tagged = "cryptopanic_tagged" in source_classes or "cryptopanic_currency_tag_match" in reason_codes
+    if not cryptopanic_tagged:
+        return False
+    if _raw_core_has_official_or_structured_evidence(row):
+        return False
+    if _raw_core_source_only_narrative(row):
+        return True
+    impact_path = str(row.get("impact_path_type") or row.get("primary_impact_path") or "").casefold()
+    return impact_path == "unlock_supply_event" and _raw_int_value(row.get("accepted_evidence_count"), row.get("evidence_acquisition_accepted_count")) <= 1
+
+
+def _raw_core_has_official_or_structured_evidence(row: Mapping[str, Any]) -> bool:
+    values = {
+        str(row.get("source_class") or "").casefold(),
+        str(row.get("source_pack") or "").casefold(),
+        *(str(item).casefold() for item in row.get("accepted_evidence_reason_codes") or ()),
+        *(str(item).casefold() for item in row.get("reason_codes") or ()),
+    }
+    return any(
+        token in value
+        for value in values
+        for token in ("official", "structured", "tokenomist", "binance", "bybit", "exchange_listing", "direct_token_unlock_fact")
+    )
+
+
+def _raw_int_value(*values: Any) -> int:
+    for value in values:
+        try:
+            return int(value or 0)
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def _raw_float_value(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _source_coverage_metadata_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
@@ -3728,6 +3883,10 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"live_sector_digest_without_asset={result.live_sector_digest_without_asset} "
             f"live_rejected_results_promoted={result.live_rejected_results_promoted} "
             f"live_skipped_budget_promoted={result.live_skipped_budget_promoted} "
+            f"raw_core_validated_without_confirmation={result.raw_core_validated_without_confirmation} "
+            f"raw_core_source_only_narrative_validated={result.raw_core_source_only_narrative_validated} "
+            f"raw_core_cryptopanic_tag_only_direct_path_confirmed={result.raw_core_cryptopanic_tag_only_direct_path_confirmed} "
+            f"raw_core_suppressed_duplicate_validated_stale={result.raw_core_suppressed_duplicate_validated_stale} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "

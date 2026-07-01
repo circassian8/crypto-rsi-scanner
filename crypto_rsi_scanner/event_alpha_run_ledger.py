@@ -79,6 +79,63 @@ def load_run_records(path: str | Path, *, limit: int | None = None) -> EventAlph
     return EventAlphaRunLedgerReadResult(path=p, rows_read=len(rows), rows=rows)
 
 
+def reconcile_cryptopanic_counts(
+    path: str | Path,
+    *,
+    profile: str | None = None,
+    artifact_namespace: str | None = None,
+    run_id: str | None = None,
+    accepted_evidence: int | None = None,
+    rejected_evidence: int | None = None,
+    successful_requests: int | None = None,
+    failed_requests: int | None = None,
+    effective_provider_status: str | None = None,
+    raw_provider_status: str | None = None,
+    stale_backoff_reconciled: bool | None = None,
+) -> int:
+    """Rewrite latest matching row with authoritative CryptoPanic counters."""
+    p = Path(path).expanduser()
+    rows = _read_jsonl(p)
+    if not rows:
+        return 0
+    candidates = [
+        idx for idx, row in enumerate(rows)
+        if row.get("row_type") == "event_alpha_run"
+        and (not run_id or str(row.get("run_id") or "") == str(run_id))
+        and (not profile or str(row.get("profile") or "") == str(profile))
+        and (not artifact_namespace or str(row.get("artifact_namespace") or "") == str(artifact_namespace))
+    ]
+    if not candidates:
+        return 0
+    target_idx = max(candidates, key=lambda idx: str(rows[idx].get("started_at") or ""))
+    row = rows[target_idx]
+    before = dict(row)
+    if accepted_evidence is not None:
+        row["cryptopanic_accepted_evidence"] = int(accepted_evidence)
+    if rejected_evidence is not None:
+        row["cryptopanic_rejected_evidence"] = int(rejected_evidence)
+    if successful_requests is not None:
+        row["cryptopanic_successful_requests"] = int(successful_requests)
+    if failed_requests is not None:
+        row["cryptopanic_failed_requests"] = int(failed_requests)
+    if effective_provider_status:
+        row["cryptopanic_provider_status"] = str(effective_provider_status)
+        row["cryptopanic_effective_provider_status"] = str(effective_provider_status)
+    if raw_provider_status:
+        row["cryptopanic_raw_provider_status"] = str(raw_provider_status)
+    if stale_backoff_reconciled is not None:
+        row["cryptopanic_stale_backoff_reconciled_after_success"] = bool(stale_backoff_reconciled)
+    if before == row:
+        return 0
+    rows[target_idx] = row
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("w", encoding="utf-8") as fh:
+        for item in rows:
+            fh.write(json.dumps(_json_ready(item), sort_keys=True, separators=(",", ":")))
+            fh.write("\n")
+    return 1
+
+
 def _normalize_run_row(row: Mapping[str, Any]) -> dict[str, Any]:
     out = dict(row)
     for key in (

@@ -2289,8 +2289,8 @@ def _cryptopanic_stats_for_pipeline_result(
 ) -> dict[str, Any]:
     """Summarize CryptoPanic usage without exposing the API token."""
     acquisition = pipeline_result.evidence_acquisition_result
-    accepted = 0
-    rejected = 0
+    accepted_keys: set[str] = set()
+    rejected_keys: set[str] = set()
     results_seen = 0
     attempted = False
     provider_failures = 0
@@ -2310,26 +2310,18 @@ def _cryptopanic_stats_for_pipeline_result(
                     attempted = True
                     results_seen += int(getattr(query, "results_seen", 0) or 0)
                     provider_failures += len(tuple(getattr(query, "provider_failures", ()) or ()))
-                accepted += sum(
-                    1
-                    for item in getattr(query, "accepted_evidence", ()) or ()
-                    if _mapping_mentions_cryptopanic(item)
-                )
-                rejected += sum(
-                    1
-                    for item in getattr(query, "rejected_evidence", ()) or ()
-                    if _mapping_mentions_cryptopanic(item)
-                )
-            accepted += sum(
-                1
-                for item in getattr(result, "accepted_evidence", ()) or ()
-                if _mapping_mentions_cryptopanic(item)
-            )
-            rejected += sum(
-                1
-                for item in getattr(result, "rejected_evidence", ()) or ()
-                if _mapping_mentions_cryptopanic(item)
-            )
+                for item in getattr(query, "accepted_evidence", ()) or ():
+                    if _mapping_mentions_cryptopanic(item):
+                        accepted_keys.add(_cryptopanic_evidence_key(item))
+                for item in getattr(query, "rejected_evidence", ()) or ():
+                    if _mapping_mentions_cryptopanic(item):
+                        rejected_keys.add(_cryptopanic_evidence_key(item))
+            for item in getattr(result, "accepted_evidence", ()) or ():
+                if _mapping_mentions_cryptopanic(item):
+                    accepted_keys.add(_cryptopanic_evidence_key(item))
+            for item in getattr(result, "rejected_evidence", ()) or ():
+                if _mapping_mentions_cryptopanic(item):
+                    rejected_keys.add(_cryptopanic_evidence_key(item))
             provider_failures += sum(
                 1
                 for item in getattr(result, "provider_failures", ()) or ()
@@ -2370,6 +2362,8 @@ def _cryptopanic_stats_for_pipeline_result(
     ]
     duplicate_requests = max(0, len(normalized_keys) - len(set(normalized_keys)))
     invalid_currency_requests = sum(1 for row in ledger_rows if _cryptopanic_row_has_invalid_currencies(row))
+    accepted = len(accepted_keys)
+    rejected = len(rejected_keys)
     requests_used = int(usage.today_requests or 0)
     successful_requests = sum(
         1
@@ -2510,6 +2504,30 @@ def _mapping_mentions_cryptopanic(item: object) -> bool:
         or str(value).casefold() == "cryptopanic_tagged"
         for value in values
     )
+
+
+def _cryptopanic_evidence_key(item: object) -> str:
+    if isinstance(item, Mapping):
+        for key in ("raw_id", "source_url", "url", "post_id", "id"):
+            value = str(item.get(key) or "").strip()
+            if value:
+                return f"{key}:{value}"
+        provider = str(item.get("provider") or item.get("provider_hint") or "cryptopanic").strip()
+        title = str(item.get("title") or item.get("headline") or "").strip()
+        reason_codes = ",".join(sorted(str(value) for value in item.get("reason_codes") or item.get("accepted_reason_codes") or ()))
+        if provider or title or reason_codes:
+            return f"{provider}:{title}:{reason_codes}"
+    return json.dumps(_jsonable_for_key(item), sort_keys=True, separators=(",", ":"))
+
+
+def _jsonable_for_key(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {str(key): _jsonable_for_key(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_jsonable_for_key(item) for item in value]
+    if isinstance(value, datetime):
+        return value.astimezone(timezone.utc).isoformat() if value.tzinfo else value.replace(tzinfo=timezone.utc).isoformat()
+    return value
 
 
 def event_alpha_cycle(
@@ -4829,6 +4847,17 @@ def event_alpha_source_coverage_report(
         cryptopanic_request_ledger_path=context.provider_health_path.with_name("cryptopanic_request_ledger.jsonl"),
         cryptopanic_weekly_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_WEEKLY_REQUEST_LIMIT,
         cryptopanic_daily_soft_limit=config.EVENT_DISCOVERY_CRYPTOPANIC_REQUESTS_PER_DAY_SOFT_LIMIT,
+    )
+    event_alpha_run_ledger.reconcile_cryptopanic_counts(
+        context.run_ledger_path,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        accepted_evidence=report.cryptopanic_accepted_evidence,
+        rejected_evidence=report.cryptopanic_rejected_evidence,
+        successful_requests=report.cryptopanic_successful_requests,
+        failed_requests=report.cryptopanic_failed_requests,
+        effective_provider_status=report.cryptopanic_health_status,
+        stale_backoff_reconciled=report.cryptopanic_backoff_reconciled_after_success,
     )
     report_text = event_alpha_source_coverage.format_source_coverage_report(report)
     source_coverage_path = context.namespace_dir / "event_alpha_source_coverage.md"
@@ -7491,9 +7520,14 @@ def event_alpha_daily_brief_report(
         _event_alpha_alert_store_config_from_runtime().path,
         latest_only=True,
     )
-    core_store = event_core_opportunity_store.load_core_opportunities(
+    event_core_opportunity_store.normalize_core_opportunity_store(
         context.core_opportunity_store_path,
         latest_run=True,
+        now=datetime.now(timezone.utc),
+    )
+    event_alpha_notification_runs.normalize_notification_runs_after_cryptopanic_success(
+        context.notification_runs_path,
+        request_ledger_path=context.provider_health_path.with_name("cryptopanic_request_ledger.jsonl"),
     )
     hypotheses = event_impact_hypothesis_store.load_impact_hypotheses(
         context.impact_hypothesis_store_path,
@@ -7504,6 +7538,10 @@ def event_alpha_daily_brief_report(
     watchlist = event_watchlist.load_watchlist(config.EVENT_WATCHLIST_STATE_PATH)
     router_result = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
     monitor_result = _event_watchlist_monitor_result_from_runtime(watchlist)
+    core_store = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+    )
     card_write = event_research_cards.write_research_cards(
         config.EVENT_RESEARCH_CARDS_DIR,
         watchlist_entries=watchlist.entries,

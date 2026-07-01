@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -487,13 +488,13 @@ def build_daily_brief(
     lines.extend(["", "### Watchlist Got Hotter"])
     lines.extend(_watchlist_hotter_lines(entries))
     lines.extend(["", "### Alertable Decisions"])
-    if alertable:
-        if include_diagnostics:
-            for decision in alertable[:10]:
-                entry = decision.entry
-                lines.append(f"- {event_alpha_router.final_route_value(decision)}: {entry.symbol}/{entry.coin_id} state={event_watchlist.final_state_value(entry)} score={entry.latest_score} reason={decision.reason}")
-        else:
-            lines.append(f"- {len(alertable)} routed alertable decision(s); see core opportunity sections above.")
+    if core_alertable_count > 0:
+        lines.append(f"- {core_alertable_count} canonical alertable core opportunity/opportunities; see core opportunity sections above.")
+    elif alertable and include_diagnostics:
+        lines.append("- Raw pre-policy route attempts only; these are diagnostic rows and are not operator alert truth.")
+        for decision in alertable[:10]:
+            entry = decision.entry
+            lines.append(f"- diagnostic {event_alpha_router.final_route_value(decision)}: {entry.symbol}/{entry.coin_id} state={event_watchlist.final_state_value(entry)} score={entry.latest_score} reason={decision.reason}")
     else:
         lines.append("- None.")
     lines.extend(["", "### Validated Impact Hypothesis Routing"])
@@ -564,7 +565,13 @@ def build_daily_brief(
         if str(row.get("status") or "") == "rejected" or row.get("why_not_promoted") or row.get("rejection_reasons")
     ]
     lines.append("- Strong opportunity candidates: " + (_brief_core_opportunities(core_opportunities, section="strong", limit=5) or "none"))
-    lines.append("- Impact-path validated digest candidates: " + (_brief_core_opportunities(core_opportunities, section="digest", limit=5) or _brief_decisions(alertable_hypotheses[:5]) or _brief_decisions(impact_path_validated_hypotheses[:5]) or "none"))
+    digest_candidates = _brief_core_opportunities(core_opportunities, section="digest", limit=5)
+    if not digest_candidates and include_diagnostics:
+        digest_candidates = (
+            "raw diagnostic only: "
+            + (_brief_decisions(alertable_hypotheses[:5]) or _brief_decisions(impact_path_validated_hypotheses[:5]) or "none")
+        )
+    lines.append("- Impact-path validated digest candidates: " + (digest_candidates or "none"))
     lines.append("- Validated but market-unconfirmed: " + (_brief_decisions(market_unconfirmed_hypotheses[:5]) or "none"))
     lines.append("- Weak validated local-only hypotheses: " + (_brief_decisions(weak_local_hypotheses[:5]) or "none"))
     lines.append("- Generic co-occurrence blocked: " + (_brief_decisions(generic_blocked_hypotheses[:5]) or "none"))
@@ -693,6 +700,7 @@ def build_daily_brief(
             event_watchlist.EventWatchlistState.ARMED.value,
         }
     ]
+    active = _dedupe_watchlist_entries(active)
     if active:
         for entry in sorted(active, key=lambda item: item.latest_score, reverse=True)[:5]:
             lines.append(
@@ -703,7 +711,7 @@ def build_daily_brief(
     else:
         lines.append("- No active watchlist entries.")
     lines.extend(["", "### Quality-Capped Watchlist Rows"])
-    capped = [entry for entry in entries if event_watchlist.state_is_quality_capped(entry)]
+    capped = _dedupe_watchlist_entries([entry for entry in entries if event_watchlist.state_is_quality_capped(entry)])
     if capped:
         for entry in sorted(capped, key=lambda item: item.latest_score, reverse=True)[:10]:
             lines.append(
@@ -734,12 +742,19 @@ def build_daily_brief(
             if not paths:
                 lines.append("- None.")
                 continue
-            for path in paths[:20]:
+            collapsed_paths = event_research_cards.collapse_card_paths_for_group(
+                paths,
+                group_name=group_name,
+                card_groups=grouped_cards,
+            )
+            for path, hidden_count in collapsed_paths[:20]:
                 target = event_research_cards.card_feedback_target(path)
                 suffix = f" · feedback target: `{target}`" if target else ""
+                if hidden_count:
+                    suffix += f" · +{hidden_count} related diagnostic/support card(s) hidden"
                 lines.append(f"- [{path.name}]({path}) · group: {group_name}{suffix}")
-            if len(paths) > 20:
-                lines.append(f"- +{len(paths) - 20} more cards")
+            if len(collapsed_paths) > 20:
+                lines.append(f"- +{len(collapsed_paths) - 20} more card families")
     else:
         lines.append("- No cards written for this brief.")
     lines.extend(["", "### Missed Opportunities"])
@@ -763,7 +778,7 @@ def build_daily_brief(
     )))
     lines.extend(["", "### Top Suppression Reasons"])
     lines.extend(_suppression_lines(decisions, entries))
-    if not alertable and core_alertable_count <= 0:
+    if core_alertable_count <= 0:
         lines.extend(["", "### Why No Alerts"])
         lines.append(_compact(event_alpha_explain.format_last_run_explanation(
             runs,
@@ -773,10 +788,14 @@ def build_daily_brief(
             include_test_artifacts=include_test_artifacts,
             include_legacy_artifacts=include_legacy_artifacts,
         )))
-    else:
-        lines.extend(["", "### Why Alerts Were Sent"])
+    elif alertable and include_diagnostics:
+        lines.extend(["", "### Raw Pre-Policy Route Attempts / Diagnostics"])
+        lines.append("- These rows were generated before canonical core/live-confirmation policy and are not proof of sent alerts.")
         for decision in alertable[:8]:
             lines.append(f"- {decision.entry.symbol}/{decision.entry.coin_id}: {decision.reason}")
+    else:
+        lines.extend(["", "### Why Alertable Core Routes Exist"])
+        lines.append("- Canonical core opportunities passed final quality and live-confirmation gates; no raw pre-policy route text is shown by default.")
     return _strip_sensitive("\n".join(lines).rstrip() + "\n")
 
 
@@ -877,7 +896,8 @@ def _near_miss_daily_lines(
     *,
     limit: int,
 ) -> list[str]:
-    rows = list(near_misses)
+    raw_rows = list(near_misses)
+    rows = _dedupe_near_miss_candidates(raw_rows)
     if not rows:
         return ["- None."]
     lines: list[str] = []
@@ -916,8 +936,11 @@ def _near_miss_daily_lines(
                 f"status={item.refresh_upgrade_status or item.upgrade_reason or item.no_upgrade_reason or 'pending'}"
             )
         lines.append(f"  would invalidate: {invalidate}")
+    hidden_duplicates = max(0, len(raw_rows) - len(rows))
+    if hidden_duplicates:
+        lines.append(f"- +{hidden_duplicates} related duplicate/support near-miss row(s) hidden")
     if len(rows) > limit:
-        lines.append(f"- +{len(rows) - limit} more near-miss candidates")
+        lines.append(f"- +{len(rows) - limit} more near-miss candidate families")
     return lines
 
 
@@ -926,7 +949,8 @@ def _near_miss_diagnostic_lines(
     *,
     limit: int,
 ) -> list[str]:
-    rows = list(near_misses)
+    raw_rows = list(near_misses)
+    rows = _dedupe_near_miss_candidates(raw_rows)
     if not rows:
         return ["- None."]
     lines: list[str] = []
@@ -944,7 +968,71 @@ def _near_miss_diagnostic_lines(
             f" provider={item.market_refresh_provider or item.market_context_source or 'unknown'}"
             f" upgrade_status={item.refresh_upgrade_status or item.upgrade_reason or item.no_upgrade_reason or 'pending'}"
         )
+    hidden_duplicates = max(0, len(raw_rows) - len(rows))
+    if hidden_duplicates:
+        lines.append(f"- +{hidden_duplicates} related duplicate/support diagnostic row(s) hidden")
     return lines
+
+
+def _dedupe_near_miss_candidates(
+    rows: Iterable[event_near_miss.EventNearMissCandidate],
+) -> list[event_near_miss.EventNearMissCandidate]:
+    grouped: dict[tuple[str, str], event_near_miss.EventNearMissCandidate] = {}
+    for item in rows:
+        key = (
+            event_core_opportunities.asset_key_for_values(item.coin_id, item.symbol),
+            _impact_family(getattr(item, "impact_path_type", None) or getattr(item, "playbook_type", None) or ""),
+        )
+        current = grouped.get(key)
+        if current is None or item.opportunity_score_before > current.opportunity_score_before:
+            grouped[key] = item
+    return sorted(grouped.values(), key=lambda item: item.opportunity_score_before, reverse=True)
+
+
+def _decision_family_key(decision: event_alpha_router.EventAlphaRouteDecision) -> tuple[str, str]:
+    entry = decision.entry
+    components = entry.latest_score_components or {}
+    return (
+        event_core_opportunities.asset_key_for_values(entry.coin_id, entry.symbol),
+        _impact_family(components.get("impact_path_type") or entry.impact_path_type or entry.latest_playbook_type or ""),
+    )
+
+
+def _entry_family_key(entry: event_watchlist.EventWatchlistEntry) -> tuple[str, str]:
+    components = entry.latest_score_components or {}
+    return (
+        event_core_opportunities.asset_key_for_values(entry.coin_id, entry.symbol),
+        _impact_family(components.get("impact_path_type") or entry.impact_path_type or entry.latest_playbook_type or ""),
+    )
+
+
+def _dedupe_watchlist_entries(
+    rows: Iterable[event_watchlist.EventWatchlistEntry],
+) -> list[event_watchlist.EventWatchlistEntry]:
+    grouped: dict[tuple[str, str], event_watchlist.EventWatchlistEntry] = {}
+    for entry in rows:
+        key = _entry_family_key(entry)
+        current = grouped.get(key)
+        if current is None or entry.latest_score > current.latest_score:
+            grouped[key] = entry
+    return sorted(grouped.values(), key=lambda item: item.latest_score, reverse=True)
+
+
+def _impact_family(value: object) -> str:
+    text = str(value or "").casefold()
+    if any(token in text for token in ("fan", "sports", "world_cup", "world cup")):
+        return "fan_token"
+    if any(token in text for token in ("proxy", "preipo", "pre-ipo", "rwa", "venue_value", "tokenized")):
+        return "proxy"
+    if "listing" in text or "exchange" in text:
+        return "listing"
+    if "unlock" in text or "supply" in text:
+        return "supply"
+    if "security" in text or "exploit" in text:
+        return "security"
+    if "insufficient" in text or not text:
+        return "unknown"
+    return re.sub(r"[^a-z0-9]+", "_", text).strip("_") or "unknown"
 
 
 def _source_coverage_summary_lines(
@@ -1518,7 +1606,12 @@ def _brief_hypothesis_labels(rows: Iterable[Mapping[str, Any]]) -> str:
 
 def _brief_decisions(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
     labels = []
+    seen: set[tuple[str, str]] = set()
     for decision in rows:
+        key = _decision_family_key(decision)
+        if key in seen:
+            continue
+        seen.add(key)
         entry = decision.entry
         components = entry.latest_score_components or {}
         final_route = event_alpha_router.final_route_value(decision)
@@ -1980,8 +2073,13 @@ def _brief_core_opportunities(
 
 
 def _brief_entries(rows: Iterable[event_watchlist.EventWatchlistEntry]) -> str:
-    labels = []
+    labels: list[str] = []
+    seen: set[tuple[str, str]] = set()
     for entry in rows:
+        key = _entry_family_key(entry)
+        if key in seen:
+            continue
+        seen.add(key)
         components = entry.latest_score_components or {}
         labels.append(
             f"{entry.symbol}/{entry.coin_id}"
@@ -2261,14 +2359,19 @@ def _feedback_by_impact_path(alerts: Iterable[Mapping[str, Any]], feedback: Iter
 
 def _upgrade_candidate_line(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
     labels: list[str] = []
+    seen: set[tuple[str, str]] = set()
     for decision in sorted(rows, key=lambda item: item.entry.latest_score, reverse=True):
         entry = decision.entry
         if event_alpha_router.alertable_after_quality_gate(decision) or entry.relationship_type != "impact_hypothesis":
+            continue
+        key = _decision_family_key(decision)
+        if key in seen:
             continue
         components = entry.latest_score_components or {}
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
         if not upgrade.upgrade_requirements:
             continue
+        seen.add(key)
         labels.append(
             f"{entry.symbol}/{entry.coin_id}: "
             + event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.upgrade_requirements, limit=2)
@@ -2280,14 +2383,19 @@ def _upgrade_candidate_line(rows: Iterable[event_alpha_router.EventAlphaRouteDec
 
 def _downgrade_risk_line(rows: Iterable[event_alpha_router.EventAlphaRouteDecision]) -> str:
     labels: list[str] = []
+    seen: set[tuple[str, str]] = set()
     for decision in sorted(rows, key=lambda item: item.entry.latest_score, reverse=True):
         entry = decision.entry
         if not event_alpha_router.alertable_after_quality_gate(decision) and event_watchlist.final_state_value(entry) not in {"WATCHLIST", "HIGH_PRIORITY"}:
+            continue
+        key = _decision_family_key(decision)
+        if key in seen:
             continue
         components = entry.latest_score_components or {}
         upgrade = event_opportunity_verdict.explain_upgrade_path(components=components)
         if not upgrade.downgrade_warnings:
             continue
+        seen.add(key)
         labels.append(
             f"{entry.symbol}/{entry.coin_id}: "
             + event_alpha_reason_text.humanize_event_alpha_reasons(upgrade.downgrade_warnings, limit=2)

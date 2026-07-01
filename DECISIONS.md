@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - CoreOpportunity final fields are post-policy truth
+**Status:** accepted
+**Decision:** Raw `event_core_opportunities.jsonl` rows must persist final
+opportunity level, route, state, score, and live-confirmation fields after all
+live-confirmation and quality-policy caps have been applied. If a pre-policy or
+support-row value is useful for audit, it must live in an explicitly named
+requested/pre-policy/raw-support field. `SUPPRESS_DUPLICATE` is not allowed to
+mask an invalid `final_opportunity_level`.
+**Why:** Operator views, artifact doctor, notification readiness, and Pro-model
+review zips all inspect raw artifacts. A raw row that says
+`final_opportunity_level=validated_digest` while the canonical rendered view is
+exploratory makes the artifact set internally contradictory and can make
+source-only narrative evidence look alertable.
+**Revisit when:** CoreOpportunity artifacts move to a typed versioned schema
+with separate immutable requested/verdict/final sections and all readers are
+schema-aware.
+
 ## 2026-07-01 - CryptoPanic success reconciles stale backoff and narrative digest stays strict
 **Status:** accepted
 **Decision:** A successful same-day CryptoPanic Growth request is operational

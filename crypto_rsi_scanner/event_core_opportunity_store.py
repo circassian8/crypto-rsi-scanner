@@ -54,6 +54,17 @@ class EventCoreOpportunityCardLinkUpdateResult:
 
 
 @dataclass(frozen=True)
+class EventCoreOpportunityStoreNormalizeResult:
+    path: Path
+    attempted: bool
+    success: bool
+    rows_read: int = 0
+    rows_written: int = 0
+    rows_updated: int = 0
+    block_reason: str | None = None
+
+
+@dataclass(frozen=True)
 class CanonicalCoreOpportunityView:
     """Single read model for one operator-facing Event Alpha opportunity."""
 
@@ -235,6 +246,121 @@ def load_core_opportunities(
             "limit": limit,
         },
     )
+
+
+def normalize_core_opportunity_rows(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Return canonical raw rows with post-policy final fields persisted.
+
+    Older artifacts can contain stale pre-policy values in fields such as
+    ``final_opportunity_level`` even though the canonical read model caps them.
+    This helper materializes the same canonical view back to JSONL rows.
+    """
+    observed = _as_utc(now or datetime.now(timezone.utc)).isoformat()
+    opportunities = event_core_opportunities.aggregate_core_opportunities(rows)
+    return [
+        _row_from_core_opportunity(
+            item,
+            generated_at=str(item.primary_row.get("generated_at") or observed),
+            run_id=_first_text([item.primary_row], ("run_id",)),
+            profile=_first_text([item.primary_row], ("profile",)),
+            run_mode=_first_text([item.primary_row], ("run_mode",)),
+            artifact_namespace=_first_text([item.primary_row], ("artifact_namespace", "namespace")),
+            card_path=_first_text([item.primary_row], ("card_path", "research_card_path")),
+        )
+        for item in opportunities
+    ]
+
+
+def normalize_core_opportunity_store(
+    path: str | Path,
+    *,
+    run_id: str | None = None,
+    latest_run: bool = True,
+    now: datetime | None = None,
+) -> EventCoreOpportunityStoreNormalizeResult:
+    """Rewrite current-run core rows so raw artifacts match canonical verdicts."""
+    p = Path(path).expanduser()
+    try:
+        rows = _read_jsonl(p)
+        core_rows = [row for row in rows if row.get("row_type") == "event_core_opportunity"]
+        if not rows or not core_rows:
+            return EventCoreOpportunityStoreNormalizeResult(
+                path=p,
+                attempted=True,
+                success=True,
+                rows_read=len(core_rows),
+                rows_written=0,
+                rows_updated=0,
+            )
+        target_run_id = str(run_id or "").strip()
+        if not target_run_id and latest_run:
+            target_run_id = _latest_run_id(core_rows) or ""
+
+        def _is_target(row: Mapping[str, Any]) -> bool:
+            if row.get("row_type") != "event_core_opportunity":
+                return False
+            if target_run_id:
+                return str(row.get("run_id") or "") == target_run_id
+            return True
+
+        target_rows = [row for row in rows if _is_target(row)]
+        if not target_rows:
+            return EventCoreOpportunityStoreNormalizeResult(
+                path=p,
+                attempted=True,
+                success=True,
+                rows_read=len(core_rows),
+                rows_written=0,
+                rows_updated=0,
+            )
+        normalized = normalize_core_opportunity_rows(target_rows, now=now)
+        old_ready = [_json_ready(row) for row in target_rows]
+        new_ready = [_json_ready(row) for row in normalized]
+        if old_ready == new_ready:
+            return EventCoreOpportunityStoreNormalizeResult(
+                path=p,
+                attempted=True,
+                success=True,
+                rows_read=len(core_rows),
+                rows_written=0,
+                rows_updated=0,
+            )
+
+        new_rows: list[dict[str, Any]] = []
+        inserted = False
+        for row in rows:
+            if _is_target(row):
+                if not inserted:
+                    new_rows.extend(normalized)
+                    inserted = True
+                continue
+            new_rows.append(row)
+        if not inserted:
+            new_rows.extend(normalized)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("w", encoding="utf-8") as fh:
+            for row in new_rows:
+                fh.write(json.dumps(_json_ready(row), sort_keys=True, separators=(",", ":")))
+                fh.write("\n")
+        return EventCoreOpportunityStoreNormalizeResult(
+            path=p,
+            attempted=True,
+            success=True,
+            rows_read=len(core_rows),
+            rows_written=len(normalized),
+            rows_updated=len(target_rows),
+        )
+    except Exception as exc:  # noqa: BLE001 - reports must fail soft.
+        return EventCoreOpportunityStoreNormalizeResult(
+            path=p,
+            attempted=True,
+            success=False,
+            block_reason=f"{type(exc).__name__}: {exc}",
+        )
 
 
 def update_core_opportunity_card_links(

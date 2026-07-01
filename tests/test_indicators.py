@@ -27933,6 +27933,58 @@ def test_research_card_index_groups_core_local_near_miss_and_diagnostics():
     assert "legacy_old.md" in index.split("## Legacy Cards", 1)[1]
 
 
+def test_research_card_index_collapses_near_miss_support_cards_by_asset_family():
+    from pathlib import Path
+    import tempfile
+    from crypto_rsi_scanner import event_research_cards
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        chz_primary = root / "card_chz_accepted.md"
+        chz_support = root / "card_chz_support.md"
+        velvet_openai = root / "card_velvet_openai.md"
+        velvet_stripe = root / "card_velvet_stripe.md"
+        chz_primary.write_text(
+            "- Asset: CHZ/chiliz\n"
+            "- Event: Portugal · sports event\n"
+            "- Playbook: fan_token_attention\n"
+            "- Final route: STORE_ONLY\n"
+            "- Evidence acquisition result: status=accepted_evidence_found accepted=1 rejected=0\n",
+            encoding="utf-8",
+        )
+        chz_support.write_text(
+            "- Asset: CHZ/chiliz\n"
+            "- Event: World Cup · unlock supply event\n"
+            "- Playbook: unlock_supply_event\n"
+            "- Final route: SUPPRESS_DUPLICATE\n"
+            "- Evidence acquisition result: status=not_executed accepted=0 rejected=0\n",
+            encoding="utf-8",
+        )
+        velvet_openai.write_text(
+            "- Asset: VELVET/velvet\n"
+            "- Event: OpenAI · ipo proxy\n"
+            "- Playbook: listing_liquidity_event\n"
+            "- Final route: STORE_ONLY\n",
+            encoding="utf-8",
+        )
+        velvet_stripe.write_text(
+            "- Asset: VELVET/velvet\n"
+            "- Event: Stripe · ipo proxy\n"
+            "- Playbook: listing_liquidity_event\n"
+            "- Final route: STORE_ONLY\n",
+            encoding="utf-8",
+        )
+        collapsed = event_research_cards.collapse_card_paths_for_group(
+            [chz_support, velvet_openai, chz_primary, velvet_stripe],
+            group_name="Near-Miss Cards",
+        )
+
+    assert len(collapsed) == 2
+    by_name = {path.name: hidden for path, hidden in collapsed}
+    assert by_name["card_chz_accepted.md"] == 1
+    assert by_name["card_velvet_openai.md"] == 1
+
+
 def test_research_card_copy_is_verdict_aware_for_market_dislocation():
     from dataclasses import replace
     from crypto_rsi_scanner import event_research_cards, event_watchlist
@@ -36711,6 +36763,104 @@ def test_core_store_load_normalizes_stale_source_only_narrative_digest():
     assert mispacked.primary_row["live_confirmation_reason"] == "source_only_narrative_without_market_confirmation"
 
 
+def test_core_store_normalize_rewrites_raw_source_only_narrative_digest():
+    import json
+
+    from crypto_rsi_scanner import event_alpha_router, event_core_opportunity_store
+
+    stale = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-chz",
+        "profile": "notify_llm_deep",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "notify_llm_deep_cryptopanic_rehearsal",
+        "core_opportunity_id": "core_chz_mispacked_unlock",
+        "symbol": "CHZ",
+        "coin_id": "chiliz",
+        "incident_id": "world-cup-chz",
+        "candidate_role": "proxy_instrument",
+        "primary_impact_path": "unlock_supply_event",
+        "impact_path_type": "unlock_supply_event",
+        "opportunity_level": "validated_digest",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_score_final": 72,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+        "source_pack": "unlock_supply_pack",
+        "source_class": "cryptopanic_tagged",
+        "evidence_acquisition_status": "not_executed",
+        "accepted_evidence_count": 0,
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+        "market_confirmation_level": "none",
+        "market_context_freshness_status": "missing",
+        "supporting_categories": ["sports_fan_proxy"],
+        "supporting_impact_paths": ["fan_token_attention", "fan_token_event"],
+        "live_confirmation_status": "confirmed",
+        "generated_at": "2026-07-01T00:00:00+00:00",
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "event_core_opportunities.jsonl"
+        path.write_text(json.dumps(stale) + "\n", encoding="utf-8")
+        result = event_core_opportunity_store.normalize_core_opportunity_store(path, latest_run=True)
+        raw = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert result.success is True
+    assert result.rows_updated == 1
+    assert raw[0]["opportunity_level"] == "exploratory"
+    assert raw[0]["final_opportunity_level"] == "exploratory"
+    assert raw[0]["requested_opportunity_level_before_live_confirmation"] == "validated_digest"
+    assert raw[0]["live_confirmation_status"] != "confirmed"
+    assert raw[0]["live_confirmation_reason"] == "source_only_narrative_without_market_confirmation"
+    assert raw[0]["final_route_after_quality_gate"] not in {
+        event_alpha_router.EventAlphaRoute.RESEARCH_DIGEST.value,
+        event_alpha_router.EventAlphaRoute.HIGH_PRIORITY_RESEARCH.value,
+    }
+
+
+def test_artifact_doctor_blocks_raw_core_source_only_narrative_stale_final_level():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_alpha_router
+
+    stale = {
+        "row_type": "event_core_opportunity",
+        "schema_version": "event_core_opportunity_store_v1",
+        "run_id": "run-chz",
+        "profile": "notify_llm_deep",
+        "run_mode": "notification_burn_in",
+        "artifact_namespace": "notify_llm_deep_cryptopanic_rehearsal",
+        "core_opportunity_id": "core_chz_mispacked_unlock",
+        "symbol": "CHZ",
+        "coin_id": "chiliz",
+        "candidate_role": "proxy_instrument",
+        "primary_impact_path": "unlock_supply_event",
+        "impact_path_type": "unlock_supply_event",
+        "opportunity_level": "validated_digest",
+        "final_opportunity_level": "validated_digest",
+        "opportunity_score_final": 72,
+        "final_route_after_quality_gate": event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+        "route": event_alpha_router.EventAlphaRoute.SUPPRESS_DUPLICATE.value,
+        "source_pack": "unlock_supply_pack",
+        "source_class": "cryptopanic_tagged",
+        "evidence_acquisition_status": "not_executed",
+        "accepted_evidence_count": 0,
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+        "market_confirmation_level": "none",
+        "market_context_freshness_status": "missing",
+        "supporting_categories": ["sports_fan_proxy"],
+        "supporting_impact_paths": ["fan_token_attention", "fan_token_event"],
+        "live_confirmation_status": "confirmed",
+    }
+    doctor = event_alpha_artifact_doctor.diagnose_artifacts(
+        core_opportunity_rows=[stale],
+        profile="notify_llm_deep",
+        artifact_namespace="notify_llm_deep_cryptopanic_rehearsal",
+        strict=True,
+    )
+    assert doctor.status == "BLOCKED"
+    assert doctor.raw_core_validated_without_confirmation == 1
+    assert doctor.raw_core_source_only_narrative_validated == 1
+    assert doctor.raw_core_cryptopanic_tag_only_direct_path_confirmed == 1
+    assert doctor.raw_core_suppressed_duplicate_validated_stale == 1
+
+
 def test_daily_brief_source_coverage_uses_json_effective_provider_health():
     import json
 
@@ -36763,6 +36913,149 @@ def test_daily_brief_source_coverage_uses_json_effective_provider_health():
     assert "status=healthy" in brief
     assert "fan_sports_pack: coverage=partial healthy=cryptopanic" in brief
     assert "What data source would most improve next run: fan_sports_pack: add sports fixture confirmation" in brief
+
+
+def test_source_coverage_reconciles_cryptopanic_backoff_after_successful_request():
+    import json
+
+    from crypto_rsi_scanner import event_alpha_source_coverage, event_provider_status
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        ledger = base / "cryptopanic_request_ledger.jsonl"
+        ledger.write_text(
+            json.dumps({
+                "timestamp": "2026-07-01T00:00:00+00:00",
+                "status_code": 200,
+                "currencies": "CHZ",
+                "normalized_request_key": "growth_weekly|CHZ",
+            }) + "\n",
+            encoding="utf-8",
+        )
+        report = event_alpha_source_coverage.build_source_coverage_report(
+            provider_status_report=event_provider_status.EventDiscoveryProviderStatus(
+                mode="research_only",
+                cache_dir=str(base),
+                lookback_hours=72,
+                horizon_days=14,
+                sources=(event_provider_status.ProviderStatus("cryptopanic", "event", True),),
+                enrichment=(),
+                warnings=(),
+                next_steps=(),
+            ),
+            provider_health_rows={
+                "cryptopanic:event_source": {
+                    "provider_key": "cryptopanic:event_source",
+                    "provider": "cryptopanic",
+                    "provider_service": "event_source",
+                    "disabled_until": "2026-07-01T01:00:00+00:00",
+                }
+            },
+            evidence_acquisition_rows=[{
+                "source_pack": "fan_sports_pack",
+                "accepted_evidence": [{"provider": "cryptopanic", "source_class": "cryptopanic_tagged"}],
+            }],
+            profile="notify_llm_deep",
+            artifact_namespace="notify_llm_deep_cryptopanic_rehearsal",
+            cryptopanic_request_ledger_path=ledger,
+            now=pd.Timestamp("2026-07-01T00:30:00Z").to_pydatetime(),
+        )
+    assert report.cryptopanic_health_status == "healthy"
+    assert report.cryptopanic_backoff_reconciled_after_success is True
+    assert report.cryptopanic_successful_requests == 1
+
+
+def test_notification_runs_filters_cryptopanic_backoff_after_same_run_success():
+    from crypto_rsi_scanner import event_alpha_notification_runs
+
+    row = event_alpha_notification_runs.notification_run_record(
+        SimpleNamespace(
+            run_id="run-1",
+            run_mode="notification_burn_in",
+            artifact_namespace="notify_llm_deep_cryptopanic_rehearsal",
+            warnings=("cryptopanic:event_source in backoff until later", "gdelt timeout"),
+            cryptopanic_successful_requests=1,
+            cryptopanic_effective_provider_status="healthy",
+        ),
+        profile="notify_llm_deep",
+        started_at=pd.Timestamp("2026-07-01T00:00:00Z").to_pydatetime(),
+        finished_at=pd.Timestamp("2026-07-01T00:01:00Z").to_pydatetime(),
+        telegram_ready=False,
+        send_guard_enabled=False,
+        provider_health_rows={
+            "cryptopanic:event_source": {
+                "provider_key": "cryptopanic:event_source",
+                "provider": "cryptopanic",
+                "disabled_until": "2026-07-01T01:00:00+00:00",
+            },
+            "gdelt:event_source": {
+                "provider_key": "gdelt:event_source",
+                "provider": "gdelt",
+                "disabled_until": "2026-07-01T01:00:00+00:00",
+            },
+        },
+    )
+    blocks = " ".join(row["provider_fail_fast_blocks"]).casefold()
+    assert "cryptopanic" not in blocks
+    assert "gdelt" in blocks
+
+
+def test_cryptopanic_run_stats_dedupes_query_and_result_accepted_evidence():
+    import json
+
+    from crypto_rsi_scanner import config, event_provider_health, scanner
+
+    old_health_path = config.EVENT_PROVIDER_HEALTH_PATH
+    old_token = config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN
+    old_live = config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE
+    old_path = config.EVENT_DISCOVERY_CRYPTOPANIC_PATH
+    try:
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            health_path = base / "event_provider_health.json"
+            config.EVENT_PROVIDER_HEALTH_PATH = health_path
+            config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN = "test-token"
+            config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE = True
+            config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = None
+            event_provider_health.write_provider_health(health_path, {})
+            ledger = health_path.with_name("cryptopanic_request_ledger.jsonl")
+            ledger.write_text(
+                json.dumps({
+                    "timestamp": "2026-07-01T00:00:00+00:00",
+                    "status_code": 200,
+                    "currencies": "CHZ",
+                    "normalized_request_key": "growth_weekly|CHZ",
+                }) + "\n",
+                encoding="utf-8",
+            )
+            evidence = {"provider": "cryptopanic", "source_url": "https://example.test/chz", "title": "CHZ World Cup demand"}
+            result = SimpleNamespace(
+                evidence_acquisition_result=SimpleNamespace(results=[
+                    SimpleNamespace(
+                        providers_used=("cryptopanic",),
+                        query_results=(SimpleNamespace(
+                            provider_hint="cryptopanic",
+                            provider_used="cryptopanic",
+                            query="CHZ",
+                            results_seen=1,
+                            provider_failures=(),
+                            accepted_evidence=(evidence,),
+                            rejected_evidence=(),
+                        ),),
+                        accepted_evidence=(evidence,),
+                        rejected_evidence=(),
+                        provider_failures=(),
+                    )
+                ])
+            )
+            stats = scanner._cryptopanic_stats_for_pipeline_result(result, provider_health_path=health_path)
+    finally:
+        config.EVENT_PROVIDER_HEALTH_PATH = old_health_path
+        config.EVENT_DISCOVERY_CRYPTOPANIC_API_TOKEN = old_token
+        config.EVENT_DISCOVERY_CRYPTOPANIC_LIVE = old_live
+        config.EVENT_DISCOVERY_CRYPTOPANIC_PATH = old_path
+    assert stats["cryptopanic_accepted_evidence"] == 1
+    assert stats["cryptopanic_successful_requests"] == 1
 
 
 def test_daily_brief_reflects_planned_research_review_delivery_without_decisions():

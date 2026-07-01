@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Make CryptoPanic rehearsal artifacts post-policy truthful · Codex
+**Why:** The `notify_llm_deep_cryptopanic_rehearsal` artifacts still had raw
+CoreOpportunity rows and lower report sections that could imply source-only
+CHZ/VELVET rows were validated digest candidates even after canonical policy
+capped them to exploratory/research-review output.
+**Changes:**
+- Normalized raw `event_core_opportunities.jsonl` latest-run rows so final
+  opportunity level, route, score, and live-confirmation fields reflect the
+  post-live-confirmation/post-quality policy, with pre-policy values retained
+  only as explicit audit fields.
+- Added strict artifact-doctor counters for raw core-store contradictions,
+  including source-only narrative validation, CryptoPanic-tag-only direct-path
+  confirmation, and `SUPPRESS_DUPLICATE` masking stale validated levels.
+- Reconciled same-run successful CryptoPanic request-ledger rows against stale
+  provider-health backoff in source coverage, notification run summaries, and
+  run-ledger counters without exposing tokens.
+- Made the daily brief use canonical post-policy routed decisions by default and
+  moved raw/pre-policy route text into diagnostic wording instead of “sent”
+  language.
+- Collapsed default near-miss/local research-card lists by asset family and
+  promoted accepted-evidence cards as the visible primary while hiding related
+  diagnostic/support cards behind counts.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (601/601 passed);
+`python3 main.py --event-alpha-source-coverage-report --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_cryptopanic_rehearsal`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`python3 main.py --event-alpha-daily-brief --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_cryptopanic_rehearsal`;
+`python3 main.py --event-alpha-artifact-doctor --event-alpha-profile notify_llm_deep --event-alpha-artifact-namespace notify_llm_deep_cryptopanic_rehearsal --event-alpha-artifact-doctor-strict`
+(WARN only, blockers none);
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-evidence-acquisition-smoke PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** No Telegram send, paper trade, normal RSI row, live execution,
+or Event Alpha-created `TRIGGERED_FADE` path was added. Strict doctor still
+reports existing non-blocking incident-linkage/quality-capped warnings for the
+inspected rehearsal namespace.
+
 ## 2026-07-01 — Harden semantic CryptoPanic narrative gates · Codex
 **Why:** A live rehearsal still exposed a CHZ/fan-token-style opportunity that
 could look like an unlock/direct-event digest row because lower-level support

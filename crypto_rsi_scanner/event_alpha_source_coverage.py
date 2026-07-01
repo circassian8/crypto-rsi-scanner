@@ -226,6 +226,7 @@ def build_source_coverage_report(
         weekly_limit=cryptopanic_weekly_limit,
         daily_soft_limit=cryptopanic_daily_soft_limit,
         now=observed,
+        raw_backoff_present=_raw_provider_backoff_present(provider_health_rows or {}, "cryptopanic"),
     )
     cryptopanic_effectively_healthy = cryptopanic_stats["coverage_status"] in {
         "observed_healthy",
@@ -533,6 +534,7 @@ def _cryptopanic_stats(
     weekly_limit: int = 600,
     daily_soft_limit: int = 80,
     now: datetime | None = None,
+    raw_backoff_present: bool = False,
 ) -> dict[str, Any]:
     accepted = 0
     rejected = 0
@@ -565,7 +567,7 @@ def _cryptopanic_stats(
     successful_requests = int(getattr(usage, "successful_requests", 0) or 0)
     failed_requests = int(getattr(usage, "failed_requests", 0) or 0)
     backoff_reconciled_after_success = bool(
-        health_status == "backoff" and (successful_requests or accepted > 0)
+        (health_status == "backoff" or raw_backoff_present) and (successful_requests or accepted > 0)
     )
     effective_health_status = health_status
     if successful_requests:
@@ -624,6 +626,25 @@ def _cryptopanic_stats(
         "coverage_status": coverage_status,
         "recommendation": _cryptopanic_recommendation(coverage_status),
     }
+
+
+def _raw_provider_backoff_present(
+    rows: Mapping[str, Mapping[str, Any]],
+    provider: str,
+) -> bool:
+    provider_l = str(provider or "").casefold()
+    for key, row in rows.items():
+        if not row.get("disabled_until"):
+            continue
+        values = (
+            key,
+            row.get("provider"),
+            row.get("provider_key"),
+            row.get("provider_service"),
+        )
+        if any(provider_l in str(value or "").casefold() for value in values):
+            return True
+    return False
 
 
 def _cryptopanic_coverage_status(

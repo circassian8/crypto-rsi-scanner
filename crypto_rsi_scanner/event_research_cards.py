@@ -67,6 +67,25 @@ def card_index_group_map(paths: Iterable[str | Path]) -> dict[Path, str]:
     return out
 
 
+def collapse_card_paths_for_group(
+    paths: Iterable[str | Path],
+    *,
+    group_name: str | None = None,
+    card_groups: Mapping[Path | str, str] | None = None,
+) -> tuple[tuple[Path, int], ...]:
+    """Collapse related card paths into primary card plus hidden count."""
+    grouped: dict[tuple[str, str, str, str], list[Path]] = {}
+    for value in paths:
+        path = Path(value)
+        key = _card_family_key(path, group_name=group_name, card_groups=card_groups)
+        grouped.setdefault(key, []).append(path)
+    collapsed: list[tuple[Path, int]] = []
+    for items in grouped.values():
+        ordered = sorted(items, key=_card_primary_sort_key)
+        collapsed.append((ordered[0], max(0, len(ordered) - 1)))
+    return tuple(sorted(collapsed, key=lambda item: item[0].name))
+
+
 def render_research_card(
     key: str,
     *,
@@ -1065,10 +1084,16 @@ def _render_index(
     for group, group_paths in grouped.items():
         lines.extend(["", f"## {group}", ""])
         if group_paths:
-            for path in group_paths:
+            for path, hidden_count in collapse_card_paths_for_group(
+                group_paths,
+                group_name=group,
+                card_groups=card_groups,
+            ):
                 target = card_feedback_target(path)
                 group_label = _card_index_group(path, card_groups=card_groups)
                 suffix = f" · group: {group_label}"
+                if hidden_count:
+                    suffix += f" · +{hidden_count} related diagnostic/support card(s) hidden"
                 if target:
                     suffix += f" · feedback target: `{target}`"
                 lines.append(f"- [{path.name}]({path.name}){suffix}")
@@ -1149,6 +1174,124 @@ def _card_index_group(path: Path, *, card_groups: Mapping[Path | str, str] | Non
         if content_group is not None:
             return content_group
     return "Core Opportunity Cards"
+
+
+def _card_family_key(
+    path: Path,
+    *,
+    group_name: str | None = None,
+    card_groups: Mapping[Path | str, str] | None = None,
+) -> tuple[str, str, str, str]:
+    group = group_name or _card_index_group(path, card_groups=card_groups)
+    text = ""
+    if path.exists():
+        text = path.read_text(encoding="utf-8", errors="replace")
+    asset = _card_metadata_line(text, "Asset") or _card_metadata_line(text, "Symbol") or path.stem
+    event = (
+        _card_metadata_line(text, "Event")
+        or _card_metadata_line(text, "External catalyst")
+        or _card_metadata_line(text, "Canonical incident")
+        or path.stem
+    )
+    playbook = (
+        _card_metadata_line(text, "Playbook")
+        or _card_metadata_line(text, "Impact path")
+        or _card_metadata_line(text, "Primary impact path")
+        or path.stem
+    )
+    if group in {"Near-Miss Cards", "Local-Only / Quality-Capped Cards"}:
+        return (
+            group,
+            _card_family_asset(asset),
+            "operator_family",
+            "operator_family",
+        )
+    return (
+        group,
+        _card_family_asset(asset),
+        _card_family_event(event),
+        _card_family_playbook(playbook),
+    )
+
+
+def _card_primary_sort_key(path: Path) -> tuple[int, int, int, int, str]:
+    text = ""
+    if path.exists():
+        text = path.read_text(encoding="utf-8", errors="replace")
+    accepted = _card_accepted_evidence_count(text)
+    suppress_duplicate = 1 if re.search(r"(?im)^\s*[-*]\s*Final route:\s*SUPPRESS_DUPLICATE\b", text or "") else 0
+    store_only = 1 if re.search(r"(?im)^\s*[-*]\s*Final route:\s*STORE_ONLY\b", text or "") else 0
+    score = _card_primary_score(text)
+    return (-accepted, suppress_duplicate, store_only, -score, path.name)
+
+
+def _card_accepted_evidence_count(text: str) -> int:
+    values: list[int] = []
+    for pattern in (
+        r"(?im)^\s*[-*]\s*Accepted evidence count:\s*(\d+)\b",
+        r"(?im)\baccepted=(\d+)\b",
+    ):
+        for match in re.finditer(pattern, text or ""):
+            try:
+                values.append(int(match.group(1)))
+            except (TypeError, ValueError):
+                continue
+    return max(values) if values else 0
+
+
+def _card_primary_score(text: str) -> int:
+    values: list[float] = []
+    for pattern in (
+        r"(?im)^\s*[-*]\s*Final opportunity verdict:\s*[A-Za-z_/-]+\s*/\s*([0-9]+(?:\.[0-9]+)?)",
+        r"(?im)\bscore[=:]\s*([0-9]+(?:\.[0-9]+)?)\b",
+    ):
+        for match in re.finditer(pattern, text or ""):
+            try:
+                values.append(float(match.group(1)))
+            except (TypeError, ValueError):
+                continue
+    return int(max(values)) if values else 0
+
+
+def _card_metadata_line(text: str, label: str) -> str | None:
+    pattern = rf"(?im)^\s*[-*]\s*{re.escape(label)}:\s*(.+?)\s*$"
+    match = re.search(pattern, text or "")
+    if not match:
+        return None
+    return match.group(1).strip()
+
+
+def _card_family_asset(value: str) -> str:
+    text = str(value or "").casefold()
+    text = re.sub(r"\([^)]*\)", " ", text)
+    text = re.sub(r"[^a-z0-9]+", " ", text).strip()
+    parts = text.split()
+    return parts[0] if parts else "unknown"
+
+
+def _card_family_event(value: str) -> str:
+    text = str(value or "").casefold().split("·", 1)[0]
+    for token in ("spacex", "world cup", "kraken", "thorchain", "zcash", "aave", "kelpdao"):
+        if token in text:
+            return token.replace(" ", "_")
+    text = re.sub(r"[^a-z0-9]+", " ", text).strip()
+    return "_".join(text.split()[:5]) or "unknown"
+
+
+def _card_family_playbook(value: str) -> str:
+    text = str(value or "").casefold()
+    if any(token in text for token in ("preipo", "pre-ipo", "proxy", "tokenized", "rwa", "venue_value")):
+        return "proxy"
+    if "fan" in text or "sports" in text or "world cup" in text:
+        return "fan_token"
+    if "source_noise" in text or "control" in text or "diagnostic" in text:
+        return "diagnostic"
+    if "listing" in text or "exchange" in text:
+        return "listing"
+    if "exploit" in text or "security" in text:
+        return "security"
+    text = re.sub(r"[^a-z0-9]+", " ", text).strip()
+    return "_".join(text.split()[:3]) or "unknown"
 
 
 def _card_index_group_for_entry(
