@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_market_anomaly_scanner, event_opportunity_verdict, event_research_cards, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_market_anomaly_scanner, event_official_exchange, event_opportunity_verdict, event_research_cards, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -88,6 +89,13 @@ class EventAlphaArtifactDoctorResult:
     market_anomaly_created_alert_rows: int = 0
     market_anomaly_missing_freshness_status: int = 0
     market_anomaly_needs_search_without_plan: int = 0
+    official_exchange_candidate_rows: int = 0
+    official_exchange_candidate_missing_source_fields: int = 0
+    official_exchange_listing_without_official_source: int = 0
+    official_exchange_secret_leak: int = 0
+    official_exchange_delisting_long_research: int = 0
+    official_exchange_quote_asset_misclassified: int = 0
+    official_exchange_created_alert_rows: int = 0
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
@@ -244,6 +252,7 @@ def diagnose_artifacts(
     incident_rows: Iterable[Mapping[str, Any] | object] = (),
     evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
     market_anomaly_rows: Iterable[Mapping[str, Any]] | None = None,
+    official_exchange_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     source_coverage_report_path: str | Path | None = None,
@@ -278,6 +287,15 @@ def diagnose_artifacts(
         raw_market_anomalies = list(event_market_anomaly_scanner.load_market_anomaly_rows(default_market_anomaly_path))
     else:
         raw_market_anomalies = [dict(row) for row in market_anomaly_rows if isinstance(row, Mapping)]
+    if official_exchange_candidate_rows is None:
+        default_official_exchange_path = None
+        if inspected_alert_store_path is not None:
+            default_official_exchange_path = Path(inspected_alert_store_path).parent
+        elif source_coverage_report_path is not None:
+            default_official_exchange_path = Path(source_coverage_report_path).parent
+        raw_official_exchange_candidates = list(event_official_exchange.load_official_listing_candidates(default_official_exchange_path))
+    else:
+        raw_official_exchange_candidates = [dict(row) for row in official_exchange_candidate_rows if isinstance(row, Mapping)]
     raw_legacy = sum(
         1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
         if event_alpha_artifacts.is_legacy_row(row)
@@ -347,6 +365,13 @@ def diagnose_artifacts(
     )
     market_anomalies = event_alpha_artifacts.filter_artifact_rows(
         raw_market_anomalies,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    official_exchange_candidates = event_alpha_artifacts.filter_artifact_rows(
+        raw_official_exchange_candidates,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -597,6 +622,7 @@ def diagnose_artifacts(
     )
     opportunity_lane_conflicts = _opportunity_lane_conflicts(core_rows)
     market_anomaly_conflicts = _market_anomaly_artifact_conflicts(market_anomalies)
+    official_exchange_conflicts = _official_exchange_artifact_conflicts(official_exchange_candidates)
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -823,6 +849,21 @@ def diagnose_artifacts(
         count = market_anomaly_conflicts.get(key, 0)
         if count:
             warnings.append(f"{key}={count}")
+    for key in (
+        "official_exchange_candidate_missing_source_fields",
+        "official_exchange_listing_without_official_source",
+        "official_exchange_secret_leak",
+        "official_exchange_delisting_long_research",
+        "official_exchange_quote_asset_misclassified",
+        "official_exchange_created_alert_rows",
+    ):
+        count = official_exchange_conflicts.get(key, 0)
+        if count:
+            message = f"{key}={count}"
+            if strict:
+                blockers.append(message)
+            else:
+                warnings.append(message)
     if source_coverage_report_conflicts["source_coverage_report_missing"]:
         warnings.append(
             "source_coverage_report_missing="
@@ -1419,6 +1460,13 @@ def diagnose_artifacts(
         market_anomaly_created_alert_rows=market_anomaly_conflicts["market_anomaly_created_alert_rows"],
         market_anomaly_missing_freshness_status=market_anomaly_conflicts["market_anomaly_missing_freshness_status"],
         market_anomaly_needs_search_without_plan=market_anomaly_conflicts["market_anomaly_needs_search_without_plan"],
+        official_exchange_candidate_rows=len(official_exchange_candidates),
+        official_exchange_candidate_missing_source_fields=official_exchange_conflicts["official_exchange_candidate_missing_source_fields"],
+        official_exchange_listing_without_official_source=official_exchange_conflicts["official_exchange_listing_without_official_source"],
+        official_exchange_secret_leak=official_exchange_conflicts["official_exchange_secret_leak"],
+        official_exchange_delisting_long_research=official_exchange_conflicts["official_exchange_delisting_long_research"],
+        official_exchange_quote_asset_misclassified=official_exchange_conflicts["official_exchange_quote_asset_misclassified"],
+        official_exchange_created_alert_rows=official_exchange_conflicts["official_exchange_created_alert_rows"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
         source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
         source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
@@ -2315,6 +2363,62 @@ def _market_anomaly_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> dic
             out["market_anomaly_suspicious_illiquid_promoted_confirmed"] += 1
         if bool(row.get("needs_catalyst_search")) and not row.get("suggested_source_packs_to_search"):
             out["market_anomaly_needs_search_without_plan"] += 1
+    return out
+
+
+def _official_exchange_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    out = {
+        "official_exchange_candidate_missing_source_fields": 0,
+        "official_exchange_listing_without_official_source": 0,
+        "official_exchange_secret_leak": 0,
+        "official_exchange_delisting_long_research": 0,
+        "official_exchange_quote_asset_misclassified": 0,
+        "official_exchange_created_alert_rows": 0,
+    }
+    quote_assets = {"USD", "USDT", "USDC", "FDUSD", "TUSD", "BUSD", "DAI", "BTC", "ETH", "BNB", "EUR", "TRY", "BRL"}
+    long_lanes = {"EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH"}
+    alertable_routes = {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH", "WATCHLIST", "TRIGGERED_FADE_RESEARCH"}
+    alertable_tiers = {"RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY", "TRIGGERED_FADE"}
+    listing_packs = {"official_exchange_listing_pack", "official_perp_listing_pack", "listing_liquidity_pack", "perp_listing_squeeze_pack"}
+    for row in rows:
+        if str(row.get("row_type") or "") != "official_listing_candidate":
+            continue
+        missing_required = any(not str(row.get(key) or "").strip() for key in ("source_url", "title", "published_at"))
+        if missing_required:
+            out["official_exchange_candidate_missing_source_fields"] += 1
+        source_class = str(row.get("source_class") or "").strip()
+        source_pack = str(row.get("source_pack") or "").strip()
+        if source_pack in listing_packs and source_class != "official_exchange":
+            out["official_exchange_listing_without_official_source"] += 1
+        payload_text = json.dumps(row, sort_keys=True, default=str)
+        if any(token in payload_text.casefold() for token in ("api_key", "apikey", "secret", "signature=", "x-mbx-apikey", "telegram_bot_token")):
+            out["official_exchange_secret_leak"] += 1
+        event_type = str(row.get("event_type") or "").strip()
+        opportunity_type = str(row.get("opportunity_type") or "").strip().upper()
+        if event_type == "delisting" and opportunity_type in long_lanes:
+            out["official_exchange_delisting_long_research"] += 1
+        symbol = str(row.get("symbol") or "").upper().strip()
+        pair_text = " ".join(
+            str(value or "")
+            for value in (
+                row.get("pairs"),
+                row.get("announcement_pairs"),
+                row.get("title"),
+                row.get("body"),
+                row.get("event_name"),
+            )
+        ).upper()
+        quote_assets_for_row = {str(value).upper() for value in row.get("quote_assets") or () if str(value).strip()}
+        symbol_is_quote_side = (
+            symbol in quote_assets_for_row
+            or bool(symbol and re.search(rf"/{re.escape(symbol)}\b", pair_text))
+        )
+        if symbol in quote_assets and symbol_is_quote_side:
+            out["official_exchange_quote_asset_misclassified"] += 1
+        route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").upper()
+        tier = str(row.get("tier") or row.get("alert_tier") or "").upper()
+        if bool(row.get("created_alert")) or bool(row.get("alert_id")) or route in alertable_routes or tier in alertable_tiers:
+            out["official_exchange_created_alert_rows"] += 1
     return out
 
 
@@ -4151,6 +4255,13 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"market_anomaly_created_alert_rows={result.market_anomaly_created_alert_rows} "
             f"market_anomaly_missing_freshness_status={result.market_anomaly_missing_freshness_status} "
             f"market_anomaly_needs_search_without_plan={result.market_anomaly_needs_search_without_plan} "
+            f"official_exchange_candidate_rows={result.official_exchange_candidate_rows} "
+            f"official_exchange_candidate_missing_source_fields={result.official_exchange_candidate_missing_source_fields} "
+            f"official_exchange_listing_without_official_source={result.official_exchange_listing_without_official_source} "
+            f"official_exchange_secret_leak={result.official_exchange_secret_leak} "
+            f"official_exchange_delisting_long_research={result.official_exchange_delisting_long_research} "
+            f"official_exchange_quote_asset_misclassified={result.official_exchange_quote_asset_misclassified} "
+            f"official_exchange_created_alert_rows={result.official_exchange_created_alert_rows} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "

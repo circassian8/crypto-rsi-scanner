@@ -11,14 +11,6 @@
           "listing_time": "2026-06-15T12:00:00Z",
           "url": "https://www.binance.com/en/support/announcement/binance-testlist",
           "source_confidence": 0.92
-        },
-        {
-          "id": "binance-general-maintenance",
-          "title": "Binance Updates API Rate Limits",
-          "body": "General operational announcement with no asset listing.",
-          "releaseDate": "2026-06-15T10:00:00Z",
-          "url": "https://www.binance.com/en/support/announcement/api-maintenance",
-          "source_confidence": 0.80
         }
       ]
     }

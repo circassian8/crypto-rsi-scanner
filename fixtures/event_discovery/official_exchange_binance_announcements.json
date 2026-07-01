@@ -1,0 +1,81 @@
+{
+  "catalogs": [
+    {
+      "catalogName": "New Cryptocurrency Listing",
+      "articles": [
+        {
+          "id": "binance-testlist-spot",
+          "title": "Binance Will List Test Listing (TESTLIST)",
+          "body": "Binance will list Test Listing (TESTLIST) and open spot trading for TESTLIST/USDT at 2026-06-15 12:00 UTC.",
+          "releaseDate": "2026-06-15T09:00:00Z",
+          "listing_time": "2026-06-15T12:00:00Z",
+          "url": "https://www.binance.com/en/support/announcement/binance-testlist",
+          "coin_ids": {
+            "TESTLIST": "test-listing"
+          },
+          "market_snapshot": {
+            "return_24h": 0.01,
+            "volume_zscore_24h": 0.2,
+            "event_age_hours": -3,
+            "market_context_freshness_status": "fresh"
+          },
+          "source_confidence": 0.92
+        },
+        {
+          "id": "binance-testdelist",
+          "title": "Binance Will Delist Test Delist (TESTDEL)",
+          "body": "Binance will delist and cease trading on TESTDEL/USDT at 2026-06-16 03:00 UTC.",
+          "releaseDate": "2026-06-15T12:00:00Z",
+          "effective_time": "2026-06-16T03:00:00Z",
+          "url": "https://www.binance.com/en/support/announcement/binance-testdelist",
+          "coin_ids": {
+            "TESTDEL": "test-delist"
+          },
+          "market_snapshot": {
+            "return_24h": -0.08,
+            "volume_zscore_24h": 1.3,
+            "event_age_hours": -15,
+            "market_context_freshness_status": "fresh"
+          },
+          "source_confidence": 0.94
+        },
+        {
+          "id": "binance-launchpool-testfarm",
+          "title": "Binance Launchpool: Farm Test Farm (TESTFARM)",
+          "body": "Users can farm Test Farm (TESTFARM) by staking BNB and FDUSD before spot trading opens.",
+          "releaseDate": "2026-06-15T13:00:00Z",
+          "launchTime": "2026-06-16T00:00:00Z",
+          "url": "https://www.binance.com/en/support/announcement/binance-testfarm-launchpool",
+          "symbols": ["TESTFARM"],
+          "market_snapshot": {
+            "return_24h": 0.0,
+            "volume_zscore_24h": 0.0,
+            "event_age_hours": -11,
+            "market_context_freshness_status": "fresh"
+          },
+          "source_confidence": 0.91
+        },
+        {
+          "id": "binance-btc-usdt-pair",
+          "title": "Binance Adds New Spot Trading Pair BTC/USDT",
+          "body": "Binance adds BTC/USDT to a regional promotion. USDT is the quote asset.",
+          "releaseDate": "2026-06-15T14:00:00Z",
+          "url": "https://www.binance.com/en/support/announcement/binance-btc-usdt-pair",
+          "symbols": ["BTC"],
+          "coin_ids": {
+            "BTC": "bitcoin"
+          },
+          "source_confidence": 0.86
+        },
+        {
+          "id": "binance-general-maintenance",
+          "title": "Binance Updates API Rate Limits",
+          "body": "General operational announcement with no asset listing.",
+          "releaseDate": "2026-06-15T10:00:00Z",
+          "url": "https://www.binance.com/en/support/announcement/api-maintenance",
+          "source_confidence": 0.80
+        }
+      ]
+    }
+  ]
+}

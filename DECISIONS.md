@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Official exchange announcements are first-class research evidence only
+**Status:** accepted
+**Decision:** Event Alpha may normalize official exchange announcements into
+profile-scoped research artifacts and use explicit official source packs for
+listing, perp-listing, and exchange-risk evidence. These rows can support local
+reports, source coverage, cards, audits, and artifact-doctor checks, but they
+must not create Telegram sends, normal RSI signal rows, paper trades, live
+trades, execution, or Event Alpha-created `TRIGGERED_FADE`.
+**Why:** Official exchange announcements are high-quality identity/catalyst
+evidence for listing and tradability events, but promotion still requires the
+deterministic Event Alpha quality/router gates and market/source confirmation
+rules.
+**Revisit when:** A reviewed validation sample proves an official-exchange
+event lane should move beyond research artifacts, and the human approves a
+separate notification or paper-tracking promotion.
+
 ## 2026-07-01 - Market anomaly artifacts are catalyst-search seeds only
 **Status:** accepted
 **Decision:** Event Alpha may write profile-scoped market-state snapshots and

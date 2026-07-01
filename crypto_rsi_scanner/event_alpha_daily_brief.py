@@ -26,6 +26,7 @@ from . import (
     event_alpha_reason_text,
     event_market_anomaly_scanner,
     event_research_cards,
+    event_official_exchange,
     event_source_packs,
     event_source_registry,
     event_source_reliability,
@@ -52,6 +53,7 @@ def build_daily_brief(
     incident_rows: Iterable[Mapping[str, Any]] = (),
     evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
     market_anomaly_rows: Iterable[Mapping[str, Any]] | None = None,
+    official_exchange_candidate_rows: Iterable[Mapping[str, Any]] | None = None,
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
@@ -133,6 +135,18 @@ def build_daily_brief(
     )
     market_anomalies = event_alpha_artifacts.filter_artifact_rows(
         raw_market_anomalies,
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    raw_official_exchange_candidates = (
+        [dict(row) for row in official_exchange_candidate_rows if isinstance(row, Mapping)]
+        if official_exchange_candidate_rows is not None
+        else list(event_official_exchange.load_official_listing_candidates(Path(run_ledger_path).parent if run_ledger_path else None))
+    )
+    official_exchange_candidates = event_alpha_artifacts.filter_artifact_rows(
+        raw_official_exchange_candidates,
         profile=requested_profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -308,6 +322,9 @@ def build_daily_brief(
         "",
         "## Market Anomalies Without Confirmed Catalyst",
         *_market_anomaly_daily_lines(market_anomalies, limit=10),
+        "",
+        "## Fresh Official Exchange Catalysts",
+        *_official_exchange_daily_lines(official_exchange_candidates, limit=10),
         "",
         "## Canonical Incidents",
         *_canonical_incident_lines(incidents),
@@ -1868,6 +1885,60 @@ def _market_anomaly_daily_lines(
     remaining = max(0, len(candidates) - displayed)
     if remaining:
         lines.append(f"- +{remaining} more market anomaly rows in local artifacts.")
+    return lines
+
+
+def _official_exchange_daily_lines(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int,
+) -> list[str]:
+    candidates = [
+        dict(row)
+        for row in rows
+        if isinstance(row, Mapping)
+        and str(row.get("row_type") or "") == "official_listing_candidate"
+    ]
+    if not candidates:
+        return ["- None."]
+    priority = {
+        "CONFIRMED_LONG_RESEARCH": 0,
+        "EARLY_LONG_RESEARCH": 1,
+        "FADE_SHORT_REVIEW": 2,
+        "RISK_ONLY": 3,
+        "UNCONFIRMED_RESEARCH": 4,
+        "DIAGNOSTIC": 5,
+    }
+    candidates.sort(key=lambda row: (priority.get(str(row.get("opportunity_type") or ""), 9), str(row.get("published_at") or "")))
+    lines: list[str] = []
+    displayed = 0
+    for row in candidates:
+        lines.append(
+            f"- {row.get('symbol') or 'UNRESOLVED'}/{row.get('coin_id') or 'unresolved'}: "
+            f"{row.get('event_type') or 'unknown'} on {row.get('exchange') or 'exchange'} "
+            f"lane={row.get('opportunity_type') or 'unknown'} "
+            f"market_state={row.get('market_state') or 'unknown'} "
+            f"pack={row.get('source_pack') or 'unknown'}"
+        )
+        if row.get("effective_time") or row.get("published_at"):
+            lines.append(
+                f"  timing: published={row.get('published_at') or 'unknown'} "
+                f"effective={row.get('effective_time') or 'unknown'}"
+            )
+        warnings = [str(item) for item in row.get("resolver_warnings") or () if str(item)]
+        if warnings:
+            lines.append("  resolver: " + "; ".join(warnings[:3]))
+        why_not = [str(item) for item in row.get("why_not_alertable") or () if str(item)]
+        if why_not:
+            lines.append("  why_not_alertable: " + "; ".join(why_not[:3]))
+        if row.get("source_url"):
+            lines.append(f"  source: {row.get('source_url')}")
+        displayed += 1
+        if displayed >= limit:
+            break
+    remaining = max(0, len(candidates) - displayed)
+    if remaining:
+        lines.append(f"- +{remaining} more official exchange rows in local artifacts.")
     return lines
 
 

@@ -37650,6 +37650,216 @@ def test_makefile_exposes_market_anomaly_targets():
     assert "--event-alpha-market-anomaly-scan" in text
 
 
+def test_bybit_announcement_provider_supports_documented_query_params():
+    from crypto_rsi_scanner.event_providers.bybit_announcements import BybitAnnouncementProvider
+
+    provider = BybitAnnouncementProvider(
+        None,
+        live_enabled=True,
+        locale="en-US",
+        announcement_type="new_crypto",
+        tag="spot",
+        page=3,
+        limit=50,
+    )
+    url = provider._request_url()
+
+    assert "/v5/announcements/index" in url
+    assert "locale=en-US" in url
+    assert "type=new_crypto" in url
+    assert "tag=spot" in url
+    assert "page=3" in url
+    assert "limit=50" in url
+
+
+def test_official_exchange_fixture_lanes_and_quote_filtering():
+    from crypto_rsi_scanner import event_official_exchange
+
+    with TemporaryDirectory() as tmp:
+        result = event_official_exchange.run_official_exchange_scan(
+            namespace_dir=tmp,
+            provider_paths={
+                "binance_announcements": "fixtures/event_discovery/official_exchange_binance_announcements.json",
+                "bybit_announcements": "fixtures/event_discovery/official_exchange_bybit_announcements.json",
+            },
+            profile="fixture",
+            artifact_namespace="official_exchange_smoke",
+            run_mode="fixture",
+            run_id="run-official-fixture",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        candidates = event_official_exchange.load_official_listing_candidates(tmp)
+
+    by_symbol = {str(row.get("symbol") or ""): row for row in candidates}
+    event_types = {row["event_type"] for row in result.events}
+
+    assert result.announcement_count >= 8
+    assert result.event_count == result.announcement_count
+    assert result.candidate_count >= 7
+    assert "spot_listing" in event_types
+    assert "perp_listing" in event_types
+    assert "delisting" in event_types
+    assert by_symbol["TESTSPOT"]["opportunity_type"] == "EARLY_LONG_RESEARCH"
+    assert by_symbol["TESTPERP"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH"
+    assert by_symbol["TESTDEL"]["opportunity_type"] == "RISK_ONLY"
+    assert by_symbol["TESTFARM"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+    assert "deterministic_resolver_validation_missing" in by_symbol["TESTFARM"]["why_not_alertable"]
+    assert "USDT" not in by_symbol
+    assert by_symbol["BTC"]["coin_id"] == "bitcoin"
+    assert all(row["source_class"] == "official_exchange" for row in candidates)
+    assert all(row["created_alert"] is False for row in candidates)
+    assert all(row["research_only"] is True for row in candidates)
+
+
+def test_official_exchange_artifact_doctor_conflicts():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    rows = [
+        {
+            "row_type": "official_listing_candidate",
+            "symbol": "BAD",
+            "coin_id": "bad",
+            "event_type": "spot_listing",
+            "source_class": "crypto_news",
+            "source_pack": "official_exchange_listing_pack",
+            "title": "Media says BAD listed",
+            "published_at": "2026-06-15T12:00:00Z",
+            "source_url": "https://example.test/bad",
+        },
+        {
+            "row_type": "official_listing_candidate",
+            "symbol": "USDT",
+            "coin_id": "tether",
+            "event_type": "spot_listing",
+            "source_class": "official_exchange",
+            "source_pack": "official_exchange_listing_pack",
+            "title": "Binance Adds BTC/USDT",
+            "published_at": "2026-06-15T12:00:00Z",
+            "source_url": "https://www.binance.com/en/support/announcement/btc-usdt",
+        },
+        {
+            "row_type": "official_listing_candidate",
+            "symbol": "DLST",
+            "coin_id": "delist",
+            "event_type": "delisting",
+            "source_class": "official_exchange",
+            "source_pack": "official_exchange_risk_pack",
+            "title": "Binance Will Delist DLST",
+            "published_at": "2026-06-15T12:00:00Z",
+            "source_url": "https://www.binance.com/en/support/announcement/dlst",
+            "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+        },
+        {
+            "row_type": "official_listing_candidate",
+            "symbol": "MISS",
+            "coin_id": "missing",
+            "event_type": "spot_listing",
+            "source_class": "official_exchange",
+            "source_pack": "official_exchange_listing_pack",
+        },
+        {
+            "row_type": "official_listing_candidate",
+            "symbol": "LEAK",
+            "coin_id": "leak",
+            "event_type": "spot_listing",
+            "source_class": "official_exchange",
+            "source_pack": "official_exchange_listing_pack",
+            "title": "Binance Will List LEAK",
+            "published_at": "2026-06-15T12:00:00Z",
+            "source_url": "https://www.binance.com/en/support/announcement/leak?signature=abc",
+        },
+        {
+            "row_type": "official_listing_candidate",
+            "symbol": "ALRT",
+            "coin_id": "alert",
+            "event_type": "spot_listing",
+            "source_class": "official_exchange",
+            "source_pack": "official_exchange_listing_pack",
+            "title": "Binance Will List ALRT",
+            "published_at": "2026-06-15T12:00:00Z",
+            "source_url": "https://www.binance.com/en/support/announcement/alrt",
+            "created_alert": True,
+        },
+    ]
+    conflicts = event_alpha_artifact_doctor._official_exchange_artifact_conflicts(rows)
+
+    assert conflicts["official_exchange_listing_without_official_source"] == 1
+    assert conflicts["official_exchange_quote_asset_misclassified"] == 1
+    assert conflicts["official_exchange_delisting_long_research"] == 1
+    assert conflicts["official_exchange_candidate_missing_source_fields"] == 1
+    assert conflicts["official_exchange_secret_leak"] == 1
+    assert conflicts["official_exchange_created_alert_rows"] == 1
+
+
+def test_cryptopanic_listing_article_is_not_official_exchange_proof():
+    from crypto_rsi_scanner import event_market_reaction, event_source_packs
+
+    row = {
+        "provider": "cryptopanic",
+        "source_class": "cryptopanic_tagged",
+        "source_pack": "official_exchange_listing_pack",
+        "symbol": "CHZ",
+        "coin_id": "chiliz",
+        "title": "CHZ fans react to listing rumors",
+        "currency_tags": ["CHZ"],
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match"],
+        "market_snapshot": {
+            "return_24h": 0.20,
+            "volume_zscore_24h": 3.0,
+            "market_context_freshness_status": "fresh",
+        },
+    }
+    pack_result = event_source_packs.evaluate_pack_evidence(row, pack=event_source_packs.get_source_pack("official_exchange_listing_pack"))
+    reaction = event_market_reaction.evaluate_market_reaction({
+        **row,
+        "impact_path_type": "listing_liquidity_event",
+        "evidence_quality_score": 86,
+        "accepted_evidence_count": 1,
+    })
+
+    assert pack_result["source_pack_validated_digest_sufficient"] is False
+    assert "preferred_source_missing" in pack_result["source_pack_missing_evidence"]
+    assert reaction.opportunity_type == "UNCONFIRMED_RESEARCH"
+    assert "official_exchange_source_required" in reaction.why_not_alertable
+
+
+def test_daily_brief_renders_official_exchange_section():
+    from crypto_rsi_scanner import event_alpha_daily_brief, event_official_exchange
+
+    with TemporaryDirectory() as tmp:
+        result = event_official_exchange.run_official_exchange_scan(
+            namespace_dir=tmp,
+            provider_paths={
+                "binance_announcements": "fixtures/event_discovery/official_exchange_binance_announcements.json",
+                "bybit_announcements": "fixtures/event_discovery/official_exchange_bybit_announcements.json",
+            },
+            profile="fixture",
+            artifact_namespace="official_exchange_smoke",
+            run_mode="fixture",
+            run_id="run-official-fixture",
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        brief = event_alpha_daily_brief.build_daily_brief(
+            run_rows=[],
+            official_exchange_candidate_rows=result.candidates,
+            requested_profile="fixture",
+            artifact_namespace="official_exchange_smoke",
+            include_test_artifacts=True,
+        )
+
+    assert "## Fresh Official Exchange Catalysts" in brief
+    assert "TESTSPOT/test-spot" in brief
+    assert "TESTPERP/test-perp" in brief
+
+
+def test_makefile_exposes_official_exchange_targets():
+    text = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "event-alpha-official-exchange-report" in text
+    assert "event-alpha-official-exchange-smoke" in text
+    assert "--event-alpha-official-exchange-report" in text
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

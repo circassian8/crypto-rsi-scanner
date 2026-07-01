@@ -53,6 +53,50 @@ class SourcePack:
 
 
 SOURCE_PACKS: dict[str, SourcePack] = {
+    "official_exchange_listing_pack": SourcePack(
+        name="official_exchange_listing_pack",
+        playbooks=("listing_volatility", "direct_event", "exchange_listing"),
+        preferred_source_classes=(event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value,),
+        preferred_providers=("binance_announcements", "bybit_announcements", "okx_announcements", "coinbase", "kucoin"),
+        minimum_evidence=("official listing announcement", "asset/pair identity", "listing or trading start time"),
+        validation_requirements=("official_exchange_source", "symbol_or_pair_match", "official_pair_match"),
+        sufficient_for_validated_digest=("official_exchange_source", "symbol_or_pair_match"),
+        required_for_watchlist=("official_exchange_source", "symbol_or_pair_match", "market_confirmation"),
+        required_for_high_priority=("official_exchange_source", "symbol_or_pair_match", "strong_market_confirmation"),
+        impact_path_validating_sources=(event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value,),
+        impact_path_families=("listing_liquidity_event", "direct_listing", "exchange_campaign_event"),
+        market_refresh_required=True,
+    ),
+    "official_perp_listing_pack": SourcePack(
+        name="official_perp_listing_pack",
+        playbooks=("perp_listing_squeeze", "listing_volatility", "direct_event"),
+        preferred_source_classes=(
+            event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value,
+            event_source_registry.SourceClass.DERIVATIVES_DATA.value,
+        ),
+        preferred_providers=("binance_announcements", "bybit_announcements", "coinalyze", "binance_futures", "bybit_futures"),
+        minimum_evidence=("official perp listing", "contract/pair identity", "funding or open-interest context"),
+        validation_requirements=("official_exchange_source", "symbol_or_pair_match", "derivatives_confirmation"),
+        sufficient_for_validated_digest=("official_exchange_source", "symbol_or_pair_match"),
+        required_for_watchlist=("official_exchange_source", "symbol_or_pair_match", "derivatives_confirmation", "market_confirmation"),
+        required_for_high_priority=("official_exchange_source", "symbol_or_pair_match", "derivatives_confirmation", "strong_market_confirmation"),
+        impact_path_validating_sources=(event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value,),
+        impact_path_families=("perp_listing", "listing_liquidity_event"),
+        market_refresh_required=True,
+        derivatives_refresh_required=True,
+    ),
+    "official_exchange_risk_pack": SourcePack(
+        name="official_exchange_risk_pack",
+        playbooks=("exchange_risk", "direct_event", "listing_volatility"),
+        preferred_source_classes=(event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value,),
+        preferred_providers=("binance_announcements", "bybit_announcements", "okx_announcements", "coinbase", "kucoin"),
+        minimum_evidence=("official delisting/suspension/resumption/maintenance notice", "asset/pair identity", "effective time"),
+        validation_requirements=("official_exchange_source", "symbol_or_pair_match", "tradability_impact"),
+        sufficient_for_validated_digest=("official_exchange_source", "symbol_or_pair_match"),
+        impact_path_validating_sources=(event_source_registry.SourceClass.OFFICIAL_EXCHANGE.value,),
+        impact_path_families=("exchange_tradability_risk", "delisting", "trading_suspension", "maintenance"),
+        market_refresh_required=True,
+    ),
     "listing_liquidity_pack": SourcePack(
         name="listing_liquidity_pack",
         playbooks=("listing_volatility", "direct_event", "exchange_listing"),
@@ -342,6 +386,12 @@ def source_pack_for_playbook(
     impact_category: str | None = None,
 ) -> SourcePack:
     text = " ".join(str(value or "") for value in (playbook_type, impact_path_type, impact_category)).casefold()
+    if "official_perp_listing_pack" in text:
+        return SOURCE_PACKS["official_perp_listing_pack"]
+    if "official_exchange_risk_pack" in text:
+        return SOURCE_PACKS["official_exchange_risk_pack"]
+    if "official_exchange_listing_pack" in text:
+        return SOURCE_PACKS["official_exchange_listing_pack"]
     if "perp" in text and "listing" in text:
         return SOURCE_PACKS["perp_listing_squeeze_pack"]
     if "listing" in text or "exchange_listing" in text:

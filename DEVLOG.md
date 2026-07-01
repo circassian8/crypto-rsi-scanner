@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Add Event Alpha official exchange announcement pack · Codex
+**Why:** Event Alpha needs first-class official exchange evidence for listings,
+perp launches, delistings, launchpool/product notices, and trading-risk events
+without relying on broad news or CryptoPanic narratives as substitutes.
+**Changes:**
+- Added `event_official_exchange.py` to normalize configured Binance/Bybit
+  announcement fixtures into research-only exchange announcement, official
+  exchange event, and official listing candidate JSONL artifacts plus a local
+  Markdown report.
+- Added official source packs for listing, perp listing, and exchange-risk
+  evidence, source-coverage ordering, daily-brief rendering, card/audit official
+  exchange evidence sections, provider-health observations, and strict artifact
+  doctor checks for source class, quote-side identity, secret leakage, delisting
+  lane misuse, and accidental alert creation.
+- Added dedicated official exchange fixture files so legacy discovery fixtures
+  keep their old row counts, and extended the Bybit provider URL builder with
+  documented `tag` and `page` query parameters.
+- Added `main.py --event-alpha-official-exchange-report`,
+  `make event-alpha-official-exchange-report`, and
+  `make event-alpha-official-exchange-smoke`.
+**Verify:** `python3 tests/test_indicators.py` (621/621 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-official-exchange-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The official exchange pack is artifact-only and
+research-only. It writes no normal RSI rows, sends no Telegram messages, opens
+no paper/live trades, and cannot create `TRIGGERED_FADE`.
+
 ## 2026-07-01 — Add Event Alpha market-state anomaly artifacts · Codex
 **Why:** Event Alpha needs a market-first radar layer that can flag abnormal
 price/volume behavior and seed catalyst search without treating price action as

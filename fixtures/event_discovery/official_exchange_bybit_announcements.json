@@ -1,0 +1,55 @@
+{
+  "retCode": 0,
+  "retMsg": "OK",
+  "result": {
+    "list": [
+      {
+        "id": "bybit-testspot-spot",
+        "title": "Bybit Lists TESTSPOT on Spot",
+        "description": "Bybit will list Test Spot (TESTSPOT) and open TESTSPOT/USDT spot trading.",
+        "publishTime": "2026-06-15T10:30:00Z",
+        "launchTime": "2026-06-15T13:00:00Z",
+        "url": "https://announcements.bybit.com/article/testspot-spot-listing",
+        "coin_ids": {
+          "TESTSPOT": "test-spot"
+        },
+        "market_snapshot": {
+          "return_24h": 0.01,
+          "volume_zscore_24h": 0.1,
+          "event_age_hours": -2,
+          "market_context_freshness_status": "fresh"
+        },
+        "source_confidence": 0.91
+      },
+      {
+        "id": "bybit-testperp-perp",
+        "title": "Bybit New Derivatives Listing: TESTPERPUSDT Perpetual Contract",
+        "description": "Bybit will launch the TESTPERPUSDT perpetual contract for Test Perp (TESTPERP).",
+        "publishTime": "2026-06-15T11:00:00Z",
+        "launchTime": "2026-06-15T14:00:00Z",
+        "url": "https://announcements.bybit.com/article/testperp-usdt-perpetual",
+        "coin_ids": {
+          "TESTPERP": "test-perp"
+        },
+        "market_snapshot": {
+          "return_1h": 0.06,
+          "return_24h": 0.19,
+          "relative_return_vs_btc": 0.12,
+          "volume_zscore_24h": 3.5,
+          "event_age_hours": -1,
+          "market_context_freshness_status": "fresh"
+        },
+        "source_confidence": 0.90
+      },
+      {
+        "id": "bybit-unknownlisting-spot",
+        "title": "Bybit Lists MYSTERY on Spot",
+        "description": "Bybit will list Mystery Token (MYSTERY) and open MYSTERY/USDT trading.",
+        "publishTime": "2026-06-15T12:00:00Z",
+        "launchTime": "2026-06-15T15:00:00Z",
+        "url": "https://announcements.bybit.com/article/mystery-spot-listing",
+        "source_confidence": 0.88
+      }
+    ]
+  }
+}

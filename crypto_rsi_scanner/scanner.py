@@ -127,6 +127,7 @@ from . import event_llm_catalyst_frames
 from . import event_llm_extractor
 from . import event_market_anomaly_scanner
 from . import event_near_miss
+from . import event_official_exchange
 from . import event_opportunity_audit
 from . import event_provider_health
 from . import event_provider_status
@@ -4063,6 +4064,7 @@ def event_alpha_notification_checklist_report(
         incident_rows=artifacts["incidents"].rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
+        official_exchange_candidate_rows=event_official_exchange.load_official_listing_candidates(context.namespace_dir),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
@@ -7572,6 +7574,7 @@ def event_alpha_daily_brief_report(
         incident_rows=event_incident_store.load_incidents(context.incident_store_path, limit=100, include_legacy=True).rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
         market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
+        official_exchange_candidate_rows=event_official_exchange.load_official_listing_candidates(context.namespace_dir),
         watchlist_entries=watchlist.entries,
         router_result=router_result,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
@@ -7699,6 +7702,165 @@ def _append_market_anomaly_run_ledger_row(
         "success": True,
         "failure": None,
         "warnings": (),
+    }
+    context.run_ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with context.run_ledger_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True, default=str, separators=(",", ":")))
+        fh.write("\n")
+
+
+def event_alpha_official_exchange_report(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    binance_path: str | None = None,
+    bybit_path: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
+    """Run the research-only official exchange announcement normalizer."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "fixture"
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            selected_profile,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    started_at = datetime.now(timezone.utc)
+    run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
+    provider_paths = {
+        "binance_announcements": Path(binance_path).expanduser() if binance_path else Path(config.EVENT_ALPHA_OFFICIAL_EXCHANGE_BINANCE_PATH),
+        "bybit_announcements": Path(bybit_path).expanduser() if bybit_path else Path(config.EVENT_ALPHA_OFFICIAL_EXCHANGE_BYBIT_PATH),
+    }
+    result = event_official_exchange.run_official_exchange_scan(
+        namespace_dir=context.namespace_dir,
+        provider_paths=provider_paths,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_mode=context.run_mode,
+        run_id=run_id,
+        observed_at=_event_research_now(),
+    )
+    finished_at = datetime.now(timezone.utc)
+    _record_official_exchange_provider_health(context, result=result, run_id=run_id, now=finished_at)
+    _append_official_exchange_run_ledger_row(
+        context,
+        run_id=run_id,
+        started_at=started_at,
+        finished_at=finished_at,
+        announcement_count=result.announcement_count,
+        event_count=result.event_count,
+        candidate_count=result.candidate_count,
+        warnings=result.warnings,
+    )
+    print(_event_alpha_context_block(context))
+    print(
+        "official_exchange_scan: "
+        f"announcements={result.announcement_count} events={result.event_count} candidates={result.candidate_count} "
+        f"announcements_path={result.announcements_path} events_path={result.events_path} "
+        f"candidates_path={result.candidates_path} report_path={result.report_path}"
+    )
+    print(event_official_exchange.format_official_exchange_report(
+        result.events,
+        result.candidates,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        warnings=result.warnings,
+    ))
+
+
+def _record_official_exchange_provider_health(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    result: event_official_exchange.OfficialExchangeScanResult,
+    run_id: str,
+    now: datetime,
+) -> None:
+    cfg = _event_provider_health_config_from_runtime()
+    events_by_provider: dict[str, int] = {}
+    for event in result.events:
+        provider = str(event.get("provider") or "")
+        if provider:
+            events_by_provider[provider] = events_by_provider.get(provider, 0) + 1
+    for provider in ("binance_announcements", "bybit_announcements"):
+        if events_by_provider.get(provider, 0) > 0:
+            event_provider_health.record_provider_success(
+                provider,
+                cfg=cfg,
+                run_id=run_id,
+                now=now,
+                provider_kind="event_source",
+                provider_service=provider,
+                provider_role="official_exchange_announcements",
+            )
+        else:
+            event_provider_health.record_provider_failure(
+                provider,
+                "official_exchange_fixture_no_rows",
+                cfg=cfg,
+                run_id=run_id,
+                now=now,
+                provider_kind="event_source",
+                provider_service=provider,
+                provider_role="official_exchange_announcements",
+            )
+
+
+def _append_official_exchange_run_ledger_row(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    run_id: str,
+    started_at: datetime,
+    finished_at: datetime,
+    announcement_count: int,
+    event_count: int,
+    candidate_count: int,
+    warnings: Iterable[str] = (),
+) -> None:
+    row = {
+        "schema_version": event_alpha_run_ledger.RUN_LEDGER_SCHEMA_VERSION,
+        "row_type": "event_alpha_run",
+        "run_id": run_id,
+        "profile": context.profile,
+        "run_mode": context.run_mode,
+        "artifact_namespace": context.artifact_namespace,
+        "started_at": started_at.astimezone(timezone.utc).isoformat(),
+        "finished_at": finished_at.astimezone(timezone.utc).isoformat(),
+        "runtime_seconds": max(0.0, (finished_at - started_at).total_seconds()),
+        "with_llm": False,
+        "send_requested": False,
+        "raw_events": int(announcement_count),
+        "official_exchange_announcements": int(announcement_count),
+        "official_exchange_events": int(event_count),
+        "official_listing_candidates": int(candidate_count),
+        "market_anomalies": 0,
+        "catalyst_queries": 0,
+        "catalyst_results_accepted": 0,
+        "catalyst_results_rejected": 0,
+        "extraction_rows": 0,
+        "extraction_hints_applied": 0,
+        "candidates": int(candidate_count),
+        "clusters": 0,
+        "alerts": 0,
+        "watchlist_entries": 0,
+        "watchlist_escalations": 0,
+        "routed": 0,
+        "alertable": 0,
+        "sent": False,
+        "provider_fetch_count": 0,
+        "provider_cache_hits": 0,
+        "provider_cache_misses": 0,
+        "llm_cache_hits": 0,
+        "llm_cache_misses": 0,
+        "llm_calls_attempted": 0,
+        "llm_skipped_due_budget": 0,
+        "warnings": tuple(str(warning) for warning in warnings if str(warning)),
+        "success": True,
+        "failure": None,
     }
     context.run_ledger_path.parent.mkdir(parents=True, exist_ok=True)
     with context.run_ledger_path.open("a", encoding="utf-8") as fh:
@@ -10311,6 +10473,21 @@ def cli() -> None:
         help="Optional JSON/JSONL market rows path for --event-alpha-market-anomaly-scan.",
     )
     parser.add_argument(
+        "--event-alpha-official-exchange-report",
+        action="store_true",
+        help="Write research-only official exchange announcement artifacts from configured fixtures.",
+    )
+    parser.add_argument(
+        "--event-alpha-official-exchange-binance",
+        default=None,
+        help="Optional Binance announcement fixture path for --event-alpha-official-exchange-report.",
+    )
+    parser.add_argument(
+        "--event-alpha-official-exchange-bybit",
+        default=None,
+        help="Optional Bybit announcement fixture path for --event-alpha-official-exchange-report.",
+    )
+    parser.add_argument(
         "--event-alpha-replay",
         action="store_true",
         help="Replay Event Alpha local artifacts without provider calls or sends.",
@@ -11270,6 +11447,16 @@ def cli() -> None:
             profile_name=args.event_alpha_profile,
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             market_rows_path=args.event_alpha_market_anomaly_rows,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
+        return
+    if args.event_alpha_official_exchange_report:
+        event_alpha_official_exchange_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            binance_path=args.event_alpha_official_exchange_binance,
+            bybit_path=args.event_alpha_official_exchange_bybit,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
         )
         return

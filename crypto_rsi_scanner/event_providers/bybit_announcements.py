@@ -38,6 +38,8 @@ class BybitAnnouncementProvider:
         base_url: str = "https://api.bybit.com",
         locale: str = "en-US",
         announcement_type: str = "new_crypto",
+        tag: str = "",
+        page: int = 1,
         limit: int = 20,
         timeout: float = 10.0,
         opener: UrlOpen | None = None,
@@ -48,6 +50,8 @@ class BybitAnnouncementProvider:
         self.base_url = base_url.rstrip("/") + "/"
         self.locale = locale
         self.announcement_type = announcement_type
+        self.tag = tag
+        self.page = page
         self.limit = limit
         self.timeout = timeout
         self.opener = opener or _urlopen_with_timeout
@@ -93,11 +97,13 @@ class BybitAnnouncementProvider:
     def _request_url(self) -> str:
         query = {
             "locale": self.locale,
-            "page": 1,
+            "page": max(1, self.page),
             "limit": max(1, self.limit),
         }
         if self.announcement_type:
             query["type"] = self.announcement_type
+        if self.tag:
+            query["tag"] = self.tag
         return urljoin(self.base_url, "v5/announcements/index") + "?" + urlencode(query)
 
 

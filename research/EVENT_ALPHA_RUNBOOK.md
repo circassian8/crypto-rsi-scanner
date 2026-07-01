@@ -51,6 +51,17 @@ path. Official exchange rows should preserve the exchange, normalized event kind
 `exchange_product_event`), product type, symbols, pairs/contracts,
 announcement time, and source URL so cards and audits can show exactly what the
 official source proves.
+The official exchange announcement pack writes three local research artifacts:
+`event_exchange_announcements.jsonl`, `event_official_exchange_events.jsonl`,
+and `event_official_listing_candidates.jsonl`. Use
+`make event-alpha-official-exchange-smoke PYTHON=python3` to prove fixture
+normalization, source coverage, daily brief output, and strict artifact-doctor
+checks without sends. Use `make event-alpha-official-exchange-report
+PROFILE=<profile> ARTIFACT_NAMESPACE=<namespace> PYTHON=python3` to inspect a
+configured namespace. Official listing/perp/risk packs require
+`source_class=official_exchange`; CryptoPanic or broad-news listing rumors are
+context only for these packs unless another official/structured source validates
+the exchange catalyst.
 Structured calendar and unlock rows have narrower but stronger contracts.
 CoinMarketCal-style rows should preserve `event_time_source=structured_calendar`,
 `source_class=structured_calendar`, event category/type, event-time confidence,

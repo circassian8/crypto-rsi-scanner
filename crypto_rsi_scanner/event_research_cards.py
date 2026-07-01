@@ -206,6 +206,10 @@ def render_research_card(
         "## Evidence Sources",
     ])
     lines.extend(_source_lines(entry, alert))
+    official_exchange_lines = _official_exchange_evidence_lines(entry, alert)
+    if official_exchange_lines:
+        lines.extend(["", "## Official Exchange Evidence"])
+        lines.extend(official_exchange_lines)
     lines.extend(["", "## Source Coverage / Evidence Acquisition"])
     lines.extend(_source_acquisition_lines(entry, alert, card_path=card_path, lineage_context=lineage_context))
     lines.extend([
@@ -1785,6 +1789,59 @@ def _source_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
     if provider:
         lines.append(f"- Provider: {provider}")
     return lines
+
+
+def _official_exchange_evidence_lines(
+    entry: event_watchlist.EventWatchlistEntry | None,
+    alert: Mapping[str, Any] | None,
+) -> list[str]:
+    components = _card_components(entry, alert)
+    source_pack = str(components.get("source_pack") or "")
+    source_class = str(components.get("source_class") or "")
+    event_type = str(components.get("event_type") or "")
+    if (
+        source_class != "official_exchange"
+        and not source_pack.startswith("official_exchange")
+        and not source_pack.startswith("official_perp")
+    ):
+        return []
+    reason_codes = _list_strings(components.get("reason_codes") or components.get("accepted_evidence_reason_codes"))
+    pairs = _list_strings(components.get("pairs") or components.get("announcement_pairs"))
+    contracts = _list_strings(components.get("contracts") or components.get("announcement_contracts"))
+    lines = [
+        f"- Exchange: {_display_text(components.get('exchange')) or 'unknown'}",
+        f"- Event type: {event_type or 'unknown'}",
+        f"- Source pack: {source_pack or 'unknown'}",
+        f"- Token identity: {'resolved' if components.get('coin_id') or components.get('validated_coin_id') else 'unresolved'}",
+        f"- Impact path: {_display_text(components.get('impact_path_type')) or 'unknown'}",
+    ]
+    if pairs:
+        lines.append("- Pairs: " + ", ".join(pairs[:6]))
+    if contracts:
+        lines.append("- Contracts: " + ", ".join(contracts[:6]))
+    if reason_codes:
+        lines.append("- Reason codes: " + ", ".join(reason_codes[:8]))
+    if components.get("published_at") or components.get("effective_time"):
+        lines.append(
+            "- Timing: "
+            f"published={components.get('published_at') or 'unknown'} "
+            f"effective={components.get('effective_time') or 'unknown'}"
+        )
+    if components.get("source_url"):
+        lines.append(f"- Official source: {components.get('source_url')}")
+    return lines
+
+
+def _list_strings(value: Any) -> list[str]:
+    if value in (None, "", [], (), {}):
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Mapping):
+        return [str(key) for key in value.keys()]
+    if isinstance(value, Iterable):
+        return [str(item) for item in value if str(item).strip()]
+    return [str(value)]
 
 
 def _display_text(value: Any) -> str | None:

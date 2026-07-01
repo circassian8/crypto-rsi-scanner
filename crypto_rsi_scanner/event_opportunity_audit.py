@@ -169,6 +169,7 @@ def format_opportunity_audit(
         "",
         "## Source coverage and acquisition plan",
         *_source_acquisition_audit_lines(row, components),
+        *_official_exchange_audit_section(row, components),
         "",
         "## Market confirmation decision",
         f"- market level/score: {components.get('market_confirmation_level') or row.get('market_confirmation_level') or 'unknown'} / {components.get('market_confirmation_score') or row.get('market_confirmation_score') or 'n/a'}",
@@ -481,6 +482,32 @@ def _source_acquisition_audit_lines(row: Mapping[str, Any], components: Mapping[
         f"- provider gaps/failures: {'; '.join(str(item) for item in list(failures or ())[:5]) if failures else 'none'}",
         f"- validation criteria: {'; '.join(pack.validation_requirements[:5])}",
     ]
+
+
+def _official_exchange_audit_section(row: Mapping[str, Any], components: Mapping[str, Any]) -> list[str]:
+    merged = {**dict(components or {}), **dict(row or {})}
+    source_pack = str(merged.get("source_pack") or "")
+    source_class = str(merged.get("source_class") or "")
+    if (
+        source_class != "official_exchange"
+        and not source_pack.startswith("official_exchange")
+        and not source_pack.startswith("official_perp")
+    ):
+        return []
+    lines = [
+        "",
+        "## Official exchange evidence",
+        f"- exchange: {merged.get('exchange') or 'unknown'}",
+        f"- event type: {merged.get('event_type') or 'unknown'}",
+        f"- source pack: {source_pack or 'unknown'}",
+        f"- identity: {merged.get('validated_symbol') or merged.get('symbol') or 'unknown'}/{merged.get('validated_coin_id') or merged.get('coin_id') or 'unresolved'}",
+        f"- pairs: {_list_value(merged.get('pairs') or merged.get('announcement_pairs'))}",
+        f"- contracts: {_list_value(merged.get('contracts') or merged.get('announcement_contracts'))}",
+        f"- reason codes: {_list_value(merged.get('reason_codes') or merged.get('accepted_evidence_reason_codes'))}",
+        f"- timing: published={merged.get('published_at') or 'unknown'} effective={merged.get('effective_time') or 'unknown'}",
+        f"- official source: {merged.get('source_url') or 'unknown'}",
+    ]
+    return lines
 
 
 def _source_contract_text(values: object, *, limit: int = 5) -> str:

@@ -18,6 +18,9 @@ from .event_providers import cryptopanic as cryptopanic_provider
 
 
 SOURCE_COVERAGE_PACK_ORDER = (
+    "official_exchange_listing_pack",
+    "official_perp_listing_pack",
+    "official_exchange_risk_pack",
     "proxy_preipo_rwa_pack",
     "strategic_investment_pack",
     "security_shock_pack",
