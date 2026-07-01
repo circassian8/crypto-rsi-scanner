@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from . import event_market_reaction
+from . import config, event_market_reaction
 from .event_providers._announcement_common import (
     _announcement_contracts,
     _announcement_items,
@@ -63,6 +63,7 @@ QUOTE_ASSETS = {
     "TRY",
     "BRL",
 }
+MAJOR_PAIR_BASE_ASSETS = {"BTC", "ETH", "USDT", "USDC", "FDUSD", "TUSD", "BUSD", "DAI"}
 
 RISK_EVENT_TYPES = {DELISTING, TRADING_SUSPENSION, MAINTENANCE}
 LISTING_EVENT_TYPES = {
@@ -247,6 +248,7 @@ def normalize_official_exchange_event(
         "symbols": symbols,
         "coin_ids": coin_ids,
         "quote_assets": quote_assets,
+        "major_pair_simple_announcement": _is_simple_major_pair_event(event_type, symbols=symbols, pairs=pairs),
         "pairs": pairs,
         "contracts": contracts,
         "effective_time": effective_time,
@@ -417,6 +419,13 @@ def _candidate_rows_for_event(event: Mapping[str, Any], item: Mapping[str, Any])
         opportunity_type = reaction.opportunity_type
         why_not = list(reaction.why_not_alertable)
         warnings = list(event.get("resolver_warnings") or ())
+        reason_codes = list(event.get("reason_codes") or ())
+        major_pair_noise = bool(event.get("major_pair_simple_announcement")) and not bool(config.EVENT_ALPHA_ALLOW_MAJOR_PAIR_CATALYSTS)
+        if major_pair_noise:
+            opportunity_type = event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
+            why_not.append("major_pair_simple_announcement_not_alpha")
+            warnings.append("major_pair_simple_pair_capped")
+            reason_codes.append("major_pair_simple_announcement_capped")
         if not coin_id:
             opportunity_type = event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value
             why_not.append("deterministic_resolver_validation_missing")
@@ -451,7 +460,8 @@ def _candidate_rows_for_event(event: Mapping[str, Any], item: Mapping[str, Any])
             "source_strength": SOURCE_STRENGTH,
             "source_pack": event.get("source_pack"),
             "impact_path_type": event.get("impact_path_type"),
-            "reason_codes": event.get("reason_codes") or (),
+            "reason_codes": tuple(dict.fromkeys(reason_codes)),
+            "major_pair_simple_announcement": major_pair_noise,
             "resolver_warnings": tuple(dict.fromkeys(warnings)),
             "market_snapshot": market_snapshot,
             "market_state_snapshot": reaction.market_state_snapshot.to_dict(),
@@ -630,6 +640,20 @@ def _reason_codes_for_event(event_type: str, *, symbols: tuple[str, ...], coin_i
     elif event_type in {LAUNCHPOOL, LAUNCHPAD, AIRDROP, STAKING_EARN}:
         reasons.append("official_exchange_campaign")
     return tuple(dict.fromkeys(reasons))
+
+
+def _is_simple_major_pair_event(event_type: str, *, symbols: tuple[str, ...], pairs: tuple[str, ...]) -> bool:
+    if event_type not in {SPOT_LISTING, NEW_TRADING_PAIR}:
+        return False
+    bases = {str(symbol or "").upper() for symbol in symbols if str(symbol or "").strip()}
+    for pair in pairs:
+        if "/" not in str(pair):
+            continue
+        base, quote = str(pair).upper().split("/", 1)
+        bases.add(base)
+        if base in MAJOR_PAIR_BASE_ASSETS and quote in QUOTE_ASSETS:
+            return True
+    return bool(bases and bases.issubset(MAJOR_PAIR_BASE_ASSETS))
 
 
 def _resolver_warnings(symbols: tuple[str, ...], coin_ids: tuple[str, ...]) -> tuple[str, ...]:

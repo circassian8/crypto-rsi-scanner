@@ -4070,7 +4070,7 @@ def event_alpha_notification_checklist_report(
         scheduled_catalyst_rows=event_scheduled_catalysts.load_scheduled_catalysts(context.namespace_dir),
         unlock_candidate_rows=event_scheduled_catalysts.load_unlock_candidates(context.namespace_dir),
         derivatives_state_rows=event_derivatives_crowding.load_derivatives_state(context.namespace_dir),
-        fade_review_candidate_rows=event_derivatives_crowding.load_fade_review_candidates(context.namespace_dir),
+        fade_review_candidate_rows=event_derivatives_crowding.load_derivatives_candidates(context.namespace_dir),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",

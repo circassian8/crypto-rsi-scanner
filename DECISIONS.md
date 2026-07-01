@@ -16,6 +16,25 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Event Alpha market-state returns use explicit units
+**Status:** accepted
+**Decision:** Raw/latest market snapshots use fractional returns by default
+(`0.012` means `+1.2%`). Persisted Event Alpha market-state snapshots use
+percentage points with explicit `return_unit=percent_points`,
+`source_return_unit`, and unit warnings when needed. Reports and research cards
+must format returns with `%` signs, and artifact doctor should block obvious
+double-scaled market-state snapshots relative to the raw/latest source. Raw
+source-pack evidence acquisition rows must not retain promoted final levels when
+no evidence was accepted and acquisition was skipped, rejected, or unresolved.
+Official exchange simple BTC/ETH/stable pair additions are capped to
+unconfirmed/diagnostic by default unless explicitly enabled.
+**Why:** Mixed fractional and percentage-point values made CHZ/VELVET cards
+show impossible 1h/4h moves and could corrupt market-state classification,
+opportunity lanes, and fade-review diagnostics. Stale acquisition and simple
+major-pair artifacts can likewise make non-confirming evidence look promoted.
+**Revisit when:** Event Alpha market and evidence artifacts move to a typed
+schema that enforces units/final fields at serialization boundaries.
+
 ## 2026-07-01 - Derivatives crowding is fade-review evidence, not a trigger
 **Status:** accepted
 **Decision:** Event Alpha may normalize derivatives crowding evidence such as

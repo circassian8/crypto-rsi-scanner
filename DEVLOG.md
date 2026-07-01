@@ -17,6 +17,43 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Stabilize Event Alpha market units and artifact gates · Codex
+**Why:** Live-style Event Alpha artifacts were mixing fractional raw returns
+with percentage-point market-state values, which could double-scale short-horizon
+returns and pollute opportunity-lane decisions. Several adjacent artifacts also
+kept stale pre-policy truth for acquisition and derivatives review.
+**Changes:**
+- Added `event_market_units.py` and wired market reaction/state, cards, daily
+  briefs, and artifact doctor checks around explicit return-unit metadata.
+- Fixed market reaction recomputation so raw/latest market snapshots win over
+  stale normalized market-state snapshots when both are present.
+- Normalized evidence-acquisition final fields against canonical post-policy
+  truth so zero-accepted/rejected/skipped rows cannot persist
+  `validated_digest`.
+- Persisted all derivatives crowding candidates separately from the fade-review
+  subset, exposed confirmed-long crowding warnings, added market anomaly
+  `market_state_class`, and capped simple BTC/ETH/stable-pair exchange
+  announcements by default.
+- Added regression tests for CHZ/VELVET return-unit examples, stale
+  acquisition rows, derivatives all-candidate artifacts, market anomaly schema,
+  and major-pair official-exchange noise.
+**Verify:** `python3 tests/test_indicators.py` (637/637 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-market-anomaly-smoke PYTHON=python3`;
+`make event-alpha-official-exchange-smoke PYTHON=python3`;
+`make event-alpha-scheduled-catalyst-smoke PYTHON=python3`;
+`make event-alpha-unlock-risk-smoke PYTHON=python3`;
+`make event-alpha-derivatives-smoke PYTHON=python3`;
+`make event-alpha-fade-review-smoke PYTHON=python3`;
+`make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The refreshed `notify_llm_deep_cryptopanic_rehearsal` artifacts
+are no-send guarded and strict-doctor clean for the new unit/stale-field checks.
+Public-provider warnings remain fail-soft diagnostics. No Telegram sends,
+trades, paper rows, normal RSI rows, or `TRIGGERED_FADE` behavior changed.
+
 ## 2026-07-01 — Add Event Alpha derivatives crowding review lane · Codex
 **Why:** Event Alpha needs derivatives context for crowded post-pump fade
 review without allowing open interest, funding, or liquidation data to create

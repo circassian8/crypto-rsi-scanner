@@ -12,6 +12,8 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
+from . import event_market_units
+
 
 class EventMarketState(str, Enum):
     NO_REACTION = "no_reaction"
@@ -55,6 +57,10 @@ class MarketStateSnapshot:
     event_age_hours: float | None = None
     freshness_status: str | None = None
     source: str | None = None
+    return_unit: str = event_market_units.RETURN_UNIT_PERCENT_POINTS
+    source_return_unit: str = event_market_units.RETURN_UNIT_UNKNOWN
+    threshold_unit: str = event_market_units.RETURN_UNIT_PERCENT_POINTS
+    unit_warnings: tuple[str, ...] = ()
     observed_fields: int = 0
 
     def to_dict(self) -> dict[str, Any]:
@@ -254,13 +260,13 @@ def evaluate_market_reaction(data: MarketReactionInput | Mapping[str, Any] | Non
 
 
 def _input_from_mapping(row: Mapping[str, Any]) -> MarketReactionInput:
-    market = _mapping(row.get("market_state_snapshot") or row.get("market_snapshot") or row.get("latest_market_snapshot") or row.get("market"))
+    market = _mapping(row.get("market_snapshot") or row.get("latest_market_snapshot") or row.get("market") or row.get("market_state_snapshot"))
     derivatives = _mapping(row.get("derivatives_snapshot") or row.get("derivatives") or row.get("perp"))
     dex = _mapping(row.get("dex_liquidity_snapshot") or row.get("dex_liquidity") or row.get("dex"))
     supply = _mapping(row.get("supply_snapshot") or row.get("supply"))
     components = _mapping(row.get("latest_score_components") or row.get("score_components"))
     if components:
-        market = {**_mapping(components.get("market_state_snapshot") or components.get("market_snapshot")), **market}
+        market = {**_mapping(components.get("market_snapshot") or components.get("latest_market_snapshot") or components.get("market_state_snapshot")), **market}
         derivatives = {**_mapping(components.get("derivatives_snapshot") or components.get("derivatives")), **derivatives}
         dex = {**_mapping(components.get("dex_liquidity_snapshot") or components.get("dex_liquidity")), **dex}
         supply = {**_mapping(components.get("supply_snapshot") or components.get("supply")), **supply}
@@ -300,15 +306,41 @@ def _build_snapshot(data: MarketReactionInput) -> MarketStateSnapshot:
     derivatives = _mapping(data.derivatives_snapshot)
     dex = _mapping(data.dex_liquidity_snapshot)
     supply = _mapping(data.supply_snapshot)
+    market_unit = event_market_units.infer_return_unit(
+        market,
+        default=event_market_units.RETURN_UNIT_FRACTION,
+        keys=(
+            "return_5m",
+            "return_15m",
+            "return_1h",
+            "return_4h",
+            "return_24h",
+            "price_change_5m",
+            "price_change_15m",
+            "price_change_1h",
+            "price_change_4h",
+            "price_change_24h",
+            "price_change_percentage_24h",
+            "relative_return_vs_btc",
+            "relative_return_vs_eth",
+            "relative_return_vs_sector",
+            "rel_return_btc",
+            "rel_return_eth",
+            "rel_return_sector",
+            "relative_strength_vs_btc",
+            "relative_strength_vs_eth",
+            "relative_strength_vs_sector",
+        ),
+    )
     values = {
-        "return_5m": _pct(_first(market, "return_5m", "price_change_5m")),
-        "return_15m": _pct(_first(market, "return_15m", "price_change_15m")),
-        "return_1h": _pct(_first(market, "return_1h", "price_change_1h")),
-        "return_4h": _pct(_first(market, "return_4h", "price_change_4h")),
-        "return_24h": _pct(_first(market, "return_24h", "price_change_24h", "price_change_percentage_24h")),
-        "relative_return_vs_btc": _pct(_first(market, "relative_return_vs_btc", "rel_return_btc", "relative_strength_vs_btc")),
-        "relative_return_vs_eth": _pct(_first(market, "relative_return_vs_eth", "rel_return_eth", "relative_strength_vs_eth")),
-        "relative_return_vs_sector": _pct(_first(market, "relative_return_vs_sector", "rel_return_sector", "relative_strength_vs_sector")),
+        "return_5m": _pct(_first(market, "return_5m", "price_change_5m"), unit_hint=market_unit),
+        "return_15m": _pct(_first(market, "return_15m", "price_change_15m"), unit_hint=market_unit),
+        "return_1h": _pct(_first(market, "return_1h", "price_change_1h"), unit_hint=market_unit),
+        "return_4h": _pct(_first(market, "return_4h", "price_change_4h"), unit_hint=market_unit),
+        "return_24h": _pct(_first(market, "return_24h", "price_change_24h", "price_change_percentage_24h"), unit_hint=market_unit),
+        "relative_return_vs_btc": _pct(_first(market, "relative_return_vs_btc", "rel_return_btc", "relative_strength_vs_btc"), unit_hint=market_unit),
+        "relative_return_vs_eth": _pct(_first(market, "relative_return_vs_eth", "rel_return_eth", "relative_strength_vs_eth"), unit_hint=market_unit),
+        "relative_return_vs_sector": _pct(_first(market, "relative_return_vs_sector", "rel_return_sector", "relative_strength_vs_sector"), unit_hint=market_unit),
         "volume_turnover_zscore": _float(_first(market, "volume_turnover_zscore", "volume_zscore_24h", "volume_zscore", "volume_z")),
         "volume_to_market_cap": _float(_first(market, "volume_to_market_cap", "volume_mcap", "volume_mcap_ratio")),
         "liquidity_usd": _float(_first(market, "liquidity_usd", "order_book_depth_2pct", "depth_2pct_usd")),
@@ -335,6 +367,13 @@ def _build_snapshot(data: MarketReactionInput) -> MarketStateSnapshot:
         **values,
         freshness_status=data.market_context_freshness_status or _first_text(market, {}, "market_context_freshness_status", "freshness_status"),
         source=_first_text(market, {}, "market_context_source", "source", "provider"),
+        return_unit=event_market_units.RETURN_UNIT_PERCENT_POINTS,
+        source_return_unit=market_unit,
+        threshold_unit=event_market_units.RETURN_UNIT_PERCENT_POINTS,
+        unit_warnings=event_market_units.validate_market_snapshot_units(
+            {"return_unit": event_market_units.RETURN_UNIT_PERCENT_POINTS, **{key: values.get(key) for key in ("return_1h", "return_4h", "return_24h")}},
+            market,
+        ),
         observed_fields=observed,
     )
 
@@ -565,7 +604,9 @@ def _int(value: object) -> int | None:
         return None
 
 
-def _pct(value: object) -> float | None:
+def _pct(value: object, *, unit_hint: str | None = None) -> float | None:
+    if unit_hint:
+        return event_market_units.normalize_return_percent_points(value, unit_hint)
     number = _float(value)
     if number is None:
         return None

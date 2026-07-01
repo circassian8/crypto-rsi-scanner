@@ -25,6 +25,7 @@ from . import (
     event_alpha_router,
     event_opportunity_verdict,
     event_alpha_reason_text,
+    event_market_units,
     event_market_anomaly_scanner,
     event_research_cards,
     event_official_exchange,
@@ -1921,7 +1922,7 @@ def _market_anomaly_daily_lines(
     displayed = 0
     for row in candidates:
         key = str(row.get("canonical_asset_id") or row.get("coin_id") or row.get("symbol") or "")
-        family = str(row.get("anomaly_type") or "")
+        family = str(row.get("market_state_class") or row.get("anomaly_type") or "")
         dedupe_key = f"{key}|{family}"
         if dedupe_key in seen:
             continue
@@ -1933,7 +1934,7 @@ def _market_anomaly_daily_lines(
         invalidates = row.get("what_invalidates") if isinstance(row.get("what_invalidates"), list) else []
         lines.append(
             f"- {row.get('symbol') or row.get('coin_id') or 'UNKNOWN'}/{row.get('coin_id') or 'unknown'}: "
-            f"type={row.get('anomaly_type') or 'unknown'} "
+            f"type={row.get('market_state_class') or row.get('anomaly_type') or 'unknown'} "
             f"return_4h={_format_signed_pct(snapshot.get('return_4h'))} "
             f"return_24h={_format_signed_pct(snapshot.get('return_24h'))} "
             f"volume_z={_format_float(snapshot.get('volume_zscore_24h'))} "
@@ -2141,9 +2142,10 @@ def _derivatives_move_summary(row: Mapping[str, Any]) -> str:
     snapshot = row.get("market_state_snapshot")
     if not isinstance(snapshot, Mapping):
         snapshot = {}
+    unit = event_market_units.infer_return_unit(snapshot, default=event_market_units.RETURN_UNIT_PERCENT_POINTS)
     return (
-        f"4h={_format_pct(snapshot.get('return_4h'))} "
-        f"24h={_format_pct(snapshot.get('return_24h'))} "
+        f"4h={event_market_units.format_return_pct(snapshot.get('return_4h'), unit)} "
+        f"24h={event_market_units.format_return_pct(snapshot.get('return_24h'), unit)} "
         f"liquidity={_format_compact_number(snapshot.get('liquidity_usd'))} "
         f"spread_bps={_format_float(snapshot.get('spread_bps'))}"
     )

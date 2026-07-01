@@ -20,6 +20,7 @@ from .event_providers.manual_json import parse_datetime
 
 
 DERIVATIVES_STATE_FILENAME = "event_derivatives_state.jsonl"
+DERIVATIVES_CROWDING_CANDIDATES_FILENAME = "event_derivatives_crowding_candidates.jsonl"
 DERIVATIVES_CROWDING_REPORT_FILENAME = "event_derivatives_crowding_report.md"
 FADE_SHORT_REVIEW_CANDIDATES_FILENAME = "event_fade_short_review_candidates.jsonl"
 
@@ -31,6 +32,7 @@ RESEARCH_DISCLAIMER = "Research-only. Not a trade signal."
 class DerivativesCrowdingScanResult:
     namespace_dir: Path
     derivatives_state_path: Path
+    derivatives_candidates_path: Path
     fade_review_candidates_path: Path
     report_path: Path
     derivatives_state_count: int
@@ -98,9 +100,11 @@ def run_derivatives_crowding_scan(
 
     fade_rows = [row for row in candidate_rows if row.get("opportunity_type") == FADE_REVIEW_LANE]
     state_path = directory / DERIVATIVES_STATE_FILENAME
+    candidates_path = directory / DERIVATIVES_CROWDING_CANDIDATES_FILENAME
     fade_path = directory / FADE_SHORT_REVIEW_CANDIDATES_FILENAME
     report_path = directory / DERIVATIVES_CROWDING_REPORT_FILENAME
     _write_jsonl(state_path, state_rows)
+    _write_jsonl(candidates_path, candidate_rows)
     _write_jsonl(fade_path, fade_rows)
     report_path.write_text(
         format_derivatives_crowding_report(
@@ -115,6 +119,7 @@ def run_derivatives_crowding_scan(
     return DerivativesCrowdingScanResult(
         namespace_dir=directory,
         derivatives_state_path=state_path,
+        derivatives_candidates_path=candidates_path,
         fade_review_candidates_path=fade_path,
         report_path=report_path,
         derivatives_state_count=len(state_rows),
@@ -315,6 +320,12 @@ def load_fade_review_candidates(namespace_dir: str | Path | None) -> tuple[dict[
     return tuple(_read_jsonl(Path(namespace_dir) / FADE_SHORT_REVIEW_CANDIDATES_FILENAME))
 
 
+def load_derivatives_candidates(namespace_dir: str | Path | None) -> tuple[dict[str, Any], ...]:
+    if namespace_dir is None:
+        return ()
+    return tuple(_read_jsonl(Path(namespace_dir) / DERIVATIVES_CROWDING_CANDIDATES_FILENAME))
+
+
 def format_derivatives_crowding_report(
     *,
     state_rows: Iterable[Mapping[str, Any]],
@@ -364,6 +375,9 @@ def format_derivatives_crowding_report(
             f"market_state={row.get('market_state')} crowding={row.get('crowding_class')} "
             f"fade_ready={row.get('fade_readiness')}"
         )
+        row_warnings = [str(item) for item in row.get("warnings") or () if str(item)]
+        if row_warnings:
+            lines.append("  - warnings: " + "; ".join(row_warnings[:5]))
     lines.extend(["", "## Derivatives State"])
     if not states:
         lines.append("- none")

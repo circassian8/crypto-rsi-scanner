@@ -61,7 +61,17 @@ PROFILE=<profile> ARTIFACT_NAMESPACE=<namespace> PYTHON=python3` to inspect a
 configured namespace. Official listing/perp/risk packs require
 `source_class=official_exchange`; CryptoPanic or broad-news listing rumors are
 context only for these packs unless another official/structured source validates
-the exchange catalyst.
+the exchange catalyst. Simple BTC/ETH/stable quote/base pair additions are
+diagnostic by default and should not become `EARLY_LONG_RESEARCH` unless
+`RSI_EVENT_ALPHA_ALLOW_MAJOR_PAIR_CATALYSTS=1` is set or the announcement is a
+material access/product change.
+
+Market return units are explicit. Raw/latest market snapshots keep fractional
+returns (`0.012` means `+1.2%`). Event market-state snapshots are persisted in
+percentage points with `return_unit=percent_points` and should also carry
+`source_return_unit`. Cards, daily briefs, and reports format returns with `%`
+signs for humans. A card showing `+148%` when the latest snapshot is `0.0148`
+is a unit bug; strict artifact doctor checks for that double-scaling pattern.
 Structured calendar and unlock rows have narrower but stronger contracts.
 CoinMarketCal-style rows should preserve `event_time_source=structured_calendar`,
 `source_class=structured_calendar`, event category/type, event-time confidence,
@@ -100,6 +110,7 @@ liquidation imbalance, long/short ratio, basis, perp/spot volume, exchange,
 market, provider, and freshness fields into:
 
 - `event_derivatives_state.jsonl`
+- `event_derivatives_crowding_candidates.jsonl`
 - `event_fade_short_review_candidates.jsonl`
 - `event_derivatives_crowding_report.md`
 
@@ -110,12 +121,19 @@ manual fade/short-review lane. A `FADE_SHORT_REVIEW` row requires evidence that
 the move already happened plus crowding/exhaustion and liquidity sanity; poor
 liquidity stays `RISK_ONLY`. The lane is research-only metadata and cannot
 create `TRIGGERED_FADE`, normal RSI rows, Telegram sends, paper trades, live
-trades, or execution.
+trades, or execution. `event_derivatives_crowding_candidates.jsonl` keeps every
+evaluated derivatives candidate for audit/doctor checks; `event_fade_short_review_candidates.jsonl`
+is only the review-ready subset.
 Source-pack acquisition rows now persist the attempted plan, execution results,
 query execution statuses, provider coverage statuses, accepted/rejected samples,
-and source-pack sufficiency booleans. Treat these rows as audit evidence; they
-can improve a local research verdict only after deterministic identity,
-catalyst-link, impact-path, source-quality, and quality-gate checks pass.
+source-pack sufficiency booleans, and canonical post-policy final fields. If no
+evidence was accepted and the status is `rejected_results_only`, `no_results`,
+`skipped_budget`, or another unresolved/no-confirmation state, raw acquisition
+rows must not retain `final_opportunity_level=validated_digest`; reconciliation
+caps those rows to local/exploratory unless the canonical core row has separate
+confirming evidence. Treat these rows as audit evidence; they can improve a
+local research verdict only after deterministic identity, catalyst-link,
+impact-path, source-quality, and quality-gate checks pass.
 
 Source enrichment is now quality-gated before LLM extraction or catalyst-frame
 analysis can consume fetched article bodies. Enrichment cache rows should carry

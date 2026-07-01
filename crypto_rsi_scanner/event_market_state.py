@@ -12,6 +12,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from . import event_market_units
+
 
 @dataclass(frozen=True)
 class MarketStateSnapshot:
@@ -46,12 +48,17 @@ class MarketStateSnapshot:
     event_age_hours: float | None = None
     market_data_source: str = "unknown"
     freshness_status: str = "unknown"
+    return_unit: str = event_market_units.RETURN_UNIT_PERCENT_POINTS
+    source_return_unit: str = event_market_units.RETURN_UNIT_UNKNOWN
+    threshold_unit: str = event_market_units.RETURN_UNIT_PERCENT_POINTS
     observed_fields: tuple[str, ...] = ()
+    unit_warnings: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["observed_fields"] = list(self.observed_fields)
+        data["unit_warnings"] = list(self.unit_warnings)
         data["warnings"] = list(self.warnings)
         return data
 
@@ -70,6 +77,7 @@ def snapshot_from_market_row(
     canonical_asset_id = str(row.get("canonical_asset_id") or coin_id or symbol).strip()
     warnings: list[str] = []
     fields: list[str] = []
+    source_unit = event_market_units.infer_return_unit(row, default=event_market_units.RETURN_UNIT_FRACTION)
 
     def capture(name: str, value: float | None) -> float | None:
         if value is not None:
@@ -84,39 +92,45 @@ def snapshot_from_market_row(
     if not symbol and not coin_id:
         warnings.append("missing_asset_identity")
 
-    r1h = _percent_value(row.get("return_1h") or row.get("price_change_percentage_1h_in_currency"))
-    r4h = _percent_value(row.get("return_4h") or row.get("price_change_percentage_4h_in_currency"))
-    r24h = _percent_value(row.get("return_24h") or row.get("price_change_24h") or row.get("price_change_percentage_24h_in_currency"))
+    r1h = _percent_value(row.get("return_1h") or row.get("price_change_percentage_1h_in_currency"), unit=source_unit)
+    r4h = _percent_value(row.get("return_4h") or row.get("price_change_percentage_4h_in_currency"), unit=source_unit)
+    r24h = _percent_value(row.get("return_24h") or row.get("price_change_24h") or row.get("price_change_percentage_24h_in_currency"), unit=source_unit)
     btc = btc_benchmark or {}
     eth = eth_benchmark or {}
-    rel_btc_1h = _percent_value(row.get("relative_return_vs_btc_1h") or row.get("rel_btc_1h"))
-    rel_btc_4h = _percent_value(row.get("relative_return_vs_btc_4h") or row.get("rel_btc_4h"))
-    rel_btc_24h = _percent_value(row.get("relative_return_vs_btc_24h") or row.get("relative_strength_vs_btc") or row.get("btc_relative_return"))
-    rel_eth_1h = _percent_value(row.get("relative_return_vs_eth_1h") or row.get("rel_eth_1h"))
-    rel_eth_4h = _percent_value(row.get("relative_return_vs_eth_4h") or row.get("rel_eth_4h"))
-    rel_eth_24h = _percent_value(row.get("relative_return_vs_eth_24h") or row.get("rel_eth_24h"))
+    rel_btc_1h = _percent_value(row.get("relative_return_vs_btc_1h") or row.get("rel_btc_1h"), unit=source_unit)
+    rel_btc_4h = _percent_value(row.get("relative_return_vs_btc_4h") or row.get("rel_btc_4h"), unit=source_unit)
+    rel_btc_24h = _percent_value(row.get("relative_return_vs_btc_24h") or row.get("relative_strength_vs_btc") or row.get("btc_relative_return"), unit=source_unit)
+    rel_eth_1h = _percent_value(row.get("relative_return_vs_eth_1h") or row.get("rel_eth_1h"), unit=source_unit)
+    rel_eth_4h = _percent_value(row.get("relative_return_vs_eth_4h") or row.get("rel_eth_4h"), unit=source_unit)
+    rel_eth_24h = _percent_value(row.get("relative_return_vs_eth_24h") or row.get("rel_eth_24h"), unit=source_unit)
     if rel_btc_1h is None and r1h is not None:
-        btc_r1h = _percent_value(btc.get("return_1h") or btc.get("price_change_percentage_1h_in_currency"))
+        btc_unit = event_market_units.infer_return_unit(btc, default=source_unit)
+        btc_r1h = _percent_value(btc.get("return_1h") or btc.get("price_change_percentage_1h_in_currency"), unit=btc_unit)
         if btc_r1h is not None:
             rel_btc_1h = r1h - btc_r1h
     if rel_btc_4h is None and r4h is not None:
-        btc_r4h = _percent_value(btc.get("return_4h") or btc.get("price_change_percentage_4h_in_currency"))
+        btc_unit = event_market_units.infer_return_unit(btc, default=source_unit)
+        btc_r4h = _percent_value(btc.get("return_4h") or btc.get("price_change_percentage_4h_in_currency"), unit=btc_unit)
         if btc_r4h is not None:
             rel_btc_4h = r4h - btc_r4h
     if rel_btc_24h is None and r24h is not None:
-        btc_r24h = _percent_value(btc.get("return_24h") or btc.get("price_change_percentage_24h_in_currency"))
+        btc_unit = event_market_units.infer_return_unit(btc, default=source_unit)
+        btc_r24h = _percent_value(btc.get("return_24h") or btc.get("price_change_percentage_24h_in_currency"), unit=btc_unit)
         if btc_r24h is not None:
             rel_btc_24h = r24h - btc_r24h
     if rel_eth_1h is None and r1h is not None:
-        eth_r1h = _percent_value(eth.get("return_1h") or eth.get("price_change_percentage_1h_in_currency"))
+        eth_unit = event_market_units.infer_return_unit(eth, default=source_unit)
+        eth_r1h = _percent_value(eth.get("return_1h") or eth.get("price_change_percentage_1h_in_currency"), unit=eth_unit)
         if eth_r1h is not None:
             rel_eth_1h = r1h - eth_r1h
     if rel_eth_4h is None and r4h is not None:
-        eth_r4h = _percent_value(eth.get("return_4h") or eth.get("price_change_percentage_4h_in_currency"))
+        eth_unit = event_market_units.infer_return_unit(eth, default=source_unit)
+        eth_r4h = _percent_value(eth.get("return_4h") or eth.get("price_change_percentage_4h_in_currency"), unit=eth_unit)
         if eth_r4h is not None:
             rel_eth_4h = r4h - eth_r4h
     if rel_eth_24h is None and r24h is not None:
-        eth_r24h = _percent_value(eth.get("return_24h") or eth.get("price_change_percentage_24h_in_currency"))
+        eth_unit = event_market_units.infer_return_unit(eth, default=source_unit)
+        eth_r24h = _percent_value(eth.get("return_24h") or eth.get("price_change_percentage_24h_in_currency"), unit=eth_unit)
         if eth_r24h is not None:
             rel_eth_24h = r24h - eth_r24h
 
@@ -132,8 +146,8 @@ def snapshot_from_market_row(
         canonical_asset_id=canonical_asset_id,
         observed_at=observed.isoformat(),
         price=capture("price", _float(row.get("price") or row.get("current_price"))),
-        return_5m=capture("return_5m", _percent_value(row.get("return_5m"))),
-        return_15m=capture("return_15m", _percent_value(row.get("return_15m"))),
+        return_5m=capture("return_5m", _percent_value(row.get("return_5m"), unit=source_unit)),
+        return_15m=capture("return_15m", _percent_value(row.get("return_15m"), unit=source_unit)),
         return_1h=capture("return_1h", r1h),
         return_4h=capture("return_4h", r4h),
         return_24h=capture("return_24h", r24h),
@@ -149,16 +163,23 @@ def snapshot_from_market_row(
         volume_to_market_cap=capture("volume_to_market_cap", volume_mcap),
         liquidity_usd=capture("liquidity_usd", _float(row.get("liquidity_usd") or row.get("order_book_liquidity_usd"))),
         spread_bps=capture("spread_bps", _float(row.get("spread_bps"))),
-        open_interest_delta=capture("open_interest_delta", _percent_value(row.get("open_interest_delta") or row.get("open_interest_delta_24h"))),
+        open_interest_delta=capture("open_interest_delta", _percent_value(row.get("open_interest_delta") or row.get("open_interest_delta_24h"), unit=event_market_units.infer_return_unit(row, default=event_market_units.RETURN_UNIT_PERCENT_POINTS))),
         funding_level=capture("funding_level", _float(row.get("funding_level") or row.get("funding_rate"))),
         funding_zscore=capture("funding_zscore", _float(row.get("funding_zscore"))),
         liquidation_imbalance=capture("liquidation_imbalance", _float(row.get("liquidation_imbalance"))),
-        dex_volume_change=capture("dex_volume_change", _percent_value(row.get("dex_volume_change"))),
-        dex_liquidity_change=capture("dex_liquidity_change", _percent_value(row.get("dex_liquidity_change"))),
+        dex_volume_change=capture("dex_volume_change", _percent_value(row.get("dex_volume_change"), unit=source_unit)),
+        dex_liquidity_change=capture("dex_liquidity_change", _percent_value(row.get("dex_liquidity_change"), unit=source_unit)),
         event_age_hours=capture("event_age_hours", _float(row.get("event_age_hours"))),
         market_data_source=source,
         freshness_status=freshness,
+        return_unit=event_market_units.RETURN_UNIT_PERCENT_POINTS,
+        source_return_unit=source_unit,
+        threshold_unit=event_market_units.RETURN_UNIT_PERCENT_POINTS,
         observed_fields=tuple(dict.fromkeys(fields)),
+        unit_warnings=event_market_units.validate_market_snapshot_units(
+            {"return_unit": event_market_units.RETURN_UNIT_PERCENT_POINTS, "return_1h": r1h, "return_4h": r4h, "return_24h": r24h},
+            row,
+        ),
         warnings=tuple(dict.fromkeys(warnings)),
     )
     return snapshot
@@ -190,15 +211,8 @@ def _observed_at(row: Mapping[str, Any], observed_at: datetime | str | None) -> 
     return datetime.now(timezone.utc)
 
 
-def _percent_value(value: object) -> float | None:
-    parsed = _float(value)
-    if parsed is None:
-        return None
-    # Existing market-enrichment snapshots use fractions. User-facing market
-    # state artifacts use percentage points to match threshold language.
-    if abs(parsed) <= 3.0:
-        return parsed * 100.0
-    return parsed
+def _percent_value(value: object, *, unit: str | None) -> float | None:
+    return event_market_units.normalize_return_percent_points(value, unit)
 
 
 def _float(value: object) -> float | None:

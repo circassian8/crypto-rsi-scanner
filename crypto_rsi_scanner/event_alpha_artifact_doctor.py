@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_market_anomaly_scanner, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -49,6 +49,7 @@ class EventAlphaArtifactDoctorResult:
     evidence_acquisition_core_id_missing_from_store: int = 0
     card_primary_fields_mismatch_core_store: int = 0
     card_evidence_acquisition_count_mismatch: int = 0
+    evidence_acquisition_stale_validated_digest: int = 0
     card_source_pack_mismatch_core_acquisition: int = 0
     card_primary_section_contains_support_row_blockers: int = 0
     card_upgrade_text_inconsistent_with_final_level: int = 0
@@ -82,8 +83,12 @@ class EventAlphaArtifactDoctorResult:
     cryptopanic_only_narrative_confirmed_lane: int = 0
     diagnostic_visible_default_operator_lane: int = 0
     core_missing_market_state_snapshot: int = 0
+    market_state_return_unit_missing: int = 0
+    market_state_possible_double_scaled: int = 0
+    market_state_lane_possible_double_scaled: int = 0
     market_anomaly_rows: int = 0
     market_anomaly_missing_market_state_snapshot: int = 0
+    market_anomaly_missing_market_state_class: int = 0
     market_anomaly_confirmed_breakout_missing_evidence: int = 0
     market_anomaly_suspicious_illiquid_promoted_confirmed: int = 0
     market_anomaly_created_alert_rows: int = 0
@@ -353,7 +358,9 @@ def diagnose_artifacts(
             default_fade_review_path = Path(inspected_alert_store_path).parent
         elif source_coverage_report_path is not None:
             default_fade_review_path = Path(source_coverage_report_path).parent
-        raw_fade_review_candidates = list(event_derivatives_crowding.load_fade_review_candidates(default_fade_review_path))
+        raw_fade_review_candidates = list(event_derivatives_crowding.load_derivatives_candidates(default_fade_review_path))
+        if not raw_fade_review_candidates:
+            raw_fade_review_candidates = list(event_derivatives_crowding.load_fade_review_candidates(default_fade_review_path))
     else:
         raw_fade_review_candidates = [dict(row) for row in fade_review_candidate_rows if isinstance(row, Mapping)]
     raw_legacy = sum(
@@ -722,6 +729,7 @@ def diagnose_artifacts(
         source_coverage_report_path=source_coverage_report_path,
     )
     evidence_count_mismatches = _evidence_count_mismatches(acquisition_rows)
+    acquisition_final_conflicts = _evidence_acquisition_final_field_conflicts(acquisition_rows)
     visible_sector_cores = _visible_sector_core_without_config(core_rows)
     duplicate_proxy_cores = _duplicate_proxy_core_rows(core_rows)
     daily_brief_conflicts = _daily_brief_consistency_conflicts(
@@ -830,6 +838,12 @@ def diagnose_artifacts(
     if card_acquisition_mismatches:
         message = f"card_evidence_acquisition_count_mismatch={card_acquisition_mismatches}"
         (blockers if strict and core_store_available else warnings).append(message)
+    if acquisition_final_conflicts["evidence_acquisition_stale_validated_digest"]:
+        message = (
+            "evidence_acquisition_stale_validated_digest="
+            f"{acquisition_final_conflicts['evidence_acquisition_stale_validated_digest']}"
+        )
+        (blockers if strict else warnings).append(message)
     if card_source_pack_mismatches:
         message = f"card_source_pack_mismatch_core_acquisition={card_source_pack_mismatches}"
         (blockers if strict and core_store_available else warnings).append(message)
@@ -915,14 +929,22 @@ def diagnose_artifacts(
         "cryptopanic_only_narrative_confirmed_lane",
         "diagnostic_visible_default_operator_lane",
         "core_missing_market_state_snapshot",
+        "market_state_possible_double_scaled",
+        "market_state_lane_possible_double_scaled",
     ):
         count = opportunity_lane_conflicts.get(key, 0)
         if not count:
             continue
         message = f"{key}={count}"
         (blockers if strict and core_store_available else warnings).append(message)
+    if opportunity_lane_conflicts.get("market_state_return_unit_missing", 0):
+        warnings.append(
+            "market_state_return_unit_missing="
+            f"{opportunity_lane_conflicts['market_state_return_unit_missing']}"
+        )
     for key in (
         "market_anomaly_missing_market_state_snapshot",
+        "market_anomaly_missing_market_state_class",
         "market_anomaly_confirmed_breakout_missing_evidence",
         "market_anomaly_suspicious_illiquid_promoted_confirmed",
         "market_anomaly_created_alert_rows",
@@ -1551,6 +1573,7 @@ def diagnose_artifacts(
         evidence_acquisition_core_id_missing_from_store=acquisition_core_missing_store,
         card_primary_fields_mismatch_core_store=card_primary_mismatches,
         card_evidence_acquisition_count_mismatch=card_acquisition_mismatches,
+        evidence_acquisition_stale_validated_digest=acquisition_final_conflicts["evidence_acquisition_stale_validated_digest"],
         card_source_pack_mismatch_core_acquisition=card_source_pack_mismatches,
         card_primary_section_contains_support_row_blockers=card_support_blockers,
         card_upgrade_text_inconsistent_with_final_level=card_upgrade_inconsistent,
@@ -1584,8 +1607,12 @@ def diagnose_artifacts(
         cryptopanic_only_narrative_confirmed_lane=opportunity_lane_conflicts["cryptopanic_only_narrative_confirmed_lane"],
         diagnostic_visible_default_operator_lane=opportunity_lane_conflicts["diagnostic_visible_default_operator_lane"],
         core_missing_market_state_snapshot=opportunity_lane_conflicts["core_missing_market_state_snapshot"],
+        market_state_return_unit_missing=opportunity_lane_conflicts["market_state_return_unit_missing"],
+        market_state_possible_double_scaled=opportunity_lane_conflicts["market_state_possible_double_scaled"],
+        market_state_lane_possible_double_scaled=opportunity_lane_conflicts["market_state_lane_possible_double_scaled"],
         market_anomaly_rows=len(market_anomalies),
         market_anomaly_missing_market_state_snapshot=market_anomaly_conflicts["market_anomaly_missing_market_state_snapshot"],
+        market_anomaly_missing_market_state_class=market_anomaly_conflicts["market_anomaly_missing_market_state_class"],
         market_anomaly_confirmed_breakout_missing_evidence=market_anomaly_conflicts["market_anomaly_confirmed_breakout_missing_evidence"],
         market_anomaly_suspicious_illiquid_promoted_confirmed=market_anomaly_conflicts["market_anomaly_suspicious_illiquid_promoted_confirmed"],
         market_anomaly_created_alert_rows=market_anomaly_conflicts["market_anomaly_created_alert_rows"],
@@ -2440,6 +2467,9 @@ def _opportunity_lane_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         "cryptopanic_only_narrative_confirmed_lane": 0,
         "diagnostic_visible_default_operator_lane": 0,
         "core_missing_market_state_snapshot": 0,
+        "market_state_return_unit_missing": 0,
+        "market_state_possible_double_scaled": 0,
+        "market_state_lane_possible_double_scaled": 0,
     }
     for row in rows:
         lane = str(row.get("opportunity_type") or "").strip()
@@ -2448,6 +2478,17 @@ def _opportunity_lane_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         snapshot = row.get("market_state_snapshot")
         if not isinstance(snapshot, Mapping) or not snapshot:
             out["core_missing_market_state_snapshot"] += 1
+            snapshot = {}
+        elif not str(snapshot.get("return_unit") or "").strip():
+            out["market_state_return_unit_missing"] += 1
+        unit_warnings = set(event_market_units.validate_market_snapshot_units(
+            snapshot if isinstance(snapshot, Mapping) else {},
+            row.get("latest_market_snapshot") if isinstance(row.get("latest_market_snapshot"), Mapping) else row.get("market_snapshot") if isinstance(row.get("market_snapshot"), Mapping) else None,
+        ))
+        if any("possible_double_scaled" in warning or "unit_mismatch" in warning for warning in unit_warnings):
+            out["market_state_possible_double_scaled"] += 1
+            if lane in {"CONFIRMED_LONG_RESEARCH", "FADE_SHORT_REVIEW"}:
+                out["market_state_lane_possible_double_scaled"] += 1
         source_met = _truthy(row.get("source_requirements_met") if row.get("source_requirements_met") is not None else row.get("opportunity_type_source_requirements_met"))
         market_met = _truthy(row.get("market_requirements_met") if row.get("market_requirements_met") is not None else row.get("opportunity_type_market_requirements_met"))
         fade_met = _truthy(row.get("fade_requirements_met") if row.get("fade_requirements_met") is not None else row.get("opportunity_type_fade_requirements_met"))
@@ -2471,6 +2512,7 @@ def _opportunity_lane_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
 def _market_anomaly_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     out = {
         "market_anomaly_missing_market_state_snapshot": 0,
+        "market_anomaly_missing_market_state_class": 0,
         "market_anomaly_confirmed_breakout_missing_evidence": 0,
         "market_anomaly_suspicious_illiquid_promoted_confirmed": 0,
         "market_anomaly_created_alert_rows": 0,
@@ -2483,6 +2525,8 @@ def _market_anomaly_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> dic
         if str(row.get("row_type") or "") != "event_market_anomaly":
             continue
         anomaly_type = str(row.get("anomaly_type") or row.get("market_state") or "")
+        if anomaly_type and not str(row.get("market_state_class") or "").strip():
+            out["market_anomaly_missing_market_state_class"] += 1
         snapshot = row.get("market_state_snapshot")
         if not isinstance(snapshot, Mapping) or not snapshot:
             out["market_anomaly_missing_market_state_snapshot"] += 1
@@ -3140,6 +3184,29 @@ def _evidence_count_mismatches(rows: Iterable[Mapping[str, Any]]) -> int:
         if legacy_rejected is not None and rejected is not None and legacy_rejected != rejected:
             mismatches += 1
     return mismatches
+
+
+def _evidence_acquisition_final_field_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    out = {"evidence_acquisition_stale_validated_digest": 0}
+    unresolved_statuses = {
+        "rejected_results_only",
+        "no_results",
+        "skipped_budget",
+        "not_executed",
+        "not_configured",
+        "provider_unavailable",
+        "provider_backoff",
+        "skipped_config",
+    }
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        accepted = _raw_int_value(row.get("accepted_evidence_count"), row.get("evidence_acquisition_accepted_count"))
+        status = str(row.get("status") or row.get("evidence_acquisition_status") or row.get("acquisition_evidence_status") or "").strip()
+        final_level = str(row.get("final_opportunity_level") or row.get("opportunity_level_after") or "").strip()
+        if accepted <= 0 and status in unresolved_statuses and final_level in {"validated_digest", "watchlist", "high_priority"}:
+            out["evidence_acquisition_stale_validated_digest"] += 1
+    return out
 
 
 def _daily_brief_card_names(path: str | Path | None) -> set[str]:
@@ -4486,6 +4553,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"evidence_acquisition_core_id_missing_from_store={result.evidence_acquisition_core_id_missing_from_store} "
             f"card_primary_fields_mismatch_core_store={result.card_primary_fields_mismatch_core_store} "
             f"card_evidence_acquisition_count_mismatch={result.card_evidence_acquisition_count_mismatch} "
+            f"evidence_acquisition_stale_validated_digest={result.evidence_acquisition_stale_validated_digest} "
             f"card_source_pack_mismatch_core_acquisition={result.card_source_pack_mismatch_core_acquisition} "
             f"card_primary_section_contains_support_row_blockers={result.card_primary_section_contains_support_row_blockers} "
             f"card_upgrade_text_inconsistent_with_final_level={result.card_upgrade_text_inconsistent_with_final_level} "
@@ -4533,8 +4601,12 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"cryptopanic_only_narrative_confirmed_lane={result.cryptopanic_only_narrative_confirmed_lane} "
             f"diagnostic_visible_default_operator_lane={result.diagnostic_visible_default_operator_lane} "
             f"core_missing_market_state_snapshot={result.core_missing_market_state_snapshot} "
+            f"market_state_return_unit_missing={result.market_state_return_unit_missing} "
+            f"market_state_possible_double_scaled={result.market_state_possible_double_scaled} "
+            f"market_state_lane_possible_double_scaled={result.market_state_lane_possible_double_scaled} "
             f"market_anomaly_rows={result.market_anomaly_rows} "
             f"market_anomaly_missing_market_state_snapshot={result.market_anomaly_missing_market_state_snapshot} "
+            f"market_anomaly_missing_market_state_class={result.market_anomaly_missing_market_state_class} "
             f"market_anomaly_confirmed_breakout_missing_evidence={result.market_anomaly_confirmed_breakout_missing_evidence} "
             f"market_anomaly_suspicious_illiquid_promoted_confirmed={result.market_anomaly_suspicious_illiquid_promoted_confirmed} "
             f"market_anomaly_created_alert_rows={result.market_anomaly_created_alert_rows} "

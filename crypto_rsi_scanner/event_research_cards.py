@@ -16,6 +16,7 @@ from . import (
     event_core_opportunity_store,
     event_graph,
     event_llm_evidence_planner,
+    event_market_units,
     event_opportunity_verdict,
     event_alpha_reason_text,
     event_source_packs,
@@ -2279,9 +2280,13 @@ def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
         lines.append(f"- Market freshness/source: {freshness or 'not available'} / {context_source or 'not available'} (age={context_age})")
     if snapshot.get("summary_only"):
         lines.append("- Market snapshot: computed from refresh summary; raw snapshot not stored.")
+    snapshot_unit = event_market_units.infer_return_unit(snapshot, default=event_market_units.RETURN_UNIT_FRACTION)
     for key in ("price", "market_price", "return_24h", "return_72h", "return_7d", "volume_24h", "market_cap"):
         if snapshot.get(key) is not None:
-            lines.append(f"- {key}: {snapshot.get(key)}")
+            if key.startswith("return_"):
+                lines.append(f"- {key}: {event_market_units.format_return_pct(snapshot.get(key), snapshot_unit)}")
+            else:
+                lines.append(f"- {key}: {snapshot.get(key)}")
     return lines or ["- Market data: not available."]
 
 
@@ -2308,6 +2313,7 @@ def _opportunity_lane_lines(entry: event_watchlist.EventWatchlistEntry | None, a
         lines.append(f"- Why not alertable: {'; '.join(why_not[:4])}")
     if snapshot:
         compact = []
+        snapshot_unit = event_market_units.infer_return_unit(snapshot, default=event_market_units.RETURN_UNIT_PERCENT_POINTS)
         for key in (
             "return_5m",
             "return_15m",
@@ -2324,7 +2330,10 @@ def _opportunity_lane_lines(entry: event_watchlist.EventWatchlistEntry | None, a
         ):
             value = snapshot.get(key)
             if value not in (None, "", [], {}, ()):
-                compact.append(f"{key}={value}")
+                if key.startswith("return_") or key.startswith("relative_return_") or key in {"open_interest_delta", "funding_level"}:
+                    compact.append(f"{key}={event_market_units.format_return_pct(value, snapshot_unit)}")
+                else:
+                    compact.append(f"{key}={value}")
         lines.append(f"- Market state snapshot: {'; '.join(compact[:8]) if compact else 'present but sparse'}")
     lines.append("- Research-only / not a trade signal.")
     return lines

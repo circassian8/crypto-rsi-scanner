@@ -277,7 +277,7 @@ def format_market_anomaly_report(
     rows = [dict(row) for row in anomalies if isinstance(row, Mapping)]
     counts: dict[str, int] = {}
     for row in rows:
-        key = str(row.get("anomaly_type") or "unknown")
+        key = str(row.get("market_state_class") or row.get("anomaly_type") or "unknown")
         counts[key] = counts.get(key, 0) + 1
     lines = [
         "# Event Alpha Market Anomaly Report",
@@ -295,9 +295,10 @@ def format_market_anomaly_report(
         lines.append("- None.")
     for row in rows[: max(0, limit)]:
         snapshot = row.get("market_state_snapshot") if isinstance(row.get("market_state_snapshot"), Mapping) else {}
+        market_state_class = row.get("market_state_class") or row.get("anomaly_type") or "unknown"
         lines.append(
             f"- {row.get('symbol') or row.get('coin_id') or 'UNKNOWN'}: "
-            f"{row.get('anomaly_type') or 'unknown'} "
+            f"{market_state_class} "
             f"return_4h={_format_pct(snapshot.get('return_4h'))} "
             f"return_24h={_format_pct(snapshot.get('return_24h'))} "
             f"volume_z={_format_number(snapshot.get('volume_zscore_24h'))} "
@@ -344,6 +345,7 @@ def _anomaly_row(
         "canonical_asset_id": snapshot.get("canonical_asset_id") or coin_id or symbol,
         "anomaly_type": anomaly_type,
         "market_state": anomaly_type,
+        "market_state_class": anomaly_type,
         "market_state_snapshot": dict(snapshot),
         "needs_catalyst_search": True,
         "priority": round(priority, 2),

@@ -31,6 +31,17 @@ from .event_resolver import clean_text
 
 
 SCHEMA_VERSION = "event_evidence_acquisition_v1"
+PROMOTED_OPPORTUNITY_LEVELS = {"validated_digest", "watchlist", "high_priority"}
+UNCONFIRMED_ACQUISITION_STATUSES = {
+    "rejected_results_only",
+    "no_results",
+    "skipped_budget",
+    "not_executed",
+    "not_configured",
+    "provider_unavailable",
+    "provider_backoff",
+    "skipped_config",
+}
 
 
 class EvidenceAcquisitionStatus(str, Enum):
@@ -447,6 +458,12 @@ def reconcile_acquisition_core_ids(
                     rows.append(raw)
     except OSError:
         return 0
+    core_rows = tuple(_row_from_object(item) for item in core_opportunity_rows)
+    core_by_id = {
+        str(row.get("core_opportunity_id") or "").strip(): row
+        for row in core_rows
+        if str(row.get("core_opportunity_id") or "").strip()
+    }
     for row in rows:
         if row.get("row_type") != "event_evidence_acquisition":
             continue
@@ -456,15 +473,20 @@ def reconcile_acquisition_core_ids(
             continue
         if artifact_namespace and str(row.get("artifact_namespace") or row.get("namespace") or "") != str(artifact_namespace):
             continue
-        resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, core_opportunity_rows)
+        resolution = event_core_opportunities.resolve_canonical_core_opportunity_id(row, core_rows)
         canonical = resolution.canonical_core_opportunity_id
         if not canonical:
+            changed += _normalize_acquisition_final_fields(row)
             continue
         current = str(row.get("core_opportunity_id") or "").strip()
         if current != canonical:
             row["original_core_opportunity_id"] = current or None
             row["core_opportunity_id"] = canonical
             changed += 1
+        core = core_by_id.get(canonical)
+        if core:
+            changed += _sync_acquisition_final_fields_from_core(row, core)
+        changed += _normalize_acquisition_final_fields(row)
         row["core_opportunity_id_status"] = resolution.resolution_status
         if resolution.diagnostic_support_for_core_opportunity_id:
             row["diagnostic_support_for_core_opportunity_id"] = resolution.diagnostic_support_for_core_opportunity_id
@@ -1131,7 +1153,7 @@ def _artifact_row(
         symbol=result.symbol,
         coin_id=result.coin_id,
     )
-    return {
+    row = {
         "schema_version": SCHEMA_VERSION,
         "row_type": "event_evidence_acquisition",
         "observed_at": observed_at,
@@ -1215,6 +1237,79 @@ def _artifact_row(
         "no_upgrade_reason": result.no_upgrade_reason,
         "warnings": result.warnings,
     }
+    _normalize_acquisition_final_fields(row)
+    return row
+
+
+def _sync_acquisition_final_fields_from_core(row: dict[str, Any], core: Mapping[str, Any]) -> int:
+    changed = 0
+    mapping = {
+        "final_opportunity_level": (
+            core.get("final_opportunity_level")
+            or core.get("opportunity_level")
+        ),
+        "opportunity_type": core.get("opportunity_type"),
+        "final_route_after_quality_gate": core.get("final_route_after_quality_gate"),
+        "final_state_after_quality_gate": core.get("final_state_after_quality_gate"),
+        "final_opportunity_score": (
+            core.get("final_opportunity_score")
+            if core.get("final_opportunity_score") not in (None, "")
+            else core.get("opportunity_score_final")
+        ),
+        "opportunity_score_final": core.get("opportunity_score_final"),
+        "live_confirmation_status": core.get("live_confirmation_status"),
+        "live_confirmation_reason": core.get("live_confirmation_reason"),
+        "acquisition_confirmation_status": core.get("acquisition_confirmation_status"),
+        "acquisition_confirms_candidate": core.get("acquisition_confirms_candidate"),
+        "acquisition_confirms_impact_path": core.get("acquisition_confirms_impact_path"),
+    }
+    for key, value in mapping.items():
+        if value in (None, "", [], {}, ()):
+            continue
+        if row.get(key) != value:
+            row[key] = value
+            changed += 1
+    return changed
+
+
+def _normalize_acquisition_final_fields(row: dict[str, Any]) -> int:
+    accepted = _float(row.get("accepted_evidence_count") or row.get("evidence_acquisition_accepted_count")) or 0.0
+    status = str(row.get("status") or row.get("evidence_acquisition_status") or "").casefold()
+    acquisition_status = str(row.get("acquisition_evidence_status") or "").casefold()
+    final_level = str(row.get("final_opportunity_level") or "").casefold()
+    if accepted > 0:
+        return 0
+    if final_level not in PROMOTED_OPPORTUNITY_LEVELS:
+        return 0
+    if status not in UNCONFIRMED_ACQUISITION_STATUSES and acquisition_status not in {"rejected_only", "no_results", "failed"}:
+        return 0
+    changed = 0
+    previous = row.get("final_opportunity_level")
+    target = str(row.get("opportunity_level_after") or row.get("post_refresh_opportunity_level") or row.get("opportunity_level_before") or "exploratory")
+    if str(target).casefold() in PROMOTED_OPPORTUNITY_LEVELS:
+        target = "exploratory"
+    row["final_opportunity_level_before_acquisition_normalization"] = previous
+    row["final_opportunity_level"] = target
+    if str(row.get("final_route_after_quality_gate") or "").upper() in {"RESEARCH_DIGEST", "WATCHLIST", "HIGH_PRIORITY_RESEARCH"}:
+        row["final_route_after_quality_gate"] = "STORE_ONLY"
+    if str(row.get("final_state_after_quality_gate") or "").upper() in {"WATCHLIST", "HIGH_PRIORITY"}:
+        row["final_state_after_quality_gate"] = "RADAR"
+    row["final_verdict_reason"] = row.get("final_verdict_reason") or _unconfirmed_acquisition_reason(status or acquisition_status)
+    row["acquisition_final_level_normalized"] = True
+    changed += 1
+    return changed
+
+
+def _unconfirmed_acquisition_reason(status: str) -> str:
+    if status == "rejected_results_only" or status == "rejected_only":
+        return "rejected_results_only_not_confirmation"
+    if status == "skipped_budget":
+        return "skipped_budget_not_confirmation"
+    if status == "no_results":
+        return "no_results_not_confirmation"
+    if status in {"provider_unavailable", "provider_backoff", "failed"}:
+        return "provider_unavailable_not_confirmation"
+    return "evidence_acquisition_not_confirming"
 
 
 def _provider_counts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:

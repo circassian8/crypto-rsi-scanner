@@ -34662,10 +34662,93 @@ def test_evidence_acquisition_rows_reconcile_to_canonical_core_store_ids():
             artifact_namespace="market_refresh_smoke",
         )
         rows = event_evidence_acquisition.load_acquisition_results(acquisition_path)
-    assert changed == 1
+    assert changed >= 1
     assert rows[0]["core_opportunity_id"] == meme_core
     assert rows[0]["core_opportunity_id_status"] == "diagnostic_support"
     assert rows[0]["original_core_opportunity_id"] == "core_legacy_memecore"
+
+
+def test_evidence_acquisition_caps_stale_promoted_final_fields():
+    import json
+    from crypto_rsi_scanner import event_evidence_acquisition
+
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        acquisition_path = root / "event_evidence_acquisition.jsonl"
+        acquisition_path.write_text(
+            json.dumps({
+                "row_type": "event_evidence_acquisition",
+                "run_id": "run-acq-cap",
+                "profile": "live_burn_in_no_send",
+                "artifact_namespace": "live_burn_in_no_send",
+                "core_opportunity_id": "core_tao",
+                "symbol": "TAO",
+                "coin_id": "bittensor",
+                "status": "rejected_results_only",
+                "accepted_evidence_count": 0,
+                "final_opportunity_level": "validated_digest",
+                "final_route_after_quality_gate": "RESEARCH_DIGEST",
+                "final_state_after_quality_gate": "WATCHLIST",
+            }) + "\n",
+            encoding="utf-8",
+        )
+        changed = event_evidence_acquisition.reconcile_acquisition_core_ids(
+            acquisition_path,
+            [{
+                "row_type": "event_core_opportunity",
+                "core_opportunity_id": "core_tao",
+                "symbol": "TAO",
+                "coin_id": "bittensor",
+                "final_opportunity_level": "validated_digest",
+                "opportunity_type": "UNCONFIRMED_RESEARCH",
+                "final_route_after_quality_gate": "RESEARCH_DIGEST",
+                "final_state_after_quality_gate": "WATCHLIST",
+            }],
+            run_id="run-acq-cap",
+            profile="live_burn_in_no_send",
+            artifact_namespace="live_burn_in_no_send",
+        )
+        rows = event_evidence_acquisition.load_acquisition_results(acquisition_path)
+
+    assert changed >= 1
+    assert rows[0]["core_opportunity_id"] == "core_tao"
+    assert rows[0]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+    assert rows[0]["final_opportunity_level"] == "exploratory"
+    assert rows[0]["final_route_after_quality_gate"] == "STORE_ONLY"
+    assert rows[0]["final_state_after_quality_gate"] == "RADAR"
+    assert rows[0]["acquisition_final_level_normalized"] is True
+    assert rows[0]["final_verdict_reason"] == "rejected_results_only_not_confirmation"
+
+
+def test_artifact_doctor_blocks_stale_acquisition_validated_digest():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    result = event_alpha_artifact_doctor.diagnose_artifacts(
+        run_rows=[{
+            "row_type": "event_alpha_run",
+            "run_id": "run-acq-stale",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "live_burn_in_no_send",
+            "run_mode": "notification_burn_in",
+            "success": True,
+        }],
+        evidence_acquisition_rows=[{
+            "row_type": "event_evidence_acquisition",
+            "run_id": "run-acq-stale",
+            "profile": "live_burn_in_no_send",
+            "artifact_namespace": "live_burn_in_no_send",
+            "run_mode": "notification_burn_in",
+            "status": "skipped_budget",
+            "accepted_evidence_count": 0,
+            "final_opportunity_level": "validated_digest",
+        }],
+        profile="live_burn_in_no_send",
+        artifact_namespace="live_burn_in_no_send",
+        strict=True,
+    )
+
+    assert result.evidence_acquisition_stale_validated_digest == 1
+    assert any("evidence_acquisition_stale_validated_digest=1" in item for item in result.blockers)
 
 
 def test_artifact_doctor_detects_canonical_core_rendering_mismatch_and_acquisition_orphan():
@@ -37430,6 +37513,113 @@ def test_market_reaction_rejected_evidence_is_unconfirmed_research():
     assert "evidence_acquisition_rejected_results_only" in result.why_not_alertable
 
 
+def test_market_reaction_fractional_latest_snapshot_not_double_scaled():
+    from crypto_rsi_scanner import event_market_reaction, event_market_units
+
+    chz = event_market_reaction.evaluate_market_reaction({
+        "source_class": "cryptopanic_tagged",
+        "source_pack": "fan_sports_pack",
+        "impact_path_type": "fan_token_attention",
+        "evidence_quality_score": 75,
+        "accepted_evidence_count": 1,
+        "market_snapshot": {
+            "return_1h": 0.005345456377672031,
+            "return_4h": -0.006396566961983541,
+            "return_24h": -0.05264195188444422,
+            "volume_zscore_24h": 0.2,
+            "market_context_freshness_status": "fresh",
+        },
+    })
+    velvet = event_market_reaction.evaluate_market_reaction({
+        "source_class": "cryptopanic_tagged",
+        "source_pack": "proxy_preipo_rwa_pack",
+        "impact_path_type": "venue_value_capture",
+        "evidence_quality_score": 75,
+        "accepted_evidence_count": 1,
+        "market_snapshot": {
+            "return_1h": -0.02849172797190569,
+            "return_4h": 0.014859616004286647,
+            "return_24h": -0.06803294958669015,
+            "return_7d": 2.1615314699482866,
+            "volume_zscore_24h": 0.2,
+            "market_context_freshness_status": "fresh",
+        },
+    })
+
+    chz_snapshot = chz.market_state_snapshot.to_dict()
+    velvet_snapshot = velvet.market_state_snapshot.to_dict()
+    assert chz_snapshot["return_unit"] == event_market_units.RETURN_UNIT_PERCENT_POINTS
+    assert chz_snapshot["source_return_unit"] == event_market_units.RETURN_UNIT_FRACTION
+    assert velvet_snapshot["source_return_unit"] == event_market_units.RETURN_UNIT_FRACTION
+    assert round(chz_snapshot["return_1h"], 2) == 0.53
+    assert round(chz_snapshot["return_4h"], 2) == -0.64
+    assert round(chz_snapshot["return_24h"], 2) == -5.26
+    assert round(velvet_snapshot["return_1h"], 2) == -2.85
+    assert round(velvet_snapshot["return_4h"], 2) == 1.49
+    assert round(velvet_snapshot["return_24h"], 2) == -6.8
+    assert event_market_units.format_return_pct(chz_snapshot["return_1h"], unit="percent_points") == "+0.53%"
+    assert event_market_units.format_return_pct(velvet_snapshot["return_4h"], unit="percent_points") == "+1.49%"
+
+    recomputed = event_market_reaction.evaluate_market_reaction({
+        "source_class": "cryptopanic_tagged",
+        "source_pack": "proxy_preipo_rwa_pack",
+        "impact_path_type": "venue_value_capture",
+        "evidence_quality_score": 75,
+        "accepted_evidence_count": 1,
+        "market_state_snapshot": {
+            "return_unit": "percent_points",
+            "return_1h": -284.91727971905686,
+            "return_4h": 148.59616004286647,
+            "return_24h": -6.8032949586690155,
+        },
+        "market_snapshot": {
+            "return_1h": -0.02849172797190569,
+            "return_4h": 0.014859616004286647,
+            "return_24h": -0.06803294958669015,
+            "return_7d": 2.1615314699482866,
+        },
+    }).market_state_snapshot.to_dict()
+    assert recomputed["source_return_unit"] == event_market_units.RETURN_UNIT_FRACTION
+    assert round(recomputed["return_1h"], 2) == -2.85
+    assert round(recomputed["return_4h"], 2) == 1.49
+
+
+def test_market_reaction_percent_point_snapshot_not_rescaled_again():
+    from crypto_rsi_scanner import event_market_reaction, event_market_state
+
+    reaction = event_market_reaction.evaluate_market_reaction({
+        "source_class": "official_exchange",
+        "source_pack": "listing_liquidity_pack",
+        "impact_path_type": "listing_liquidity_event",
+        "evidence_quality_score": 92,
+        "accepted_evidence_count": 1,
+        "market_snapshot": {
+            "return_unit": "percent_points",
+            "return_4h": 1.4859616004286647,
+            "return_24h": -6.8032949586690155,
+            "volume_zscore_24h": 0.2,
+            "market_context_freshness_status": "fresh",
+        },
+    })
+    snapshot = reaction.market_state_snapshot.to_dict()
+    market_state_snapshot = event_market_state.snapshot_from_market_row({
+        "symbol": "PCT",
+        "id": "percent-token",
+        "return_unit": "percent_points",
+        "return_4h": 1.2,
+        "return_24h": 5.0,
+        "volume_zscore_24h": 0.1,
+        "market_context_freshness_status": "fresh",
+    }).to_dict()
+
+    assert round(snapshot["return_4h"], 2) == 1.49
+    assert round(snapshot["return_24h"], 2) == -6.8
+    assert snapshot["source_return_unit"] == "percent_points"
+    assert market_state_snapshot["return_4h"] == 1.2
+    assert market_state_snapshot["return_24h"] == 5.0
+    assert market_state_snapshot["source_return_unit"] == "percent_points"
+
+
 def test_market_reaction_sector_theme_is_diagnostic():
     from crypto_rsi_scanner import event_market_reaction
 
@@ -37500,6 +37690,15 @@ def test_artifact_doctor_flags_invalid_opportunity_lanes():
             "market_state_snapshot": {"observed_fields": 1},
             "final_route_after_quality_gate": "RESEARCH_DIGEST",
         },
+        {
+            "core_opportunity_id": "core_double_scaled",
+            "opportunity_type": "CONFIRMED_LONG_RESEARCH",
+            "market_state": "confirmed_breakout",
+            "source_requirements_met": True,
+            "market_requirements_met": True,
+            "latest_market_snapshot": {"return_4h": 0.014859616004286647},
+            "market_state_snapshot": {"return_unit": "percent_points", "return_4h": 148.59616004286647},
+        },
     ]
     conflicts = event_alpha_artifact_doctor._opportunity_lane_conflicts(rows)
 
@@ -37510,6 +37709,8 @@ def test_artifact_doctor_flags_invalid_opportunity_lanes():
     assert conflicts["risk_only_missing_evidence_only"] == 1
     assert conflicts["diagnostic_visible_default_operator_lane"] == 1
     assert conflicts["core_missing_market_state_snapshot"] == 1
+    assert conflicts["market_state_possible_double_scaled"] == 1
+    assert conflicts["market_state_lane_possible_double_scaled"] == 1
 
 
 def test_market_state_snapshot_normalizes_returns_and_relative_benchmarks():
@@ -37524,6 +37725,8 @@ def test_market_state_snapshot_normalizes_returns_and_relative_benchmarks():
     assert snapshot.coin_id == "token-b"
     assert round(snapshot.return_24h or 0, 1) == 18.0
     assert round(snapshot.relative_return_vs_btc_4h or 0, 1) == 10.7
+    assert snapshot.return_unit == "percent_points"
+    assert snapshot.source_return_unit == "fraction"
     assert "return_24h" in snapshot.observed_fields
     assert snapshot.freshness_status == "fresh"
 
@@ -37547,6 +37750,7 @@ def test_market_anomaly_scanner_classifies_fixture_rows():
     assert by_coin["token-d"] == "risk_off_sell_pressure"
     assert by_coin["token-f"] == "post_event_fade_setup"
     assert "token-e" not in by_coin
+    assert all(row["market_state_class"] == row["anomaly_type"] for row in anomalies)
 
 
 def test_market_anomaly_artifacts_are_research_only_and_seed_search():
@@ -37576,6 +37780,7 @@ def test_market_anomaly_artifacts_are_research_only_and_seed_search():
         assert not any("alert_id" in row or "tier" in row for row in loaded)
         fade_row = next(row for row in loaded if row["coin_id"] == "token-f")
         assert fade_row["anomaly_type"] == "post_event_fade_setup"
+        assert fade_row["market_state_class"] == "post_event_fade_setup"
         assert fade_row["suggested_source_packs_to_search"] == [
             "perp_listing_squeeze_pack",
             "cryptopanic_tagged",
@@ -37599,6 +37804,7 @@ def test_artifact_doctor_flags_malformed_market_anomaly_artifacts():
                 "relative_return_vs_btc_4h": 1.0,
                 "freshness_status": "fresh",
             },
+            "market_state_class": "confirmed_breakout",
             "needs_catalyst_search": True,
             "suggested_source_packs_to_search": ["market_anomaly_pack"],
         },
@@ -37607,6 +37813,7 @@ def test_artifact_doctor_flags_malformed_market_anomaly_artifacts():
             "symbol": "ILL",
             "coin_id": "ill",
             "anomaly_type": "suspicious_illiquid_move",
+            "market_state_class": "suspicious_illiquid_move",
             "market_state_snapshot": {"return_24h": 70, "freshness_status": "fresh"},
             "final_route_after_quality_gate": "RESEARCH_DIGEST",
         },
@@ -37615,6 +37822,7 @@ def test_artifact_doctor_flags_malformed_market_anomaly_artifacts():
             "symbol": "ALRT",
             "coin_id": "alert-leak",
             "anomaly_type": "late_momentum",
+            "market_state_class": "late_momentum",
             "market_state_snapshot": {"return_24h": 35, "freshness_status": "fresh"},
             "alert_id": "should_not_exist",
         },
@@ -37623,6 +37831,7 @@ def test_artifact_doctor_flags_malformed_market_anomaly_artifacts():
             "symbol": "NOSNAP",
             "coin_id": "nosnap",
             "anomaly_type": "late_momentum",
+            "market_state_class": "late_momentum",
         },
         {
             "row_type": "event_market_anomaly",
@@ -37639,6 +37848,7 @@ def test_artifact_doctor_flags_malformed_market_anomaly_artifacts():
     assert conflicts["market_anomaly_suspicious_illiquid_promoted_confirmed"] == 1
     assert conflicts["market_anomaly_created_alert_rows"] == 2
     assert conflicts["market_anomaly_missing_market_state_snapshot"] == 1
+    assert conflicts["market_anomaly_missing_market_state_class"] == 1
     assert conflicts["market_anomaly_missing_freshness_status"] == 2
     assert conflicts["market_anomaly_needs_search_without_plan"] == 1
 
@@ -37674,24 +37884,44 @@ def test_bybit_announcement_provider_supports_documented_query_params():
 
 
 def test_official_exchange_fixture_lanes_and_quote_filtering():
-    from crypto_rsi_scanner import event_official_exchange
+    from crypto_rsi_scanner import config, event_official_exchange
 
-    with TemporaryDirectory() as tmp:
-        result = event_official_exchange.run_official_exchange_scan(
-            namespace_dir=tmp,
-            provider_paths={
-                "binance_announcements": "fixtures/event_discovery/official_exchange_binance_announcements.json",
-                "bybit_announcements": "fixtures/event_discovery/official_exchange_bybit_announcements.json",
-            },
-            profile="fixture",
-            artifact_namespace="official_exchange_smoke",
-            run_mode="fixture",
-            run_id="run-official-fixture",
-            observed_at="2026-06-15T16:00:00Z",
-        )
-        candidates = event_official_exchange.load_official_listing_candidates(tmp)
+    original_allow_major = config.EVENT_ALPHA_ALLOW_MAJOR_PAIR_CATALYSTS
+    try:
+        config.EVENT_ALPHA_ALLOW_MAJOR_PAIR_CATALYSTS = False
+        with TemporaryDirectory() as tmp:
+            result = event_official_exchange.run_official_exchange_scan(
+                namespace_dir=tmp,
+                provider_paths={
+                    "binance_announcements": "fixtures/event_discovery/official_exchange_binance_announcements.json",
+                    "bybit_announcements": "fixtures/event_discovery/official_exchange_bybit_announcements.json",
+                },
+                profile="fixture",
+                artifact_namespace="official_exchange_smoke",
+                run_mode="fixture",
+                run_id="run-official-fixture",
+                observed_at="2026-06-15T16:00:00Z",
+            )
+            candidates = event_official_exchange.load_official_listing_candidates(tmp)
+        with TemporaryDirectory() as tmp:
+            config.EVENT_ALPHA_ALLOW_MAJOR_PAIR_CATALYSTS = True
+            allowed = event_official_exchange.run_official_exchange_scan(
+                namespace_dir=tmp,
+                provider_paths={
+                    "binance_announcements": "fixtures/event_discovery/official_exchange_binance_announcements.json",
+                    "bybit_announcements": "fixtures/event_discovery/official_exchange_bybit_announcements.json",
+                },
+                profile="fixture",
+                artifact_namespace="official_exchange_smoke",
+                run_mode="fixture",
+                run_id="run-official-fixture",
+                observed_at="2026-06-15T16:00:00Z",
+            )
+    finally:
+        config.EVENT_ALPHA_ALLOW_MAJOR_PAIR_CATALYSTS = original_allow_major
 
     by_symbol = {str(row.get("symbol") or ""): row for row in candidates}
+    allowed_by_symbol = {str(row.get("symbol") or ""): row for row in allowed.candidates}
     event_types = {row["event_type"] for row in result.events}
 
     assert result.announcement_count >= 8
@@ -37707,6 +37937,11 @@ def test_official_exchange_fixture_lanes_and_quote_filtering():
     assert "deterministic_resolver_validation_missing" in by_symbol["TESTFARM"]["why_not_alertable"]
     assert "USDT" not in by_symbol
     assert by_symbol["BTC"]["coin_id"] == "bitcoin"
+    assert by_symbol["BTC"]["opportunity_type"] == "UNCONFIRMED_RESEARCH"
+    assert by_symbol["BTC"]["major_pair_simple_announcement"] is True
+    assert "major_pair_simple_announcement_not_alpha" in by_symbol["BTC"]["why_not_alertable"]
+    assert "major_pair_simple_announcement_capped" in by_symbol["BTC"]["reason_codes"]
+    assert allowed_by_symbol["BTC"]["opportunity_type"] == "EARLY_LONG_RESEARCH"
     assert all(row["source_class"] == "official_exchange" for row in candidates)
     assert all(row["created_alert"] is False for row in candidates)
     assert all(row["research_only"] is True for row in candidates)
@@ -38085,7 +38320,9 @@ def test_derivatives_crowding_fixture_lanes_and_artifacts():
             observed_at="2026-06-15T16:00:00Z",
         )
         states = event_derivatives_crowding.load_derivatives_state(tmp)
+        evaluated_rows = event_derivatives_crowding.load_derivatives_candidates(tmp)
         fade_rows = event_derivatives_crowding.load_fade_review_candidates(tmp)
+        derivatives_candidates_path_exists = result.derivatives_candidates_path.exists()
         report = result.report_path.read_text(encoding="utf-8")
 
     by_symbol = {str(row.get("symbol") or ""): row for row in result.candidate_rows}
@@ -38094,6 +38331,8 @@ def test_derivatives_crowding_fixture_lanes_and_artifacts():
     assert result.evaluated_candidate_count == 5
     assert result.fade_review_candidate_count == 1
     assert len(states) == 4
+    assert len(evaluated_rows) == 5
+    assert derivatives_candidates_path_exists is True
     assert len(fade_rows) == 1
     assert by_symbol["TESTLIST"]["opportunity_type"] == "FADE_SHORT_REVIEW"
     assert by_symbol["TESTLIST"]["completed_move"] is True
@@ -38102,6 +38341,7 @@ def test_derivatives_crowding_fixture_lanes_and_artifacts():
     assert by_symbol["TESTCROWD"]["opportunity_type"] in {"FADE_SHORT_REVIEW", "CONFIRMED_LONG_RESEARCH"}
     if by_symbol["TESTCROWD"]["opportunity_type"] == "CONFIRMED_LONG_RESEARCH":
         assert "confirmed_long_derivatives_crowding_warning" in by_symbol["TESTCROWD"]["warnings"]
+        assert "warnings: confirmed_long_derivatives_crowding_warning" in report
     assert by_symbol["TESTILLIQ"]["opportunity_type"] == "RISK_ONLY"
     assert by_symbol["TESTRISK"]["opportunity_type"] == "RISK_ONLY"
     assert all(row["created_alert"] is False for row in result.candidate_rows)
