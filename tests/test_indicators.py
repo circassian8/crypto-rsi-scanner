@@ -37511,6 +37511,145 @@ def test_artifact_doctor_flags_invalid_opportunity_lanes():
     assert conflicts["core_missing_market_state_snapshot"] == 1
 
 
+def test_market_state_snapshot_normalizes_returns_and_relative_benchmarks():
+    from crypto_rsi_scanner import event_market_anomaly_scanner, event_market_state
+
+    rows = event_market_anomaly_scanner.load_market_rows("fixtures/event_market_anomaly/market_rows.json")
+    btc, eth = event_market_state.benchmark_rows(rows)
+    token_b = next(row for row in rows if row["id"] == "token-b")
+    snapshot = event_market_state.snapshot_from_market_row(token_b, btc_benchmark=btc, eth_benchmark=eth)
+
+    assert snapshot.symbol == "TKNB"
+    assert snapshot.coin_id == "token-b"
+    assert round(snapshot.return_24h or 0, 1) == 18.0
+    assert round(snapshot.relative_return_vs_btc_4h or 0, 1) == 10.7
+    assert "return_24h" in snapshot.observed_fields
+    assert snapshot.freshness_status == "fresh"
+
+
+def test_market_anomaly_scanner_classifies_fixture_rows():
+    from crypto_rsi_scanner import event_market_anomaly_scanner
+
+    rows = event_market_anomaly_scanner.load_market_rows("fixtures/event_market_anomaly/market_rows.json")
+    snapshots, anomalies = event_market_anomaly_scanner.scan_market_rows(
+        rows,
+        observed_at="2026-06-15T16:00:00Z",
+        profile="fixture",
+        artifact_namespace="market_anomaly_smoke",
+    )
+    by_coin = {row["coin_id"]: row["anomaly_type"] for row in anomalies}
+
+    assert len(snapshots) == 8
+    assert by_coin["token-a"] == "stealth_accumulation"
+    assert by_coin["token-b"] == "confirmed_breakout"
+    assert by_coin["token-c"] == "suspicious_illiquid_move"
+    assert by_coin["token-d"] == "risk_off_sell_pressure"
+    assert by_coin["token-f"] == "post_event_fade_setup"
+    assert "token-e" not in by_coin
+
+
+def test_market_anomaly_artifacts_are_research_only_and_seed_search():
+    from crypto_rsi_scanner import event_market_anomaly_scanner
+
+    rows = event_market_anomaly_scanner.load_market_rows("fixtures/event_market_anomaly/market_rows.json")
+    with TemporaryDirectory() as tmp:
+        result = event_market_anomaly_scanner.run_market_anomaly_scan(
+            market_rows=rows,
+            namespace_dir=tmp,
+            observed_at="2026-06-15T16:00:00Z",
+            profile="fixture",
+            artifact_namespace="market_anomaly_smoke",
+        )
+        loaded = event_market_anomaly_scanner.load_market_anomaly_rows(tmp)
+
+        assert result.snapshot_count == 8
+        assert result.anomaly_count == 5
+        assert result.snapshots_path.exists()
+        assert result.anomalies_path.exists()
+        assert result.report_path.exists()
+        assert len(loaded) == 5
+        assert all(row["created_alert"] is False for row in loaded)
+        assert all(row["research_only"] is True for row in loaded)
+        assert all(row["needs_catalyst_search"] is True for row in loaded)
+        assert all(row.get("suggested_source_packs_to_search") for row in loaded)
+        assert not any("alert_id" in row or "tier" in row for row in loaded)
+        fade_row = next(row for row in loaded if row["coin_id"] == "token-f")
+        assert fade_row["anomaly_type"] == "post_event_fade_setup"
+        assert fade_row["suggested_source_packs_to_search"] == [
+            "perp_listing_squeeze_pack",
+            "cryptopanic_tagged",
+            "coinalyze_derivatives",
+        ]
+
+
+def test_artifact_doctor_flags_malformed_market_anomaly_artifacts():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    rows = [
+        {
+            "row_type": "event_market_anomaly",
+            "symbol": "BAD",
+            "coin_id": "bad",
+            "anomaly_type": "confirmed_breakout",
+            "market_state_snapshot": {
+                "return_4h": 3.0,
+                "return_24h": 4.0,
+                "volume_zscore_24h": 0.5,
+                "relative_return_vs_btc_4h": 1.0,
+                "freshness_status": "fresh",
+            },
+            "needs_catalyst_search": True,
+            "suggested_source_packs_to_search": ["market_anomaly_pack"],
+        },
+        {
+            "row_type": "event_market_anomaly",
+            "symbol": "ILL",
+            "coin_id": "ill",
+            "anomaly_type": "suspicious_illiquid_move",
+            "market_state_snapshot": {"return_24h": 70, "freshness_status": "fresh"},
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+        },
+        {
+            "row_type": "event_market_anomaly",
+            "symbol": "ALRT",
+            "coin_id": "alert-leak",
+            "anomaly_type": "late_momentum",
+            "market_state_snapshot": {"return_24h": 35, "freshness_status": "fresh"},
+            "alert_id": "should_not_exist",
+        },
+        {
+            "row_type": "event_market_anomaly",
+            "symbol": "NOSNAP",
+            "coin_id": "nosnap",
+            "anomaly_type": "late_momentum",
+        },
+        {
+            "row_type": "event_market_anomaly",
+            "symbol": "NOPLAN",
+            "coin_id": "noplan",
+            "anomaly_type": "stealth_accumulation",
+            "market_state_snapshot": {"return_4h": 4, "volume_zscore_24h": 1.4},
+            "needs_catalyst_search": True,
+        },
+    ]
+    conflicts = event_alpha_artifact_doctor._market_anomaly_artifact_conflicts(rows)
+
+    assert conflicts["market_anomaly_confirmed_breakout_missing_evidence"] == 1
+    assert conflicts["market_anomaly_suspicious_illiquid_promoted_confirmed"] == 1
+    assert conflicts["market_anomaly_created_alert_rows"] == 2
+    assert conflicts["market_anomaly_missing_market_state_snapshot"] == 1
+    assert conflicts["market_anomaly_missing_freshness_status"] == 2
+    assert conflicts["market_anomaly_needs_search_without_plan"] == 1
+
+
+def test_makefile_exposes_market_anomaly_targets():
+    text = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "event-alpha-market-anomaly-scan" in text
+    assert "event-alpha-market-anomaly-smoke" in text
+    assert "--event-alpha-market-anomaly-scan" in text
+
+
 def _run_all():
     funcs = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failures = 0

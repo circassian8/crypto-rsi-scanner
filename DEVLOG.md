@@ -17,6 +17,39 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Add Event Alpha market-state anomaly artifacts · Codex
+**Why:** Event Alpha needs a market-first radar layer that can flag abnormal
+price/volume behavior and seed catalyst search without treating price action as
+an alert or fade trigger.
+**Changes:**
+- Added `event_market_state.py` with a stable `MarketStateSnapshot` schema for
+  returns, relative BTC/ETH performance, volume/turnover, liquidity/spread,
+  derivatives-lite fields, freshness, observed fields, and warnings.
+- Added `event_market_anomaly_scanner.py` plus fixture rows under
+  `fixtures/event_market_anomaly/` to classify stealth accumulation, confirmed
+  breakout, late/crowded momentum, post-event fade setup seeds, risk-off sell
+  pressure, suspicious illiquid moves, and no-reaction rows.
+- Added `main.py --event-alpha-market-anomaly-scan`,
+  `make event-alpha-market-anomaly-scan`, and
+  `make event-alpha-market-anomaly-smoke`. The scan writes
+  `event_market_state_snapshots.jsonl`, `event_market_anomalies.jsonl`, and
+  `event_market_anomaly_report.md` under the selected Event Alpha artifact
+  namespace, plus a minimal run-ledger row with zero alertable/sent counts.
+- Added a daily-brief “Market Anomalies Without Confirmed Catalyst” section and
+  artifact-doctor checks for malformed anomaly artifacts, including missing
+  snapshots, unsupported confirmed-breakout claims, suspicious illiquid rows
+  leaking into confirmed lanes, and alert fields leaking into anomaly rows.
+**Verify:** `python3 tests/test_indicators.py` (615/615 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-market-anomaly-smoke PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The new scanner is artifact-only and research-only. It creates
+no Event Alpha alert snapshots, no Telegram sends, no normal RSI rows, no paper
+trades, no execution, and no Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-01 — Split weak Event Alpha lanes from risk-only · Codex
 **Why:** The first opportunity-lane pass was safe but too coarse: unresolved
 or weak rows all became `RISK_ONLY`, which made operator output less useful and

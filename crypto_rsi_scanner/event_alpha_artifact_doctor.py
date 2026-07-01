@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_opportunity_verdict, event_research_cards, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_market_anomaly_scanner, event_opportunity_verdict, event_research_cards, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -81,6 +81,13 @@ class EventAlphaArtifactDoctorResult:
     cryptopanic_only_narrative_confirmed_lane: int = 0
     diagnostic_visible_default_operator_lane: int = 0
     core_missing_market_state_snapshot: int = 0
+    market_anomaly_rows: int = 0
+    market_anomaly_missing_market_state_snapshot: int = 0
+    market_anomaly_confirmed_breakout_missing_evidence: int = 0
+    market_anomaly_suspicious_illiquid_promoted_confirmed: int = 0
+    market_anomaly_created_alert_rows: int = 0
+    market_anomaly_missing_freshness_status: int = 0
+    market_anomaly_needs_search_without_plan: int = 0
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
@@ -236,6 +243,7 @@ def diagnose_artifacts(
     watchlist_rows: Iterable[Mapping[str, Any] | object] = (),
     incident_rows: Iterable[Mapping[str, Any] | object] = (),
     evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
+    market_anomaly_rows: Iterable[Mapping[str, Any]] | None = None,
     card_paths: Iterable[str | Path] = (),
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
     source_coverage_report_path: str | Path | None = None,
@@ -261,6 +269,15 @@ def diagnose_artifacts(
     raw_watchlist = [_row(row) for row in watchlist_rows]
     raw_incidents = [_row(row) for row in incident_rows]
     raw_acquisition_rows = [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)]
+    if market_anomaly_rows is None:
+        default_market_anomaly_path = None
+        if inspected_alert_store_path is not None:
+            default_market_anomaly_path = Path(inspected_alert_store_path).parent
+        elif source_coverage_report_path is not None:
+            default_market_anomaly_path = Path(source_coverage_report_path).parent
+        raw_market_anomalies = list(event_market_anomaly_scanner.load_market_anomaly_rows(default_market_anomaly_path))
+    else:
+        raw_market_anomalies = [dict(row) for row in market_anomaly_rows if isinstance(row, Mapping)]
     raw_legacy = sum(
         1 for row in (*raw_runs, *raw_alerts, *raw_feedback, *raw_outcomes)
         if event_alpha_artifacts.is_legacy_row(row)
@@ -323,6 +340,13 @@ def diagnose_artifacts(
     )
     acquisition_rows = event_alpha_artifacts.filter_artifact_rows(
         raw_acquisition_rows,
+        profile=profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    market_anomalies = event_alpha_artifacts.filter_artifact_rows(
+        raw_market_anomalies,
         profile=profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -572,6 +596,7 @@ def diagnose_artifacts(
         artifact_namespace=artifact_namespace,
     )
     opportunity_lane_conflicts = _opportunity_lane_conflicts(core_rows)
+    market_anomaly_conflicts = _market_anomaly_artifact_conflicts(market_anomalies)
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -780,6 +805,24 @@ def diagnose_artifacts(
             continue
         message = f"{key}={count}"
         (blockers if strict and core_store_available else warnings).append(message)
+    for key in (
+        "market_anomaly_missing_market_state_snapshot",
+        "market_anomaly_confirmed_breakout_missing_evidence",
+        "market_anomaly_suspicious_illiquid_promoted_confirmed",
+        "market_anomaly_created_alert_rows",
+    ):
+        count = market_anomaly_conflicts.get(key, 0)
+        if not count:
+            continue
+        message = f"{key}={count}"
+        (blockers if strict else warnings).append(message)
+    for key in (
+        "market_anomaly_missing_freshness_status",
+        "market_anomaly_needs_search_without_plan",
+    ):
+        count = market_anomaly_conflicts.get(key, 0)
+        if count:
+            warnings.append(f"{key}={count}")
     if source_coverage_report_conflicts["source_coverage_report_missing"]:
         warnings.append(
             "source_coverage_report_missing="
@@ -1369,6 +1412,13 @@ def diagnose_artifacts(
         cryptopanic_only_narrative_confirmed_lane=opportunity_lane_conflicts["cryptopanic_only_narrative_confirmed_lane"],
         diagnostic_visible_default_operator_lane=opportunity_lane_conflicts["diagnostic_visible_default_operator_lane"],
         core_missing_market_state_snapshot=opportunity_lane_conflicts["core_missing_market_state_snapshot"],
+        market_anomaly_rows=len(market_anomalies),
+        market_anomaly_missing_market_state_snapshot=market_anomaly_conflicts["market_anomaly_missing_market_state_snapshot"],
+        market_anomaly_confirmed_breakout_missing_evidence=market_anomaly_conflicts["market_anomaly_confirmed_breakout_missing_evidence"],
+        market_anomaly_suspicious_illiquid_promoted_confirmed=market_anomaly_conflicts["market_anomaly_suspicious_illiquid_promoted_confirmed"],
+        market_anomaly_created_alert_rows=market_anomaly_conflicts["market_anomaly_created_alert_rows"],
+        market_anomaly_missing_freshness_status=market_anomaly_conflicts["market_anomaly_missing_freshness_status"],
+        market_anomaly_needs_search_without_plan=market_anomaly_conflicts["market_anomaly_needs_search_without_plan"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
         source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
         source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
@@ -2217,6 +2267,64 @@ def _opportunity_lane_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, 
         if lane == "DIAGNOSTIC" and _opportunity_lane_diagnostic_visible(row):
             out["diagnostic_visible_default_operator_lane"] += 1
     return out
+
+
+def _market_anomaly_artifact_conflicts(rows: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    out = {
+        "market_anomaly_missing_market_state_snapshot": 0,
+        "market_anomaly_confirmed_breakout_missing_evidence": 0,
+        "market_anomaly_suspicious_illiquid_promoted_confirmed": 0,
+        "market_anomaly_created_alert_rows": 0,
+        "market_anomaly_missing_freshness_status": 0,
+        "market_anomaly_needs_search_without_plan": 0,
+    }
+    alertable_routes = {"RESEARCH_DIGEST", "HIGH_PRIORITY_RESEARCH", "WATCHLIST", "TRIGGERED_FADE_RESEARCH"}
+    alertable_tiers = {"RADAR_DIGEST", "WATCHLIST", "HIGH_PRIORITY", "TRIGGERED_FADE"}
+    for row in rows:
+        if str(row.get("row_type") or "") != "event_market_anomaly":
+            continue
+        anomaly_type = str(row.get("anomaly_type") or row.get("market_state") or "")
+        snapshot = row.get("market_state_snapshot")
+        if not isinstance(snapshot, Mapping) or not snapshot:
+            out["market_anomaly_missing_market_state_snapshot"] += 1
+            snapshot = {}
+        freshness = str(snapshot.get("freshness_status") or row.get("freshness_status") or "").strip()
+        if not freshness:
+            out["market_anomaly_missing_freshness_status"] += 1
+        if anomaly_type == "confirmed_breakout":
+            r4 = _safe_float(snapshot.get("return_4h"))
+            r24 = _safe_float(snapshot.get("return_24h"))
+            volume_z = _safe_float(snapshot.get("volume_zscore_24h"))
+            rel_btc_4h = _safe_float(snapshot.get("relative_return_vs_btc_4h"))
+            has_price = (r4 is not None and r4 >= 8.0) or (r24 is not None and r24 >= 15.0)
+            has_volume = volume_z is not None and volume_z >= 2.0
+            has_relative = rel_btc_4h is not None and rel_btc_4h >= 5.0
+            if not (has_price and has_volume and has_relative):
+                out["market_anomaly_confirmed_breakout_missing_evidence"] += 1
+        route = str(row.get("final_route_after_quality_gate") or row.get("route") or "").upper()
+        tier = str(row.get("tier") or row.get("alert_tier") or "").upper()
+        opportunity_type = str(row.get("opportunity_type") or "").upper()
+        created_alert = bool(row.get("created_alert")) or bool(row.get("alert_id")) or route in alertable_routes or tier in alertable_tiers
+        if created_alert:
+            out["market_anomaly_created_alert_rows"] += 1
+        if anomaly_type == "suspicious_illiquid_move" and (
+            opportunity_type == "CONFIRMED_LONG_RESEARCH"
+            or route in alertable_routes
+            or tier in {"WATCHLIST", "HIGH_PRIORITY", "TRIGGERED_FADE"}
+        ):
+            out["market_anomaly_suspicious_illiquid_promoted_confirmed"] += 1
+        if bool(row.get("needs_catalyst_search")) and not row.get("suggested_source_packs_to_search"):
+            out["market_anomaly_needs_search_without_plan"] += 1
+    return out
+
+
+def _safe_float(value: object) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _opportunity_lane_risk_only_missing_evidence(row: Mapping[str, Any]) -> bool:
@@ -4036,6 +4144,13 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"cryptopanic_only_narrative_confirmed_lane={result.cryptopanic_only_narrative_confirmed_lane} "
             f"diagnostic_visible_default_operator_lane={result.diagnostic_visible_default_operator_lane} "
             f"core_missing_market_state_snapshot={result.core_missing_market_state_snapshot} "
+            f"market_anomaly_rows={result.market_anomaly_rows} "
+            f"market_anomaly_missing_market_state_snapshot={result.market_anomaly_missing_market_state_snapshot} "
+            f"market_anomaly_confirmed_breakout_missing_evidence={result.market_anomaly_confirmed_breakout_missing_evidence} "
+            f"market_anomaly_suspicious_illiquid_promoted_confirmed={result.market_anomaly_suspicious_illiquid_promoted_confirmed} "
+            f"market_anomaly_created_alert_rows={result.market_anomaly_created_alert_rows} "
+            f"market_anomaly_missing_freshness_status={result.market_anomaly_missing_freshness_status} "
+            f"market_anomaly_needs_search_without_plan={result.market_anomaly_needs_search_without_plan} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "

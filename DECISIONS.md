@@ -16,6 +16,22 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Market anomaly artifacts are catalyst-search seeds only
+**Status:** accepted
+**Decision:** Event Alpha may write profile-scoped market-state snapshots and
+broad market anomaly rows for abnormal price/volume/liquidity behavior. These
+rows can seed catalyst search, daily-brief diagnostics, source-pack follow-up,
+and artifact-doctor checks, but they must not create alert snapshots, Telegram
+sends, normal RSI signal rows, paper trades, live trades, or
+Event Alpha-created `TRIGGERED_FADE`.
+**Why:** Market anomalies are useful for recall and for finding missed
+catalysts, but price/volume movement alone is not evidence of an actionable
+research alert. Keeping anomaly rows as search seeds prevents the radar from
+turning “coin moved” into a false alert lane.
+**Revisit when:** A reviewed sample proves a specific anomaly class has
+reliable catalyst-confirmation behavior and the human approves a separate
+promotion path.
+
 ## 2026-07-01 - Event Alpha opportunity lanes are research metadata only
 **Status:** accepted
 **Decision:** Event Alpha may classify canonical CoreOpportunity rows into

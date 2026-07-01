@@ -474,6 +474,32 @@ when you explicitly want a deeper review cycle: it keeps the same research-only
 send guards and per-run delivery behavior but raises the LLM/enrichment caps to
 250 calls/run, 1500 calls/day, 16 concurrent LLM calls, and 45s LLM timeouts.
 
+## Market-State Anomaly Artifacts
+
+Use the standalone anomaly scan when you want a market-first research pass from
+cached/fixture market rows before catalyst search:
+
+```bash
+make event-alpha-market-anomaly-scan PROFILE=no_key_live
+make event-alpha-market-anomaly-smoke PYTHON=python3
+```
+
+The scan writes only local research artifacts under the selected Event Alpha
+namespace:
+
+- `event_market_state_snapshots.jsonl`
+- `event_market_anomalies.jsonl`
+- `event_market_anomaly_report.md`
+
+Anomaly rows are catalyst-search seeds. They should show `created_alert=false`,
+`needs_catalyst_search=true`, and `suggested_source_packs_to_search`. They are
+not alert snapshots, not Telegram notifications, not paper trades, not normal
+RSI rows, and not `TRIGGERED_FADE`. Daily briefs display them in “Market
+Anomalies Without Confirmed Catalyst”; artifact doctor checks malformed anomaly
+rows, including missing snapshots, unsupported confirmed-breakout claims,
+suspicious illiquid moves leaking into confirmed lanes, and alert fields leaking
+into anomaly rows.
+
 Use `notify_llm_quality` when the task is to prove current signal-quality
 artifact writers rather than deliver Telegram notifications. It uses the
 `notify_llm` source/LLM/quality settings, writes under

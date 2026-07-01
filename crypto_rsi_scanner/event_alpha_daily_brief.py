@@ -24,6 +24,7 @@ from . import (
     event_alpha_router,
     event_opportunity_verdict,
     event_alpha_reason_text,
+    event_market_anomaly_scanner,
     event_research_cards,
     event_source_packs,
     event_source_registry,
@@ -50,6 +51,7 @@ def build_daily_brief(
     hypothesis_rows: Iterable[Mapping[str, Any]] = (),
     incident_rows: Iterable[Mapping[str, Any]] = (),
     evidence_acquisition_rows: Iterable[Mapping[str, Any]] = (),
+    market_anomaly_rows: Iterable[Mapping[str, Any]] | None = None,
     watchlist_entries: Iterable[event_watchlist.EventWatchlistEntry] = (),
     router_result: event_alpha_router.EventAlphaRouterResult | None = None,
     provider_health_rows: Mapping[str, Mapping[str, Any]] | None = None,
@@ -119,6 +121,18 @@ def build_daily_brief(
     )
     acquisition_rows = event_alpha_artifacts.filter_artifact_rows(
         [dict(row) for row in evidence_acquisition_rows if isinstance(row, Mapping)],
+        profile=requested_profile,
+        artifact_namespace=artifact_namespace,
+        include_test_artifacts=include_test_artifacts,
+        include_legacy_artifacts=include_legacy_artifacts,
+    )
+    raw_market_anomalies = (
+        [dict(row) for row in market_anomaly_rows if isinstance(row, Mapping)]
+        if market_anomaly_rows is not None
+        else list(event_market_anomaly_scanner.load_market_anomaly_rows(Path(run_ledger_path).parent if run_ledger_path else None))
+    )
+    market_anomalies = event_alpha_artifacts.filter_artifact_rows(
+        raw_market_anomalies,
         profile=requested_profile,
         artifact_namespace=artifact_namespace,
         include_test_artifacts=include_test_artifacts,
@@ -291,6 +305,9 @@ def build_daily_brief(
         "",
         "## Live Confirmation Gated Candidates",
         *_live_confirmation_gated_core_lines(core_opportunities, limit=8),
+        "",
+        "## Market Anomalies Without Confirmed Catalyst",
+        *_market_anomaly_daily_lines(market_anomalies, limit=10),
         "",
         "## Canonical Incidents",
         *_canonical_incident_lines(incidents),
@@ -1796,6 +1813,81 @@ def _research_review_delivery_line(row: Mapping[str, Any]) -> str:
         f"delivery={state} would_send={str(bool(row.get('would_send'))).lower()} "
         f"mode={mode or 'unknown'}"
     )
+
+
+def _market_anomaly_daily_lines(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    limit: int,
+) -> list[str]:
+    candidates = [
+        dict(row)
+        for row in rows
+        if isinstance(row, Mapping)
+        and str(row.get("symbol") or "").upper() != "SECTOR"
+        and str(row.get("row_type") or "") == "event_market_anomaly"
+    ]
+    if not candidates:
+        return ["- None."]
+    candidates.sort(key=lambda row: float(row.get("priority") or 0.0), reverse=True)
+    lines: list[str] = []
+    seen: set[str] = set()
+    displayed = 0
+    for row in candidates:
+        key = str(row.get("canonical_asset_id") or row.get("coin_id") or row.get("symbol") or "")
+        family = str(row.get("anomaly_type") or "")
+        dedupe_key = f"{key}|{family}"
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        snapshot = row.get("market_state_snapshot") if isinstance(row.get("market_state_snapshot"), Mapping) else {}
+        packs = row.get("suggested_source_packs_to_search") if isinstance(row.get("suggested_source_packs_to_search"), list) else []
+        why = row.get("why_interesting") if isinstance(row.get("why_interesting"), list) else []
+        confirms = row.get("what_confirms") if isinstance(row.get("what_confirms"), list) else []
+        invalidates = row.get("what_invalidates") if isinstance(row.get("what_invalidates"), list) else []
+        lines.append(
+            f"- {row.get('symbol') or row.get('coin_id') or 'UNKNOWN'}/{row.get('coin_id') or 'unknown'}: "
+            f"type={row.get('anomaly_type') or 'unknown'} "
+            f"return_4h={_format_signed_pct(snapshot.get('return_4h'))} "
+            f"return_24h={_format_signed_pct(snapshot.get('return_24h'))} "
+            f"volume_z={_format_float(snapshot.get('volume_zscore_24h'))} "
+            f"needs_catalyst_search={str(bool(row.get('needs_catalyst_search'))).lower()} "
+            f"priority={_format_float(row.get('priority'))}"
+        )
+        if packs:
+            lines.append("  search packs: " + ", ".join(str(item) for item in packs[:4]))
+        if why:
+            lines.append("  why_interesting: " + "; ".join(str(item) for item in why[:4]))
+        if confirms:
+            lines.append("  what_confirms: " + "; ".join(str(item) for item in confirms[:3]))
+        if invalidates:
+            lines.append("  what_invalidates: " + "; ".join(str(item) for item in invalidates[:3]))
+        displayed += 1
+        if displayed >= limit:
+            break
+    remaining = max(0, len(candidates) - displayed)
+    if remaining:
+        lines.append(f"- +{remaining} more market anomaly rows in local artifacts.")
+    return lines
+
+
+def _format_signed_pct(value: object) -> str:
+    parsed = _optional_float(value)
+    return "n/a" if parsed is None else f"{parsed:+.1f}%"
+
+
+def _format_float(value: object) -> str:
+    parsed = _optional_float(value)
+    return "n/a" if parsed is None else f"{parsed:.1f}"
+
+
+def _optional_float(value: object) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _live_confirmation_gated_core_lines(

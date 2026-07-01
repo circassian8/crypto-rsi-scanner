@@ -125,6 +125,7 @@ from . import event_feedback
 from . import event_llm_analyzer
 from . import event_llm_catalyst_frames
 from . import event_llm_extractor
+from . import event_market_anomaly_scanner
 from . import event_near_miss
 from . import event_opportunity_audit
 from . import event_provider_health
@@ -4061,6 +4062,7 @@ def event_alpha_notification_checklist_report(
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
+        market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
@@ -6910,6 +6912,7 @@ def event_alpha_artifact_doctor_report(
         watchlist_rows=artifacts["watchlist"].entries,
         incident_rows=artifacts["incidents"].rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
+        market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
         card_paths=[str(path) for path in _research_card_markdown_paths(cards_dir, include_index=True)],
         provider_health_rows=artifacts["provider_rows"],
         source_coverage_report_path=context.namespace_dir / "event_alpha_source_coverage.md",
@@ -7568,6 +7571,7 @@ def event_alpha_daily_brief_report(
         hypothesis_rows=hypotheses.rows,
         incident_rows=event_incident_store.load_incidents(context.incident_store_path, limit=100, include_legacy=True).rows,
         evidence_acquisition_rows=event_evidence_acquisition.load_acquisition_results(context.evidence_acquisition_path),
+        market_anomaly_rows=event_market_anomaly_scanner.load_market_anomaly_rows(context.namespace_dir),
         watchlist_entries=watchlist.entries,
         router_result=router_result,
         provider_health_rows=event_provider_health.load_provider_health(config.EVENT_PROVIDER_HEALTH_PATH),
@@ -7589,6 +7593,117 @@ def event_alpha_daily_brief_report(
     if profile:
         report += f"\nprofile_applied: {profile.name}"
     print(report)
+
+
+def event_alpha_market_anomaly_scan_report(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    market_rows_path: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
+    """Run the research-only broad market anomaly scanner and write artifacts."""
+    _setup_event_discovery_logging(verbose)
+    selected_profile = profile_name or "fixture"
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            selected_profile,
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    started_at = datetime.now(timezone.utc)
+    run_id = event_alpha_run_ledger.run_id_for(started_at, context.profile)
+    path = Path(market_rows_path).expanduser() if market_rows_path else Path(config.EVENT_ALPHA_MARKET_ANOMALY_ROWS_PATH)
+    rows = event_market_anomaly_scanner.load_market_rows(path)
+    cfg = event_market_anomaly_scanner.MarketAnomalyScannerConfig(
+        max_assets=int(getattr(config, "EVENT_ALPHA_MARKET_ANOMALY_MAX_ASSETS", config.EVENT_ANOMALY_MAX_ASSETS)),
+        suspicious_liquidity_usd=float(getattr(config, "EVENT_ALPHA_MARKET_ANOMALY_SUSPICIOUS_LIQUIDITY_USD", 50_000.0)),
+    )
+    result = event_market_anomaly_scanner.run_market_anomaly_scan(
+        market_rows=rows,
+        namespace_dir=context.namespace_dir,
+        cfg=cfg,
+        observed_at=_event_research_now(),
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+        run_mode=context.run_mode,
+        run_id=run_id,
+    )
+    finished_at = datetime.now(timezone.utc)
+    _append_market_anomaly_run_ledger_row(
+        context,
+        run_id=run_id,
+        started_at=started_at,
+        finished_at=finished_at,
+        raw_rows=len(rows),
+        snapshot_count=result.snapshot_count,
+        anomaly_count=result.anomaly_count,
+    )
+    print(_event_alpha_context_block(context))
+    print(
+        "market_anomaly_scan: "
+        f"rows={len(rows)} snapshots={result.snapshot_count} anomalies={result.anomaly_count} "
+        f"snapshots_path={result.snapshots_path} anomalies_path={result.anomalies_path} report_path={result.report_path}"
+    )
+    print(event_market_anomaly_scanner.format_market_anomaly_report(
+        result.anomalies,
+        snapshot_count=result.snapshot_count,
+        profile=context.profile,
+        artifact_namespace=context.artifact_namespace,
+    ))
+
+
+def _append_market_anomaly_run_ledger_row(
+    context: event_alpha_artifacts.EventAlphaArtifactContext,
+    *,
+    run_id: str,
+    started_at: datetime,
+    finished_at: datetime,
+    raw_rows: int,
+    snapshot_count: int,
+    anomaly_count: int,
+) -> None:
+    row = {
+        "schema_version": event_alpha_run_ledger.RUN_LEDGER_SCHEMA_VERSION,
+        "row_type": "event_alpha_run",
+        "run_id": run_id,
+        "profile": context.profile,
+        "run_mode": context.run_mode,
+        "artifact_namespace": context.artifact_namespace,
+        "started_at": started_at.astimezone(timezone.utc).isoformat(),
+        "finished_at": finished_at.astimezone(timezone.utc).isoformat(),
+        "runtime_seconds": max(0.0, (finished_at - started_at).total_seconds()),
+        "with_llm": False,
+        "send_requested": False,
+        "raw_events": 0,
+        "market_rows": int(raw_rows),
+        "market_state_snapshots": int(snapshot_count),
+        "market_anomalies": int(anomaly_count),
+        "catalyst_queries": 0,
+        "catalyst_results_accepted": 0,
+        "catalyst_results_rejected": 0,
+        "extraction_rows": 0,
+        "extraction_hints_applied": 0,
+        "candidates": 0,
+        "clusters": 0,
+        "alerts": 0,
+        "watchlist_entries": 0,
+        "watchlist_escalations": 0,
+        "routed": 0,
+        "alertable": 0,
+        "sent": False,
+        "success": True,
+        "failure": None,
+        "warnings": (),
+    }
+    context.run_ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with context.run_ledger_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True, default=str, separators=(",", ":")))
+        fh.write("\n")
 
 
 def event_alpha_replay_report(
@@ -10186,6 +10301,16 @@ def cli() -> None:
         help="Write and print a daily Event Alpha research brief from local artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-market-anomaly-scan",
+        action="store_true",
+        help="Write research-only market-state/anomaly artifacts from cached or fixture market rows.",
+    )
+    parser.add_argument(
+        "--event-alpha-market-anomaly-rows",
+        default=None,
+        help="Optional JSON/JSONL market rows path for --event-alpha-market-anomaly-scan.",
+    )
+    parser.add_argument(
         "--event-alpha-replay",
         action="store_true",
         help="Replay Event Alpha local artifacts without provider calls or sends.",
@@ -11137,6 +11262,15 @@ def cli() -> None:
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             include_test_artifacts=args.event_alpha_include_test_artifacts,
             include_legacy_artifacts=args.event_alpha_include_legacy_artifacts,
+        )
+        return
+    if args.event_alpha_market_anomaly_scan:
+        event_alpha_market_anomaly_scan_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            market_rows_path=args.event_alpha_market_anomaly_rows,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
         )
         return
     if args.event_alpha_replay:
