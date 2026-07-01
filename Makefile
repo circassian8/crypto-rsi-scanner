@@ -75,6 +75,7 @@ EVENT_PROVIDER_HEALTH_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_provider_health.j
 EVENT_ALPHA_DAILY_BRIEF_PATH ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_daily_brief.md
 EVENT_ALPHA_PROPOSED_EVAL_CASES_DIR ?= $(EVENT_ALPHA_PROFILE_DIR)/proposed_eval_cases
 EVENT_RESEARCH_CARDS_DIR ?= $(EVENT_ALPHA_PROFILE_DIR)/research_cards
+EVENT_RESEARCH_CARDS_WRITE_LIMIT ?= 250
 EVENT_ALPHA_ALERT_OUTCOMES ?= $(EVENT_ALPHA_PROFILE_DIR)/event_alpha_alerts_with_outcomes.jsonl
 EVENT_ALPHA_ALERT_PRICES ?= fixtures/event_discovery/outcome_prices.json
 PROFILE ?= no_key_live
@@ -1835,14 +1836,15 @@ event-research-cards:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
-	$(PYTHON) main.py --event-research-card $(ALERT_KEY)
+	$(PYTHON) main.py --event-research-card $(ALERT_KEY) --event-alpha-artifact-namespace $(EVENT_ALPHA_ARTIFACT_NAMESPACE)
 
 event-research-cards-write:
 	RSI_EVENT_ALPHA_ALERT_STORE_PATH=$(EVENT_ALPHA_ALERT_STORE_PATH) \
 	RSI_EVENT_WATCHLIST_STATE_PATH=$(EVENT_WATCHLIST_STATE_PATH) \
 	RSI_EVENT_ALPHA_ROUTER_ENABLED=1 \
 	RSI_EVENT_RESEARCH_CARDS_DIR=$(EVENT_RESEARCH_CARDS_DIR) \
-	$(PYTHON) main.py --event-research-cards-write --event-alpha-profile $(PROFILE)
+	RSI_EVENT_RESEARCH_CARDS_WRITE_LIMIT=$(EVENT_RESEARCH_CARDS_WRITE_LIMIT) \
+	$(PYTHON) main.py --event-research-cards-write --event-alpha-profile $(PROFILE) --event-alpha-artifact-namespace $(EVENT_ALPHA_ARTIFACT_NAMESPACE)
 
 event-feedback-report:
 	RSI_EVENT_ALPHA_ARTIFACT_BASE_DIR=$(EVENT_ALPHA_ARTIFACT_BASE_DIR) \

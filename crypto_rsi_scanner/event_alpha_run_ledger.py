@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from . import event_artifact_paths
+
 
 RUN_LEDGER_SCHEMA_VERSION = "event_alpha_run_ledger_v1"
 
@@ -365,7 +367,8 @@ def _run_record(
     extraction_rows = list(getattr(result, "extraction_rows", ()) or ())
     catalyst_frame_rows = list(getattr(result, "catalyst_frame_rows", ()) or ())
     relationship_rows = list(getattr(result, "relationship_rows", ()) or ())
-    card_paths = tuple(str(path) for path in getattr(result, "research_card_paths", ()) or ())
+    raw_card_paths = tuple(str(path) for path in getattr(result, "research_card_paths", ()) or ())
+    card_paths = tuple(event_artifact_paths.artifact_display_path(path) for path in raw_card_paths)
     llm_stats = _llm_stats((*extraction_rows, *catalyst_frame_rows, *relationship_rows))
     catalyst_frame_counts = _catalyst_frame_counts(result, catalyst_frame_rows)
     acquisition = getattr(result, "evidence_acquisition_result", None)
@@ -392,7 +395,7 @@ def _run_record(
         or str(getattr(result, "run_mode", "") or "") == "notification_burn_in"
         or str(profile or "").startswith("notify_")
     )
-    return {
+    row = {
         "schema_version": RUN_LEDGER_SCHEMA_VERSION,
         "row_type": "event_alpha_run",
         "run_id": run_id,
@@ -544,6 +547,7 @@ def _run_record(
         "cards_written": _int(getattr(result, "cards_written", len(card_paths))),
         "research_cards_written": _int(getattr(result, "research_cards_written", len(card_paths))),
         "research_card_paths": card_paths,
+        "research_card_paths_abs_debug": raw_card_paths if raw_card_paths else (),
         "provider_fetch_count": _int(getattr(catalyst, "provider_fetch_count", 0)),
         "provider_cache_hits": _int(getattr(catalyst, "provider_cache_hits", 0)),
         "provider_cache_misses": _int(getattr(catalyst, "provider_cache_misses", 0)),
@@ -560,7 +564,8 @@ def _run_record(
         "warnings": tuple(dict.fromkeys(str(warning) for warning in warnings if str(warning))),
         "success": bool(success),
         "failure": failure,
-}
+    }
+    return event_artifact_paths.normalize_operator_path_fields(row)
 
 
 def _notification_summary(result: Any, *, profile: str | None, notify_burn: bool) -> dict[str, Any]:

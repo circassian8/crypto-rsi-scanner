@@ -16,6 +16,7 @@ from . import (
     event_alpha_notifications,
     event_alpha_notification_runs,
     event_alpha_explain,
+    event_artifact_paths,
     event_core_opportunities,
     event_core_opportunity_store,
     event_derivatives_crowding,
@@ -882,7 +883,8 @@ def build_daily_brief(
                 suffix = f" · feedback target: `{target}`" if target else ""
                 if hidden_count:
                     suffix += f" · +{hidden_count} related diagnostic/support card(s) hidden"
-                lines.append(f"- [{path.name}]({path}) · group: {group_name}{suffix}")
+                display_path = event_artifact_paths.artifact_display_path(path)
+                lines.append(f"- [{path.name}]({display_path}) · group: {group_name}{suffix}")
             if len(collapsed_paths) > 20:
                 lines.append(f"- +{len(collapsed_paths) - 20} more card families")
     else:
@@ -1227,7 +1229,8 @@ def _source_coverage_summary_lines(
     report_path = Path(source_coverage_report_path) if source_coverage_report_path else None
     report_status = "not written yet"
     if report_path is not None:
-        report_status = str(report_path) if report_path.exists() else f"{report_path} (not written yet)"
+        report_label = event_artifact_paths.artifact_display_path(report_path)
+        report_status = report_label if report_path.exists() else f"{report_label} (not written yet)"
     return [
         f"- Detailed source coverage report: {report_status}",
         f"- Source registry: {summary}",
@@ -1259,7 +1262,8 @@ def _source_coverage_json_summary_lines(
     json_path = _source_coverage_json_path(source_coverage_report_path)
     report_status = "not written yet"
     if report_path is not None:
-        report_status = str(report_path) if report_path.exists() else f"{report_path} (not written yet)"
+        report_label = event_artifact_paths.artifact_display_path(report_path)
+        report_status = report_label if report_path.exists() else f"{report_label} (not written yet)"
     lines = [
         f"- Detailed source coverage report: {report_status}",
         (
@@ -2957,8 +2961,9 @@ def _format_clock_warning_lines(status: Mapping[str, Any]) -> list[str]:
 
 
 def _strip_sensitive(text: str) -> str:
-    return (
+    cleaned = (
         text.replace("OPENAI_API_KEY", "[redacted]")
         .replace("TELEGRAM_BOT_TOKEN", "[redacted]")
         .replace(".env", "[env-file]")
     )
+    return event_artifact_paths.scrub_absolute_paths_from_markdown(cleaned)

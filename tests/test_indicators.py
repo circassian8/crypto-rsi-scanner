@@ -13752,8 +13752,8 @@ def test_event_alpha_notification_uses_canonical_core_identity_and_compact_messa
     assert rows[0]["canonical_symbols"] == ["BTC"]
     assert rows[0]["canonical_coin_id"] == "bitcoin"
     assert rows[0]["canonical_coin_ids"] == ["bitcoin"]
-    assert rows[0]["canonical_card_path"] == "/tmp/local/cards/agg-ffdcb488dbed.md"
-    assert rows[0]["canonical_card_paths"] == ["/tmp/local/cards/agg-ffdcb488dbed.md"]
+    assert rows[0]["canonical_card_path"] == "agg-ffdcb488dbed.md"
+    assert rows[0]["canonical_card_paths"] == ["agg-ffdcb488dbed.md"]
     assert rows[0]["feedback_target"] == "agg:ffdcb488dbed"
     assert rows[0]["feedback_targets"] == ["agg:ffdcb488dbed"]
     assert rows[0]["identity_reconciled"] is True
@@ -17021,6 +17021,8 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
     )
     assert card_by_alert_id.found is True
     card_dir = __import__("pathlib").Path(__import__("tempfile").mkdtemp())
+    stale_card = card_dir / "card_stale.md"
+    stale_card.write_text("stale absolute path /Users/example/card_stale.md", encoding="utf-8")
     written_cards = event_research_cards.write_research_cards(
         card_dir,
         watchlist_entries=[entry],
@@ -17029,6 +17031,7 @@ def test_event_alpha_missed_calibration_and_research_card_reports():
         selected_tiers=("HIGH_PRIORITY_WATCH",),
     )
     assert any(routed.card_id in str(path) for path in written_cards.card_paths)
+    assert not stale_card.exists()
 
 
 def test_event_alpha_eval_fixture_passes():
@@ -38956,17 +38959,29 @@ def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
         preview.write_text("Alertable decisions: 0 · Alerts: 1\nNo research-only disclaimer", encoding="utf-8")
         deliveries = tmp_path / "event_integrated_radar_notification_deliveries.jsonl"
         deliveries.write_text(
-            json.dumps({
-                "row_type": "event_integrated_radar_notification_delivery",
-                "lane": "early_long_research",
-                "lane_title": "Early Long Research",
-                "message_text": "Card: /Users/test/card.md",
-                "sent": True,
-                "no_send_rehearsal": True,
-                "skipped_item_count": 1,
-                "card_paths": ["/Users/test/card.md"],
-                "normal_rsi_signal_written": True,
-            }) + "\n",
+            "\n".join([
+                json.dumps({
+                    "row_type": "event_integrated_radar_notification_delivery",
+                    "lane": "early_long_research",
+                    "lane_title": "Early Long Research",
+                    "message_text": "Card: /Users/test/card.md",
+                    "sent": True,
+                    "no_send_rehearsal": True,
+                    "skipped_item_count": 1,
+                    "card_paths": ["/Users/test/card.md"],
+                    "normal_rsi_signal_written": True,
+                }),
+                json.dumps({
+                    "row_type": "event_integrated_radar_notification_delivery",
+                    "lane": "early_long_research",
+                    "lane_title": "Early Long Research",
+                    "message_text": "Research-only. Not a trade signal. Card: none",
+                    "sent": False,
+                    "no_send_rehearsal": True,
+                    "skipped_item_count": 0,
+                    "card_paths": ["event_fade_cache/test/research_cards/card_core_test.md"],
+                }),
+            ]) + "\n",
             encoding="utf-8",
         )
         outcomes = tmp_path / "event_integrated_radar_outcomes.jsonl"
@@ -38985,9 +39000,27 @@ def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
             }) + "\n",
             encoding="utf-8",
         )
+        (tmp_path / "event_integrated_radar_calibration_priors.json").write_text(
+            json.dumps({
+                "auto_apply": False,
+                "recommendation_only": True,
+                "eligible_for_auto_apply": False,
+                "opportunity_type_priors": {
+                    "DIAGNOSTIC": {"sample_size": 1, "auto_apply": True},
+                    "EARLY_LONG_RESEARCH": {"sample_size": 1, "min_sample_size": 25},
+                },
+            }),
+            encoding="utf-8",
+        )
+        manifest = tmp_path / "event_integrated_radar_input_manifest.json"
+        manifest.write_text(json.dumps({"sidecars": []}), encoding="utf-8")
+        daily = tmp_path / "event_alpha_daily_brief.md"
+        daily.write_text("Input manifest: not available\n", encoding="utf-8")
         conflicts = event_alpha_artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
             [candidate],
             core_rows=[{**candidate, "row_type": "event_core_opportunity"}],
+            daily_brief_path=daily,
+            manifest_path=manifest,
             delivery_path=deliveries,
             outcome_path=outcomes,
             preview_path=preview,
@@ -38998,10 +39031,16 @@ def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
     assert conflicts["integrated_delivery_side_effect_flag"] == 1
     assert conflicts["integrated_delivery_missing_skip_reasons"] == 1
     assert conflicts["integrated_delivery_card_path_absolute"] == 1
+    assert conflicts["integrated_delivery_card_path_not_rendered"] == 1
+    assert conflicts["operator_structured_path_absolute"] >= 1
+    assert conflicts["integrated_manifest_daily_brief_unavailable"] == 1
     assert conflicts["integrated_outcome_side_effect_flag"] == 1
+    assert conflicts["integrated_outcome_schema_missing"] >= 1
     assert conflicts["integrated_outcome_missing_identity"] == 1
     assert conflicts["integrated_outcome_returns_without_price"] == 1
     assert conflicts["integrated_outcome_diagnostic_in_performance"] == 1
+    assert conflicts["integrated_calibration_diagnostic_in_main_priors"] == 1
+    assert conflicts["integrated_calibration_prior_safety_missing"] >= 1
     assert conflicts["integrated_outcome_return_double_scaled"] == 1
     assert conflicts["integrated_outcome_missing_data_unlabeled"] == 1
 

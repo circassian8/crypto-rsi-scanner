@@ -17,6 +17,7 @@ from . import (
     config,
     event_alpha_router,
     event_core_opportunities,
+    event_artifact_paths,
     event_market_reaction,
     event_opportunity_verdict,
     event_watchlist,
@@ -396,10 +397,16 @@ def update_core_opportunity_card_links(
                 continue
             core_id = str(row.get("core_opportunity_id") or "").strip()
             card_path = card_by_core.get(core_id)
-            if not card_path or row.get("card_path") == card_path:
+            if not card_path:
                 continue
-            row["card_path"] = card_path
-            row["research_card_path"] = card_path
+            rel_card_path = event_artifact_paths.artifact_display_path(card_path)
+            if row.get("card_path") == rel_card_path:
+                continue
+            if event_artifact_paths.has_operator_absolute_path(card_path):
+                row.setdefault("card_path_abs_debug", str(card_path))
+                row.setdefault("research_card_path_abs_debug", str(card_path))
+            row["card_path"] = rel_card_path
+            row["research_card_path"] = rel_card_path
             row.setdefault("feedback_target", core_id)
             row.setdefault("feedback_target_type", "core_opportunity_id")
             updated += 1
@@ -1126,12 +1133,15 @@ def _row_from_core_opportunity(
         "final_verdict_reason": final_verdict_reason,
         "why_opportunity_visible": item.why_opportunity_visible,
         "why_other_rows_hidden": item.why_other_rows_hidden,
-        "card_path": str(card_path) if card_path else None,
-        "research_card_path": str(card_path) if card_path else None,
+        "card_path": event_artifact_paths.artifact_display_path(card_path) if card_path else None,
+        "research_card_path": event_artifact_paths.artifact_display_path(card_path) if card_path else None,
         "feedback_target": item.core_opportunity_id,
         "feedback_target_type": "core_opportunity_id",
         "generated_at": generated_at,
     }
+    if card_path and event_artifact_paths.has_operator_absolute_path(card_path):
+        row["card_path_abs_debug"] = str(card_path)
+        row["research_card_path_abs_debug"] = str(card_path)
     return _apply_integrated_candidate_truth(row, primary=primary, all_rows=all_rows, reaction=reaction)
 
 

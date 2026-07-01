@@ -436,6 +436,7 @@ def format_integrated_daily_brief(
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
     deliveries = [dict(row) for row in delivery_rows if isinstance(row, Mapping)]
     outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
+    manifest_rows = _manifest_rows(input_manifest, context=context)
     core_count = len([row for row in core_rows if isinstance(row, Mapping)])
     would_send = sum(1 for row in deliveries if row.get("would_send"))
     rendered = sum(_int(row.get("rendered_item_count")) for row in deliveries)
@@ -458,7 +459,7 @@ def format_integrated_daily_brief(
         "",
         "### Input Manifest",
     ]
-    lines.extend(_input_manifest_lines(input_manifest, compact=True))
+    lines.extend(_input_manifest_lines(manifest_rows, compact=True))
     lines.extend([
         "",
         "### Research Review Digest",
@@ -510,11 +511,32 @@ def format_integrated_daily_brief(
     if outcomes:
         matured = sum(1 for row in outcomes if str(row.get("outcome_status") or "") == "filled")
         partial = sum(1 for row in outcomes if str(row.get("outcome_status") or "") != "filled")
+        performance_rows = [row for row in outcomes if _truthy(row.get("include_in_performance"))]
+        diagnostics = [row for row in outcomes if not _truthy(row.get("include_in_performance"))]
         lines.append(f"- Outcome rows: {len(outcomes)}")
         lines.append(f"- Filled: {matured}")
         lines.append(f"- Partial/missing data: {partial}")
-        for lane, count in Counter(str(row.get("opportunity_type") or "unknown") for row in outcomes).most_common():
+        lines.append(f"- Performance rows: {len(performance_rows)}")
+        lines.append(f"- Diagnostics excluded: {len(diagnostics)}")
+        for lane, count in Counter(str(row.get("opportunity_type") or "unknown") for row in performance_rows).most_common():
             lines.append(f"- {lane}: {count}")
+        lines.extend(["", "## Recently Matured Integrated Radar Outcomes"])
+        for row in sorted(performance_rows, key=lambda item: str(item.get("preview_time") or item.get("observed_at") or ""), reverse=True)[:10]:
+            lines.append(
+                f"- {row.get('symbol')}/{row.get('coin_id')} {row.get('opportunity_type')} "
+                f"label={row.get('outcome_label')} primary={_pct(row.get('primary_horizon_return'))} "
+                f"vs BTC={_pct(_by_horizon(row.get('relative_return_vs_btc_by_horizon'), row.get('primary_horizon')))} "
+                f"status={row.get('outcome_status')}"
+            )
+        if diagnostics:
+            lines.append(f"- Diagnostics excluded from performance: {len(diagnostics)}")
+        lines.extend(["", "## Calibration Snapshot"])
+        for lane, lane_rows in sorted(_group_by(performance_rows, "opportunity_type").items()):
+            useful = sum(1 for row in lane_rows if _outcome_truth(row) == "useful")
+            junk = sum(1 for row in lane_rows if _outcome_truth(row) == "junk")
+            rate = useful / max(1, useful + junk)
+            lines.append(f"- {lane}: rows={len(lane_rows)} useful_rate={rate:.2f}")
+        lines.append("- Small-sample warning: recommendations only; no automatic threshold or routing changes were applied.")
     else:
         lines.append("- No integrated radar outcomes filled yet.")
     lines.extend(["", "## Diagnostics Appendix"])
@@ -553,6 +575,7 @@ def build_integrated_notification_delivery_rows(
             lane_title=title,
             context=context,
             lane=lane,
+            core_by_id=core_by_id,
         )
         out.append(_integrated_delivery_row(
             lane=lane,
@@ -679,6 +702,7 @@ def _integrated_lane_message(
     lane_title: str,
     context: event_alpha_artifacts.EventAlphaArtifactContext | None,
     lane: str,
+    core_by_id: Mapping[str, Mapping[str, Any]] | None = None,
     extra_lines: Iterable[str] = (),
 ) -> str:
     materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
@@ -693,7 +717,7 @@ def _integrated_lane_message(
     if not materialized:
         lines.append("- No candidate items in this lane.")
     for index, row in enumerate(materialized, start=1):
-        card_path = _row_card_path(row)
+        card_path = _row_card_path(row, core_by_id=core_by_id)
         lines.extend([
             f"{index}. {row.get('symbol')}/{row.get('coin_id')}",
             f"   Opportunity: {row.get('opportunity_type') or 'unknown'}",
@@ -703,7 +727,7 @@ def _integrated_lane_message(
             f"   What confirms: {_list_label(row.get('what_confirms') or ())}",
             f"   What invalidates: {_list_label(row.get('what_invalidates') or ())}",
             f"   Why not alertable: {_list_label(row.get('why_not_alertable') or ())}",
-            f"   Card: {card_path or 'none'}",
+            f"   Card: {card_path or 'not generated'}",
             "",
         ])
     for extra in extra_lines:
@@ -1805,6 +1829,63 @@ def _input_manifest_lines(
             line += " warnings=" + "; ".join(str(warning) for warning in warnings[:3])
         lines.append(line)
     return lines
+
+
+def _manifest_rows(
+    manifest: Iterable[Mapping[str, Any]],
+    *,
+    context: event_alpha_artifacts.EventAlphaArtifactContext | None = None,
+) -> list[dict[str, Any]]:
+    rows = [dict(item) for item in manifest if isinstance(item, Mapping)]
+    if rows or context is None:
+        return rows
+    path = context.namespace_dir / INPUT_MANIFEST_FILENAME
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    sidecars = payload.get("sidecars") if isinstance(payload, Mapping) else None
+    if not isinstance(sidecars, Iterable) or isinstance(sidecars, (str, bytes, Mapping)):
+        return []
+    return [dict(item) for item in sidecars if isinstance(item, Mapping)]
+
+
+def _by_horizon(value: Any, horizon: Any) -> Any:
+    if isinstance(value, Mapping):
+        return value.get(str(horizon or "24h")) or value.get("24h")
+    return value
+
+
+def _pct(value: Any) -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "n/a"
+    return f"{number * 100:+.2f}%"
+
+
+def _group_by(rows: Iterable[Mapping[str, Any]], key: str) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(str(row.get(key) or "unknown"), []).append(dict(row))
+    return grouped
+
+
+def _outcome_truth(row: Mapping[str, Any]) -> str:
+    label = str(row.get("outcome_label") or "")
+    if label in {"useful", "early_good", "continuation_good", "fade_review_good", "risk_validated", "watch"}:
+        return "useful"
+    if label in {"junk", "remained_noise"}:
+        return "junk"
+    return "neutral"
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 def _review_candidates(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:

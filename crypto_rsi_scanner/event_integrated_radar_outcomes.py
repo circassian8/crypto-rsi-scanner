@@ -41,8 +41,10 @@ def load_integrated_radar_outcomes(namespace_dir: str | Path) -> tuple[dict[str,
 
 def format_integrated_radar_outcome_report(rows: Iterable[Mapping[str, Any]]) -> str:
     materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    performance_rows = [row for row in materialized if _truthy(row.get("include_in_performance"))]
+    diagnostic_rows = [row for row in materialized if not _truthy(row.get("include_in_performance"))]
     status_counts = Counter(str(row.get("outcome_status") or "unknown") for row in materialized)
-    lane_counts = Counter(str(row.get("opportunity_type") or "unknown") for row in materialized)
+    lane_counts = Counter(str(row.get("opportunity_type") or "unknown") for row in performance_rows)
     lines = [
         "# Event Alpha Integrated Radar Outcome Report",
         "",
@@ -51,13 +53,15 @@ def format_integrated_radar_outcome_report(rows: Iterable[Mapping[str, Any]]) ->
         "",
         "## Summary",
         f"- Outcome rows: {len(materialized)}",
+        f"- Performance rows: {len(performance_rows)}",
+        f"- Diagnostics excluded from performance: {len(diagnostic_rows)}",
         f"- Status: {_format_counts(status_counts)}",
         f"- Lanes: {_format_counts(lane_counts)}",
         "",
         "## Outcomes By Lane",
     ]
     by_lane: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in materialized:
+    for row in performance_rows:
         by_lane[str(row.get("opportunity_type") or "unknown")].append(row)
     for lane in sorted(by_lane):
         lane_rows = by_lane[lane]
@@ -71,16 +75,28 @@ def format_integrated_radar_outcome_report(rows: Iterable[Mapping[str, Any]]) ->
                 f"primary={_pct(row.get('primary_horizon_return')) if row.get('primary_horizon_return') is not None else 'n/a'} "
                 f"status={row.get('outcome_status')}"
             )
+    if diagnostic_rows:
+        lines.extend(["", "## Diagnostics Appendix"])
+        lines.append("DIAGNOSTIC rows are excluded from performance and calibration priors.")
+        for row in diagnostic_rows[:10]:
+            lines.append(
+                f"- {row.get('symbol')}/{row.get('coin_id')} lane={row.get('opportunity_type')} "
+                f"label={row.get('outcome_label')} status={row.get('outcome_status')}"
+            )
     return "\n".join(lines).rstrip() + "\n"
 
 
 def format_integrated_radar_calibration_report(rows: Iterable[Mapping[str, Any]]) -> str:
-    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    all_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
+    materialized = [row for row in all_rows if _truthy(row.get("include_in_performance"))]
+    excluded = len(all_rows) - len(materialized)
     lines = [
         "# Event Alpha Integrated Radar Calibration Report",
         "",
         event_integrated_radar.RESEARCH_DISCLAIMER,
         "Recommendations only. Thresholds and priors are not changed automatically.",
+        "Sample sizes are too small for automatic threshold changes.",
+        f"Diagnostics excluded from performance: {excluded}",
         "",
     ]
     for dimension in ("opportunity_type", "source_pack", "source_origin", "market_state_class", "source_strength", "crowding_class"):
@@ -106,29 +122,53 @@ def format_integrated_radar_calibration_report(rows: Iterable[Mapping[str, Any]]
 
 
 def build_integrated_radar_calibration_priors(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
-    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    all_rows = [dict(row) for row in rows if isinstance(row, Mapping)]
+    materialized = [row for row in all_rows if _truthy(row.get("include_in_performance"))]
+    diagnostics = [row for row in all_rows if not _truthy(row.get("include_in_performance"))]
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in materialized:
         groups[str(row.get("opportunity_type") or "unknown")].append(row)
     priors = {}
+    min_sample = 25
     for lane, lane_rows in groups.items():
         useful = sum(1 for row in lane_rows if _truth_label(row) == "useful")
         junk = sum(1 for row in lane_rows if _truth_label(row) == "junk")
+        sample_size = len(lane_rows)
         priors[lane] = {
-            "sample_size": len(lane_rows),
+            "sample_size": sample_size,
+            "min_sample_size": min_sample,
+            "min_sample_warning": sample_size < min_sample,
             "useful": useful,
             "junk": junk,
             "suggested_prior": round(useful / max(1, useful + junk), 4),
-            "confidence": "low" if len(lane_rows) < 25 else "medium",
+            "confidence": "low" if sample_size < min_sample else "medium",
             "recommendation_only": True,
+            "eligible_for_auto_apply": False,
+            "auto_apply": False,
+            "generated_from_fixture": True,
+            "excluded_from_auto_apply_reason": "fixture_or_small_sample_research_only",
+            "last_updated_at": datetime.now(timezone.utc).isoformat(),
+            "horizon_basis": "primary_horizon",
+        }
+    diagnostic_priors: dict[str, Any] = {}
+    for lane, lane_rows in _group_by(diagnostics, "opportunity_type").items():
+        diagnostic_priors[lane] = {
+            "sample_size": len(lane_rows),
+            "excluded_from_performance": True,
+            "recommendation_only": True,
+            "eligible_for_auto_apply": False,
+            "auto_apply": False,
         }
     return {
         "schema_version": 1,
         "row_type": "event_integrated_radar_calibration_priors",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "research_only": True,
+        "recommendation_only": True,
+        "eligible_for_auto_apply": False,
         "auto_apply": False,
         "opportunity_type_priors": priors,
+        "diagnostic_debug_priors": diagnostic_priors,
     }
 
 
@@ -136,6 +176,8 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
     symbol = str(candidate.get("symbol") or "UNKNOWN")
     lane = str(candidate.get("opportunity_type") or "UNCONFIRMED_RESEARCH")
     returns = _fixture_returns(symbol, lane)
+    btc_returns = _benchmark_returns("BTC")
+    eth_returns = _benchmark_returns("ETH")
     primary_horizon = _primary_horizon(lane)
     primary_return = returns.get(primary_horizon)
     label = _label_for(symbol, lane, primary_return)
@@ -164,21 +206,43 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "price_at_observation": price,
         "price_source": "fixture_or_candidate_snapshot",
         "horizons": {horizon: returns.get(horizon) for horizon in HORIZONS},
+        "outcome_horizons": list(HORIZONS),
+        "return_by_horizon": {horizon: returns.get(horizon) for horizon in HORIZONS},
+        "relative_return_vs_btc_by_horizon": {
+            horizon: _relative_return(returns.get(horizon), btc_returns.get(horizon))
+            for horizon in HORIZONS
+        },
+        "relative_return_vs_eth_by_horizon": {
+            horizon: _relative_return(returns.get(horizon), eth_returns.get(horizon))
+            for horizon in HORIZONS
+        },
+        "benchmark_btc_price_at_observation": 65000.0,
+        "benchmark_eth_price_at_observation": 3500.0,
+        "benchmark_btc_return_by_horizon": {horizon: btc_returns.get(horizon) for horizon in HORIZONS},
+        "benchmark_eth_return_by_horizon": {horizon: eth_returns.get(horizon) for horizon in HORIZONS},
         "primary_horizon": primary_horizon,
         "primary_horizon_return": primary_return,
         "relative_return_vs_btc_24h": returns.get("relative_vs_btc_24h"),
-        "mfe": max((value for value in returns.values() if isinstance(value, (int, float))), default=None),
-        "mae": min((value for value in returns.values() if isinstance(value, (int, float))), default=None),
+        "mfe": max((value for key, value in returns.items() if key in HORIZONS and isinstance(value, (int, float))), default=None),
+        "mae": min((value for key, value in returns.items() if key in HORIZONS and isinstance(value, (int, float))), default=None),
+        "max_favorable_excursion_by_window": _window_extremes(returns, want_peak=True),
+        "max_adverse_excursion_by_window": _window_extremes(returns, want_peak=False),
         "time_to_peak": _time_to_extreme(returns, want_peak=True),
         "time_to_trough": _time_to_extreme(returns, want_peak=False),
-        "market_confirmed": lane == "CONFIRMED_LONG_RESEARCH" and label == "useful",
-        "fade_confirmed": lane == "FADE_SHORT_REVIEW" and label == "useful",
+        "time_to_peak_hours": _time_to_extreme_hours(returns, want_peak=True),
+        "time_to_trough_hours": _time_to_extreme_hours(returns, want_peak=False),
+        "catalyst_confirmed_after_observation": _confirmed_after_observation(label, kind="catalyst"),
+        "market_confirmed_after_observation": _confirmed_after_observation(label, kind="market"),
+        "market_confirmed": lane == "CONFIRMED_LONG_RESEARCH" and label in {"continuation_good", "useful"},
+        "fade_confirmed": lane == "FADE_SHORT_REVIEW" and label in {"fade_review_good", "useful"},
         "risk_validated": lane == "RISK_ONLY" and label == "useful",
         "outcome_label": label,
         "outcome_status": status,
         "missing_data_reason": missing_reason,
         "include_in_performance": lane != "DIAGNOSTIC" and status == "filled",
         "research_only": True,
+        "no_trade_created": True,
+        "no_paper_trade_created": True,
         "normal_rsi_signal_written": False,
         "triggered_fade_created": False,
         "paper_trade_created": False,
@@ -197,6 +261,58 @@ def _fixture_returns(symbol: str, lane: str) -> dict[str, float]:
         "SECTOR": {"15m": 0.0, "1h": 0.0, "4h": 0.0, "24h": 0.0, "3d": 0.0, "7d": 0.0, "relative_vs_btc_24h": 0.0},
     }
     return dict(table.get(symbol.upper(), table.get("SECTOR" if lane == "DIAGNOSTIC" else "", {})))
+
+
+def _benchmark_returns(symbol: str) -> dict[str, float]:
+    if symbol == "ETH":
+        return {"15m": 0.0005, "1h": 0.0015, "4h": 0.003, "24h": 0.006, "3d": 0.01, "7d": 0.018}
+    return {"15m": 0.0003, "1h": 0.001, "4h": 0.002, "24h": 0.005, "3d": 0.008, "7d": 0.012}
+
+
+def _relative_return(value: float | None, benchmark: float | None) -> float | None:
+    if value is None or benchmark is None:
+        return None
+    return float(value) - float(benchmark)
+
+
+def _window_extremes(returns: Mapping[str, float], *, want_peak: bool) -> dict[str, float | None]:
+    values: dict[str, float | None] = {}
+    ordered: list[float] = []
+    for horizon in HORIZONS:
+        value = returns.get(horizon)
+        if isinstance(value, (int, float)):
+            ordered.append(float(value))
+            values[horizon] = max(ordered) if want_peak else min(ordered)
+        else:
+            values[horizon] = None
+    return values
+
+
+def _time_to_extreme_hours(returns: Mapping[str, float], *, want_peak: bool) -> float | None:
+    horizon = _time_to_extreme(returns, want_peak=want_peak)
+    return {
+        "15m": 0.25,
+        "1h": 1.0,
+        "4h": 4.0,
+        "24h": 24.0,
+        "3d": 72.0,
+        "7d": 168.0,
+    }.get(str(horizon or ""))
+
+
+def _confirmed_after_observation(label: str, *, kind: str) -> str:
+    if label in {"early_good", "continuation_good", "fade_review_good", "risk_validated"}:
+        return "yes"
+    if label in {"remained_noise", "diagnostic_only"}:
+        return "no"
+    return "unknown"
+
+
+def _group_by(rows: Iterable[Mapping[str, Any]], key: str) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        grouped[str(row.get(key) or "unknown")].append(dict(row))
+    return grouped
 
 
 def _primary_horizon(lane: str) -> str:
@@ -273,6 +389,14 @@ def _pct(value: Any) -> str:
 def _format_counts(values: Mapping[str, int] | Counter[Any]) -> str:
     items = [(str(key), int(value)) for key, value in dict(values).items() if int(value)]
     return ", ".join(f"{key}={value}" for key, value in sorted(items)) if items else "none"
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().casefold() in {"1", "true", "yes", "y", "on"}
 
 
 def _parse_time(value: datetime | str | None) -> datetime | None:

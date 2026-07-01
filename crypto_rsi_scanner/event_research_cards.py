@@ -311,15 +311,8 @@ def render_research_card(
     if warnings:
         lines.extend(["", "## Warnings / Source-Noise Rejections"])
         lines.extend(f"- {warning}" for warning in warnings)
-    lines.extend([
-        "",
-        "## Outcome Tracking Fields",
-        f"- Expected direction: {_value(None, outcome, '', 'expected_direction') or 'unknown'}",
-        f"- Primary horizon: {_value(None, outcome, '', 'primary_horizon') or 'unknown'}",
-        f"- Success metric: {_value(None, outcome, '', 'success_metric') or 'manual'}",
-        f"- Primary horizon return: {_value(None, outcome, '', 'primary_horizon_return') or 'blank'}",
-        f"- MFE/MAE: {_value(None, outcome, '', 'mfe_mae_ratio') or 'blank'}",
-    ])
+    lines.extend(["", "## Outcome Tracking"])
+    lines.extend(_outcome_tracking_lines(outcome))
     return EventResearchCardResult(key=clean_key, markdown="\n".join(lines).rstrip() + "\n", found=True)
 
 
@@ -381,6 +374,9 @@ def write_research_cards(
     """Write selected Markdown cards and an index under a local artifact dir."""
     target = Path(out_dir).expanduser()
     target.mkdir(parents=True, exist_ok=True)
+    for stale_card in target.glob("card_*.md"):
+        if stale_card.is_file():
+            stale_card.unlink()
     observed = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     alert_row_list = list(alert_rows)
     entries = _selected_entries(
@@ -2988,16 +2984,60 @@ def _lifecycle_lines(
     )):
         lines.append(
             "- outcome: "
-            f"primary={outcome.get('primary_horizon_return', 'blank')} "
-            f"24h={outcome.get('return_24h', 'blank')} "
-            f"72h={outcome.get('return_72h', 'blank')} "
-            f"7d={outcome.get('return_7d', 'blank')} "
+            f"primary={_display_pct(outcome.get('primary_horizon_return'))} "
+            f"24h={_display_pct(outcome.get('return_24h'))} "
+            f"72h={_display_pct(outcome.get('return_72h'))} "
+            f"7d={_display_pct(outcome.get('return_7d'))} "
             f"direction_hit={outcome.get('direction_hit', 'blank')} "
             f"mfe_mae={outcome.get('mfe_mae_ratio', 'blank')}"
         )
     else:
         lines.append("- outcome: not filled")
     return lines or ["- No lifecycle timestamps found."]
+
+
+def _outcome_tracking_lines(outcome: Mapping[str, Any] | None) -> list[str]:
+    if outcome is None:
+        return [
+            "- Outcome status: pending",
+            "- Outcome label: not filled",
+            "- Research-only outcome; not PnL, not a trade, not a paper trade.",
+        ]
+    primary_horizon = str(outcome.get("primary_horizon") or "unknown")
+    rel_btc = _outcome_horizon_value(outcome.get("relative_return_vs_btc_by_horizon"), primary_horizon)
+    if rel_btc in (None, ""):
+        rel_btc = outcome.get("relative_return_vs_btc_24h")
+    rel_eth = _outcome_horizon_value(outcome.get("relative_return_vs_eth_by_horizon"), primary_horizon)
+    mfe = outcome.get("mfe")
+    mae = outcome.get("mae")
+    if mfe in (None, ""):
+        mfe = _outcome_horizon_value(outcome.get("max_favorable_excursion_by_window"), primary_horizon)
+    if mae in (None, ""):
+        mae = _outcome_horizon_value(outcome.get("max_adverse_excursion_by_window"), primary_horizon)
+    status = str(outcome.get("outcome_status") or "pending")
+    missing_reason = str(outcome.get("missing_data_reason") or "").strip()
+    lines = [
+        f"- Outcome status: {status}",
+        f"- Outcome label: {outcome.get('outcome_label') or 'unknown'}",
+        f"- Primary horizon: {primary_horizon}",
+        f"- Primary horizon return: {_display_pct(outcome.get('primary_horizon_return'))}",
+        f"- Relative return vs BTC: {_display_pct(rel_btc)}",
+        f"- Relative return vs ETH: {_display_pct(rel_eth)}",
+        f"- MFE / MAE: {_display_pct(mfe)} / {_display_pct(mae)}",
+        f"- Time to peak / trough: {outcome.get('time_to_peak_hours') or outcome.get('time_to_peak') or 'unknown'} / {outcome.get('time_to_trough_hours') or outcome.get('time_to_trough') or 'unknown'}",
+        f"- Catalyst confirmed after observation: {outcome.get('catalyst_confirmed_after_observation') or 'unknown'}",
+        f"- Market confirmed after observation: {outcome.get('market_confirmed_after_observation') or 'unknown'}",
+    ]
+    if missing_reason:
+        lines.append(f"- Missing data reason: {missing_reason}")
+    lines.append("- Research-only outcome; not PnL, not a trade, not a paper trade.")
+    return lines
+
+
+def _outcome_horizon_value(value: Any, horizon: str) -> Any:
+    if isinstance(value, Mapping):
+        return value.get(horizon) or value.get("24h")
+    return value
 
 
 def _monitor_value(row: event_watchlist_monitor.EventWatchlistMonitorRow | Mapping[str, Any], field: str) -> Any:

@@ -894,10 +894,10 @@ def _recommendation_lines(report: EventAlphaSourceCoverageReport) -> list[str]:
 
 def _provider_lane_priority(provider: str) -> int:
     text = str(provider or "").casefold()
+    if any(token in text for token in ("coinalyze", "futures", "derivatives", "funding")):
+        return 760
     if any(token in text for token in ("binance", "bybit", "coinbase", "kucoin", "okx")):
         return 700
-    if any(token in text for token in ("coinalyze", "futures", "derivatives", "funding")):
-        return 650
     if any(token in text for token in ("tokenomist", "coinmarketcal", "coindar", "messari")):
         return 600
     if any(token in text for token in ("geckoterminal", "arkham", "dune", "etherscan")):

@@ -17,6 +17,30 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Finish integrated radar artifact portability follow-up · Codex
+**Why:** The integrated radar artifact pass still needed a few final hardening
+fixes so operator JSON/Markdown stayed checkout-portable, research-card
+generation used the selected namespace consistently, and outcome/calibration
+reports separated performance rows from diagnostics.
+**Changes:**
+- Normalized operator-facing path fields to artifact-relative labels, retaining
+  absolute originals only in explicit `*_abs_debug` fields.
+- Made research-card writing use the active artifact context, prune stale
+  generated cards, and write enough cards for the full inspected namespace by
+  default.
+- Hardened integrated delivery/card/daily-brief doctor checks for missing card
+  renders, absolute path leaks, unavailable manifests, outcome schema gaps, and
+  unsafe calibration priors.
+- Split integrated outcome/calibration reporting into performance rows and
+  diagnostic appendices, with diagnostics excluded from main priors.
+**Verify:** `python3 tests/test_indicators.py` (644/644 passed);
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Research-only artifact/reporting work. No Telegram sends,
+normal RSI rows, paper/live trades, execution, or Event Alpha-created
+`TRIGGERED_FADE`.
+
 ## 2026-07-01 — Make integrated radar artifacts portable and outcome-aware · Codex
 **Why:** Integrated radar operator artifacts needed portable paths, structured
 no-send preview delivery rows, run-ledger telemetry, and a research-only outcome

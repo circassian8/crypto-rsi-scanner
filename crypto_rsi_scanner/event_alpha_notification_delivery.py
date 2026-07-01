@@ -25,6 +25,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from . import event_artifact_paths
+
 DELIVERY_SCHEMA_VERSION = "event_alpha_notification_delivery_v1"
 
 STATE_PLANNED = "planned"
@@ -150,7 +152,7 @@ class NotificationDeliveryRecord:
     channel_summary: dict[str, Any] = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
-        return {
+        row = {
             "schema_version": DELIVERY_SCHEMA_VERSION,
             "row_type": "event_alpha_notification_delivery",
             "delivery_id": self.delivery_id,
@@ -201,6 +203,7 @@ class NotificationDeliveryRecord:
             "failed_chunks": int(self.failed_chunks or 0),
             "channel_summary": _json_ready(self.channel_summary or {}),
         }
+        return event_artifact_paths.normalize_operator_path_fields(row)
 
 
 @dataclass(frozen=True)
@@ -362,8 +365,8 @@ def build_record(
         canonical_symbols=tuple(str(item) for item in canonical_symbols if str(item)),
         canonical_coin_id=str(canonical_coin_id) if canonical_coin_id else None,
         canonical_coin_ids=tuple(str(item) for item in canonical_coin_ids if str(item)),
-        canonical_card_path=str(canonical_card_path) if canonical_card_path else None,
-        canonical_card_paths=tuple(str(item) for item in canonical_card_paths if str(item)),
+        canonical_card_path=event_artifact_paths.artifact_display_path(canonical_card_path) if canonical_card_path else None,
+        canonical_card_paths=tuple(event_artifact_paths.artifact_display_path(item) for item in canonical_card_paths if str(item)),
         feedback_target=str(feedback_target) if feedback_target else None,
         feedback_targets=tuple(str(item) for item in feedback_targets if str(item)),
         source_alert_ids=tuple(str(item) for item in source_alert_ids if str(item)),

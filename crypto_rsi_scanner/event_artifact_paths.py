@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 
 _ABS_PATH_RE = re.compile(
@@ -18,14 +18,28 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def artifact_relpath(path: str | Path | None, *, base: str | Path | None = None) -> str:
+def artifact_relpath(
+    path: str | Path | None,
+    *,
+    base: str | Path | None = None,
+    repo_root: str | Path | None = None,
+    artifact_base: str | Path | None = None,
+) -> str:
     """Return a stable POSIX relative path for an artifact."""
     if path in (None, ""):
         return ""
     raw = Path(str(path)).expanduser()
-    roots = [Path(base).expanduser() if base is not None else repo_root(), Path.cwd()]
+    root_value = repo_root if repo_root is not None else None
+    roots = [
+        Path(base).expanduser() if base is not None else None,
+        Path(root_value).expanduser() if root_value is not None else globals()["repo_root"](),
+        Path(artifact_base).expanduser() if artifact_base is not None else None,
+        Path.cwd(),
+    ]
     if raw.is_absolute():
         for root in roots:
+            if root is None:
+                continue
             try:
                 return raw.resolve().relative_to(root.resolve()).as_posix()
             except (OSError, ValueError):
@@ -38,9 +52,15 @@ def artifact_relpath(path: str | Path | None, *, base: str | Path | None = None)
     return raw.as_posix()
 
 
-def artifact_display_path(path: str | Path | None, *, base: str | Path | None = None) -> str:
+def artifact_display_path(
+    path: str | Path | None,
+    *,
+    base: str | Path | None = None,
+    repo_root: str | Path | None = None,
+    artifact_base: str | Path | None = None,
+) -> str:
     """Return a human/operator safe artifact path label."""
-    rel = artifact_relpath(path, base=base)
+    rel = artifact_relpath(path, base=base, repo_root=repo_root, artifact_base=artifact_base)
     return rel or "none"
 
 
@@ -77,3 +97,78 @@ def scrub_absolute_paths_from_markdown(text: str, *, base: str | Path | None = N
         return Path(path).name
 
     return _ABS_PATH_RE.sub(_replace, out)
+
+
+def normalize_operator_path_fields(
+    row: Mapping[str, Any],
+    *,
+    rel_field_names: Iterable[str] | None = None,
+    debug_abs_suffix: str = "_abs_debug",
+    repo_root: str | Path | None = None,
+    artifact_base: str | Path | None = None,
+) -> dict[str, Any]:
+    """Return a copy with operator path fields made portable.
+
+    Fields whose names end with ``debug_abs_suffix`` are left untouched. For
+    other path-like fields, absolute paths are converted to repo/artifact
+    relative labels and the original absolute value is preserved beside it as a
+    ``*_abs_debug`` field. Lists/tuples are normalized element-wise.
+    """
+    rel_names = set(rel_field_names or ())
+    out: dict[str, Any] = {}
+    debug_values: dict[str, Any] = {}
+    for key, value in dict(row).items():
+        key_text = str(key)
+        if key_text.endswith(debug_abs_suffix):
+            out[key_text] = value
+            continue
+        if _is_operator_path_field(key_text, rel_names=rel_names):
+            normalized, debug_value = _normalize_path_value(
+                value,
+                repo_root=repo_root,
+                artifact_base=artifact_base,
+            )
+            out[key_text] = normalized
+            if debug_value not in (None, "", [], ()):
+                debug_values.setdefault(f"{key_text}{debug_abs_suffix}", debug_value)
+        else:
+            out[key_text] = value
+    for key, value in debug_values.items():
+        out.setdefault(key, value)
+    return out
+
+
+def _is_operator_path_field(key: str, *, rel_names: set[str]) -> bool:
+    clean = key.casefold()
+    if clean in rel_names:
+        return True
+    if clean.endswith("_relpath") or clean.endswith("_relpaths"):
+        return False
+    return clean.endswith("_path") or clean.endswith("_paths") or "card_path" in clean
+
+
+def _normalize_path_value(
+    value: Any,
+    *,
+    repo_root: str | Path | None,
+    artifact_base: str | Path | None,
+) -> tuple[Any, Any]:
+    if value in (None, ""):
+        return value, None
+    if isinstance(value, (list, tuple, set)):
+        normalized_items = []
+        debug_items = []
+        for item in value:
+            normalized, debug = _normalize_path_value(
+                item,
+                repo_root=repo_root,
+                artifact_base=artifact_base,
+            )
+            normalized_items.append(normalized)
+            if debug not in (None, ""):
+                debug_items.append(debug)
+        return tuple(normalized_items) if isinstance(value, tuple) else list(normalized_items), debug_items
+    text = str(value)
+    if has_operator_absolute_path(text) or Path(text).expanduser().is_absolute():
+        return artifact_display_path(text, repo_root=repo_root, artifact_base=artifact_base), text
+    return text, None

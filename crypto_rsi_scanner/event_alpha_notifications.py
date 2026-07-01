@@ -17,7 +17,7 @@ import re
 
 from . import event_alpha_notification_delivery as delivery
 from . import event_alpha_notification_sender as sender
-from . import event_alpha_pipeline, event_alpha_router, event_watchlist
+from . import event_alpha_pipeline, event_alpha_router, event_artifact_paths, event_watchlist
 
 LANE_DAILY_DIGEST = "daily_digest"
 LANE_INSTANT_ESCALATION = "instant_escalation"
@@ -1589,12 +1589,12 @@ def _delivery_identity_for_decisions(
         or _first_card_path(card_path_by_alert_id, (*core_ids, *source_ids))
     )
     card_paths = tuple(dict.fromkeys(
-        str(
+        event_artifact_paths.artifact_display_path(
             row.get("card_path")
             or row.get("research_card_path")
             or row.get("canonical_card_path")
             or ""
-        ).strip()
+        )
         for row in core_rows
         if str(row.get("card_path") or row.get("research_card_path") or row.get("canonical_card_path") or "").strip()
     ))
@@ -1625,7 +1625,7 @@ def _delivery_identity_for_decisions(
         core_opportunity_id=core_ids[0] if core_ids else None,
         canonical_symbol=symbols[0] if symbols else None,
         canonical_coin_id=coin_ids[0] if coin_ids else None,
-        canonical_card_path=str(card_path) if card_path else None,
+        canonical_card_path=event_artifact_paths.artifact_display_path(card_path) if card_path else None,
         feedback_target=feedback_targets[0] if feedback_targets else (requested or alert_id),
         identity_reconciled=reconciled,
         identity_reconciliation_reason="canonical_core_opportunity" if reconciled else "source_alert_identity",
@@ -2243,16 +2243,7 @@ def _preview_path_label(path: str | None) -> str:
     text = str(path or "").strip()
     if not text:
         return "none"
-    normalized = text.replace("\\", "/")
-    marker = "/event_fade_cache/"
-    if marker in normalized:
-        return "event_fade_cache/" + normalized.split(marker, 1)[1]
-    if normalized.startswith("event_fade_cache/"):
-        return normalized
-    try:
-        return Path(text).name or "local_card"
-    except (OSError, ValueError):
-        return "local_card"
+    return event_artifact_paths.artifact_display_path(text)
 
 
 class _DeliveryWriter:
@@ -3025,13 +3016,12 @@ def _telegram_card_basename(
     ):
         text = str(value or "").strip()
         if text:
-            return Path(text).name or "local card"
+            return event_artifact_paths.artifact_display_path(text)
     card_paths = {str(key): value for key, value in (card_path_by_alert_id or {}).items()}
     for key in _decision_identity_keys(decision):
         path = card_paths.get(key)
         if path:
-            name = Path(str(path)).name
-            return name or "local card"
+            return event_artifact_paths.artifact_display_path(path)
     return "local artifacts"
 
 

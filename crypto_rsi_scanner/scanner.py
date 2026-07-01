@@ -7427,20 +7427,20 @@ def event_research_cards_write(
     except ValueError as exc:
         print(str(exc))
         return
-    watch_cfg = _event_watchlist_config_from_runtime()
-    watchlist = event_watchlist.load_watchlist(watch_cfg.state_path or config.EVENT_WATCHLIST_STATE_PATH)
+    _apply_event_alpha_context_to_config(context)
+    watchlist = event_watchlist.load_watchlist(context.watchlist_state_path)
     alerts = event_alpha_alert_store.load_alert_snapshots(
-        _event_alpha_alert_store_config_from_runtime().path,
+        context.alert_store_path,
         latest_only=True,
     )
     core_store = event_core_opportunity_store.load_core_opportunities(context.core_opportunity_store_path, latest_run=True)
-    feedback = event_feedback.load_feedback(_event_feedback_config_from_runtime().path)
+    feedback = event_feedback.load_feedback(context.feedback_path)
     feedback_rows = [record.__dict__ for record in feedback.records]
     outcome_rows = _event_alpha_local_artifacts(run_limit=1, latest_alerts=False)["outcome_rows"]
     routed = event_alpha_router.route_watchlist(watchlist, cfg=_event_alpha_router_config_from_runtime())
     monitor_result = _event_watchlist_monitor_result_from_runtime(watchlist)
     result = event_research_cards.write_research_cards(
-        config.EVENT_RESEARCH_CARDS_DIR,
+        context.research_cards_dir,
         watchlist_entries=watchlist.entries,
         alert_rows=[*core_store.rows, *alerts.rows],
         route_decisions=routed.decisions,

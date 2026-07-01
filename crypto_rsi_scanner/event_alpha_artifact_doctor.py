@@ -167,13 +167,19 @@ class EventAlphaArtifactDoctorResult:
     integrated_delivery_side_effect_flag: int = 0
     integrated_delivery_missing_skip_reasons: int = 0
     integrated_delivery_card_path_absolute: int = 0
+    integrated_delivery_card_path_not_rendered: int = 0
     integrated_operator_markdown_absolute_path: int = 0
+    operator_structured_path_absolute: int = 0
     integrated_legacy_preview_alerts_wording: int = 0
+    integrated_manifest_daily_brief_unavailable: int = 0
     integrated_outcome_missing_for_candidate: int = 0
     integrated_outcome_side_effect_flag: int = 0
+    integrated_outcome_schema_missing: int = 0
     integrated_outcome_missing_identity: int = 0
     integrated_outcome_returns_without_price: int = 0
     integrated_outcome_diagnostic_in_performance: int = 0
+    integrated_calibration_diagnostic_in_main_priors: int = 0
+    integrated_calibration_prior_safety_missing: int = 0
     integrated_outcome_return_double_scaled: int = 0
     integrated_outcome_missing_data_unlabeled: int = 0
     integrated_created_normal_rsi_signal: int = 0
@@ -1174,13 +1180,19 @@ def diagnose_artifacts(
         "integrated_delivery_side_effect_flag",
         "integrated_delivery_missing_skip_reasons",
         "integrated_delivery_card_path_absolute",
+        "integrated_delivery_card_path_not_rendered",
         "integrated_operator_markdown_absolute_path",
+        "operator_structured_path_absolute",
         "integrated_legacy_preview_alerts_wording",
+        "integrated_manifest_daily_brief_unavailable",
         "integrated_outcome_missing_for_candidate",
         "integrated_outcome_side_effect_flag",
+        "integrated_outcome_schema_missing",
         "integrated_outcome_missing_identity",
         "integrated_outcome_returns_without_price",
         "integrated_outcome_diagnostic_in_performance",
+        "integrated_calibration_diagnostic_in_main_priors",
+        "integrated_calibration_prior_safety_missing",
         "integrated_outcome_return_double_scaled",
         "integrated_outcome_missing_data_unlabeled",
         "integrated_created_normal_rsi_signal",
@@ -1870,13 +1882,19 @@ def diagnose_artifacts(
         integrated_delivery_side_effect_flag=integrated_conflicts["integrated_delivery_side_effect_flag"],
         integrated_delivery_missing_skip_reasons=integrated_conflicts["integrated_delivery_missing_skip_reasons"],
         integrated_delivery_card_path_absolute=integrated_conflicts["integrated_delivery_card_path_absolute"],
+        integrated_delivery_card_path_not_rendered=integrated_conflicts["integrated_delivery_card_path_not_rendered"],
         integrated_operator_markdown_absolute_path=integrated_conflicts["integrated_operator_markdown_absolute_path"],
+        operator_structured_path_absolute=integrated_conflicts["operator_structured_path_absolute"],
         integrated_legacy_preview_alerts_wording=integrated_conflicts["integrated_legacy_preview_alerts_wording"],
+        integrated_manifest_daily_brief_unavailable=integrated_conflicts["integrated_manifest_daily_brief_unavailable"],
         integrated_outcome_missing_for_candidate=integrated_conflicts["integrated_outcome_missing_for_candidate"],
         integrated_outcome_side_effect_flag=integrated_conflicts["integrated_outcome_side_effect_flag"],
+        integrated_outcome_schema_missing=integrated_conflicts["integrated_outcome_schema_missing"],
         integrated_outcome_missing_identity=integrated_conflicts["integrated_outcome_missing_identity"],
         integrated_outcome_returns_without_price=integrated_conflicts["integrated_outcome_returns_without_price"],
         integrated_outcome_diagnostic_in_performance=integrated_conflicts["integrated_outcome_diagnostic_in_performance"],
+        integrated_calibration_diagnostic_in_main_priors=integrated_conflicts["integrated_calibration_diagnostic_in_main_priors"],
+        integrated_calibration_prior_safety_missing=integrated_conflicts["integrated_calibration_prior_safety_missing"],
         integrated_outcome_return_double_scaled=integrated_conflicts["integrated_outcome_return_double_scaled"],
         integrated_outcome_missing_data_unlabeled=integrated_conflicts["integrated_outcome_missing_data_unlabeled"],
         integrated_created_normal_rsi_signal=integrated_conflicts["integrated_created_normal_rsi_signal"],
@@ -3085,13 +3103,19 @@ def _integrated_radar_artifact_conflicts(
         "integrated_delivery_side_effect_flag": 0,
         "integrated_delivery_missing_skip_reasons": 0,
         "integrated_delivery_card_path_absolute": 0,
+        "integrated_delivery_card_path_not_rendered": 0,
         "integrated_operator_markdown_absolute_path": 0,
+        "operator_structured_path_absolute": 0,
         "integrated_legacy_preview_alerts_wording": 0,
+        "integrated_manifest_daily_brief_unavailable": 0,
         "integrated_outcome_missing_for_candidate": 0,
         "integrated_outcome_side_effect_flag": 0,
+        "integrated_outcome_schema_missing": 0,
         "integrated_outcome_missing_identity": 0,
         "integrated_outcome_returns_without_price": 0,
         "integrated_outcome_diagnostic_in_performance": 0,
+        "integrated_calibration_diagnostic_in_main_priors": 0,
+        "integrated_calibration_prior_safety_missing": 0,
         "integrated_outcome_return_double_scaled": 0,
         "integrated_outcome_missing_data_unlabeled": 0,
         "integrated_created_normal_rsi_signal": 0,
@@ -3169,6 +3193,12 @@ def _integrated_radar_artifact_conflicts(
             daily_text = Path(daily_brief_path).read_text(encoding="utf-8", errors="replace")
         except OSError:
             daily_text = ""
+        if (
+            manifest_path is not None
+            and Path(manifest_path).exists()
+            and "Input manifest: not available" in daily_text
+        ):
+            out["integrated_manifest_daily_brief_unavailable"] += 1
         if _daily_brief_has_integrated_diagnostic_leak(daily_text, materialized_rows):
             out["integrated_diagnostic_visible_in_default_operator_section"] += 1
     if row_count and preview_path is not None:
@@ -3197,6 +3227,12 @@ def _integrated_radar_artifact_conflicts(
     outcome_rows = _read_jsonl(outcome_path) if outcome_path is not None and Path(outcome_path).exists() else []
     if outcome_rows:
         out.update(_merge_conflicts(out, _integrated_outcome_conflicts(materialized_rows, outcome_rows)))
+    if outcome_path is not None:
+        priors_path = Path(outcome_path).parent / event_integrated_radar.INTEGRATED_CALIBRATION_PRIORS_FILENAME
+        out.update(_merge_conflicts(out, _integrated_calibration_conflicts(priors_path)))
+    out["operator_structured_path_absolute"] += _structured_operator_path_conflicts(
+        (*materialized_rows, *core_rows, *delivery_rows, *outcome_rows)
+    )
     return out
 
 
@@ -3219,7 +3255,9 @@ def _integrated_delivery_conflicts(
         "integrated_delivery_side_effect_flag": 0,
         "integrated_delivery_missing_skip_reasons": 0,
         "integrated_delivery_card_path_absolute": 0,
+        "integrated_delivery_card_path_not_rendered": 0,
         "integrated_operator_markdown_absolute_path": 0,
+        "operator_structured_path_absolute": 0,
     }
     materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
     preview_text = ""
@@ -3241,8 +3279,15 @@ def _integrated_delivery_conflicts(
             out["integrated_delivery_missing_skip_reasons"] += 1
         if event_artifact_paths.has_operator_absolute_path(row.get("card_paths") or ()):
             out["integrated_delivery_card_path_absolute"] += 1
+        card_paths = [str(item) for item in _tuple_value(row.get("card_paths")) if str(item).strip()]
+        if card_paths:
+            if "Card: none" in message:
+                out["integrated_delivery_card_path_not_rendered"] += 1
+            elif not any(path in message or Path(path).name in message for path in card_paths):
+                out["integrated_delivery_card_path_not_rendered"] += 1
         if event_artifact_paths.has_operator_absolute_path(message):
             out["integrated_operator_markdown_absolute_path"] += 1
+        out["operator_structured_path_absolute"] += _structured_operator_path_conflicts((row,))
         lane_title = str(row.get("lane_title") or "")
         if preview_text and lane_title and lane_title not in preview_text:
             out["integrated_preview_lane_mismatch"] += 1
@@ -3256,6 +3301,7 @@ def _integrated_outcome_conflicts(
     out = {
         "integrated_outcome_missing_for_candidate": 0,
         "integrated_outcome_side_effect_flag": 0,
+        "integrated_outcome_schema_missing": 0,
         "integrated_outcome_missing_identity": 0,
         "integrated_outcome_returns_without_price": 0,
         "integrated_outcome_diagnostic_in_performance": 0,
@@ -3273,6 +3319,8 @@ def _integrated_outcome_conflicts(
         for key in ("normal_rsi_signal_written", "triggered_fade_created", "paper_trade_created", "trade_created"):
             if _truthy(row.get(key)):
                 out["integrated_outcome_side_effect_flag"] += 1
+        if not _truthy(row.get("no_trade_created")) or not _truthy(row.get("no_paper_trade_created")):
+            out["integrated_outcome_schema_missing"] += 1
         if not (row.get("symbol") and row.get("coin_id")):
             out["integrated_outcome_missing_identity"] += 1
         if row.get("primary_horizon_return") is not None and row.get("price_at_observation") in (None, ""):
@@ -3283,11 +3331,99 @@ def _integrated_outcome_conflicts(
         horizons = row.get("horizons")
         if isinstance(horizons, Mapping):
             returns.extend(horizons.values())
+        if str(row.get("outcome_status") or "").casefold() in {"filled", "partial"}:
+            if not _tuple_value(row.get("outcome_horizons")):
+                out["integrated_outcome_schema_missing"] += 1
+            required_mappings = (
+                "return_by_horizon",
+                "relative_return_vs_btc_by_horizon",
+                "relative_return_vs_eth_by_horizon",
+                "max_favorable_excursion_by_window",
+                "max_adverse_excursion_by_window",
+            )
+            for key in required_mappings:
+                if not isinstance(row.get(key), Mapping):
+                    out["integrated_outcome_schema_missing"] += 1
+                    break
+            if not (
+                row.get("benchmark_btc_price_at_observation") is not None
+                or row.get("benchmark_eth_price_at_observation") is not None
+            ):
+                out["integrated_outcome_schema_missing"] += 1
         if any(isinstance(value, (int, float)) and abs(float(value)) > 5.0 for value in returns):
             out["integrated_outcome_return_double_scaled"] += 1
         if str(row.get("outcome_status") or "") == "missing_data" and not row.get("missing_data_reason"):
             out["integrated_outcome_missing_data_unlabeled"] += 1
     return out
+
+
+def _integrated_calibration_conflicts(path: str | Path | None) -> dict[str, int]:
+    out = {
+        "integrated_calibration_diagnostic_in_main_priors": 0,
+        "integrated_calibration_prior_safety_missing": 0,
+    }
+    if path is None or not Path(path).exists():
+        return out
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return out
+    if not isinstance(data, Mapping):
+        return out
+    priors = data.get("opportunity_type_priors")
+    if not isinstance(priors, Mapping):
+        return out
+    if "DIAGNOSTIC" in {str(key).upper() for key in priors}:
+        out["integrated_calibration_diagnostic_in_main_priors"] += 1
+    if not _truthy(data.get("recommendation_only")) or _truthy(data.get("auto_apply")) or _truthy(data.get("eligible_for_auto_apply")):
+        out["integrated_calibration_prior_safety_missing"] += 1
+    for value in priors.values():
+        if not isinstance(value, Mapping):
+            out["integrated_calibration_prior_safety_missing"] += 1
+            continue
+        sample_size = _safe_float(value.get("sample_size"))
+        min_sample_size = _safe_float(value.get("min_sample_size"))
+        has_warning = bool(str(value.get("min_sample_warning") or "").strip())
+        if (
+            sample_size is None
+            or min_sample_size is None
+            or value.get("confidence") in (None, "")
+            or not _truthy(value.get("recommendation_only"))
+            or _truthy(value.get("eligible_for_auto_apply"))
+            or _truthy(value.get("auto_apply"))
+            or not str(value.get("excluded_from_auto_apply_reason") or "").strip()
+            or not str(value.get("last_updated_at") or "").strip()
+            or not str(value.get("horizon_basis") or "").strip()
+        ):
+            out["integrated_calibration_prior_safety_missing"] += 1
+            continue
+        if sample_size < min_sample_size and not has_warning:
+            out["integrated_calibration_prior_safety_missing"] += 1
+    return out
+
+
+def _structured_operator_path_conflicts(rows: Iterable[Mapping[str, Any]]) -> int:
+    conflicts = 0
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        conflicts += _structured_operator_path_conflict_count(row)
+    return conflicts
+
+
+def _structured_operator_path_conflict_count(value: Any, *, key_name: str = "") -> int:
+    if key_name.endswith("_abs_debug"):
+        return 0
+    if isinstance(value, Mapping):
+        return sum(
+            _structured_operator_path_conflict_count(item, key_name=str(key))
+            for key, item in value.items()
+        )
+    if isinstance(value, (list, tuple, set)):
+        return sum(_structured_operator_path_conflict_count(item, key_name=key_name) for item in value)
+    if key_name and "path" in key_name.casefold() and event_artifact_paths.has_operator_absolute_path(value):
+        return 1
+    return 0
 
 
 def _integrated_candidate_core_card_conflicts(
@@ -3710,6 +3846,9 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
     if "Most useful next data source:" in text:
         top_section = text.split("Most useful next data source:", 1)[1]
         ranked = [line.strip() for line in top_section.splitlines() if line.strip().startswith("- ")][:5]
+        full_ranked_section = "\n".join(
+            line.strip() for line in top_section.splitlines() if line.strip().startswith("- ")
+        )
         broad_idx = [
             idx for idx, line in enumerate(ranked)
             if any(token in line.casefold() for token in ("gdelt", "rss", "project_blog"))
@@ -3719,6 +3858,16 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
             if any(token in line.casefold() for token in ("coinalyze", "tokenomist", "binance", "bybit", "coinbase", "kucoin", "okx"))
         ]
         if broad_idx and critical_idx and min(broad_idx) < min(critical_idx):
+            out["source_coverage_context_provider_ranked_above_lane_critical"] = 1
+        coinalyze_gap = bool(
+            re.search(
+                r"(missing|degraded|backoff|not configured|not_configured)[^\n]{0,120}coinalyze"
+                r"|coinalyze[^\n]{0,120}(missing|degraded|backoff|not configured|not_configured)",
+                text,
+                re.IGNORECASE,
+            )
+        )
+        if coinalyze_gap and "coinalyze" not in full_ranked_section.casefold():
             out["source_coverage_context_provider_ranked_above_lane_critical"] = 1
     return out
 
@@ -5413,13 +5562,19 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"integrated_delivery_side_effect_flag={result.integrated_delivery_side_effect_flag} "
             f"integrated_delivery_missing_skip_reasons={result.integrated_delivery_missing_skip_reasons} "
             f"integrated_delivery_card_path_absolute={result.integrated_delivery_card_path_absolute} "
+            f"integrated_delivery_card_path_not_rendered={result.integrated_delivery_card_path_not_rendered} "
             f"integrated_operator_markdown_absolute_path={result.integrated_operator_markdown_absolute_path} "
+            f"operator_structured_path_absolute={result.operator_structured_path_absolute} "
             f"integrated_legacy_preview_alerts_wording={result.integrated_legacy_preview_alerts_wording} "
+            f"integrated_manifest_daily_brief_unavailable={result.integrated_manifest_daily_brief_unavailable} "
             f"integrated_outcome_missing_for_candidate={result.integrated_outcome_missing_for_candidate} "
             f"integrated_outcome_side_effect_flag={result.integrated_outcome_side_effect_flag} "
+            f"integrated_outcome_schema_missing={result.integrated_outcome_schema_missing} "
             f"integrated_outcome_missing_identity={result.integrated_outcome_missing_identity} "
             f"integrated_outcome_returns_without_price={result.integrated_outcome_returns_without_price} "
             f"integrated_outcome_diagnostic_in_performance={result.integrated_outcome_diagnostic_in_performance} "
+            f"integrated_calibration_diagnostic_in_main_priors={result.integrated_calibration_diagnostic_in_main_priors} "
+            f"integrated_calibration_prior_safety_missing={result.integrated_calibration_prior_safety_missing} "
             f"integrated_outcome_return_double_scaled={result.integrated_outcome_return_double_scaled} "
             f"integrated_outcome_missing_data_unlabeled={result.integrated_outcome_missing_data_unlabeled} "
             f"integrated_created_normal_rsi_signal={result.integrated_created_normal_rsi_signal} "
