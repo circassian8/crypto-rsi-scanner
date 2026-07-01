@@ -20,13 +20,19 @@ decision, rationale, and revisit condition.
 **Status:** accepted
 **Decision:** Event Alpha may classify canonical CoreOpportunity rows into
 research opportunity lanes (`EARLY_LONG_RESEARCH`,
-`CONFIRMED_LONG_RESEARCH`, `FADE_SHORT_REVIEW`, and `RISK_ONLY`) using a pure
-market-reaction snapshot and source-pack requirements. These lanes can improve
+`CONFIRMED_LONG_RESEARCH`, `FADE_SHORT_REVIEW`, `RISK_ONLY`,
+`UNCONFIRMED_RESEARCH`, and `DIAGNOSTIC`) using a pure market-reaction snapshot
+and source-pack requirements. Weak/missing-confirmation rows should become
+`UNCONFIRMED_RESEARCH`, and sector/control/source-noise rows should become
+`DIAGNOSTIC`; `RISK_ONLY` is reserved for credible negative/risk catalysts such
+as exploits, delistings, structured unlock/supply risk, legal/regulatory shock,
+chain halt, bridge compromise, or severe liquidity risk. These lanes can improve
 cards, previews, doctor checks, and review artifacts, but they cannot write
 normal RSI signal rows, paper trades, live trades, or create `TRIGGERED_FADE`.
-`FADE_SHORT_REVIEW` is not a trigger; only `event_fade.py` plus `proxy_fade`
-can produce a fade trigger. CryptoPanic-only narratives are not sufficient for
-confirmed lanes.
+`FADE_SHORT_REVIEW` is not a trigger; only `event_fade.py` plus `proxy_fade` can
+produce a fade trigger. CryptoPanic-only narratives are not sufficient for
+early or confirmed lanes unless separate official/structured evidence or
+deterministic market/source requirements explicitly validate the row.
 **Why:** The radar needs to distinguish early catalyst research, confirmed
 market reaction, crowded fade review, and risk-only rows without turning source
 evidence or market movement into automated trading authority.

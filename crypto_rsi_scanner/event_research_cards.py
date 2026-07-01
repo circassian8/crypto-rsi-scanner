@@ -944,6 +944,7 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
         "market_confirmation_after",
         "market_state_snapshot",
         "market_state",
+        "market_state_class",
         "opportunity_type",
         "opportunity_type_why_now",
         "opportunity_type_evidence",
@@ -956,6 +957,14 @@ def _core_score_components(opportunity: event_core_opportunities.CoreOpportunity
         "opportunity_type_source_strength",
         "opportunity_type_warnings",
         "opportunity_type_reason_codes",
+        "source_strength",
+        "source_requirements_met",
+        "market_requirements_met",
+        "fade_requirements_met",
+        "why_now",
+        "what_confirms",
+        "what_invalidates",
+        "why_not_alertable",
         "final_route_after_quality_gate",
         "final_tier_after_quality_gate",
         "final_state_after_quality_gate",
@@ -2117,17 +2126,17 @@ def _market_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapp
 def _opportunity_lane_lines(entry: event_watchlist.EventWatchlistEntry | None, alert: Mapping[str, Any] | None) -> list[str]:
     components = _card_components(entry, alert)
     lane = components.get("opportunity_type")
-    market_state = components.get("market_state")
+    market_state = components.get("market_state") or components.get("market_state_class")
     snapshot = components.get("market_state_snapshot") if isinstance(components.get("market_state_snapshot"), Mapping) else {}
     if not lane and not market_state and not snapshot:
         return []
-    confirms = _list_value(components.get("opportunity_type_what_confirms"))
-    invalidates = _list_value(components.get("opportunity_type_what_invalidates"))
-    why_not = _list_value(components.get("opportunity_type_why_not_alertable"))
+    confirms = _list_value(components.get("opportunity_type_what_confirms") or components.get("what_confirms"))
+    invalidates = _list_value(components.get("opportunity_type_what_invalidates") or components.get("what_invalidates"))
+    why_not = _list_value(components.get("opportunity_type_why_not_alertable") or components.get("why_not_alertable"))
     evidence = _list_value(components.get("opportunity_type_evidence"))
     lines = [
         f"- Opportunity type: {lane or 'not classified'}",
-        f"- Why now: {components.get('opportunity_type_why_now') or 'not available'}",
+        f"- Why now: {components.get('opportunity_type_why_now') or components.get('why_now') or 'not available'}",
         f"- Market state: {market_state or 'not available'}",
         f"- Evidence: {'; '.join(evidence[:4]) if evidence else 'not available'}",
         f"- What confirms: {'; '.join(confirms[:4]) if confirms else 'not available'}",

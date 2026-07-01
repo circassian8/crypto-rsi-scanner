@@ -37327,7 +37327,7 @@ def test_market_reaction_listing_pump_crowding_is_fade_short_review():
     assert result.fade_requirements_met is True
 
 
-def test_market_reaction_cryptopanic_fan_narrative_stays_risk_only_without_market():
+def test_market_reaction_cryptopanic_fan_narrative_is_unconfirmed_without_market():
     from crypto_rsi_scanner import event_market_reaction
 
     result = event_market_reaction.evaluate_market_reaction({
@@ -37345,9 +37345,30 @@ def test_market_reaction_cryptopanic_fan_narrative_stays_risk_only_without_marke
     })
 
     assert result.market_state == "no_reaction"
-    assert result.opportunity_type == "RISK_ONLY"
+    assert result.opportunity_type == "UNCONFIRMED_RESEARCH"
     assert "cryptopanic_only_narrative_not_confirmed" in result.why_not_alertable
     assert result.market_requirements_met is False
+
+
+def test_market_reaction_security_incident_is_risk_only():
+    from crypto_rsi_scanner import event_market_reaction
+
+    result = event_market_reaction.evaluate_market_reaction({
+        "source_class": "cryptopanic_tagged",
+        "source_pack": "security_incident_pack",
+        "impact_path_type": "exploit_security_event",
+        "evidence_quality_score": 84,
+        "accepted_evidence_count": 1,
+        "accepted_evidence_reason_codes": ["cryptopanic_currency_tag_match", "direct_token_mechanism"],
+        "market_snapshot": {
+            "return_24h": -0.04,
+            "volume_zscore_24h": 1.1,
+            "market_context_freshness_status": "fresh",
+        },
+    })
+
+    assert result.opportunity_type == "RISK_ONLY"
+    assert result.market_state == "no_reaction"
 
 
 def test_market_reaction_unlock_structured_source_risk_or_fade_depends_on_market():
@@ -37386,6 +37407,42 @@ def test_market_reaction_unlock_structured_source_risk_or_fade_depends_on_market
 
     assert no_reaction.opportunity_type == "RISK_ONLY"
     assert crowded.opportunity_type == "FADE_SHORT_REVIEW"
+
+
+def test_market_reaction_rejected_evidence_is_unconfirmed_research():
+    from crypto_rsi_scanner import event_market_reaction
+
+    result = event_market_reaction.evaluate_market_reaction({
+        "source_class": "broad_news",
+        "source_pack": "strategic_investment_pack",
+        "impact_path_type": "strategic_investment",
+        "evidence_quality_score": 42,
+        "evidence_acquisition_status": "rejected_results_only",
+        "market_snapshot": {
+            "return_24h": 0.01,
+            "volume_zscore_24h": 0.1,
+            "market_context_freshness_status": "fresh",
+        },
+    })
+
+    assert result.opportunity_type == "UNCONFIRMED_RESEARCH"
+    assert "evidence_acquisition_rejected_results_only" in result.why_not_alertable
+
+
+def test_market_reaction_sector_theme_is_diagnostic():
+    from crypto_rsi_scanner import event_market_reaction
+
+    result = event_market_reaction.evaluate_market_reaction({
+        "symbol": "SECTOR",
+        "coin_id": "sports_fan_proxy",
+        "source_class": "broad_news",
+        "source_pack": "fan_sports_pack",
+        "impact_path_type": "fan_token_attention",
+        "market_snapshot": {"market_context_freshness_status": "missing"},
+    })
+
+    assert result.opportunity_type == "DIAGNOSTIC"
+    assert "diagnostic_or_sector_row" in result.why_not_alertable
 
 
 def test_artifact_doctor_flags_invalid_opportunity_lanes():
@@ -37427,6 +37484,21 @@ def test_artifact_doctor_flags_invalid_opportunity_lanes():
             "market_confirmation_level": "strong",
             "market_context_freshness_status": "fresh",
         },
+        {
+            "core_opportunity_id": "core_bad_risk_bucket",
+            "opportunity_type": "RISK_ONLY",
+            "market_state": "no_reaction",
+            "market_state_snapshot": {"observed_fields": 1},
+            "opportunity_type_why_not_alertable": ["strong_source_missing", "market_reaction_missing"],
+            "impact_path_type": "proxy_attention",
+        },
+        {
+            "core_opportunity_id": "core_bad_diagnostic_visible",
+            "opportunity_type": "DIAGNOSTIC",
+            "market_state": "no_reaction",
+            "market_state_snapshot": {"observed_fields": 1},
+            "final_route_after_quality_gate": "RESEARCH_DIGEST",
+        },
     ]
     conflicts = event_alpha_artifact_doctor._opportunity_lane_conflicts(rows)
 
@@ -37434,6 +37506,8 @@ def test_artifact_doctor_flags_invalid_opportunity_lanes():
     assert conflicts["fade_short_without_crowding_exhaustion"] == 1
     assert conflicts["early_long_without_fresh_strong_source"] == 1
     assert conflicts["cryptopanic_only_narrative_confirmed_lane"] == 1
+    assert conflicts["risk_only_missing_evidence_only"] == 1
+    assert conflicts["diagnostic_visible_default_operator_lane"] == 1
     assert conflicts["core_missing_market_state_snapshot"] == 1
 
 

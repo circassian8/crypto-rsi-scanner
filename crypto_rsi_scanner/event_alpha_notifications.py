@@ -1001,10 +1001,13 @@ def format_research_review_telegram_digest(
         feedback_target = _telegram_feedback_target(decision, core=core)
         symbol = str(core.get("symbol") or core.get("validated_symbol") or entry.symbol or "UNKNOWN")
         coin_id = str(core.get("coin_id") or core.get("validated_coin_id") or entry.coin_id or "unknown")
+        lane = str(core.get("opportunity_type") or "UNCONFIRMED_RESEARCH")
+        market_state = str(core.get("market_state_class") or core.get("market_state") or "unknown")
         block = [
             "",
             f"{displayed + 1}. <b>{_esc(symbol)} / {_esc(coin_id)}</b>",
             f"   Level: {_esc(level)} · Score: {_esc(f'{score:g}')}",
+            f"   Opportunity: {_esc(_human_reason(lane))} · Market: {_esc(_human_reason(market_state))}",
             f"   Catalyst: {_esc(_candidate_catalyst_text(entry))}",
             f"   Impact path: {_esc(_human_playbook(entry.impact_path_type or entry.latest_effective_playbook_type or entry.latest_playbook_type or entry.relationship_type))}",
             f"   Why surfaced: {_esc(_human_why(item.why_included))}",
@@ -1720,6 +1723,8 @@ def format_core_opportunity_telegram_digest(
         )
         route = _human_route(event_alpha_router.final_route_value(decision))
         level = _human_reason(core.get("final_opportunity_level") or decision.opportunity_level or entry.opportunity_level or route)
+        lane = _human_reason(core.get("opportunity_type") or "UNCONFIRMED_RESEARCH")
+        market_state = _human_reason(core.get("market_state_class") or core.get("market_state") or "unknown")
         impact = _human_reason(core.get("impact_path_type") or entry.impact_path_type or entry.latest_effective_playbook_type)
         role = _human_reason(core.get("candidate_role") or entry.candidate_role or entry.relationship_type)
         evidence = _evidence_line(core)
@@ -1739,6 +1744,7 @@ def format_core_opportunity_telegram_digest(
                 f"<b>{displayed}. {_esc(symbol)} / {_esc(coin_id)}</b>",
                 f"Catalyst: {_esc(catalyst)}",
                 f"Level: {_esc(level)} · Route: {_esc(route)}",
+                f"Opportunity: {_esc(lane)} · Market: {_esc(market_state)}",
                 f"Impact: {_esc(impact)} · Role: {_esc(role)}",
                 f"Why surfaced: {_esc(why)}",
                 f"Evidence: {_esc(evidence)}",

@@ -134,6 +134,7 @@ def build_daily_brief(
         core_opportunities = event_core_opportunities.aggregate_core_opportunities([*decisions, *hypotheses])
         core_source_rows = [*(decision.entry for decision in decisions), *hypotheses]
     core_sections = _core_opportunity_sections(core_opportunities)
+    lane_sections = _core_opportunity_lane_sections(core_opportunities)
     source_coverage_report_path = (
         Path(run_ledger_path).parent / "event_alpha_source_coverage.md"
         if run_ledger_path
@@ -235,6 +236,12 @@ def build_daily_brief(
         f"- Alertable routed decisions: {core_alertable_count}",
         f"- Near-miss candidates: {len(near_miss_candidates)}",
         f"- Upgrade candidates: {len(upgrade_candidates)}",
+        "- Opportunity lanes: "
+        + ", ".join(
+            f"{name}={len(items)}"
+            for name, items in lane_sections.items()
+            if name != "diagnostics"
+        ),
         "",
         "## Burn-In Readiness",
         *_burn_in_readiness_lines(
@@ -245,6 +252,24 @@ def build_daily_brief(
             provider_health_rows=provider_health_rows or {},
             requested_profile=requested_profile,
         ),
+        "",
+        "## Opportunity Lanes",
+        "Research-only lane classification. Not a trade signal.",
+        "",
+        "### Early Long Research",
+        *_core_opportunity_lines(lane_sections["early"], limit=8),
+        "",
+        "### Confirmed Long Research",
+        *_core_opportunity_lines(lane_sections["confirmed"], limit=8),
+        "",
+        "### Fade / Short-Review",
+        *_core_opportunity_lines(lane_sections["fade"], limit=8),
+        "",
+        "### Risk Only",
+        *_core_opportunity_lines(lane_sections["risk"], limit=8),
+        "",
+        "### Unconfirmed Research",
+        *_core_opportunity_lines(lane_sections["unconfirmed"], limit=8),
         "",
         "## High-Priority Core Opportunities",
         *_core_opportunity_lines(core_sections["strong"], limit=8),
@@ -308,7 +333,8 @@ def build_daily_brief(
             "- Hidden from main opportunity sections by default: "
             f"diagnostic_rows={diagnostic_core_rows}, "
             f"source_noise_controls={diagnostic_control_rows}, "
-            f"quality_capped_support={diagnostic_capped_rows}"
+            f"quality_capped_support={diagnostic_capped_rows}, "
+            f"diagnostic_lane_cores={len(lane_sections['diagnostics'])}"
         ),
         (
             "- Pass include_diagnostics in local tooling to inspect collapsed controls."
@@ -1639,6 +1665,9 @@ def _core_opportunity_lines(
     for item in rows[:limit]:
         categories = ", ".join(item.supporting_categories[:4]) or "unknown"
         paths = ", ".join(item.supporting_impact_paths[:4]) or item.primary_impact_path
+        lane = str(item.primary_row.get("opportunity_type") or "UNCLASSIFIED")
+        market_state = str(item.primary_row.get("market_state_class") or item.primary_row.get("market_state") or "unknown")
+        lane_reason = str(item.primary_row.get("why_now") or item.primary_row.get("opportunity_type_why_now") or "")
         diagnostics = ""
         if item.diagnostic_row_count or item.quality_capped_supporting_rows:
             diagnostics = (
@@ -1653,12 +1682,15 @@ def _core_opportunity_lines(
             f"level={item.opportunity_level} route={item.final_route_after_quality_gate or 'local'} "
             f"state={item.final_state_after_quality_gate or 'unknown'} "
             f"score={item.opportunity_score_final:.0f} "
+            f"lane={lane} market_state={market_state} "
             f"path={item.primary_impact_path} role={item.candidate_role} "
             f"asset_kind={item.asset_kind or 'unknown'} "
             f"role_source={item.role_source or 'unknown'} "
             f"collision={item.collision_risk or 'none'} "
             f"categories={categories} paths={paths}{diagnostics}"
         )
+        if lane_reason:
+            lines.append(f"  why_now: {lane_reason}")
         lines.append(
             f"  support: hypotheses={len(item.supporting_hypothesis_ids)} "
             f"categories={categories} impact_paths={paths} "
@@ -1833,6 +1865,34 @@ def _core_opportunity_sections(
     take("watchlist", lambda item: item.is_watchlist)
     take("digest", lambda item: item.is_validated_digest or item.alertable)
     sections["local"] = remaining
+    return sections
+
+
+def _core_opportunity_lane_sections(
+    opportunities: Iterable[event_core_opportunities.CoreOpportunity],
+) -> dict[str, list[event_core_opportunities.CoreOpportunity]]:
+    sections: dict[str, list[event_core_opportunities.CoreOpportunity]] = {
+        "early": [],
+        "confirmed": [],
+        "fade": [],
+        "risk": [],
+        "unconfirmed": [],
+        "diagnostics": [],
+    }
+    for item in opportunities:
+        lane = str(item.primary_row.get("opportunity_type") or "").strip().upper()
+        if lane == "EARLY_LONG_RESEARCH":
+            sections["early"].append(item)
+        elif lane == "CONFIRMED_LONG_RESEARCH":
+            sections["confirmed"].append(item)
+        elif lane == "FADE_SHORT_REVIEW":
+            sections["fade"].append(item)
+        elif lane == "RISK_ONLY":
+            sections["risk"].append(item)
+        elif lane == "DIAGNOSTIC":
+            sections["diagnostics"].append(item)
+        else:
+            sections["unconfirmed"].append(item)
     return sections
 
 

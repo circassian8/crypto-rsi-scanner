@@ -187,6 +187,18 @@ def format_opportunity_audit(
         f"{components.get('protocol_metrics_score') or row.get('protocol_metrics_score') or 'n/a'} "
         f"freshness={components.get('protocol_metrics_freshness_status') or row.get('protocol_metrics_freshness_status') or 'unknown'}",
         "",
+        "## Opportunity lane decision",
+        f"- opportunity type: {components.get('opportunity_type') or row.get('opportunity_type') or 'unknown'}",
+        f"- market state: {components.get('market_state_class') or row.get('market_state_class') or components.get('market_state') or row.get('market_state') or 'unknown'}",
+        f"- source strength: {components.get('source_strength') or row.get('source_strength') or components.get('opportunity_type_source_strength') or row.get('opportunity_type_source_strength') or 'unknown'}",
+        f"- requirements: source={components.get('source_requirements_met') if components.get('source_requirements_met') is not None else row.get('source_requirements_met', row.get('opportunity_type_source_requirements_met', 'unknown'))} "
+        f"market={components.get('market_requirements_met') if components.get('market_requirements_met') is not None else row.get('market_requirements_met', row.get('opportunity_type_market_requirements_met', 'unknown'))} "
+        f"fade={components.get('fade_requirements_met') if components.get('fade_requirements_met') is not None else row.get('fade_requirements_met', row.get('opportunity_type_fade_requirements_met', 'unknown'))}",
+        f"- why now: {components.get('why_now') or row.get('why_now') or components.get('opportunity_type_why_now') or row.get('opportunity_type_why_now') or 'unknown'}",
+        f"- what confirms: {_list_value(components.get('what_confirms') or row.get('what_confirms') or components.get('opportunity_type_what_confirms') or row.get('opportunity_type_what_confirms'))}",
+        f"- what invalidates: {_list_value(components.get('what_invalidates') or row.get('what_invalidates') or components.get('opportunity_type_what_invalidates') or row.get('opportunity_type_what_invalidates'))}",
+        f"- why not alertable: {_list_value(components.get('why_not_alertable') or row.get('why_not_alertable') or components.get('opportunity_type_why_not_alertable') or row.get('opportunity_type_why_not_alertable'))}",
+        "",
         "## Final opportunity verdict",
         f"- level/score: {components.get('final_opportunity_level') or row.get('final_opportunity_level') or components.get('opportunity_level') or row.get('opportunity_level') or 'unknown'} / {components.get('final_opportunity_score') or row.get('final_opportunity_score') or components.get('opportunity_score_final') or row.get('opportunity_score_final') or 'n/a'}",
         f"- source/reason: {components.get('final_verdict_source') or row.get('final_verdict_source') or 'initial'} / {components.get('final_verdict_reason') or row.get('final_verdict_reason') or 'none'}",

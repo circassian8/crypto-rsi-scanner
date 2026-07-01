@@ -17,6 +17,41 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Split weak Event Alpha lanes from risk-only · Codex
+**Why:** The first opportunity-lane pass was safe but too coarse: unresolved
+or weak rows all became `RISK_ONLY`, which made operator output less useful and
+blurred real negative catalysts with missing-evidence research leads.
+**Changes:**
+- Extended the pure market reaction engine with `UNCONFIRMED_RESEARCH` and
+  `DIAGNOSTIC` lanes, reserving `RISK_ONLY` for credible negative/risk catalysts
+  such as exploits, delistings, structured unlock/supply risk, regulatory shock,
+  chain halt, bridge compromise, or liquidity risk.
+- Tightened lane rules so CryptoPanic-only fan/proxy/political narratives and
+  rejected/no-result evidence-acquisition rows stay unconfirmed/local, while
+  sector/control/source-noise rows become diagnostics.
+- Added unprefixed lane fields on canonical CoreOpportunity rows
+  (`market_state_class`, `source_strength`, `source_requirements_met`,
+  `market_requirements_met`, `fade_requirements_met`, `why_now`,
+  `what_confirms`, `what_invalidates`, `why_not_alertable`) for downstream
+  cards, previews, briefs, and audits.
+- Added an Opportunity Lanes section to the daily brief, lane text to Telegram
+  preview bodies, and lane details to opportunity audits and research cards.
+- Added artifact-doctor checks for `RISK_ONLY` used as a missing-evidence bucket
+  and diagnostic rows leaking into alertable/default operator lanes.
+**Verify:** `python3 tests/test_indicators.py` (610/610 passed);
+`python3 -m compileall -q crypto_rsi_scanner tests`;
+`make event-alpha-notify-llm-deep-cryptopanic-no-send-rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** The refreshed `notify_llm_deep_cryptopanic_rehearsal` core
+store now has `UNCONFIRMED_RESEARCH` and `DIAGNOSTIC` rows rather than
+all-`RISK_ONLY`; CHZ/VELVET remain research-review/local and no strict daily
+digest is planned. No Telegram send, paper trade, live execution, normal RSI
+row, or Event Alpha-created `TRIGGERED_FADE` path was added.
+
 ## 2026-07-01 — Add Event Alpha market reaction opportunity lanes · Codex
 **Why:** Event Alpha was still mostly setup-specific catalyst detection, while
 live rehearsals need explicit research lanes that separate early long ideas,

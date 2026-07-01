@@ -28,6 +28,8 @@ class EventOpportunityType(str, Enum):
     CONFIRMED_LONG_RESEARCH = "CONFIRMED_LONG_RESEARCH"
     FADE_SHORT_REVIEW = "FADE_SHORT_REVIEW"
     RISK_ONLY = "RISK_ONLY"
+    UNCONFIRMED_RESEARCH = "UNCONFIRMED_RESEARCH"
+    DIAGNOSTIC = "DIAGNOSTIC"
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,9 @@ class MarketReactionResult:
 
 @dataclass(frozen=True)
 class MarketReactionInput:
+    symbol: str | None = None
+    coin_id: str | None = None
+    row_type: str | None = None
     market_snapshot: Mapping[str, Any] | None = None
     derivatives_snapshot: Mapping[str, Any] | None = None
     dex_liquidity_snapshot: Mapping[str, Any] | None = None
@@ -97,6 +102,11 @@ class MarketReactionInput:
     evidence_quality_score: float | None = None
     accepted_evidence_count: int | None = None
     accepted_reason_codes: tuple[str, ...] = ()
+    evidence_acquisition_status: str | None = None
+    final_route_after_quality_gate: str | None = None
+    final_state_after_quality_gate: str | None = None
+    diagnostic_row_count: int | None = None
+    source_noise_control_count: int | None = None
     market_confirmation_level: str | None = None
     market_confirmation_score: float | None = None
     market_context_freshness_status: str | None = None
@@ -120,19 +130,26 @@ def evaluate_market_reaction(data: MarketReactionInput | Mapping[str, Any] | Non
     cryptopanic_only = _cryptopanic_only(data)
     negative = bool(data.negative_catalyst) or _negative_impact(impact, source_pack)
     narrative = _source_only_narrative(impact, source_pack)
+    diagnostic = _diagnostic_context(data, impact, source_pack)
     market_state, market_reasons = _classify_market_state(snapshot, negative=negative, impact=impact)
     market_confirmed = market_state in {
         EventMarketState.STEALTH_ACCUMULATION.value,
         EventMarketState.CONFIRMED_BREAKOUT.value,
     } or _level_at_least(data.market_confirmation_level, data.market_confirmation_score, "moderate")
+    market_sane = _liquidity_sane(snapshot)
     crowded = _has_crowding(snapshot)
-    fade_ready = market_state in {
-        EventMarketState.BLOWOFF_CROWDED.value,
-        EventMarketState.POST_EVENT_FADE_SETUP.value,
-    } and crowded
+    completed_move = _completed_move(snapshot, market_state)
+    exhaustion = crowded or market_state == EventMarketState.LATE_MOMENTUM.value or _volume_exhausted(snapshot)
+    fade_ready = completed_move and exhaustion
     source_ok_for_long = strong_source and not cryptopanic_only
     source_ok_for_fade = source_ok_for_long or (cryptopanic_only and not narrative)
     early_source_ok = source_ok_for_long and _fresh_enough(data, snapshot)
+    negative_source_ok = strong_source or source_strength == "tagged_context"
+    if (
+        _source_pack_requires_structured_unlock(source_pack, impact)
+        or _source_pack_requires_official_exchange(source_pack, impact)
+    ) and source_strength != "official_structured":
+        negative_source_ok = False
 
     reasons: list[str] = list(market_reasons)
     warnings: list[str] = []
@@ -159,20 +176,31 @@ def evaluate_market_reaction(data: MarketReactionInput | Mapping[str, Any] | Non
     if cryptopanic_only and narrative:
         why_not.append("cryptopanic_only_narrative_not_confirmed")
         warnings.append("cryptopanic_only_narrative_capped")
+    if not market_sane:
+        why_not.append("liquidity_sanity_missing")
+        reasons.append("liquidity_sanity_failed")
 
-    opportunity = EventOpportunityType.RISK_ONLY.value
-    if fade_ready and source_ok_for_fade:
+    opportunity = EventOpportunityType.UNCONFIRMED_RESEARCH.value
+    if diagnostic:
+        opportunity = EventOpportunityType.DIAGNOSTIC.value
+        confirms.append("diagnostic/control row only")
+        invalidates.append("not an operator-facing opportunity")
+        why_not.append("diagnostic_or_sector_row")
+    elif fade_ready and source_ok_for_fade:
         opportunity = EventOpportunityType.FADE_SHORT_REVIEW.value
         confirms.extend(("completed move already visible", "crowding/exhaustion metrics present"))
         invalidates.extend(("funding/OI cools off", "price consolidates without failed reclaim"))
     elif negative:
-        if fade_ready and source_ok_for_fade:
-            opportunity = EventOpportunityType.FADE_SHORT_REVIEW.value
-        else:
+        if negative_source_ok:
             opportunity = EventOpportunityType.RISK_ONLY.value
             confirms.append("confirm downside catalyst and market reaction before any review")
             invalidates.append("source correction or no token-specific impact")
-    elif source_ok_for_long and market_confirmed:
+        else:
+            opportunity = EventOpportunityType.UNCONFIRMED_RESEARCH.value
+            why_not.append("risk_source_not_confirmed")
+            confirms.append("needs stronger risk source confirmation")
+            invalidates.append("source correction or no token-specific impact")
+    elif source_ok_for_long and market_confirmed and market_sane:
         opportunity = EventOpportunityType.CONFIRMED_LONG_RESEARCH.value
         confirms.extend(("source is strong", "fresh market confirmation is present"))
         invalidates.extend(("market reaction fades", "source evidence is corrected or denied"))
@@ -181,26 +209,28 @@ def evaluate_market_reaction(data: MarketReactionInput | Mapping[str, Any] | Non
         confirms.extend(("watch for volume/relative-strength breakout", "seek second independent source"))
         invalidates.extend(("no market reaction after catalyst window", "source evidence is stale or corrected"))
     else:
-        opportunity = EventOpportunityType.RISK_ONLY.value
+        opportunity = EventOpportunityType.UNCONFIRMED_RESEARCH.value
         if not strong_source:
             why_not.append("strong_source_missing")
         if cryptopanic_only and narrative:
             why_not.append("source_only_narrative_requires_market_confirmation")
+        if data.evidence_acquisition_status in {"rejected_results_only", "no_results", "skipped_budget"}:
+            why_not.append(f"evidence_acquisition_{data.evidence_acquisition_status}")
         if not market_confirmed and market_state == EventMarketState.NO_REACTION.value:
             why_not.append("market_reaction_missing")
         confirms.append("needs stronger source and/or market confirmation")
         invalidates.append("unsupported catalyst-to-token mechanism")
 
-    if opportunity == EventOpportunityType.CONFIRMED_LONG_RESEARCH.value and (cryptopanic_only or not market_confirmed or not source_ok_for_long):
-        opportunity = EventOpportunityType.RISK_ONLY.value
+    if opportunity == EventOpportunityType.CONFIRMED_LONG_RESEARCH.value and (cryptopanic_only or not market_confirmed or not source_ok_for_long or not market_sane):
+        opportunity = EventOpportunityType.UNCONFIRMED_RESEARCH.value
         why_not.append("confirmed_long_requirements_not_met")
         warnings.append("confirmed_lane_capped")
-    if opportunity == EventOpportunityType.FADE_SHORT_REVIEW.value and not (fade_ready and crowded):
-        opportunity = EventOpportunityType.RISK_ONLY.value
+    if opportunity == EventOpportunityType.FADE_SHORT_REVIEW.value and not (fade_ready and exhaustion):
+        opportunity = EventOpportunityType.UNCONFIRMED_RESEARCH.value
         why_not.append("fade_short_requires_move_and_crowding")
         warnings.append("fade_lane_capped")
     if opportunity == EventOpportunityType.EARLY_LONG_RESEARCH.value and not early_source_ok:
-        opportunity = EventOpportunityType.RISK_ONLY.value
+        opportunity = EventOpportunityType.UNCONFIRMED_RESEARCH.value
         why_not.append("early_long_requires_fresh_strong_source")
         warnings.append("early_lane_capped")
 
@@ -214,9 +244,9 @@ def evaluate_market_reaction(data: MarketReactionInput | Mapping[str, Any] | Non
         what_invalidates=tuple(dict.fromkeys(invalidates or ("source correction or stale catalyst",))),
         why_not_alertable=tuple(dict.fromkeys(why_not)),
         evidence_summary=tuple(dict.fromkeys(evidence)),
-        source_requirements_met=bool(source_ok_for_long or source_ok_for_fade),
-        market_requirements_met=bool(market_confirmed),
-        fade_requirements_met=bool(fade_ready and crowded),
+        source_requirements_met=bool(source_ok_for_long if opportunity in {EventOpportunityType.EARLY_LONG_RESEARCH.value, EventOpportunityType.CONFIRMED_LONG_RESEARCH.value} else source_ok_for_fade),
+        market_requirements_met=bool(market_confirmed and market_sane),
+        fade_requirements_met=bool(fade_ready and exhaustion),
         source_strength=source_strength,
         warnings=tuple(dict.fromkeys(warnings)),
         reason_codes=tuple(dict.fromkeys(reasons)),
@@ -235,6 +265,9 @@ def _input_from_mapping(row: Mapping[str, Any]) -> MarketReactionInput:
         dex = {**_mapping(components.get("dex_liquidity_snapshot") or components.get("dex_liquidity")), **dex}
         supply = {**_mapping(components.get("supply_snapshot") or components.get("supply")), **supply}
     return MarketReactionInput(
+        symbol=_first_text(row, components, "symbol", "validated_symbol"),
+        coin_id=_first_text(row, components, "coin_id", "validated_coin_id"),
+        row_type=_first_text(row, components, "row_type", "snapshot_class"),
         market_snapshot=market,
         derivatives_snapshot=derivatives,
         dex_liquidity_snapshot=dex,
@@ -248,6 +281,11 @@ def _input_from_mapping(row: Mapping[str, Any]) -> MarketReactionInput:
         evidence_quality_score=_float(_first_value(row, components, "evidence_quality_score", "source_quality")),
         accepted_evidence_count=_int(_first_value(row, components, "accepted_evidence_count", "evidence_acquisition_accepted_count")),
         accepted_reason_codes=tuple(_list_values(_first_value(row, components, "accepted_evidence_reason_codes", "accepted_reason_codes"))),
+        evidence_acquisition_status=_first_text(row, components, "evidence_acquisition_status", "acquisition_status"),
+        final_route_after_quality_gate=_first_text(row, components, "final_route_after_quality_gate", "route", "tier"),
+        final_state_after_quality_gate=_first_text(row, components, "final_state_after_quality_gate", "state"),
+        diagnostic_row_count=_int(_first_value(row, components, "diagnostic_row_count", "hidden_diagnostic_count")),
+        source_noise_control_count=_int(_first_value(row, components, "source_noise_control_count")),
         market_confirmation_level=_first_text(row, components, "market_confirmation_level", "market_reaction_confirmation"),
         market_confirmation_score=_float(_first_value(row, components, "market_confirmation_score")),
         market_context_freshness_status=_first_text(row, components, "market_context_freshness_status", "market_data_freshness"),
@@ -333,6 +371,24 @@ def _classify_market_state(snapshot: MarketStateSnapshot, *, negative: bool, imp
     return EventMarketState.NO_REACTION.value, reasons
 
 
+def _diagnostic_context(data: MarketReactionInput, impact: str, source_pack: str) -> bool:
+    symbol = _text(data.symbol).casefold()
+    coin_id = _text(data.coin_id).casefold()
+    route = _text(data.final_route_after_quality_gate).casefold()
+    state = _text(data.final_state_after_quality_gate).casefold()
+    row_type = _text(data.row_type).casefold()
+    text = f"{impact} {source_pack} {route} {state} {row_type}"
+    return any((
+        symbol == "sector",
+        coin_id.startswith("sector") or coin_id in {"sports_fan_proxy", "market_anomaly", "unknown"},
+        "source_noise" in text,
+        "ticker_collision" in text,
+        "diagnostic" in text,
+        "ambiguous_control" in text,
+        bool(data.source_noise_control_count and data.source_noise_control_count > 0 and route in {"store_only", "suppress_duplicate", "local_report"}),
+    ))
+
+
 def _source_strength(data: MarketReactionInput) -> str:
     source_class = _text(data.source_class).casefold()
     specificity = _text(data.evidence_specificity).casefold()
@@ -388,6 +444,33 @@ def _has_crowding(snapshot: MarketStateSnapshot) -> bool:
     ))
 
 
+def _completed_move(snapshot: MarketStateSnapshot, market_state: str) -> bool:
+    return any((
+        market_state in {
+            EventMarketState.BLOWOFF_CROWDED.value,
+            EventMarketState.POST_EVENT_FADE_SETUP.value,
+            EventMarketState.LATE_MOMENTUM.value,
+        },
+        snapshot.return_24h is not None and snapshot.return_24h >= 30,
+        snapshot.return_4h is not None and snapshot.return_4h >= 20,
+    ))
+
+
+def _volume_exhausted(snapshot: MarketStateSnapshot) -> bool:
+    return any((
+        snapshot.volume_turnover_zscore is not None and snapshot.volume_turnover_zscore >= 4,
+        snapshot.volume_to_market_cap is not None and snapshot.volume_to_market_cap >= 0.35,
+    ))
+
+
+def _liquidity_sane(snapshot: MarketStateSnapshot) -> bool:
+    if snapshot.spread_bps is not None and snapshot.spread_bps > 150:
+        return False
+    if snapshot.liquidity_usd is not None and snapshot.liquidity_usd < 50_000:
+        return False
+    return True
+
+
 def _fresh_enough(data: MarketReactionInput, snapshot: MarketStateSnapshot) -> bool:
     if data.catalyst_fresh is True:
         return True
@@ -415,6 +498,12 @@ def _why_now(opportunity: str, market_state: str, source_strength: str, snapshot
         return f"strong source plus {market_state.replace('_', ' ')}"
     if opportunity == EventOpportunityType.FADE_SHORT_REVIEW.value:
         return "move appears crowded/exhausted; review only for fade risk after deterministic gates"
+    if opportunity == EventOpportunityType.UNCONFIRMED_RESEARCH.value:
+        return f"interesting context, but confirmation is missing; market state is {market_state.replace('_', ' ')}"
+    if opportunity == EventOpportunityType.DIAGNOSTIC.value:
+        return "diagnostic/control context; keep out of default operator lanes"
+    if opportunity == EventOpportunityType.RISK_ONLY.value:
+        return f"credible risk catalyst with {market_state.replace('_', ' ')}"
     if snapshot.observed_fields == 0:
         return "insufficient market reaction data; keep as risk/local research"
     return f"{market_state.replace('_', ' ')} with {source_strength.replace('_', ' ')} source strength"
