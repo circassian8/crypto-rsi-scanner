@@ -11,6 +11,7 @@ from typing import Any, Iterable, Mapping
 from urllib.parse import urlparse
 
 from . import (
+    event_artifact_paths,
     event_alpha_router,
     event_core_opportunities,
     event_core_opportunity_store,
@@ -470,7 +471,7 @@ def _lineage_lines(
         watchlist_key=watchlist_key,
         card_path=card_path,
     )
-    card_path_label = str(card_path) if card_path is not None else "none"
+    card_path_label = event_artifact_paths.artifact_display_path(card_path)
     profile_for_command = profile or "default"
     return [
         f"- Generated at: {generated_iso}",
@@ -1491,7 +1492,7 @@ def _text_is_integrated_radar_card(text: str) -> bool:
 def _strip_sensitive(markdown: str) -> str:
     out = markdown.replace("OPENAI_API_KEY", "[redacted]").replace("TELEGRAM_BOT_TOKEN", "[redacted]")
     out = out.replace(".env", "[env-file]")
-    return out
+    return event_artifact_paths.scrub_absolute_paths_from_markdown(out)
 
 
 def _find_alert(key: str, rows: list[Mapping[str, Any]]) -> Mapping[str, Any] | None:

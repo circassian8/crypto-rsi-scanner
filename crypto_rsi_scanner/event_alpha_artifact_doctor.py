@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
+from . import event_alpha_alert_store, event_alpha_artifacts, event_alpha_notification_inbox, event_alpha_quality_fields, event_alpha_router, event_artifact_paths, event_core_opportunities, event_core_opportunity_store, event_derivatives_crowding, event_integrated_radar, event_market_anomaly_scanner, event_market_units, event_official_exchange, event_opportunity_verdict, event_research_cards, event_scheduled_catalysts, event_watchlist
 from . import event_alpha_notification_delivery as _delivery
 
 STALE_PRE_CANONICAL_NOTIFICATION_WARNING = (
@@ -160,6 +160,22 @@ class EventAlphaArtifactDoctorResult:
     integrated_core_silent_upgrade: int = 0
     integrated_diagnostic_visible_in_default_operator_section: int = 0
     integrated_preview_missing_disclaimer: int = 0
+    integrated_delivery_ledger_missing: int = 0
+    integrated_preview_lane_mismatch: int = 0
+    integrated_delivery_missing_disclaimer: int = 0
+    integrated_delivery_sent_in_no_send: int = 0
+    integrated_delivery_side_effect_flag: int = 0
+    integrated_delivery_missing_skip_reasons: int = 0
+    integrated_delivery_card_path_absolute: int = 0
+    integrated_operator_markdown_absolute_path: int = 0
+    integrated_legacy_preview_alerts_wording: int = 0
+    integrated_outcome_missing_for_candidate: int = 0
+    integrated_outcome_side_effect_flag: int = 0
+    integrated_outcome_missing_identity: int = 0
+    integrated_outcome_returns_without_price: int = 0
+    integrated_outcome_diagnostic_in_performance: int = 0
+    integrated_outcome_return_double_scaled: int = 0
+    integrated_outcome_missing_data_unlabeled: int = 0
     integrated_created_normal_rsi_signal: int = 0
     integrated_created_triggered_fade: int = 0
     source_coverage_report_missing: int = 0
@@ -419,6 +435,16 @@ def diagnose_artifacts(
     )
     integrated_source_coverage_json_path = (
         default_integrated_dir / "event_alpha_source_coverage.json"
+        if default_integrated_dir is not None
+        else None
+    )
+    integrated_delivery_path = (
+        default_integrated_dir / event_integrated_radar.INTEGRATED_DELIVERIES_FILENAME
+        if default_integrated_dir is not None
+        else None
+    )
+    integrated_outcomes_path = (
+        default_integrated_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME
         if default_integrated_dir is not None
         else None
     )
@@ -793,6 +819,8 @@ def diagnose_artifacts(
         daily_brief_path=daily_brief_path,
         manifest_path=integrated_manifest_path,
         source_coverage_json_path=integrated_source_coverage_json_path,
+        delivery_path=integrated_delivery_path,
+        outcome_path=integrated_outcomes_path,
         preview_path=(
             Path(inspected_alert_store_path).parent / "event_alpha_notification_preview.md"
             if inspected_alert_store_path is not None
@@ -1139,6 +1167,22 @@ def diagnose_artifacts(
         "integrated_core_silent_upgrade",
         "integrated_diagnostic_visible_in_default_operator_section",
         "integrated_preview_missing_disclaimer",
+        "integrated_delivery_ledger_missing",
+        "integrated_preview_lane_mismatch",
+        "integrated_delivery_missing_disclaimer",
+        "integrated_delivery_sent_in_no_send",
+        "integrated_delivery_side_effect_flag",
+        "integrated_delivery_missing_skip_reasons",
+        "integrated_delivery_card_path_absolute",
+        "integrated_operator_markdown_absolute_path",
+        "integrated_legacy_preview_alerts_wording",
+        "integrated_outcome_missing_for_candidate",
+        "integrated_outcome_side_effect_flag",
+        "integrated_outcome_missing_identity",
+        "integrated_outcome_returns_without_price",
+        "integrated_outcome_diagnostic_in_performance",
+        "integrated_outcome_return_double_scaled",
+        "integrated_outcome_missing_data_unlabeled",
         "integrated_created_normal_rsi_signal",
         "integrated_created_triggered_fade",
     ):
@@ -1819,6 +1863,22 @@ def diagnose_artifacts(
         integrated_core_silent_upgrade=integrated_conflicts["integrated_core_silent_upgrade"],
         integrated_diagnostic_visible_in_default_operator_section=integrated_conflicts["integrated_diagnostic_visible_in_default_operator_section"],
         integrated_preview_missing_disclaimer=integrated_conflicts["integrated_preview_missing_disclaimer"],
+        integrated_delivery_ledger_missing=integrated_conflicts["integrated_delivery_ledger_missing"],
+        integrated_preview_lane_mismatch=integrated_conflicts["integrated_preview_lane_mismatch"],
+        integrated_delivery_missing_disclaimer=integrated_conflicts["integrated_delivery_missing_disclaimer"],
+        integrated_delivery_sent_in_no_send=integrated_conflicts["integrated_delivery_sent_in_no_send"],
+        integrated_delivery_side_effect_flag=integrated_conflicts["integrated_delivery_side_effect_flag"],
+        integrated_delivery_missing_skip_reasons=integrated_conflicts["integrated_delivery_missing_skip_reasons"],
+        integrated_delivery_card_path_absolute=integrated_conflicts["integrated_delivery_card_path_absolute"],
+        integrated_operator_markdown_absolute_path=integrated_conflicts["integrated_operator_markdown_absolute_path"],
+        integrated_legacy_preview_alerts_wording=integrated_conflicts["integrated_legacy_preview_alerts_wording"],
+        integrated_outcome_missing_for_candidate=integrated_conflicts["integrated_outcome_missing_for_candidate"],
+        integrated_outcome_side_effect_flag=integrated_conflicts["integrated_outcome_side_effect_flag"],
+        integrated_outcome_missing_identity=integrated_conflicts["integrated_outcome_missing_identity"],
+        integrated_outcome_returns_without_price=integrated_conflicts["integrated_outcome_returns_without_price"],
+        integrated_outcome_diagnostic_in_performance=integrated_conflicts["integrated_outcome_diagnostic_in_performance"],
+        integrated_outcome_return_double_scaled=integrated_conflicts["integrated_outcome_return_double_scaled"],
+        integrated_outcome_missing_data_unlabeled=integrated_conflicts["integrated_outcome_missing_data_unlabeled"],
         integrated_created_normal_rsi_signal=integrated_conflicts["integrated_created_normal_rsi_signal"],
         integrated_created_triggered_fade=integrated_conflicts["integrated_created_triggered_fade"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
@@ -2975,6 +3035,8 @@ def _integrated_radar_artifact_conflicts(
     daily_brief_path: str | Path | None = None,
     manifest_path: str | Path | None = None,
     source_coverage_json_path: str | Path | None = None,
+    delivery_path: str | Path | None = None,
+    outcome_path: str | Path | None = None,
     preview_path: str | Path | None = None,
 ) -> dict[str, int]:
     out = {
@@ -3016,6 +3078,22 @@ def _integrated_radar_artifact_conflicts(
         "integrated_core_silent_upgrade": 0,
         "integrated_diagnostic_visible_in_default_operator_section": 0,
         "integrated_preview_missing_disclaimer": 0,
+        "integrated_delivery_ledger_missing": 0,
+        "integrated_preview_lane_mismatch": 0,
+        "integrated_delivery_missing_disclaimer": 0,
+        "integrated_delivery_sent_in_no_send": 0,
+        "integrated_delivery_side_effect_flag": 0,
+        "integrated_delivery_missing_skip_reasons": 0,
+        "integrated_delivery_card_path_absolute": 0,
+        "integrated_operator_markdown_absolute_path": 0,
+        "integrated_legacy_preview_alerts_wording": 0,
+        "integrated_outcome_missing_for_candidate": 0,
+        "integrated_outcome_side_effect_flag": 0,
+        "integrated_outcome_missing_identity": 0,
+        "integrated_outcome_returns_without_price": 0,
+        "integrated_outcome_diagnostic_in_performance": 0,
+        "integrated_outcome_return_double_scaled": 0,
+        "integrated_outcome_missing_data_unlabeled": 0,
         "integrated_created_normal_rsi_signal": 0,
         "integrated_created_triggered_fade": 0,
     }
@@ -3100,6 +3178,115 @@ def _integrated_radar_artifact_conflicts(
             preview_text = ""
         if "Research-only" not in preview_text or "Not a trade signal" not in preview_text:
             out["integrated_preview_missing_disclaimer"] += 1
+        if re.search(r"\bAlertable decisions:.*\bAlerts:\s*\d+", preview_text):
+            out["integrated_legacy_preview_alerts_wording"] += 1
+        if event_artifact_paths.has_operator_absolute_path(preview_text):
+            out["integrated_operator_markdown_absolute_path"] += 1
+    for operator_path in (*research_card_paths, *(path for path in (daily_brief_path, preview_path) if path is not None)):
+        try:
+            text = Path(operator_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if event_artifact_paths.has_operator_absolute_path(text):
+            out["integrated_operator_markdown_absolute_path"] += 1
+    delivery_rows = _read_jsonl(delivery_path) if delivery_path is not None and Path(delivery_path).exists() else []
+    if row_count and delivery_path is not None and not Path(delivery_path).exists():
+        out["integrated_delivery_ledger_missing"] += 1
+    if delivery_rows:
+        out.update(_merge_conflicts(out, _integrated_delivery_conflicts(delivery_rows, preview_path=preview_path)))
+    outcome_rows = _read_jsonl(outcome_path) if outcome_path is not None and Path(outcome_path).exists() else []
+    if outcome_rows:
+        out.update(_merge_conflicts(out, _integrated_outcome_conflicts(materialized_rows, outcome_rows)))
+    return out
+
+
+def _merge_conflicts(base: Mapping[str, int], updates: Mapping[str, int]) -> dict[str, int]:
+    out = dict(base)
+    for key, value in updates.items():
+        out[key] = int(out.get(key, 0)) + int(value or 0)
+    return out
+
+
+def _integrated_delivery_conflicts(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    preview_path: str | Path | None,
+) -> dict[str, int]:
+    out = {
+        "integrated_preview_lane_mismatch": 0,
+        "integrated_delivery_missing_disclaimer": 0,
+        "integrated_delivery_sent_in_no_send": 0,
+        "integrated_delivery_side_effect_flag": 0,
+        "integrated_delivery_missing_skip_reasons": 0,
+        "integrated_delivery_card_path_absolute": 0,
+        "integrated_operator_markdown_absolute_path": 0,
+    }
+    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
+    preview_text = ""
+    if preview_path is not None:
+        try:
+            preview_text = Path(preview_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            preview_text = ""
+    for row in materialized:
+        message = str(row.get("message_text") or "")
+        if "Research-only" not in message or "Not a trade signal" not in message:
+            out["integrated_delivery_missing_disclaimer"] += 1
+        if row.get("sent") and row.get("no_send_rehearsal"):
+            out["integrated_delivery_sent_in_no_send"] += 1
+        for key in ("normal_rsi_signal_written", "triggered_fade_created", "paper_trade_created", "trade_created"):
+            if _truthy(row.get(key)):
+                out["integrated_delivery_side_effect_flag"] += 1
+        if int(row.get("skipped_item_count") or 0) > 0 and not row.get("skipped_items"):
+            out["integrated_delivery_missing_skip_reasons"] += 1
+        if event_artifact_paths.has_operator_absolute_path(row.get("card_paths") or ()):
+            out["integrated_delivery_card_path_absolute"] += 1
+        if event_artifact_paths.has_operator_absolute_path(message):
+            out["integrated_operator_markdown_absolute_path"] += 1
+        lane_title = str(row.get("lane_title") or "")
+        if preview_text and lane_title and lane_title not in preview_text:
+            out["integrated_preview_lane_mismatch"] += 1
+    return out
+
+
+def _integrated_outcome_conflicts(
+    candidates: Iterable[Mapping[str, Any]],
+    outcomes: Iterable[Mapping[str, Any]],
+) -> dict[str, int]:
+    out = {
+        "integrated_outcome_missing_for_candidate": 0,
+        "integrated_outcome_side_effect_flag": 0,
+        "integrated_outcome_missing_identity": 0,
+        "integrated_outcome_returns_without_price": 0,
+        "integrated_outcome_diagnostic_in_performance": 0,
+        "integrated_outcome_return_double_scaled": 0,
+        "integrated_outcome_missing_data_unlabeled": 0,
+    }
+    outcome_rows = [dict(row) for row in outcomes if isinstance(row, Mapping)]
+    outcome_by_candidate = {str(row.get("candidate_id") or ""): row for row in outcome_rows if row.get("candidate_id")}
+    for candidate in candidates:
+        if str(candidate.get("opportunity_type") or "") == "DIAGNOSTIC":
+            continue
+        if str(candidate.get("candidate_id") or "") not in outcome_by_candidate:
+            out["integrated_outcome_missing_for_candidate"] += 1
+    for row in outcome_rows:
+        for key in ("normal_rsi_signal_written", "triggered_fade_created", "paper_trade_created", "trade_created"):
+            if _truthy(row.get(key)):
+                out["integrated_outcome_side_effect_flag"] += 1
+        if not (row.get("symbol") and row.get("coin_id")):
+            out["integrated_outcome_missing_identity"] += 1
+        if row.get("primary_horizon_return") is not None and row.get("price_at_observation") in (None, ""):
+            out["integrated_outcome_returns_without_price"] += 1
+        if str(row.get("opportunity_type") or "") == "DIAGNOSTIC" and _truthy(row.get("include_in_performance")):
+            out["integrated_outcome_diagnostic_in_performance"] += 1
+        returns = [row.get("primary_horizon_return")]
+        horizons = row.get("horizons")
+        if isinstance(horizons, Mapping):
+            returns.extend(horizons.values())
+        if any(isinstance(value, (int, float)) and abs(float(value)) > 5.0 for value in returns):
+            out["integrated_outcome_return_double_scaled"] += 1
+        if str(row.get("outcome_status") or "") == "missing_data" and not row.get("missing_data_reason"):
+            out["integrated_outcome_missing_data_unlabeled"] += 1
     return out
 
 
@@ -5219,6 +5406,22 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"integrated_core_silent_upgrade={result.integrated_core_silent_upgrade} "
             f"integrated_diagnostic_visible_in_default_operator_section={result.integrated_diagnostic_visible_in_default_operator_section} "
             f"integrated_preview_missing_disclaimer={result.integrated_preview_missing_disclaimer} "
+            f"integrated_delivery_ledger_missing={result.integrated_delivery_ledger_missing} "
+            f"integrated_preview_lane_mismatch={result.integrated_preview_lane_mismatch} "
+            f"integrated_delivery_missing_disclaimer={result.integrated_delivery_missing_disclaimer} "
+            f"integrated_delivery_sent_in_no_send={result.integrated_delivery_sent_in_no_send} "
+            f"integrated_delivery_side_effect_flag={result.integrated_delivery_side_effect_flag} "
+            f"integrated_delivery_missing_skip_reasons={result.integrated_delivery_missing_skip_reasons} "
+            f"integrated_delivery_card_path_absolute={result.integrated_delivery_card_path_absolute} "
+            f"integrated_operator_markdown_absolute_path={result.integrated_operator_markdown_absolute_path} "
+            f"integrated_legacy_preview_alerts_wording={result.integrated_legacy_preview_alerts_wording} "
+            f"integrated_outcome_missing_for_candidate={result.integrated_outcome_missing_for_candidate} "
+            f"integrated_outcome_side_effect_flag={result.integrated_outcome_side_effect_flag} "
+            f"integrated_outcome_missing_identity={result.integrated_outcome_missing_identity} "
+            f"integrated_outcome_returns_without_price={result.integrated_outcome_returns_without_price} "
+            f"integrated_outcome_diagnostic_in_performance={result.integrated_outcome_diagnostic_in_performance} "
+            f"integrated_outcome_return_double_scaled={result.integrated_outcome_return_double_scaled} "
+            f"integrated_outcome_missing_data_unlabeled={result.integrated_outcome_missing_data_unlabeled} "
             f"integrated_created_normal_rsi_signal={result.integrated_created_normal_rsi_signal} "
             f"integrated_created_triggered_fade={result.integrated_created_triggered_fade} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "

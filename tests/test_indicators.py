@@ -28165,7 +28165,7 @@ def test_research_cards_have_current_lineage_and_legacy_marker():
     assert "- Incident ID: incident:velvet:spacex" in card.markdown
     assert "- Hypothesis ID: hyp:velvet:spacex" in card.markdown
     assert f"- Core opportunity ID: {core_id}" in card.markdown
-    assert "- Card path: /tmp/card_velvet.md" in card.markdown
+    assert "- Card path: card_velvet.md" in card.markdown
     assert f"- Feedback target: {core_id}" in card.markdown
     assert "- Feedback target type: core_opportunity_id" in card.markdown
     assert "make event-feedback-useful PROFILE=catalyst_frame_e2e" in card.markdown
@@ -38571,7 +38571,7 @@ def test_makefile_exposes_derivatives_targets():
 def test_integrated_radar_fixture_lanes_and_merge():
     import json
 
-    from crypto_rsi_scanner import event_alpha_artifacts, event_core_opportunity_store, event_integrated_radar, event_research_cards
+    from crypto_rsi_scanner import event_alpha_artifacts, event_artifact_paths, event_core_opportunity_store, event_integrated_radar, event_research_cards
 
     with TemporaryDirectory() as tmp:
         context = event_alpha_artifacts.context_from_profile(
@@ -38713,6 +38713,32 @@ def test_integrated_radar_fixture_lanes_and_merge():
         assert "Skip reasons:" in preview
         assert "Research-only / unvalidated. Not a trade signal." in preview
         assert "Alerts:" not in preview
+        assert "/Users/" not in preview
+        assert result.integrated_delivery_path and result.integrated_delivery_path.exists()
+        deliveries = [
+            json.loads(line)
+            for line in result.integrated_delivery_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        lanes = {row["lane"]: row for row in deliveries}
+        assert {"early_long_research", "confirmed_long_research", "fade_short_review", "risk_only", "unconfirmed_research", "source_provider_health"} <= set(lanes)
+        assert lanes["early_long_research"]["status"] == "would_send_but_guard_disabled"
+        assert lanes["source_provider_health"]["skipped_item_count"] == 1
+        assert lanes["source_provider_health"]["skipped_items"][0]["reason"] == "diagnostic_only_hidden_from_research_lanes"
+        assert all(row["sent"] is False for row in deliveries)
+        assert all(row["normal_rsi_signal_written"] is False for row in deliveries)
+        assert all(row["triggered_fade_created"] is False for row in deliveries)
+        assert all(not event_artifact_paths.has_operator_absolute_path(row.get("message_text", "")) for row in deliveries)
+        assert all(not event_artifact_paths.has_operator_absolute_path(row.get("card_paths", ())) for row in deliveries)
+        assert result.preview_rendered_items >= 5
+        assert result.preview_skipped_items >= 1
+        assert result.integrated_delivery_rows == len(deliveries)
+        assert run_row["integrated_delivery_rows"] == len(deliveries)
+        assert run_row["preview_rendered_items"] == result.preview_rendered_items
+        assert run_row["operator_absolute_path_count"] == 0
+        assert run_row["source_coverage_md_path_rel"].endswith("event_alpha_source_coverage.md")
+        assert "event_alpha_source_coverage.md" in daily
+        assert "/Users/" not in daily
 
 
 def test_integrated_market_anomaly_alone_does_not_confirm():
@@ -38751,16 +38777,59 @@ def test_integrated_market_anomaly_alone_does_not_confirm():
     assert rows[0]["triggered_fade_created"] is False
 
 
+def test_integrated_radar_outcomes_and_calibration_are_research_only():
+    import json
+
+    from crypto_rsi_scanner import event_alpha_artifacts, event_integrated_radar, event_integrated_radar_outcomes
+
+    with TemporaryDirectory() as tmp:
+        context = event_alpha_artifacts.context_from_profile(
+            "fixture",
+            run_mode="fixture",
+            base_dir=tmp,
+            artifact_namespace="integrated_outcomes",
+        )
+        event_integrated_radar.run_integrated_radar_cycle(
+            context=context,
+            fixture=True,
+            observed_at="2026-06-15T16:00:00Z",
+        )
+        rows = event_integrated_radar_outcomes.fill_integrated_radar_outcomes(
+            context.namespace_dir,
+            observed_at="2026-06-16T16:00:00Z",
+        )
+        by_symbol = {row["symbol"]: row for row in rows}
+        assert by_symbol["TESTLIST"]["outcome_label"] == "early_good"
+        assert by_symbol["TESTPERP"]["outcome_label"] == "continuation_good"
+        assert by_symbol["TESTFADE"]["outcome_label"] == "fade_review_good"
+        assert by_symbol["TESTUNLOCK"]["outcome_label"] == "risk_validated"
+        assert by_symbol["BTC"]["outcome_label"] == "remained_noise"
+        assert by_symbol["TESTRUMOR"]["outcome_label"] == "remained_noise"
+        assert all(row["research_only"] is True for row in rows)
+        assert all(row["normal_rsi_signal_written"] is False for row in rows)
+        assert all(row["triggered_fade_created"] is False for row in rows)
+        assert all(row["paper_trade_created"] is False for row in rows)
+        report = (context.namespace_dir / "event_integrated_radar_outcome_report.md").read_text(encoding="utf-8")
+        assert "Event Alpha Integrated Radar Outcome Report" in report
+        assert "No trades or paper trades" in report
+        priors = json.loads((context.namespace_dir / "event_integrated_radar_calibration_priors.json").read_text(encoding="utf-8"))
+        assert priors["auto_apply"] is False
+        assert "EARLY_LONG_RESEARCH" in priors["opportunity_type_priors"]
+
+
 def test_makefile_exposes_integrated_radar_target():
     text = Path("Makefile").read_text(encoding="utf-8")
 
     assert "event-alpha-integrated-radar-smoke" in text
     assert "event-alpha-integrated-radar-doctor" in text
+    assert "event-alpha-integrated-radar-outcome-smoke" in text
+    assert "event-alpha-integrated-radar-calibration-report" in text
     assert "--event-alpha-integrated-radar-cycle" in text
     assert "--event-alpha-integrated-radar-fixture" in text
     assert "--event-alpha-integrated-radar-run-sidecars" in text
     assert "--event-alpha-integrated-radar-load-existing" in text
     assert "--event-alpha-integrated-radar-auto" in text
+    assert "--event-alpha-integrated-radar-fill-outcomes" in text
 
 
 def test_integrated_doctor_catches_core_and_card_mismatches():
@@ -38863,6 +38932,78 @@ def test_integrated_doctor_catches_core_and_card_mismatches():
         )
     assert fade_conflicts["integrated_fade_card_missing_disclaimer"] == 1
     assert fade_conflicts["integrated_fade_card_crowding_unknown"] == 1
+
+
+def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
+    import json
+
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    candidate = {
+        "row_type": "event_integrated_radar_candidate",
+        "candidate_id": "iar:test",
+        "core_opportunity_id": "agg:test",
+        "symbol": "TEST",
+        "coin_id": "test",
+        "opportunity_type": "EARLY_LONG_RESEARCH",
+        "market_state_snapshot": {"market_state": "no_reaction"},
+        "source_strength": "official_structured",
+        "market_state_class": "no_reaction",
+    }
+    with TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        preview = tmp_path / "event_alpha_notification_preview.md"
+        preview.write_text("Alertable decisions: 0 · Alerts: 1\nNo research-only disclaimer", encoding="utf-8")
+        deliveries = tmp_path / "event_integrated_radar_notification_deliveries.jsonl"
+        deliveries.write_text(
+            json.dumps({
+                "row_type": "event_integrated_radar_notification_delivery",
+                "lane": "early_long_research",
+                "lane_title": "Early Long Research",
+                "message_text": "Card: /Users/test/card.md",
+                "sent": True,
+                "no_send_rehearsal": True,
+                "skipped_item_count": 1,
+                "card_paths": ["/Users/test/card.md"],
+                "normal_rsi_signal_written": True,
+            }) + "\n",
+            encoding="utf-8",
+        )
+        outcomes = tmp_path / "event_integrated_radar_outcomes.jsonl"
+        outcomes.write_text(
+            json.dumps({
+                "row_type": "event_integrated_radar_outcome",
+                "candidate_id": "iar:test",
+                "symbol": "",
+                "coin_id": "",
+                "opportunity_type": "DIAGNOSTIC",
+                "primary_horizon_return": 10.0,
+                "price_at_observation": None,
+                "include_in_performance": True,
+                "triggered_fade_created": True,
+                "outcome_status": "missing_data",
+            }) + "\n",
+            encoding="utf-8",
+        )
+        conflicts = event_alpha_artifact_doctor._integrated_radar_artifact_conflicts(  # noqa: SLF001
+            [candidate],
+            core_rows=[{**candidate, "row_type": "event_core_opportunity"}],
+            delivery_path=deliveries,
+            outcome_path=outcomes,
+            preview_path=preview,
+        )
+    assert conflicts["integrated_legacy_preview_alerts_wording"] == 1
+    assert conflicts["integrated_delivery_missing_disclaimer"] == 1
+    assert conflicts["integrated_delivery_sent_in_no_send"] == 1
+    assert conflicts["integrated_delivery_side_effect_flag"] == 1
+    assert conflicts["integrated_delivery_missing_skip_reasons"] == 1
+    assert conflicts["integrated_delivery_card_path_absolute"] == 1
+    assert conflicts["integrated_outcome_side_effect_flag"] == 1
+    assert conflicts["integrated_outcome_missing_identity"] == 1
+    assert conflicts["integrated_outcome_returns_without_price"] == 1
+    assert conflicts["integrated_outcome_diagnostic_in_performance"] == 1
+    assert conflicts["integrated_outcome_return_double_scaled"] == 1
+    assert conflicts["integrated_outcome_missing_data_unlabeled"] == 1
 
 
 def test_event_alpha_heartbeat_uses_strict_alert_and_research_candidate_copy():

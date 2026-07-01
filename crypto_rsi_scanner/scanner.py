@@ -84,6 +84,7 @@ from . import event_alpha_cryptopanic
 from . import event_impact_hypothesis_store
 from . import event_incident_store
 from . import event_integrated_radar
+from . import event_integrated_radar_outcomes
 from . import event_alpha_missed
 from . import event_alpha_notifications
 from . import event_alpha_notification_checklist
@@ -7648,6 +7649,126 @@ def event_alpha_integrated_radar_cycle_report(
     print("No Telegram sends, paper trades, normal RSI signal rows, execution, or Event Alpha TRIGGERED_FADE were created.")
 
 
+def event_alpha_integrated_radar_fill_outcomes_report(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
+    """Fill research-only integrated radar outcomes from local fixture/cache rows."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name or "fixture",
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    rows = event_integrated_radar_outcomes.fill_integrated_radar_outcomes(
+        context.namespace_dir,
+        observed_at=_event_research_now(),
+    )
+    candidate_rows = event_integrated_radar.load_integrated_candidates(context.namespace_dir)
+    core_rows = event_core_opportunity_store.load_core_opportunities(
+        context.core_opportunity_store_path,
+        latest_run=True,
+        include_legacy=True,
+    ).rows
+    card_result = event_research_cards.write_research_cards(
+        context.research_cards_dir,
+        watchlist_entries=(),
+        alert_rows=core_rows,
+        include_all_alertable=True,
+        limit=25,
+        now=_event_research_now(),
+        outcome_rows=rows,
+        lineage_context={
+            "profile": context.profile,
+            "artifact_namespace": context.artifact_namespace,
+            "run_mode": context.run_mode,
+        },
+    )
+    event_core_opportunity_store.update_core_opportunity_card_links(
+        context.core_opportunity_store_path,
+        card_result.card_paths,
+    )
+    delivery_rows = event_integrated_radar.load_integrated_notification_deliveries(context.namespace_dir)
+    (context.namespace_dir / event_integrated_radar.DAILY_BRIEF_FILENAME).write_text(
+        event_integrated_radar.format_integrated_daily_brief(
+            candidate_rows,
+            core_rows=core_rows,
+            context=context,
+            delivery_rows=delivery_rows,
+            outcome_rows=rows,
+            source_coverage_path=context.namespace_dir / event_integrated_radar.SOURCE_COVERAGE_FILENAME,
+        ),
+        encoding="utf-8",
+    )
+    print(_event_alpha_context_block(context))
+    print(f"integrated_radar_outcomes_filled: rows={len(rows)} path={context.namespace_dir / event_integrated_radar.INTEGRATED_OUTCOMES_FILENAME}")
+    print("Research-only outcome artifacts written. No trades, paper trades, normal RSI rows, or sends were created.")
+
+
+def event_alpha_integrated_radar_outcome_report(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+) -> None:
+    """Print the research-only integrated radar outcome report."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name or "fixture",
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    rows = event_integrated_radar_outcomes.load_integrated_radar_outcomes(context.namespace_dir)
+    print(_event_alpha_context_block(context))
+    print(event_integrated_radar_outcomes.format_integrated_radar_outcome_report(rows))
+
+
+def event_alpha_integrated_radar_calibration_report(
+    verbose: bool = False,
+    profile_name: str | None = None,
+    *,
+    artifact_namespace: str | None = None,
+    include_test_artifacts: bool = False,
+    export_priors: bool = False,
+) -> None:
+    """Print/export recommendation-only integrated radar calibration artifacts."""
+    _setup_event_discovery_logging(verbose)
+    try:
+        context = resolve_event_alpha_artifact_context_for_report(
+            profile_name or "fixture",
+            artifact_namespace,
+            include_test_artifacts=include_test_artifacts,
+        )
+    except ValueError as exc:
+        print(str(exc))
+        return
+    rows = event_integrated_radar_outcomes.load_integrated_radar_outcomes(context.namespace_dir)
+    if export_priors:
+        priors = event_integrated_radar_outcomes.build_integrated_radar_calibration_priors(rows)
+        path = context.namespace_dir / event_integrated_radar.INTEGRATED_CALIBRATION_PRIORS_FILENAME
+        path.write_text(json.dumps(priors, sort_keys=True), encoding="utf-8")
+        print(_event_alpha_context_block(context))
+        print(f"integrated_radar_calibration_priors: {path}")
+        return
+    report = event_integrated_radar_outcomes.format_integrated_radar_calibration_report(rows)
+    path = context.namespace_dir / event_integrated_radar.INTEGRATED_CALIBRATION_REPORT_FILENAME
+    path.write_text(report, encoding="utf-8")
+    print(_event_alpha_context_block(context))
+    print(report)
+
+
 def event_alpha_market_anomaly_scan_report(
     verbose: bool = False,
     profile_name: str | None = None,
@@ -10873,6 +10994,26 @@ def cli() -> None:
         help="Build integrated radar candidates from existing local sidecar artifacts.",
     )
     parser.add_argument(
+        "--event-alpha-integrated-radar-fill-outcomes",
+        action="store_true",
+        help="Fill research-only integrated radar outcome artifacts from local fixture/cache rows.",
+    )
+    parser.add_argument(
+        "--event-alpha-integrated-radar-outcome-report",
+        action="store_true",
+        help="Print the research-only integrated radar outcome report.",
+    )
+    parser.add_argument(
+        "--event-alpha-integrated-radar-calibration-report",
+        action="store_true",
+        help="Print the recommendation-only integrated radar calibration report.",
+    )
+    parser.add_argument(
+        "--event-alpha-integrated-radar-calibration-export-priors",
+        action="store_true",
+        help="Write recommendation-only integrated radar calibration priors JSON.",
+    )
+    parser.add_argument(
         "--event-alpha-market-anomaly-rows",
         default=None,
         help="Optional JSON/JSONL market rows path for --event-alpha-market-anomaly-scan.",
@@ -11875,6 +12016,39 @@ def cli() -> None:
             artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
             fixture=args.event_alpha_integrated_radar_fixture,
             input_mode=integrated_input_mode,
+        )
+        return
+    if args.event_alpha_integrated_radar_fill_outcomes:
+        event_alpha_integrated_radar_fill_outcomes_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
+        return
+    if args.event_alpha_integrated_radar_outcome_report:
+        event_alpha_integrated_radar_outcome_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
+        return
+    if args.event_alpha_integrated_radar_calibration_report:
+        event_alpha_integrated_radar_calibration_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+        )
+        return
+    if args.event_alpha_integrated_radar_calibration_export_priors:
+        event_alpha_integrated_radar_calibration_report(
+            verbose=args.verbose,
+            profile_name=args.event_alpha_profile,
+            artifact_namespace=args.event_alpha_artifact_namespace or config.EVENT_ALPHA_ARTIFACT_NAMESPACE or None,
+            include_test_artifacts=args.event_alpha_include_test_artifacts,
+            export_priors=True,
         )
         return
     if args.event_alpha_market_anomaly_scan:

@@ -17,6 +17,40 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Make integrated radar artifacts portable and outcome-aware · Codex
+**Why:** Integrated radar operator artifacts needed portable paths, structured
+no-send preview delivery rows, run-ledger telemetry, and a research-only outcome
+loop so Pro-model review and operator audits can compare previews, cards,
+source coverage, and outcomes without machine-specific paths or hidden side
+effects.
+**Changes:**
+- Added a shared artifact-path helper and scrubbed operator-facing cards,
+  daily briefs, previews, and delivery rows so rendered Markdown avoids
+  `/Users`, `/tmp`, `/mnt/data`, and other machine-local absolute paths.
+- Added structured integrated radar notification delivery artifacts, preview
+  lane summaries, run-ledger counters for integrated preview/source/card
+  coverage, and strict artifact-doctor checks for delivery mismatches,
+  side-effect flags, missing skip reasons, legacy wording, and path leaks.
+- Added research-only integrated radar outcome filling, outcome reporting,
+  calibration reporting, and recommendation-only prior export artifacts, plus
+  Make/CLI targets for the fixture smoke workflow.
+- Updated cards and daily briefs to show integrated outcome status and source
+  coverage through portable artifact labels.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (644/644 passed);
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-outcome-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-outcome-report PYTHON=python3`;
+`make event-alpha-integrated-radar-calibration-report PYTHON=python3`;
+`make event-alpha-signal-quality-eval PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Integrated outcomes and calibration priors are local research
+artifacts only. They do not change thresholds, send Telegram, write normal RSI
+signal rows, create paper/live trades, execute orders, or create
+`TRIGGERED_FADE`.
+
 ## 2026-07-01 — Make integrated radar operator truth canonical · Codex
 **Why:** Integrated radar candidates and core rows were correct, but some
 operator-facing paths could still render stale generic lane text, lose

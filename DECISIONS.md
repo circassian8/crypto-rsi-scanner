@@ -16,6 +16,23 @@ decision, rationale, and revisit condition.
 
 ---
 
+## 2026-07-01 - Integrated radar preview and outcome artifacts are research truth only
+**Status:** accepted
+**Decision:** Integrated Event Alpha radar operator output should use portable
+artifact-relative paths in rendered Markdown and a structured
+`event_integrated_radar_notification_deliveries.jsonl` ledger as the preview
+delivery source of truth. Integrated radar outcomes and calibration priors may
+be written as local research artifacts, but they are recommendation-only and
+must not mutate thresholds, alert tiers, normal RSI signal rows, paper/live
+state, Telegram sends, execution, or `TRIGGERED_FADE`.
+**Why:** Pro-model review and operator audits need portable, reproducible
+artifacts that explain what would have rendered, why items were skipped, and
+how fixture outcomes cohort by lane/source without relying on machine-specific
+paths or live side effects.
+**Revisit when:** Integrated radar has a reviewed live burn-in sample large
+enough to justify a human-approved promotion from local research artifacts to a
+separate notification or paper-tracking workflow.
+
 ## 2026-07-01 - Canonical integrated lane truth wins operator presentation
 **Status:** accepted
 **Decision:** For integrated Event Alpha radar artifacts, canonical integrated

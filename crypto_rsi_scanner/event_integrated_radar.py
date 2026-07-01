@@ -18,6 +18,7 @@ from tempfile import TemporaryDirectory
 from typing import Any, Iterable, Mapping
 
 from . import (
+    event_artifact_paths,
     event_alpha_artifacts,
     event_alpha_run_ledger,
     event_alpha_router,
@@ -34,6 +35,11 @@ from . import (
 
 INTEGRATED_CANDIDATES_FILENAME = "event_integrated_radar_candidates.jsonl"
 INTEGRATED_REPORT_FILENAME = "event_integrated_radar_report.md"
+INTEGRATED_DELIVERIES_FILENAME = "event_integrated_radar_notification_deliveries.jsonl"
+INTEGRATED_OUTCOMES_FILENAME = "event_integrated_radar_outcomes.jsonl"
+INTEGRATED_OUTCOME_REPORT_FILENAME = "event_integrated_radar_outcome_report.md"
+INTEGRATED_CALIBRATION_REPORT_FILENAME = "event_integrated_radar_calibration_report.md"
+INTEGRATED_CALIBRATION_PRIORS_FILENAME = "event_integrated_radar_calibration_priors.json"
 NOTIFICATION_PREVIEW_FILENAME = "event_alpha_notification_preview.md"
 DAILY_BRIEF_FILENAME = "event_alpha_daily_brief.md"
 SOURCE_COVERAGE_FILENAME = "event_alpha_source_coverage.md"
@@ -67,6 +73,7 @@ class EventIntegratedRadarResult:
     integrated_report_path: Path
     daily_brief_path: Path
     notification_preview_path: Path
+    integrated_delivery_path: Path | None
     run_ledger_path: str
     core_opportunity_store_path: str
     input_manifest_path: Path | None = None
@@ -106,6 +113,23 @@ class EventIntegratedRadarResult:
     snapshot_write_attempted: bool = True
     snapshot_write_success: bool = True
     snapshot_rows_written: int = 0
+    strict_alerts: int = 0
+    alertable_decisions: int = 0
+    research_candidates: int = 0
+    raw_source_candidates: int = 0
+    cards_written: int = 0
+    research_cards_written: int = 0
+    preview_rendered_items: int = 0
+    preview_eligible_items: int = 0
+    preview_skipped_items: int = 0
+    preview_skip_reason_counts: Mapping[str, int] | None = None
+    integrated_delivery_rows: int = 0
+    integrated_lanes_rendered: Mapping[str, int] | None = None
+    integrated_lanes_empty: Mapping[str, int] | None = None
+    operator_absolute_path_count: int = 0
+    artifact_doctor_status: str | None = None
+    source_coverage_json_path_rel: str | None = None
+    source_coverage_md_path_rel: str | None = None
     warnings: tuple[str, ...] = ()
     cycle_completed: bool = True
 
@@ -201,23 +225,59 @@ def run_integrated_radar_cycle(
         latest_run=True,
         include_legacy=True,
     ).rows
-    daily_brief_path = namespace_dir / DAILY_BRIEF_FILENAME
-    daily_brief_path.write_text(
-        format_integrated_daily_brief(candidates, core_rows=core_rows, context=context, input_manifest=input_manifest),
-        encoding="utf-8",
-    )
     source_coverage_path = namespace_dir / SOURCE_COVERAGE_FILENAME
     source_coverage_path.write_text(format_integrated_source_coverage(candidates), encoding="utf-8")
     source_coverage_json_path = namespace_dir / SOURCE_COVERAGE_JSON_FILENAME
     _write_json(source_coverage_json_path, format_integrated_source_coverage_json(candidates, input_manifest=input_manifest))
+    delivery_path = namespace_dir / INTEGRATED_DELIVERIES_FILENAME
+    delivery_rows = build_integrated_notification_delivery_rows(
+        candidates,
+        core_rows=core_rows,
+        context=context,
+        run_id=run_id,
+        generated_at=research_observed_at,
+        send_guard_enabled=False,
+    )
+    _write_jsonl(delivery_path, delivery_rows)
+    daily_brief_path = namespace_dir / DAILY_BRIEF_FILENAME
+    daily_brief_path.write_text(
+        format_integrated_daily_brief(
+            candidates,
+            core_rows=core_rows,
+            context=context,
+            input_manifest=input_manifest,
+            delivery_rows=delivery_rows,
+            source_coverage_path=source_coverage_path,
+        ),
+        encoding="utf-8",
+    )
     preview_path = namespace_dir / NOTIFICATION_PREVIEW_FILENAME
     preview_path.write_text(
-        format_integrated_notification_preview(candidates, core_rows=core_rows, context=context),
+        format_integrated_notification_preview_from_deliveries(
+            delivery_rows,
+            candidates=candidates,
+            core_rows=core_rows,
+            context=context,
+        ),
         encoding="utf-8",
     )
     finished = datetime.now(timezone.utc)
-    lane_due = {"heartbeat": 1, "research_review_digest": 0}
+    lane_due = Counter(str(row.get("lane") or "unknown") for row in delivery_rows if row.get("would_send"))
+    lane_empty = Counter(str(row.get("lane") or "unknown") for row in delivery_rows if not row.get("would_send"))
+    rendered_items = sum(_int(row.get("rendered_item_count")) for row in delivery_rows)
+    eligible_items = sum(_int(row.get("eligible_item_count")) for row in delivery_rows)
+    skipped_items = sum(_int(row.get("skipped_item_count")) for row in delivery_rows)
+    skip_reasons: Counter[str] = Counter()
+    for row in delivery_rows:
+        for item in row.get("skipped_items") or ():
+            if isinstance(item, Mapping):
+                skip_reasons[str(item.get("reason") or "unknown")] += 1
     sidecar_counts = _sidecar_count_summary(sidecars)
+    operator_absolute_paths = sum(
+        1
+        for path in (report_path, daily_brief_path, preview_path, source_coverage_path, *card_result.card_paths)
+        if _artifact_has_absolute_operator_path(path)
+    )
     result = EventIntegratedRadarResult(
         namespace_dir=namespace_dir,
         run_id=run_id,
@@ -251,17 +311,34 @@ def run_integrated_radar_cycle(
         integrated_report_path=report_path,
         daily_brief_path=daily_brief_path,
         notification_preview_path=preview_path,
+        integrated_delivery_path=delivery_path,
         run_ledger_path=str(context.run_ledger_path),
         core_opportunity_store_path=str(context.core_opportunity_store_path),
         input_manifest_path=manifest_path,
         source_coverage_json_path=source_coverage_json_path,
-        send_lane_items_attempted=lane_due,
-        send_lane_items_delivered={"heartbeat": 0, "research_review_digest": 0},
+        send_lane_items_attempted=dict(lane_due),
+        send_lane_items_delivered={lane: 0 for lane in lane_due},
         send_would_send_items=sum(lane_due.values()),
         research_review_digest_enabled=False,
         research_review_digest_candidates=0,
         research_review_digest_would_send=0,
         snapshot_rows_written=len(candidates),
+        strict_alerts=0,
+        alertable_decisions=0,
+        research_candidates=len(candidates),
+        raw_source_candidates=len(candidates),
+        cards_written=card_result.cards_written,
+        research_cards_written=card_result.cards_written,
+        preview_rendered_items=rendered_items,
+        preview_eligible_items=eligible_items,
+        preview_skipped_items=skipped_items,
+        preview_skip_reason_counts=dict(skip_reasons),
+        integrated_delivery_rows=len(delivery_rows),
+        integrated_lanes_rendered=dict(lane_due),
+        integrated_lanes_empty=dict(lane_empty),
+        operator_absolute_path_count=operator_absolute_paths,
+        source_coverage_json_path_rel=event_artifact_paths.artifact_relpath(source_coverage_json_path),
+        source_coverage_md_path_rel=event_artifact_paths.artifact_relpath(source_coverage_path),
         warnings=tuple(_integrated_warnings(candidates)),
     )
     event_alpha_run_ledger.append_run_record(
@@ -352,9 +429,17 @@ def format_integrated_daily_brief(
     core_rows: Iterable[Mapping[str, Any]] = (),
     context: event_alpha_artifacts.EventAlphaArtifactContext | None = None,
     input_manifest: Iterable[Mapping[str, Any]] = (),
+    delivery_rows: Iterable[Mapping[str, Any]] = (),
+    outcome_rows: Iterable[Mapping[str, Any]] = (),
+    source_coverage_path: str | Path | None = None,
 ) -> str:
     rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
+    deliveries = [dict(row) for row in delivery_rows if isinstance(row, Mapping)]
+    outcomes = [dict(row) for row in outcome_rows if isinstance(row, Mapping)]
     core_count = len([row for row in core_rows if isinstance(row, Mapping)])
+    would_send = sum(1 for row in deliveries if row.get("would_send"))
+    rendered = sum(_int(row.get("rendered_item_count")) for row in deliveries)
+    skipped = sum(_int(row.get("skipped_item_count")) for row in deliveries)
     lines = [
         "# Event Alpha Daily Brief",
         "",
@@ -369,7 +454,7 @@ def format_integrated_daily_brief(
         f"- Strict alerts: 0",
         f"- Alertable decisions: 0",
         "- Telegram: no-send guard enabled for this integrated smoke.",
-        f"- Source coverage report: {context.namespace_dir / SOURCE_COVERAGE_FILENAME if context else SOURCE_COVERAGE_FILENAME}",
+        f"- Source coverage report: {event_artifact_paths.artifact_display_path(source_coverage_path or SOURCE_COVERAGE_FILENAME)}",
         "",
         "### Input Manifest",
     ]
@@ -377,9 +462,10 @@ def format_integrated_daily_brief(
     lines.extend([
         "",
         "### Research Review Digest",
-        f"- Lane count sent/due: 0/{len(_review_candidates(rows))}",
+        f"- Lane count sent/due: 0/{would_send}",
         f"- Eligible candidates: {len(_review_candidates(rows))}",
-        "- Delivery: no-send preview only; integrated smoke does not create Telegram delivery rows.",
+        f"- Preview rendered/skipped: {rendered}/{skipped}",
+        "- Delivery: no-send preview only; structured integrated delivery ledger was written.",
         "",
         "## Opportunity Lanes",
     ])
@@ -420,6 +506,17 @@ def format_integrated_daily_brief(
     _append_filtered(lines, rows, lambda row: row.get("derivatives_state_snapshot"))
     lines.extend(["", "## Source Coverage"])
     lines.extend(_source_coverage_lines(rows))
+    lines.extend(["", "## Outcome Tracker Status"])
+    if outcomes:
+        matured = sum(1 for row in outcomes if str(row.get("outcome_status") or "") == "filled")
+        partial = sum(1 for row in outcomes if str(row.get("outcome_status") or "") != "filled")
+        lines.append(f"- Outcome rows: {len(outcomes)}")
+        lines.append(f"- Filled: {matured}")
+        lines.append(f"- Partial/missing data: {partial}")
+        for lane, count in Counter(str(row.get("opportunity_type") or "unknown") for row in outcomes).most_common():
+            lines.append(f"- {lane}: {count}")
+    else:
+        lines.append("- No integrated radar outcomes filled yet.")
     lines.extend(["", "## Diagnostics Appendix"])
     diagnostics = [row for row in rows if row.get("opportunity_type") == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value]
     if not diagnostics:
@@ -429,6 +526,129 @@ def format_integrated_daily_brief(
     return "\n".join(lines).rstrip() + "\n"
 
 
+def build_integrated_notification_delivery_rows(
+    candidates: Iterable[Mapping[str, Any]],
+    *,
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    context: event_alpha_artifacts.EventAlphaArtifactContext | None = None,
+    run_id: str | None = None,
+    generated_at: datetime | str | None = None,
+    send_guard_enabled: bool = False,
+) -> tuple[dict[str, Any], ...]:
+    rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
+    core_by_id = {str(row.get("core_opportunity_id") or ""): dict(row) for row in core_rows if isinstance(row, Mapping)}
+    observed = _as_utc(_parse_time(generated_at) or datetime.now(timezone.utc)).isoformat()
+    lane_specs = (
+        ("early_long_research", "Early Long Research", event_market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value),
+        ("confirmed_long_research", "Confirmed Long Research", event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value),
+        ("fade_short_review", "Fade / Short-Review", event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value),
+        ("risk_only", "Risk Only", event_market_reaction.EventOpportunityType.RISK_ONLY.value),
+        ("unconfirmed_research", "Unconfirmed Research", event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value),
+    )
+    out: list[dict[str, Any]] = []
+    for lane, title, opportunity_type in lane_specs:
+        lane_rows = [row for row in rows if row.get("opportunity_type") == opportunity_type]
+        message = _integrated_lane_message(
+            lane_rows,
+            lane_title=title,
+            context=context,
+            lane=lane,
+        )
+        out.append(_integrated_delivery_row(
+            lane=lane,
+            lane_title=title,
+            message_text=message,
+            rendered_rows=lane_rows,
+            skipped_rows=(),
+            core_by_id=core_by_id,
+            context=context,
+            run_id=run_id,
+            observed=observed,
+            send_guard_enabled=send_guard_enabled,
+        ))
+    diagnostics = [row for row in rows if row.get("opportunity_type") == event_market_reaction.EventOpportunityType.DIAGNOSTIC.value]
+    health_message = _integrated_lane_message(
+        (),
+        lane_title="Source / Provider Health",
+        context=context,
+        lane="source_provider_health",
+        extra_lines=(
+            "Lane-critical source priority: official exchange, derivatives/OI/funding, structured unlock/calendar, DEX/on-chain, protocol fundamentals, CryptoPanic tagged news, RSS/GDELT context.",
+            f"Diagnostic rows hidden from candidate lanes: {len(diagnostics)}",
+        ),
+    )
+    out.append(_integrated_delivery_row(
+        lane="source_provider_health",
+        lane_title="Source / Provider Health",
+        message_text=health_message,
+        rendered_rows=(),
+        skipped_rows=diagnostics,
+        core_by_id=core_by_id,
+        context=context,
+        run_id=run_id,
+        observed=observed,
+        send_guard_enabled=send_guard_enabled,
+    ))
+    return tuple(out)
+
+
+def format_integrated_notification_preview_from_deliveries(
+    delivery_rows: Iterable[Mapping[str, Any]],
+    *,
+    candidates: Iterable[Mapping[str, Any]] = (),
+    core_rows: Iterable[Mapping[str, Any]] = (),
+    context: event_alpha_artifacts.EventAlphaArtifactContext | None = None,
+) -> str:
+    deliveries = [dict(row) for row in delivery_rows if isinstance(row, Mapping)]
+    rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
+    due = sum(1 for row in deliveries if row.get("would_send"))
+    rendered = sum(_int(row.get("rendered_item_count")) for row in deliveries)
+    eligible = sum(_int(row.get("eligible_item_count")) for row in deliveries)
+    skipped = sum(_int(row.get("skipped_item_count")) for row in deliveries)
+    skip_reasons: Counter[str] = Counter()
+    for row in deliveries:
+        for item in row.get("skipped_items") or ():
+            if isinstance(item, Mapping):
+                skip_reasons[str(item.get("reason") or "unknown")] += 1
+    lines = [
+        "🧭 Event Alpha Integrated Radar Preview",
+        "Research-only / unvalidated. Not a trade signal.",
+        f"Profile: {context.profile if context else 'unknown'}",
+        f"Namespace: {context.artifact_namespace if context else 'unknown'}",
+        "No-send rehearsal: would send, but send guard is disabled.",
+        "This is expected in rehearsal mode. No Telegram delivery attempted.",
+        "",
+        "Summary:",
+        f"- Strict alerts: 0",
+        f"- Alertable decisions: 0",
+        f"- Research candidates: {len(rows)}",
+        f"- Raw source candidates: {len(rows)}",
+        f"- Canonical core opportunities: {len([row for row in core_rows if isinstance(row, Mapping)])}",
+        f"- Preview rendered items: {rendered}",
+        f"- Preview eligible items: {eligible}",
+        f"- Preview skipped items: {skipped}",
+        f"- Delivery lanes due/sent/blocked: {due}/0/{due}",
+        f"- Skip reasons: {_format_counts(skip_reasons) if skip_reasons else 'none'}",
+        "",
+    ]
+    for row in deliveries:
+        lines.append(f"## Lane: {row.get('lane_title') or row.get('lane')}")
+        lines.append(f"- status: {row.get('status')}")
+        lines.append(f"- would_send: {str(bool(row.get('would_send'))).lower()}")
+        lines.append(f"- rendered_items: {row.get('rendered_item_count')}")
+        lines.append(f"- skipped_items: {row.get('skipped_item_count')}")
+        if row.get("skipped_items"):
+            reasons = Counter(str(item.get("reason") or "unknown") for item in row.get("skipped_items") or () if isinstance(item, Mapping))
+            lines.append(f"- skip_reasons: {_format_counts(reasons)}")
+        lines.append("")
+        body = str(row.get("message_text") or "").strip()
+        if body:
+            lines.append(body)
+            lines.append("")
+    lines.append("This preview avoids the ambiguous raw 'Alerts' count; raw rows are shown as research candidates.")
+    return event_artifact_paths.scrub_absolute_paths_from_markdown("\n".join(lines).rstrip() + "\n")
+
+
 def format_integrated_notification_preview(
     candidates: Iterable[Mapping[str, Any]],
     *,
@@ -436,53 +656,150 @@ def format_integrated_notification_preview(
     context: event_alpha_artifacts.EventAlphaArtifactContext | None = None,
     max_review_items: int = 10,
 ) -> str:
-    rows = [dict(row) for row in candidates if isinstance(row, Mapping)]
-    review_rows = _review_candidates(rows)
-    rendered = review_rows[:max_review_items]
-    skipped = review_rows[max_review_items:]
-    skip_reasons = {"max_items": len(skipped)} if skipped else {}
-    lane_counts = Counter(str(row.get("opportunity_type") or "unknown") for row in rows)
+    del max_review_items
+    delivery_rows = build_integrated_notification_delivery_rows(
+        candidates,
+        core_rows=core_rows,
+        context=context,
+        run_id=None,
+        generated_at=datetime.now(timezone.utc),
+        send_guard_enabled=False,
+    )
+    return format_integrated_notification_preview_from_deliveries(
+        delivery_rows,
+        candidates=candidates,
+        core_rows=core_rows,
+        context=context,
+    )
+
+
+def _integrated_lane_message(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    lane_title: str,
+    context: event_alpha_artifacts.EventAlphaArtifactContext | None,
+    lane: str,
+    extra_lines: Iterable[str] = (),
+) -> str:
+    materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
     lines = [
-        "🧭 Event Alpha Integrated Radar Preview",
+        f"🧭 Event Alpha {lane_title}",
         "Research-only / unvalidated. Not a trade signal.",
         f"Profile: {context.profile if context else 'unknown'}",
-        f"Namespace: {context.artifact_namespace if context else 'unknown'}",
-        "No-send guard enabled in smoke. No Telegram delivery attempted.",
-        "",
-        "Summary:",
-        f"- Strict alerts: 0",
-        f"- Alertable decisions: 0",
-        f"- Research candidates: {len(rows)}",
-        f"- Raw source candidates: {len(rows)}",
-        f"- Rendered candidate items: {len(rendered)}",
-        f"- Eligible candidates: {len(review_rows)}",
-        f"- Skipped candidates: {len(skipped)}",
-        f"- Skip reasons: {_format_counts(skip_reasons) if skip_reasons else 'none'}",
+        f"Lane: {lane}",
+        f"Items: {len(materialized)}",
         "",
     ]
-    for title, lane in (
-        ("Early Long Research", event_market_reaction.EventOpportunityType.EARLY_LONG_RESEARCH.value),
-        ("Confirmed Long Research", event_market_reaction.EventOpportunityType.CONFIRMED_LONG_RESEARCH.value),
-        ("Fade / Short-Review", event_market_reaction.EventOpportunityType.FADE_SHORT_REVIEW.value),
-        ("Risk Only", event_market_reaction.EventOpportunityType.RISK_ONLY.value),
-        ("Unconfirmed Research", event_market_reaction.EventOpportunityType.UNCONFIRMED_RESEARCH.value),
-    ):
-        lines.append(f"{title} ({lane_counts.get(lane, 0)}):")
-        lane_rows = [row for row in rendered if row.get("opportunity_type") == lane]
-        if not lane_rows:
-            lines.append("- None.")
-        for row in lane_rows:
-            lines.append(
-                f"- {row.get('symbol')}/{row.get('coin_id')} · {row.get('why_now')} · "
-                f"state={row.get('market_state_class') or 'unknown'}"
-            )
-        lines.append("")
-    lines.extend([
-        "Source/Provider Health:",
-        "- Lane-critical source priority: official exchange, derivatives/OI/funding, structured unlock/calendar, DEX/on-chain, protocol fundamentals, CryptoPanic tagged news, RSS/GDELT context.",
-        "- This preview avoids the ambiguous raw 'Alerts' count; raw rows are shown as research candidates.",
-    ])
-    return "\n".join(lines).rstrip() + "\n"
+    if not materialized:
+        lines.append("- No candidate items in this lane.")
+    for index, row in enumerate(materialized, start=1):
+        card_path = _row_card_path(row)
+        lines.extend([
+            f"{index}. {row.get('symbol')}/{row.get('coin_id')}",
+            f"   Opportunity: {row.get('opportunity_type') or 'unknown'}",
+            f"   Why now: {row.get('why_now') or 'unknown'}",
+            f"   Evidence: {row.get('source_pack') or 'unknown'}; source={row.get('source_class') or 'unknown'}",
+            f"   Market state: {row.get('market_state_class') or 'unknown'}",
+            f"   What confirms: {_list_label(row.get('what_confirms') or ())}",
+            f"   What invalidates: {_list_label(row.get('what_invalidates') or ())}",
+            f"   Why not alertable: {_list_label(row.get('why_not_alertable') or ())}",
+            f"   Card: {card_path or 'none'}",
+            "",
+        ])
+    for extra in extra_lines:
+        text = str(extra or "").strip()
+        if text:
+            lines.append(f"- {text}")
+    return event_artifact_paths.scrub_absolute_paths_from_markdown("\n".join(lines).rstrip())
+
+
+def _integrated_delivery_row(
+    *,
+    lane: str,
+    lane_title: str,
+    message_text: str,
+    rendered_rows: Iterable[Mapping[str, Any]],
+    skipped_rows: Iterable[Mapping[str, Any]],
+    core_by_id: Mapping[str, Mapping[str, Any]],
+    context: event_alpha_artifacts.EventAlphaArtifactContext | None,
+    run_id: str | None,
+    observed: str,
+    send_guard_enabled: bool,
+) -> dict[str, Any]:
+    rendered = [dict(row) for row in rendered_rows if isinstance(row, Mapping)]
+    skipped = [dict(row) for row in skipped_rows if isinstance(row, Mapping)]
+    would_send = bool(rendered or lane == "source_provider_health")
+    status = (
+        "would_send_but_guard_disabled"
+        if would_send and not send_guard_enabled
+        else ("sent" if would_send and send_guard_enabled else "not_due")
+    )
+    card_paths = tuple(dict.fromkeys(path for row in rendered for path in (_row_card_path(row, core_by_id=core_by_id),) if path))
+    skipped_items = tuple(
+        {
+            "candidate_id": row.get("candidate_id"),
+            "core_opportunity_id": row.get("core_opportunity_id"),
+            "symbol": row.get("symbol"),
+            "coin_id": row.get("coin_id"),
+            "reason": "diagnostic_only_hidden_from_research_lanes",
+        }
+        for row in skipped
+    )
+    safe_text = event_artifact_paths.scrub_absolute_paths_from_markdown(message_text)
+    return {
+        "schema_version": 1,
+        "row_type": "event_integrated_radar_notification_delivery",
+        "run_id": run_id,
+        "profile": context.profile if context else "unknown",
+        "artifact_namespace": context.artifact_namespace if context else "unknown",
+        "run_mode": context.run_mode if context else "unknown",
+        "lane": lane,
+        "lane_title": lane_title,
+        "route": "INTEGRATED_RADAR_RESEARCH_PREVIEW",
+        "status": status,
+        "would_send": would_send,
+        "sent": False,
+        "send_guard_enabled": bool(send_guard_enabled),
+        "no_send_rehearsal": not send_guard_enabled,
+        "rendered_item_count": len(rendered),
+        "eligible_item_count": len(rendered),
+        "skipped_item_count": len(skipped),
+        "skipped_items": skipped_items,
+        "candidate_ids": tuple(str(row.get("candidate_id") or "") for row in rendered if row.get("candidate_id")),
+        "core_opportunity_ids": tuple(str(row.get("core_opportunity_id") or "") for row in rendered if row.get("core_opportunity_id")),
+        "canonical_symbols": tuple(str(row.get("symbol") or "") for row in rendered if row.get("symbol")),
+        "card_paths": card_paths,
+        "content_hash": hashlib.sha256(safe_text.encode("utf-8")).hexdigest(),
+        "message_text": safe_text,
+        "message_html": None,
+        "generated_at": observed,
+        "research_only": True,
+        "created_alert": False,
+        "normal_rsi_signal_written": False,
+        "triggered_fade_created": False,
+        "paper_trade_created": False,
+        "notification_send_attempted": False,
+        "telegram_send_attempted": False,
+    }
+
+
+def _row_card_path(
+    row: Mapping[str, Any],
+    *,
+    core_by_id: Mapping[str, Mapping[str, Any]] | None = None,
+) -> str:
+    for key in ("research_card_path", "card_path"):
+        value = row.get(key)
+        if value:
+            return event_artifact_paths.artifact_display_path(value)
+    if core_by_id:
+        core = core_by_id.get(str(row.get("core_opportunity_id") or ""))
+        if core:
+            for key in ("research_card_path", "card_path"):
+                value = core.get(key)
+                if value:
+                    return event_artifact_paths.artifact_display_path(value)
+    return ""
 
 
 def format_integrated_source_coverage(candidates: Iterable[Mapping[str, Any]]) -> str:
@@ -539,6 +856,14 @@ def format_integrated_source_coverage_json(
         ],
         "input_manifest": [dict(item) for item in input_manifest if isinstance(item, Mapping)],
     }
+
+
+def load_integrated_candidates(namespace_dir: str | Path) -> tuple[dict[str, Any], ...]:
+    return tuple(_read_jsonl(Path(namespace_dir) / INTEGRATED_CANDIDATES_FILENAME))
+
+
+def load_integrated_notification_deliveries(namespace_dir: str | Path) -> tuple[dict[str, Any], ...]:
+    return tuple(_read_jsonl(Path(namespace_dir) / INTEGRATED_DELIVERIES_FILENAME))
 
 
 def _run_or_load_sidecars(
@@ -1522,7 +1847,7 @@ def _manifest_item(
 ) -> dict[str, Any]:
     materialized = [dict(row) for row in rows if isinstance(row, Mapping)]
     artifact_paths = _sidecar_artifact_paths(namespace_dir, sidecar_name)
-    missing = [str(path) for path in artifact_paths if not path.exists()]
+    missing = [event_artifact_paths.artifact_display_path(path) for path in artifact_paths if not path.exists()]
     freshness = "fresh" if materialized else "missing"
     item_warnings = [str(warning) for warning in warnings if str(warning)]
     if missing and not materialized:
@@ -1530,7 +1855,8 @@ def _manifest_item(
     return {
         "sidecar_name": sidecar_name,
         "mode": mode,
-        "artifact_paths": [str(path) for path in artifact_paths],
+        "artifact_paths": [event_artifact_paths.artifact_display_path(path) for path in artifact_paths],
+        "artifact_relpaths": [event_artifact_paths.artifact_relpath(path) for path in artifact_paths],
         "row_counts": {"rows": len(materialized)},
         "provider_status": "configured" if configured else "not_configured",
         "configured": bool(configured),
@@ -1542,6 +1868,9 @@ def _manifest_item(
         "sidecar_wall_finished_at": wall_finished_at,
         "started_at": wall_started_at,
         "finished_at": wall_finished_at,
+        "wall_started_at": wall_started_at,
+        "wall_finished_at": wall_finished_at,
+        "research_observed_at": sidecar_research_observed_at,
     }
 
 
@@ -1571,7 +1900,10 @@ def _input_manifest_document(
         "errors": [error for item in rows for error in item.get("errors", ())],
         "started_at": wall_started_at,
         "finished_at": datetime.now(timezone.utc),
+        "wall_started_at": wall_started_at,
+        "wall_finished_at": datetime.now(timezone.utc),
         "research_observed_at": research_observed_at,
+        "generated_at": datetime.now(timezone.utc),
     }
 
 
@@ -1647,11 +1979,52 @@ def _format_counts(values: Mapping[str, int] | Counter[Any]) -> str:
     return ", ".join(f"{key}={value}" for key, value in sorted(items))
 
 
+def _list_label(values: Any, *, limit: int = 3) -> str:
+    if values in (None, "", [], (), {}):
+        return "none"
+    if isinstance(values, str):
+        return values
+    if isinstance(values, Mapping):
+        return ", ".join(f"{key}={value}" for key, value in list(values.items())[:limit]) or "none"
+    if isinstance(values, Iterable):
+        items = [str(item) for item in values if str(item)]
+        if not items:
+            return "none"
+        suffix = f"; +{len(items) - limit} more" if len(items) > limit else ""
+        return "; ".join(items[:limit]) + suffix
+    return str(values)
+
+
+def _artifact_has_absolute_operator_path(path: str | Path) -> bool:
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return event_artifact_paths.has_operator_absolute_path(text)
+
+
 def _write_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(_json_ready(dict(row)), sort_keys=True, separators=(",", ":")) + "\n")
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, Mapping):
+                rows.append(dict(value))
+    return rows
 
 
 def _write_json(path: Path, payload: Mapping[str, Any]) -> None:

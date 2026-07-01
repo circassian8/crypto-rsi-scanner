@@ -5,6 +5,40 @@ refresh watchlist rows, route research digests, write review artifacts, and
 export proposed eval cases. It must not trade, paper trade, write normal RSI
 signal rows, or let LLM/search/watchlist output create `TRIGGERED_FADE`.
 
+## Integrated Radar Artifact Review
+
+The integrated radar cycle merges sidecar evidence from market anomalies,
+official exchange announcements, scheduled/unlock catalysts, derivatives
+crowding, and fade-review rows into one portable operator artifact set. It is a
+local research surface only: generated delivery rows are no-send previews unless
+the explicit Telegram send guard is enabled outside tests.
+
+Useful commands:
+
+- `make event-alpha-integrated-radar-smoke PYTHON=python3`
+- `make event-alpha-integrated-radar-outcome-smoke PYTHON=python3`
+- `make event-alpha-integrated-radar-outcome-report PYTHON=python3`
+- `make event-alpha-integrated-radar-calibration-report PYTHON=python3`
+- `make event-alpha-integrated-radar-calibration-export-priors PYTHON=python3`
+
+The cycle writes portable review artifacts under the selected namespace,
+including:
+
+- `event_integrated_radar_candidates.jsonl`
+- `event_integrated_radar_notification_deliveries.jsonl`
+- `event_integrated_radar_notification_preview.md`
+- `event_integrated_radar_outcomes.jsonl`
+- `event_integrated_radar_outcome_report.md`
+- `event_integrated_radar_calibration_report.md`
+- `event_integrated_radar_calibration_priors.json`
+
+Rendered Markdown should use artifact-relative labels rather than absolute
+machine paths. Structured JSONL rows may keep relative path fields for tooling,
+but operator Markdown must not expose `/Users`, `/tmp`, `/mnt/data`, secrets,
+database paths, or other machine-local noise. The calibration priors export is
+advisory only: it does not update thresholds, send Telegram, create normal RSI
+rows, open paper/live trades, execute orders, or create `TRIGGERED_FADE`.
+
 ## Source Coverage And Evidence Plans
 
 Event Alpha now reports source registry and source-pack metadata in near-miss
