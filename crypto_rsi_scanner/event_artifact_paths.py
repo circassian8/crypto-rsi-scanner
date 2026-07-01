@@ -112,30 +112,20 @@ def normalize_operator_path_fields(
     Fields whose names end with ``debug_abs_suffix`` are left untouched. For
     other path-like fields, absolute paths are converted to repo/artifact
     relative labels and the original absolute value is preserved beside it as a
-    ``*_abs_debug`` field. Lists/tuples are normalized element-wise.
+    ``*_abs_debug`` field. Nested mappings and lists are normalized recursively,
+    so structured JSONL artifacts cannot leak machine-local paths in child
+    fields such as ``canonical_card_paths`` or ``research_card_paths``.
     """
     rel_names = set(rel_field_names or ())
-    out: dict[str, Any] = {}
-    debug_values: dict[str, Any] = {}
-    for key, value in dict(row).items():
-        key_text = str(key)
-        if key_text.endswith(debug_abs_suffix):
-            out[key_text] = value
-            continue
-        if _is_operator_path_field(key_text, rel_names=rel_names):
-            normalized, debug_value = _normalize_path_value(
-                value,
-                repo_root=repo_root,
-                artifact_base=artifact_base,
-            )
-            out[key_text] = normalized
-            if debug_value not in (None, "", [], ()):
-                debug_values.setdefault(f"{key_text}{debug_abs_suffix}", debug_value)
-        else:
-            out[key_text] = value
-    for key, value in debug_values.items():
-        out.setdefault(key, value)
-    return out
+    normalized, _debug_value = _normalize_operator_value(
+        dict(row),
+        key_name="",
+        rel_names=rel_names,
+        debug_abs_suffix=debug_abs_suffix,
+        repo_root=repo_root,
+        artifact_base=artifact_base,
+    )
+    return dict(normalized) if isinstance(normalized, Mapping) else dict(row)
 
 
 def _is_operator_path_field(key: str, *, rel_names: set[str]) -> bool:
@@ -144,7 +134,65 @@ def _is_operator_path_field(key: str, *, rel_names: set[str]) -> bool:
         return True
     if clean.endswith("_relpath") or clean.endswith("_relpaths"):
         return False
-    return clean.endswith("_path") or clean.endswith("_paths") or "card_path" in clean
+    return (
+        clean.endswith("_path")
+        or clean.endswith("_paths")
+        or clean.endswith("_dir")
+        or clean.endswith("_dirs")
+        or "card_path" in clean
+    )
+
+
+def _normalize_operator_value(
+    value: Any,
+    *,
+    key_name: str,
+    rel_names: set[str],
+    debug_abs_suffix: str,
+    repo_root: str | Path | None,
+    artifact_base: str | Path | None,
+) -> tuple[Any, Any]:
+    if key_name.endswith(debug_abs_suffix):
+        return value, None
+    if isinstance(value, Mapping):
+        out: dict[str, Any] = {}
+        debug_values: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            normalized, debug_value = _normalize_operator_value(
+                item,
+                key_name=key_text,
+                rel_names=rel_names,
+                debug_abs_suffix=debug_abs_suffix,
+                repo_root=repo_root,
+                artifact_base=artifact_base,
+            )
+            out[key_text] = normalized
+            if debug_value not in (None, "", [], ()):
+                debug_values.setdefault(f"{key_text}{debug_abs_suffix}", debug_value)
+        for key, debug_value in debug_values.items():
+            out.setdefault(key, debug_value)
+        return out, None
+    if isinstance(value, (list, tuple, set)):
+        normalized_items = []
+        debug_items = []
+        for item in value:
+            normalized, debug = _normalize_operator_value(
+                item,
+                key_name=key_name,
+                rel_names=rel_names,
+                debug_abs_suffix=debug_abs_suffix,
+                repo_root=repo_root,
+                artifact_base=artifact_base,
+            )
+            normalized_items.append(normalized)
+            if debug not in (None, "", [], ()):
+                debug_items.append(debug)
+        normalized_seq: Any = tuple(normalized_items) if isinstance(value, tuple) else list(normalized_items)
+        return normalized_seq, debug_items
+    if _is_operator_path_field(key_name, rel_names=rel_names):
+        return _normalize_path_value(value, repo_root=repo_root, artifact_base=artifact_base)
+    return value, None
 
 
 def _normalize_path_value(

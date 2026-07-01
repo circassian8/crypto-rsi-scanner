@@ -182,11 +182,15 @@ class EventAlphaArtifactDoctorResult:
     integrated_calibration_prior_safety_missing: int = 0
     integrated_outcome_return_double_scaled: int = 0
     integrated_outcome_missing_data_unlabeled: int = 0
+    integrated_outcome_thesis_move_missing: int = 0
+    integrated_outcome_card_thesis_interpretation_missing: int = 0
+    integrated_outcome_card_trade_wording: int = 0
     integrated_created_normal_rsi_signal: int = 0
     integrated_created_triggered_fade: int = 0
     source_coverage_report_missing: int = 0
     source_coverage_provider_status_unknown: int = 0
     source_coverage_provider_marked_healthy_without_observation: int = 0
+    source_coverage_category_priority_missing: int = 0
     source_coverage_context_provider_ranked_above_lane_critical: int = 0
     source_pack_provider_status_missing: int = 0
     missing_provider_recommendations_missing: int = 0
@@ -268,6 +272,7 @@ class EventAlphaArtifactDoctorResult:
     notification_preview_missing_send_guard_status: int = 0
     notification_preview_send_guard_status_missing: int = 0
     notification_preview_no_send_status_unclear: int = 0
+    notification_preview_legacy_alerts_wording: int = 0
     quality_fields_missing_count: int = 0
     hypothesis_rows_missing_opportunity_verdict: int = 0
     watchlist_rows_missing_quality_fields: int = 0
@@ -837,6 +842,39 @@ def diagnose_artifacts(
             )
         ),
     )
+    namespace_dir = _artifact_namespace_dir(
+        inspected_alert_store_path,
+        source_coverage_report_path,
+        daily_brief_path,
+        integrated_outcomes_path,
+    )
+    structured_path_conflicts = _structured_operator_path_conflicts(
+        (
+            *runs,
+            *alerts,
+            *feedback,
+            *outcomes,
+            *hypotheses,
+            *core_rows,
+            *watchlist,
+            *incidents,
+            *acquisition_rows,
+            *market_anomalies,
+            *official_exchange_candidates,
+            *scheduled_catalysts,
+            *unlock_candidates,
+            *derivatives_state,
+            *fade_review_candidates,
+            *integrated_candidates,
+            *delivery_rows,
+        )
+    )
+    if namespace_dir is not None:
+        structured_path_conflicts += _structured_operator_path_file_conflicts(namespace_dir)
+    integrated_conflicts["operator_structured_path_absolute"] = max(
+        int(integrated_conflicts.get("operator_structured_path_absolute", 0)),
+        int(structured_path_conflicts),
+    )
     source_coverage_conflicts = _source_coverage_metadata_conflicts((*core_rows, *acquisition_rows))
     source_coverage_report_conflicts = _source_coverage_report_conflicts(source_coverage_report_path)
     cryptopanic_conflicts = _cryptopanic_artifact_conflicts(
@@ -1195,6 +1233,9 @@ def diagnose_artifacts(
         "integrated_calibration_prior_safety_missing",
         "integrated_outcome_return_double_scaled",
         "integrated_outcome_missing_data_unlabeled",
+        "integrated_outcome_thesis_move_missing",
+        "integrated_outcome_card_thesis_interpretation_missing",
+        "integrated_outcome_card_trade_wording",
         "integrated_created_normal_rsi_signal",
         "integrated_created_triggered_fade",
     ):
@@ -1218,6 +1259,11 @@ def diagnose_artifacts(
             f"{source_coverage_report_conflicts['source_coverage_provider_marked_healthy_without_observation']}"
         )
         (blockers if strict else warnings).append(message)
+    if source_coverage_report_conflicts["source_coverage_category_priority_missing"]:
+        warnings.append(
+            "source_coverage_category_priority_missing="
+            f"{source_coverage_report_conflicts['source_coverage_category_priority_missing']}"
+        )
     if source_coverage_report_conflicts["source_coverage_context_provider_ranked_above_lane_critical"]:
         message = (
             "source_coverage_context_provider_ranked_above_lane_critical="
@@ -1560,6 +1606,12 @@ def diagnose_artifacts(
             f"{preview_conflicts['notification_preview_no_send_status_unclear']}"
         )
         (blockers if strict else warnings).append(message)
+    if preview_conflicts["notification_preview_legacy_alerts_wording"]:
+        message = (
+            "notification_preview_legacy_alerts_wording="
+            f"{preview_conflicts['notification_preview_legacy_alerts_wording']}"
+        )
+        (blockers if strict else warnings).append(message)
     if delivery_conflicts["stale_delivery_identity_missing_core"]:
         warnings.append(
             "stale_delivery_identity_missing_core="
@@ -1897,11 +1949,19 @@ def diagnose_artifacts(
         integrated_calibration_prior_safety_missing=integrated_conflicts["integrated_calibration_prior_safety_missing"],
         integrated_outcome_return_double_scaled=integrated_conflicts["integrated_outcome_return_double_scaled"],
         integrated_outcome_missing_data_unlabeled=integrated_conflicts["integrated_outcome_missing_data_unlabeled"],
+        integrated_outcome_thesis_move_missing=integrated_conflicts["integrated_outcome_thesis_move_missing"],
+        integrated_outcome_card_thesis_interpretation_missing=integrated_conflicts[
+            "integrated_outcome_card_thesis_interpretation_missing"
+        ],
+        integrated_outcome_card_trade_wording=integrated_conflicts["integrated_outcome_card_trade_wording"],
         integrated_created_normal_rsi_signal=integrated_conflicts["integrated_created_normal_rsi_signal"],
         integrated_created_triggered_fade=integrated_conflicts["integrated_created_triggered_fade"],
         source_coverage_report_missing=source_coverage_report_conflicts["source_coverage_report_missing"],
         source_coverage_provider_status_unknown=source_coverage_report_conflicts["source_coverage_provider_status_unknown"],
         source_coverage_provider_marked_healthy_without_observation=source_coverage_report_conflicts["source_coverage_provider_marked_healthy_without_observation"],
+        source_coverage_category_priority_missing=source_coverage_report_conflicts[
+            "source_coverage_category_priority_missing"
+        ],
         source_coverage_context_provider_ranked_above_lane_critical=source_coverage_report_conflicts[
             "source_coverage_context_provider_ranked_above_lane_critical"
         ],
@@ -1989,6 +2049,7 @@ def diagnose_artifacts(
         notification_preview_missing_send_guard_status=preview_conflicts["notification_preview_missing_send_guard_status"],
         notification_preview_send_guard_status_missing=preview_conflicts["notification_preview_send_guard_status_missing"],
         notification_preview_no_send_status_unclear=preview_conflicts["notification_preview_no_send_status_unclear"],
+        notification_preview_legacy_alerts_wording=preview_conflicts["notification_preview_legacy_alerts_wording"],
         quality_fields_missing_count=quality["quality_fields_missing_count"],
         hypothesis_rows_missing_opportunity_verdict=quality["hypothesis_rows_missing_opportunity_verdict"],
         watchlist_rows_missing_quality_fields=quality["watchlist_rows_missing_quality_fields"],
@@ -3118,6 +3179,9 @@ def _integrated_radar_artifact_conflicts(
         "integrated_calibration_prior_safety_missing": 0,
         "integrated_outcome_return_double_scaled": 0,
         "integrated_outcome_missing_data_unlabeled": 0,
+        "integrated_outcome_thesis_move_missing": 0,
+        "integrated_outcome_card_thesis_interpretation_missing": 0,
+        "integrated_outcome_card_trade_wording": 0,
         "integrated_created_normal_rsi_signal": 0,
         "integrated_created_triggered_fade": 0,
     }
@@ -3307,6 +3371,7 @@ def _integrated_outcome_conflicts(
         "integrated_outcome_diagnostic_in_performance": 0,
         "integrated_outcome_return_double_scaled": 0,
         "integrated_outcome_missing_data_unlabeled": 0,
+        "integrated_outcome_thesis_move_missing": 0,
     }
     outcome_rows = [dict(row) for row in outcomes if isinstance(row, Mapping)]
     outcome_by_candidate = {str(row.get("candidate_id") or ""): row for row in outcome_rows if row.get("candidate_id")}
@@ -3345,11 +3410,34 @@ def _integrated_outcome_conflicts(
                 if not isinstance(row.get(key), Mapping):
                     out["integrated_outcome_schema_missing"] += 1
                     break
+            thesis_required_mappings = (
+                "thesis_return_by_horizon",
+                "thesis_relative_return_vs_btc_by_horizon",
+                "thesis_favorable_excursion_by_window",
+                "thesis_adverse_excursion_by_window",
+            )
+            for key in thesis_required_mappings:
+                if not isinstance(row.get(key), Mapping):
+                    out["integrated_outcome_schema_missing"] += 1
+                    break
+            if not str(row.get("thesis_direction") or "").strip() or not str(
+                row.get("thesis_outcome_interpretation") or ""
+            ).strip():
+                out["integrated_outcome_schema_missing"] += 1
             if not (
                 row.get("benchmark_btc_price_at_observation") is not None
                 or row.get("benchmark_eth_price_at_observation") is not None
             ):
                 out["integrated_outcome_schema_missing"] += 1
+        lane = str(row.get("opportunity_type") or "").upper()
+        label = str(row.get("outcome_label") or "")
+        thesis_primary = _safe_float(row.get("thesis_primary_move"))
+        if lane == "FADE_SHORT_REVIEW" and label in {"fade_review_good", "useful"}:
+            if thesis_primary is None or thesis_primary <= 0:
+                out["integrated_outcome_thesis_move_missing"] += 1
+        if lane == "RISK_ONLY" and label in {"risk_validated", "useful"}:
+            if thesis_primary is None or thesis_primary <= 0:
+                out["integrated_outcome_thesis_move_missing"] += 1
         if any(isinstance(value, (int, float)) and abs(float(value)) > 5.0 for value in returns):
             out["integrated_outcome_return_double_scaled"] += 1
         if str(row.get("outcome_status") or "") == "missing_data" and not row.get("missing_data_reason"):
@@ -3411,8 +3499,46 @@ def _structured_operator_path_conflicts(rows: Iterable[Mapping[str, Any]]) -> in
     return conflicts
 
 
+def _structured_operator_path_file_conflicts(namespace_dir: str | Path) -> int:
+    base = Path(namespace_dir)
+    if not base.exists() or not base.is_dir():
+        return 0
+    conflicts = 0
+    for path in sorted((*base.glob("*.json"), *base.glob("*.jsonl"))):
+        if path.name.startswith("."):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if path.suffix == ".jsonl":
+            for line in text.splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    payload = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                conflicts += _structured_operator_path_conflict_count(payload)
+            continue
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        conflicts += _structured_operator_path_conflict_count(payload)
+    return conflicts
+
+
+def _artifact_namespace_dir(*paths: str | Path | None) -> Path | None:
+    for path in paths:
+        if path in (None, ""):
+            continue
+        return Path(path).expanduser().parent
+    return None
+
+
 def _structured_operator_path_conflict_count(value: Any, *, key_name: str = "") -> int:
-    if key_name.endswith("_abs_debug"):
+    if _operator_structured_path_debug_field(key_name):
         return 0
     if isinstance(value, Mapping):
         return sum(
@@ -3421,9 +3547,28 @@ def _structured_operator_path_conflict_count(value: Any, *, key_name: str = "") 
         )
     if isinstance(value, (list, tuple, set)):
         return sum(_structured_operator_path_conflict_count(item, key_name=key_name) for item in value)
-    if key_name and "path" in key_name.casefold() and event_artifact_paths.has_operator_absolute_path(value):
+    if _operator_structured_path_field(key_name) and event_artifact_paths.has_operator_absolute_path(value):
         return 1
     return 0
+
+
+def _operator_structured_path_debug_field(key_name: str) -> bool:
+    return str(key_name or "").casefold().endswith("_abs_debug")
+
+
+def _operator_structured_path_field(key_name: str) -> bool:
+    clean = str(key_name or "").casefold()
+    if not clean or _operator_structured_path_debug_field(clean):
+        return False
+    if clean.endswith("_relpath") or clean.endswith("_relpaths"):
+        return False
+    return (
+        clean.endswith("_path")
+        or clean.endswith("_paths")
+        or clean.endswith("_dir")
+        or clean.endswith("_dirs")
+        or "card_path" in clean
+    )
 
 
 def _integrated_candidate_core_card_conflicts(
@@ -3508,6 +3653,21 @@ def _integrated_candidate_core_card_conflicts(
             out["integrated_fade_card_crowding_unknown"] += 1
         if "Derivatives crowding: n/a" in card_text or "Derivatives crowding: not available" in card_text:
             out["integrated_derivatives_display_contradiction"] += 1
+    if str(candidate_lane).upper() in {"FADE_SHORT_REVIEW", "RISK_ONLY"}:
+        outcome_section = _markdown_section(card_text, "Outcome Tracking")
+        if outcome_section and (
+            "Thesis-favorable move:" not in outcome_section
+            or "Thesis interpretation:" not in outcome_section
+        ):
+            out["integrated_outcome_card_thesis_interpretation_missing"] += 1
+        lower_outcome = outcome_section.casefold()
+        if (
+            "profit" in lower_outcome
+            or "entry" in lower_outcome
+            or "position" in lower_outcome
+            or ("pnl" in lower_outcome and "not pnl" not in lower_outcome)
+        ):
+            out["integrated_outcome_card_trade_wording"] += 1
     if str(candidate_lane).upper() == "CONFIRMED_LONG_RESEARCH":
         if "confirmed_long_derivatives_crowding_warning" in _tuple_value(candidate.get("warnings")) and "confirmed_long_derivatives_crowding_warning" not in card_text:
             out["integrated_confirmed_long_crowding_warning_hidden"] += 1
@@ -3554,6 +3714,18 @@ def _markdown_bullet_value(text: str, label: str, *, section: str | None = None)
     pattern = re.compile(rf"^\s*-\s*{re.escape(label)}:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
     match = pattern.search(body)
     return match.group(1).strip() if match else None
+
+
+def _markdown_section(text: str, section: str) -> str:
+    marker = f"## {section}"
+    idx = text.find(marker)
+    if idx < 0:
+        return ""
+    body = text[idx + len(marker):]
+    next_section = body.find("\n## ")
+    if next_section >= 0:
+        body = body[:next_section]
+    return body.strip()
 
 
 def _integrated_manifest_mixed_timestamp_pairs(path: str | Path) -> int:
@@ -3809,6 +3981,7 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         "source_coverage_report_missing": 0,
         "source_coverage_provider_status_unknown": 0,
         "source_coverage_provider_marked_healthy_without_observation": 0,
+        "source_coverage_category_priority_missing": 0,
         "source_coverage_context_provider_ranked_above_lane_critical": 0,
     }
     if path is None:
@@ -3843,6 +4016,26 @@ def _source_coverage_report_conflicts(path: str | Path | None) -> dict[str, int]
         unknown = set(_split_provider_line(unknown_line))
         if healthy & unknown:
             out["source_coverage_provider_marked_healthy_without_observation"] += len(healthy & unknown)
+    if "Most useful next data source categories:" not in text:
+        out["source_coverage_category_priority_missing"] = 1
+    else:
+        category_section = text.split("Most useful next data source categories:", 1)[1]
+        category_section = category_section.split("Most useful next data source:", 1)[0]
+        category_lower = category_section.casefold()
+        context_pos = min(
+            (pos for token in ("context/news", "cryptopanic", "rss", "gdelt") if (pos := category_lower.find(token)) >= 0),
+            default=-1,
+        )
+        critical_pos = min(
+            (
+                pos
+                for token in ("derivatives/oi/funding", "official exchange announcements", "structured unlock/calendar")
+                if (pos := category_lower.find(token)) >= 0
+            ),
+            default=-1,
+        )
+        if context_pos >= 0 and critical_pos >= 0 and context_pos < critical_pos:
+            out["source_coverage_context_provider_ranked_above_lane_critical"] = 1
     if "Most useful next data source:" in text:
         top_section = text.split("Most useful next data source:", 1)[1]
         ranked = [line.strip() for line in top_section.splitlines() if line.strip().startswith("- ")][:5]
@@ -4592,6 +4785,7 @@ def _notification_preview_consistency_conflicts(
         "notification_preview_missing_send_guard_status": 0,
         "notification_preview_send_guard_status_missing": 0,
         "notification_preview_no_send_status_unclear": 0,
+        "notification_preview_legacy_alerts_wording": 0,
     }
     if not latest_run:
         return out
@@ -4603,6 +4797,8 @@ def _notification_preview_consistency_conflicts(
     except OSError:
         return out
     summary = _parse_notification_preview_summary(text)
+    if _notification_preview_legacy_alerts_wording(text, latest_run=latest_run):
+        out["notification_preview_legacy_alerts_wording"] += 1
     if not summary:
         return out
     if "completed" in summary:
@@ -4652,6 +4848,19 @@ def _notification_preview_consistency_conflicts(
     ):
         out["notification_preview_no_send_status_unclear"] += 1
     return out
+
+
+def _notification_preview_legacy_alerts_wording(text: str, *, latest_run: Mapping[str, Any] | None) -> bool:
+    strict_alerts = _as_int((latest_run or {}).get("alerts"))
+    bodies = "\n".join(_telegram_preview_bodies(text)) or text
+    if strict_alerts > 0:
+        return False
+    return bool(
+        re.search(
+            r"(?im)^Alertable decisions:\s*\d+\s*(?:·|-|\|)\s*Alerts:\s*[1-9]\d*\b",
+            bodies,
+        )
+    )
 
 
 def _latest_preview_path(
@@ -5577,11 +5786,16 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"integrated_calibration_prior_safety_missing={result.integrated_calibration_prior_safety_missing} "
             f"integrated_outcome_return_double_scaled={result.integrated_outcome_return_double_scaled} "
             f"integrated_outcome_missing_data_unlabeled={result.integrated_outcome_missing_data_unlabeled} "
+            f"integrated_outcome_thesis_move_missing={result.integrated_outcome_thesis_move_missing} "
+            "integrated_outcome_card_thesis_interpretation_missing="
+            f"{result.integrated_outcome_card_thesis_interpretation_missing} "
+            f"integrated_outcome_card_trade_wording={result.integrated_outcome_card_trade_wording} "
             f"integrated_created_normal_rsi_signal={result.integrated_created_normal_rsi_signal} "
             f"integrated_created_triggered_fade={result.integrated_created_triggered_fade} "
             f"source_coverage_report_missing={result.source_coverage_report_missing} "
             f"source_coverage_provider_status_unknown={result.source_coverage_provider_status_unknown} "
             f"source_coverage_provider_marked_healthy_without_observation={result.source_coverage_provider_marked_healthy_without_observation} "
+            f"source_coverage_category_priority_missing={result.source_coverage_category_priority_missing} "
             f"source_coverage_context_provider_ranked_above_lane_critical={result.source_coverage_context_provider_ranked_above_lane_critical} "
             f"source_pack_provider_status_missing={result.source_pack_provider_status_missing} "
             f"missing_provider_recommendations_missing={result.missing_provider_recommendations_missing} "
@@ -5657,6 +5871,7 @@ def format_artifact_doctor_report(result: EventAlphaArtifactDoctorResult) -> str
             f"preview_missing_send_guard={result.notification_preview_missing_send_guard_status} "
             f"preview_send_guard_missing={result.notification_preview_send_guard_status_missing} "
             f"preview_no_send_unclear={result.notification_preview_no_send_status_unclear} "
+            f"preview_legacy_alerts_wording={result.notification_preview_legacy_alerts_wording} "
             f"raw_debug_dump={result.telegram_message_contains_raw_debug_dump} "
             f"absolute_path={result.telegram_message_contains_absolute_path} "
             f"research_review_missing_label={result.research_review_digest_missing_confirmation_label} "

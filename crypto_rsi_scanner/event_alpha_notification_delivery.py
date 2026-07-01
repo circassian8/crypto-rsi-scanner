@@ -152,6 +152,20 @@ class NotificationDeliveryRecord:
     channel_summary: dict[str, Any] = field(default_factory=dict)
 
     def to_row(self) -> dict[str, Any]:
+        status_value = self.status_detail or self.delivery_state
+        if not status_value and self.would_send and self.send_guard_enabled is False:
+            status_value = "would_send_but_guard_disabled"
+        if not status_value:
+            status_value = self.state
+        if not status_value:
+            if self.sent:
+                status_value = DELIVERY_STATE_SENT
+            elif self.failed:
+                status_value = DELIVERY_STATE_FAILED
+            elif self.would_send:
+                status_value = DELIVERY_STATE_PREVIEW
+            else:
+                status_value = "not_due"
         row = {
             "schema_version": DELIVERY_SCHEMA_VERSION,
             "row_type": "event_alpha_notification_delivery",
@@ -183,9 +197,10 @@ class NotificationDeliveryRecord:
             "identity_reconciliation_reason": self.identity_reconciliation_reason,
             "notification_preview_path": self.notification_preview_path,
             "notification_preview_relpath": self.notification_preview_relpath,
+            "status": status_value,
             "delivery_mode": self.delivery_mode,
             "delivery_state": self.delivery_state,
-            "status_detail": self.status_detail,
+            "status_detail": status_value,
             "send_guard_enabled": self.send_guard_enabled,
             "would_send": self.would_send,
             "sent": self.sent,

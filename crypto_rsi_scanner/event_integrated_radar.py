@@ -22,6 +22,7 @@ from . import (
     event_alpha_artifacts,
     event_alpha_run_ledger,
     event_alpha_router,
+    event_alpha_source_coverage,
     event_core_opportunity_store,
     event_derivatives_crowding,
     event_market_anomaly_scanner,
@@ -849,6 +850,18 @@ def format_integrated_source_coverage(candidates: Iterable[Mapping[str, Any]]) -
     ]
     for pack, count in source_counts.most_common():
         lines.append(f"- {pack}: {count}")
+    lines.extend(["", "Most useful next data source categories:"])
+    for idx, category in enumerate(event_alpha_source_coverage.SOURCE_COVERAGE_CATEGORY_PRIORITIES, start=1):
+        providers = ", ".join(str(item) for item in category.get("providers") or ()) or "none"
+        lanes = ", ".join(str(item) for item in category.get("enabled_lanes") or ()) or "none"
+        lines.extend(
+            [
+                f"{idx}. {category.get('category')}",
+                f"   providers: {providers}",
+                f"   enables: {lanes}",
+                f"   reason: {category.get('reason') or 'none'}",
+            ]
+        )
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -869,6 +882,16 @@ def format_integrated_source_coverage_json(
         "candidate_count": len(rows),
         "lane_counts": dict(sorted(lane_counts.items())),
         "source_pack_counts": dict(source_counts.most_common()),
+        "category_priorities": [
+            {
+                "category_priority_rank": idx + 1,
+                "category": item.get("category"),
+                "providers": list(item.get("providers") or ()),
+                "enabled_lanes": list(item.get("enabled_lanes") or ()),
+                "reason": item.get("reason"),
+            }
+            for idx, item in enumerate(event_alpha_source_coverage.SOURCE_COVERAGE_CATEGORY_PRIORITIES)
+        ],
         "lane_critical_priority": [
             "official_exchange_announcements",
             "derivatives_oi_funding",

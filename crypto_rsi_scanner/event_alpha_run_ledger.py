@@ -133,7 +133,8 @@ def reconcile_cryptopanic_counts(
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("w", encoding="utf-8") as fh:
         for item in rows:
-            fh.write(json.dumps(_json_ready(item), sort_keys=True, separators=(",", ":")))
+            normalized = event_artifact_paths.normalize_operator_path_fields(item)
+            fh.write(json.dumps(_json_ready(normalized), sort_keys=True, separators=(",", ":")))
             fh.write("\n")
     return 1
 

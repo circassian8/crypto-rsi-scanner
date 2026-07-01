@@ -99,6 +99,46 @@ _COVERAGE_GAP_REASONS = {
 }
 
 
+SOURCE_COVERAGE_CATEGORY_PRIORITIES: tuple[dict[str, Any], ...] = (
+    {
+        "category": "Derivatives/OI/funding",
+        "providers": ("coinalyze",),
+        "enabled_lanes": ("FADE_SHORT_REVIEW", "CONFIRMED_LONG_RESEARCH", "perp_listing_squeeze_pack"),
+        "reason": "enables fade/short-review crowding checks and confirmed-long crowding warnings",
+    },
+    {
+        "category": "Official exchange announcements",
+        "providers": ("binance_announcements", "bybit_announcements", "okx_announcements", "coinbase"),
+        "enabled_lanes": ("EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH", "listing/perp/risk packs"),
+        "reason": "validates listing, perp, delisting, launchpool, and exchange-specific catalyst identity",
+    },
+    {
+        "category": "Structured unlock/calendar",
+        "providers": ("tokenomist", "messari_unlocks", "coinmarketcal"),
+        "enabled_lanes": ("RISK_ONLY", "EARLY_LONG_RESEARCH", "scheduled catalyst monitoring"),
+        "reason": "separates dated unlock/supply risk from generic news co-occurrence",
+    },
+    {
+        "category": "DEX/on-chain liquidity",
+        "providers": ("geckoterminal", "defillama"),
+        "enabled_lanes": ("market anomaly confirmation", "DEX-native moves"),
+        "reason": "confirms whether market anomalies have real DEX liquidity and turnover support",
+    },
+    {
+        "category": "Protocol fundamentals",
+        "providers": ("defillama", "project official metrics"),
+        "enabled_lanes": ("strategic investment", "protocol fundamentals", "risk review"),
+        "reason": "adds non-price context for protocol-specific catalysts",
+    },
+    {
+        "category": "Context/news",
+        "providers": ("cryptopanic", "rss", "gdelt"),
+        "enabled_lanes": ("research review", "contextual catalyst discovery"),
+        "reason": "discovers narratives, but cannot alone unlock strict confirmed lanes",
+    },
+)
+
+
 @dataclass(frozen=True)
 class EventAlphaSourceCoveragePack:
     source_pack: str
@@ -172,6 +212,7 @@ class EventAlphaSourceCoverageReport:
     cryptopanic_not_used_reason: str | None = None
     cryptopanic_coverage_status: str = "not_configured"
     cryptopanic_recommendation: str | None = None
+    category_priorities: tuple[Mapping[str, Any], ...] = SOURCE_COVERAGE_CATEGORY_PRIORITIES
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -197,6 +238,16 @@ class EventAlphaSourceCoverageReport:
             "cryptopanic_not_used_reason": self.cryptopanic_not_used_reason,
             "cryptopanic_coverage_status": self.cryptopanic_coverage_status,
             "cryptopanic_recommendation": self.cryptopanic_recommendation,
+            "category_priorities": [
+                {
+                    "category_priority_rank": idx + 1,
+                    "category": str(item.get("category") or ""),
+                    "providers": list(item.get("providers") or ()),
+                    "enabled_lanes": list(item.get("enabled_lanes") or ()),
+                    "reason": str(item.get("reason") or ""),
+                }
+                for idx, item in enumerate(self.category_priorities)
+            ],
             "packs": [pack.to_dict() for pack in self.packs],
         }
 
@@ -413,6 +464,14 @@ def format_source_coverage_report(report: EventAlphaSourceCoverageReport) -> str
                 f"  recommended actions: {_join(pack.recommended_actions)}",
             ]
         )
+    lines.extend(["", "Most useful next data source categories:"])
+    for idx, category in enumerate(report.category_priorities, start=1):
+        lines.extend([
+            f"{idx}. {category.get('category')}",
+            f"   providers: {_join(category.get('providers') or ())}",
+            f"   enables: {_join(category.get('enabled_lanes') or ())}",
+            f"   reason: {category.get('reason') or 'none'}",
+        ])
     recs = _recommendation_lines(report)
     lines.extend(["", "Most useful next data source:"])
     lines.extend(recs)

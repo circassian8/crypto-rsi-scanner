@@ -747,6 +747,12 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert report.cryptopanic_accepted_evidence == 1
     assert report.cryptopanic_rejected_evidence == 0
     assert report.cryptopanic_source_packs == ("security_shock_pack",)
+    payload = report.to_dict()
+    categories = payload["category_priorities"]
+    assert categories[0]["category"] == "Derivatives/OI/funding"
+    assert "coinalyze" in categories[0]["providers"]
+    assert categories[1]["category"] == "Official exchange announcements"
+    assert categories[-1]["category"] == "Context/news"
     by_pack = {pack.source_pack: pack for pack in report.packs}
     proxy = by_pack["proxy_preipo_rwa_pack"]
     security = by_pack["security_shock_pack"]
@@ -798,6 +804,9 @@ def test_event_alpha_source_coverage_report_groups_pack_provider_and_evidence_ga
     assert "evidence absence meaningful: false" in text
     assert "accepted=1" in text
     assert "article quality: good=1" in text
+    assert "Most useful next data source categories:" in text
+    assert "1. Derivatives/OI/funding" in text
+    assert "2. Official exchange announcements" in text
     assert "Most useful next data source:" in text
     assert event_alpha_source_coverage._provider_lane_priority("coinalyze") > event_alpha_source_coverage._provider_lane_priority("gdelt")  # noqa: SLF001
     assert event_alpha_source_coverage._provider_lane_priority("binance_announcements") > event_alpha_source_coverage._provider_lane_priority("project_blog_rss")  # noqa: SLF001
@@ -5331,6 +5340,24 @@ def test_event_alpha_artifact_context_and_doctor_filter_modes():
                 os.environ[key] = value
 
 
+def test_event_alpha_artifact_context_display_uses_relative_paths():
+    from pathlib import Path
+    from crypto_rsi_scanner import event_alpha_artifacts, scanner
+
+    context = event_alpha_artifacts.context_from_profile(
+        "fixture",
+        base_dir=Path("event_fade_cache").resolve(),
+        artifact_namespace="display_paths",
+    )
+    text = scanner._event_alpha_context_block(context)  # noqa: SLF001
+
+    assert "artifact context:" in text
+    assert "- run_ledger_path: event_fade_cache/display_paths/event_alpha_runs.jsonl" in text
+    assert "- research_cards_dir: event_fade_cache/display_paths/research_cards" in text
+    assert "/Users/" not in text
+    assert "/tmp/" not in text
+
+
 def test_event_alpha_report_context_and_preflight_are_profile_scoped():
     import contextlib
     import io
@@ -5426,7 +5453,8 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
             with contextlib.redirect_stdout(out):
                 scanner.event_alpha_artifact_doctor_report()
             text = out.getvalue()
-            assert f"{root}" in text
+            assert "- run_ledger_path: event_alpha_runs.jsonl" in text
+            assert str(root) not in text
             assert "rows: runs=1" in text
 
             no_key = base / "no_key_live"
@@ -5448,7 +5476,8 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
                 scanner.event_alpha_artifact_doctor_report(profile_name="no_key_live")
             text = out.getvalue()
             assert "event_fade_cache" not in text
-            assert f"{no_key / 'event_alpha_runs.jsonl'}" in text
+            assert "- run_ledger_path: event_alpha_runs.jsonl" in text
+            assert str(no_key / "event_alpha_runs.jsonl") not in text
             assert "rows: runs=1" in text
             assert "root-run" not in text
 
@@ -5471,9 +5500,10 @@ def test_event_alpha_report_context_and_preflight_are_profile_scoped():
                 scanner.event_alpha_artifact_doctor_report(
                     profile_name="no_key_live",
                     artifact_namespace="custom_ns",
-                )
+            )
             text = out.getvalue()
-            assert f"{custom / 'event_alpha_runs.jsonl'}" in text
+            assert "- run_ledger_path: event_alpha_runs.jsonl" in text
+            assert str(custom / "event_alpha_runs.jsonl") not in text
             assert "namespace: custom_ns" in text
 
             out = io.StringIO()
@@ -38808,6 +38838,14 @@ def test_integrated_radar_outcomes_and_calibration_are_research_only():
         assert by_symbol["TESTUNLOCK"]["outcome_label"] == "risk_validated"
         assert by_symbol["BTC"]["outcome_label"] == "remained_noise"
         assert by_symbol["TESTRUMOR"]["outcome_label"] == "remained_noise"
+        assert by_symbol["TESTFADE"]["primary_horizon_return"] < 0
+        assert by_symbol["TESTFADE"]["thesis_direction"] == "downside_or_risk_research"
+        assert by_symbol["TESTFADE"]["thesis_primary_move"] > 0
+        assert by_symbol["TESTFADE"]["thesis_favorable_excursion"] > 0
+        assert "asset fell" in by_symbol["TESTFADE"]["thesis_outcome_interpretation"]
+        assert by_symbol["TESTUNLOCK"]["primary_horizon_return"] < 0
+        assert by_symbol["TESTUNLOCK"]["thesis_direction"] == "downside_or_risk_research"
+        assert by_symbol["TESTUNLOCK"]["thesis_primary_move"] > 0
         assert all(row["research_only"] is True for row in rows)
         assert all(row["normal_rsi_signal_written"] is False for row in rows)
         assert all(row["triggered_fade_created"] is False for row in rows)
@@ -38815,9 +38853,19 @@ def test_integrated_radar_outcomes_and_calibration_are_research_only():
         report = (context.namespace_dir / "event_integrated_radar_outcome_report.md").read_text(encoding="utf-8")
         assert "Event Alpha Integrated Radar Outcome Report" in report
         assert "No trades or paper trades" in report
+        assert "Median asset primary return" in report
+        assert "Median thesis-favorable move" in report
         priors = json.loads((context.namespace_dir / "event_integrated_radar_calibration_priors.json").read_text(encoding="utf-8"))
         assert priors["auto_apply"] is False
         assert "EARLY_LONG_RESEARCH" in priors["opportunity_type_priors"]
+        assert "validated_count" in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
+        assert "invalidated_count" in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
+        assert "validation_rate" in priors["opportunity_type_priors"]["FADE_SHORT_REVIEW"]
+        calibration = (context.namespace_dir / "event_integrated_radar_calibration_report.md").read_text(encoding="utf-8")
+        assert "validated=" in calibration
+        assert "invalidated/noise=" in calibration
+        assert "validation_rate=" in calibration
+        assert " junk" not in calibration.casefold()
 
 
 def test_makefile_exposes_integrated_radar_target():
@@ -38923,6 +38971,9 @@ def test_integrated_doctor_catches_core_and_card_mismatches():
                 "- Crowding class: unknown",
                 "- Fade readiness: unknown",
                 "",
+                "## Outcome Tracking",
+                "- Asset primary return: -12.00%",
+                "",
                 "## Artifact Lineage",
                 "- Core opportunity ID: core-fade",
             ]),
@@ -38935,6 +38986,7 @@ def test_integrated_doctor_catches_core_and_card_mismatches():
         )
     assert fade_conflicts["integrated_fade_card_missing_disclaimer"] == 1
     assert fade_conflicts["integrated_fade_card_crowding_unknown"] == 1
+    assert fade_conflicts["integrated_outcome_card_thesis_interpretation_missing"] == 1
 
 
 def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
@@ -39043,6 +39095,151 @@ def test_integrated_doctor_catches_delivery_and_outcome_conflicts():
     assert conflicts["integrated_calibration_prior_safety_missing"] >= 1
     assert conflicts["integrated_outcome_return_double_scaled"] == 1
     assert conflicts["integrated_outcome_missing_data_unlabeled"] == 1
+
+
+def test_integrated_doctor_requires_thesis_interpretation_for_fade_and_risk_outcomes():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+
+    candidate = {
+        "row_type": "event_integrated_radar_candidate",
+        "candidate_id": "iar:fade",
+        "core_opportunity_id": "core-fade",
+        "symbol": "TESTFADE",
+        "coin_id": "testfade",
+        "opportunity_type": "FADE_SHORT_REVIEW",
+        "market_state_snapshot": {"market_state": "post_event_fade_setup"},
+        "market_state_class": "post_event_fade_setup",
+    }
+    missing_thesis = {
+        "row_type": "event_integrated_radar_outcome",
+        "candidate_id": "iar:fade",
+        "symbol": "TESTFADE",
+        "coin_id": "testfade",
+        "opportunity_type": "FADE_SHORT_REVIEW",
+        "outcome_label": "fade_review_good",
+        "outcome_status": "filled",
+        "primary_horizon_return": -0.12,
+        "thesis_primary_move": None,
+        "price_at_observation": 1.0,
+        "include_in_performance": True,
+        "no_trade_created": True,
+        "no_paper_trade_created": True,
+        "outcome_horizons": ["24h"],
+        "return_by_horizon": {"24h": -0.12},
+        "relative_return_vs_btc_by_horizon": {"24h": -0.14},
+        "relative_return_vs_eth_by_horizon": {"24h": -0.13},
+        "max_favorable_excursion_by_window": {"24h": -0.02},
+        "max_adverse_excursion_by_window": {"24h": -0.12},
+        "benchmark_btc_price_at_observation": 65000.0,
+    }
+
+    conflicts = event_alpha_artifact_doctor._integrated_outcome_conflicts(  # noqa: SLF001
+        [candidate],
+        [missing_thesis],
+    )
+
+    assert conflicts["integrated_outcome_thesis_move_missing"] == 1
+    assert conflicts["integrated_outcome_schema_missing"] >= 1
+
+
+def test_event_alpha_operator_path_fields_are_portable_and_debug_only_abs_allowed():
+    from crypto_rsi_scanner import event_alpha_artifact_doctor, event_artifact_paths
+
+    row = {
+        "research_cards_dir": "/Users/example/crypto-rsi-scanner/event_fade_cache/demo/research_cards",
+        "canonical_card_paths": [
+            "/Users/example/crypto-rsi-scanner/event_fade_cache/demo/research_cards/card_core_demo.md",
+        ],
+        "nested": {
+            "notification_preview_path": "/Users/example/crypto-rsi-scanner/event_fade_cache/demo/event_alpha_notification_preview.md",
+        },
+    }
+
+    normalized = event_artifact_paths.normalize_operator_path_fields(row)
+
+    assert normalized["research_cards_dir"] == "event_fade_cache/demo/research_cards"
+    assert normalized["research_cards_dir_abs_debug"].startswith("/Users/example/")
+    assert normalized["canonical_card_paths"] == ["event_fade_cache/demo/research_cards/card_core_demo.md"]
+    assert normalized["nested"]["notification_preview_path"] == "event_fade_cache/demo/event_alpha_notification_preview.md"
+    assert not event_artifact_paths.has_operator_absolute_path(normalized["research_cards_dir"])
+    assert event_alpha_artifact_doctor._structured_operator_path_conflicts([normalized]) == 0  # noqa: SLF001
+    assert event_alpha_artifact_doctor._structured_operator_path_conflicts([row]) >= 1  # noqa: SLF001
+
+
+def test_event_alpha_notification_delivery_status_fallback_and_legacy_preview_wording():
+    import json
+
+    from crypto_rsi_scanner import event_alpha_artifact_doctor
+    from crypto_rsi_scanner.event_alpha_notification_delivery import NotificationDeliveryRecord
+
+    record = NotificationDeliveryRecord(
+        delivery_id="delivery-1",
+        run_id="run-preview",
+        alert_id="heartbeat:run-preview",
+        profile="fixture",
+        namespace="preview_status",
+        lane="heartbeat",
+        route="heartbeat",
+        content_hash="hash-preview",
+        state="blocked",
+        delivery_state="",
+        status_detail="",
+        send_guard_enabled=False,
+        would_send=True,
+        sent=False,
+        failed=False,
+    )
+    row = record.to_row()
+    assert row["status"] == "would_send_but_guard_disabled"
+    assert row["status_detail"] == "would_send_but_guard_disabled"
+
+    with TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        preview = base / "event_alpha_notification_preview.md"
+        preview.write_text(
+            "\n".join([
+                "Completed: yes",
+                "Raw events: 1 · Core opportunities: 1",
+                "Alertable decisions: 0 · Alerts: 41",
+                "Extraction rows: 1",
+                "LLM calls/skips: 0/0",
+                "Delivery lanes: due=1 · sent=0",
+                "Send guard: no-send rehearsal",
+                "No-send rehearsal: would send, but send guard is disabled.",
+            ]),
+            encoding="utf-8",
+        )
+        deliveries = base / "event_alpha_notification_deliveries.jsonl"
+        row["notification_preview_path"] = str(preview)
+        row["notification_preview_relpath"] = str(preview)
+        deliveries.write_text(json.dumps(row) + "\n", encoding="utf-8")
+        result = event_alpha_artifact_doctor.diagnose_artifacts(
+            run_rows=[
+                {
+                    "row_type": "event_alpha_run",
+                    "run_id": "run-preview",
+                    "started_at": "2026-06-15T16:00:00+00:00",
+                    "profile": "fixture",
+                    "artifact_namespace": "preview_status",
+                    "run_mode": "test",
+                    "cycle_completed": True,
+                    "raw_events": 1,
+                    "extraction_rows": 1,
+                    "core_opportunity_rows_written": 1,
+                    "alertable": 0,
+                    "alerts": 0,
+                    "send_lane_items_attempted": {"heartbeat": 1},
+                    "send_lane_items_delivered": {"heartbeat": 0},
+                }
+            ],
+            delivery_rows=[row],
+            profile="fixture",
+            artifact_namespace="preview_status",
+            include_test_artifacts=True,
+            strict=True,
+        )
+    assert result.notification_preview_legacy_alerts_wording == 1
+    assert any("notification_preview_legacy_alerts_wording=1" in item for item in result.blockers)
 
 
 def test_event_alpha_heartbeat_uses_strict_alert_and_research_candidate_copy():

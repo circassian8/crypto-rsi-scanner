@@ -3008,6 +3008,13 @@ def _outcome_tracking_lines(outcome: Mapping[str, Any] | None) -> list[str]:
     if rel_btc in (None, ""):
         rel_btc = outcome.get("relative_return_vs_btc_24h")
     rel_eth = _outcome_horizon_value(outcome.get("relative_return_vs_eth_by_horizon"), primary_horizon)
+    thesis_rel_btc = _outcome_horizon_value(outcome.get("thesis_relative_return_vs_btc_by_horizon"), primary_horizon)
+    thesis_favorable = outcome.get("thesis_favorable_excursion")
+    thesis_adverse = outcome.get("thesis_adverse_excursion")
+    if thesis_favorable in (None, ""):
+        thesis_favorable = _outcome_horizon_value(outcome.get("thesis_favorable_excursion_by_window"), primary_horizon)
+    if thesis_adverse in (None, ""):
+        thesis_adverse = _outcome_horizon_value(outcome.get("thesis_adverse_excursion_by_window"), primary_horizon)
     mfe = outcome.get("mfe")
     mae = outcome.get("mae")
     if mfe in (None, ""):
@@ -3020,10 +3027,16 @@ def _outcome_tracking_lines(outcome: Mapping[str, Any] | None) -> list[str]:
         f"- Outcome status: {status}",
         f"- Outcome label: {outcome.get('outcome_label') or 'unknown'}",
         f"- Primary horizon: {primary_horizon}",
-        f"- Primary horizon return: {_display_pct(outcome.get('primary_horizon_return'))}",
-        f"- Relative return vs BTC: {_display_pct(rel_btc)}",
-        f"- Relative return vs ETH: {_display_pct(rel_eth)}",
-        f"- MFE / MAE: {_display_pct(mfe)} / {_display_pct(mae)}",
+        f"- Asset primary return: {_display_pct(outcome.get('primary_horizon_return'))}",
+        f"- Asset relative return vs BTC: {_display_pct(rel_btc)}",
+        f"- Asset relative return vs ETH: {_display_pct(rel_eth)}",
+        f"- Raw asset MFE / MAE: {_display_pct(mfe)} / {_display_pct(mae)}",
+        f"- Thesis direction: {outcome.get('thesis_direction') or 'unknown'}",
+        f"- Thesis-favorable move: {_display_pct(outcome.get('thesis_primary_move'))}",
+        f"- Thesis relative return vs BTC: {_display_pct(thesis_rel_btc)}",
+        f"- Thesis-favorable excursion: {_display_pct(thesis_favorable)}",
+        f"- Thesis-adverse excursion: {_display_pct(thesis_adverse)}",
+        f"- Thesis interpretation: {outcome.get('thesis_outcome_interpretation') or 'not available'}",
         f"- Time to peak / trough: {outcome.get('time_to_peak_hours') or outcome.get('time_to_peak') or 'unknown'} / {outcome.get('time_to_trough_hours') or outcome.get('time_to_trough') or 'unknown'}",
         f"- Catalyst confirmed after observation: {outcome.get('catalyst_confirmed_after_observation') or 'unknown'}",
         f"- Market confirmed after observation: {outcome.get('market_confirmed_after_observation') or 'unknown'}",

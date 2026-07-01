@@ -66,13 +66,26 @@ def format_integrated_radar_outcome_report(rows: Iterable[Mapping[str, Any]]) ->
     for lane in sorted(by_lane):
         lane_rows = by_lane[lane]
         returns = [float(row.get("primary_horizon_return") or 0.0) for row in lane_rows if row.get("outcome_status") == "filled"]
+        thesis_returns = [
+            float(row.get("thesis_primary_move") or 0.0)
+            for row in lane_rows
+            if row.get("outcome_status") == "filled" and row.get("thesis_primary_move") is not None
+        ]
+        thesis_favorable = [
+            float(row.get("thesis_favorable_excursion") or 0.0)
+            for row in lane_rows
+            if row.get("outcome_status") == "filled" and row.get("thesis_favorable_excursion") is not None
+        ]
         lines.append(f"### {lane}")
         lines.append(f"- Rows: {len(lane_rows)}")
-        lines.append(f"- Median primary return: {_pct(median(returns)) if returns else 'n/a'}")
+        lines.append(f"- Median asset primary return: {_pct(median(returns)) if returns else 'n/a'}")
+        lines.append(f"- Median thesis primary move: {_pct(median(thesis_returns)) if thesis_returns else 'n/a'}")
+        lines.append(f"- Median thesis-favorable move: {_pct(median(thesis_favorable)) if thesis_favorable else 'n/a'}")
         for row in lane_rows[:10]:
             lines.append(
                 f"- {row.get('symbol')}/{row.get('coin_id')} label={row.get('outcome_label')} "
-                f"primary={_pct(row.get('primary_horizon_return')) if row.get('primary_horizon_return') is not None else 'n/a'} "
+                f"asset={_pct(row.get('primary_horizon_return')) if row.get('primary_horizon_return') is not None else 'n/a'} "
+                f"thesis={_pct(row.get('thesis_primary_move')) if row.get('thesis_primary_move') is not None else 'n/a'} "
                 f"status={row.get('outcome_status')}"
             )
     if diagnostic_rows:
@@ -106,11 +119,22 @@ def format_integrated_radar_calibration_report(rows: Iterable[Mapping[str, Any]]
             groups[str(row.get(dimension) or "unknown")].append(row)
         for key in sorted(groups):
             group = groups[key]
-            useful = sum(1 for row in group if _truth_label(row) == "useful")
-            junk = sum(1 for row in group if _truth_label(row) == "junk")
+            validated = sum(1 for row in group if _validation_label(row) == "validated")
+            invalidated = sum(1 for row in group if _validation_label(row) == "invalidated/noise")
+            inconclusive = sum(1 for row in group if _validation_label(row) == "inconclusive")
             filled = sum(1 for row in group if row.get("outcome_status") == "filled")
-            rate = useful / max(1, useful + junk)
-            lines.append(f"- {key}: rows={len(group)} filled={filled} useful={useful} junk={junk} useful_rate={rate:.2f}")
+            rate = validated / max(1, validated + invalidated)
+            thesis_moves = [
+                float(row.get("thesis_favorable_excursion") or 0.0)
+                for row in group
+                if row.get("thesis_favorable_excursion") is not None
+            ]
+            median_thesis = _pct(median(thesis_moves)) if thesis_moves else "n/a"
+            lines.append(
+                f"- {key}: rows={len(group)} filled={filled} validated={validated} "
+                f"invalidated/noise={invalidated} inconclusive={inconclusive} "
+                f"validation_rate={rate:.2f} median_thesis_favorable_move={median_thesis}"
+            )
         lines.append("")
     lines.extend([
         "## Recommended Next Experiments",
@@ -131,13 +155,27 @@ def build_integrated_radar_calibration_priors(rows: Iterable[Mapping[str, Any]])
     priors = {}
     min_sample = 25
     for lane, lane_rows in groups.items():
-        useful = sum(1 for row in lane_rows if _truth_label(row) == "useful")
-        junk = sum(1 for row in lane_rows if _truth_label(row) == "junk")
+        validated = sum(1 for row in lane_rows if _validation_label(row) == "validated")
+        invalidated = sum(1 for row in lane_rows if _validation_label(row) == "invalidated/noise")
+        inconclusive = sum(1 for row in lane_rows if _validation_label(row) == "inconclusive")
+        useful = validated
+        junk = invalidated
         sample_size = len(lane_rows)
+        thesis_moves = [
+            float(row.get("thesis_favorable_excursion") or 0.0)
+            for row in lane_rows
+            if row.get("thesis_favorable_excursion") is not None
+        ]
         priors[lane] = {
             "sample_size": sample_size,
             "min_sample_size": min_sample,
             "min_sample_warning": sample_size < min_sample,
+            "validated_count": validated,
+            "invalidated_count": invalidated,
+            "invalidated_noise_count": invalidated,
+            "inconclusive_count": inconclusive,
+            "validation_rate": round(validated / max(1, validated + invalidated), 4),
+            "median_thesis_favorable_move": median(thesis_moves) if thesis_moves else None,
             "useful": useful,
             "junk": junk,
             "suggested_prior": round(useful / max(1, useful + junk), 4),
@@ -184,6 +222,16 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
     price = _price(candidate)
     status = "filled" if returns else "missing_data"
     missing_reason = None if returns else "no_cached_price_fixture"
+    relative_vs_btc = {
+        horizon: _relative_return(returns.get(horizon), btc_returns.get(horizon))
+        for horizon in HORIZONS
+    }
+    thesis_direction = _thesis_direction(lane)
+    thesis_returns = _thesis_returns(returns, lane)
+    thesis_relative_vs_btc = _thesis_returns(relative_vs_btc, lane)
+    thesis_favorable = _window_extremes(thesis_returns, want_peak=True)
+    thesis_adverse = _window_extremes(thesis_returns, want_peak=False)
+    thesis_primary = thesis_returns.get(primary_horizon)
     return {
         "schema_version": 1,
         "row_type": "event_integrated_radar_outcome",
@@ -208,10 +256,7 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "horizons": {horizon: returns.get(horizon) for horizon in HORIZONS},
         "outcome_horizons": list(HORIZONS),
         "return_by_horizon": {horizon: returns.get(horizon) for horizon in HORIZONS},
-        "relative_return_vs_btc_by_horizon": {
-            horizon: _relative_return(returns.get(horizon), btc_returns.get(horizon))
-            for horizon in HORIZONS
-        },
+        "relative_return_vs_btc_by_horizon": relative_vs_btc,
         "relative_return_vs_eth_by_horizon": {
             horizon: _relative_return(returns.get(horizon), eth_returns.get(horizon))
             for horizon in HORIZONS
@@ -227,6 +272,15 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "mae": min((value for key, value in returns.items() if key in HORIZONS and isinstance(value, (int, float))), default=None),
         "max_favorable_excursion_by_window": _window_extremes(returns, want_peak=True),
         "max_adverse_excursion_by_window": _window_extremes(returns, want_peak=False),
+        "thesis_direction": thesis_direction,
+        "thesis_primary_move": thesis_primary,
+        "thesis_return_by_horizon": thesis_returns,
+        "thesis_relative_return_vs_btc_by_horizon": thesis_relative_vs_btc,
+        "thesis_favorable_excursion_by_window": thesis_favorable,
+        "thesis_adverse_excursion_by_window": thesis_adverse,
+        "thesis_favorable_excursion": _best_mapping_value(thesis_favorable, want_peak=True),
+        "thesis_adverse_excursion": _best_mapping_value(thesis_adverse, want_peak=False),
+        "thesis_outcome_interpretation": _thesis_interpretation(lane, label, thesis_primary),
         "time_to_peak": _time_to_extreme(returns, want_peak=True),
         "time_to_trough": _time_to_extreme(returns, want_peak=False),
         "time_to_peak_hours": _time_to_extreme_hours(returns, want_peak=True),
@@ -235,7 +289,7 @@ def _outcome_row(candidate: Mapping[str, Any], *, now: str) -> dict[str, Any]:
         "market_confirmed_after_observation": _confirmed_after_observation(label, kind="market"),
         "market_confirmed": lane == "CONFIRMED_LONG_RESEARCH" and label in {"continuation_good", "useful"},
         "fade_confirmed": lane == "FADE_SHORT_REVIEW" and label in {"fade_review_good", "useful"},
-        "risk_validated": lane == "RISK_ONLY" and label == "useful",
+        "risk_validated": lane == "RISK_ONLY" and label in {"risk_validated", "useful"},
         "outcome_label": label,
         "outcome_status": status,
         "missing_data_reason": missing_reason,
@@ -261,6 +315,78 @@ def _fixture_returns(symbol: str, lane: str) -> dict[str, float]:
         "SECTOR": {"15m": 0.0, "1h": 0.0, "4h": 0.0, "24h": 0.0, "3d": 0.0, "7d": 0.0, "relative_vs_btc_24h": 0.0},
     }
     return dict(table.get(symbol.upper(), table.get("SECTOR" if lane == "DIAGNOSTIC" else "", {})))
+
+
+def _thesis_direction(lane: str) -> str:
+    return {
+        "EARLY_LONG_RESEARCH": "upside_research",
+        "CONFIRMED_LONG_RESEARCH": "upside_research",
+        "FADE_SHORT_REVIEW": "downside_or_risk_research",
+        "RISK_ONLY": "downside_or_risk_research",
+        "UNCONFIRMED_RESEARCH": "neutral_validation_research",
+        "DIAGNOSTIC": "diagnostic",
+    }.get(str(lane or "").upper(), "neutral_validation_research")
+
+
+def _thesis_multiplier(lane: str) -> float | None:
+    lane_upper = str(lane or "").upper()
+    if lane_upper in {"EARLY_LONG_RESEARCH", "CONFIRMED_LONG_RESEARCH"}:
+        return 1.0
+    if lane_upper in {"FADE_SHORT_REVIEW", "RISK_ONLY"}:
+        return -1.0
+    return None
+
+
+def _thesis_returns(values: Mapping[str, float | None], lane: str) -> dict[str, float | None]:
+    multiplier = _thesis_multiplier(lane)
+    out: dict[str, float | None] = {}
+    for horizon in HORIZONS:
+        value = values.get(horizon)
+        if multiplier is None or value is None:
+            out[horizon] = None
+            continue
+        try:
+            out[horizon] = float(value) * multiplier
+        except (TypeError, ValueError):
+            out[horizon] = None
+    return out
+
+
+def _best_mapping_value(values: Mapping[str, float | None], *, want_peak: bool) -> float | None:
+    numeric = [float(value) for value in values.values() if isinstance(value, (int, float))]
+    if not numeric:
+        return None
+    return max(numeric) if want_peak else min(numeric)
+
+
+def _thesis_interpretation(lane: str, label: str, thesis_primary: float | None) -> str:
+    direction = _thesis_direction(lane)
+    lane_upper = str(lane or "").upper()
+    if direction == "upside_research":
+        if thesis_primary is None:
+            return "long research thesis pending; no primary market outcome available"
+        return "validated long-research reaction" if thesis_primary > 0 else "not validated by primary market reaction"
+    if direction == "downside_or_risk_research" and lane_upper == "FADE_SHORT_REVIEW":
+        if thesis_primary is None:
+            return "fade-review thesis pending; no primary market outcome available"
+        return (
+            "validated fade-review thesis: asset fell after the crowded move"
+            if thesis_primary > 0
+            else "not validated: asset return did not favor the fade thesis"
+        )
+    if direction == "downside_or_risk_research":
+        if thesis_primary is None:
+            return "risk thesis pending; no primary market outcome available"
+        return (
+            "validated risk thesis: asset sold off in the evaluation window"
+            if thesis_primary > 0
+            else "not validated: asset did not sell off enough for the risk thesis"
+        )
+    if str(label or "") == "remained_noise":
+        return "neutral/noise validation: no directional research thesis scored"
+    if direction == "diagnostic":
+        return "diagnostic row excluded from performance calibration"
+    return "inconclusive research validation; no directional thesis scored"
 
 
 def _benchmark_returns(symbol: str) -> dict[str, float]:
@@ -358,6 +484,17 @@ def _truth_label(row: Mapping[str, Any]) -> str:
     if label in {"remained_noise", "diagnostic_only"}:
         return "junk"
     return "watch"
+
+
+def _validation_label(row: Mapping[str, Any]) -> str:
+    label = str(row.get("outcome_label") or "")
+    if label in {"useful", "early_good", "continuation_good", "fade_review_good", "risk_validated"}:
+        return "validated"
+    if label in {"junk", "remained_noise"}:
+        return "invalidated/noise"
+    if label == "diagnostic_only":
+        return "invalidated/noise"
+    return "inconclusive"
 
 
 def _time_to_extreme(values: Mapping[str, float], *, want_peak: bool) -> str | None:

@@ -17,6 +17,49 @@ deep reasoning can link to code. See `AGENTS.md` for the working agreement.
 
 ---
 
+## 2026-07-01 — Polish Event Alpha artifact portability and thesis outcomes · Codex
+**Why:** Event Alpha operator artifacts still had stale absolute paths in
+structured JSONL rows, ambiguous heartbeat alert wording, and raw asset
+outcome fields that were easy to misread for fade/risk research lanes.
+**Changes:**
+- Recursively normalized operator-facing structured artifact path fields,
+  preserving absolute originals only in explicit `*_abs_debug` fields, and made
+  artifact-context console paths relative by default.
+- Hardened notification delivery/run-ledger status and path rewrites so
+  would-send, blocked, preview, and delivery rows keep explicit portable state.
+- Split integrated outcome reporting into raw asset movement and
+  thesis-direction movement, with card/report/calibration wording based on
+  validated/invalidated/inconclusive research labels.
+- Added strict doctor checks for structured path leaks, legacy preview
+  `Alerts:` wording, source-coverage category priorities, and missing
+  thesis-direction outcome interpretation.
+- Added category-level source coverage priorities ahead of provider-level
+  recommendations, and aligned integrated source coverage output with the same
+  operator wording.
+**Verify:** `python3 -m compileall -q crypto_rsi_scanner tests`;
+`python3 tests/test_indicators.py` (648/648 passed);
+`make event-alpha-integrated-radar-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-doctor PYTHON=python3`;
+`make event-alpha-integrated-radar-outcome-smoke PYTHON=python3`;
+`make event-alpha-integrated-radar-outcome-report PYTHON=python3`;
+`make event-alpha-integrated-radar-calibration-report PYTHON=python3`;
+`make event-alpha-market-anomaly-smoke PYTHON=python3`;
+`make event-alpha-official-exchange-smoke PYTHON=python3`;
+`make event-alpha-scheduled-catalyst-smoke PYTHON=python3`;
+`make event-alpha-unlock-risk-smoke PYTHON=python3`;
+`make event-alpha-derivatives-smoke PYTHON=python3`;
+`make event-alpha-fade-review-smoke PYTHON=python3`;
+`make event-alpha-source-coverage-report PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-daily-brief PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal PYTHON=python3`;
+`make event-alpha-artifact-doctor PROFILE=notify_llm_deep ARTIFACT_NAMESPACE=notify_llm_deep_cryptopanic_rehearsal STRICT=1 PYTHON=python3`;
+`make event-alpha-notification-format-smoke PYTHON=python3`;
+`make event-alpha-telegram-no-send-final-check-fast PYTHON=python3`;
+`make verify PYTHON=python3`.
+**Notes/risks:** Repaired the local `notify_llm_deep_cryptopanic_rehearsal`
+run/delivery JSONL artifacts so the zip-bound artifact set passes the new
+strict path checks. No Telegram sends, normal RSI rows, paper/live trades,
+execution, or Event Alpha-created `TRIGGERED_FADE`.
+
 ## 2026-07-01 — Finish integrated radar artifact portability follow-up · Codex
 **Why:** The integrated radar artifact pass still needed a few final hardening
 fixes so operator JSON/Markdown stayed checkout-portable, research-card

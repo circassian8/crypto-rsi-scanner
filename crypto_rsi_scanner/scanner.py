@@ -118,6 +118,7 @@ from . import event_alpha_tuning
 from . import event_alpha_telegram_recipient_check
 from . import event_alpha_v1_readiness
 from . import event_alpha_environment_doctor
+from . import event_artifact_paths
 from . import event_source_reliability
 from . import event_catalyst_search
 from . import event_clock
@@ -1913,21 +1914,24 @@ def resolve_event_alpha_artifact_context_for_report(
 
 
 def _event_alpha_context_block(context: event_alpha_artifacts.EventAlphaArtifactContext) -> str:
+    def _display(path: Path) -> str:
+        return event_artifact_paths.artifact_display_path(path, artifact_base=context.namespace_dir)
+
     return "\n".join([
         "artifact context:",
         f"- profile: {context.profile}",
         f"- artifact_namespace: {context.artifact_namespace}",
         f"- run_mode: {context.run_mode}",
-        f"- run_ledger_path: {context.run_ledger_path}",
-        f"- alert_store_path: {context.alert_store_path}",
-        f"- notification_runs_path: {context.notification_runs_path}",
-        f"- feedback_path: {context.feedback_path}",
-        f"- provider_health_path: {context.provider_health_path}",
-        f"- impact_hypothesis_store_path: {context.impact_hypothesis_store_path}",
-        f"- core_opportunity_store_path: {context.core_opportunity_store_path}",
-        f"- incident_store_path: {context.incident_store_path}",
-        f"- evidence_acquisition_path: {context.evidence_acquisition_path}",
-        f"- research_cards_dir: {context.research_cards_dir}",
+        f"- run_ledger_path: {_display(context.run_ledger_path)}",
+        f"- alert_store_path: {_display(context.alert_store_path)}",
+        f"- notification_runs_path: {_display(context.notification_runs_path)}",
+        f"- feedback_path: {_display(context.feedback_path)}",
+        f"- provider_health_path: {_display(context.provider_health_path)}",
+        f"- impact_hypothesis_store_path: {_display(context.impact_hypothesis_store_path)}",
+        f"- core_opportunity_store_path: {_display(context.core_opportunity_store_path)}",
+        f"- incident_store_path: {_display(context.incident_store_path)}",
+        f"- evidence_acquisition_path: {_display(context.evidence_acquisition_path)}",
+        f"- research_cards_dir: {_display(context.research_cards_dir)}",
     ])
 
 
